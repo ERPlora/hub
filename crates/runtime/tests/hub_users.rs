@@ -70,6 +70,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
             // personal LOCAL.
             role: "employee".into(),
             pin: "4821".into(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -137,6 +138,7 @@ async fn resets_the_pin_and_clears_it_when_empty() {
             email: "ana@example.com".into(),
             role: "employee".into(),
             pin: String::new(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -177,6 +179,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "employee".into(),
             pin: String::new(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -189,6 +192,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "employee".into(),
             pin: "12".into(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -201,6 +205,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: "no-es-un-email".into(),
             role: "employee".into(),
             pin: String::new(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -213,6 +218,7 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
             email: String::new(),
             role: "  ".into(),
             pin: String::new(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -331,6 +337,7 @@ async fn a_module_reads_the_hub_users_through_the_dispatcher() {
         name: "Marta Ruiz".into(),
         role: "cashier".into(),
         pin: "4821".into(),
+        badge: String::new(),
         local: true,
         ..NewHubUser::default()
     })

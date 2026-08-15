@@ -90,6 +90,23 @@
               :error-text="pinError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
             />
+            <!-- **Placa** (hub#658): un campo que el LECTOR rellena y que sigue siendo tecleable —
+                 un iButton lleva el número grabado y no todo el mundo tiene el lector a mano. El
+                 lector no necesita que este campo tenga el foco: la ráfaga la caza el listener
+                 global del shell y aterriza aquí (el foro de Odoo es el archivo de por qué la
+                 captura por foco no vale). La placa NUNCA sustituye al PIN: vaciarla la revoca y el
+                 PIN sigue donde estaba. -->
+            <ion-input
+              v-model="form.badge"
+              :label="t('employeeForm.badge')"
+              label-placement="floating"
+              mode="md"
+              fill="outline"
+              autocomplete="off"
+              :maxlength="64"
+              :helper-text="badgeHelp"
+              :error-text="badgeError"
+            />
           </div>
 
           <!-- «Local user» (hub#355): nombre + PIN, sin email y sin nada en el SaaS. Solo en el
@@ -122,11 +139,23 @@
             type="button"
             fill="clear"
             size="small"
-            class="clear-pin"
+            class="clear-credential"
             :disabled="saving"
             @click="clearPin"
           >
             {{ t('employeeForm.clearPin') }}
+          </ion-button>
+
+          <ion-button
+            v-if="hasBadge"
+            type="button"
+            fill="clear"
+            size="small"
+            class="clear-credential"
+            :disabled="saving"
+            @click="clearBadge"
+          >
+            {{ t('employeeForm.clearBadge') }}
           </ion-button>
 
           <div class="form-actions">
@@ -145,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -172,6 +201,7 @@ import {
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
+import { onBadgeScan } from '../lib/badge-scanner';
 import { toast } from '../lib/toast';
 
 const { t } = useI18n();
@@ -184,6 +214,7 @@ const form = reactive({
   email: '',
   role: 'employee',
   pin: '',
+  badge: '',
   isActive: true,
   /** Casilla «Local user» (hub#355). Solo cuenta en el alta; una ficha existente no la usa. */
   local: false,
@@ -192,6 +223,7 @@ const form = reactive({
 const roles = ref<HubRole[]>([]);
 const users = ref<HubUser[]>([]);
 const hasPin = ref(false);
+const hasBadge = ref(false);
 const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
@@ -252,6 +284,15 @@ const pinError = computed(() => {
   const issue = issueOn(PIN_ISSUES);
   return issue ? t(`employeeForm.errors.${issue}`) : '';
 });
+const BADGE_SHAPE = /^[A-Za-z0-9\-_]{4,64}$/;
+const badgeError = computed(() =>
+  form.badge.trim() && !BADGE_SHAPE.test(form.badge.trim())
+    ? t('employeeForm.errors.badge_shape')
+    : '',
+);
+const badgeHelp = computed(() =>
+  hasBadge.value ? t('employeeForm.badgeSetHelp') : t('employeeForm.badgeHelp'),
+);
 const pinHelp = computed(() => {
   if (isLocal.value) return t('employeeForm.localPinHelp');
   if (hasPin.value) return t('employeeForm.pinSetHelp');
@@ -259,7 +300,7 @@ const pinHelp = computed(() => {
   return isEdit.value ? t('employeeForm.pinHelp') : t('employeeForm.accountPinHelp');
 });
 const canSubmit = computed(
-  () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value,
+  () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value && !badgeError.value,
 );
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
@@ -290,11 +331,13 @@ async function load(): Promise<void> {
       const target = users.value.find((u) => u.id === id);
       if (!target) throw new Error(t('employeeForm.notFound'));
       hasPin.value = target.has_pin;
+      hasBadge.value = target.has_badge === true;
       Object.assign(form, {
         name: target.name,
         email: target.email,
         role: target.role,
         pin: '',
+        badge: '',
         isActive: target.is_active,
       });
       initial = {
@@ -319,6 +362,18 @@ function clearPin(): void {
   dirty.value = true;
 }
 
+/**
+ * **Revoca la placa, y solo la placa** (hub#658). El PIN no se toca: perder la tarjeta no puede
+ * dejar a nadie fuera, y volver a solo-PIN tiene que poder hacerse siempre. El caso Lightspeed
+ * L-Series —tarjeta irrevocable, sin recuperación documentada, producto descatalogado— es por qué
+ * este botón existe.
+ */
+function clearBadge(): void {
+  form.badge = '';
+  hasBadge.value = false;
+  dirty.value = true;
+}
+
 async function onSave(): Promise<void> {
   submitted.value = true;
   if (!canSubmit.value) return;
@@ -327,6 +382,7 @@ async function onSave(): Promise<void> {
   const name = form.name.trim();
   const email = form.email.trim();
   const pin = form.pin.trim();
+  const badge = form.badge.trim();
   try {
     if (isEdit.value) {
       // Parcial: solo viaja lo que cambió. `pin: ''` solo si se pulsó «retirar PIN» — un campo
@@ -338,6 +394,10 @@ async function onSave(): Promise<void> {
       if (form.isActive !== initial.isActive) patch.is_active = form.isActive;
       if (pin) patch.pin = pin;
       else if (!hasPin.value) patch.pin = '';
+      // La placa viaja **por separado** del PIN y solo cuando se ha tocado: escribir `badge: ''` en
+      // cada guardado revocaría la tarjeta de quien solo cambió el nombre.
+      if (badge) patch.badge = badge;
+      else if (!hasBadge.value) patch.badge = '';
       await updateHubUser(String(route.params.id), patch);
     } else {
       await createHubUser({
@@ -346,6 +406,7 @@ async function onSave(): Promise<void> {
         email: isLocal.value ? '' : email,
         role: form.role || 'employee',
         pin,
+        badge,
         local: isLocal.value,
       });
     }
@@ -384,9 +445,22 @@ async function onCancel(): Promise<void> {
 }
 
 onBeforeRouteLeave(async () => confirmDiscard());
+// **El lector rellena el campo sin tocarlo** (hub#658): la ráfaga llega del listener global del
+// shell, no del foco. Es lo que hace que dar de alta una tarjeta sea «pasarla», que es el gesto que
+// el mercado usa (Square, Toast, Aloha), sin que el número pueda caer en otro campo por el camino.
+let stopBadgeScan: (() => void) | null = null;
 onMounted(async () => {
+  stopBadgeScan = onBadgeScan((badge) => {
+    form.badge = badge;
+    hasBadge.value = false;
+    dirty.value = true;
+  });
   await load();
   dirty.value = false;
+});
+onUnmounted(() => {
+  stopBadgeScan?.();
+  stopBadgeScan = null;
 });
 watch(form, () => {
   if (!loading.value) dirty.value = serializeForm() !== snapshot;
@@ -423,7 +497,8 @@ watch(form, () => {
   color: var(--ion-color-medium);
 }
 
-.clear-pin {
+/* Retirar el PIN y retirar la placa: el mismo gesto sobre dos credenciales hermanas (hub#658). */
+.clear-credential {
   align-self: flex-start;
   --color: var(--ion-color-danger);
 }

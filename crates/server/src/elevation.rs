@@ -21,7 +21,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_db::Params;
-use erplora_runtime::elevation::ElevationRequest;
+use erplora_runtime::elevation::{ApproverCredential, ElevationRequest};
 use erplora_runtime::RuntimeError;
 use serde::Deserialize;
 use serde_json::json;
@@ -36,13 +36,52 @@ const BAD_PIN_CODE: &str = "hub.elevation.rejected";
 #[derive(Deserialize)]
 pub struct ApproveReq {
     /// The approver's `hub_user.name` — the pinpad resolves people by name, and so does this.
+    /// Empty when the approval arrives as a **badge**, which resolves the person on its own.
+    #[serde(default)]
     approver: String,
+    #[serde(default)]
     pin: String,
+    /// The badge swiped in the dialog (hub#658). Present INSTEAD of `approver` + `pin`, never as
+    /// well: two credentials in one request is a caller that does not know who is standing there,
+    /// and picking one for them is how a screen ends up approving with the wrong identity.
+    #[serde(default)]
+    badge: String,
     /// The action being approved. Both travel so the runtime can bind the approval to them; it
     /// re-reads the command's permission from the registry rather than trusting anything here.
     command: String,
     #[serde(default)]
     payload: Params,
+}
+
+impl ApproveReq {
+    /// The key the brute-force guard counts against.
+    ///
+    /// For a PIN it is the approver's NAME, unchanged since hub#361 — the same key the login
+    /// pinpad uses, so a lock earned at one door holds at the other. For a badge there is no name
+    /// to type, so it is the badge itself: the guard has to bound the attempts against the CARD
+    /// being tried, and a shared key would let anybody lock out a colleague by swiping rubbish.
+    fn throttle_key(&self) -> String {
+        if self.badge.trim().is_empty() {
+            self.approver.clone()
+        } else {
+            format!("badge:{}", self.badge.trim())
+        }
+    }
+
+    /// What the approver presented. A badge wins when both travel: it is the more specific claim,
+    /// and it cannot be typed by mistake into a dialog that is showing a pinpad.
+    fn credential(&self) -> ApproverCredential<'_> {
+        if self.badge.trim().is_empty() {
+            ApproverCredential::Pin {
+                name: &self.approver,
+                pin: &self.pin,
+            }
+        } else {
+            ApproverCredential::Badge {
+                badge: self.badge.trim(),
+            }
+        }
+    }
 }
 
 /// `POST /api/elevation/approve` → `{ok, data:{token, permission, approved_by, approver_name,
@@ -67,7 +106,8 @@ pub async fn approve(
 
     // Checked BEFORE verifying, like the pinpad (hub#329): a locked identity must stop leaking the
     // right/wrong signal that is exactly what an attacker is fishing for.
-    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.approver) {
+    let throttle_key = req.throttle_key();
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&throttle_key) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({
@@ -86,8 +126,7 @@ pub async fn approve(
         .approve_elevation(
             &requester,
             ElevationRequest {
-                approver_name: &req.approver,
-                pin: &req.pin,
+                credential: req.credential(),
                 command: &req.command,
                 payload: &req.payload,
             },
@@ -95,7 +134,7 @@ pub async fn approve(
         .await
     {
         Ok(approval) => {
-            st.login_throttle.record_success(&req.approver);
+            st.login_throttle.record_success(&throttle_key);
             Json(json!({
                 "ok": true,
                 "data": {
@@ -110,7 +149,7 @@ pub async fn approve(
         }
         Err(e) => {
             if is_bad_pin(&e) {
-                st.login_throttle.record_failure(&req.approver);
+                st.login_throttle.record_failure(&throttle_key);
             }
             err_response(e)
         }

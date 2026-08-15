@@ -61,16 +61,57 @@ use sha2::{Digest, Sha256};
 /// screenshot is worthless by the time anybody reads it.
 pub const GRANT_TTL: Duration = Duration::from_secs(120);
 
+/// **How the approver proves they are standing there** (hub#658).
+///
+/// Two presentations of one identity, which is what the market decision of hub#658 settled: Toast,
+/// Aloha/NCR and Square use the same credential to sign in, to clock in and to approve. What
+/// authorises is the ROLE — [`Runtime::approve_elevation`] asks exactly the same questions of both
+/// branches, and neither manufactures a privilege its holder did not already have.
+///
+/// [`Runtime::approve_elevation`]: crate::Runtime::approve_elevation
+#[derive(Debug, Clone, Copy)]
+pub enum ApproverCredential<'a> {
+    /// The pinpad: it resolves people by NAME, so the name travels with the digits.
+    Pin { name: &'a str, pin: &'a str },
+    /// A badge resolves the person on its own — it replaces the (name, PIN) **pair**, never the
+    /// PIN alone. Making a manager type four digits in front of the customer when they already
+    /// hold the card is friction the sector removed twenty years ago.
+    Badge { badge: &'a str },
+}
+
 /// What the manager is being asked to approve. `payload` is the caller's payload **as sent**
 /// (before schema defaults are applied): it is what the dialog showed and what the fingerprint
 /// has to match on the retry.
 #[derive(Debug, Clone, Copy)]
 pub struct ElevationRequest<'a> {
-    /// The approver's `hub_user.name` — the pinpad resolves people by name (`identity::verify_pin`).
-    pub approver_name: &'a str,
-    pub pin: &'a str,
+    pub credential: ApproverCredential<'a>,
     pub command: &'a str,
     pub payload: &'a Params,
+}
+
+impl<'a> ElevationRequest<'a> {
+    /// The manager taps their name and types four digits.
+    pub fn with_pin(
+        name: &'a str,
+        pin: &'a str,
+        command: &'a str,
+        payload: &'a Params,
+    ) -> Self {
+        Self {
+            credential: ApproverCredential::Pin { name, pin },
+            command,
+            payload,
+        }
+    }
+
+    /// The manager swipes their card, and that IS the approval.
+    pub fn with_badge(badge: &'a str, command: &'a str, payload: &'a Params) -> Self {
+        Self {
+            credential: ApproverCredential::Badge { badge },
+            command,
+            payload,
+        }
+    }
 }
 
 /// A minted approval. The `token` is the only part the client ever sees.
@@ -109,7 +150,20 @@ pub(crate) struct Binding {
 struct Grant {
     binding: Binding,
     approved_by: String,
+    /// **What the approver used** (hub#658). It travels inside the grant and not inside the
+    /// [`Binding`] on purpose: the binding is what the retry has to MATCH, and the retry sends
+    /// only the token — it does not re-present the card. Carrying it here is what lets
+    /// [`record_spend`] name the credential on the receipt without the client ever being asked.
+    credential: crate::identity::Credential,
     expires_at: Instant,
+}
+
+/// An approval that has just been spent: who allowed it and what they used to say so.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SpentApproval {
+    /// `hub_user.id` of the approver.
+    pub approved_by: String,
+    pub credential: crate::identity::Credential,
 }
 
 /// The live approvals of this runtime. Tiny (bounded by the approvals a human taps within
@@ -125,23 +179,34 @@ impl Grants {
     }
 
     /// Mint an approval and return its token.
-    pub(crate) fn mint(&self, binding: Binding, approved_by: &str) -> String {
-        self.mint_at(binding, approved_by, Instant::now())
+    pub(crate) fn mint(
+        &self,
+        binding: Binding,
+        approved_by: &str,
+        credential: crate::identity::Credential,
+    ) -> String {
+        self.mint_at(binding, approved_by, credential, Instant::now())
     }
 
-    /// Spend the approval matching `binding`, returning the `hub_user.id` that approved it.
+    /// Spend the approval matching `binding`, returning who approved it and with what.
     ///
     /// **Removes it.** That single line is rule 4: after this call the same token, for the same
     /// action, buys nothing. `None` = there is no such approval (never granted, already spent,
     /// expired, or granted for a different action, cashier or hub) — and every one of those is
     /// reported identically, because to the caller they mean the same thing: ask the manager.
-    pub(crate) fn spend(&self, token: &str, binding: &Binding) -> Option<String> {
+    pub(crate) fn spend(&self, token: &str, binding: &Binding) -> Option<SpentApproval> {
         self.spend_at(token, binding, Instant::now())
     }
 
     // ── The same logic with an explicit clock, so the tests below can prove expiry ──
 
-    fn mint_at(&self, binding: Binding, approved_by: &str, now: Instant) -> String {
+    fn mint_at(
+        &self,
+        binding: Binding,
+        approved_by: &str,
+        credential: crate::identity::Credential,
+        now: Instant,
+    ) -> String {
         let token = new_token();
         let mut entries = self.lock();
         sweep(&mut entries, now);
@@ -150,13 +215,14 @@ impl Grants {
             Grant {
                 binding,
                 approved_by: approved_by.to_string(),
+                credential,
                 expires_at: now + GRANT_TTL,
             },
         );
         token
     }
 
-    fn spend_at(&self, token: &str, binding: &Binding, now: Instant) -> Option<String> {
+    fn spend_at(&self, token: &str, binding: &Binding, now: Instant) -> Option<SpentApproval> {
         let mut entries = self.lock();
         sweep(&mut entries, now);
         let grant = entries.get(token)?;
@@ -166,7 +232,10 @@ impl Grants {
         if grant.binding != *binding {
             return None;
         }
-        entries.remove(token).map(|g| g.approved_by)
+        entries.remove(token).map(|g| SpentApproval {
+            approved_by: g.approved_by,
+            credential: g.credential,
+        })
     }
 
     /// Live approvals. Only the tests look; production never needs to count them.
@@ -223,9 +292,10 @@ pub(crate) async fn record_spend(
     command: &str,
     permission: &str,
     created_by: &str,
-    approved_by: &str,
+    spent: &SpentApproval,
     fingerprint: &str,
 ) -> crate::errors::Result<()> {
+    let approved_by = spent.approved_by.as_str();
     let mut p = Params::new();
     p.insert("id".into(), Json::String(crate::registry::new_id()));
     p.insert("hub_id".into(), Json::String(hub_id.to_string()));
@@ -243,11 +313,25 @@ pub(crate) async fn record_spend(
         Json::String(fingerprint.to_string()),
     );
     p.insert("created_at".into(), Json::String(crate::registry::now_rfc3339()));
+    // **Which credential said yes, and which card** (hub#658). This is the criterion the market
+    // study called the one worth the most: no competitor records it, so in every one of them
+    // «somebody used my card» is structurally unanswerable — their log only names the employee.
+    // The reference is the badge's INDEX, never the number printed on it, so the audit trail does
+    // not become a list of live credentials.
+    p.insert(
+        "credential_kind".into(),
+        Json::String(spent.credential.kind.clone()),
+    );
+    p.insert(
+        "credential_ref".into(),
+        Json::String(spent.credential.reference.clone()),
+    );
     db.execute(
         "INSERT INTO _elevation_audit \
-         (id, hub_id, command, permission, created_by, approved_by, payload_fingerprint, created_at) \
+         (id, hub_id, command, permission, created_by, approved_by, payload_fingerprint, \
+          created_at, credential_kind, credential_ref) \
          VALUES (:id, :hub_id, :command, :permission, :created_by, :approved_by, \
-         :payload_fingerprint, :created_at)",
+         :payload_fingerprint, :created_at, :credential_kind, :credential_ref)",
         &p,
     )
     .await?;
@@ -377,11 +461,11 @@ mod tests {
         // Rule 4 in one assertion: the approval is not a window somebody works inside, it is a
         // single yes. A second identical action finds nothing left.
         let grants = Grants::new();
-        let token = grants.mint(binding(), "u-manager");
+        let token = grants.mint(binding(), "u-manager", crate::identity::Credential::pin());
 
         assert_eq!(
-            grants.spend(&token, &binding()).as_deref(),
-            Some("u-manager")
+            grants.spend(&token, &binding()).map(|s| s.approved_by),
+            Some("u-manager".to_string())
         );
         assert_eq!(grants.spend(&token, &binding()), None);
         assert_eq!(grants.len(), 0, "spending removes it, it does not mark it");
@@ -407,7 +491,7 @@ mod tests {
 
         let grants = Grants::new();
         let start = Instant::now();
-        let token = grants.mint_at(binding(), "u-manager", start);
+        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
         assert_eq!(
             grants.spend_at(&token, &binding(), start + Duration::from_secs(600)),
             None,
@@ -419,7 +503,7 @@ mod tests {
     fn an_unused_approval_stops_being_spendable_at_the_ceiling() {
         let grants = Grants::new();
         let start = Instant::now();
-        let token = grants.mint_at(binding(), "u-manager", start);
+        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
 
         // Still inside the ceiling: the retry that took a moment to arrive still works.
         assert!(grants
@@ -430,7 +514,7 @@ mod tests {
             )
             .is_some());
 
-        let token = grants.mint_at(binding(), "u-manager", start);
+        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
         // Exactly at the ceiling is already over: an approval that expires "at" a moment must not
         // still be usable during it.
         assert_eq!(grants.spend_at(&token, &binding(), start + GRANT_TTL), None);
@@ -481,7 +565,7 @@ mod tests {
         ];
         for (what, other) in variants {
             let grants = Grants::new();
-            let token = grants.mint(binding(), "u-manager");
+            let token = grants.mint(binding(), "u-manager", crate::identity::Credential::pin());
             assert_eq!(grants.spend(&token, &other), None, "{what} must not match");
             // …and the mismatch does not burn the real approval.
             assert!(
@@ -496,7 +580,7 @@ mod tests {
         // The tenant is never negotiable. One process serves one hub today, but the binding does
         // not rely on that being true forever.
         let grants = Grants::new();
-        let token = grants.mint(binding(), "u-manager");
+        let token = grants.mint(binding(), "u-manager", crate::identity::Credential::pin());
         let elsewhere = Binding {
             hub_id: "h2".into(),
             ..binding()
@@ -507,7 +591,7 @@ mod tests {
     #[test]
     fn a_token_nobody_minted_is_simply_not_a_grant() {
         let grants = Grants::new();
-        grants.mint(binding(), "u-manager");
+        grants.mint(binding(), "u-manager", crate::identity::Credential::pin());
         for forged in ["", "approved", &"0".repeat(64), &new_token()] {
             assert_eq!(
                 grants.spend(forged, &binding()),
@@ -655,8 +739,8 @@ mod tests {
             requester: "u-other".into(),
             ..binding()
         };
-        let a = grants.mint(mine.clone(), "u-manager");
-        let b = grants.mint(theirs.clone(), "u-manager");
+        let a = grants.mint(mine.clone(), "u-manager", crate::identity::Credential::pin());
+        let b = grants.mint(theirs.clone(), "u-manager", crate::identity::Credential::pin());
         assert_ne!(a, b);
 
         assert!(grants.spend(&a, &mine).is_some());

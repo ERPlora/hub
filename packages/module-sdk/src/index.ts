@@ -377,6 +377,15 @@ export interface ElevationAsk {
   /** The permission the refusal named as a field (hub#360) — never parsed out of the message. */
   permission: string;
   approve(approver: string, pin: string): Promise<ElevationApproval>;
+  /**
+   * The same approval, presented as a **badge** (hub#658).
+   *
+   * A separate door and not an overload of `approve` because a badge resolves the whole person: it
+   * replaces the (name, PIN) **pair**, so there is no name to pass. What it does NOT change is who
+   * may approve — the runtime asks exactly the same questions of both and answers with the same
+   * `hub.elevation.*` codes.
+   */
+  approveWithBadge(badge: string): Promise<ElevationApproval>;
 }
 
 /**
@@ -749,7 +758,9 @@ export class HttpWsTransport implements ErploraTransport {
         command: name,
         payload,
         permission: refusal.permission ?? '',
-        approve: (approver, pin) => this.approveElevation(name, payload, approver, pin),
+        approve: (approver, pin) =>
+          this.approveElevation(name, payload, { approver, pin }),
+        approveWithBadge: (badge) => this.approveElevation(name, payload, { badge }),
       };
       const token = await this.elevationApprover!(ask);
       // Nobody approved: hand back the refusal the caller already had, untouched. A module written
@@ -764,14 +775,16 @@ export class HttpWsTransport implements ErploraTransport {
     return flow;
   }
 
-  /** `POST /api/elevation/approve` — the PIN is verified by the runtime, never here (hub#361). */
+  /**
+   * `POST /api/elevation/approve` — the credential is verified by the runtime, never here
+   * (hub#361, and hub#658 for the badge half).
+   */
   private approveElevation(
     command: string,
     payload: Record<string, unknown>,
-    approver: string,
-    pin: string,
+    credential: { approver: string; pin: string } | { badge: string },
   ): Promise<ElevationApproval> {
-    return this.post(ELEVATION_APPROVE_PATH, { approver, pin, command, payload }).then((data) => {
+    return this.post(ELEVATION_APPROVE_PATH, { ...credential, command, payload }).then((data) => {
       const d = (data ?? {}) as Record<string, unknown>;
       return {
         token: String(d.token ?? ''),

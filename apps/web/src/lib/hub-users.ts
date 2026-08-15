@@ -31,6 +31,12 @@ export interface HubUser {
   is_active: boolean;
   /** `true` si puede entrar con PIN local; el owner normalmente entra por Cloud. */
   has_pin: boolean;
+  /**
+   * `true` si lleva una **placa** enrolada (hub#658). Se enseña aparte de `has_pin` porque son
+   * credenciales hermanas e independientes: revocar la tarjeta no toca el PIN, y volver a solo-PIN
+   * tiene que ser siempre posible. Ausente en un runtime anterior a hub#658.
+   */
+  has_badge?: boolean;
   created_at: string;
   /**
    * Por qué el backfill v19 no pudo llevar el email de esta persona a donde se administra el acceso
@@ -114,16 +120,22 @@ export interface NewHubUser {
   email: string;
   role: string;
   pin: string;
+  /** La placa que rellena el lector (o que se teclea, para un iButton). Vacío = sin placa. */
+  badge?: string;
   local?: boolean;
 }
 
-/** Edición parcial: solo viaja lo que se toca. `pin: ''` retira el PIN. */
+/**
+ * Edición parcial: solo viaja lo que se toca. `pin: ''` retira el PIN y `badge: ''` revoca la placa
+ * **sin tocar el PIN** — la revocación independiente es el contrato entero de hub#658.
+ */
 export interface HubUserPatch {
   name?: string;
   email?: string;
   role?: string;
   is_active?: boolean;
   pin?: string;
+  badge?: string;
 }
 
 interface Envelope<T> {
@@ -266,16 +278,22 @@ export function deactivateHubUser(id: string): Promise<HubUser> {
 }
 
 /** Cómo entra un usuario al Hub. `none` = existe como persona, pero no puede iniciar sesión. */
-export type HubAccess = 'pin' | 'cloud' | 'none';
+export type HubAccess = 'pin' | 'pin_badge' | 'badge' | 'cloud' | 'none';
 
 /**
- * Vía de acceso de un usuario. El **PIN manda** cuando hay ambas: es la del día a día en el POS.
+ * Vía de acceso de un usuario. El **PIN manda** cuando hay varias: es la del día a día en el POS.
  * `none` no es un error — es el registro de alguien que trabaja en el negocio pero no usa el Hub
  * (p. ej. un profesional reservable en la agenda). Distinguirlo importa: decir «cuenta online» de
  * quien no tiene cuenta hace creer que puede entrar.
+ *
+ * La **placa** (hub#658) se dice aparte y no absorbida en «PIN», porque quien administra necesita
+ * ver de un vistazo quién lleva tarjeta: es lo que hay que revocar cuando alguien pierde la suya, y
+ * es la credencial que se presta. `badge` a secas solo lo produce un usuario de cuenta que retiró su
+ * PIN — el runtime no deja que una placa sea la única puerta de nadie.
  */
 export function accessOf(user: HubUser): HubAccess {
-  if (user.has_pin) return 'pin';
+  if (user.has_pin) return user.has_badge ? 'pin_badge' : 'pin';
+  if (user.has_badge) return 'badge';
   return user.cloud_user_id ? 'cloud' : 'none';
 }
 

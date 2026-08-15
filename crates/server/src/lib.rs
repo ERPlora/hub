@@ -1595,6 +1595,7 @@ pub fn app(state: AppState) -> Router {
         // máquina nunca toca el navegador). Ver `frontend_error_report`.
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
+        .route("/api/auth/badge", post(auth_badge))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/courier", post(auth_courier))
@@ -3741,20 +3742,81 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
+    if let Some(refusal) = device_trust_gate(&st, &rt, device_id).await {
+        return refusal;
+    }
+    // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
+    // the right/wrong signal an attacker is fishing for.
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.name) {
+        return too_many_attempts(retry_after_secs);
+    }
+    match rt.verify_pin(&req.name, &req.pin).await {
+        Ok(Some(user)) => {
+            st.login_throttle.record_success(&req.name);
+            // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
+            // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
+            let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
+            mint_session(
+                &rt,
+                user,
+                device_id,
+                max_devices,
+                &erplora_runtime::identity::Credential::pin(),
+            )
+            .await
+        }
+        Ok(None) => {
+            st.login_throttle.record_failure(&req.name);
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+            )
+                .into_response()
+        }
+        Err(e) => err_response(e),
+    }
+}
+
+/// `429` de la guarda de fuerza bruta, idéntico en las dos puertas de login local.
+fn too_many_attempts(retry_after_secs: u64) -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "ok": false,
+            "error": "demasiados intentos fallidos: espera unos minutos",
+            "code": "too_many_attempts",
+            "retry_after_secs": retry_after_secs
+        })),
+    )
+        .into_response()
+}
+
+/// El gate de **device-trust** (§2.9, hub#330), compartido por las dos credenciales locales.
+///
+/// Vive en una función y no duplicado en cada puerta porque una placa que se saltase este gate
+/// sería, literalmente, la vuelta atrás de hub#330: el hub responde en la internet pública y una
+/// tarjeta se clona con un Flipper Zero. `None` = puede pasar.
+async fn device_trust_gate(
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+    device_id: Option<&str>,
+) -> Option<Response> {
     if st.config.device_trust_enforce {
         // No `device_id`, no bypass (hub#330): the check used to sit in an `if let Some(..)` with
         // no `else`, so leaving the field out walked past the gate entirely. The hub lives on the
         // public internet, so an unidentified device is the shape of the attack, not an oversight.
         let Some(device_id) = device_id else {
-            return (
-                StatusCode::FORBIDDEN,
-                Json(json!({
-                    "ok": false,
-                    "error": "this client did not identify its device",
-                    "code": "device_unidentified"
-                })),
-            )
-                .into_response();
+            return Some(
+                (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "ok": false,
+                        "error": "this client did not identify its device",
+                        "code": "device_unidentified"
+                    })),
+                )
+                    .into_response(),
+            );
         };
         match rt.is_device_trusted(device_id).await {
             Ok(true) => {}
@@ -3774,56 +3836,95 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
                 // The rule itself lives in `device_mode::demo_would_adopt`, SHARED with the read
                 // door that decides whether the pinpad is painted (hub#514): when the two drifted,
                 // this branch became unreachable — no pinpad, no PIN submit, no adoption.
-                let adopt = match device_mode::demo_would_adopt(st.config.demo, &rt, device_id).await
+                let adopt = match device_mode::demo_would_adopt(st.config.demo, rt, device_id).await
                 {
                     Ok(adopt) => adopt,
-                    Err(e) => return err_response(e),
+                    Err(e) => return Some(err_response(e)),
                 };
                 if !adopt {
-                    return (
-                        StatusCode::FORBIDDEN,
-                        Json(json!({
-                            "ok": false,
-                            "error": "this device has not signed in with an account yet",
-                            "code": "device_untrusted"
-                        })),
-                    )
-                        .into_response();
+                    return Some(
+                        (
+                            StatusCode::FORBIDDEN,
+                            Json(json!({
+                                "ok": false,
+                                "error": "this device has not signed in with an account yet",
+                                "code": "device_untrusted"
+                            })),
+                        )
+                            .into_response(),
+                    );
                 }
                 if let Err(e) = rt.trust_device(device_id, "Demo (first device)").await {
-                    return err_response(e);
+                    return Some(err_response(e));
                 }
             }
-            Err(e) => return err_response(e),
+            Err(e) => return Some(err_response(e)),
         }
     }
-    // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
-    // the right/wrong signal an attacker is fishing for.
-    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.name) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({
-                "ok": false,
-                "error": "demasiados intentos fallidos: espera unos minutos",
-                "code": "too_many_attempts",
-                "retry_after_secs": retry_after_secs
-            })),
-        )
-            .into_response();
+    None
+}
+
+#[derive(serde::Deserialize)]
+struct BadgeReq {
+    /// Lo que el lector escribió como ráfaga de teclado (o lo que se tecleó, para un iButton).
+    badge: String,
+    #[serde(default)]
+    device_id: Option<String>,
+}
+
+/// Login local por **PLACA** → abre sesión. Body `{badge, device_id?}` → `{ok, token, user}`
+/// (401 si falla). hub#658.
+///
+/// La placa resuelve la identidad ENTERA: sustituye al par (nombre, PIN) del pinpad, nunca al PIN
+/// solo. Por eso este cuerpo no lleva nombre — y por eso la respuesta no dice nunca si la tarjeta
+/// existe: un 401 igual para «esa placa no es de nadie» y «esa placa es de alguien dado de baja».
+///
+/// **Las tres barandillas del PIN se mantienen enteras**: el mismo gate de device-trust
+/// ([`device_trust_gate`]), la misma guarda de fuerza bruta y el mismo límite de dispositivos del
+/// plan. La guarda se cuenta contra el **índice** de la tarjeta y no contra un nombre —aquí no hay
+/// nombre que teclear— y eso además la hace más precisa: bloquea la tarjeta que se está probando,
+/// sin que nadie pueda dejar fuera a un compañero pasando cinco veces una tarjeta rota a su nombre.
+async fn auth_badge(State(st): State<AppState>, Json(req): Json<BadgeReq>) -> Response {
+    let rt = st.runtime.lock().await;
+    let device_id = req
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    if let Some(refusal) = device_trust_gate(&st, &rt, device_id).await {
+        return refusal;
     }
-    match rt.verify_pin(&req.name, &req.pin).await {
-        Ok(Some(user)) => {
-            st.login_throttle.record_success(&req.name);
-            // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
-            // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
+    // La clave del índice para poder acotar los intentos SIN guardar el número de la tarjeta en
+    // ninguna estructura del servidor: lo que entra en el contador es el índice, que ya es lo que
+    // la traza guarda.
+    let throttle_key = match rt.badge_index_key().await {
+        Ok(key) => format!(
+            "badge:{}",
+            erplora_runtime::identity::badge_index(&key, &req.badge)
+        ),
+        Err(e) => return err_response(e),
+    };
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&throttle_key) {
+        return too_many_attempts(retry_after_secs);
+    }
+    match rt.verify_badge(&req.badge).await {
+        Ok(Some(matched)) => {
+            st.login_throttle.record_success(&throttle_key);
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
-            mint_session(&rt, user, device_id, max_devices).await
+            mint_session(
+                &rt,
+                matched.user,
+                device_id,
+                max_devices,
+                &erplora_runtime::identity::Credential::badge(&matched.badge_index),
+            )
+            .await
         }
         Ok(None) => {
-            st.login_throttle.record_failure(&req.name);
+            st.login_throttle.record_failure(&throttle_key);
             (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+                Json(json!({ "ok": false, "error": "placa no reconocida", "code": "badge_rejected" })),
             )
                 .into_response()
         }
@@ -4005,6 +4106,7 @@ async fn open_cloud_session(
                 user,
                 device_id.as_deref(),
                 max_devices,
+                &erplora_runtime::identity::Credential::cloud(),
                 cloud_tokens,
             )
             .await
@@ -4190,8 +4292,9 @@ async fn mint_session(
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
+    credential: &erplora_runtime::identity::Credential,
 ) -> Response {
-    mint_session_with_extra(rt, user, device_id, max_devices, None).await
+    mint_session_with_extra(rt, user, device_id, max_devices, credential, None).await
 }
 
 async fn mint_session_with_extra(
@@ -4199,6 +4302,10 @@ async fn mint_session_with_extra(
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
+    // **Con qué se probó la identidad** (hub#658). Viaja hasta la fila de `hub_session` porque el
+    // login es la mitad de la traza que contesta «alguien usó mi tarjeta»; la otra mitad la escribe
+    // `_elevation_audit`.
+    credential: &erplora_runtime::identity::Credential,
     extra: Option<Value>,
 ) -> Response {
     if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
@@ -4215,7 +4322,10 @@ async fn mint_session_with_extra(
         Ok(ttl) => ttl,
         Err(e) => return err_response(e),
     };
-    match rt.create_session(&user.id, ttl_secs, device_id).await {
+    match rt
+        .create_session_with_credential(&user.id, ttl_secs, device_id, credential)
+        .await
+    {
         Ok(token) => {
             let permissions = rt.session_permissions(&user.role);
             let mut payload = json!({

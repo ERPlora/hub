@@ -185,6 +185,292 @@ fn hex_lower(bytes: &[u8]) -> String {
     s
 }
 
+/// Bytes de una cadena hex en minúsculas (la inversa de [`hex_lower`]). `None` si no es hex.
+fn hex_bytes(hex: &str) -> Option<Vec<u8>> {
+    if hex.len() % 2 != 0 || hex.is_empty() {
+        return None;
+    }
+    (0..hex.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).ok())
+        .collect()
+}
+
+// ── Placa de empleado (RFID/NFC/banda) — hub#658 ─────────────────────────────────────────────
+//
+// **La placa es HERMANA del PIN, nunca su sustituta.** Decisión de mercado publicada en la issue
+// (15 referencias: Square, Toast, Lightspeed, Odoo, Clover, Revel, Aloha/NCR, Simphony…): placa y
+// PIN son dos PRESENTACIONES de la misma identidad, y lo que autoriza es el ROL. Square directamente
+// no deja quitar el PIN, y el aviso es Lightspeed L-Series: tarjeta irrevocable, sin recuperación
+// documentada, producto descatalogado. Por eso `set_badge` **no toca `pin_hash`** en ninguna de sus
+// ramas, ni al poner la placa ni al retirarla.
+//
+// ⚠️ **Y NO se copia el patrón de `pin_is_taken`/`verify_pin`.** Aquel recorre las filas verificando
+// argon2 una a una: con cuatro dígitos vale (una decena de filas, y solo en un alta), pero con una
+// placa de alta entropía sería **un argon2 por fila en CADA tap de la puerta de login** — un DoS
+// contra la propia caja, y encima gratis para quien lo lance. Aquí la búsqueda entra por un **índice
+// determinista** (`badge_index` = HMAC-SHA256 con la clave del hub) que estrecha a UNA fila en SQL, y
+// solo entonces se verifica el hash argon2 de esa fila.
+//
+// Por qué las DOS columnas y no solo el índice: el índice es lo que se puede buscar, el hash es lo
+// que **prueba** la credencial. Si la clave HMAC se filtrase, un índice por sí solo convertiría la
+// columna en la credencial (quien sepa calcularla entra); con el argon2 detrás sigue haciendo falta
+// la placa. Y el índice, al ser **con clave**, no es una tabla arcoíris de números de tarjeta: la
+// misma placa en dos hubs da dos índices distintos.
+
+/// La identidad se probó con el **PIN** (o el pinpad de siempre).
+pub const CREDENTIAL_PIN: &str = "pin";
+/// La identidad se probó pasando una **placa** (RFID/NFC/banda/iButton).
+pub const CREDENTIAL_BADGE: &str = "badge";
+/// La identidad la acreditó el **Cloud** (JWT de usuario, ADR-0157).
+pub const CREDENTIAL_CLOUD: &str = "cloud";
+
+/// **Con qué se probó la identidad**, tal y como queda escrito en la traza (hub#658).
+///
+/// Es la columna que el criterio de aceptación de la issue llama «la que más valor tiene»: ningún
+/// competidor la registra, y sin ella «alguien usó mi tarjeta» es estructuralmente irresoluble
+/// porque el log solo dice el empleado. `reference` identifica **qué** placa fue — por su índice,
+/// nunca por el número impreso en ella, para que la auditoría no se convierta en una lista de
+/// credenciales vivas.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Credential {
+    pub kind: String,
+    pub reference: String,
+}
+
+impl Credential {
+    /// El PIN: no hay nada que referenciar, la credencial ES la persona.
+    pub fn pin() -> Self {
+        Self {
+            kind: CREDENTIAL_PIN.to_string(),
+            reference: String::new(),
+        }
+    }
+
+    /// Una placa, identificada por su `badge_index` (ver [`badge_index`]).
+    pub fn badge(index: &str) -> Self {
+        Self {
+            kind: CREDENTIAL_BADGE.to_string(),
+            reference: index.to_string(),
+        }
+    }
+
+    /// Login cloud (JWT de usuario).
+    pub fn cloud() -> Self {
+        Self {
+            kind: CREDENTIAL_CLOUD.to_string(),
+            reference: String::new(),
+        }
+    }
+
+    /// Sin declarar: lo que escriben los caminos internos que no son un login de una persona
+    /// (tests, herramientas). Vacío y no `"pin"` a propósito — «no consta» y «fue el PIN» son
+    /// respuestas distintas a la disputa que esta columna existe para resolver.
+    pub fn unknown() -> Self {
+        Self::default()
+    }
+}
+
+/// Una placa que ha resuelto a su dueño.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BadgeMatch {
+    pub user: HubUser,
+    /// El índice de la placa usada — el «id de placa» que viaja a la traza.
+    pub badge_index: String,
+}
+
+/// Normaliza lo que teclea/emite un lector antes de indexar o verificar.
+///
+/// Mayúsculas porque el mismo UID sale `4a00b7` de un lector y se teclea `4A00B7` de la etiqueta
+/// grabada (iButton, Lightspeed K), y son la misma tarjeta: sin plegar, el alta a mano y el tap
+/// serían dos credenciales distintas y la segunda no abriría nada.
+fn normalize_badge(badge: &str) -> String {
+    badge.trim().to_ascii_uppercase()
+}
+
+/// La **clave del hub** con la que se deriva el índice de una placa. Se acuña una vez, con
+/// aleatoriedad del SO, y se guarda en `_hub_badge_key` (tabla de sistema, sin puerta HTTP ninguna).
+///
+/// No vive en `hub_settings` a propósito: ahí la leería cualquiera que pueda leer la configuración,
+/// y la clave es lo único que impide construir el índice de un número de tarjeta a voluntad.
+///
+/// **Se acuña una sola vez y se conserva**: una clave que cambiase dejaría huérfanas, en silencio,
+/// todas las placas del hub — todas las tarjetas dejan de funcionar y nada dice por qué. De ahí el
+/// `ON CONFLICT DO NOTHING` + relectura: si dos arranques la piden a la vez, los dos acaban con la
+/// misma.
+///
+/// Sí, la primera llamada **escribe**, y puede venir de la puerta de login sin autenticar (un tap
+/// contra un hub que aún no enroló ninguna placa). Está acotado a **una fila por hub y una sola
+/// vez**: a partir de ahí es una lectura. La alternativa —derivarla al enrolar— dejaría el login
+/// fallando hasta que alguien diese de alta una tarjeta, y con un mensaje que no explicaría nada.
+pub async fn badge_index_key(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<u8>> {
+    if let Some(key) = stored_badge_index_key(db, hub_id).await? {
+        return Ok(key);
+    }
+    let mut bytes = [0u8; 32];
+    ring::rand::SecureRandom::fill(&ring::rand::SystemRandom::new(), &mut bytes).map_err(|_| {
+        crate::errors::RuntimeError::Other("no se pudo generar la clave de índice de placas".into())
+    })?;
+    let mut ins = Params::new();
+    ins.insert("hub_id".into(), json!(hub_id));
+    ins.insert("key_hex".into(), json!(hex_lower(&bytes)));
+    ins.insert("now".into(), json!(now_rfc3339()));
+    db.execute(
+        "INSERT INTO _hub_badge_key (hub_id, key_hex, created_at) \
+          VALUES (:hub_id, :key_hex, :now) ON CONFLICT (hub_id) DO NOTHING",
+        &ins,
+    )
+    .await?;
+    // Relectura y no `bytes`: si otro arranque ganó la carrera, la clave BUENA es la suya. Devolver
+    // la que este proceso generó dejaría dos procesos del mismo hub indexando distinto durante el
+    // rollout, y las placas enroladas por uno no abrirían nada contra el otro.
+    stored_badge_index_key(db, hub_id).await?.ok_or_else(|| {
+        crate::errors::RuntimeError::Other("la clave de índice de placas no se guardó".into())
+    })
+}
+
+/// La clave ya guardada de este hub, o `None` si aún no se ha acuñado ninguna.
+async fn stored_badge_index_key(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Option<Vec<u8>>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT key_hex FROM _hub_badge_key WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|row| row["key_hex"].as_str())
+        .and_then(hex_bytes))
+}
+
+/// El índice determinista de una placa bajo la clave del hub: HMAC-SHA256 en hex.
+///
+/// Determinista (o no sería un índice) y **con clave** (o sería un número de tarjeta hasheado, que
+/// se invierte con una tabla precalculada porque el espacio de UIDs es pequeño y público).
+pub fn badge_index(key: &[u8], badge: &str) -> String {
+    let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, key);
+    hex_lower(ring::hmac::sign(&key, normalize_badge(badge).as_bytes()).as_ref())
+}
+
+/// Fija (o **retira**) la placa de un usuario existente. `badge` vacío = revocada.
+///
+/// **No toca el PIN en ninguna de las dos ramas**, y eso es el contrato entero de la decisión:
+/// perder la tarjeta no deja a nadie fuera, y volver a solo-PIN es siempre posible. Idempotente.
+pub async fn set_badge(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    badge: &str,
+) -> Result<()> {
+    let badge = normalize_badge(badge);
+    let (index, hash) = if badge.is_empty() {
+        (String::new(), String::new())
+    } else {
+        let key = badge_index_key(db, hub_id).await?;
+        (badge_index(&key, &badge), hash_secret_argon2(&badge)?)
+    };
+    let mut p = Params::new();
+    p.insert("id".into(), json!(user_id));
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("badge_index".into(), json!(index));
+    p.insert("badge_hash".into(), json!(hash));
+    db.execute(
+        "UPDATE hub_user SET badge_index = :badge_index, badge_hash = :badge_hash \
+          WHERE id = :id AND hub_id = :hub_id",
+        &p,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Las filas **activas** de este hub cuyo índice coincide con `badge`, con su hash. Una consulta
+/// indexada: es la puerta única por la que pasan el login, el alta y la aprobación.
+async fn badge_candidates(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    badge: &str,
+    columns: &str,
+) -> Result<(String, Vec<serde_json::Value>)> {
+    let key = badge_index_key(db, hub_id).await?;
+    let index = badge_index(&key, badge);
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("badge_index".into(), json!(index.clone()));
+    let res = db
+        .query(
+            &format!(
+                "SELECT {columns} FROM hub_user \
+                  WHERE hub_id = :hub_id AND is_active = 1 AND badge_index = :badge_index"
+            ),
+            &p,
+        )
+        .await?;
+    Ok((index, res.rows))
+}
+
+/// Resuelve una placa a su dueño **activo**. `None` = nadie de este hub la lleva.
+///
+/// La placa sustituye al par (nombre, PIN) del pinpad, no al PIN: identifica a la persona entera.
+pub async fn verify_badge(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    badge: &str,
+) -> Result<Option<BadgeMatch>> {
+    let badge = normalize_badge(badge);
+    if badge.is_empty() {
+        return Ok(None); // toda fila sin placa guarda la cadena vacía: nunca es una credencial.
+    }
+    let (index, rows) = badge_candidates(
+        db,
+        hub_id,
+        &badge,
+        "id, name, role, cloud_user_id, is_active, badge_hash",
+    )
+    .await?;
+    for row in &rows {
+        if verify_secret_argon2(row["badge_hash"].as_str().unwrap_or_default(), &badge) {
+            return Ok(Some(BadgeMatch {
+                user: row_to_user(row),
+                badge_index: index,
+            }));
+        }
+    }
+    Ok(None)
+}
+
+/// `true` si esta placa ya abre la sesión de **otro** usuario activo del hub. El gemelo de
+/// [`pin_is_taken`] — pero por índice, no recorriendo la tabla.
+///
+/// Dos personas detrás de una tarjeta es peor que dos detrás de un PIN: una tarjeta se presta.
+pub async fn badge_is_taken(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    badge: &str,
+    excluding_id: Option<&str>,
+) -> Result<bool> {
+    let badge = normalize_badge(badge);
+    if badge.is_empty() {
+        return Ok(false); // sin placa, no hay choque.
+    }
+    let (_, rows) = badge_candidates(db, hub_id, &badge, "id, badge_hash").await?;
+    for row in &rows {
+        let id = row["id"].as_str().unwrap_or_default();
+        if excluding_id.is_some_and(|excluded| excluded == id) {
+            continue;
+        }
+        if verify_secret_argon2(row["badge_hash"].as_str().unwrap_or_default(), &badge) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 // ── Usuarios ────────────────────────────────────────────────────────────────────────────────
 
 /// Crea un usuario local. `pin` vacío = usuario sin PIN (login por otro método). Devuelve su id.
@@ -991,6 +1277,24 @@ pub async fn create_session(
     ttl_secs: i64,
     device_id: Option<&str>,
 ) -> Result<String> {
+    create_session_with_credential(db, hub_id, user_id, ttl_secs, device_id, &Credential::unknown())
+        .await
+}
+
+/// [`create_session`] diciendo además **con qué se probó la identidad** (hub#658).
+///
+/// Es la mitad de la traza que vive en el login: la otra está en `_elevation_audit`. Se escribe en
+/// la fila de la sesión —y no en una tabla aparte— porque la pregunta que contesta es «¿quién abrió
+/// ESTA sesión y con qué?», y la sesión es justo la fila que ya sabe cuándo, en qué dispositivo y
+/// de quién.
+pub async fn create_session_with_credential(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    ttl_secs: i64,
+    device_id: Option<&str>,
+    credential: &Credential,
+) -> Result<String> {
     let token = format!("{}{}", new_id(), new_id()).replace('-', "");
     let expires = (chrono::Utc::now() + chrono::Duration::seconds(ttl_secs)).to_rfc3339();
     let mut p = Params::new();
@@ -1000,9 +1304,14 @@ pub async fn create_session(
     p.insert("now".into(), json!(now_rfc3339()));
     p.insert("expires".into(), json!(expires));
     p.insert("device_id".into(), json!(device_id));
+    p.insert("credential_kind".into(), json!(credential.kind));
+    p.insert("credential_ref".into(), json!(credential.reference));
     db.execute(
-        "INSERT INTO hub_session (token, hub_id, user_id, created_at, expires_at, device_id) \
-          VALUES (:token, :hub_id, :user_id, :now, :expires, :device_id)",
+        "INSERT INTO hub_session \
+           (token, hub_id, user_id, created_at, expires_at, device_id, credential_kind, \
+            credential_ref) \
+          VALUES (:token, :hub_id, :user_id, :now, :expires, :device_id, :credential_kind, \
+                  :credential_ref)",
         &p,
     )
     .await?;
@@ -1291,9 +1600,13 @@ mod tests {
     /// tras el baseline, igual que `device_trust_gate` monta `hub_trusted_device` (v2) a mano.
     async fn setup_identity(db: &PgAdapter) {
         ensure_tables(db).await.unwrap();
-        db.execute_batch("ALTER TABLE hub_session ADD COLUMN device_id TEXT;")
-            .await
-            .unwrap();
+        db.execute_batch(
+            "ALTER TABLE hub_session ADD COLUMN device_id TEXT;\
+             ALTER TABLE hub_session ADD COLUMN credential_kind TEXT NOT NULL DEFAULT '';\
+             ALTER TABLE hub_session ADD COLUMN credential_ref TEXT NOT NULL DEFAULT '';",
+        )
+        .await
+        .unwrap();
     }
 
     /// `ensure_tables` + las columnas que el login cloud necesita y el baseline v0 no trae:
@@ -1311,13 +1624,18 @@ mod tests {
         .unwrap();
     }
 
-    /// Como [`ensure_identity_email`] pero además con `hub_session.device_id` (v8), para los tests
-    /// de revocación que abren una sesión de verdad y comprueban que muere con la membresía.
+    /// Como [`ensure_identity_email`] pero además con `hub_session.device_id` (v8) y las dos
+    /// columnas de la traza de credencial (**v48**, hub#658), para los tests de revocación que
+    /// abren una sesión de verdad y comprueban que muere con la membresía.
     async fn ensure_identity_with_sessions(db: &PgAdapter) {
         ensure_identity_email(db).await;
-        db.execute_batch("ALTER TABLE hub_session ADD COLUMN device_id TEXT;")
-            .await
-            .unwrap();
+        db.execute_batch(
+            "ALTER TABLE hub_session ADD COLUMN device_id TEXT;\
+             ALTER TABLE hub_session ADD COLUMN credential_kind TEXT NOT NULL DEFAULT '';\
+             ALTER TABLE hub_session ADD COLUMN credential_ref TEXT NOT NULL DEFAULT '';",
+        )
+        .await
+        .unwrap();
     }
 
     /// `true` si el `hub_user` sigue activo.

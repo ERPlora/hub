@@ -1341,6 +1341,40 @@ test('hub#363: the ask can mint an approval, and the endpoint + header are the S
   assert.equal(calls[2].headers['X-Elevation-Token'], 'tok-xyz');
 });
 
+test('hub#658: a BADGE mints the same approval, and it travels as a badge — not as a name+PIN', async () => {
+  // The market decision of hub#658: swiping the manager's card IS the approval. It is its own door
+  // on the ask (`approveWithBadge`) and not an overload of `approve`, because a badge resolves the
+  // whole person — there is no name to pass. What must NOT change is the wire on the way back: the
+  // same endpoint, the same `X-Elevation-Token` on the retry, the same shape of answer.
+  const approved = {
+    ok: true,
+    data: {
+      token: 'tok-badge',
+      permission: 'till.void_sale',
+      approved_by: 'u-sofia',
+      approver_name: 'Sofía',
+      expires_in_seconds: 120,
+    },
+  };
+  const { fetchImpl, calls } = scriptedFetch([REFUSED, approved, WENT_THROUGH]);
+  const t = new HttpWsTransport({
+    fetchImpl,
+    headers: () => ({ 'X-Hub-Id': 'h1' }),
+    elevationApprover: async (ask) => (await ask.approveWithBadge('0009171456')).token,
+  });
+
+  assert.deepEqual(await t.command('till.sale.void', { sale_id: 's1' }), { voided: true });
+  assert.equal(calls[1].url, '/api/elevation/approve');
+  // No `approver`, no `pin`: sending an empty name next to a badge would make the runtime's
+  // «one credential per request» branch depend on the emptiness of a string.
+  assert.deepEqual(calls[1].body, {
+    badge: '0009171456',
+    command: 'till.sale.void',
+    payload: { sale_id: 's1' },
+  });
+  assert.equal(calls[2].headers['X-Elevation-Token'], 'tok-badge');
+});
+
 test('hub#363: a refused PIN throws the runtime\'s stable code, so the dialog can try again', async () => {
   // The dialog stays open on a refusal — the manager mistyped, they retype. That only works if the
   // ask hands the failure back instead of tearing the whole flow down.

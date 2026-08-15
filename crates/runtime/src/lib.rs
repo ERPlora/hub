@@ -1088,6 +1088,31 @@ impl Runtime {
         identity::list_pin_users(self.db.as_ref(), &self.hub_id).await
     }
 
+    // ── Placa de empleado (hub#658). Hermana del PIN: ver `identity`. ───────────────────────
+
+    /// Resuelve una **placa** a su dueño activo. La placa sustituye al par (nombre, PIN) del
+    /// pinpad, nunca al PIN.
+    pub async fn verify_badge(&self, badge: &str) -> Result<Option<identity::BadgeMatch>> {
+        identity::verify_badge(self.db.as_ref(), &self.hub_id, badge).await
+    }
+
+    /// Fija (o **retira**, con `badge` vacío) la placa de un usuario. No toca su PIN.
+    pub async fn set_user_badge(&self, user_id: &str, badge: &str) -> Result<()> {
+        identity::set_badge(self.db.as_ref(), &self.hub_id, user_id, badge).await
+    }
+
+    /// `true` si esta placa ya es de **otro** usuario activo del hub.
+    pub async fn badge_is_taken(&self, badge: &str, excluding_id: Option<&str>) -> Result<bool> {
+        identity::badge_is_taken(self.db.as_ref(), &self.hub_id, badge, excluding_id).await
+    }
+
+    /// La clave HMAC con la que este hub indexa sus placas (se acuña en la primera llamada).
+    /// Expuesta para que la capa HTTP pueda derivar el índice de una placa **sin** verla en claro
+    /// más allá de la petición — p. ej. para limitar los intentos por tarjeta en el login.
+    pub async fn badge_index_key(&self) -> Result<Vec<u8>> {
+        identity::badge_index_key(self.db.as_ref(), &self.hub_id).await
+    }
+
     /// **The manager approves one action** (hub#361, PLAN paso 2b rules 2 and 4).
     ///
     /// `requester` is the cashier whose command was refused with
@@ -1159,16 +1184,35 @@ impl Runtime {
             ));
         }
 
-        let approver = identity::verify_pin(self.db.as_ref(), &self.hub_id, req.approver_name, req.pin)
-            .await?
-            // One answer for an unknown name, a wrong PIN and a deactivated user: a dialog at the
-            // counter must not become a way to find out who works here.
-            .ok_or_else(|| {
-                reject(
-                    "rejected",
-                    "those details do not approve this action. Check the name and the PIN.",
-                )
-            })?;
+        // **Two presentations of one identity** (hub#658). The PIN resolves NAME + digits; a badge
+        // resolves the person on its own. Both land on the same `hub_user`, and everything below
+        // this point — including the `approver_cannot` check, which is what rule 5 actually is —
+        // reads the ROLE, never how the person proved they were standing there.
+        //
+        // One answer for all the ways this can fail — an unknown name, a wrong PIN, a card nobody
+        // carries, a deactivated user: a dialog at the counter must not become a way to find out
+        // who works here, nor which cards this shop has issued.
+        let rejected = || {
+            reject(
+                "rejected",
+                "those details do not approve this action. Check the name and the PIN.",
+            )
+        };
+        let (approver, credential) = match req.credential {
+            elevation::ApproverCredential::Pin { name, pin } => (
+                identity::verify_pin(self.db.as_ref(), &self.hub_id, name, pin)
+                    .await?
+                    .ok_or_else(rejected)?,
+                identity::Credential::pin(),
+            ),
+            elevation::ApproverCredential::Badge { badge } => {
+                let matched = identity::verify_badge(self.db.as_ref(), &self.hub_id, badge)
+                    .await?
+                    .ok_or_else(rejected)?;
+                let credential = identity::Credential::badge(&matched.badge_index);
+                (matched.user, credential)
+            }
+        };
 
         if !permissions::has(
             &RequestContext::new(
@@ -1194,6 +1238,7 @@ impl Runtime {
                 permission: permission.clone(),
             },
             &approver.id,
+            credential,
         );
         Ok(elevation::ElevationApproval {
             token,
@@ -1329,6 +1374,26 @@ impl Runtime {
         device_id: Option<&str>,
     ) -> Result<String> {
         identity::create_session(self.db.as_ref(), &self.hub_id, user_id, ttl_secs, device_id).await
+    }
+
+    /// [`Runtime::create_session`] dejando escrito **con qué se probó la identidad** (hub#658):
+    /// es la mitad de la traza que vive en el login. Lo usa la capa HTTP en cada puerta de login.
+    pub async fn create_session_with_credential(
+        &self,
+        user_id: &str,
+        ttl_secs: i64,
+        device_id: Option<&str>,
+        credential: &identity::Credential,
+    ) -> Result<String> {
+        identity::create_session_with_credential(
+            self.db.as_ref(),
+            &self.hub_id,
+            user_id,
+            ttl_secs,
+            device_id,
+            credential,
+        )
+        .await
     }
 
     /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con

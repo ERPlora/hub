@@ -1451,6 +1451,65 @@ ALTER TABLE _print_host ADD COLUMN IF NOT EXISTS station_id TEXT NOT NULL DEFAUL
 CREATE INDEX IF NOT EXISTS ix_print_queue_station ON _print_queue (hub_id, station_id, status, seq);\
 CREATE INDEX IF NOT EXISTS ix_print_host_station ON _print_host (hub_id, station_id, last_seen_at);",
     },
+    // ── v48 — hub#658: la PLACA de empleado, hermana del PIN, y la traza de qué se usó ────────
+    // Decisión de mercado publicada en la issue (15 referencias). Tres cosas, y las tres aditivas:
+    //
+    // 1. **`hub_user.badge_index` + `hub_user.badge_hash`** — la credencial. Hermana de `pin_hash`,
+    //    en la MISMA fila, porque placa y PIN son dos presentaciones de la misma identidad. Dos
+    //    columnas y no una: el índice (HMAC-SHA256 con la clave del hub) es por lo que se BUSCA, el
+    //    argon2 es lo que PRUEBA. Copiar el patrón de `pin_is_taken` —recorrer las filas verificando
+    //    argon2— sería un argon2 por fila en cada tap de la puerta de login: con cuatro dígitos vale,
+    //    con una placa de alta entropía es un DoS contra la propia caja. El índice estrecha a una
+    //    fila en SQL; de ahí `ix_hub_user_badge`.
+    //
+    // 2. **`_hub_badge_key`** — la clave del hub con la que se deriva ese índice. Tabla propia y no
+    //    `hub_settings` a propósito: en settings la leería cualquiera que pueda leer la
+    //    configuración, y esa clave es lo único que impide construir el índice de un número de
+    //    tarjeta a voluntad (el espacio de UIDs EM4100/MIFARE es pequeño y público, así que un hash
+    //    sin clave se invierte con una tabla precalculada). Se acuña una vez, con aleatoriedad del
+    //    SO, la primera vez que alguien enrola una placa.
+    //
+    // 3. **`credential_kind` + `credential_ref` en `hub_session` y en `_elevation_audit`** — la
+    //    traza, que es el criterio de aceptación que más valor tiene de toda la issue: ningún
+    //    competidor la registra, y sin ella «alguien usó mi tarjeta» es estructuralmente
+    //    irresoluble porque el log solo dice el empleado. `credential_ref` guarda el **índice** de
+    //    la placa, nunca el número impreso: identifica QUÉ tarjeta se pasó sin que la auditoría se
+    //    convierta en una lista de credenciales vivas.
+    //
+    // ⚠️ **`DEFAULT ''`, no `'pin'`.** Las filas anteriores a esta versión no dicen con qué se
+    // entró, y «no consta» es una respuesta distinta de «fue el PIN»: rellenarlas con `'pin'` sería
+    // inventar el dato exacto que esta columna existe para poder disputar. Vacío = anterior a la
+    // traza. Y `DEFAULT ''` en vez de `NOT NULL` a secas porque en la ventana del start-first
+    // (ADR-0269) el contenedor viejo sigue insertando sesiones sin estas columnas — y ahí un fallo
+    // NO se desanda solo: sería un login rechazado, no un reintento con backoff como en la v46.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`
+    // y `CREATE INDEX IF NOT EXISTS`. Sin backfill: los DEFAULT ya dejan a las filas existentes
+    // exactamente como tienen que quedar (sin placa, sin credencial declarada).
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice.** Al escribirla el máximo en
+    // `origin/develop` era v46 y había otra rama de esta misma tanda (hub#457) tomando la v47, así
+    // que esta tomó la **v48** dejando el hueco a propósito — un hueco por delante es inalcanzable
+    // y por tanto inofensivo, mientras que un número repetido ABORTA el arranque (hub#573) y, si se
+    // cuela, deja la tabla sin crear en un hub ya desplegado. hub#457 se mergeó antes y ocupó su
+    // v47, así que el hueco duró lo que duró el rebase y el catálogo queda seguido. Recomprobado
+    // contra `origin/develop` en cada push.
+    SystemMigration {
+        version: 48,
+        name: "hub_user_badge_credential",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS badge_index TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS badge_hash TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_hub_user_badge ON hub_user (hub_id, badge_index);\
+CREATE TABLE IF NOT EXISTS _hub_badge_key (\
+  hub_id TEXT NOT NULL, key_hex TEXT NOT NULL, created_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));\
+ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS credential_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DEFAULT '';",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3266,6 +3325,12 @@ mod kind_contract_tests {
         // cadena. Solo DDL — la siembra por hub vive en `print_stations::ensure_stations`, que
         // corre desde `apply` en cada arranque porque una migración se registra por BASE DE DATOS
         // y esto hace falta por HUB.
-        assert_eq!(MIGRATIONS.len(), 44, "el catálogo cambió de tamaño");
+        // + `hub_user_badge_credential` (v48, hub#658): la placa de empleado, hermana del PIN, y la
+        // traza de con qué se probó la identidad. Tomó el **48** dejando libre el 47 a propósito,
+        // porque hub#457 iba a por él en la misma tanda — y en efecto lo cogió y se mergeó antes,
+        // así que el hueco duró lo que duró el rebase. Es la lección de la v46 (que nació como v45 y
+        // chocó) aplicada **por delante** en vez de por detrás: un hueco no se puede coger por
+        // accidente, un número repetido sí, y ese aborta el arranque de un hub ya desplegado.
+        assert_eq!(MIGRATIONS.len(), 45, "el catálogo cambió de tamaño");
     }
 }

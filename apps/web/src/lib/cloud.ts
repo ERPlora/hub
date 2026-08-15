@@ -436,6 +436,23 @@ export async function runtimePinLogin(name: string, pin: string): Promise<HubSes
   );
 }
 
+/**
+ * Login por **placa** (hub#658): la tarjeta resuelve la identidad entera, así que no viaja nombre.
+ *
+ * Hermana de `runtimePinLogin` y no su sustituta: el PIN sigue siendo la vía de vuelta cuando la
+ * tarjeta se pierde. El runtime aplica exactamente las mismas barandillas que al PIN —device-trust,
+ * límite de intentos y límite de dispositivos del plan— y contesta 401 sin decir nunca si esa placa
+ * existe.
+ */
+export async function runtimeBadgeLogin(badge: string): Promise<HubSessionResult> {
+  const deviceId = await resolveDeviceId();
+  return runtimePost<HubSessionResult>(
+    '/api/auth/badge',
+    { badge, ...(deviceId ? { device_id: deviceId } : {}) },
+    {},
+  );
+}
+
 /** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */
 export async function runtimeSetPin(pin: string, sessionToken: string): Promise<void> {
   await runtimePost<{ ok: boolean }>('/api/auth/set-pin', { pin }, { 'X-Hub-Session': sessionToken });

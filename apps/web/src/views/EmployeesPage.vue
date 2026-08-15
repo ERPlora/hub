@@ -396,7 +396,9 @@ const userColumns = computed<DataTableColumn[]>(() => [
       const access = accessOf(row as unknown as HubUser);
       return badgeCell(
         t(`employees.access.${access}`),
-        access === 'pin' ? 'primary' : access === 'cloud' ? 'neutral' : 'danger',
+        // `danger` está reservado a `none` — «no puede entrar» —, así que toda vía real es
+        // `primary`; la placa (hub#658) es una credencial más, no una anomalía.
+        access === 'none' ? 'danger' : access === 'cloud' ? 'neutral' : 'primary',
       );
     },
   },
