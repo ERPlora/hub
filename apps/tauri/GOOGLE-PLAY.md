@@ -52,7 +52,11 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
    registra la upload key (keystore ADR-0053) y activa Play App Signing. Formularios: Data
    safety · content rating IARC · privacy policy URL · screenshots (mín. 2) + feature graphic
    1024×500 + icono 512×512.
-3. Cablear la publicación automática en **este** repo (hub#308).
+3. Cablear la publicación automática en **este** repo (hub#308): poner la Variable
+   `PLAY_PACKAGE_NAME` (+ el secret `PLAY_SERVICE_ACCOUNT_JSON`) y **quitar `play` de
+   `RELEASE_CHANNELS_PENDING`** (hub#895). Mientras `play` siga en esa lista, el job
+   `release-gate` deja pasar el tag en verde avisando de que Play no publicó; en cuanto se
+   quita, un tag que no llegue a Play sale **rojo**.
 4. Promoción `internal` → `production` manual en consola (cuenta org = sin closed testing
    obligatorio).
 5. Con la ficha LIVE: setting `GOOGLE_PLAY_APP_ID=com.erplora.app` en Dokploy (saas-web) → la
