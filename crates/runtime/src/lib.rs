@@ -660,6 +660,33 @@ impl Runtime {
         settings::ensure_demo_fiscal_identity(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// Seeds `country_code` with the country the SaaS acuñó at provisioning (`HUB_COUNTRY`,
+    /// ADR-0207). Never overwrites an answer this hub already has — see
+    /// [`settings::ensure_provisioned_country`].
+    pub async fn ensure_provisioned_country(&self, country: &str) -> Result<bool> {
+        settings::ensure_provisioned_country(self.db.as_ref(), &self.hub_id, country).await
+    }
+
+    /// **Where this hub is** (ADR-0062, hub#69): `(country_code, region_code)` from `hub_settings`,
+    /// which is what the marketplace catalogue has to be asked about.
+    ///
+    /// Tolerant on purpose — a hub whose settings cannot be read answers `("", "")`, which the
+    /// caller turns into "no filter". A failure here must not empty the shelf: not being able to
+    /// tell where a hub is is a reason to show everything, never to show nothing.
+    pub async fn country_and_region(&self) -> (String, String) {
+        let Ok(settings) = settings::get_all(self.db.as_ref(), &self.hub_id).await else {
+            return (String::new(), String::new());
+        };
+        let read = |key: &str| {
+            settings
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        };
+        (read("country_code"), read("region_code"))
+    }
+
     /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
     /// cierre, para que el cliente sepa cuál de los tres se negó.
     fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {

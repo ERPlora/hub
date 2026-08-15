@@ -477,6 +477,8 @@ export default {
         'A demo always stays in the tax authority’s test environment. Create your own business at erplora.com to file for real.',
       business_tax_id_frozen:
         'The tax id can no longer be changed: this business has already issued under it.',
+      hub_country_frozen:
+        'The country can no longer be changed: this business already files under its tax rules. Get in touch with us if the business really did move.',
     },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',

@@ -726,6 +726,31 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
+    // **El PAÍS que el SaaS acuñó al aprovisionar** (`HUB_COUNTRY`, ADR-0207 — hub#69). Va AQUÍ,
+    // después del seed SQL (que también puede escribir `country_code`, y quien lo escribe manda
+    // sobre un default) y ANTES del perfil fiscal, que deriva el régimen del país: sembrarlo
+    // después dejaría el perfil calculado sobre el país equivocado hasta el siguiente arranque.
+    //
+    // Se lee del entorno aquí y no en `HubConfig` por lo mismo que `HUB_SEED_SQL` o
+    // `HUB_OWNER_EMAIL`: es una entrada de ARRANQUE que se consume una vez y no vuelve a hacer
+    // falta — a partir de este punto la autoridad es `hub_settings.country_code`, que es lo único
+    // que leen el motor de impuestos, la checklist y el filtro del marketplace.
+    //
+    // NUNCA pisa una respuesta que el hub ya tenga: el env es la SUGERENCIA del alta («corregible»,
+    // ADR-0207), y quien la corrigió en Ajustes manda sobre ella.
+    match state
+        .runtime
+        .lock()
+        .await
+        .ensure_provisioned_country(&std::env::var("HUB_COUNTRY").unwrap_or_default())
+        .await
+    {
+        Ok(true) => eprintln!("país: `country_code` sembrado desde HUB_COUNTRY (ADR-0207)"),
+        Ok(false) => {}
+        // No aborta el arranque: un hub que no abre es peor que un hub con el país por defecto.
+        Err(e) => eprintln!("✗ país: no se pudo sembrar el país del aprovisionamiento: {e}"),
+    }
+
     // **La DEMO arranca con su identidad fiscal ya puesta** (hub#684). Va AQUÍ, después del seed
     // (que escribe el `country_code`) y ANTES del perfil fiscal, que es quien deriva `READY` de
     // «identidad ∧ certificado»: sembrarla después dejaría el perfil calculado sobre un hub sin
@@ -2834,21 +2859,27 @@ async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Re
 }
 
 async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    {
+    // **The country the catalogue is asked about is read HERE, from this hub's own settings**
+    // (ADR-0062, hub#69) — never from the request. The page cannot widen what its till is offered,
+    // and it does not have to know the rule: what comes back is already filtered.
+    let country = {
         let rt = st.runtime.lock().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
-    }
+        let (country_code, region_code) = rt.country_and_region().await;
+        cloud_client::CountryFilter::new(&country_code, &region_code)
+    };
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     if st.is_dev_hub() {
-        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules()).await;
+        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules(&country))
+            .await;
     }
     let placeholder = cloud_client::Auth::HubToken {
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder)).await {
+    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &country)).await {
         Ok((status, body)) => {
             let rt = st.runtime.lock().await;
             if let Err(e) =
@@ -3272,6 +3303,9 @@ pub(crate) fn err_status_and_code(
         // own code, never the demo one — the demo lock has a way out (create your own hub) and this
         // one does not.
         E::BusinessTaxIdFrozen { .. } => (StatusCode::CONFLICT, "business_tax_id_frozen".into()),
+        // hub#69: same 409 as its sibling — the request is well formed, the STATE of the hub is
+        // what refuses it (ADR-0273: the country freezes at go-live).
+        E::HubCountryFrozen { .. } => (StatusCode::CONFLICT, "hub_country_frozen".into()),
         // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
         // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling

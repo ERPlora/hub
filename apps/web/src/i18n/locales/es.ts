@@ -444,6 +444,8 @@ export default {
         'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio negocio en erplora.com para remitir de verdad.',
       business_tax_id_frozen:
         'El NIF ya no se puede cambiar: este negocio ya ha emitido con él.',
+      hub_country_frozen:
+        'El país ya no se puede cambiar: este negocio ya declara con sus normas fiscales. Escríbenos si el negocio se ha mudado de verdad.',
     },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',
