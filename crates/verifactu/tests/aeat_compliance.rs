@@ -250,10 +250,24 @@ fn record_alta_centimos(record_hash: &str) -> serde_json::Value {
 
 fn config_minima() -> serde_json::Value {
     json!({
+        // Las columnas editables `software_*` ya NO deciden la identidad del fabricante
+        // (hub#323): se dejan puestas, y con valores distintos a propósito, porque el XML no
+        // debe contener ninguno de ellos.
         "software_name": "ERPlora",
         "software_nif": "B99999999",
         "software_id": "01",
         "software_version": "1.0",
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
     })
 }
 

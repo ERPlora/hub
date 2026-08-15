@@ -273,6 +273,21 @@ async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>
             m.insert("certificate_type".into(), json!(certificate_type));
         }
     }
+
+    // Los hechos del productor (hub#323): identidad del fabricante + `IndicadorMultiplesOT`, que
+    // el hub NO puede saber y que el plano de control sirve en el latido. Viajan pegados a la
+    // config —igual que los marcadores del certificado— para que el constructor del XML lea UN
+    // objeto y no sepa que existe un Cloud. Ausentes = ausentes: no hay defaults para una
+    // declaración legal, y `sistema_informatico` se niega a construir el registro.
+    //
+    // Se ADJUNTAN a la config, nunca la CREAN: «este hub no tiene config de VeriFactu» tiene que
+    // seguir contestando `None` a quien pregunta. Los hechos del productor son de la flota, no de
+    // este hub, y no convierten un módulo sin configurar en uno configurado.
+    if let Some(obj) = config.as_mut().and_then(Json::as_object_mut) {
+        if let Some(facts) = host.producer_facts().await.unwrap_or_default() {
+            obj.insert("producer_facts".into(), facts);
+        }
+    }
     Ok(config)
 }
 
@@ -3269,6 +3284,20 @@ mod environment_chain_tests {
         /// because these tests are about the CHAIN and not about which certificate signs.
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
             Ok(self.has_core_certificate.then(|| "own".to_string()))
+        }
+
+        /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
+        /// envelope can be built at all, so a fixture that transmits has to answer this.
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(Some(json!({
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            })))
         }
 
         async fn write_static_file(

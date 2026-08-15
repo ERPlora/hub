@@ -7,6 +7,7 @@
 //! fabricated zero.
 
 use erplora_db::{DatabaseAdapter, Params};
+use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -75,6 +76,17 @@ pub struct HeartbeatResponse {
     /// a proxy can answer something that is not JSON at all. Reading either as `0` would be reading
     /// «the control plane has no certificate» out of silence.
     pub cert_version: Option<i64>,
+    /// The manufacturer's half of `SistemaInformatico` (ADR-0202 §5.1 — hub#323), when the block
+    /// came and was valid.
+    ///
+    /// It rides the beat instead of being announced: ~80 bytes of PUBLIC data, so a version
+    /// number to trigger a fetch would cost more —in bytes, in state and in one more state
+    /// machine on this side— than the payload it would be guarding. The certificate is versioned
+    /// precisely because it is the opposite: a private key that cannot travel in a 60-second loop.
+    ///
+    /// `None` again means «nothing was announced», and it is NOT a set of defaults: there are
+    /// none for a legal declaration. The engine refuses to build an envelope it cannot fill.
+    pub producer: Option<ProducerFacts>,
 }
 
 impl HeartbeatResponse {
@@ -85,15 +97,23 @@ impl HeartbeatResponse {
     /// a body this hub cannot understand must not turn into an error that stops the clock. The
     /// certificate announcement is an extra that rides along, and it degrades to «no news».
     pub fn parse(body: &str) -> Self {
-        let announced = serde_json::from_str::<Value>(body)
-            .ok()
-            .and_then(|value| value.get("cert_version").and_then(Value::as_i64))
+        let Ok(body) = serde_json::from_str::<Value>(body) else {
+            return Self::default();
+        };
+        let announced = body
+            .get("cert_version")
+            .and_then(Value::as_i64)
             // A negative version cannot exist (`DelegatedCertificate.version` starts at 0 and only
             // grows). Treating it as an announcement would make the hub chase a version nobody can
             // serve, once per heartbeat, against a budgeted endpoint.
             .filter(|version| *version >= 0);
+        // `ProducerFacts::parse` is the validation, and it is deliberately all-or-nothing: these
+        // fields are identical across the fleet, so one bad character is AEAT error 1100 on every
+        // record of every hub. A block that would be rejected is treated as no block, which keeps
+        // whatever this hub already had.
         Self {
             cert_version: announced,
+            producer: body.get("producer").and_then(ProducerFacts::parse),
         }
     }
 }
@@ -182,7 +202,16 @@ pub async fn send_heartbeat(
     // caller may confirm it. The body is a bonus, so a truncated read degrades to «nothing
     // announced» rather than undoing a heartbeat that the Cloud already recorded.
     let body = response.text().await.unwrap_or_default();
-    Ok(HeartbeatResponse::parse(&body))
+    let answer = HeartbeatResponse::parse(&body);
+    // The manufacturer's facts are installed HERE and not by each caller (ADR-0202 §5.1 —
+    // hub#323): both the boot announce and the 60-second loop go through this function, so the
+    // boot one doubles as the pull the fiscal endpoint exists for, and there is no second place
+    // that can forget. Nothing below the host learns that a control plane exists — the engine
+    // reads the cache through `NativeHost::producer_facts`.
+    if let Some(facts) = answer.producer.clone() {
+        ProducerFactsCache::global().store(facts);
+    }
+    Ok(answer)
 }
 
 fn value_as_u64(value: &Value) -> Option<u64> {
@@ -397,7 +426,8 @@ mod tests {
         assert_eq!(
             HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 4}"#),
             HeartbeatResponse {
-                cert_version: Some(4)
+                cert_version: Some(4),
+                producer: None,
             }
         );
         // `0` es un anuncio de pleno derecho: «no he subido nada» (y el hub NO debe pedir el GET).
@@ -427,6 +457,56 @@ mod tests {
         assert_eq!(HeartbeatResponse::parse("<html>502</html>").cert_version, None);
         assert_eq!(HeartbeatResponse::parse("").cert_version, None);
         assert_eq!(HeartbeatResponse::parse("[]").cert_version, None);
+    }
+
+    // ── The manufacturer's facts ride the beat (ADR-0202 §5.1 — hub#323) ─────────────────────
+    //
+    // `SistemaInformatico` needs seven fields this hub cannot know: the manufacturer's identity
+    // and `IndicadorMultiplesOT`, which the AEAT computes per ACCOUNT. They are ~80 bytes and
+    // public, so they travel inline every minute instead of being announced by a version number
+    // the hub would then have to go and fetch.
+
+    fn served_producer_body() -> String {
+        r#"{"ok": true, "producer": {
+             "NombreRazon": "ERPLORA CLOUD SL", "NIF": "B27593136",
+             "NombreSistemaInformatico": "ERPlora Hub", "IdSistemaInformatico": "EC",
+             "TipoUsoPosibleSoloVerifactu": "S", "TipoUsoPosibleMultiOT": "S",
+             "IndicadorMultiplesOT": "S"}}"#
+            .to_string()
+    }
+
+    /// 🔴 hub#323: the block was served (saas#1128) and the hub threw it away, so every record
+    /// kept declaring a hardcoded `IndicadorMultiplesOT = N`.
+    #[test]
+    fn the_beat_carries_the_manufacturer_s_facts() {
+        let facts = HeartbeatResponse::parse(&served_producer_body())
+            .producer
+            .expect("the block the SaaS serves must be read");
+
+        assert_eq!(facts.nombre_razon, "ERPLORA CLOUD SL");
+        assert_eq!(facts.nombre_sistema_informatico, "ERPlora Hub");
+        assert_eq!(
+            facts.indicador_multiples_ot, "S",
+            "this is the field only the control plane can compute"
+        );
+    }
+
+    /// A control plane from before saas#1128 says nothing, and nothing is not a set of defaults:
+    /// the hub keeps whatever it already had rather than inventing a legal declaration.
+    #[test]
+    fn a_beat_without_the_block_announces_no_facts() {
+        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#).producer.is_none());
+        assert!(HeartbeatResponse::parse("<html>502</html>").producer.is_none());
+    }
+
+    /// A block that would be rejected by the AEAT is not installed. These facts are identical for
+    /// the whole fleet, so one bad field is error 1100 on every record of every hub — keeping the
+    /// previous ones beats adopting a broken identity.
+    #[test]
+    fn a_block_the_aeat_would_reject_is_not_adopted() {
+        let broken = served_producer_body().replace(r#""IdSistemaInformatico": "EC""#, r#""IdSistemaInformatico": "ERPLORA-001""#);
+
+        assert!(HeartbeatResponse::parse(&broken).producer.is_none());
     }
 
     /// A version that cannot exist is not an announcement. `DelegatedCertificate.version` starts at

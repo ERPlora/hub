@@ -98,7 +98,20 @@ async fn consulta_real_contra_preproduccion() {
 fn validacion_xsd_sobre_el_xml_real() {
     let nif = env("ERPLORA_ISSUER_NIF");
     let name = env("ERPLORA_ISSUER_NAME");
-    let cfg = serde_json::json!({ "software_name": name, "software_nif": nif });
+    let cfg = serde_json::json!({
+        "software_name": name, "software_nif": nif,
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
+    });
     let f2 = serde_json::json!({
         "record_type": "alta", "issuer_nif": nif, "issuer_name": name,
         "invoice_number": "PRUEBA-XSD", "invoice_date": "2026-08-02", "invoice_type": "F2",

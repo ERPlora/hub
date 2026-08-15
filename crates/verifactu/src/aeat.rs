@@ -8,6 +8,8 @@
 //! modalidad "NO VERI*FACTU"). Por eso "firma PKCS#12" == identidad cliente TLS.
 use serde_json::Value as Json;
 
+use erplora_runtime::producer_facts::ProducerFacts;
+
 use crate::chain::{format_amount, format_date};
 use crate::VerifactuError;
 
@@ -213,53 +215,63 @@ fn facturas_sustituidas(record: &Json) -> String {
     )
 }
 
-/// Bloque `SistemaInformatico` (identificación del software, config del hub).
+/// Bloque `SistemaInformatico` — y **quién declara cada campo** (ADR-0202 §5.1, hub#323).
 ///
-/// La identidad del PRODUCTOR del software (ERPlora) es FIJA — la misma para todos los hubs, lo
-/// declara la AEAT. Si la config del módulo no la trae (fila vacía/stale), usamos el fallback
-/// hardcodeado en vez de emitir un NIF vacío (que la AEAT rechaza con error 1100).
-fn sistema_informatico(config: &Json, hub_id: &str) -> String {
-    // Fallback del productor: identidad legal de ERPlora como fabricante del software.
-    const PRODUCER_NAME: &str = "ERPLORA CLOUD SL";
-    const PRODUCER_NIF: &str = "B27593136";
-    const PRODUCER_ID: &str = "EC";
-    const PRODUCER_VERSION: &str = "1.0.0";
+/// Mezcla dos clases de hecho con dueños distintos, y confundirlos es lo que había:
+///
+/// - **el hub** declara `Version` (su propio binario: la flota está clavada a digests distintos,
+///   así que cada hub tiene que decir el SUYO) y `NumeroInstalacion` (su `hub_id`, §4.2);
+/// - **el plano de control** declara los otros siete: la identidad del fabricante, las capacidades
+///   del producto y `IndicadorMultiplesOT`, que la AEAT calcula **por cuenta** —sobre cuántas
+///   facturaciones ha creado su propietario— y que un hub no puede ver.
+///
+/// Lo que se retira con esto: la `Version` hardcodeada a `"1.0.0"` (la flota corre v1.1.2 y cada
+/// registro declaraba una versión que no existe), el `IndicadorMultiplesOT` clavado a `N`, el
+/// mismo nombre emitido como fabricante Y como producto, y el fallback a las columnas editables
+/// `verifactu_config.software_*` — que es por donde entró un `IdSistemaInformatico` de 11
+/// caracteres y el error 1100 en todos los registros.
+///
+/// **Sin los hechos no hay sobre.** No hay defaults para una declaración legal: un hub al que
+/// nadie se los ha dicho todavía deja el registro en la cola de contingencia hasta el siguiente
+/// latido (un minuto como mucho, y sin llegar al Cloud tampoco podría transmitir), en vez de
+/// inventarse el dato — que es exactamente el defecto que se está arreglando.
+fn sistema_informatico(config: &Json, hub_id: &str) -> Result<String, VerifactuError> {
+    let facts = config
+        .get("producer_facts")
+        .and_then(ProducerFacts::parse)
+        .ok_or_else(|| {
+            VerifactuError::Payload(
+                "faltan los hechos del productor (`SistemaInformatico`): este hub todavía no los \
+                 ha recibido del plano de control, o el bloque no es válido. Sin ellos no se \
+                 puede construir el registro"
+                    .into(),
+            )
+        })?;
 
-    let name = nonempty(s(config, "software_name"), PRODUCER_NAME);
-    let nif = nonempty(s(config, "software_nif"), PRODUCER_NIF);
-    // IdSistemaInformatico: la AEAT lo limita a 2 caracteres y es un valor FIJO asignado al
-    // software ERPlora. No se lee de la BD (que puede tener valores legacy inválidos como
-    // "ERPLORA-001" de 11 chars → la AEAT rechaza con error 1100).
-    let id = PRODUCER_ID.to_string();
-    let version = nonempty(s(config, "software_version"), PRODUCER_VERSION);
-
-    format!(
+    Ok(format!(
         "<sum1:SistemaInformatico>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
          <sum1:NIF>{nif}</sum1:NIF>\
-         <sum1:NombreSistemaInformatico>{name}</sum1:NombreSistemaInformatico>\
+         <sum1:NombreSistemaInformatico>{product}</sum1:NombreSistemaInformatico>\
          <sum1:IdSistemaInformatico>{id}</sum1:IdSistemaInformatico>\
          <sum1:Version>{version}</sum1:Version>\
          <sum1:NumeroInstalacion>{hub}</sum1:NumeroInstalacion>\
-         <sum1:TipoUsoPosibleSoloVerifactu>S</sum1:TipoUsoPosibleSoloVerifactu>\
-         <sum1:TipoUsoPosibleMultiOT>S</sum1:TipoUsoPosibleMultiOT>\
-         <sum1:IndicadorMultiplesOT>N</sum1:IndicadorMultiplesOT>\
+         <sum1:TipoUsoPosibleSoloVerifactu>{solo}</sum1:TipoUsoPosibleSoloVerifactu>\
+         <sum1:TipoUsoPosibleMultiOT>{multi}</sum1:TipoUsoPosibleMultiOT>\
+         <sum1:IndicadorMultiplesOT>{indicador}</sum1:IndicadorMultiplesOT>\
          </sum1:SistemaInformatico>",
-        name = esc(&name),
-        nif = esc(&nif),
-        id = esc(&id),
-        version = esc(&version),
+        name = esc(&facts.nombre_razon),
+        nif = esc(&facts.nif),
+        product = esc(&facts.nombre_sistema_informatico),
+        id = esc(&facts.id_sistema_informatico),
+        // La declara ESTE binario, y solo él puede: `CORE_VERSION` es el número del
+        // `[workspace.package]` con el que se construyó la imagen (hub#515/#521).
+        version = esc(erplora_runtime::CORE_VERSION),
         hub = esc(hub_id),
-    )
-}
-
-/// Devuelve `val` si no está vacío, si no `fallback`.
-fn nonempty(val: String, fallback: &str) -> String {
-    if val.is_empty() {
-        fallback.to_string()
-    } else {
-        val
-    }
+        solo = esc(&facts.tipo_uso_posible_solo_verifactu),
+        multi = esc(&facts.tipo_uso_posible_multi_ot),
+        indicador = esc(&facts.indicador_multiples_ot),
+    ))
 }
 // ── Desglose: el TIPO y la CALIFICACIÓN ───────────────────────────────────────────────────
 //
@@ -580,7 +592,7 @@ pub fn build_soap(
             num = esc(&s(record, "invoice_number")),
             fecha = esc(&format_date(&s(record, "invoice_date"))),
             chain = encadenamiento(record, prev),
-            sistema = sistema_informatico(config, hub_id),
+            sistema = sistema_informatico(config, hub_id)?,
             ts = esc(&gen_ts),
             hash = esc(&s(record, "record_hash")),
         )
@@ -621,7 +633,7 @@ pub fn build_soap(
             cuota = format_amount(amount(record, "tax_amount")? / 100.0),
             total = format_amount(amount(record, "total_amount")? / 100.0),
             chain = encadenamiento(record, prev),
-            sistema = sistema_informatico(config, hub_id),
+            sistema = sistema_informatico(config, hub_id)?,
             ts = esc(&gen_ts),
             hash = esc(&s(record, "record_hash")),
         )
@@ -645,6 +657,24 @@ pub fn build_soap(
         nif = esc(&s(record, "issuer_nif")),
         registro = registro,
     ))
+}
+
+/// La config mínima con la que un registro se puede declarar: los hechos del productor tal y como
+/// los sirve el plano de control (hub#323). Sin ellos no hay `SistemaInformatico` y por tanto no
+/// hay sobre, así que todo test que construya uno los necesita.
+#[cfg(test)]
+pub(crate) fn test_config_with_producer_facts() -> Json {
+    serde_json::json!({
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        }
+    })
 }
 
 /// El bloque de la `Cabecera` que declara que este envío sale de una **incidencia** (XSD:
@@ -1319,7 +1349,13 @@ mod desglose_tests {
     }
 
     fn xml_de(record: &Json) -> String {
-        build_soap(record, &json!({}), None, "hub-1").expect("el registro se puede declarar")
+        build_soap(
+            record,
+            &test_config_with_producer_facts(),
+            None,
+            "hub-1",
+        )
+        .expect("el registro se puede declarar")
     }
 
     /// EL caso del negocio: una caña (21%) y una tapa (10%) en el mismo ticket. Antes se declaraba
@@ -1681,7 +1717,7 @@ mod amount_tests {
     }
 
     fn build(record: &Json) -> Result<String, VerifactuError> {
-        build_soap(record, &json!({}), None, "hub-1")
+        build_soap(record, &test_config_with_producer_facts(), None, "hub-1")
     }
 
     /// The baseline: nothing removed, the envelope is built. Without this the tests below would
@@ -1880,7 +1916,8 @@ mod contingency_incidence_tests {
             "record_hash": "ABC123",
             "generation_timestamp": "2026-07-09T10:00:00+02:00",
         });
-        build_soap(&record, &json!({}), None, "hub-1").expect("declarable")
+        build_soap(&record, &test_config_with_producer_facts(), None, "hub-1")
+            .expect("declarable")
     }
 
     /// A punctual remission declares no incidence at all — the element is `minOccurs="0"` and
@@ -1957,5 +1994,181 @@ mod contingency_incidence_tests {
     fn an_unrecognised_envelope_is_returned_untouched() {
         let foreign = "<soapenv:Envelope><soapenv:Body/></soapenv:Envelope>";
         assert_eq!(stamp_contingency_incidence(foreign), foreign);
+    }
+}
+
+#[cfg(test)]
+mod producer_facts_tests {
+    //! **Who declares what in `SistemaInformatico`** (hub#323).
+    //!
+    //! Three things were wrong at once, and they were wrong in the same twelve lines:
+    //!
+    //! * `Version` was the string `"1.0.0"`, or whatever an editable config row happened to hold.
+    //!   The fleet runs pinned digests — v1.1.2 at the time of writing — so every record declared
+    //!   a version that does not exist;
+    //! * `IndicadorMultiplesOT` was nailed to `N`. It is computed by the SaaS **per account**,
+    //!   over how many facturaciones its owner created, and a hub cannot see that;
+    //! * the manufacturer's identity fell back to `verifactu_config.software_*` — an editable
+    //!   row, which is exactly the field that once held an 11-character `IdSistemaInformatico`
+    //!   and got error 1100 on every record.
+    use super::*;
+    use serde_json::json;
+
+    /// The block as the control plane serves it, keyed by the literal AEAT element names.
+    fn producer() -> Json {
+        json!({
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        })
+    }
+
+    fn config_with(producer_facts: Json) -> Json {
+        json!({ "producer_facts": producer_facts })
+    }
+
+    fn record() -> Json {
+        json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "Bar Paco SL",
+            "invoice_number": "F2026/1",
+            "invoice_date": "2026-07-09",
+            "invoice_type": "F2",
+            "description": "Ticket",
+            "base_amount": 1000.0,
+            "tax_amount": 210.0,
+            "total_amount": 1210.0,
+            "tax_rate": 21.0,
+            "tax_breakdown": r#"{"21.00":{"base":1000,"tax":210}}"#,
+            "record_hash": "ABC123",
+            "generation_timestamp": "2026-07-09T10:00:00+02:00",
+        })
+    }
+
+    fn xml_with(config: &Json) -> String {
+        build_soap(&record(), config, None, "hub-1").expect("declarable")
+    }
+
+    /// 🔴 The one that is a lie on every hub in the fleet: `Version` is the running binary's, and
+    /// nothing else can know it — two hubs on two digests must declare two numbers.
+    #[test]
+    fn the_version_is_the_running_binary_s() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(
+            xml.contains(&format!(
+                "<sum1:Version>{}</sum1:Version>",
+                erplora_runtime::CORE_VERSION
+            )),
+            "{xml}"
+        );
+        // ⚠️ In the source tree `CORE_VERSION` is the `[workspace.package]` value and the release
+        // CI rewrites it from the `v*` tag before building, so asserting it is NOT some particular
+        // number would prove nothing here. What has to hold is that the emitted number IS this
+        // binary's — hence the comparison above, and the config test right below, which is the one
+        // that would have caught the old hardcoded `"1.0.0"`.
+        assert_eq!(xml.matches("<sum1:Version>").count(), 1, "{xml}");
+    }
+
+    /// And it is NOT taken from the config: an editable row cannot tell this binary what binary
+    /// it is.
+    #[test]
+    fn a_config_row_cannot_rename_the_running_version() {
+        let mut config = config_with(producer());
+        config["software_version"] = json!("9.9.9");
+
+        let xml = xml_with(&config);
+
+        assert!(!xml.contains("<sum1:Version>9.9.9</sum1:Version>"), "{xml}");
+    }
+
+    /// 🔴 `IndicadorMultiplesOT` was hardcoded. It comes from the control plane, and a hub whose
+    /// owner runs a second business declares `S`.
+    #[test]
+    fn the_multiple_taxpayer_indicator_comes_from_the_control_plane() {
+        let mut facts = producer();
+        facts["IndicadorMultiplesOT"] = json!("S");
+
+        let xml = xml_with(&config_with(facts));
+
+        assert!(
+            xml.contains("<sum1:IndicadorMultiplesOT>S</sum1:IndicadorMultiplesOT>"),
+            "{xml}"
+        );
+    }
+
+    /// The manufacturer is not the product. The engine emitted `NombreRazon` in both slots, so
+    /// `NombreSistemaInformatico` declared a company where the AEAT expects a product name.
+    #[test]
+    fn the_manufacturer_and_the_product_are_declared_separately() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(xml.contains("<sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:NombreSistemaInformatico>ERPlora Hub</sum1:NombreSistemaInformatico>"),
+            "{xml}"
+        );
+    }
+
+    /// The editable `verifactu_config.software_*` columns are NOT a source of the manufacturer's
+    /// identity any more. That fallback is how an 11-character `IdSistemaInformatico` reached the
+    /// AEAT, and these fields are identical across the fleet: one typo is every record of every
+    /// hub (error 1100).
+    #[test]
+    fn the_editable_software_columns_no_longer_decide_who_we_are() {
+        let mut config = config_with(producer());
+        config["software_name"] = json!("Whatever SL");
+        config["software_nif"] = json!("B99999999");
+        config["software_id"] = json!("ERPLORA-001");
+
+        let xml = xml_with(&config);
+
+        assert!(!xml.contains("Whatever SL"), "{xml}");
+        assert!(!xml.contains("B99999999"), "{xml}");
+        assert!(!xml.contains("ERPLORA-001"), "{xml}");
+    }
+
+    /// `NumeroInstalacion` stays the hub's own id (ADR-0202 §4.2): one hub, one chain.
+    #[test]
+    fn the_installation_number_is_still_this_hub() {
+        let xml = xml_with(&config_with(producer()));
+
+        assert!(
+            xml.contains("<sum1:NumeroInstalacion>hub-1</sum1:NumeroInstalacion>"),
+            "{xml}"
+        );
+    }
+
+    /// **Without the facts there is no envelope.** A hub that has never been told them cannot
+    /// declare `IndicadorMultiplesOT` — and inventing an `N` is the exact defect being fixed.
+    /// Refusing leaves the record in the contingency queue until the next beat (a minute at
+    /// most); declaring a guess to Hacienda cannot be undone.
+    #[test]
+    fn a_hub_that_has_not_been_told_the_facts_does_not_build_an_envelope() {
+        let error = build_soap(&record(), &json!({}), None, "hub-1")
+            .expect_err("nobody has declared the manufacturer to this hub yet");
+
+        assert!(
+            error.to_string().contains("productor"),
+            "the reason has to name what is missing: {error}"
+        );
+    }
+
+    /// And a block that would be rejected by the AEAT is treated as no block at all, rather than
+    /// emitted and refused with the chain number already spent.
+    #[test]
+    fn an_invalid_block_is_not_emitted() {
+        let mut facts = producer();
+        facts["IdSistemaInformatico"] = json!("ERPLORA-001");
+
+        let error = build_soap(&record(), &config_with(facts), None, "hub-1")
+            .expect_err("an 11-character product code is error 1100 on every record");
+
+        assert!(error.to_string().contains("productor"), "{error}");
     }
 }

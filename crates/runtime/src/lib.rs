@@ -51,6 +51,7 @@ pub mod pin_policy;
 pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
+pub mod producer_facts;
 pub mod queries;
 pub mod registry;
 pub mod reset;

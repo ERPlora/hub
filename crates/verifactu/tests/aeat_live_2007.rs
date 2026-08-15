@@ -45,6 +45,17 @@ fn config() -> Json {
         "software_name": env("ERPLORA_ISSUER_NAME"),
         "software_nif": env("ERPLORA_ISSUER_NIF"),
         "environment": "testing",
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
     })
 }
 
