@@ -1309,6 +1309,10 @@ export default {
     // hub#354 — the job titles the template switches on (Waiter, Kitchen…). A vertical brings its
     // own role set; the people who fill it are never in the file.
     sectionRoles: 'Roles',
+    // hub#473 — the permissions each app had been given over this hub's own hardware and keys
+    // (printer, signing certificate, internet, notifications). A backup brings them back so the
+    // apps work again after a restore; a downloaded template never carries any.
+    sectionCapabilities: 'App permissions',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'includes data',
@@ -1374,6 +1378,15 @@ export default {
     // that issued them (a VeriFactu chain, a TicketBai one), so they only ever come back to it.
     reasonInstallationBoundData:
       'Records discarded: {n}. This app keeps an official record chained to the till that issued it, so it only travels back to that same till. Yours starts its own — nothing here has been changed.',
+    // hub#473 — the file came from ANOTHER hub and brought the permissions its owner had given to
+    // its apps. Those are decisions about THIS terminal's printer, certificate and internet access,
+    // so a downloaded file never makes them: you grant them here, once, and only if you want to.
+    reasonCapabilityGrantsNotPortable:
+      "App permissions discarded: {n}. Access to your printer, your signing certificate and the internet is granted on this terminal only. Nothing was allowed \u2014 grant what you need in Settings \u203a Permissions.",
+    // hub#473 — this hub's OWN backup asked to restore permissions it can no longer grant: the app
+    // was updated and stopped asking for them, or it is not installed here.
+    reasonCapabilitiesNotGrantable:
+      'Permissions not restored: {n}. Those apps no longer ask for them, or are not installed here. Everything else was given back.',
     done: 'Go to home',
   },
   moduleView: {

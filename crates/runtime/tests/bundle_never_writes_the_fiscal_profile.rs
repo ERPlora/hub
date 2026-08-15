@@ -123,6 +123,7 @@ fn tampered_bundle() -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
             "modules/_hub".into(),
         ],
         active_roles: Vec::new(),
+        capability_grants: Default::default(),
         sha256,
     };
     (manifest, files)

@@ -71,6 +71,21 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('numbering_not_portable')).toBe('numbering_not_portable');
   });
 
+  // hub#473 — un bundle de OTRO hub traía los permisos que su dueño había concedido a sus módulos
+  // (`certificate`, `network`…). Se descartan enteros: un fichero descargado no concede acceso al
+  // certificado de firma de este hub. Con su código, para que la fila no enseñe la cadena cruda.
+  it('reconoce el código de unos permisos de módulo que no son de este hub', () => {
+    expect(sectionDiscardCode('capability_grants_not_portable')).toBe(
+      'capability_grants_not_portable',
+    );
+  });
+
+  // hub#473 — el backup DE ESTE hub pidió reconceder permisos que ya no se pueden conceder: el
+  // módulo se actualizó y dejó de pedirlos, o no está instalado. El resto sí entró.
+  it('reconoce el código de unos permisos que ya no se pueden conceder', () => {
+    expect(sectionDiscardCode('capabilities_not_grantable')).toBe('capabilities_not_grantable');
+  });
+
   // ADR-0273 D8 / hub#560 — el runtime ya emitía este código y el shell no lo conocía: se pintaba
   // en crudo. Mismo contrato que los demás.
   it('reconoce el código de una sección sobre una tabla de sistema del hub', () => {
