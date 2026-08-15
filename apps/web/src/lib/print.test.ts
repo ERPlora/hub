@@ -265,6 +265,31 @@ describe('vía COLA del hub cuando no hay Bridge (hub#344)', () => {
     expect(browserPrint).not.toHaveBeenCalled();
   });
 
+  // hub#987: el shell tenía su propio `|| 'receipt'`, así que TODO lo que encolaba decía `receipt`
+  // aunque fuera una comanda — y con eso el mapa del hub no habría llegado a resolver nunca. Quien
+  // no nombra impresora debe encolar SIN rol, que es como se le pide al hub que enrute.
+  it('sin rol nombrado encola sin rol, para que el hub enrute por tipo de documento', async () => {
+    const enqueue = vi.fn(async () => true);
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    await print({ documentType: 'kitchen_order', jobId: 'k-1', data: { items: [] } });
+
+    expect(enqueue).toHaveBeenCalledWith({
+      jobId: 'k-1', role: '', documentType: 'kitchen_order',
+      document: { items: [] }, format: undefined,
+    });
+  });
+
+  // …y quien SÍ lo nombra sigue mandándolo: es un override, en deprecación pero vivo (hub#987).
+  it('con rol nombrado lo manda tal cual, como override', async () => {
+    const enqueue = vi.fn(async () => true);
+    const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });
+
+    await print({ role: 'bar', documentType: 'kitchen_order', jobId: 'k-2', data: { items: [] } });
+
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ role: 'bar' }));
+  });
+
   it('un duplicado (mismo jobId) es éxito: la cola es idempotente', async () => {
     const enqueue = vi.fn(async () => true); // el runtime responde ok:true a un duplicado
     const print = createPrintService(fakeClient({ peripherals: noBridge }), { enqueue });

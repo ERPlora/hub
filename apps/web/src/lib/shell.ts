@@ -105,13 +105,44 @@ export async function trackRequest<T>(p: Promise<T>): Promise<T> {
   }
 }
 
-// ── Notificaciones (STUB) ───────────────────────────────────────────────────
-// TODO(stub): NO hay señal de backend de notificaciones todavía. Este contador es un PLACEHOLDER
-// (arranca en 0 = sin badge). Cuando exista el endpoint/WS de notificaciones, alimentar este ref
-// desde ahí (o reemplazarlo por un store dedicado). La campana de la topbar lee `notificationCount`.
-const _notificationCount = ref<number>(0);
-export const notificationCount = computed<number>(() => _notificationCount.value);
-/** STUB: fija el contador de notificaciones (placeholder hasta que haya backend). */
-export function setNotificationCount(n: number): void {
-  _notificationCount.value = Math.max(0, n);
+// ── Notificaciones ──────────────────────────────────────────────────────────
+// Ya NO es un stub: la campana tiene señales reales de backend, y desde hub#987 son **dos**, así
+// que el contador es la SUMA por fuente y no un número que el último en escribir pisa.
+//
+//   - `deadLetters` (hub#660) — un evento que murió y necesita a un admin.
+//   - `printing`    (hub#987) — una estación con trabajo esperando y nadie drenándola.
+//
+// Por fuente y no un total que cada watcher recalcula: los dos pollers corren a su ritmo y sin
+// saber el uno del otro, así que el que refrescara segundo borraría al primero. Un hub con un
+// evento muerto Y una caja apagada enseñaría «1» y escondería una de las dos.
+//
+// Son ESTADO derivado, no eventos con acuse: se curan solos al arreglar la causa y por eso no
+// llevan leído/descartado (ADR-0067 — un ítem que no se puede descartar, en un feed hecho para
+// descartar, enseña a ignorar la campana).
+export type NotificationSource = 'deadLetters' | 'printing';
+
+const _notificationCounts = ref<Record<NotificationSource, number>>({
+  deadLetters: 0,
+  printing: 0,
+});
+
+/** Lo que pinta el badge: el total de todas las fuentes. */
+export const notificationCount = computed<number>(() =>
+  Object.values(_notificationCounts.value).reduce((a, b) => a + b, 0),
+);
+
+/** Cuántas avisa una fuente concreta, para que el popover pinte su fila. */
+export function notificationCountOf(source: NotificationSource): number {
+  return _notificationCounts.value[source] ?? 0;
+}
+
+/**
+ * Fija lo que aporta UNA fuente. El defecto es `deadLetters` porque era la única cuando esto
+ * era un contador suelto, así que la llamada que ya existía sigue diciendo lo mismo.
+ */
+export function setNotificationCount(n: number, source: NotificationSource = 'deadLetters'): void {
+  _notificationCounts.value = {
+    ..._notificationCounts.value,
+    [source]: Math.max(0, n),
+  };
 }

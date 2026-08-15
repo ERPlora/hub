@@ -68,7 +68,13 @@ pub struct PrintIntent {
     /// (`print_queue::enqueue` es `ON CONFLICT DO NOTHING`), así que la deduplicación que un flujo
     /// necesita no hay que construirla: basta con que la clave viaje en el payload.
     pub job_id: String,
-    /// Rol de impresora: `receipt`, `kitchen`, `bar`…
+    /// **Override de la estación, en deprecación** (hub#987). Ausente —lo normal ya— significa «lo
+    /// decide el hub», y la cola lo resuelve del mapa `documentType → estación`.
+    ///
+    /// Que sea opcional importa más aquí que en el shell: un flujo lo escribe el comerciante en un
+    /// editor, y pedirle que teclee el nombre de una impresora sería devolverle exactamente la
+    /// cadena tecleada que hub#457 quitó de en medio. Un flujo dice `kitchen_order` y ya está.
+    #[serde(default)]
     pub role: String,
     /// Qué documento es, del vocabulario cerrado de la cola.
     pub document_type: String,
@@ -125,6 +131,25 @@ mod tests {
         assert_eq!(intent.role, "kitchen");
         assert_eq!(intent.document_type, "kitchen_order");
         assert_eq!(intent.format, None);
+    }
+
+    /// **Un flujo puede decir solo QUÉ imprime** (hub#987). Sin `role` la intención sigue siendo
+    /// válida y llega a la cola con el override vacío, que es lo que hace que el mapa del hub
+    /// resuelva la estación. Pedirle al comerciante que teclee el nombre de una impresora en el
+    /// editor de flujos sería devolver la cadena tecleada que hub#457 quitó de en medio.
+    #[test]
+    fn an_intent_without_a_role_is_valid_and_lets_the_hub_route_it() {
+        let mut p = intent_params();
+        p.remove("role");
+
+        let intent = PrintIntent::from_event_payload(&p).unwrap();
+
+        assert_eq!(intent.role, "", "ausente y vacío son la misma cosa");
+        assert_eq!(
+            intent.into_job().role,
+            "",
+            "el override viaja vacío hasta la cola, que es quien consulta el mapa"
+        );
     }
 
     /// El payload de un evento declarativo llega con los parámetros de sistema que el runtime

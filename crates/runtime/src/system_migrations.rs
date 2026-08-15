@@ -1560,6 +1560,55 @@ ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS comment TEXT NOT NULL DEFAU
 ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_reject TEXT NOT NULL DEFAULT 'cancel';\
 ALTER TABLE _flow_approvals ALTER COLUMN command SET DEFAULT '';",
     },
+    // ── v50 — hub#987: el mapa `documentType → estación`, la otra mitad del diagrama de la v47 ──
+    // La v47 convirtió el DESTINO en una fila y dejó sin construir la flecha de la izquierda:
+    //
+    //     tipo de documento ──(FK)──▶ ESTACIÓN (id, nombre) ◀──(FK)── impresora
+    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^                          esto ya estaba (v47 + hub#342)
+    //     esto es la v50
+    //
+    // Sin ella, `sales` llevaba `role: 'receipt'` a fuego e `inventory` `role: 'label'`: **un módulo
+    // de negocio nombrando el periférico del comerciante**, que es la fuga que señaló la decisión de
+    // mercado de hub#457. Un módulo no puede saber que ESTE restaurante manda sus comandas a *Grill*
+    // y sus chits a *Barra 2*; el hub sí, porque el hub es del comerciante. El eje que un módulo sí
+    // es competente para declarar ya viajaba en el mismo payload: `documentType` (vocabulario
+    // cerrado de 8). Es el *print class* de Simphony y el split recibos/comandas/etiquetas de Square.
+    //
+    // **Solo DDL**, y por el mismo motivo exacto que la v47: la siembra por hub vive en
+    // `print_routes::ensure_routes`, que corre desde [`apply`] en CADA arranque, porque una
+    // migración de sistema se registra **por BASE DE DATOS** y el hub legacy pre-ADR-0201 (varios
+    // hubs, una BD) que llega a una BD ya migrada no recibiría ninguna ruta.
+    //
+    // **Sin FK declarada hacia `_print_station`** a propósito. Una FK con `ON DELETE CASCADE`
+    // borraría la fila al borrar la estación y una `RESTRICT` impediría borrarla; las dos le quitan
+    // al comerciante la traza de que su mapa quedó roto. La fila **se queda colgando** y
+    // `print_routes::route_for` falla ABIERTO hacia `receipt` (la protegida), que es lo que pide
+    // hub#987: un trabajo sin destino sale por la caja, nunca por ningún sitio. `list` la devuelve
+    // con la estación vacía para que la pantalla la enseñe rota y el comerciante la reapunte.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `CREATE TABLE IF NOT EXISTS`. Sin backfill — un hub sin
+    // filas está exactamente en el estado de fallo abierto, que es correcto, y `ensure_routes` lo
+    // siembra en el mismo arranque.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice**, y esta entrada es el caso de libro.
+    // Nació pidiendo la **v49** (el máximo en `origin/develop` era la v48) y, con la rama ya en
+    // vuelo, apareció hub#950 pidiendo también la 49. Se movió a la **v50** dejando el hueco POR
+    // DELANTE —la jugada de hub#658 con la v47, y la lección de la v46 al revés—: un hueco por
+    // delante es inalcanzable y por tanto inofensivo, mientras que un número repetido ABORTA el
+    // arranque (hub#573) de un hub ya desplegado. hub#950 se mergeó antes, así que el hueco duró lo
+    // que duró el rebase y el catálogo queda seguido: 47, 48, 49, 50. Recomprobado en cada rebase
+    // contra TODAS las ramas remotas, no solo `develop`. Los huecos v15/v20/v24 siguen libres e
+    // inalcanzables (cogerlos ES el fallo mudo que ya renumeró hub#341/#342/#470/#501).
+    SystemMigration {
+        version: 50,
+        name: "print_routes",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _print_route (\
+  hub_id TEXT NOT NULL, document_type TEXT NOT NULL, station_id TEXT NOT NULL, \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, document_type));",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1651,6 +1700,13 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
     // barato (cuatro filas como mucho), y siembra **solo si el hub no tiene ninguna** — un
     // comerciante que borró `bar` no se lo encuentra de vuelta mañana.
     crate::print_stations::ensure_stations(db, hub_id).await?;
+    // …y el mapa `documentType → estación` de este hub (hub#987). **Después** de las estaciones, no
+    // antes: una ruta apunta al `id` de una estación, así que sembrarla primero la dejaría colgando
+    // en el primer arranque. Misma razón que arriba para vivir aquí y no dentro de la v50: la
+    // migración se registra por BASE DE DATOS y esto es por HUB. Siembra **por hueco** (no «solo si
+    // no hay ninguna») para que un `documentType` nuevo de una versión futura llegue a su estación
+    // en un hub que ya existía, en vez de fallar abierto para siempre.
+    crate::print_routes::ensure_routes(db, hub_id).await?;
     Ok(())
 }
 
@@ -3385,6 +3441,13 @@ mod kind_contract_tests {
         // «lo que propuso un modelo» y gana `kind`, la pregunta ya templada (`title`/`summary`),
         // el rol que puede contestarla, el comentario de quien decidió y `on_reject`. Se
         // generaliza la fila; no se bifurca la tabla.
-        assert_eq!(MIGRATIONS.len(), 46, "el catálogo cambió de tamaño");
+        // + `print_routes` (v50, hub#987): el mapa `documentType → estación`, la otra mitad del
+        // diagrama que la v47 dejó a medias — el módulo dice QUÉ imprime y el hub decide DÓNDE sale.
+        // Solo DDL, y por el mismo motivo que la v47: la siembra por hub vive en
+        // `print_routes::ensure_routes`, que corre desde `apply` **después** de `ensure_stations`
+        // (una ruta apunta al `id` de una estación). Al escribirla el máximo era la v48 en
+        // `origin/develop` y en TODAS las ramas remotas — recomprobado contra el conjunto, no solo
+        // contra develop, que es donde el recuento a mano se ha equivocado antes.
+        assert_eq!(MIGRATIONS.len(), 47, "el catálogo cambió de tamaño");
     }
 }

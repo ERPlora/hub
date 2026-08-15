@@ -45,6 +45,11 @@ export default {
     noNotifications: 'All caught up. No notifications.',
     deadLettersTitle: 'Failed events',
     deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
+    // Undrained printing (hub#987). It names the station because "printing is stuck" sends the
+    // owner to look at four printers; "the kitchen is stuck" sends them to one.
+    printingStalledTitle: 'Nothing is printing “{station}”',
+    printingStalledBody:
+      '{count} document(s) waiting for {minutes} min. Check the till that prints there is on.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',

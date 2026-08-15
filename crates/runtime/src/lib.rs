@@ -52,6 +52,7 @@ pub mod pin_policy;
 pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
+pub mod print_routes;
 pub mod print_stations;
 pub mod producer_facts;
 pub mod queries;
@@ -1050,6 +1051,34 @@ impl Runtime {
     /// grow in silence.
     pub async fn print_coverage(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
         print_hosts::coverage(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// The stations that are stuck: work waiting, nobody draining, past the threshold (hub#987).
+    /// The cheap question a badge on every screen is allowed to ask — see [`print_hosts::undrained`].
+    pub async fn print_undrained(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
+        print_hosts::undrained(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// This hub's `documentType → station` map (hub#987): where each kind of document comes out.
+    pub async fn print_routes(&self) -> Result<Vec<print_routes::PrintRoute>> {
+        print_routes::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Points a document type at a station. The merchant's decision, not a module's.
+    pub async fn set_print_route(
+        &self,
+        document_type: &str,
+        station_key: &str,
+        actor: &str,
+    ) -> Result<print_routes::PrintRoute> {
+        print_routes::set(
+            self.db.as_ref(),
+            &self.hub_id,
+            document_type,
+            station_key,
+            actor,
+        )
+        .await
     }
 
     // ── Draining the queue: who may pull, and who may close (ADR-0196 §6, hub#343) ─────────────
