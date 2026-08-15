@@ -1327,6 +1327,10 @@ export default {
     // (RD 1007/2023: no gaps, no duplicates). Yours are untouched; set them up here if you have not.
     reasonNumberingNotPortable:
       'Invoice numbering discarded: {n}. Series and the numbers already issued belong to the business that created the file. Your own numbering is untouched — set up your series in Settings if you have not yet.',
+    // hub#380 — the app declares `installation_bound_data`: its records are chained to the till
+    // that issued them (a VeriFactu chain, a TicketBai one), so they only ever come back to it.
+    reasonInstallationBoundData:
+      'Records discarded: {n}. This app keeps an official record chained to the till that issued it, so it only travels back to that same till. Yours starts its own — nothing here has been changed.',
     done: 'Go to home',
   },
   moduleView: {

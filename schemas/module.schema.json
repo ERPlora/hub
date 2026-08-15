@@ -811,6 +811,14 @@
         }
       }
     },
+    "installation_bound_data": {
+      "type": "boolean",
+      "default": false,
+      "description": "Los datos de este módulo pertenecen a la INSTALACIÓN que los creó (hub#380, generaliza ADR-0202 §4.2). El import de un bundle de OTRO hub descarta la sección de este módulo diciéndolo (`installation_bound_data`); el MISMO hub restaurando su copia la recupera (ADR-0113 §1). Lo declara quien encadena registros contra el anterior bajo un identificador de instalación —VeriFactu (`NumeroInstalacion` = `hub_id`), TicketBai, NF525—: aplicados en otro hub, el siguiente registro encadenaría con uno que la autoridad fiscal nunca recibió para esa instalación. Es PORTABILIDAD, no secreto: las filas se exportan igual (un hub tiene que poder respaldarse), simplemente no aterrizan en otro sitio. Ausente = portable, que es la forma de todos los manifests publicados.",
+      "examples": [
+        true
+      ]
+    },
     "scheduled_tasks": {
       "type": "array",
       "description": "Tareas programadas del módulo (ADR-0011). Las ejecuta el Hub (no Cloud): se vuelcan a la tabla de sistema `_scheduled_tasks` al instalar y el barrido del relay corre el `command` al vencer el `cron`, sin usuario (contexto de sistema). Idempotentes por diseño (catch-up collapse tras un apagado).",

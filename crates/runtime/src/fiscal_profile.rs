@@ -700,8 +700,9 @@ pub async fn close(db: &dyn DatabaseAdapter, hub_id: &str, actor: &str) -> Resul
 /// ⚠️ **What this does NOT cover**: a hand-made "rehome" that also re-stamps the `hub_id` of the
 /// provider's own records. Then the anchor would find them and the chain would continue instead of
 /// restarting — but no path in the product does that: a bundle refuses to carry another hub's
-/// fiscal section (`import::chain_not_portable`), and a pgBackRest restore keeps the same `hub_id`,
-/// which is the same installation legitimately resuming its own chain (AEAT developer FAQ §4).
+/// fiscal section (`import::installation_bound_not_portable`), and a pgBackRest restore keeps the
+/// same `hub_id`, which is the same installation legitimately resuming its own chain (AEAT
+/// developer FAQ §4).
 pub async fn adopt_installation(
     db: &dyn DatabaseAdapter,
     hub_id: &str,

@@ -238,6 +238,19 @@ impl Registry {
         self.installed.iter().any(|m| m.id == module_id)
     }
 
+    /// Does the installed module declare that its data belongs to the installation that produced
+    /// it? ([`crate::manifest::Manifest::installation_bound_data`], hub#380.)
+    ///
+    /// Asked of the module installed **in the destination hub**, which is where the import engine
+    /// stands: the server installs the bundle's modules before the engine runs, so by then this is
+    /// the manifest the data would be applied against. A module nobody installed answers `false` —
+    /// its section cannot be applied anyway (`apply_section` fails it as not installed).
+    pub fn is_installation_bound(&self, module_id: &str) -> bool {
+        self.installed
+            .iter()
+            .any(|m| m.id == module_id && m.installation_bound_data)
+    }
+
     /// ¿Está el módulo instalado **y** activo?
     pub fn is_active(&self, module_id: &str) -> bool {
         matches!(self.status.get(module_id), Some(ModuleStatus::Active))

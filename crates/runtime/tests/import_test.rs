@@ -935,7 +935,7 @@ async fn las_series_de_facturacion_del_destino_sobreviven_al_import() {
 /// serie define **cómo numera un negocio lo que declara a Hacienda** y `invoice_series_allocation`
 /// es el libro de números ya entregados que el RD 1007/2023 exige sin huecos ni duplicados. De
 /// otra instalación, aquí, son numeración ajena — la misma regla que ya se aplica a la cadena
-/// VeriFactu (`chain_not_portable`, ADR-0202 §4.2).
+/// VeriFactu (`installation_bound_not_portable`, ADR-0202 §4.2 generalizada por hub#380).
 #[tokio::test]
 async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
     if !erplora_runtime::require_modules_workspace() { return; }

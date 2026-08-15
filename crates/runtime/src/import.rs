@@ -153,10 +153,15 @@ pub async fn import_sections(
         if section == crate::export::ROLES_SECTION {
             continue;
         }
+        // Asked BEFORE the match, not inside it: the answer comes from `rt.registry()` and the
+        // arms below hand `rt` out mutably, so the borrow must be over by then. The value is a
+        // plain `Option<String>`, so `.or()` is the same decision `.or_else()` would make.
+        let installation_bound =
+            installation_bound_not_portable(rt.registry(), manifest, section, target_hub_id);
         let (status, discarded_rows) = match system_table_not_portable(section)
             .or_else(|| ignored_by_purpose(manifest, section))
             .or_else(|| identity_not_portable(manifest, section, target_hub_id))
-            .or_else(|| chain_not_portable(manifest, section, target_hub_id))
+            .or(installation_bound)
         {
             // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a
             // status the user skims past into something they can act on (hub#331).
@@ -269,6 +274,11 @@ pub mod ignore_reason {
     /// that sequence with no gaps and no duplicates — per installation. The destination keeps its
     /// own series, its own `current_sequence` and its own ledger, untouched.
     pub const NUMBERING_NOT_PORTABLE: &str = "numbering_not_portable";
+    /// A bundle produced by ANOTHER hub carried the data section of a module that declares
+    /// `installation_bound_data` in its `module.json` (hub#380, generalising ADR-0202 §4.2): the
+    /// records it chains belong to the installation that emitted them, and this hub opens its own.
+    /// Named after the flag so the manifest field and the report row are one grep apart.
+    pub const INSTALLATION_BOUND_DATA: &str = "installation_bound_data";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -395,29 +405,51 @@ fn ignored_by_purpose(manifest: &BlueprintManifest, section: &str) -> Option<Str
     ))
 }
 
-/// The fiscal chain never travels across installations (ADR-0202 §4.2 — hub#312).
+/// Data bound to the installation that produced it never travels (hub#380, generalising
+/// ADR-0202 §4.2 — hub#312).
 ///
-/// `NumeroInstalacion` = `hub_id`: the `verifactu` data section (chain records, contingency
-/// queue, events, AEAT log) is the fiscal history of ONE installation. Applied under another
-/// hub, its next record would chain on a `RegistroAnterior` the AEAT never received for that
-/// installation — and another hub's pending queue would get transmitted under the wrong
-/// `NumeroInstalacion`. A bundle proves its origin only through `manifest.hub.hub_id`
-/// (bundles older than that field read as unknown origin and import conservatively); the
-/// SAME hub restoring its own backup resumes its own chain (AEAT developer FAQ §4).
-fn chain_not_portable(
+/// The module says so itself, through `installation_bound_data` in its `module.json`. This used to
+/// ask whether the section was the literal `modules/verifactu`, which put one country's regime
+/// inside a generic engine: TicketBai chains its records the same way and NF525 carries the same
+/// integrity requirement, so every new regime would have been one more name in the core.
+///
+/// What the flag means, in the case that motivated it: `NumeroInstalacion` = `hub_id`, so the
+/// `verifactu` data section (chain records, contingency queue, events, AEAT log) is the fiscal
+/// history of ONE installation. Applied under another hub, its next record would chain on a
+/// `RegistroAnterior` the AEAT never received for that installation — and another hub's pending
+/// queue would get transmitted under the wrong `NumeroInstalacion`. A bundle proves its origin only
+/// through `manifest.hub.hub_id` (bundles older than that field read as unknown origin and import
+/// conservatively); the SAME hub restoring its own backup resumes its own chain (AEAT developer
+/// FAQ §4).
+fn installation_bound_not_portable(
+    registry: &crate::Registry,
     manifest: &BlueprintManifest,
     section: &str,
     target_hub_id: &str,
 ) -> Option<String> {
-    if section != "modules/verifactu" || is_same_hub(manifest, target_hub_id) {
+    let module_id = section.strip_prefix("modules/")?;
+    if !is_installation_bound(registry, module_id) || is_same_hub(manifest, target_hub_id) {
         return None;
     }
-    Some(
-        "la cadena VeriFactu pertenece a la instalación de origen (NumeroInstalacion = hub_id): \
-         los registros fiscales de otro hub no se aplican aquí — este hub abre su propia cadena \
-         con PrimerRegistro=S"
-            .into(),
-    )
+    Some(ignore_reason::INSTALLATION_BOUND_DATA.into())
+}
+
+/// Modules whose data is bound to their installation even though the manifest INSTALLED here does
+/// not say so — a bridge, not a rule (hub#380).
+///
+/// `verifactu` was published before the flag existed, so asking its manifest answers «portable»,
+/// and another installation's fiscal chain would land in this hub: precisely what ADR-0202 §4.2
+/// forbids and what the literal this function replaces was there to stop. The name keeps it bound
+/// until the module is republished declaring `installation_bound_data: true`, and it goes away with
+/// that republication. Nothing else may be added here: a second name would be the hard-coding
+/// coming back through the door it just left.
+const INSTALLATION_BOUND_BY_LEGACY_NAME: [&str; 1] = ["verifactu"];
+
+/// Is this module's data bound to the installation that produced it? Its manifest first, the
+/// legacy fallback second.
+fn is_installation_bound(registry: &crate::Registry, module_id: &str) -> bool {
+    registry.is_installation_bound(module_id)
+        || INSTALLATION_BOUND_BY_LEGACY_NAME.contains(&module_id)
 }
 
 /// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`. Devuelve
@@ -654,12 +686,13 @@ fn carries_a_foreign_numbering(sql: &str) -> bool {
 /// gate en el productor no protege al que importa.
 ///
 /// La pregunta no es «¿qué dice el bundle que es?» sino **«¿de quién es este hub?»** —igual que en
-/// [`identity_not_portable`] y [`chain_not_portable`]—, porque lo que hace peligrosas a estas filas
-/// no es la etiqueta del manifest: una serie define **cómo se numera cada documento que un negocio
-/// emite ante Hacienda** y `invoice_series_allocation` es el libro de números ya entregados que el
-/// RD 1007/2023 exige sin huecos ni duplicados. De OTRA instalación, aquí, son numeración ajena.
-/// El MISMO hub restaurando su copia sí las recupera: es su numeración volviendo a su sitio
-/// (ADR-0113 §1), que es justo lo que `chain_not_portable` hace con la cadena VeriFactu.
+/// [`identity_not_portable`] y [`installation_bound_not_portable`]—, porque lo que hace peligrosas
+/// a estas filas no es la etiqueta del manifest: una serie define **cómo se numera cada documento
+/// que un negocio emite ante Hacienda** y `invoice_series_allocation` es el libro de números ya
+/// entregados que el RD 1007/2023 exige sin huecos ni duplicados. De OTRA instalación, aquí, son
+/// numeración ajena. El MISMO hub restaurando su copia sí las recupera: es su numeración volviendo
+/// a su sitio (ADR-0113 §1), que es justo lo que `installation_bound_not_portable` hace con la
+/// cadena VeriFactu.
 ///
 /// Qué pasa con los números: **nada**. Las series del destino conservan su `id`, su `code`, su
 /// `current_sequence` y su libro; las del bundle no se aplican, no se fusionan y no renumeran nada.
@@ -1346,6 +1379,96 @@ mod tests {
         assert_eq!(
             identity_not_portable(&manifest_from(""), "hub_users", "h2").as_deref(),
             Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+    }
+
+    /// A destination registry where one module is installed, declaring (or not) that its data
+    /// belongs to the installation that produced it.
+    ///
+    /// The manifest is built through `serde` on purpose: what the engine asks about must be the
+    /// field a real `module.json` writes, not a struct literal a rename could leave behind.
+    fn registry_with(module_id: &str, bound: bool) -> crate::Registry {
+        let mut registry = crate::Registry::new();
+        registry.installed.push(
+            serde_json::from_str(&format!(
+                r#"{{ "id": "{module_id}", "name": "{module_id}", "version": "1.0.0",
+                      "installation_bound_data": {bound} }}"#
+            ))
+            .expect("manifest parses"),
+        );
+        registry
+    }
+
+    /// hub#380 — the engine asks the INSTALLED MANIFEST, and never names a module.
+    ///
+    /// The literal `modules/verifactu` made a Spanish regime part of a generic engine; TicketBai
+    /// chains its records the same way and NF525 has the same integrity requirement, so the next
+    /// two regimes would each have been one more `||` in the core. `ticketbai` is used here
+    /// precisely because nothing in the runtime has ever heard of it: what discards its section is
+    /// the flag, not the name.
+    #[test]
+    fn installation_bound_data_is_declared_by_the_module_not_named_by_the_core() {
+        let bound = registry_with("ticketbai", true);
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h2")
+                .as_deref(),
+            Some(ignore_reason::INSTALLATION_BOUND_DATA),
+            "another installation's bound records must not be applied here"
+        );
+        // The SAME installation restoring its own backup resumes its own chain (ADR-0113 §1).
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h1"),
+            None,
+            "a hub restoring its own backup gets its own records back"
+        );
+        // A module that declares nothing travels: the shape of every published manifest today.
+        let portable = registry_with("inventory", false);
+        assert_eq!(
+            installation_bound_not_portable(
+                &portable,
+                &manifest_from("h1"),
+                "modules/inventory",
+                "h2"
+            ),
+            None
+        );
+        // And this gate is about MODULE sections only; the others have their own.
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "hub_settings", "h2"),
+            None
+        );
+    }
+
+    /// 🔴 Compatibility (hub#380): the PUBLISHED `verifactu` predates the flag, so asking its
+    /// manifest answers «portable» — and the fiscal chain of another installation would land here,
+    /// which is exactly what ADR-0202 §4.2 forbids. Until the module is republished declaring the
+    /// flag, the name keeps it bound.
+    ///
+    /// A fallback, not the rule: it only ADDS to what the manifest says and disappears with the
+    /// republication. Nothing else in the engine may grow a second name.
+    #[test]
+    fn verifactu_stays_bound_while_its_published_manifest_has_no_flag() {
+        let published = registry_with("verifactu", false);
+        assert_eq!(
+            installation_bound_not_portable(
+                &published,
+                &manifest_from("h1"),
+                "modules/verifactu",
+                "h2"
+            )
+            .as_deref(),
+            Some(ignore_reason::INSTALLATION_BOUND_DATA),
+            "the VeriFactu chain never travels across installations (ADR-0202 §4.2)"
+        );
+        assert_eq!(
+            installation_bound_not_portable(
+                &published,
+                &manifest_from("h1"),
+                "modules/verifactu",
+                "h1"
+            ),
+            None,
+            "the same hub restoring its own backup resumes its own chain"
         );
     }
 
