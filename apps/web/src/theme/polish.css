@@ -368,14 +368,12 @@ ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(scroll) {
   border-radius: 25px;
 }
 
-/* ── Ancho interior compartido para páginas legibles/de detalle ───────────────────────────── */
-/* AppPage lo aplica solo cuando la vista lo pide. Tablas, exploradores y módulos conservan todo
-   el ancho; formularios, perfil, ajustes, sistema y documentación comparten el mismo eje visual. */
+/* ── Layout interior compartido para páginas legibles/de detalle ───────────────────────── */
+/* AppPage lo aplica solo cuando la vista lo pide. El ion-content ya posee el gutter responsive;
+   este wrapper no vuelve a limitar ni centrar el ancho disponible. */
 .hub-detail-shell {
   box-sizing: border-box;
-  width: min(100%, 72rem);
   min-width: 0;
-  margin-inline: auto;
 }
 .hub-detail-shell > * {
   min-width: 0;
