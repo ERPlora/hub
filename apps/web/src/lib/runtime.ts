@@ -945,6 +945,15 @@ export const SECTION_DISCARD_CODES = [
   // módulo instalado siga declarando, y los demás se cuentan.
   'capability_grants_not_portable',
   'capabilities_not_grantable',
+  // hub#986 — el kernel de automatización. El DOCUMENTO de un flujo es del negocio y aterriza; lo
+  // que se le permitía hacer es la aprobación de ESTE despliegue, así que de otro hub no se
+  // reconcede nada y el flujo llega en pausa (`flow_grants_not_portable`). En el backup PROPIO,
+  // un permiso que aquí ya no existe deja el flujo pausado (`flows_paused_without_grants`), y un
+  // documento que este hub rechazaría en la pantalla tampoco entra por el zip
+  // (`flows_not_restorable`).
+  'flow_grants_not_portable',
+  'flows_paused_without_grants',
+  'flows_not_restorable',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */

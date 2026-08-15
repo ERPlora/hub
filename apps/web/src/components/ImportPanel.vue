@@ -857,6 +857,7 @@ function sectionLabel(section: string): string {
     media: t('importPage.sectionMedia'),
     roles: t('importPage.sectionRoles'),
     capabilities: t('importPage.sectionCapabilities'),
+    flows: t('importPage.sectionFlows'),
   };
   return map[section] ?? section;
 }
@@ -972,6 +973,11 @@ const discardMessage: Record<SectionDiscardCode, (n: number) => string> = {
   installation_bound_data: (n) => t('importPage.reasonInstallationBoundData', { n }),
   capability_grants_not_portable: (n) => t('importPage.reasonCapabilityGrantsNotPortable', { n }),
   capabilities_not_grantable: (n) => t('importPage.reasonCapabilitiesNotGrantable', { n }),
+  // hub#986 — estos dos NO cuentan filas descartadas: los flujos SÍ están en el hub, lo que les
+  // falta es el permiso para actuar. Decir «descartados: 0» sería mentir sobre lo que pasó.
+  flow_grants_not_portable: () => t('importPage.reasonFlowGrantsNotPortable'),
+  flows_paused_without_grants: () => t('importPage.reasonFlowsPausedWithoutGrants'),
+  flows_not_restorable: (n) => t('importPage.reasonFlowsNotRestorable', { n }),
 };
 
 /** Frase que acompaña a la fila del informe: la traducción del código, o el motivo tal cual. */

@@ -124,6 +124,7 @@ fn tampered_bundle() -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         ],
         active_roles: Vec::new(),
         capability_grants: Default::default(),
+        flows: Vec::new(),
         sha256,
     };
     (manifest, files)

@@ -63,6 +63,7 @@ fn bundle(sql: &str) -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         sections: vec!["hub_settings".into()],
         active_roles: Vec::new(),
         capability_grants: Default::default(),
+        flows: Vec::new(),
         sha256,
     };
     (manifest, files)

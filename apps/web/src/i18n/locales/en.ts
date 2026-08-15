@@ -1336,6 +1336,10 @@ export default {
     // (printer, signing certificate, internet, notifications). A backup brings them back so the
     // apps work again after a restore; a downloaded template never carries any.
     sectionCapabilities: 'App permissions',
+    // hub#986 — the automations the owner wrote («when a big sale closes, note it on the
+    // customer»). A backup brings the documents back; what each one is allowed to do is granted
+    // again only on the terminal that granted it.
+    sectionFlows: 'Automations',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'includes data',
@@ -1410,6 +1414,19 @@ export default {
     // was updated and stopped asking for them, or it is not installed here.
     reasonCapabilitiesNotGrantable:
       'Permissions not restored: {n}. Those apps no longer ask for them, or are not installed here. Everything else was given back.',
+    // hub#986 — the file came from ANOTHER hub. Its automations are the owner's work and do come
+    // back, but what each one may DO — which actions it runs, which addresses it writes to — is
+    // granted on this terminal only, so they arrive switched off.
+    reasonFlowGrantsNotPortable:
+      'Automations restored, but switched off. What each one is allowed to do is granted on this terminal only — review them in Automations and turn on the ones you want.',
+    // hub#986 — this hub's OWN backup asked to give an automation back a permission that no longer
+    // exists here: the app did not come back, or its new version renamed the action.
+    reasonFlowsPausedWithoutGrants:
+      'Some automations came back switched off: a permission they had is no longer available here. Open Automations to see what each one is missing.',
+    // hub#986 — the import saves through the same door as the editor, so a document this hub would
+    // refuse on screen does not get in from a file either.
+    reasonFlowsNotRestorable:
+      'Automations discarded: {n}. Their instructions name something that is not here, so they could not be saved. The rest came back.',
     done: 'Go to home',
   },
   moduleView: {

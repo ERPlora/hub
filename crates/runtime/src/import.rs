@@ -152,8 +152,11 @@ pub async fn import_sections(
         // own write door. Skipped here so it does not also report a hollow `Skipped` row.
         // Same for the capability grants (hub#473): keys in `manifest.capability_grants`, applied
         // after this loop through the granting door, never as rows.
+        // Same again for the flows (hub#986): documents in `manifest.flows`, saved after this loop
+        // through `flows::store::create`, never as rows.
         if section == crate::export::ROLES_SECTION
             || section == crate::export::CAPABILITY_GRANTS_SECTION
+            || section == crate::export::FLOWS_SECTION
         {
             continue;
         }
@@ -203,6 +206,19 @@ pub async fn import_sections(
             apply_capability_grants(rt, manifest, target_hub_id, same_hub).await;
         report.sections.push(SectionResult {
             section: crate::export::CAPABILITY_GRANTS_SECTION.to_string(),
+            status,
+            discarded_rows,
+        });
+    }
+    // ── The automations the business had written (hub#986) ───────────────────
+    // LAST of the three declarative sections, and the order is load-bearing: a flow names commands
+    // and queries of modules the server installs before the engine runs, and its grants are judged
+    // against the registry as it stands. Driven by the DATA (`flows`) and not by the section label,
+    // so a hand-made bundle that omits the label gets the very same guards.
+    if !manifest.flows.is_empty() {
+        let (status, discarded_rows) = apply_flows(rt, manifest, target_hub_id, same_hub).await;
+        report.sections.push(SectionResult {
+            section: crate::export::FLOWS_SECTION.to_string(),
             status,
             discarded_rows,
         });
@@ -312,6 +328,189 @@ async fn apply_capability_grants(
     }
 }
 
+/// Restores the automations the backup carried and turns the outcome into a row of the report
+/// (hub#986 — ADR-0345 §2bis, the ⚠️ row of the table).
+///
+/// **The definition lands; the authority is what depends on whose bundle this is.** ADR-0345 draws
+/// the line by asking whether a datum is of the BUSINESS or of THIS DEPLOYMENT, and a flow falls on
+/// both sides at once: the document is what its owner wrote (so it travels in a backup, like the
+/// customers and the products already do), while its `_flow_grants` are the approval of one
+/// deployment's owner over what an automation may do with nobody watching (so they are only re-made
+/// for the hub restoring its own copy, `is_same_hub`, exactly like the capability grants of hub#473).
+///
+/// Four properties, each one deliberate:
+///
+/// - **The same door as `POST /flows`.** Every document goes through [`crate::flows::store::create`],
+///   so a bundle gets the guards the screen gets: a document that does not parse, an unresolvable
+///   `cron`, a `query` step naming a read nobody has — all refused here, counted, and the rest of
+///   the flows still land. An `INSERT` would have let a zip store what the hub can never execute.
+/// - **Created DISABLED, armed last.** The flow is written paused, its grants are re-made, and only
+///   then is it armed. The reverse order would leave a window in which the tick could fire a flow
+///   whose permissions had not arrived yet — and a flow that runs without its grants fails every
+///   step. If any grant did not come back, it simply stays paused, with its reason in the report.
+/// - **Additive, never mirroring.** A flow this hub wrote after the backup was taken is left alone;
+///   restoring an old copy must not delete an automation somebody created later (hub#473's lesson).
+/// - **Idempotent by name + document.** The same flow, by the same name, already live is already
+///   there: restoring twice does not hand the owner two copies of the same job, and two runs per
+///   event.
+///
+/// A database failure is `Failed`, never a discard: «I could not write» must not read as «this hub
+/// said no».
+async fn apply_flows(
+    rt: &Runtime,
+    manifest: &BlueprintManifest,
+    target_hub_id: &str,
+    same_hub: bool,
+) -> (SectionStatus, u32) {
+    use crate::flows::grants::GrantKind;
+
+    let db = rt.db();
+    let registry = rt.registry();
+    let mut live = match crate::flows::store::list(db, target_hub_id).await {
+        Ok(live) => live,
+        Err(e) => return (SectionStatus::Failed(e.to_string()), 0),
+    };
+
+    // Documents that landed (created here or already present), documents this hub will not save,
+    // and the ones that landed but stayed PAUSED because their authority did not come back.
+    let (mut landed, mut refused, mut paused) = (0u32, 0u32, 0u32);
+    // …and whether the reason for that is that this bundle is not this hub's own copy, which is a
+    // different sentence to the user than «that command no longer exists here».
+    let mut grants_not_portable = false;
+
+    for spec in &manifest.flows {
+        if live
+            .iter()
+            .any(|f| f.name == spec.name && f.definition == spec.definition)
+        {
+            landed += 1;
+            continue;
+        }
+        let new = crate::flows::NewFlow {
+            name: spec.name.clone(),
+            enabled: false, // armed at the end, once its authority is back
+            definition: spec.definition.clone(),
+        };
+        let flow = match crate::flows::store::create(
+            db,
+            target_hub_id,
+            registry,
+            &new,
+            crate::roles::BLUEPRINT_ACTOR,
+        )
+        .await
+        {
+            Ok(flow) => flow,
+            Err(e) if is_write_failure(&e) => return (SectionStatus::Failed(e.to_string()), refused),
+            Err(_) => {
+                refused += 1;
+                continue;
+            }
+        };
+        landed += 1;
+        live.push(flow.clone());
+
+        // The grants. Only this hub's own copy re-makes them; anybody else's bundle leaves the flow
+        // inert, which is what default-deny already means.
+        let mut authority_complete = true;
+        if !spec.grants.is_empty() && !same_hub {
+            grants_not_portable = true;
+            authority_complete = false;
+        } else {
+            for wanted in &spec.grants {
+                // One pair at a time, each time re-reading what is already live and offering it
+                // back plus the candidate. `grants::replace` is a REPLACE and it refuses a whole
+                // list if one pair names nothing — right for a screen somebody typed, wrong for a
+                // restore, which is best-effort like every other section here. Asking the REAL door
+                // once per pair keeps the judgement in the one place that enforces it; filtering
+                // the list first would be a SECOND door, judging by rules that could drift from the
+                // ones that matter.
+                let Some(kind) = GrantKind::parse(&wanted.kind) else {
+                    authority_complete = false;
+                    continue;
+                };
+                let mut candidate: Vec<(GrantKind, String)> = crate::flows::grants::list(
+                    db,
+                    target_hub_id,
+                    &flow.id,
+                )
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|g| GrantKind::parse(&g.kind).map(|k| (k, g.value)))
+                .collect();
+                candidate.push((kind, wanted.value.clone()));
+                match crate::flows::grants::replace(
+                    db,
+                    target_hub_id,
+                    &flow.id,
+                    registry,
+                    &candidate,
+                    crate::roles::BLUEPRINT_ACTOR,
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) if is_write_failure(&e) => {
+                        return (SectionStatus::Failed(e.to_string()), refused)
+                    }
+                    Err(_) => authority_complete = false,
+                }
+            }
+        }
+
+        if spec.enabled && authority_complete {
+            let armed = crate::flows::NewFlow { enabled: true, ..new };
+            match crate::flows::store::update(
+                db,
+                target_hub_id,
+                &flow.id,
+                registry,
+                &armed,
+                crate::roles::BLUEPRINT_ACTOR,
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(e) if is_write_failure(&e) => {
+                    return (SectionStatus::Failed(e.to_string()), refused)
+                }
+                Err(_) => paused += 1,
+            }
+        } else if spec.enabled {
+            paused += 1;
+        }
+    }
+
+    // One row, so the reasons are ordered by what the user has to act on first: a document that did
+    // not land at all, then permissions a foreign bundle may not make, then a flow waiting for the
+    // permission it lost. `discarded_rows` counts DOCUMENTS left out — a paused flow is in the hub,
+    // it is simply not running.
+    let status = if refused > 0 && landed == 0 {
+        SectionStatus::Ignored(ignore_reason::FLOWS_NOT_RESTORABLE.into())
+    } else if refused > 0 {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOWS_NOT_RESTORABLE.into())
+    } else if grants_not_portable {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOW_GRANTS_NOT_PORTABLE.into())
+    } else if paused > 0 {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOWS_PAUSED_WITHOUT_GRANTS.into())
+    } else {
+        SectionStatus::Applied
+    };
+    (status, refused)
+}
+
+/// Is this error the database (or the disk) failing, rather than the hub REFUSING?
+///
+/// The distinction is the one every best-effort section here depends on: a policy refusal is
+/// reported and the import goes on, while «I could not write» has to surface as `Failed` instead of
+/// being dressed up as a decision. Everything the runtime raises on its own — an invalid document,
+/// a command that does not exist, an internal one — is a refusal; only the adapter's own errors and
+/// I/O are not.
+fn is_write_failure(e: &crate::RuntimeError) -> bool {
+    matches!(e, crate::RuntimeError::Db(_) | crate::RuntimeError::Io(_))
+}
+
 /// Stable reason codes carried by [`SectionStatus::Ignored`] — a CONTRACT with the shell, which
 /// turns each one into a translated sentence (same lesson as the domain-error channel, hub#139:
 /// a code that never changes, plus a message that can live in i18n, instead of prose that the UI
@@ -357,6 +556,22 @@ pub mod ignore_reason {
     /// records it chains belong to the installation that emitted them, and this hub opens its own.
     /// Named after the flag so the manifest field and the report row are one grep apart.
     pub const INSTALLATION_BOUND_DATA: &str = "installation_bound_data";
+    /// The bundle carried the flow grants of ANOTHER hub (hub#986). What an automation may do —
+    /// which commands it runs, which URLs it dials, whose address it may read — is the approval of
+    /// THIS deployment's owner (ADR-0283 §2, default-deny), the same argument as
+    /// [`CAPABILITY_GRANTS_NOT_PORTABLE`]. The documents landed, so the owner can read them and
+    /// decide; they landed **paused**, because arming them was nobody's decision.
+    pub const FLOW_GRANTS_NOT_PORTABLE: &str = "flow_grants_not_portable";
+    /// This hub's own backup asked to re-grant permissions it cannot grant (hub#986): a command or
+    /// a read that is no longer here — a module that did not come back, or one whose new version
+    /// renamed it. Those flows are restored **disabled**, because an armed flow missing a permission
+    /// fails on every run, at whatever hour its trigger fires, with nobody watching.
+    pub const FLOWS_PAUSED_WITHOUT_GRANTS: &str = "flows_paused_without_grants";
+    /// The bundle carried flow documents this hub **would refuse at the screen** (hub#986): one that
+    /// does not parse, a `cron` the engine cannot resolve, a `query` step naming a read no installed
+    /// module has. The import saves through the same door as `POST /flows`, so what the owner could
+    /// not type in cannot arrive in a zip either. The rest of the flows still landed.
+    pub const FLOWS_NOT_RESTORABLE: &str = "flows_not_restorable";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -1420,6 +1635,7 @@ mod tests {
             sections: vec!["hub_users".into()],
             active_roles: Vec::new(),
             capability_grants: Default::default(),
+            flows: Vec::new(),
             sha256: BTreeMap::new(),
         }
     }

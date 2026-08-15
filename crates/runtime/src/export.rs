@@ -35,6 +35,13 @@ pub const ROLES_SECTION: &str = "roles";
 /// the inventory the user confirms before importing shows that the bundle brings permissions.
 pub const CAPABILITY_GRANTS_SECTION: &str = "capabilities";
 
+/// Section that carries the **automation kernel** of the hub (hub#986 — ADR-0345 §2bis). Like
+/// [`ROLES_SECTION`] and [`CAPABILITY_GRANTS_SECTION`] it has **no `data/*.sql`**: the flows travel
+/// as declarative documents in [`BlueprintManifest::flows`] and the import saves each one through
+/// `flows::store::create`, the very door `POST /flows` uses. Listed in `sections` so the inventory
+/// the user confirms before importing shows that the bundle brings automations.
+pub const FLOWS_SECTION: &str = "flows";
+
 /// Metadatos del hub de origen (informativos; el import NO los aplica como datos).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HubMeta {
@@ -193,6 +200,43 @@ pub fn is_portable_setting(key: &str) -> bool {
     PORTABLE_SETTING_KEYS.contains(&key)
 }
 
+/// One permission of a flow, as it travels: the same `{kind, value}` pair the owner's screen sends
+/// to `PUT …/flows/<id>/grants` (hub#986).
+///
+/// A pair and not a row of `_flow_grants`: that table is what decides, with nobody watching, which
+/// commands an automation may run and which URLs it may dial (ADR-0283 §2, default-deny). The
+/// import re-makes each pair through `flows::grants::replace`, so a bundle gets the guards a click
+/// gets — a grant naming a command this hub does not have is refused there, not stored here.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowGrantSpec {
+    /// `command`, `query`, `notify`, `http`, `recipient_query` (`flows::grants::GrantKind`).
+    pub kind: String,
+    pub value: String,
+}
+
+/// One automation as it travels in a **backup** (hub#986): the document its owner wrote, plus the
+/// keys of what it was allowed to do.
+///
+/// `_flow_triggers` is **not** here, and that is not an omission: the triggers are part of the
+/// `definition`, and saving it re-materialises them (`flows::store::seed_triggers`). Carrying the
+/// rows would have carried `next_run`/`last_run` too — the schedule of ANOTHER installation,
+/// computed under a timezone the destination may not even have.
+///
+/// Neither is the flow's `id`: it is the row identity of one installation, and what the owner reads
+/// (and what the import matches on, so restoring twice does not duplicate) is the NAME plus the
+/// document.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowSpec {
+    pub name: String,
+    /// Whether it was ARMED in the origin. It is a wish, not an order: the import arms a flow only
+    /// once its authority is back (see `import::apply_flows`).
+    pub enabled: bool,
+    /// The versioned document (`flow.schema.json`), exactly as the owner saved it.
+    pub definition: serde_json::Value,
+    #[serde(default)]
+    pub grants: Vec<FlowGrantSpec>,
+}
+
 /// `manifest.json` del bundle — fuente de verdad del contenido (a prueba de renombres del zip).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlueprintManifest {
@@ -246,6 +290,25 @@ pub struct BlueprintManifest {
     /// every bundle produced so far does.
     #[serde(default)]
     pub capability_grants: BTreeMap<String, Vec<String>>,
+    /// The **automations** the hub was running, as documents (hub#986). Without them, restoring a
+    /// backup gave the business back its data and not the work it had automated — the flow that
+    /// reorders stock, the one that chases an unpaid invoice — with an import report that said
+    /// everything landed.
+    ///
+    /// Only a **backup** carries them: a flow document is the origin's own — the URLs its `http`
+    /// steps dial, the texts it sends, the reads it names — and a published template is an artefact
+    /// for somebody else's business. Pre-made automations in a catalogue are a product decision with
+    /// its own review, not something an export form turns on for every download.
+    ///
+    /// Their `grants`, on the other hand, are only re-made when the bundle is **this hub's own copy**
+    /// (`is_same_hub`), exactly like [`capability_grants`](Self::capability_grants): the definition is
+    /// vocabulary of a business, the authority is the approval of ONE deployment's owner. A flow that
+    /// arrives without its authority arrives PAUSED.
+    ///
+    /// `#[serde(default)]` ⇒ a bundle older than this field restores no flows, which is what every
+    /// bundle produced so far does.
+    #[serde(default)]
+    pub flows: Vec<FlowSpec>,
     /// SHA256 hex por fichero del bundle (ruta relativa → hash). Verificado al importar.
     pub sha256: BTreeMap<String, String>,
 }
@@ -527,6 +590,32 @@ pub async fn export_hub(
         sections.push(CAPABILITY_GRANTS_SECTION.to_string());
     }
 
+    // ── Las AUTOMATIZACIONES del negocio (hub#986) ───────────────────────────
+    // Third table of the same family, and the one ADR-0345 §2bis left written down as ⚠️: the
+    // definition of a flow is of the BUSINESS —lo escribió su dueño— so a backup that does not
+    // carry it gives the hub back its data and not the work it had automated. Como los roles y los
+    // permisos, viaja DECLARATIVO: el documento y las claves de sus grants, nunca filas de `_flow`
+    // ni de `_flow_grants` en un `data/*.sql`.
+    //
+    // Lo que NO sale, y no por olvido (ADR-0345 §2bis, tabla por tabla):
+    // - `_flow_secrets` — credenciales, y encima selladas con la clave maestra del ENTORNO: el
+    //   sobre viajaría y la llave no. Ni el valor ni el nombre.
+    // - `_flow_runs`/`_flow_run_steps`/`_flow_approvals` — historial de ejecución de ESTA
+    //   instalación, mismo criterio que `_elevation_audit`.
+    // - `_flow_triggers` — no porque no importen, sino porque SON parte del documento: el destino
+    //   los re-materializa con `seed_triggers` sobre su propio reloj.
+    //
+    // Solo en un `backup`, como los grants de módulo: un documento de flujo lleva las URLs a las
+    // que sale, los textos que manda y las lecturas que nombra — todo del negocio de origen.
+    let flows = if carries_identity {
+        collect_flows(db, hub_id).await
+    } else {
+        Vec::new()
+    };
+    if !flows.is_empty() {
+        sections.push(FLOWS_SECTION.to_string());
+    }
+
     // ── Manifest (fuente de verdad) + integridad ─────────────────────────────
     let mut sha256 = BTreeMap::new();
     for (path, bytes) in &files {
@@ -548,9 +637,35 @@ pub async fn export_hub(
         sections,
         active_roles,
         capability_grants,
+        flows,
         sha256,
     };
     Ok(ExportBundle { manifest, files })
+}
+
+/// The flows of `hub_id` with their grants, read through the kernel's own listing doors so the
+/// export sees exactly what the owner's screen sees — soft-deleted flows out, revoked grants out,
+/// and every read scoped to this hub (the database is shared: `tenancy.md`).
+///
+/// Best-effort like the rest of the export: a kernel that cannot be read (an old schema, a table
+/// that is not there yet) yields no flows instead of losing the whole backup.
+async fn collect_flows(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Vec<FlowSpec> {
+    let mut out = Vec::new();
+    for flow in crate::flows::store::list(db, hub_id).await.unwrap_or_default() {
+        let grants = crate::flows::grants::list(db, hub_id, &flow.id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|g| FlowGrantSpec { kind: g.kind, value: g.value })
+            .collect();
+        out.push(FlowSpec {
+            name: flow.name,
+            enabled: flow.enabled,
+            definition: flow.definition,
+            grants,
+        });
+    }
+    out
 }
 
 /// Una tabla del módulo y cuántas filas volcaría el export (hub#534).
@@ -1195,6 +1310,7 @@ mod tests {
                 "verifactu".to_string(),
                 vec!["certificate".to_string(), "network".to_string()],
             )]),
+            flows: Vec::new(),
             sha256: BTreeMap::from([("data/taxes.sql".into(), "ab".repeat(32))]),
         };
         let json = serde_json::to_string(&m).unwrap();

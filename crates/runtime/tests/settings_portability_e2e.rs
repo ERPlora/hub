@@ -302,6 +302,7 @@ async fn an_unknown_settings_key_from_a_foreign_bundle_is_not_written() {
         sections: vec!["hub_settings".into()],
         active_roles: Vec::new(),
         capability_grants: Default::default(),
+        flows: Vec::new(),
         sha256,
     };
 
