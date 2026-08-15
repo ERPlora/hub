@@ -88,6 +88,7 @@ pub mod state;
 pub mod shutdown;
 pub mod system;
 pub mod system_metrics;
+pub mod usage_series;
 pub mod tenant;
 pub mod version;
 
@@ -1321,6 +1322,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
         .route("/api/system/metrics", get(system_metrics::system_metrics))
+        // Series de uso (CPU/RAM/conexiones) para /system: proxy con caché al endpoint device
+        // del SaaS (saas#1511) — el machine token vive en el runtime, nunca en el navegador.
+        .route("/api/system/usage-series", get(usage_series::usage_series))
         // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
         // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
         .route(
