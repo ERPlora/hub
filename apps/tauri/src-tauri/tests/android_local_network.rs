@@ -297,8 +297,12 @@ fn the_release_build_reads_the_permissions_back_off_the_apk() {
     // And the feature the NFC permission drags in with it. This one is invisible everywhere else:
     // an implicit `android.hardware.nfc` requirement breaks no build and fails no test — it just
     // makes Play stop offering the app to devices without a chip, months later, silently.
+    // Matched loosely because the job's own pattern is a regex: aapt1 prints
+    // `uses-feature-not-required:name=` and aapt2 puts a space after the colon, so the step
+    // tolerates both. What must not disappear is the CHECK.
     assert!(
-        RELEASE_WORKFLOW.contains("uses-feature-not-required:name='android.hardware.nfc'"),
+        RELEASE_WORKFLOW.contains("uses-feature-not-required")
+            && RELEASE_WORKFLOW.contains(NFC_FEATURE),
         "the release job never reads back whether the built APK still says the NFC chip is \
          OPTIONAL, so a merged manifest that requires it would ship and narrow the listing (hub#988)"
     );

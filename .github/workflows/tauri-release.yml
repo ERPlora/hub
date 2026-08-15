@@ -508,10 +508,14 @@ jobs:
           # son justo las que no tienen lector USB— salvo que el manifest diga que es opcional. Solo
           # el manifest FUSIONADO lo sabe, y `dump badging` es quien lo lee. Un `uses-feature` que
           # se cuele como obligatorio no rompe nada: adelgaza la ficha de la tienda en silencio.
-          AAPT1=$(find "$ANDROID_HOME/build-tools" -name aapt | sort | tail -1)
-          BADGING=$("$AAPT1" dump badging "$APK")
-          echo "$BADGING" | grep -q "uses-feature-not-required:name='android.hardware.nfc'" \
-            || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; exit 1; }
+          #
+          # El ` ?` del patrón NO es descuido: aapt1 imprime `uses-feature-not-required:name=` y
+          # aapt2 mete un espacio tras los dos puntos. Sin él, este control pasaría siempre —
+          # comprobado contra dos APKs de prueba, uno con `required="false"` y otro con `"true"`,
+          # porque un guard que nunca caza nada es peor que no tenerlo.
+          BADGING=$("$AAPT" dump badging "$APK")
+          echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.nfc'" \
+            || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; echo "$BADGING" | grep -i nfc; exit 1; }
 
       - name: Stage artifacts
         run: |
