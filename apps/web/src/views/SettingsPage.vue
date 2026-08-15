@@ -262,7 +262,13 @@
           </ion-card-content>
         </ion-card>
 
-        <ion-button v-if="isAdmin" class="mt-3" expand="block" @click="saveTaxSettings">
+        <ion-button
+          v-if="isAdmin"
+          class="mt-3"
+          expand="block"
+          data-testid="settings-save-business"
+          @click="saveTaxSettings"
+        >
           <HubIcon slot="start" name="save-outline" />
           {{ t('settings.saveChanges') }}
         </ion-button>
@@ -564,7 +570,10 @@ import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
 import { coverageRows, fetchPrintHosts, type PrintRoleRow } from '../lib/print-coverage';
+// hub#900: saving a setting can move the configuration checklist, so this screen invalidates it.
+import { refreshSetupStatus } from '../lib/setup-status';
 import {
+  getClient,
   listInstalledModules,
   getModuleCapabilities,
   putModuleCapabilities,
@@ -730,6 +739,20 @@ async function persistHubSettings(
 ): Promise<void> {
   try {
     await updateHubSettings(partial);
+    // hub#900 — the ⛔ strip is a READ of `hub.setup.status`, and this screen is the one that
+    // clears it: the tax id and the legal name it saves ARE the item behind it
+    // (`ITEM_BUSINESS_IDENTITY`, ADR-0203). Nothing re-read the document after a write, so the only
+    // triggers left were boot, a route change and `module.installed`: the owner filled in her
+    // business, pressed save, and «You cannot issue invoices yet» stayed on screen until she
+    // happened to open the till. The gate was already open — the strip was lying — and what she
+    // concluded was that she had failed to configure the one thing her till depends on.
+    //
+    // EVERY successful save re-reads, not just the fiscal one: the country decides WHICH items
+    // apply and the language decides the words they are written in, so a whitelist of keys here
+    // would rot the first time a check reads one more. The read is a local query of the runtime
+    // and best-effort by contract, and it happens BEFORE the toast so the screen is already true
+    // when she reads that it saved.
+    await refreshSetupStatus(getClient());
     await toastSuccess(t('settings.saved'));
   } catch (e) {
     revert();
