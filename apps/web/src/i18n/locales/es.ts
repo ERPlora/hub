@@ -1128,6 +1128,29 @@ export default {
     tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
   },
+  // hub#456 — el turno cambia en mitad de un ticket. Cada frase la lee alguien con una cola
+  // delante, y lo primero que tiene que decir el texto es que pulsar aquí NO pierde la venta: sin
+  // esa frase el cajero termina el ticket a nombre de otro, que es justo lo que esto viene a
+  // acabar.
+  userSwitch: {
+    menu: 'Cambiar de usuario',
+    title: 'Cambiar de usuario',
+    lead: 'La venta sigue abierta. A partir de ahora queda a nombre de quien entre aquí.',
+    chooseUser: '¿Quién se pone?',
+    userName: 'Su nombre',
+    userNamePlaceholder: 'Escribe su nombre',
+    continue: 'Continuar',
+    cancel: 'Cancelar',
+    someoneElse: 'Otra persona',
+    // La confirmación: la caja ya es de otra persona, y las siguientes líneas de esta venta van
+    // con su nombre.
+    nowServing: 'Ahora atiende {name}',
+    rejected: 'Esos datos no han funcionado. Revisa el nombre y el PIN, y vuelve a intentarlo.',
+    deviceNotEnrolled:
+      'Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.',
+    deviceUnidentified: 'Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.',
+    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
+  },
   activation: {
     title: 'Activación requerida',
     lead: 'Este dispositivo tiene que comprobar tus apps en erplora.com antes de poder abrir tu negocio. Conéctate a internet y vuelve a intentarlo.',

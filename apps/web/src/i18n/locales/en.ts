@@ -1198,6 +1198,29 @@ export default {
     tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
     failed: 'The approval could not be sent. Check the connection and try again.',
   },
+  // hub#456 — the shift changes in the middle of a ticket. Every line here is read by somebody with
+  // a queue in front of them, and the first job of the copy is to say that pressing this does NOT
+  // lose the sale: without that sentence a cashier finishes the ticket under the wrong name, which
+  // is the behaviour this feature exists to end.
+  userSwitch: {
+    menu: 'Switch user',
+    title: 'Switch user',
+    lead: 'The sale stays open. From now on it is recorded under whoever signs in here.',
+    chooseUser: 'Who is taking over?',
+    userName: 'Their name',
+    userNamePlaceholder: 'Type their name',
+    continue: 'Continue',
+    cancel: 'Cancel',
+    someoneElse: 'Someone else',
+    // The confirmation: the till belongs to somebody else now, and the next lines of this sale
+    // carry their name.
+    nowServing: 'Now serving as {name}',
+    rejected: 'Those details did not work. Check the name and the PIN, and try again.',
+    deviceNotEnrolled:
+      'This device is not set up for PINs yet. Sign in once with an ERPlora account on it, and the PIN will work from then on.',
+    deviceUnidentified: 'This device could not identify itself. Reload the page and try again.',
+    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
+  },
   activation: {
     title: 'Activation required',
     lead: 'This device has to check your apps with erplora.com before it can open your business. Connect to the internet and try again.',

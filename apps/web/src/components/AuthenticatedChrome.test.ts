@@ -41,7 +41,12 @@ vi.mock('../lib/entitlement', async () => {
   const { ref } = await import('vue');
   return { resolveEntitlement: vi.fn(async () => {}), needsActivation: ref(false) };
 });
-vi.mock('../lib/device', () => ({ getDeviceContext: vi.fn(async () => null) }));
+// `resolveDeviceId` too: since hub#456 the shell asks the hub what kind of device this is from
+// INSIDE the session (`loadDeviceMode` in `gateAndRefresh`), and that reads the device's id first.
+vi.mock('../lib/device', () => ({
+  getDeviceContext: vi.fn(async () => null),
+  resolveDeviceId: vi.fn(async () => null),
+}));
 vi.mock('../lib/hub-settings', () => ({ getHubSettings: vi.fn(async () => ({ language: 'en' })) }));
 vi.mock('../lib/user-profile', () => ({ getUserProfile: vi.fn(async () => null) }));
 vi.mock('../lib/setup-status', () => ({ refreshSetupStatus: vi.fn(async () => {}) }));
