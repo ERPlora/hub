@@ -117,6 +117,14 @@ export default {
     reportSent: 'Gracias, hemos recibido tu denuncia.',
     reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
   },
+  // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
+  // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue
+  // funcionando igual que siempre, así que no hay nada que el usuario pueda hacer al respecto).
+  badge: {
+    nfcDisabled: 'El NFC está apagado en este aparato. Enciéndelo para leer las tarjetas acercándolas.',
+    nfcRandomUid:
+      'Esta tarjeta da un número distinto cada vez que se lee, así que no puede usarse como placa. Prueba con otra.',
+  },
   // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
   // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,
   // no lo dice nadie.
@@ -854,6 +862,10 @@ export default {
       'Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes. También puedes teclear el número, para un llavero o una etiqueta grabada.',
     badgeSetHelp:
       'Ya lleva una placa. Pasa una tarjeta nueva para sustituirla, o déjalo en blanco y se queda como está.',
+    badgeNfcHelp:
+      'Acerca la tarjeta a este aparato —o pásala por el lector— y se rellena sola. También puedes teclear el número, para un llavero o una etiqueta grabada.',
+    badgeNfcSetHelp:
+      'Ya lleva una placa. Acerca o pasa una tarjeta nueva para sustituirla, o déjalo en blanco y se queda como está.',
     clearBadge: 'Retirar la placa',
     localUser: 'Usuario local',
     localUserHelp:

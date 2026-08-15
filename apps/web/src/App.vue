@@ -206,6 +206,7 @@ import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { installIdleLogout } from './lib/idle-logout';
 import { installBadgeScanner } from './lib/badge-scanner';
+import { installNfcBadgeReader } from './lib/nfc-badge';
 import { loadDeviceMode } from './lib/device-mode';
 import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
@@ -371,6 +372,12 @@ installIdleLogout(() => {
 // `App.vue` no se desmonta nunca, así que esta instalación es única y no se deshace. Quién atiende
 // cada tarjeta lo deciden las pantallas suscritas (`onBadgeScan`), y manda la última.
 installBadgeScanner();
+// …y la MISMA placa por el lector NFC del propio aparato, donde lo haya (hub#988). En una tablet no
+// hay lector USB y el lector lleva dentro desde el primer día: hasta ahora, sin usar. No es una
+// segunda vía de entrega — sale por la misma puerta (`deliverBadge`), así que ninguna pantalla sabe
+// de dónde vino la tarjeta. Solo lee mientras alguien la espera; fuera de la app instalada, y en un
+// aparato sin lector, no hace absolutamente nada.
+installNfcBadgeReader();
 // La franja bloqueante NO se puede descartar (hub#374): la única forma de que desaparezca es que el
 // hub deje de estar bloqueado, así que el documento se relee al navegar. Es también lo que detecta
 // un gate que APARECE a mitad de sesión —instalar el módulo que pide certificado añade un ⛔ que en

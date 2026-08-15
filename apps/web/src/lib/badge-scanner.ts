@@ -51,6 +51,17 @@ export type BadgeHandler = (badge: string) => void;
 const handlers: BadgeHandler[] = [];
 
 /**
+ * Quién quiere saber si hay ALGUIEN esperando una tarjeta (hub#988).
+ *
+ * Lo pregunta el lector NFC de la app instalada: el modo lector es una radio, y tenerla abierta
+ * bajo una pantalla que nadie mira gasta la batería de una tablet que se pasa el día en el
+ * mostrador y entrega el toque a un handler que ya no existe. El teclado no lo necesita —una tecla
+ * no cuesta nada—, pero la puerta es la misma para los dos.
+ */
+type WaitingWatcher = (waiting: boolean) => void;
+const watchers: WaitingWatcher[] = [];
+
+/**
  * Escucha las placas hasta que se llame a la función devuelta.
  *
  * Se llama desde `onMounted` y se desuscribe en `onUnmounted`: una pantalla que se va y deja su
@@ -58,10 +69,52 @@ const handlers: BadgeHandler[] = [];
  */
 export function onBadgeScan(handler: BadgeHandler): () => void {
   handlers.push(handler);
+  // Solo los BORDES. Un diálogo que se abre encima de una pantalla que ya escuchaba no es «empieza
+  // a leer otra vez», y al cerrarse no es «deja de leer» mientras la pantalla de debajo sigue ahí.
+  if (handlers.length === 1) announceWaiting(true);
   return () => {
     const at = handlers.lastIndexOf(handler);
-    if (at !== -1) handlers.splice(at, 1);
+    if (at === -1) return;
+    handlers.splice(at, 1);
+    if (handlers.length === 0) announceWaiting(false);
   };
+}
+
+/**
+ * **La puerta por la que entra una placa venga de donde venga** (hub#988).
+ *
+ * La ráfaga del lector-teclado y el toque NFC de la app instalada acaban los dos aquí, y por eso
+ * ninguna pantalla —el login, el diálogo de aprobación, la ficha de personal— sabe de dónde salió
+ * la tarjeta. Es la condición de diseño de la issue: **un solo camino de placa, dos orígenes**.
+ *
+ * Devuelve si había alguien escuchando. Una tarjeta que no recoge nadie no es un error, pero el
+ * lector NFC necesita distinguirlo de una entrega para no quedarse leyendo contra el vacío.
+ */
+export function deliverBadge(badge: string): boolean {
+  const handler = handlers[handlers.length - 1];
+  if (!handler) return false;
+  handler(badge);
+  return true;
+}
+
+/**
+ * Avisa cuando el shell **empieza** y **deja** de esperar una placa.
+ *
+ * Al suscribirse se entrega el estado actual de inmediato: el lector NFC se instala una vez en el
+ * arranque y las pantallas se suscriben después, pero un recargado en caliente —o una instalación
+ * posterior a que el login ya esté montado— lo dejaría convencido de que nadie quiere una tarjeta.
+ */
+export function onBadgeWaiting(watcher: WaitingWatcher): () => void {
+  watchers.push(watcher);
+  watcher(handlers.length > 0);
+  return () => {
+    const at = watchers.lastIndexOf(watcher);
+    if (at !== -1) watchers.splice(at, 1);
+  };
+}
+
+function announceWaiting(waiting: boolean): void {
+  for (const watcher of [...watchers]) watcher(waiting);
 }
 
 /** Estado de la ráfaga en curso. Vacío = no hay ninguna. */
@@ -99,7 +152,9 @@ export function installBadgeScanner(): () => void {
       // formulario de debajo.
       ev.preventDefault();
       ev.stopPropagation();
-      handlers[handlers.length - 1]?.(badge);
+      // Por `deliverBadge` y no por el array: es la MISMA puerta que usa el lector NFC (hub#988),
+      // así que las dos vías no pueden divergir en a quién entregan.
+      deliverBadge(badge);
       return;
     }
 

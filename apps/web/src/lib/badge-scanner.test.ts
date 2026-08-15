@@ -15,8 +15,10 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   BADGE_MAX_GAP_MS,
+  deliverBadge,
   installBadgeScanner,
   onBadgeScan,
+  onBadgeWaiting,
 } from './badge-scanner';
 
 /** One keystroke, `gap` ms after the previous one. Returns the event so a test can inspect it. */
@@ -159,5 +161,67 @@ describe('badge scanner', () => {
     swipe('0009171456');
 
     expect(seen).toEqual([]);
+  });
+});
+
+// ── The door a second origin comes in through (hub#988) ────────────────────────────────────────
+//
+// The tablet's own NFC reader produces the same thing a swipe produces, and it has to reach the
+// same subscribers or every screen would need a second code path. What it needs from here is a way
+// IN (`deliverBadge`) and a way to know when anybody is actually waiting (`onBadgeWaiting`) — a
+// radio held open under a screen nobody is looking at drains a counter tablet and delivers taps to
+// callbacks that are long gone.
+
+describe('the badge door', () => {
+  it('delivers a badge from another origin to the same last subscriber', () => {
+    const page: string[] = [];
+    const dialog: string[] = [];
+    listen((badge) => page.push(badge));
+    const closeDialog = listen((badge) => dialog.push(badge));
+
+    expect(deliverBadge('04A23B5C6D7E80')).toBe(true);
+    expect([page, dialog]).toEqual([[], ['04A23B5C6D7E80']]);
+
+    closeDialog();
+    deliverBadge('04A23B5C6D7E80');
+    expect(page).toEqual(['04A23B5C6D7E80']);
+  });
+
+  it('says so when nobody is listening, instead of dropping the card in silence', () => {
+    expect(deliverBadge('04A23B5C6D7E80')).toBe(false);
+  });
+
+  it('announces the first subscriber and the departure of the last one', () => {
+    // The edges, not every subscription: a dialog opening on top of a listening page must not read
+    // as "start the radio again", and its closing must not read as "stop" while the page waits.
+    const waiting: boolean[] = [];
+    // The snapshot on subscribing (nobody is waiting yet) — see the test below for why it is there.
+    const stopWatching = onBadgeWaiting((isWaiting) => waiting.push(isWaiting));
+    expect(waiting).toEqual([false]);
+
+    const offPage = listen(() => {});
+    const offDialog = listen(() => {});
+    expect(waiting).toEqual([false, true]);
+
+    offDialog();
+    expect(waiting).toEqual([false, true]);
+
+    offPage();
+    expect(waiting).toEqual([false, true, false]);
+
+    stopWatching();
+  });
+
+  it('tells a late watcher whether somebody is already waiting', () => {
+    // The NFC reader is installed once at boot and screens subscribe later — but a hot reload, or
+    // an install after the login screen has already mounted, would otherwise leave it convinced
+    // that nobody wants a card.
+    listen(() => {});
+
+    const waiting: boolean[] = [];
+    const stopWatching = onBadgeWaiting((isWaiting) => waiting.push(isWaiting));
+    expect(waiting).toEqual([true]);
+
+    stopWatching();
   });
 });

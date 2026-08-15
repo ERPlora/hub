@@ -39,4 +39,27 @@ describe('Personal (core)', () => {
     expect(listSource).toContain('has_pin');
     expect(listSource).toContain('is_active');
   });
+
+  // ── hub#988: la placa se da de alta pasándola O acercándola ────────────────────────────────
+  //
+  // El alta de una tarjeta es «pásala», el gesto que usa el mercado (Square, Toast, Aloha). En una
+  // tablet no hay lector USB que pasarla por, y el lector lleva dentro del aparato desde siempre.
+
+  it('el campo de la placa NO se suscribe al NFC: escucha la puerta común', () => {
+    // La condición de diseño de la issue. Si esta pantalla llegara a importar el lector NFC para
+    // recibir tarjetas, habría dos caminos de placa que mantener —y el diálogo de aprobación y el
+    // login tendrían que crecer el suyo—. El toque entra por `onBadgeScan`, como la ráfaga.
+    expect(formSource).toContain('onBadgeScan');
+    expect(formSource).not.toContain('erplora_nfc_read');
+    expect(formSource).not.toContain('installNfcBadgeReader');
+  });
+
+  it('solo promete «acércala» donde el aparato sabe leerla', () => {
+    // `nfcBadgeReady` se enciende cuando el shell ha atendido una lectura de VERDAD. Ramificar por
+    // `isTauri()` prometería el toque en cada instalación de escritorio, y una instrucción que no
+    // funciona es peor que no darla.
+    expect(formSource).toContain('nfcBadgeReady');
+    expect(formSource).toContain('badgeNfcHelp');
+    expect(formSource).not.toMatch(/isTauri\(\)[^\n]*badge/i);
+  });
 });

@@ -498,10 +498,24 @@ jobs:
                    android.permission.CHANGE_WIFI_MULTICAST_STATE \
                    android.permission.ACCESS_LOCAL_NETWORK \
                    android.permission.POST_NOTIFICATIONS \
-                   android.permission.BLUETOOTH_CONNECT; do
+                   android.permission.BLUETOOTH_CONNECT \
+                   android.permission.NFC; do
             echo "$PERMISOS" | grep -q "name='$P'" \
               || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
           done
+          # 🔴 El permiso NFC arrastra un requisito IMPLÍCITO de `android.hardware.nfc` (hub#988):
+          # Play esconde la app de todo dispositivo sin chip —las tablets baratas de mostrador, que
+          # son justo las que no tienen lector USB— salvo que el manifest diga que es opcional. Solo
+          # el manifest FUSIONADO lo sabe, y `dump badging` es quien lo lee. Un `uses-feature` que
+          # se cuele como obligatorio no rompe nada: adelgaza la ficha de la tienda en silencio.
+          #
+          # El ` ?` del patrón NO es descuido: aapt1 imprime `uses-feature-not-required:name=` y
+          # aapt2 mete un espacio tras los dos puntos. Sin él, este control pasaría siempre —
+          # comprobado contra dos APKs de prueba, uno con `required="false"` y otro con `"true"`,
+          # porque un guard que nunca caza nada es peor que no tenerlo.
+          BADGING=$("$AAPT" dump badging "$APK")
+          echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.nfc'" \
+            || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; echo "$BADGING" | grep -i nfc; exit 1; }
 
       - name: Stage artifacts
         run: |

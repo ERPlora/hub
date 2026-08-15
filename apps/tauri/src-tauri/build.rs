@@ -30,6 +30,9 @@ fn main() {
             "erplora_remove_device",
             // Notificación del SO: el aviso cuando NADIE mira la pantalla (comanda a cocina).
             "erplora_notify",
+            // La placa por el lector NFC del propio aparato (hub#988): el segundo origen de la
+            // MISMA puerta que el lector-teclado.
+            "erplora_nfc_read",
             // «Start on login» (ADR-0204 §7, hub#389). App commands and not the autostart
             // plugin's own (`autostart:allow-*`): the plugin is a DESKTOP-ONLY dependency, so on
             // an Android build its permissions do not exist and a capability naming them would
