@@ -168,6 +168,13 @@ pub enum RuntimeError {
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
     #[error("host.notify: {0}")]
     Notify(String),
+    /// Fallo de la capacidad de host `host.print` (hub#957): el gemelo de la de arriba para la cola
+    /// de impresión del hub (ADR-0196 §6). El relay del outbox lo trata como un listener fallido →
+    /// reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter. Su código propio existe por lo
+    /// mismo que el de `notify`: «no se encoló el papel» y «no salió el email» se arreglan en
+    /// pantallas distintas.
+    #[error("host.print: {0}")]
+    Print(String),
     /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
     #[error("host.module_storage: {0}")]
     Storage(String),

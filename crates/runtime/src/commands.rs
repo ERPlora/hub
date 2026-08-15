@@ -1221,6 +1221,9 @@ fn consumed_new_ids(output: &Output, new_ids: &[Json]) -> Vec<Json> {
 /// 2. **`*.reminder.due`** (el disparador de `host.notify`) → el módulo DEBE declarar la capability
 ///    `notify`. El *grant* del usuario se comprueba aparte, contra la BD
 ///    ([`crate::capabilities::require`]), tanto al encolar como al entregar.
+/// 2b. **`*.print.due`** (el disparador de `host.print`, hub#957) → lo mismo con la capability
+///    `printer`: encola en la cola de impresión del hub, que es otro primitivo del host, y sin
+///    declararla el command falla entero en vez de dejar una fila que morirá en el dead-letter.
 /// 3. **Namespace ajeno**: el primer segmento no puede ser el id de OTRO módulo instalado — un
 ///    módulo del marketplace no emite `verifactu.record.transmitted` en nombre de nadie.
 /// 4. Si el módulo **declara** `events.emits`, queda en **modo estricto**: cualquier nombre fuera de
@@ -1258,6 +1261,20 @@ pub(crate) fn validate_handler_event(
             return Err(RuntimeError::CapabilityDenied {
                 module: handler_module_id.to_string(),
                 capability: crate::manifest::CapabilityKind::Notify.as_str().to_string(),
+            });
+        }
+    }
+
+    // Regla 2b — lo mismo para el disparador de `host.print` (hub#957): `*.print.due` encola en la
+    // cola de impresión del hub, así que exige la capability `printer` declarada.
+    if name.ends_with(crate::outbox::PRINT_DUE_SUFFIX) {
+        let declares_printer = manifest
+            .map(|m| m.requests_capability(crate::manifest::CapabilityKind::Printer))
+            .unwrap_or(false);
+        if !declares_printer {
+            return Err(RuntimeError::CapabilityDenied {
+                module: handler_module_id.to_string(),
+                capability: crate::manifest::CapabilityKind::Printer.as_str().to_string(),
             });
         }
     }
@@ -1955,6 +1972,36 @@ mod tests {
         validate_handler_event(&reg, "appt", "appt.reminder.due").unwrap();
     }
 
+    /// **El mismo vector, la otra puerta de host** (hub#957). `*.print.due` es lo que dispara el
+    /// listener-host de `host.print` (la cola de impresión del hub): un módulo que no declara la
+    /// capability `printer` no puede emitirlo, ni siquiera dentro de su propio namespace. Sin esto,
+    /// declarar la capability sería opcional para sacar papel y el gate de la entrega sería el
+    /// único — un guardarraíl en vez de dos, como en `notify`.
+    #[test]
+    fn print_due_event_requires_the_printer_capability_to_be_declared() {
+        let reg = registry_with_module(
+            r#"{"id":"labels","name":"Labels","version":"1.0.0"}"#,
+            "labels.print",
+        );
+        let err = validate_handler_event(&reg, "labels", "labels.print.due").unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::CapabilityDenied { capability, .. } if capability == "printer"),
+            "got {err:?}"
+        );
+    }
+
+    /// Declarando la capability, el evento de impresión es legítimo (el **grant** del usuario se
+    /// comprueba aparte, contra la BD, antes de encolar y antes de imprimir).
+    #[test]
+    fn print_due_event_is_allowed_when_printer_is_declared() {
+        let reg = registry_with_module(
+            r#"{"id":"labels","name":"Labels","version":"1.0.0",
+                "capabilities":{"printer":{}}}"#,
+            "labels.print",
+        );
+        validate_handler_event(&reg, "labels", "labels.print.due").unwrap();
+    }
+
     /// Modo compatible: un manifest sin `events.emits` (todos los publicados hoy) sigue
     /// pudiendo emitir en su propio namespace y en namespaces de nadie — pero se avisa.
     #[test]
@@ -2105,6 +2152,110 @@ mod tests {
         assert_eq!(rows.rows[0]["event_name"], json!("sale.completed"));
         // La fila guarda el módulo emisor: es lo que permite exigirle la capability al entregar.
         assert_eq!(rows.rows[0]["module_id"], json!("sales"));
+    }
+
+    // ── El mismo camino para la puerta de papel (hub#957) ─────────────────────────────────────
+    //
+    // `*.print.due` dispara el listener-host de `host.print`. Como con `notify`, no basta con
+    // probar el validador: hay que probar que el CAMINO REAL (handler → persist_handler_output →
+    // outbox) rechaza y no encola. El módulo de aquí **declara el evento** (`events.emits`) a
+    // propósito: así la regla 1 lo admitiría y lo único que puede negarlo es la regla 2b — si se
+    // borra, el evento se encola y el test cae.
+
+    /// Registry con un módulo `labels` que declara su evento de impresión y, opcionalmente, la
+    /// capability `printer`; su command corre un handler nativo que emite ese evento.
+    fn registry_with_printing_handler(declares_printer: bool) -> Registry {
+        let manifest_json = if declares_printer {
+            r#"{"id":"labels","name":"Labels","version":"1.0.0",
+                "capabilities":{"printer":{}},
+                "events":{"emits":["labels.print.due"]}}"#
+        } else {
+            r#"{"id":"labels","name":"Labels","version":"1.0.0",
+                "events":{"emits":["labels.print.due"]}}"#
+        };
+        let mut reg = Registry::new();
+        reg.status.insert("labels".into(), ModuleStatus::Active);
+        reg.installed
+            .push(serde_json::from_str(manifest_json).unwrap());
+        let mut def = cmd_def();
+        def.sql = vec![];
+        def.handler = Some(crate::manifest::HandlerRef {
+            kind: "native".to_string(),
+            file: None,
+            function: "handle".to_string(),
+        });
+        reg.commands.insert(
+            "labels.print".into(),
+            RegisteredCommand {
+                module_id: "labels".into(),
+                def,
+                sql: vec![],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg.native.insert(
+            "labels".into(),
+            std::sync::Arc::new(EmittingHandler("labels.print.due")),
+        );
+        reg
+    }
+
+    async fn db_with_capability_tables() -> erplora_db::PgAdapter {
+        let db = erplora_db::testutil::fresh_db().await;
+        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::identity::ensure_tables(&db).await.unwrap();
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        crate::system_migrations::apply(&db, "h1").await.unwrap();
+        db
+    }
+
+    /// **La regresión de hub#957 por el camino real.** Un handler que emite `*.print.due` desde un
+    /// módulo que NO declara `printer` hace fallar el command entero: la fila no llega al outbox,
+    /// así que el listener-host no tiene nada que encolar.
+    #[tokio::test]
+    async fn handler_emitting_print_due_without_declaring_printer_fails_and_queues_nothing() {
+        let db = db_with_capability_tables().await;
+        let reg = registry_with_printing_handler(false);
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        let err = execute(&db, &reg, "labels.print", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::CapabilityDenied { capability, .. } if capability == "printer"),
+            "got {err:?}"
+        );
+
+        let rows = db
+            .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(rows.rows[0]["c"].as_i64().unwrap_or(-1), 0, "no se encola nada");
+    }
+
+    /// El camino feliz: con la capability declarada **y concedida**, el evento llega al outbox con
+    /// su módulo emisor puesto — que es lo que permite exigirle la capability otra vez al entregar.
+    #[tokio::test]
+    async fn handler_emitting_print_due_with_printer_granted_reaches_the_outbox() {
+        let db = db_with_capability_tables().await;
+        let reg = registry_with_printing_handler(true);
+        crate::capabilities::set_grant(&db, &reg, "h1", "labels", "printer", true, "hub_user:admin")
+            .await
+            .unwrap();
+
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+        execute(&db, &reg, "labels.print", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+
+        let rows = db
+            .query("SELECT event_name, module_id FROM _event_outbox", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(rows.rows[0]["event_name"], json!("labels.print.due"));
+        assert_eq!(rows.rows[0]["module_id"], json!("labels"));
     }
 
     // ── hub#139: domain error channel from a handler ─────────────────────────────────────────

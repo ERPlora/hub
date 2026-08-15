@@ -30,6 +30,7 @@ pub mod export;
 pub mod fiscal_profile;
 pub mod flows;
 pub mod host_notify;
+pub mod host_print;
 pub mod hub_meta;
 pub mod hub_users;
 pub mod identity;

@@ -314,6 +314,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::InvalidPayload { .. } => "invalid_payload",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
+        // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero
+        // «no se encoló el papel» y «no salió el aviso» se atienden en sitios distintos.
+        E::Print(_) => "print",
         E::Storage(_) => "module_storage",
         E::Certificate(_) => "certificate",
         // hub#701: a required read that cannot be resolved aborts the command. Its own code — not a
