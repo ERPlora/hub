@@ -390,10 +390,14 @@ async fn run_step(
                 (Some(s), _) => (chrono::Utc::now() + chrono::Duration::seconds(*s)).to_rfc3339(),
                 (None, Some(path)) => {
                     let value = def::resolve(&json!(path), scope);
+                    // **Normalised to UTC before it is persisted** (hub#970): `wake_sleeping`
+                    // compares this against `:now` as TEXT, so an instant that keeps the offset it
+                    // was written in sorts by its wall clock instead of by when it happens — two
+                    // hours late in Spanish summer, and EARLY with a negative offset.
                     match value.as_str().and_then(|s| {
                         chrono::DateTime::parse_from_rfc3339(s)
                             .ok()
-                            .map(|d| d.to_rfc3339())
+                            .map(|d| store::to_utc_rfc3339(&d))
                     }) {
                         Some(instant) => instant,
                         None => {
@@ -1852,5 +1856,107 @@ mod tests {
         );
         assert_eq!(raw_run(&db, &run_id).await, before);
         assert_eq!(raw_steps(&db, &run_id).await, steps_before);
+    }
+
+    // ── hub#970: `delay.until` sleeps until an INSTANT, not until a piece of text ──────────────
+    //
+    // `wake_sleeping` compares `wake_at <= :now` in SQL, over TEXT. That is only the same question
+    // as «has this instant arrived?» while every string in the column is UTC. An `until` arrives
+    // with the offset of wherever it was written (`trigger.at` says so explicitly: the offset is
+    // part of the instant), so a `+02:00` sorted two hours late and a `-05:00` sorted five hours
+    // early — silently: the run ends `done`, the history says nothing, and the only trace is the
+    // hour on the message.
+
+    /// A flow that waits for `input.when` and then writes a note.
+    fn wait_until_flow() -> Json {
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "wait", "kind": "delay", "until": "input.when" },
+                { "id": "write", "kind": "command", "command": "notes.note.add",
+                  "params": { "text": "later" } }
+            ]
+        })
+    }
+
+    async fn park_until(db: &dyn DatabaseAdapter, when: &str) -> (String, String) {
+        let flow_id = flow(db, wait_until_flow()).await;
+        grant(db, &flow_id, "notes.note.add").await;
+        let run_id =
+            start_manual_run(db, HUB, &flow_id, &json!({ "when": when }), "hub_user:1")
+                .await
+                .unwrap();
+        tick(db, &registry(), HUB).await.unwrap();
+        (flow_id, run_id)
+    }
+
+    fn at_offset(instant: chrono::DateTime<chrono::Utc>, hours: i32) -> String {
+        instant
+            .with_timezone(&chrono::FixedOffset::east_opt(hours * 3600).expect("valid offset"))
+            .to_rfc3339()
+    }
+
+    /// A moment already past, written with a POSITIVE offset. Its text sorts AFTER `now`, so the
+    /// string comparison keeps the run asleep for the length of the offset.
+    #[tokio::test]
+    async fn a_delay_until_a_past_instant_written_in_another_zone_wakes_on_the_next_tick() {
+        let db = db().await;
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let (flow_id, run_id) = park_until(&db, &due).await;
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+
+        // What was stored has to be an instant the clock can compare, not the text it was given.
+        let stored = raw_run(&db, &run_id).await["wake_at"].as_str().unwrap().to_string();
+        assert!(stored.ends_with("+00:00"), "stored with an offset of its own: {stored}");
+
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert_eq!(
+            notes(&db).await,
+            vec!["later"],
+            "the instant passed a minute ago: the run resumes"
+        );
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
+    }
+
+    /// The other sign, and the worse one: a future moment written with a NEGATIVE offset sorts
+    /// BEFORE `now`, so the run wakes early — a reminder sent before the thing it reminds of.
+    /// One control can be right by accident; two with opposite signs cannot.
+    #[tokio::test]
+    async fn a_delay_until_a_future_instant_in_a_western_zone_does_not_wake_early() {
+        let db = db().await;
+        let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(1), -5);
+        let (flow_id, _) = park_until(&db, &later).await;
+
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert!(notes(&db).await.is_empty(), "the instant has not arrived yet");
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+    }
+
+    /// The runs that were parked BEFORE this fix are still in the table with their offset, and
+    /// nothing would ever re-write them: a sleeping run is only read by the comparison that the
+    /// offset breaks. The boot repair is what reaches them (`store::normalize_wake_at`).
+    #[tokio::test]
+    async fn a_run_parked_before_the_fix_is_repaired_at_boot_and_then_wakes() {
+        let db = db().await;
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let (flow_id, run_id) = park_until(&db, &due).await;
+
+        // Rewind it to the shape the old code wrote: the instant, with its origin offset.
+        let mut p = Params::new();
+        p.insert("id".into(), json!(run_id));
+        p.insert("wake_at".into(), json!(due));
+        db.execute("UPDATE _flow_runs SET wake_at = :wake_at WHERE id = :id", &p)
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert!(
+            notes(&db).await.is_empty(),
+            "this is the bug, reproduced: the text sorts late, so the run oversleeps"
+        );
+
+        store::normalize_wake_at(&db, HUB).await.unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert_eq!(notes(&db).await, vec!["later"]);
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
     }
 }
