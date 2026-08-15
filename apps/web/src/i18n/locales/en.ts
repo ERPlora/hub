@@ -969,8 +969,6 @@ export default {
     database: 'Database',
     memory: 'Memory',
     connections: 'Connections',
-    connectionsOf: 'of {limit}',
-    connectionsActive: 'active',
     // The printer card's headline, status word and status sentence used to live here, naming a
     // process («Bridge») instead of the thing on the counter. They now come from `system.health.*`
     // (hub#375). What is left below is the INSTALL flow, which is still about a piece of software
@@ -1034,6 +1032,13 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    // Usage-series range selector (saas#1511). The contract stops at 3 days on purpose.
+    usageRange3h: '3 h',
+    usageRange24h: '24 h',
+    usageRange3d: '3 days',
+    usageRangeLabel3h: 'Last 3 hours',
+    usageRangeLabel24h: 'Last 24 hours',
+    usageRangeLabel3d: 'Last 3 days',
     databaseShared: 'Shared database',
     colTime: 'Time',
     colLevel: 'Level',
