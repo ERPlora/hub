@@ -614,6 +614,73 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     std::fs::remove_dir_all(f.temp).ok();
 }
 
+/// **hub#954 — the `query` step is judged at the door, not at 3 AM.**
+///
+/// Three refusals, and each is a different question with a different remedy, so each keeps its own
+/// status: a `limit` bigger than the ceiling is a wrong DOCUMENT (`400`), a read that does not
+/// exist is a `404` — the very answer the `query` grant door already gives for the same mistake —
+/// and the good document saves. What must never happen is the fourth case: `201 Created` on a step
+/// that reads two hundred rows when it says a thousand.
+#[tokio::test]
+async fn a_query_step_is_refused_at_the_save_door_for_its_limit_and_for_a_read_that_is_not_there() {
+    let f = fixture_with_modules().await;
+
+    let flow = |step: Value| {
+        json!({
+            "name": "Report",
+            "definition": { "schema_version": 1, "steps": [step] }
+        })
+    };
+    let post = |body: Value| {
+        send(
+            &f.router,
+            request("POST", "/api/hub/flows", Some(&f.admin), Some(body)),
+        )
+    };
+
+    // 1. Above the ceiling. Refused, not clamped — and it is the document that is wrong, so `400`.
+    let over = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.slots.list", "limit": 1000
+    })))
+    .await;
+    assert_eq!(over.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(over).await["error"]["code"],
+        "flow.limit_out_of_range",
+        "the editor programs against the CODE so it can point at the field"
+    );
+
+    // 2. A read nothing in this hub performs. Same answer the grants door gives it (`404`): a
+    // different question from «that one is internal», and a different remedy.
+    let missing = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.nope.list"
+    })))
+    .await;
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+
+    // 3. …and the document that is right lands.
+    let ok = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.slots.list",
+        "result": "count", "limit": 50
+    })))
+    .await;
+    assert_eq!(ok.status(), StatusCode::CREATED, "the good one saves");
+
+    let listed = body_json(send(
+        &f.router,
+        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert_eq!(
+        listed["data"].as_array().unwrap().len(),
+        1,
+        "only the good one landed: {listed}"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
 /// **hub#824 — the door does not promise what the engine will refuse.**
 ///
 /// An INTERNAL command exists in the registry, so "does it exist" waved it through: `PUT …/grants`

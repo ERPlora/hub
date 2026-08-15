@@ -65,6 +65,19 @@ pub const ERR_SECRET_NOT_AVAILABLE: &str = "flow.secret_not_available";
 pub const ERR_INVALID_CRON: &str = "flow.invalid_cron";
 /// Same family: `at: "manana por la tarde"` was copied straight into `next_run`.
 pub const ERR_INVALID_AT: &str = "flow.invalid_at";
+/// hub#954 — a `query` step asking for more rows than [`MAX_QUERY_ROWS`]. Refused at save, like
+/// `max_iters`: a document that says 1000 and reads 200 lies to whoever wrote it, and the silent
+/// truncation is the single complaint every competitor's forum is full of.
+pub const ERR_LIMIT_OUT_OF_RANGE: &str = "flow.limit_out_of_range";
+
+/// The most rows one `query` step may bring into a run (hub#954).
+///
+/// It is a hard ceiling and not a clamp. The reason it exists at all is that the read happens
+/// inside the tick, under the runtime's global lock: a thousand rows there is every till in the
+/// hub waiting. And the reason it is the DEFAULT too is the market's own lesson — Make's invisible
+/// `Limit: 10` and Zapier's «only the first» are the truncations their forums are full of, so a
+/// step that says nothing about how much it wants is capped, never quietly cut short.
+pub const MAX_QUERY_ROWS: i64 = 200;
 
 /// Turns of the agent loop when the document does not say (ADR-0283 §7).
 pub const DEFAULT_MAX_ITERS: i64 = 6;
@@ -81,12 +94,21 @@ fn invalid(code: &str, message: impl Into<String>) -> RuntimeError {
 
 // ── Steps ─────────────────────────────────────────────────────────────────────────────────────
 
-/// The six step kinds of `schema_version: 1` (ADR-0283 §5). The VOCABULARY is frozen here, and
-/// since hub#821 every one of them EXECUTES: the list of what a document may say and the list of
-/// what this kernel performs are finally the same list.
+/// The step kinds of `schema_version: 1` (ADR-0283 §5). The VOCABULARY is frozen here, and since
+/// hub#821 every one of them EXECUTES: the list of what a document may say and the list of what
+/// this kernel performs are finally the same list.
+///
+/// hub#954 added the seventh, `query`, and it is the one addition that took nothing new from the
+/// permission model: `GrantKind::Query` and `grants::check_query_grant` have gated the `ai` step's
+/// reads since hub#665. What the kernel gained is the ability to say «read this» without a model
+/// in the middle — a deterministic read instead of a non-deterministic one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepKind {
     Command,
+    /// hub#954 — a DETERMINISTIC read. The grant it goes through (`GrantKind::Query`) and the door
+    /// it opens have run in production since hub#665; what was missing was a way to say «read
+    /// this» without putting a language model in the middle of it.
+    Query,
     Condition,
     Delay,
     /// The first way out to the internet (hub#662): allow-listed URL + `_flow_secrets`.
@@ -102,6 +124,7 @@ impl StepKind {
     pub fn as_str(self) -> &'static str {
         match self {
             StepKind::Command => "command",
+            StepKind::Query => "query",
             StepKind::Condition => "condition",
             StepKind::Delay => "delay",
             StepKind::Http => "http",
@@ -113,6 +136,7 @@ impl StepKind {
     pub fn parse(s: &str) -> Option<Self> {
         Some(match s {
             "command" => StepKind::Command,
+            "query" => StepKind::Query,
             "condition" => StepKind::Condition,
             "delay" => StepKind::Delay,
             "http" => StepKind::Http,
@@ -134,8 +158,8 @@ impl StepKind {
         matches!(self, StepKind::Http | StepKind::Ai)
     }
 
-    /// Can this hub EXECUTE this kind? The vocabulary is frozen at six and, since hub#821, all six
-    /// run: `http` joined with hub#662, `ai` with hub#665 and `notify` with hub#821. The guard that
+    /// Can this hub EXECUTE this kind? Every kind in the vocabulary runs: `http` joined with
+    /// hub#662, `ai` with hub#665, `notify` with hub#821 and `query` with hub#954. The guard that
     /// used this stays where it is, because the rule it enforced is what got them here one at a
     /// time — a flow is never stored with a step nothing performs.
     pub fn is_available(self) -> bool {
@@ -145,6 +169,7 @@ impl StepKind {
     /// Every kind, in document order. Mirrored by `schemas/flow.schema.json`.
     pub const ALL: &'static [StepKind] = &[
         StepKind::Command,
+        StepKind::Query,
         StepKind::Condition,
         StepKind::Delay,
         StepKind::Http,
@@ -161,6 +186,9 @@ pub enum StepSpec {
     /// `{"kind":"command","command":"sales.sale.create","params":{…}}` — the params are mapped
     /// (paths/templates) against the run before the command sees them.
     Command { command: String, params: Map<String, Json> },
+    /// `{"kind":"query","query":"sales.summary","params":{…},"result":"first","limit":50}` — a
+    /// deterministic read (hub#954). See [`QueryStep`].
+    Query(QueryStep),
     /// `{"kind":"condition","when":{…}}` — a guard. False stops the run; v1 is linear, so there
     /// is no "else" branch to go to.
     Condition { when: Condition },
@@ -215,6 +243,60 @@ pub struct NotifyStep {
     /// The copy, mapped against the run. `vars.text` is what an email or a free WhatsApp message
     /// says; the transport refuses an intent with nothing to say rather than inventing it.
     pub vars: Map<String, Json>,
+}
+
+/// **A read a flow performs itself** (hub#954), shaped after Salesforce Flow's *Get Records* —
+/// the form the market converged on, and the only one of the ten references studied that makes
+/// «how many rows» an explicit choice of the author with a hard ceiling behind it.
+///
+/// It adds NO permission surface: the door is [`crate::flows::grants::check_query_grant`], the
+/// same one the `ai` step's reads have gone through since hub#665. What changes is that a read no
+/// longer needs a language model in front of it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct QueryStep {
+    /// The read, by name. It must exist in the registry at SAVE time (`flows::store`), the same
+    /// rule a `query` grant follows: a grant naming nothing reads like a permission and is not
+    /// one, and a step naming nothing reads like a read and is not one either.
+    pub query: String,
+    /// Its params, mapped against the run like any other value.
+    pub params: Map<String, Json>,
+    /// What lands in `steps.<id>`.
+    pub result: QueryResult,
+    /// The ceiling of rows this read may bring into the tick. `1..=`[`MAX_QUERY_ROWS`], refused
+    /// above it at save time, and defaulting to the ceiling itself.
+    pub limit: i64,
+}
+
+/// **What a `query` step leaves behind** — and, deliberately, not a list of rows.
+///
+/// `rows` is NOT in v1 because [`resolve_path`] does not index arrays: a document could write
+/// `steps.week.rows.0.total` and the kernel would resolve it to nothing, silently. Offering a
+/// mapping the kernel cannot resolve is offering a lie, so the two shapes below are the two the
+/// mapping language can actually read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueryResult {
+    /// The fields of the FIRST row, at the root of `steps.<id>`, plus `found` and `count`. The
+    /// default, and Salesforce's *Only the first record*.
+    First,
+    /// Only `count` and `found`. «Are there any, and how many» without carrying the rows.
+    Count,
+}
+
+impl QueryResult {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            QueryResult::First => "first",
+            QueryResult::Count => "count",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "first" => Some(QueryResult::First),
+            "count" => Some(QueryResult::Count),
+            _ => None,
+        }
+    }
+    pub const ALL: &'static [QueryResult] = &[QueryResult::First, QueryResult::Count];
 }
 
 /// What an `ai` step may do, and how far it is trusted (ADR-0283 §7 / D3).
@@ -276,6 +358,10 @@ impl StepDef {
     fn expressions(&self) -> Vec<Json> {
         match &self.spec {
             StepSpec::Command { params, .. } => vec![Json::Object(params.clone())],
+            // The params of a read are mapped like a command's, so the `secret.…` refusal of
+            // hub#662 has to reach them for the same reason: a credential interpolated into a
+            // `WHERE` is one handed to a module's table and written to its query log.
+            StepSpec::Query(q) => vec![Json::Object(q.params.clone())],
             // Both sides of every clause (hub#828): the paths it reads and the values it compares
             // against. Scanning only the paths left `{"input.x": {"eq": "{{secret.K}}"}}` saving
             // as literal text — a guard that never matches and never says so.
@@ -1017,6 +1103,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
 
     let allowed: &[&str] = match kind {
         StepKind::Command => &["id", "kind", "command", "params"],
+        StepKind::Query => &["id", "kind", "query", "params", "result", "limit"],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &["id", "kind", "seconds", "until"],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
@@ -1061,6 +1148,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             };
             StepSpec::Command { command, params }
         }
+        StepKind::Query => StepSpec::Query(parse_query(&id, map)?),
         StepKind::Condition => StepSpec::Condition {
             when: Condition::parse(map.get("when").unwrap_or(&Json::Null))?,
         },
@@ -1172,6 +1260,96 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     };
 
     Ok(StepDef { id, kind, spec })
+}
+
+/// The keys of a `query` step (hub#954).
+///
+/// Two of the three refusals here are about the same thing — that a document never quietly means
+/// something smaller than it says. `limit` above the ceiling is refused instead of clamped
+/// (`max_iters`'s precedent), and `result: "rows"` is refused instead of accepted-and-ignored,
+/// because the mapping language cannot index an array and a step whose output nobody can read is
+/// a promise the kernel does not keep.
+fn parse_query(id: &str, map: &Map<String, Json>) -> Result<QueryStep> {
+    let query = map
+        .get("query")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if query.is_empty() {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!("step `{id}`: a `query` step needs the name of the read it performs"),
+        ));
+    }
+
+    let params = match map.get("params") {
+        Some(Json::Object(m)) => m.clone(),
+        None | Some(Json::Null) => Map::new(),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `params` is an object of mappings"),
+            ))
+        }
+    };
+
+    let result = match map.get("result") {
+        None | Some(Json::Null) => QueryResult::First,
+        Some(Json::String(s)) => QueryResult::parse(s.trim()).ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `result` is one of {} — `rows` is deliberately absent from v1, \
+                     because the mapping language cannot index an array and `steps.{id}.rows.0.x` \
+                     would resolve to nothing without saying so",
+                    QueryResult::ALL
+                        .iter()
+                        .map(|r| r.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            )
+        })?,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `result` is a name, not a value"),
+            ))
+        }
+    };
+
+    let limit = match map.get("limit") {
+        None | Some(Json::Null) => MAX_QUERY_ROWS,
+        Some(Json::Number(n)) => match n.as_i64() {
+            Some(v) if (1..=MAX_QUERY_ROWS).contains(&v) => v,
+            _ => {
+                return Err(invalid(
+                    ERR_LIMIT_OUT_OF_RANGE,
+                    format!(
+                        "step `{id}`: `limit` is a whole number of rows between 1 and \
+                         {MAX_QUERY_ROWS}. It is refused above the ceiling rather than cut down to \
+                         it: the read happens inside the tick, under the runtime's global lock, and \
+                         a document that says more than it reads is how a report comes out wrong \
+                         with nobody noticing."
+                    ),
+                ))
+            }
+        },
+        Some(_) => {
+            return Err(invalid(
+                ERR_LIMIT_OUT_OF_RANGE,
+                format!("step `{id}`: `limit` is a number of rows"),
+            ))
+        }
+    };
+
+    Ok(QueryStep {
+        query,
+        params,
+        result,
+        limit,
+    })
 }
 
 /// The keys of a `notify` step (hub#821).
@@ -2081,6 +2259,116 @@ mod tests {
         let err = Condition::parse(&json!({ "event.total": { "greater_than": 100 } }))
             .expect_err("a filter that silently matches everything emails the whole customer list");
         assert!(format!("{err}").contains("greater_than"), "{err}");
+    }
+
+    // ── the `query` step (hub#954) ────────────────────────────────────────────────────────────
+
+    /// The whitelist of the kind, which is the whole shape of the step: six keys, and a seventh is
+    /// a document the editor accepts and the hub refuses.
+    #[test]
+    fn a_query_step_takes_its_six_keys_and_refuses_a_seventh() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "week", "kind": "query", "query": "sales.summary",
+                "params": { "from": "input.from" }, "result": "first", "limit": 50
+            }]
+        }))
+        .expect("the six keys of the contract");
+        let StepSpec::Query(step) = &def.steps[0].spec else {
+            panic!("a query step parses into a query spec");
+        };
+        assert_eq!(step.query, "sales.summary");
+        assert_eq!(step.result, QueryResult::First);
+        assert_eq!(step.limit, 50);
+        assert_eq!(step.params["from"], json!("input.from"));
+
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "week", "kind": "query", "query": "sales.summary", "sort": "date" }]
+        }))
+        .expect_err("a key the hub does not understand is a promise nobody keeps");
+        assert!(format!("{err}").contains("sort"), "{err}");
+    }
+
+    /// `result` defaults to `first`, and `limit` to the ceiling — never to a small hidden number.
+    /// The failure every forum of every competitor is full of is a default that truncates without
+    /// saying so (Make's invisible `Limit: 10`), so the default here is the maximum.
+    #[test]
+    fn a_query_step_defaults_to_the_first_row_and_to_the_ceiling() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "week", "kind": "query", "query": "sales.summary" }]
+        }))
+        .unwrap();
+        let StepSpec::Query(step) = &def.steps[0].spec else {
+            panic!("a query step parses into a query spec");
+        };
+        assert_eq!(step.result, QueryResult::First);
+        assert_eq!(step.limit, MAX_QUERY_ROWS);
+    }
+
+    /// Refused above the ceiling instead of clamped — the `max_iters` precedent (§14.10). A
+    /// document that says 1000 and reads 200 lies to whoever wrote it.
+    #[test]
+    fn a_limit_beyond_the_ceiling_is_refused_at_save_time() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "w", "kind": "query", "query": "sales.summary", "limit": 1000 }]
+        }))
+        .expect_err("a run that quietly reads a fifth of what was asked for is worse than a refusal");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_LIMIT_OUT_OF_RANGE),
+            "{err}"
+        );
+        assert!(format!("{err}").contains(&MAX_QUERY_ROWS.to_string()), "{err}");
+
+        // Zero and a negative are the same refusal: a read of no rows is not a read.
+        for limit in [0, -1] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{ "id": "w", "kind": "query", "query": "sales.summary", "limit": limit }]
+            }))
+            .expect_err("a limit below one asks for nothing");
+            assert!(
+                matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_LIMIT_OUT_OF_RANGE),
+                "{err}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_query_step_needs_the_name_of_the_read_and_a_result_the_hub_knows() {
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "w", "kind": "query" }]
+        }))
+        .is_err());
+
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "w", "kind": "query", "query": "sales.summary", "result": "rows" }]
+        }))
+        .expect_err("`rows` is not in v1: the mapping language cannot index an array");
+        assert!(format!("{err}").contains("rows"), "{err}");
+    }
+
+    /// The params of a read are mapped like any other value, so the `secret.…` refusal has to
+    /// reach them: a credential handed to a module's `WHERE` is one written to its query log.
+    #[test]
+    fn a_secret_cannot_be_interpolated_into_the_params_of_a_query_step() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "w", "kind": "query", "query": "sales.summary",
+                "params": { "token": "{{secret.API_KEY}}" }
+            }]
+        }))
+        .expect_err("a secret is readable from an `http` step and from nowhere else");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_SECRET_NOT_AVAILABLE),
+            "{err}"
+        );
     }
 
     #[test]

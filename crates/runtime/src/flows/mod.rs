@@ -46,6 +46,7 @@ pub mod grants;
 pub mod http;
 pub mod net;
 pub mod notify;
+pub mod query;
 pub mod schema;
 pub mod secrets;
 pub mod store;
@@ -53,7 +54,10 @@ pub mod triggers;
 
 pub use agent::AiRequest;
 pub use approvals::{Approval, ExpirySweepReport, NewApproval};
-pub use def::{AiPolicy, AiStep, Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
+pub use def::{
+    AiPolicy, AiStep, Condition, FlowDefinition, QueryResult, QueryStep, StepKind, TriggerKind,
+    MAX_QUERY_ROWS, SCHEMA_VERSION,
+};
 pub use executor::{tick, IoResult, PendingIo, TickReport};
 pub use http::HttpRequest;
 pub use schema::{flow_schema, FLOW_SCHEMA_JSON};
@@ -150,6 +154,7 @@ mod tests {
             def::ERR_STEP_KIND_NOT_AVAILABLE,
             def::ERR_UNKNOWN_OPERATOR,
             def::ERR_SECRET_NOT_AVAILABLE,
+            def::ERR_LIMIT_OUT_OF_RANGE,
             grants::ERR_GRANT_DENIED,
             grants::ERR_UNKNOWN_GRANT_KIND,
             grants::ERR_INVALID_HTTP_PATTERN,
