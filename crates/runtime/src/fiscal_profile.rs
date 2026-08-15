@@ -854,6 +854,93 @@ pub async fn regime_for_country(db: &dyn DatabaseAdapter, country_code: &str) ->
         .to_string())
 }
 
+/// What the regime of THIS hub caps, as a fact the till can read (hub#297).
+///
+/// # Why this is an answer and not a veto
+///
+/// The market decision of hub#297 wants the POS to refuse to close a ≥ 3.000,00 € sale as a
+/// *ticket* when nobody identified the customer. The tempting way to build that is for the core to
+/// reject `sale.completed` on fiscal grounds — and that is precisely the version the issue rules
+/// out: it would be the core vetoing a business module, and it would couple the till to the fiscal
+/// plane. `sales` would gain a dependency on `verifactu` that its manifest does not declare.
+///
+/// So the direction is inverted. **The core RESPONDS, the till DECIDES.** This function states a
+/// fact about the country the hub files in; what to do about it is the POS's call, and the wire is
+/// backed independently by §15.8 in `crates/verifactu/src/xsd.rs`. Neither layer masks the other.
+///
+/// # The three shapes of "no ceiling", and why they all answer `None`
+///
+/// 1. **A country with no row.** Nobody wrote a rule for it, so there is none. Lending it Spain's
+///    would block legitimate sales in a country that never asked for it.
+/// 2. **A regime that caps nothing** (`simplified_invoice_max_cents = 0`). The column cannot be
+///    NULL — the row contract forbids it, a third state is one more branch to slip through — so
+///    zero is how "no cap" is written down, and it is translated HERE, once, instead of at every
+///    caller. A `0` that reached the till as an amount would stop every sale in the shop.
+/// 3. **A hub with no profile yet.** Early boot, before the system tables exist. Same tolerance as
+///    [`load`]: the answer is "nothing known", never an error propagated into a query the cashier
+///    is waiting on.
+pub async fn limits(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalLimits> {
+    // The profile is the authority on which country this hub files in; `hub_settings` is where that
+    // country came from and is the fallback for a hub whose profile has not been resolved yet.
+    let country = match load(db, hub_id).await? {
+        Some(p) if !p.country_code.is_empty() => p.country_code,
+        _ => crate::settings::country_code_of(db, hub_id)
+            .await
+            .unwrap_or_default(),
+    }
+    .to_uppercase();
+
+    let mut limits = FiscalLimits { country_code: country.clone(), ..Default::default() };
+    if country.is_empty() {
+        return Ok(limits);
+    }
+
+    let mut p = Params::new();
+    p.insert("country_code".into(), json!(country));
+    p.insert("now".into(), json!(now_rfc3339()));
+    // Same resolution rule as `regime_for_country`: the most recent row whose `since` has arrived,
+    // so a country that CHANGES regime is one more row and not a schema change. Tolerant of the
+    // table not being there yet, for the same reason `load` is.
+    let Ok(res) = db
+        .query(
+            "SELECT regime_key, simplified_invoice_max_cents FROM _hub_fiscal_regime_registry \
+             WHERE country_code = :country_code AND since <= :now \
+             ORDER BY since DESC LIMIT 1",
+            &p,
+        )
+        .await
+    else {
+        return Ok(limits);
+    };
+    let Some(row) = res.rows.first() else {
+        return Ok(limits); // property 1: no row, no ceiling
+    };
+
+    limits.regime = row["regime_key"].as_str().unwrap_or_default().to_string();
+    // Property 2: `0` in the column is "this regime caps nothing", so it never becomes an amount.
+    limits.simplified_invoice_max_cents = match row["simplified_invoice_max_cents"].as_i64() {
+        Some(cents) if cents > 0 => Some(cents),
+        _ => None,
+    };
+    Ok(limits)
+}
+
+/// The fiscal ceilings that apply to this hub — see [`limits`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct FiscalLimits {
+    /// The country the hub files in, uppercased. Empty when it has not been resolved yet.
+    pub country_code: String,
+    /// The regime that imposes these limits (`verifactu`), or empty when the country owes none.
+    pub regime: String,
+    /// Ceiling of the simplified invoice in **cents**, or `None` when there is no ceiling.
+    ///
+    /// For `ES` this is 3.000,00 € — **not** the 3.010,00 € that `verifactu::xsd` validates
+    /// against. That extra +10,00 € is the rounding margin the AEAT admits on its own sums; it is
+    /// the agency's holgura, not the merchant's, and a till that spends it builds the shop on ten
+    /// euros somebody else is keeping for their decimals.
+    pub simplified_invoice_max_cents: Option<i64>,
+}
+
 /// Reads the profile of `hub_id`, or `None` if it has not been bootstrapped yet.
 ///
 /// **Tolerant of the table not being there** (same shape as [`crate::settings::country_code_of`]):

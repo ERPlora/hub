@@ -64,7 +64,8 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// `approvals.list` (hub#512) es la puerta de lectura del registro de aprobaciones por PIN
 /// (`_elevation_audit`, hub#362). Requiere `hub.administer` (nivel admin, no encargado): quién
 /// aprobó qué es información sobre el personal.
-const CORE_QUERIES: &[&str] = &["users.list", "roles.list", "setup.status", "approvals.list"];
+const CORE_QUERIES: &[&str] =
+    &["users.list", "roles.list", "setup.status", "approvals.list", "fiscal.limits"];
 
 /// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
 /// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
@@ -970,6 +971,24 @@ pub async fn core_query(
         "setup.status" => Ok(whole(vec![
             crate::setup_status::status(db, registry, hub_id, ctx).await?,
         ])),
+        // What this hub's fiscal regime CAPS (hub#297) — today, the ceiling of the simplified
+        // invoice. **The core answers, the till decides**: a query is the shape that keeps it that
+        // way, because a veto on `sale.completed` would be the core overruling a business module
+        // and would hand `sales` a dependency on `verifactu` it does not declare.
+        //
+        // It lives in the `hub.` namespace and not in the fiscal module for the same reason
+        // ADR-0273 puts the obligation in the core: the answer must not depend on a module being
+        // installed, enabled or licensed. A till whose limit disappears when somebody uninstalls
+        // the provider is a till that quietly stops protecting anybody.
+        //
+        // The namespace gate is enough and nothing narrower would do: the consumer is the CASHIER,
+        // who holds no administrative permission. `hub.users.view` is granted to every local
+        // session and to no API key, which is exactly the audience — the person standing at the
+        // screen the ceiling has to stop.
+        "fiscal.limits" => Ok(whole(vec![serde_json::to_value(
+            crate::fiscal_profile::limits(db, hub_id).await?,
+        )
+        .unwrap_or_else(|_| json!({}))])),
         // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double
         // attribution: who asked for the elevation and who approved it. The ids resolve to names
         // against `hub_user`, or the screen shows UUIDs and nobody uses it.
