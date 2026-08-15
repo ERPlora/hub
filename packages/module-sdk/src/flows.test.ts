@@ -538,6 +538,45 @@ test('hub#953: a retry the runtime REFUSES arrives as a refusal, never as a prom
   );
 });
 
+test('hub#955: discarding can say WHY, and the reason is the only thing the body carries', async () => {
+  // `discarded_at` and `discarded_by` already survived the click; the reason did not, so the only
+  // reading a closed row supported was «somebody discarded this». The tray asks for it, and the
+  // hub writes it down — the author still comes from the session, so it is NOT in this body.
+  const { client, calls } = scoped({
+    ok: true,
+    data: {
+      id: A_DEAD_LETTER.id,
+      status: 'discarded',
+      discarded_by: 'hub_user:admin-1',
+      discard_reason: 'duplicada: la factura se registró a mano',
+    },
+  });
+
+  const closed = await client.events.discard(
+    A_DEAD_LETTER.id,
+    'duplicada: la factura se registró a mano',
+  );
+  assert.equal(closed.discard_reason, 'duplicada: la factura se registró a mano');
+
+  // And it stays OPTIONAL: the call the surface shipped with (hub#953) sends no body at all,
+  // rather than an empty reason a hub older than this would have to know to ignore.
+  await client.events.discard(A_DEAD_LETTER.id);
+
+  assert.deepEqual(
+    calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
+    [
+      `POST /api/hub/events/${A_DEAD_LETTER.id}/discard`,
+      `POST /api/hub/events/${A_DEAD_LETTER.id}/discard`,
+    ],
+    'the reason changes the body, never the route',
+  );
+  assert.deepEqual(
+    calls.map((c) => c.body),
+    [{ reason: 'duplicada: la factura se registró a mano' }, undefined],
+    'one field and no other: `discarded_by` is the session, not an argument',
+  );
+});
+
 test('hub#953: the count is a number the badge can render, and retryAll says how many moved', async () => {
   const { client: counter } = scoped({ ok: true, data: { count: 3 } });
   assert.equal((await counter.events.deadCount()).count, 3);

@@ -1810,9 +1810,15 @@ impl Runtime {
     }
 
     /// Closes a dead-letter for good, keeping the row (auditable). `discarded_by` is the identity
-    /// the HTTP layer resolved from the session. `false` if there is no such dead-letter here.
-    pub async fn discard_dead_event(&self, id: &str, discarded_by: &str) -> Result<bool> {
-        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by).await
+    /// the HTTP layer resolved from the session; `reason` is why the person closed it (hub#955),
+    /// optional and stored clamped. `false` if there is no such dead-letter here.
+    pub async fn discard_dead_event(
+        &self,
+        id: &str,
+        discarded_by: &str,
+        reason: &str,
+    ) -> Result<bool> {
+        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by, reason).await
     }
 
     /// Puts EVERY dead-letter of this hub back in front of the relay at once (bulk retry, hub#660).

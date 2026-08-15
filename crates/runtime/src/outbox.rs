@@ -67,10 +67,10 @@ const LEASE_SECONDS: i64 = 300;
 ///
 /// New columns arrive here as `ALTER TABLE … ADD COLUMN IF NOT EXISTS` and **not** as a numbered
 /// system migration. That is this table's own pattern (`module_id` in ADR-0168, `discarded_at/by`
-/// in hub#660, `run_id`/`parent_event_id` in hub#666) and it is deliberate: these tables are
-/// created by the runtime before the migration engine runs at all — a hub with zero modules still
-/// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
-/// columns out of the way of the number races between parallel branches.
+/// in hub#660, `run_id`/`parent_event_id` in hub#666, `discard_reason` in hub#955) and it is
+/// deliberate: these tables are created by the runtime before the migration engine runs at all — a
+/// hub with zero modules still has an outbox — so their shape cannot depend on a numbered version.
+/// It also keeps additive columns out of the way of the number races between parallel branches.
 ///
 /// `ix_outbox_prune` backs the retention sweep (hub#699, `crate::retention`), which scans by
 /// terminal age and not by `next_attempt_at`, so `ix_outbox_due` does not serve it. It is
@@ -89,12 +89,13 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
   module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
-  discarded_at TEXT, discarded_by TEXT, \
+  discarded_at TEXT, discarded_by TEXT, discard_reason TEXT NOT NULL DEFAULT '', \
   run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '');\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS failure_kind TEXT NOT NULL DEFAULT '';\
@@ -1016,12 +1017,14 @@ pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<R
 /// no maximum age at all.
 ///
 /// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
-/// something the caller sent in the body.
+/// something the caller sent in the body. `reason`, on the other hand, IS the caller's — it is the
+/// one thing only the person closing the row knows (see [`clamp_discard_reason`]).
 pub async fn discard(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     id: &str,
     discarded_by: &str,
+    reason: &str,
 ) -> Result<bool> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -1029,16 +1032,37 @@ pub async fn discard(
     p.insert("status".into(), json!(STATUS_DEAD));
     p.insert("discarded".into(), json!(STATUS_DISCARDED));
     p.insert("by".into(), json!(discarded_by));
+    p.insert("reason".into(), json!(clamp_discard_reason(reason)));
     p.insert("now".into(), json!(now_rfc3339()));
     let res = db
         .execute(
             "UPDATE _event_outbox SET status = :discarded, discarded_at = :now, discarded_by = :by, \
-             claim_expires_at = NULL \
+             discard_reason = :reason, claim_expires_at = NULL \
              WHERE id = :id AND hub_id = :hub_id AND status = :status",
             &p,
         )
         .await?;
     Ok(res.affected > 0)
+}
+
+/// How much of a discard reason is kept, in characters.
+///
+/// Long enough for the sentence an operator actually writes («duplicada: la factura se registró a
+/// mano»), short enough that the field cannot become a place to paste a stack trace. This text
+/// arrives from a request body and lands in a row the relay scans and retention keeps for ninety
+/// days: unbounded free text there is not an audit trail, it is a hole.
+pub const MAX_DISCARD_REASON: usize = 500;
+
+/// The reason as it gets STORED: trimmed and capped at [`MAX_DISCARD_REASON`] characters.
+///
+/// Trimmed because a text area hands back the whitespace around what was typed, and «duplicada» and
+/// « duplicada » are not two different decisions. Cut on a **character** boundary and never on a
+/// byte one: half an `é` is a panic in Rust and mojibake everywhere else, and this text is Spanish.
+///
+/// Public because the HTTP layer echoes the stored value back to the caller (hub#955): one
+/// implementation, so what the tray renders and what the row holds cannot drift apart.
+pub fn clamp_discard_reason(reason: &str) -> String {
+    reason.trim().chars().take(MAX_DISCARD_REASON).collect()
 }
 
 /// Puts **every** dead-letter of this hub back in front of the relay at once — the bulk gesture
@@ -2129,7 +2153,7 @@ mod tests {
         let (db, mut reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
 
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "").await.unwrap());
 
         // The row is conserved, with its audit stamp.
         let mut p = Params::new();
@@ -2177,6 +2201,79 @@ mod tests {
         assert!(list_dead(&db, "h1", 50).await.unwrap().is_empty());
     }
 
+    /// Reads back the stored `discard_reason` of one row.
+    async fn reason_of(db: &dyn DatabaseAdapter, id: &str) -> String {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let rows = db
+            .query("SELECT discard_reason FROM _event_outbox WHERE id = :id", &p)
+            .await
+            .unwrap()
+            .rows;
+        rows[0]["discard_reason"].as_str().unwrap_or_default().to_string()
+    }
+
+    /// **A decision that does not say WHY is half a record** (hub#955).
+    ///
+    /// The row already survived the gesture stamped with who closed it and when. What it could not
+    /// answer was the only question anybody asks six months later: why. Without it the sole reading
+    /// left of a closed dead-letter is «somebody discarded this», which is the half that needed no
+    /// storing. The reason is stored TRIMMED — a text area hands back the whitespace the operator
+    /// typed around it, and «duplicada» and « duplicada » are not two different decisions.
+    #[tokio::test]
+    async fn discard_records_why_it_was_closed() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+
+        assert!(discard(
+            &db,
+            "h1",
+            &id,
+            "hub_user:admin-1",
+            "  duplicada: la factura se registró a mano  "
+        )
+        .await
+        .unwrap());
+
+        assert_eq!(
+            reason_of(&db, &id).await,
+            "duplicada: la factura se registró a mano",
+            "the reason survives the click, trimmed"
+        );
+    }
+
+    /// The reason is **optional** and **bounded**. Optional because the gesture existed before it
+    /// did and demanding an essay to close a row is how a queue stops being drained; bounded
+    /// because this text arrives from a request body and the row is kept for ninety days —
+    /// unbounded free text on a table the relay scans is not an audit trail, it is a hole. Absent
+    /// reads back as the empty string, never NULL: every other additive column of this table
+    /// carries a `NOT NULL DEFAULT ''` and a reader should not have to know which.
+    #[tokio::test]
+    async fn a_discard_reason_is_optional_and_bounded() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "   ").await.unwrap());
+        assert_eq!(
+            reason_of(&db, &id).await,
+            "",
+            "no reason given is the empty string — the row is closed all the same"
+        );
+
+        // A caller that pastes a log into the field gets a bounded column, cut on a CHARACTER
+        // boundary: truncating «é» in the middle is a panic in Rust and mojibake everywhere else.
+        let (db2, _reg2) = hub_with_a_dead_letter().await;
+        let id2 = dead_id(&db2).await;
+        let essay = "é".repeat(MAX_DISCARD_REASON + 50);
+        assert!(discard(&db2, "h1", &id2, "hub_user:admin-1", &essay).await.unwrap());
+        let stored = reason_of(&db2, &id2).await;
+        assert_eq!(
+            stored.chars().count(),
+            MAX_DISCARD_REASON,
+            "the stored reason is capped at {MAX_DISCARD_REASON} characters"
+        );
+        assert!(stored.chars().all(|c| c == 'é'), "and cut where a character ends");
+    }
+
     /// Neither gesture crosses hubs, and neither invents a row: an unknown id is simply `false`.
     #[tokio::test]
     async fn retry_and_discard_are_scoped_to_the_hub() {
@@ -2188,9 +2285,9 @@ mod tests {
             RetryOutcome::NotFound,
             "another hub cannot replay it"
         );
-        assert!(!discard(&db, "other-hub", &id, "hub_user:x").await.unwrap());
+        assert!(!discard(&db, "other-hub", &id, "hub_user:x", "").await.unwrap());
         assert_eq!(retry(&db, "h1", "no-such-event").await.unwrap(), RetryOutcome::NotFound);
-        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x").await.unwrap());
+        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x", "").await.unwrap());
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
             1,

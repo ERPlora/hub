@@ -1332,6 +1332,20 @@ export interface RetryAllResult {
   retried: number;
 }
 
+/** What `POST /api/hub/events/{id}/discard` answers: the closed row's stamp (hub#955). */
+export interface DiscardResult {
+  id: string;
+  status: string;
+  /** `hub_user:<id>` — the resolved session, never anything the caller sent. */
+  discarded_by: string;
+  /**
+   * Why it was closed, **as stored**: trimmed and capped by the runtime, `''` when no reason was
+   * given. A hub older than hub#955 leaves the field out entirely, so a tray that renders it must
+   * treat it as possibly absent.
+   */
+  discard_reason?: string;
+}
+
 /** One link of a correlation chain (hub#666). No payload: the chain is for walking, not inspecting. */
 export interface CorrelatedEvent {
   id: string;
@@ -1471,18 +1485,25 @@ export class EventsApi {
   }
 
   /**
-   * `POST /api/hub/events/{id}/discard` — close a dead-letter for good.
+   * `POST /api/hub/events/{id}/discard` — close a dead-letter for good, optionally saying WHY.
    *
    * **Never a delete**: the row survives as the only proof the event existed, stamped with
    * `discarded_at` and a `discarded_by` the runtime takes from the resolved session — never from
    * anything a caller sends. The relay does not pick it up again.
+   *
+   * `reason` is the one part of the stamp the hub cannot know (hub#955), so it is the one thing
+   * this body carries. It is stored trimmed and capped, and it comes back in the answer as
+   * {@link DiscardResult.discard_reason} — the stored value, not the string that was sent. Leaving
+   * it out sends no body at all: discarding without an explanation stays a legitimate gesture,
+   * because a queue that demands an essay to close a row is a queue nobody drains.
    */
-  async discard(id: string): Promise<{ id: string; status: string; discarded_by: string }> {
+  async discard(id: string, reason?: string): Promise<DiscardResult> {
     const event = checkedSegment('event id', id, ID_PATTERN);
     return this.send({
       method: 'POST',
       path: `${EVENTS_BASE_PATH}/${event}/discard`,
-    }) as Promise<{ id: string; status: string; discarded_by: string }>;
+      ...(reason === undefined ? {} : { body: { reason } }),
+    }) as Promise<DiscardResult>;
   }
 
   /**
