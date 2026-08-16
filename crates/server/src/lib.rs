@@ -2873,28 +2873,52 @@ async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Re
     proxy_public_cloud_get(&st, &headers, cloud.app_release()).await
 }
 
-async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+async fn proxy_marketplace_catalog(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
     // **The country the catalogue is asked about is read HERE, from this hub's own settings**
     // (ADR-0062, hub#69) — never from the request. The page cannot widen what its till is offered,
     // and it does not have to know the rule: what comes back is already filtered.
-    let country = {
+    //
+    // **The language is the opposite case, and on purpose** (hub#1003, ADR-0364). The Cloud serves
+    // the catalogue per language now, but only to a caller that says which one — silence means
+    // English, which is the bug. Unlike the country, it comes from `?locale=` (ADR-0055, the same
+    // param `navigation` takes): the country is a fact about the *hub* and a page must not be able
+    // to widen it, whereas the language is a fact about the *person reading right now*, and only
+    // the page knows which one that is. Widening nothing is exactly what it can do with it.
+    //
+    // The hub's stored `language` is the fallback, not the source — that is what serves a caller
+    // that has not said (an old web build, a script), and it beats defaulting to English for a hub
+    // that has told us in its settings which language it reads in.
+    let catalog = {
         let rt = st.runtime.lock().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
         let (country_code, region_code) = rt.country_and_region().await;
-        cloud_client::CountryFilter::new(&country_code, &region_code)
+        let requested = q.locale.unwrap_or_default();
+        let language = if requested.trim().is_empty() {
+            rt.language().await
+        } else {
+            requested
+        };
+        cloud_client::CatalogQuery::new(
+            cloud_client::CountryFilter::new(&country_code, &region_code),
+            &language,
+        )
     };
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     if st.is_dev_hub() {
-        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules(&country))
+        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules(&catalog))
             .await;
     }
     let placeholder = cloud_client::Auth::HubToken {
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &country)).await {
+    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &catalog)).await {
         Ok((status, body)) => {
             let rt = st.runtime.lock().await;
             if let Err(e) =
