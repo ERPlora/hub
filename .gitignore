@@ -33,3 +33,12 @@ apps/web/public/modules/*
 
 # Script de inspección temporal con Playwright (no versionar).
 erplora-inspect.mjs
+
+# Capturas de las sesiones de QA con Playwright MCP (evidencia efímera: la que
+# importa se sube a la issue). 86 png / 16 MB llegaron a ensuciar el status.
+.playwright-mcp/
+
+# Worktrees de la flota creados dentro del propio checkout (`.wt-<tarea>`).
+# Son worktrees registrados con su rama, NO ficheros del repo: se podan con
+# `git worktree remove`, nunca borrándolos a mano.
+.wt-*/
