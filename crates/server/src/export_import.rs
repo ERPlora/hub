@@ -18,7 +18,7 @@
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read as _, Write as _};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 use axum::body::{Body, Bytes};
 use axum::extract::State;
@@ -285,16 +285,18 @@ pub async fn export_blueprint(
             ensure_section(&mut manifest.sections, "fiscal");
         }
     }
-    drop(rt); // la carpeta media no necesita el runtime: suelta el lock antes del I/O de disco.
+    drop(rt); // la media no necesita el runtime: suelta el lock antes de hablar con el Cloud.
 
-    // Media (ADR-0047): los bytes los añade el server (el runtime solo marca la sección). Se
-    // recorre `media_dir` en un hilo blocking; carpetas de sistema `_*` de primer nivel
-    // (`_logs`, `_system`, `_import_tmp`) NO son datos del negocio y se excluyen.
+    // Media (ADR-0047): los bytes los añade el server (el runtime solo marca la sección). Se leen
+    // del GESTOR MEDIA —Object Storage vía el Cloud—, que es donde viven los ficheros del hub; las
+    // carpetas de sistema `_*` de primer nivel (`_logs`, `_system`, `_import_tmp`) NO son datos
+    // del negocio y las excluye el propio recorrido.
+    //
+    // 🔴 Esto recorría `config.media_dir` con `std::fs`. En Hub Cloud (ADR-0154) ese directorio es
+    // scratch local y no contiene NADA del hub, así que el recorrido salía vacío, la sección
+    // `media` ni se declaraba y todo blueprint se publicaba sin una sola imagen.
     if selection.media {
-        let root = st.config.media_dir.clone();
-        let media_files = tokio::task::spawn_blocking(move || collect_media(&root))
-            .await
-            .unwrap_or_default();
+        let media_files = media::collect_for_bundle(&st).await;
         if !media_files.is_empty() {
             ensure_section(&mut manifest.sections, "media");
         }
@@ -343,53 +345,6 @@ fn ensure_section(sections: &mut Vec<String>, section: &str) {
 /// alguien pueda olvidarse de repetir la próxima vez que se toque el export.
 async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
     erplora_runtime::certificate::exportable_der_bytes(rt.db(), hub_id).await.ok().flatten()
-}
-
-/// Recorre `media/` y devuelve `(ruta "media/<rel>", bytes)` por fichero. No sigue symlinks
-/// (podrían salir del root); excluye las carpetas de sistema `_*` de PRIMER nivel; profundidad
-/// acotada (defensivo, como `MAX_TREE_DEPTH` del gestor media).
-fn collect_media(root: &Path) -> Vec<(String, Vec<u8>)> {
-    let mut out = Vec::new();
-    walk_media(root, root, 0, &mut out);
-    out
-}
-
-fn walk_media(root: &Path, dir: &Path, depth: usize, out: &mut Vec<(String, Vec<u8>)>) {
-    const MAX_DEPTH: usize = 16;
-    if depth > MAX_DEPTH {
-        return;
-    }
-    let Ok(rd) = std::fs::read_dir(dir) else {
-        return;
-    };
-    for e in rd.flatten() {
-        let Ok(ft) = e.file_type() else { continue };
-        if ft.is_symlink() {
-            continue;
-        }
-        let path = e.path();
-        let name = e.file_name().to_string_lossy().into_owned();
-        if ft.is_dir() {
-            if depth == 0 && name.starts_with('_') {
-                continue; // _logs/_system/…: sistema, no datos del negocio.
-            }
-            walk_media(root, &path, depth + 1, out);
-        } else if ft.is_file() {
-            if let Ok(bytes) = std::fs::read(&path) {
-                let rel = path
-                    .strip_prefix(root)
-                    .unwrap_or(&path)
-                    .components()
-                    .filter_map(|c| match c {
-                        Component::Normal(s) => Some(s.to_string_lossy().into_owned()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("/");
-                out.push((format!("media/{rel}"), bytes));
-            }
-        }
-    }
 }
 
 /// Construye el `.blueprint.zip` en memoria: `manifest.json` + cada fichero del bundle.
@@ -777,8 +732,14 @@ pub(crate) async fn run_import(
         (r, batch_id)
     };
 
-    // (5) Media: copia `media/*` del bundle al gestor media (ADR-0047). Best-effort por fichero
-    //     (un fichero que no se pueda escribir se ignora y se sigue).
+    // (5) Media: sube `media/*` del bundle al GESTOR MEDIA (ADR-0047) — Object Storage vía el
+    //     Cloud, que es de donde el hub las sirve. Best-effort por fichero: uno que el Cloud
+    //     rechace se cuenta como fallido y se sigue.
+    //
+    // 🔴 Esto escribía con `std::fs` en `config.media_dir`. Era el espejo del fallo del export:
+    // aun con un bundle que trajese imágenes, quedaban en un scratch local que nadie consulta, así
+    // que el catálogo importado seguía sin fotos. La guarda anti-traversal no se pierde: vive
+    // ahora dentro de `upload_from_bundle`.
     let mut media_copied = 0u32;
     let mut media_failed = 0u32;
     if selection.media {
@@ -786,17 +747,10 @@ pub(crate) async fn run_import(
             let Some(rel) = path.strip_prefix("media/") else {
                 continue;
             };
-            // Confinamiento DURO del destino (hub#239): `..`/rutas absolutas y, sobre todo,
-            // symlinks ya presentes dentro de `media/` que apuntan fuera. Sin esto, un
-            // `media/<link>/x.png` escribía a través del symlink FUERA de la carpeta del hub.
-            let Some(target) = prepare_media_target(&st.config.media_dir, rel) else {
-                tracing::warn!(entry = %path, "import: destino de media rechazado (fuera de media/)");
-                media_failed += 1;
-                continue;
-            };
-            if std::fs::write(&target, bytes).is_ok() {
+            if media::upload_from_bundle(st, rel, bytes.clone()).await {
                 media_copied += 1;
             } else {
+                tracing::warn!(entry = %path, "import: el gestor media rechazó el fichero");
                 media_failed += 1;
             }
         }
@@ -1177,55 +1131,6 @@ fn module_install_entry(
     }
 }
 
-/// Prepara (creando las carpetas intermedias) el destino de un `media/<rel>` del bundle,
-/// **confinado** a `root`. `None` = la ruta escapa y NO debe escribirse.
-///
-/// `safe_join` ya descarta `..` y las rutas absolutas, pero eso no basta: si dentro de `media/`
-/// existe un **symlink** (creado por otra vía: subida, import previo, volumen montado), escribir
-/// «dentro» de él aterriza fuera del hub. Por eso aquí se recorre componente a componente
-/// rechazando cualquier symlink, se crean solo directorios reales, y al final se comprueba contra
-/// la raíz **canonicalizada** (defensa en profundidad). Nada se crea si la ruta no es válida.
-fn prepare_media_target(root: &Path, rel: &str) -> Option<PathBuf> {
-    let joined = media::safe_join(root, rel)?;
-    // `media/` puede no existir todavía (creación perezosa): se crea la RAÍZ y se canonicaliza.
-    std::fs::create_dir_all(root).ok()?;
-    let canonical_root = std::fs::canonicalize(root).ok()?;
-    let relative = joined.strip_prefix(root).ok()?;
-    let mut components: Vec<&std::ffi::OsStr> = Vec::new();
-    for comp in relative.components() {
-        match comp {
-            Component::Normal(c) => components.push(c),
-            Component::CurDir => {}
-            _ => return None,
-        }
-    }
-    let (file_name, dirs) = components.split_last()?;
-    let mut cur = canonical_root.clone();
-    for dir in dirs {
-        cur.push(dir);
-        match std::fs::symlink_metadata(&cur) {
-            // Un symlink en el camino es una fuga potencial: se rechaza (no se sigue).
-            Ok(meta) if meta.file_type().is_symlink() => return None,
-            Ok(meta) if meta.is_dir() => {}
-            // Existe pero no es directorio → no se puede anidar dentro.
-            Ok(_) => return None,
-            Err(_) => std::fs::create_dir(&cur).ok()?,
-        }
-    }
-    // Belt & braces: la carpeta contenedora real sigue dentro de `media/`.
-    if !std::fs::canonicalize(&cur).ok()?.starts_with(&canonical_root) {
-        return None;
-    }
-    let target = cur.join(file_name);
-    // Sobrescribir a través de un symlink existente también escaparía.
-    if let Ok(meta) = std::fs::symlink_metadata(&target) {
-        if meta.file_type().is_symlink() {
-            return None;
-        }
-    }
-    Some(target)
-}
-
 /// Extrae TODO el bundle en memoria: valida rutas (anti zip-slip), parsea `manifest.json`
 /// (versión conocida) y devuelve el resto de ficheros como mapa ruta→bytes.
 fn extract_bundle(
@@ -1258,16 +1163,7 @@ fn extract_bundle(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn media_root(tag: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "erplora-media-target-{}-{tag}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
-        root
-    }
+    use std::path::PathBuf;
 
     /// Toda ruta del bundle con `..`, absoluta o con `\` queda fuera del zip ANTES de extraer.
     #[test]
@@ -1283,69 +1179,6 @@ mod tests {
         ] {
             assert!(!is_safe_entry(evil), "{evil} debería rechazarse");
         }
-    }
-
-    /// El destino de un fichero legítimo cae dentro de `media/` (creando las carpetas del camino).
-    #[test]
-    fn el_destino_legitimo_queda_dentro_de_media() {
-        let root = media_root("ok");
-        let target = prepare_media_target(&root, "modules/inventory/logo.png")
-            .expect("ruta relativa legítima");
-        assert!(target.starts_with(std::fs::canonicalize(&root).unwrap()));
-        assert!(target.parent().unwrap().is_dir(), "se crean las carpetas");
-        std::fs::write(&target, b"x").unwrap();
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    /// Un symlink dentro de `media/` que apunta fuera NO sirve de puente para escribir fuera.
-    #[cfg(unix)]
-    #[test]
-    fn un_symlink_dentro_de_media_no_deja_escribir_fuera() {
-        let root = media_root("symlink");
-        let outside = root.parent().unwrap().join(format!(
-            "erplora-media-target-{}-symlink-outside",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&outside);
-        std::fs::create_dir_all(&outside).unwrap();
-        std::os::unix::fs::symlink(&outside, root.join("escape")).unwrap();
-
-        assert_eq!(
-            prepare_media_target(&root, "escape/pwned.png"),
-            None,
-            "escribir a través de un symlink de media/ debe rechazarse"
-        );
-        // Y tampoco se crea nada al otro lado del enlace.
-        assert!(!outside.join("pwned.png").exists());
-
-        // Sobrescribir el propio symlink (fichero) tampoco.
-        std::fs::write(outside.join("f.png"), b"orig").unwrap();
-        std::os::unix::fs::symlink(outside.join("f.png"), root.join("f.png")).unwrap();
-        assert_eq!(prepare_media_target(&root, "f.png"), None);
-
-        let _ = std::fs::remove_dir_all(&root);
-        let _ = std::fs::remove_dir_all(&outside);
-    }
-
-    /// PRIMER import de un hub: `media/` todavía no existe (creación perezosa) → se crea la raíz y
-    /// el destino cae dentro. Sin esto el primer bundle con imágenes perdería TODAS sus medias.
-    #[test]
-    fn con_la_raiz_de_media_sin_crear_el_primer_import_funciona() {
-        let root = media_root("lazy");
-        std::fs::remove_dir_all(&root).unwrap(); // la raíz NO existe
-        let target = prepare_media_target(&root, "logo.png").expect("la raíz se crea al vuelo");
-        assert!(target.starts_with(std::fs::canonicalize(&root).unwrap()));
-        std::fs::write(&target, b"x").unwrap();
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    /// Entradas del zip que no nombran un fichero (`media/`, `media/sub/`) no producen destino.
-    #[test]
-    fn una_entrada_sin_nombre_de_fichero_no_produce_destino() {
-        let root = media_root("empty");
-        assert_eq!(prepare_media_target(&root, ""), None);
-        assert_eq!(prepare_media_target(&root, "."), None);
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     // ── ADR-0060 (hub#68): el informe del import no puede ser mudo ─────────────
@@ -1406,16 +1239,6 @@ mod tests {
         assert_eq!(entry["blocked_on"][0], "invoice");
         assert_eq!(entry["purchase"][0]["module_id"], "invoice");
         assert_eq!(entry["purchase"][0]["price"], "9.00");
-    }
-
-    /// `safe_join` sigue descartando lo evidente (por si el bundle llegara por otra vía).
-    #[test]
-    fn traversal_y_rutas_absolutas_no_producen_destino() {
-        let root = media_root("traversal");
-        assert_eq!(prepare_media_target(&root, "../evil.png"), None);
-        assert_eq!(prepare_media_target(&root, "/etc/passwd"), None);
-        assert_eq!(prepare_media_target(&root, "a/../../evil.png"), None);
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     // ── hub#845 — retry ONLY what did not make it in ───────────────────────────

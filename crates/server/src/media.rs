@@ -38,7 +38,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::future::Future;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 
 use erplora_runtime::manifest::{StaticFilesDef, UserFileAction};
 
@@ -642,23 +642,204 @@ pub async fn media_move(
     cloud_move(&st, &req.from, &req.to).await
 }
 
-// ─────────────────────────── Helpers ───────────────────────────
+// ───────────────── Puerta del export/import de blueprints (ADR-0113 + ADR-0047) ─────────────────
+//
+// El bundle lleva las imágenes DENTRO del zip, y su fuente y destino es el gestor media — es decir,
+// Object Storage vía el Cloud. Estas dos funciones son esa puerta.
+//
+// 🔴 No las sustituyas por `std::fs` sobre `config.media_dir`: eso es lo que hacía el export y por
+// eso los blueprints salían sin una sola imagen. En Hub Cloud (ADR-0154) `media_dir` es scratch
+// local y los ficheros del hub NO están ahí; este módulo no tiene ni una llamada al sistema de
+// ficheros, y esa es justamente la propiedad que hay que conservar.
 
-/// Une `rel` (ruta relativa) bajo `root` descartando cualquier intento de salir del root: solo se
-/// aceptan componentes normales; `..`, raíz absoluta y prefijos (p.ej. `C:\`) se rechazan
-/// devolviendo `None`.
-/// `pub(crate)`: lo reutiliza el import de blueprints (`export_import.rs`) al copiar `media/*`.
-pub(crate) fn safe_join(root: &Path, rel: &str) -> Option<PathBuf> {
-    let mut out = root.to_path_buf();
+/// Carpetas de PRIMER nivel que no son datos del negocio (`_logs`, `_system`, `_import_tmp`…) y
+/// por tanto no entran en un bundle.
+fn is_system_folder(path: &str) -> bool {
+    path.split('/').next().is_some_and(|top| top.starts_with('_'))
+}
+
+/// Aplana el árbol de carpetas del listado (`[{id, children:[…]}]`) en rutas.
+fn flatten_folder_ids(folders: &Value, out: &mut Vec<String>) {
+    let Some(arr) = folders.as_array() else { return };
+    for node in arr {
+        if let Some(id) = node.get("id").and_then(Value::as_str) {
+            if !id.is_empty() {
+                out.push(id.to_string());
+            }
+        }
+        if let Some(children) = node.get("children") {
+            flatten_folder_ids(children, out);
+        }
+    }
+}
+
+/// Listado CRUDO de una carpeta tal cual lo da el Cloud (sin el mapeo cosmético que necesita la
+/// UI): aquí solo interesan `folders` y `files[].path`.
+async fn cloud_list_raw(st: &AppState, folder: &str) -> Option<Value> {
+    let headers = cloud_headers(st)?;
+    let url = format!(
+        "{}/api/v1/hub/device/media/?folder={}",
+        cloud_base(st),
+        pct_encode(folder)
+    );
+    let mut r = st.http.get(&url);
+    for (k, v) in headers {
+        r = r.header(k, v);
+    }
+    let resp = r.send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    resp.json::<Value>().await.ok()
+}
+
+/// Bytes de un objeto del gestor media. Repite el doble salto de [`cloud_raw`] —el Cloud firma una
+/// URL de Object Storage y la descarga la hace el runtime— con su mismo límite de concurrencia y
+/// su tope por objeto, porque un export de catálogo pide ~300 ficheros seguidos (hub#759).
+///
+/// La URL firmada se pide con el cliente LIMPIO: `X-Hub-Token` es un secreto del hub y no viaja a
+/// un tercero (ADR-0003).
+async fn fetch_object_bytes(st: &AppState, path: &str) -> Option<Vec<u8>> {
+    let _permit = st.media_fetch_limiter.clone().acquire_owned().await.ok()?;
+    let headers = cloud_headers(st)?;
+    let url = format!(
+        "{}/api/v1/hub/device/media/raw?path={}",
+        cloud_base(st),
+        pct_encode(path)
+    );
+    let mut r = st.http.get(&url);
+    for (k, v) in headers {
+        r = r.header(k, v);
+    }
+    let resp = r.send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let signed = resp
+        .json::<Value>()
+        .await
+        .ok()?
+        .get("url")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    if signed.is_empty() {
+        return None;
+    }
+    let object = st.http.get(&signed).send().await.ok()?;
+    if !object.status().is_success() {
+        return None;
+    }
+    if object
+        .content_length()
+        .is_some_and(|len| len > MAX_MEDIA_OBJECT_BYTES)
+    {
+        tracing::warn!(path, "export: objeto de media por encima del tope, se omite");
+        return None;
+    }
+    let bytes = object.bytes().await.ok()?;
+    if bytes.len() as u64 > MAX_MEDIA_OBJECT_BYTES {
+        tracing::warn!(path, "export: objeto de media por encima del tope, se omite");
+        return None;
+    }
+    Some(bytes.to_vec())
+}
+
+/// Recorre el gestor media entero y devuelve `(ruta "media/<rel>", bytes)` por fichero, listo para
+/// entrar en el zip. Excluye las carpetas de sistema de primer nivel. Profundidad acotada y con
+/// conjunto de visitadas: el listado del Cloud puede venir como árbol completo o nivel a nivel, y
+/// ninguna de las dos formas debe hacer que un fichero se recoja dos veces.
+pub(crate) async fn collect_for_bundle(st: &AppState) -> Vec<(String, Vec<u8>)> {
+    const MAX_FOLDERS: usize = 4096;
+    let mut pending = vec![String::new()];
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+
+    while let Some(folder) = pending.pop() {
+        if !seen.insert(folder.clone()) || seen.len() > MAX_FOLDERS {
+            continue;
+        }
+        let Some(raw) = cloud_list_raw(st, &folder).await else {
+            tracing::warn!(folder, "export: el Cloud no listó la carpeta de media");
+            continue;
+        };
+        let mut children = Vec::new();
+        flatten_folder_ids(raw.get("folders").unwrap_or(&Value::Null), &mut children);
+        for child in children {
+            if !is_system_folder(&child) && !seen.contains(&child) {
+                pending.push(child);
+            }
+        }
+        let Some(files) = raw.get("files").and_then(Value::as_array) else {
+            continue;
+        };
+        for f in files {
+            let path = f.get("path").and_then(Value::as_str).unwrap_or_default();
+            if path.is_empty() || is_system_folder(path) {
+                continue;
+            }
+            match fetch_object_bytes(st, path).await {
+                Some(bytes) => out.push((format!("media/{path}"), bytes)),
+                None => tracing::warn!(path, "export: no se pudo descargar el fichero de media"),
+            }
+        }
+    }
+    out
+}
+
+/// Destino `(carpeta, nombre)` de un `media/<rel>` del bundle, o `None` si la ruta no debe
+/// escribirse. Es la guarda anti-traversal del import, en función pura para poder probarla sin red:
+/// solo se aceptan componentes normales (`..`, rutas absolutas y prefijos como `C:\` se rechazan) y
+/// la entrada tiene que nombrar un fichero (`media/` o `media/sub/` no producen destino).
+///
+/// Antes esta guarda vivía en `prepare_media_target`, que además esquivaba symlinks porque escribía
+/// en disco. Ya no hay disco: el destino es Object Storage y el Cloud es el dueño de la validación
+/// de rutas — pero rechazar aquí lo que ni siquiera debería salir del hub sigue siendo barato.
+pub(crate) fn bundle_media_destination(rel: &str) -> Option<(String, String)> {
+    // `\` no es separador en el zip: una entrada que lo trae está intentando algo (hub#239).
+    if rel.contains('\\') {
+        return None;
+    }
+    let mut parts: Vec<String> = Vec::new();
     for comp in Path::new(rel).components() {
         match comp {
-            Component::Normal(c) => out.push(c),
+            Component::Normal(c) => parts.push(c.to_string_lossy().into_owned()),
             Component::CurDir => {}
             _ => return None,
         }
     }
-    Some(out)
+    let name = parts.pop()?;
+    if name.is_empty() {
+        return None;
+    }
+    Some((parts.join("/"), name))
 }
+
+/// Sube un `media/<rel>` del bundle al gestor media, conservando su carpeta. `false` si la ruta se
+/// rechaza o el Cloud lo rechazó — el import lo cuenta como fallido y sigue (best-effort por
+/// fichero, ADR-0113).
+pub(crate) async fn upload_from_bundle(st: &AppState, rel: &str, bytes: Vec<u8>) -> bool {
+    let Some((folder, name)) = bundle_media_destination(rel) else {
+        return false;
+    };
+    let Some(headers) = cloud_headers(st) else {
+        return false;
+    };
+    let form = reqwest::multipart::Form::new()
+        .text("folder", folder)
+        .part(
+            "files",
+            reqwest::multipart::Part::bytes(bytes).file_name(name),
+        );
+    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
+    let mut r = st.http.post(&url).multipart(form);
+    for (k, v) in headers {
+        r = r.header(k, v);
+    }
+    matches!(r.send().await, Ok(resp) if resp.status().is_success())
+}
+
+// ─────────────────────────── Helpers ───────────────────────────
 
 /// Componente final del path (nombre de fichero); cadena vacía si no tiene.
 fn file_name_str(path: &Path) -> String {
@@ -861,6 +1042,73 @@ async fn require_action(st: &AppState, rel: &str, action: UserFileAction) -> Res
         StatusCode::FORBIDDEN,
         "esta carpeta es de solo lectura: su módulo no permite esa acción",
     ))
+}
+
+#[cfg(test)]
+mod bundle_tests {
+    use super::*;
+
+    /// Una ruta legítima conserva su carpeta y su nombre: es lo que hace que un catálogo importado
+    /// encuentre sus fotos donde el `image` del producto dice que están.
+    #[test]
+    fn una_ruta_legitima_conserva_carpeta_y_nombre() {
+        assert_eq!(
+            bundle_media_destination("modules/inventory/logo.png"),
+            Some(("modules/inventory".into(), "logo.png".into()))
+        );
+        // En la raíz de media/ la carpeta es la cadena vacía, que es lo que espera el Cloud.
+        assert_eq!(
+            bundle_media_destination("logo.png"),
+            Some((String::new(), "logo.png".into()))
+        );
+    }
+
+    /// La guarda que heredamos de `prepare_media_target` (hub#239): ninguna entrada del bundle
+    /// puede nombrar algo fuera de `media/`. Sin disco de por medio la consecuencia ya no es
+    /// escribir fuera del hub, pero una ruta así no tiene por qué llegar siquiera al Cloud.
+    #[test]
+    fn ninguna_ruta_con_traversal_produce_destino() {
+        for evil in [
+            "../evil.png",
+            "../../etc/passwd",
+            "/etc/passwd",
+            "sub/../../evil.png",
+            "modules\\..\\evil.png",
+        ] {
+            assert_eq!(bundle_media_destination(evil), None, "{evil} debía rechazarse");
+        }
+    }
+
+    /// Entradas que no nombran un fichero (`media/`, `media/sub/`) no producen destino.
+    #[test]
+    fn una_entrada_sin_nombre_de_fichero_no_produce_destino() {
+        assert_eq!(bundle_media_destination(""), None);
+        assert_eq!(bundle_media_destination("."), None);
+        assert_eq!(bundle_media_destination("sub/"), Some(("".into(), "sub".into())));
+    }
+
+    /// Las carpetas de sistema de primer nivel no son datos del negocio y no entran en un bundle.
+    #[test]
+    fn las_carpetas_de_sistema_se_reconocen_por_su_primer_nivel() {
+        assert!(is_system_folder("_logs"));
+        assert!(is_system_folder("_logs/boot.log"));
+        assert!(is_system_folder("_system/activity.json"));
+        assert!(!is_system_folder("catalogo/cafe.webp"));
+        // Solo el PRIMER nivel: una subcarpeta con guion bajo sí es del negocio.
+        assert!(!is_system_folder("catalogo/_borradores/x.webp"));
+    }
+
+    /// El árbol de carpetas del listado se aplana a rutas, hijos incluidos.
+    #[test]
+    fn el_arbol_de_carpetas_se_aplana_a_rutas() {
+        let tree = serde_json::json!([
+            { "id": "catalogo", "children": [{ "id": "catalogo/bebidas", "children": [] }] },
+            { "id": "_logs", "children": [] }
+        ]);
+        let mut out = Vec::new();
+        flatten_folder_ids(&tree, &mut out);
+        assert_eq!(out, vec!["catalogo", "catalogo/bebidas", "_logs"]);
+    }
 }
 
 #[cfg(test)]
