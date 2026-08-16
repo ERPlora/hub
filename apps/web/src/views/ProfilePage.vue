@@ -115,6 +115,7 @@
                 </div>
               </div>
               <ion-select
+                :key="`profile-language-${locale}`"
                 v-model="selectedLocale"
                 interface="popover"
                 :aria-label="t('profile.language')"
@@ -214,7 +215,12 @@ import {
 } from '../lib/user-profile';
 import { toast } from '../lib/toast';
 
-const { t } = useI18n();
+// `locale` is not read by the template for its value: it keys the language
+// `ion-select` so a locale switch REMOUNTS it. Ionic captures `aria-label` once,
+// in `componentWillLoad` (`inheritAttributes(this.el, ['aria-label'])`), and
+// renders it from `inheritedAttributes` — so rebinding the attribute later never
+// reaches the native button and the accessible name stays in the old language.
+const { t, locale } = useI18n();
 const selectedLocale = ref<string>('');
 const firstName = ref('');
 const lastName = ref('');
