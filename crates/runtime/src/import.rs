@@ -851,7 +851,16 @@ async fn apply_section(
     // cuyo literal apunte a un id reescrito). La guarda pasa a `hub_id = <dest> AND id = <nuevo>`,
     // que sigue siendo idempotente para una re-importación sobre el MISMO hub y deja de colisionar
     // con un hub hermano.
-    let keys = natural_keys_for_sql(rt.db(), &sql).await;
+    //
+    // hub#842: y a esas claves se suma la que declara el SEED del módulo, porque hay una que la BD
+    // no puede expresar como índice único. **Solo para un bundle AJENO.** Un hub que restaura su
+    // propia copia no tiene nada que deduplicar: sus filas sembradas no viajaron nunca
+    // (`export::is_module_seeded` las deja fuera), así que todo lo que trae el zip lo creó una
+    // persona — incluido un segundo método `card` («Amex») que la clave del seed, aplicada aquí,
+    // tiraría. Restaurar tu copia no puede perder nada; adoptar la plantilla de otro sí cede el
+    // hueco que el módulo ya te había sembrado.
+    let seed_declared = (!same_hub).then(|| rt.registry());
+    let keys = natural_keys_for_sql(rt.db(), seed_declared, &sql).await;
     let sql = remap_section_ids(&sql, target_hub_id, &keys);
     // Con lote abierto, el import REGISTRA qué filas inserta (ADR-0170): así esta importación
     // se puede deshacer después sin tocar lo que el usuario cree más tarde. Sin lote (llamadas
@@ -914,7 +923,9 @@ async fn apply_identity_extra(
     }
     let scope = crate::import_sql::scope_for_data_file(path)
         .ok_or_else(|| crate::RuntimeError::Other(format!("{path} no corresponde a ninguna sección conocida")))?;
-    let keys = natural_keys_for_sql(rt.db(), &sql).await;
+    // Sin claves de seed (hub#842): estas son tablas de IDENTIDAD del core, que ningún módulo
+    // siembra — y esta ruta solo corre para la copia del PROPIO hub (`identity_not_portable`).
+    let keys = natural_keys_for_sql(rt.db(), None, &sql).await;
     let sql = remap_section_ids(&sql, target_hub_id, &keys);
     match batch_id {
         Some(batch) => {
@@ -1361,6 +1372,28 @@ fn natural_key_guards(
                 _ => usable = false,
             }
         }
+        // 🌱 hub#842: la clave que declara el SEED de un módulo no pregunta por cualquier fila
+        // equivalente — pregunta por **la que sembró el módulo**. `(hub_id, type)` identifica la
+        // forma de pago que el seed planta, pero no es única para el negocio: un salón cobra con
+        // `Visa` y con `Amex`, las dos `card`. Sin este `created_by = 'system'`, la fila del
+        // bundle cedería también ante el `Visa` del dueño, y adoptar una plantilla se comería una
+        // forma de pago que nadie pidió tirar.
+        //
+        // El marcador es el mismo que ya usa `export::is_module_seeded` y lo pone
+        // `seed::apply_module_seed` en TODA fila que siembra un módulo, así que no hay una segunda
+        // convención que mantener. Si la tabla no tiene esa columna, la clave se descarta: la
+        // guarda no puede nombrar una columna que no existe (es el error que tumbó la sección
+        // Usuarios entera en producción el 2026-08-03) y sin ella no sabríamos distinguir lo
+        // sembrado de lo del dueño, que es justo lo que esta clave necesita saber.
+        if key.seeded_only {
+            match value_of(SEEDED_ROW_MARKER_COLUMN) {
+                Some(_) => conds.push((
+                    SEEDED_ROW_MARKER_COLUMN.to_string(),
+                    Some(quote_string_literal(SEEDED_ROW_MARKER)),
+                )),
+                None => usable = false,
+            }
+        }
         if !usable || conds.is_empty() {
             continue;
         }
@@ -1377,23 +1410,39 @@ fn natural_key_guards(
     out
 }
 
+/// La columna y el valor con que `seed::apply_module_seed` firma TODA fila que siembra un módulo
+/// (`created_by = 'system'`, ver [`crate::export::is_module_seeded`]) — el marcador que separa lo
+/// que planta el módulo de lo que crea una persona (hub#842).
+const SEEDED_ROW_MARKER_COLUMN: &str = "created_by";
+const SEEDED_ROW_MARKER: &str = "system";
+
 /// Claves naturales de cada tabla que toca `sql`, leídas del catálogo del hub DESTINO.
 ///
 /// Se pregunta a la BD de destino, no al bundle: lo que decide si un INSERT choca es el índice que
 /// está creado AQUÍ. Una tabla que no se pueda leer devuelve la lista vacía y su fila conserva el
 /// comportamiento anterior (best-effort, como el resto del import).
+///
+/// A ellas se suman las que declara el SEED del módulo dueño de la tabla (`seed_declared`,
+/// hub#842) — `None` cuando el bundle es la copia de ESTE MISMO hub, que no tiene nada que
+/// deduplicar.
 async fn natural_keys_for_sql(
     db: &dyn erplora_db::DatabaseAdapter,
+    seed_declared: Option<&crate::Registry>,
     sql: &str,
 ) -> std::collections::HashMap<String, Vec<crate::export::NaturalKey>> {
-    let mut out = std::collections::HashMap::new();
+    let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
+        std::collections::HashMap::new();
     let Ok(stmts) = crate::import_sql::split_statements(sql) else { return out };
     for stmt in &stmts {
         let Some(parsed) = parse_insert(stmt) else { continue };
         if out.contains_key(parsed.table) {
             continue;
         }
-        out.insert(parsed.table.to_string(), crate::export::natural_keys(db, parsed.table).await);
+        let mut keys = crate::export::natural_keys(db, parsed.table).await;
+        if let Some(registry) = seed_declared {
+            keys.extend(registry.seed_natural_keys_for(parsed.table));
+        }
+        out.insert(parsed.table.to_string(), keys);
     }
     out
 }
@@ -2048,6 +2097,7 @@ mod tests {
                 cols: vec!["hub_id".into(), "code".into()],
                 predicate: vec![("is_deleted".into(), Some("0".into()))],
                 nulls_not_distinct: false,
+            seeded_only: false,
             }],
         );
         let out = remap_section_ids(sql, "h2", &keys);
@@ -2075,6 +2125,7 @@ mod tests {
             cols: c.into_iter().map(str::to_string).collect(),
             predicate: p.into_iter().map(|(a, b)| (a.to_string(), Some(b.to_string()))).collect(),
             nulls_not_distinct: false,
+            seeded_only: false,
         };
 
         for (caso, key) in [
@@ -2105,6 +2156,7 @@ mod tests {
                 .into_iter().map(str::to_string).collect(),
             predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
             nulls_not_distinct: true,
+            seeded_only: false,
         };
         let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
         assert_eq!(
@@ -2130,6 +2182,7 @@ mod tests {
                 .into_iter().map(str::to_string).collect(),
             predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
             nulls_not_distinct: true,
+            seeded_only: false,
         };
         let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
         assert!(out.is_empty(), "a component row cannot collide on the roots-only index: `{out}`");
@@ -2145,8 +2198,98 @@ mod tests {
             cols: vec!["hub_id".into(), "code".into()],
             predicate: vec![],
             nulls_not_distinct: false,
+            seeded_only: false,
         };
         let out = natural_key_guards("t", &cols, &vals, &[key]);
         assert!(out.is_empty(), "NULLS DISTINCT: a NULL value must keep discarding the key, got `{out}`");
+    }
+
+    // ── Claves declaradas por el SEED del módulo (hub#842) ──────────────────────────────────
+
+    /// Columnas y valores de una forma de pago del bundle `peluqueria` («Efectivo», `cash`).
+    fn fila_forma_de_pago(nombre: &str, kind: &str, autor: &str) -> (Vec<String>, Vec<String>) {
+        let cols = ["id", "hub_id", "name", "type", "is_deleted", "created_by"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let vals = vec![
+            "'pm-1'".to_string(),
+            "'h2'".to_string(),
+            format!("'{nombre}'"),
+            format!("'{kind}'"),
+            "0".to_string(),
+            format!("'{autor}'"),
+        ];
+        (cols, vals)
+    }
+
+    /// La clave del seed (`hub_id, type, is_deleted`) pregunta por la fila que **sembró el
+    /// módulo**, no por cualquier equivalente: sin `created_by = 'system'`, la «Tarjeta» del bundle
+    /// cedería también ante el «Visa» que creó el dueño.
+    #[test]
+    fn una_clave_de_seed_solo_pregunta_por_la_fila_que_sembro_el_modulo() {
+        let (cols, vals) = fila_forma_de_pago("Efectivo", "cash", "u-owner");
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into(), "is_deleted".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: true,
+        };
+        let out = natural_key_guards("sales_payment_method", &cols, &vals, &[key]);
+        assert_eq!(
+            out,
+            " AND NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE \"hub_id\" = 'h2' \
+             AND \"type\" = 'cash' AND \"is_deleted\" = 0 AND \"created_by\" = 'system')",
+            "la guarda del seed tiene que acotarse a lo sembrado por el módulo"
+        );
+        // …y encadenada a la guarda por `id`, como la emite `rewrite_insert`, sigue siendo SQL que
+        // el subconjunto del import admite (hub#239): una guarda que no se pudiera ejecutar
+        // tumbaría la sección entera.
+        let scope = crate::import_sql::scope_for_data_file("data/sales.sql").unwrap();
+        crate::import_sql::validate(
+            &format!(
+                "INSERT INTO sales_payment_method (\"id\") SELECT 'x' \
+                 WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE \"hub_id\" = 'h2' AND id = 'x'){out};"
+            ),
+            &scope,
+        )
+        .expect("la guarda del seed es SQL admitido por el subconjunto del import");
+    }
+
+    /// Una tabla sin `created_by` no puede distinguir lo sembrado de lo del dueño, y la guarda no
+    /// puede nombrar una columna que no existe: la clave se descarta y esa tabla se comporta como
+    /// antes de hub#842.
+    #[test]
+    fn una_clave_de_seed_se_descarta_si_la_tabla_no_marca_quien_creo_la_fila() {
+        let cols: Vec<String> = ["id", "hub_id", "type"].into_iter().map(str::to_string).collect();
+        let vals: Vec<String> = ["'x'", "'h2'", "'cash'"].into_iter().map(str::to_string).collect();
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: true,
+        };
+        assert!(
+            natural_key_guards("t", &cols, &vals, &[key]).is_empty(),
+            "sin `created_by` la clave del seed no se puede evaluar"
+        );
+    }
+
+    /// Una clave del CATÁLOGO (índice único) sigue preguntando por CUALQUIER fila equivalente: es
+    /// el índice quien rechazaría el INSERT, le dé igual quién creó la fila (hub#753, intacto).
+    #[test]
+    fn una_clave_del_catalogo_no_se_acota_a_lo_sembrado() {
+        let (cols, vals) = fila_forma_de_pago("Efectivo", "cash", "u-owner");
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: false,
+        };
+        let out = natural_key_guards("sales_payment_method", &cols, &vals, &[key]);
+        assert!(
+            !out.contains("created_by"),
+            "una clave de índice único no mira quién creó la fila: `{out}`"
+        );
     }
 }

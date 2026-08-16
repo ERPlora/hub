@@ -908,6 +908,11 @@ pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str
 /// identidad técnica y cambia de instalación a instalación. Sale del CATÁLOGO de la BD del hub
 /// DESTINO (no se adivina por el nombre ni se declara en el manifest de módulo): lo que decide si
 /// un INSERT choca es el índice que está creado ahí, no lo que diga un fichero.
+///
+/// …**salvo la que declara el propio SEED de un módulo** ([`seeded_only`](Self::seeded_only),
+/// hub#842): hay claves que la BD no puede expresar como índice único porque no son únicas para el
+/// negocio, y aun así identifican la fila que el módulo SIEMBRA. Ver [`crate::seed::declared_natural_keys`].
+#[derive(Debug, Clone)]
 pub(crate) struct NaturalKey {
     /// Columnas del índice único.
     pub(crate) cols: Vec<String>,
@@ -922,6 +927,17 @@ pub(crate) struct NaturalKey {
     /// default (`false`, NULLS DISTINCT) un NULL no choca nunca y la clave se descarta para esa
     /// fila, como siempre.
     pub(crate) nulls_not_distinct: bool,
+    /// La clave la declara el **seed del módulo**, no un índice único de la BD (hub#842). Cambia
+    /// contra QUÉ pregunta la guarda: no contra cualquier fila equivalente, sino solo contra la
+    /// que **sembró el módulo** (`created_by = 'system'`, el marcador uniforme que pone
+    /// [`crate::seed::apply_module_seed`] y que ya distingue lo sembrado de lo que crea un usuario
+    /// — ver [`is_module_seeded`]).
+    ///
+    /// La diferencia no es cosmética: `(hub_id, type)` identifica la forma de pago que el seed
+    /// planta, pero **no** es única para el negocio (una peluquería puede cobrar con `Visa` y con
+    /// `Amex`, las dos `card`). Preguntando solo por lo sembrado, la fila del bundle cede ante el
+    /// `Cash` del módulo y no ante el `Visa` del dueño.
+    pub(crate) seeded_only: bool,
 }
 
 /// Claves naturales DECLARADAS por `table` en la BD (índices únicos no primarios), leídas del
@@ -975,7 +991,7 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
                 Some(expr) => parse_index_predicate(expr)?,
             };
             let nulls_not_distinct = truthy(r.get("nnd"));
-            Some(NaturalKey { cols, predicate, nulls_not_distinct })
+            Some(NaturalKey { cols, predicate, nulls_not_distinct, seeded_only: false })
         })
         .collect()
 }

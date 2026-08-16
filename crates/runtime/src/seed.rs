@@ -361,6 +361,107 @@ pub(crate) fn split_statements(sql: &str) -> Vec<String> {
         .collect()
 }
 
+/// **Las CLAVES NATURALES que el seed de un módulo declara sobre sus propias tablas** (hub#842).
+///
+/// El seed de un módulo es DML idempotente por contrato, y su idempotencia la escribe como
+/// `WHERE NOT EXISTS (SELECT 1 FROM <tabla> WHERE hub_id = :hub_id AND type = 'cash' AND is_deleted = 0)`.
+/// Esa guarda **es** la declaración de qué fila considera «la misma» el módulo: `sales` lo dice con
+/// todas las letras en su comentario —«si el dueño ya creó o renombró un método de ese tipo, se
+/// respeta el suyo»— y por eso reinstalar no duplica.
+///
+/// El import necesita exactamente esa clave y **no la puede sacar de ningún otro sitio**. El
+/// catálogo ([`crate::export::natural_keys`], hub#753) solo ve índices ÚNICOS, y `(hub_id, type)`
+/// no puede ser uno: `type` es una CLASE DE COMPORTAMIENTO —`cash` abre el cajón y pide entregado,
+/// `card` no—, no una identidad, así que un hub puede tener `Visa` y `Amex` a la vez. La clave
+/// existe en un solo sitio del sistema: aquí. (El manifest tampoco sirve como sitio: obligaría a
+/// republicar el módulo, y las cuatro plantillas publicadas y los hubs vivos duplican **hoy**.)
+///
+/// Se lee del MISMO texto que se va a ejecutar, en [`crate::installer::register_module`], así que
+/// no puede desincronizarse de lo que el seed siembra de verdad.
+///
+/// **Fail-open, como todo el resto del camino**: una guarda que no case con la forma canónica se
+/// descarta —no se traduce a medias— y su tabla se comporta como antes de hub#842. Dos descartes
+/// concretos, y los dos importan:
+///
+/// * una guarda cuya única columna sea `hub_id` («siembra solo si la tabla está vacía») declararía
+///   como clave «todo el hub», y saltaría la sección ENTERA de esa tabla;
+/// * una guarda que mire una tabla distinta de la que inserta no habla de esta fila.
+pub(crate) fn declared_natural_keys(
+    sql: &str,
+) -> std::collections::HashMap<String, Vec<crate::export::NaturalKey>> {
+    let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
+        std::collections::HashMap::new();
+    for stmt in split_statements(sql) {
+        let Some((table, key)) = parse_seed_guard(&stmt) else { continue };
+        let keys = out.entry(table).or_default();
+        // El seed planta una fila por sentencia y todas comparten la clave (cambia el VALOR, no la
+        // columna): basta con quedarse una vez con cada juego de columnas.
+        if !keys
+            .iter()
+            .any(|k: &crate::export::NaturalKey| k.cols == key.cols && k.predicate == key.predicate)
+        {
+            keys.push(key);
+        }
+    }
+    out
+}
+
+/// Traduce la guarda de UNA sentencia de seed a la clave natural que declara, o `None`.
+///
+/// Forma aceptada, que es la que escriben los tres seeds del repo:
+/// `INSERT INTO <t> (…) SELECT … WHERE NOT EXISTS (SELECT 1 FROM <t> WHERE <cond> [AND <cond>]…)`,
+/// donde cada `<cond>` es `columna = <lo que sea>` (el valor lo pondrá la fila del bundle, no el
+/// seed) o `columna IS NULL`.
+fn parse_seed_guard(stmt: &str) -> Option<(String, crate::export::NaturalKey)> {
+    let table = stmt.trim().strip_prefix("INSERT INTO ")?.split_whitespace().next()?;
+    if !crate::export::safe_ident(table) {
+        return None;
+    }
+    // El cuerpo del `NOT EXISTS`, hasta su paréntesis de cierre.
+    let needle = format!("NOT EXISTS (SELECT 1 FROM {table} WHERE ");
+    let at = stmt.find(&needle)?;
+    let body_start = at + needle.len();
+    let body_end = body_start + stmt[body_start..].find(')')?;
+    let body = &stmt[body_start..body_end];
+    // 🔴 El cierre se busca por el PRIMER `)`, así que un paréntesis o una comilla dentro de la
+    // guarda la cortarían a media condición — y una clave con MENOS columnas es una guarda MÁS
+    // PERMISIVA, que saltaría filas legítimas en silencio. Es la única dirección en la que
+    // equivocarse sale caro, y no se intenta entender: la forma canónica no tiene ni una cosa ni
+    // la otra, así que cualquiera de las dos descarta la clave entera.
+    if body.contains('(') || body.matches('\'').count() % 2 != 0 {
+        return None;
+    }
+
+    let mut cols: Vec<String> = Vec::new();
+    let mut predicate: Vec<(String, Option<String>)> = Vec::new();
+    for cond in body.split(" AND ") {
+        let cond = cond.trim();
+        if let Some(col) = cond.strip_suffix(" IS NULL") {
+            let col = col.trim();
+            if !crate::export::safe_ident(col) {
+                return None;
+            }
+            predicate.push((col.to_string(), None));
+            continue;
+        }
+        let (col, _value) = cond.split_once('=')?;
+        let col = col.trim();
+        if !crate::export::safe_ident(col) {
+            return None;
+        }
+        cols.push(col.to_string());
+    }
+    // `hub_id` a secas no es una clave: es «esta tabla, en este hub». Con ella la guarda saltaría
+    // TODA fila entrante en cuanto el módulo hubiera sembrado una sola.
+    if cols.iter().all(|c| c == "hub_id") {
+        return None;
+    }
+    Some((
+        table.to_string(),
+        crate::export::NaturalKey { cols, predicate, nulls_not_distinct: false, seeded_only: true },
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,4 +682,109 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
     // Sanity: el módulo de identidad expone verify_pin (compila el import).
     #[allow(unused_imports)]
     use identity::HubUser as _SeedHubUser;
+
+    // ── hub#842: la clave natural que declara el seed ────────────────────────────────────────
+
+    /// El seed REAL de `sales`, verbatim (dos sentencias, misma clave `(hub_id, type, is_deleted)`).
+    const SALES_SEED: &str = "\
+-- comentario con ; dentro
+INSERT INTO sales_payment_method (id, hub_id, name, type, is_deleted)
+SELECT (:hub_id || '|paymethod|cash'), :hub_id, 'Cash', 'cash', 0
+WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND type = 'cash' AND is_deleted = 0);
+
+INSERT INTO sales_payment_method (id, hub_id, name, type, is_deleted)
+SELECT (:hub_id || '|paymethod|card'), :hub_id, 'Card', 'card', 0
+WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND type = 'card' AND is_deleted = 0);";
+
+    #[test]
+    fn el_seed_declara_su_clave_natural_y_solo_una_vez_por_juego_de_columnas() {
+        let keys = declared_natural_keys(SALES_SEED);
+        let payment = keys.get("sales_payment_method").expect("la tabla del seed");
+        assert_eq!(payment.len(), 1, "dos sentencias, una sola clave: {payment:?}");
+        assert_eq!(payment[0].cols, vec!["hub_id", "type", "is_deleted"]);
+        assert!(payment[0].seeded_only, "una clave de seed solo pregunta por lo que sembró el módulo");
+        assert!(payment[0].predicate.is_empty());
+    }
+
+    /// `col IS NULL` no es un valor a comparar contra la fila entrante: es una condición que la
+    /// fila debe cumplir para caer en la clave (la forma de `taxes_rule`).
+    #[test]
+    fn is_null_en_la_guarda_va_al_predicado_no_a_las_columnas() {
+        let sql = "INSERT INTO taxes_rule (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM taxes_rule WHERE hub_id = :hub_id \
+                   AND country_code = 'ES' AND parent_id IS NULL);";
+        let keys = declared_natural_keys(sql);
+        let rule = &keys["taxes_rule"][0];
+        assert_eq!(rule.cols, vec!["hub_id", "country_code"]);
+        assert_eq!(rule.predicate, vec![("parent_id".to_string(), None)]);
+    }
+
+    /// «Siembra solo si la tabla está vacía» NO es una clave natural: tomada por tal, saltaría la
+    /// sección entera de esa tabla en cuanto el módulo hubiera sembrado una fila.
+    #[test]
+    fn una_guarda_que_solo_mira_el_hub_no_declara_nada() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id);";
+        assert!(declared_natural_keys(sql).is_empty(), "«toda la tabla» no es una clave");
+    }
+
+    /// Una guarda que pregunta por OTRA tabla no habla de la fila que se inserta.
+    #[test]
+    fn una_guarda_sobre_otra_tabla_se_descarta() {
+        let sql = "INSERT INTO a (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM b WHERE hub_id = :hub_id AND code = 'k');";
+        assert!(declared_natural_keys(sql).is_empty());
+    }
+
+    /// 🔴 El cierre del `NOT EXISTS` se busca por el primer `)`, así que un paréntesis DENTRO de la
+    /// guarda la cortaría a media condición — y la clave saldría con **menos** columnas, es decir
+    /// **más permisiva**: saltaría filas que no debía. Es la única dirección en la que este parser
+    /// puede equivocarse de forma cara, así que no se intenta entender: se descarta.
+    #[test]
+    fn una_guarda_con_parentesis_dentro_se_descarta_en_vez_de_cortarse() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id \
+                   AND code = upper('a') AND is_deleted = 0);";
+        assert!(
+            declared_natural_keys(sql).is_empty(),
+            "cortada por el primer `)`, la clave saldría sin `is_deleted` y saltaría filas de más"
+        );
+    }
+
+    /// Lo mismo con un literal que se coma el `)` o el ` AND `: comillas descompensadas dentro del
+    /// cuerpo significan que el troceo no vio la guarda entera.
+    #[test]
+    fn una_guarda_con_comillas_descompensadas_se_descarta() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id \
+                   AND note = 'cierra aqui ) y sigue' AND is_deleted = 0);";
+        assert!(
+            declared_natural_keys(sql).is_empty(),
+            "el `)` dentro del literal corta el cuerpo: la clave saldría incompleta"
+        );
+    }
+
+    /// Un seed sin guarda (o con una que no case con la forma canónica) deja su tabla exactamente
+    /// como estaba antes de hub#842.
+    #[test]
+    fn un_seed_sin_guarda_no_declara_clave() {
+        let sql = "INSERT INTO t (id, hub_id) VALUES ('x', :hub_id);";
+        assert!(declared_natural_keys(sql).is_empty());
+    }
+
+    /// El seed REAL del módulo `sales`, leído del repo hermano: lo que este arreglo promete es
+    /// sobre ESE fichero, no sobre una copia parafraseada aquí.
+    #[test]
+    fn el_seed_real_de_sales_declara_hub_id_y_type() {
+        let path = crate::e2e_support::modules_root().join("sales/seed/install.postgres.sql");
+        let Ok(sql) = std::fs::read_to_string(&path) else {
+            println!("⏭  SKIP: sin modules-workspace en {}", path.display());
+            return;
+        };
+        let keys = declared_natural_keys(&sql);
+        let payment = keys
+            .get("sales_payment_method")
+            .unwrap_or_else(|| panic!("el seed de sales declara su clave:\n{sql}"));
+        assert_eq!(payment[0].cols, vec!["hub_id", "type", "is_deleted"]);
+    }
 }
