@@ -32,6 +32,7 @@ vi.mock('../lib/runtime', async () => {
     moduleInstallStatusInfo: actual.moduleInstallStatusInfo,
   };
 });
+
 // hub#488 — los nombres humanos de las apps. Mutable por test: la mayoría no pone ninguno, que es
 // el caso «no hay nombre» y debe seguir pintando el id.
 const appNames = vi.hoisted(() => new Map<string, string>());
@@ -378,6 +379,38 @@ describe('ImportPanel · hub#763 — el informe no se pierde al navegar', () => 
     expect(w.find('[data-testid="import-blueprint-table"]').exists()).toBe(true);
   });
 
+  it('98 copiadas y 182 fallidas recupera el informe y pinta Media como fallo', async () => {
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    fetchImportReport.mockResolvedValue({
+      batch_id: 'b-media',
+      name: 'restaurante',
+      created_at: '2026-08-17T00:00:00Z',
+      report: {
+        sections: [{ section: 'media', status: 'Skipped', discarded_rows: 0 }],
+        installed_modules: [],
+        media: { selected: true, copied: 98, failed: 182 },
+      },
+    });
+    const i18nReal = createI18n({
+      legacy: false,
+      locale: 'en',
+      missingWarn: false,
+      fallbackWarn: false,
+      messages: { en },
+    });
+    const w = mount(ImportPanel, {
+      shallow: true,
+      global: { plugins: [i18nReal], renderStubDefaultSlot: true },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-testid="import-report-recovered"]').exists()).toBe(true);
+    const report = w.get('[data-testid="import-report"]');
+    expect(report.text()).toContain(en.importPage.statusFailed);
+    expect(report.text()).toContain('182 not copied');
+    expect(report.html()).toContain('danger');
+  });
+
   it('«ver las plantillas» descarta el informe recuperado y vuelve al catálogo', async () => {
     fetchBlueprintCatalog.mockResolvedValue([
       { slug: 'rest', name: 'Restaurante', locale: 'es', latest_version: '1.0.0' },
@@ -524,4 +557,3 @@ describe('ImportPanel · hub#845 — «Reintentar lo que falta» en el informe r
     );
   });
 });
-

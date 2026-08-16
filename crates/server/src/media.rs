@@ -37,6 +37,7 @@ use axum::Json;
 use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::{Component, Path};
 
@@ -815,28 +816,237 @@ pub(crate) fn bundle_media_destination(rel: &str) -> Option<(String, String)> {
     Some((parts.join("/"), name))
 }
 
-/// Sube un `media/<rel>` del bundle al gestor media, conservando su carpeta. `false` si la ruta se
-/// rechaza o el Cloud lo rechazó — el import lo cuenta como fallido y sigue (best-effort por
-/// fichero, ADR-0113).
-pub(crate) async fn upload_from_bundle(st: &AppState, rel: &str, bytes: Vec<u8>) -> bool {
-    let Some((folder, name)) = bundle_media_destination(rel) else {
-        return false;
-    };
-    let Some(headers) = cloud_headers(st) else {
-        return false;
-    };
-    let form = reqwest::multipart::Form::new()
-        .text("folder", folder)
-        .part(
-            "files",
-            reqwest::multipart::Part::bytes(bytes).file_name(name),
-        );
-    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
-    let mut r = st.http.post(&url).multipart(form);
-    for (k, v) in headers {
-        r = r.header(k, v);
+/// Maximum number of files in one Cloud media request.
+///
+/// The Cloud endpoint already accepts repeated multipart fields named `files`. Keeping the batch
+/// deliberately small avoids the per-request/file guard at the edge and bounds the amount of work
+/// the synchronous Cloud view hands to Object Storage at once. A restaurant blueprint with ~300
+/// images used to make ~300 HTTP requests here and consistently lost everything after the first
+/// ~100; grouping by folder turns that into a handful of requests.
+const MAX_BUNDLE_MEDIA_BATCH_FILES: usize = 40;
+
+/// A batch is also bounded by bytes, not only by file count. `Part::bytes` owns its payload, so a
+/// 40 × 25 MiB multipart would otherwise briefly duplicate far more than the Hub container can
+/// hold. The per-object limit remains [`MAX_MEDIA_OBJECT_BYTES`].
+const MAX_BUNDLE_MEDIA_BATCH_BYTES: u64 = MAX_MEDIA_OBJECT_BYTES;
+
+/// Total attempts for an idempotent multipart. A media upload overwrites by `(folder, name)`, so
+/// replaying the whole batch after an edge timeout cannot create duplicates. Bounded retries cover
+/// the Cloud/edge throttling that motivated batching without making an import hang indefinitely.
+const BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS: usize = 3;
+const BUNDLE_MEDIA_UPLOAD_RETRY_BASE_MS: u64 = 200;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BundleMediaUploadReport {
+    pub copied: u32,
+    pub failed: u32,
+}
+
+impl BundleMediaUploadReport {
+    fn add(&mut self, other: Self) {
+        self.copied += other.copied;
+        self.failed += other.failed;
     }
-    matches!(r.send().await, Ok(resp) if resp.status().is_success())
+}
+
+struct BundleMediaUpload<'a> {
+    name: String,
+    bytes: &'a [u8],
+}
+
+/// Counts returned by the Cloud for one terminal multipart response. The contract reports `saved`
+/// and `failed` on a partial rejection; older Clouds only signalled success through the status.
+/// Trust explicit counts only when they account for the whole batch. Retryable statuses bypass
+/// this function: an exhausted 408/429/5xx fails the complete batch conservatively.
+fn bundle_upload_response_counts(
+    status_success: bool,
+    payload: Option<&Value>,
+    expected: usize,
+) -> BundleMediaUploadReport {
+    if let Some(body) = payload {
+        let has_counts = body.get("saved").is_some() || body.get("failed").is_some();
+        if has_counts {
+            let saved = body.get("saved").and_then(Value::as_u64);
+            let failed = match body.get("failed") {
+                Some(value) => value.as_u64(),
+                None => Some(0),
+            };
+            let explicit = saved
+                .zip(failed)
+                .filter(|(saved, failed)| saved + failed == expected as u64)
+                .map(|(saved, failed)| BundleMediaUploadReport {
+                    copied: saved as u32,
+                    failed: failed as u32,
+                });
+            return explicit.unwrap_or(BundleMediaUploadReport {
+                copied: 0,
+                failed: expected as u32,
+            });
+        }
+    }
+
+    // Backward compatibility with the original endpoint (`2xx {success:true}` without counts),
+    // while remaining fail-closed for transport/5xx responses whose outcome is unknown.
+    if status_success {
+        BundleMediaUploadReport {
+            copied: expected as u32,
+            failed: 0,
+        }
+    } else {
+        BundleMediaUploadReport {
+            copied: 0,
+            failed: expected as u32,
+        }
+    }
+}
+
+fn bundle_upload_status_retryable(status: StatusCode) -> bool {
+    status == StatusCode::REQUEST_TIMEOUT
+        || status == StatusCode::TOO_MANY_REQUESTS
+        || status.is_server_error()
+}
+
+async fn upload_bundle_batch(
+    st: &AppState,
+    headers: &[(&'static str, String)],
+    folder: &str,
+    batch: &[BundleMediaUpload<'_>],
+) -> BundleMediaUploadReport {
+    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
+    for attempt in 1..=BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS {
+        // Multipart bodies are streams and cannot be replayed. Rebuild the bounded form for each
+        // attempt; the byte cap above keeps this owned copy within the Hub's memory budget.
+        let mut form = reqwest::multipart::Form::new().text("folder", folder.to_string());
+        for file in batch {
+            let part = reqwest::multipart::Part::bytes(file.bytes.to_vec())
+                .file_name(file.name.clone());
+            let part = match part.mime_str(content_type(&file.name)) {
+                Ok(part) => part,
+                Err(error) => {
+                    tracing::warn!(file = %file.name, %error, "import: MIME inválido para fichero media");
+                    return BundleMediaUploadReport {
+                        copied: 0,
+                        failed: batch.len() as u32,
+                    };
+                }
+            };
+            form = form.part("files", part);
+        }
+
+        let mut request = st.http.post(&url).multipart(form);
+        for (key, value) in headers {
+            request = request.header(*key, value);
+        }
+        match request.send().await {
+            Ok(response) => {
+                let status = response.status();
+                let retryable = bundle_upload_status_retryable(status);
+                if retryable {
+                    if attempt < BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS {
+                        tracing::warn!(folder, %status, attempt, files = batch.len(), "import: reintentando lote media idempotente");
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            BUNDLE_MEDIA_UPLOAD_RETRY_BASE_MS * attempt as u64,
+                        ))
+                        .await;
+                        continue;
+                    }
+                    // A timeout/429/5xx is an unknown final outcome. Even if its JSON claims some
+                    // writes, retry attempts may overlap; count the complete batch as failed so the
+                    // report can never present an unverified file as copied.
+                    tracing::warn!(folder, %status, attempts = attempt, files = batch.len(), "import: lote media agotó sus reintentos");
+                    return BundleMediaUploadReport {
+                        copied: 0,
+                        failed: batch.len() as u32,
+                    };
+                }
+
+                let payload = response.json::<Value>().await.ok();
+                let report = bundle_upload_response_counts(
+                    status.is_success(),
+                    payload.as_ref(),
+                    batch.len(),
+                );
+                if report.failed > 0 {
+                    tracing::warn!(folder, status = %status, copied = report.copied, failed = report.failed, "import: el Cloud rechazó parte o todo el lote de media");
+                }
+                return report;
+            }
+            Err(error) if attempt < BUNDLE_MEDIA_UPLOAD_MAX_ATTEMPTS => {
+                tracing::warn!(folder, %error, attempt, files = batch.len(), "import: reintentando lote media tras error de red");
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    BUNDLE_MEDIA_UPLOAD_RETRY_BASE_MS * attempt as u64,
+                ))
+                .await;
+            }
+            Err(error) => {
+                tracing::warn!(folder, %error, attempts = attempt, files = batch.len(), "import: lote media agotó sus reintentos de red");
+                return BundleMediaUploadReport {
+                    copied: 0,
+                    failed: batch.len() as u32,
+                };
+            }
+        }
+    }
+    unreachable!("el rango de intentos nunca está vacío")
+}
+
+/// Sube las entradas `media/<rel>` de un bundle al gestor media.
+///
+/// Las rutas se validan antes de cualquier petición, los ficheros se agrupan por carpeta (el
+/// contrato multipart tiene un único campo `folder`) y se mandan en lotes de hasta 40 y 25 MiB.
+/// El resultado sigue siendo best-effort por fichero: un lote parcial usa los contadores
+/// `saved`/`failed` del Cloud y los lotes posteriores continúan.
+pub(crate) async fn upload_bundle_media(
+    st: &AppState,
+    entries: &[(&str, &[u8])],
+) -> BundleMediaUploadReport {
+    let mut report = BundleMediaUploadReport::default();
+    let mut by_folder: BTreeMap<String, Vec<BundleMediaUpload<'_>>> = BTreeMap::new();
+
+    for &(rel, bytes) in entries {
+        let Some((folder, name)) = bundle_media_destination(rel) else {
+            tracing::warn!(entry = rel, "import: ruta media rechazada");
+            report.failed += 1;
+            continue;
+        };
+        if bytes.len() as u64 > MAX_MEDIA_OBJECT_BYTES {
+            tracing::warn!(
+                entry = rel,
+                bytes = bytes.len(),
+                "import: fichero media por encima del tope"
+            );
+            report.failed += 1;
+            continue;
+        }
+        by_folder
+            .entry(folder)
+            .or_default()
+            .push(BundleMediaUpload { name, bytes });
+    }
+
+    let Some(headers) = cloud_headers(st) else {
+        report.failed += by_folder.values().map(Vec::len).sum::<usize>() as u32;
+        return report;
+    };
+
+    for (folder, files) in by_folder {
+        let mut start = 0;
+        while start < files.len() {
+            let mut end = start;
+            let mut bytes = 0u64;
+            while end < files.len() && end - start < MAX_BUNDLE_MEDIA_BATCH_FILES {
+                let next = files[end].bytes.len() as u64;
+                if end > start && bytes + next > MAX_BUNDLE_MEDIA_BATCH_BYTES {
+                    break;
+                }
+                bytes += next;
+                end += 1;
+            }
+            report.add(upload_bundle_batch(st, &headers, &folder, &files[start..end]).await);
+            start = end;
+        }
+    }
+    report
 }
 
 // ─────────────────────────── Helpers ───────────────────────────
@@ -1085,6 +1295,53 @@ mod bundle_tests {
         assert_eq!(bundle_media_destination(""), None);
         assert_eq!(bundle_media_destination("."), None);
         assert_eq!(bundle_media_destination("sub/"), Some(("".into(), "sub".into())));
+    }
+
+    #[test]
+    fn solo_timeouts_throttling_y_errores_del_servidor_reintentan() {
+        for retryable in [
+            StatusCode::REQUEST_TIMEOUT,
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            assert!(bundle_upload_status_retryable(retryable), "{retryable}");
+        }
+        for terminal in [
+            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ] {
+            assert!(!bundle_upload_status_retryable(terminal), "{terminal}");
+        }
+    }
+
+    #[test]
+    fn un_rechazo_parcial_no_inventa_contadores() {
+        let payload = json!({ "saved": 39, "failed": 1 });
+        assert_eq!(
+            bundle_upload_response_counts(false, Some(&payload), 40),
+            BundleMediaUploadReport { copied: 39, failed: 1 }
+        );
+        // Una respuesta que no cubre el lote completo es desconocida y por tanto falla cerrada.
+        let inconsistent = json!({ "saved": 38, "failed": 1 });
+        assert_eq!(
+            bundle_upload_response_counts(true, Some(&inconsistent), 40),
+            BundleMediaUploadReport { copied: 0, failed: 40 }
+        );
+        let missing_failed = json!({ "saved": 39 });
+        assert_eq!(
+            bundle_upload_response_counts(true, Some(&missing_failed), 40),
+            BundleMediaUploadReport { copied: 0, failed: 40 },
+            "un 201 con un contador incompleto nunca cae al fallback legacy"
+        );
+        assert_eq!(
+            bundle_upload_response_counts(true, Some(&json!({ "success": true })), 40),
+            BundleMediaUploadReport { copied: 40, failed: 0 },
+            "el Cloud antiguo no tenía contadores; su 2xx sigue siendo compatible"
+        );
     }
 
     /// Las carpetas de sistema de primer nivel no son datos del negocio y no entran en un bundle.

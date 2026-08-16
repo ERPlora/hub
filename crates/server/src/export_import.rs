@@ -733,28 +733,26 @@ pub(crate) async fn run_import(
     };
 
     // (5) Media: sube `media/*` del bundle al GESTOR MEDIA (ADR-0047) — Object Storage vía el
-    //     Cloud, que es de donde el hub las sirve. Best-effort por fichero: uno que el Cloud
-    //     rechace se cuenta como fallido y se sigue.
+    //     Cloud, que es de donde el hub las sirve. Best-effort por fichero: se agrupan por carpeta
+    //     en multipart acotados, y los contadores `saved`/`failed` del Cloud conservan el resultado
+    //     exacto cuando un lote se acepta solo en parte.
     //
     // 🔴 Esto escribía con `std::fs` en `config.media_dir`. Era el espejo del fallo del export:
     // aun con un bundle que trajese imágenes, quedaban en un scratch local que nadie consulta, así
     // que el catálogo importado seguía sin fotos. La guarda anti-traversal no se pierde: vive
-    // ahora dentro de `upload_from_bundle`.
-    let mut media_copied = 0u32;
-    let mut media_failed = 0u32;
-    if selection.media {
-        for (path, bytes) in &files {
-            let Some(rel) = path.strip_prefix("media/") else {
-                continue;
-            };
-            if media::upload_from_bundle(st, rel, bytes.clone()).await {
-                media_copied += 1;
-            } else {
-                tracing::warn!(entry = %path, "import: el gestor media rechazó el fichero");
-                media_failed += 1;
-            }
-        }
-    }
+    // ahora dentro de `upload_bundle_media`.
+    let media_report = if selection.media {
+        let entries: Vec<(&str, &[u8])> = files
+            .iter()
+            .filter_map(|(path, bytes)| {
+                path.strip_prefix("media/")
+                    .map(|rel| (rel, bytes.as_slice()))
+            })
+            .collect();
+        media::upload_bundle_media(st, &entries).await
+    } else {
+        media::BundleMediaUploadReport::default()
+    };
 
     // (6) Fiscal (decisión (d)): el `.p12` NO se aplica automáticamente — la contraseña no viaja.
     //     Se devuelve como `pending` y el usuario lo sube por `PUT /api/business/certificate`.
@@ -777,8 +775,11 @@ pub(crate) async fn run_import(
     // (7) Informe del runtime EXTENDIDO con lo que gestionó esta capa.
     let mut report_v = serde_json::to_value(&report).unwrap_or_else(|_| json!({ "sections": [] }));
     report_v["installed_modules"] = Value::Array(installed_modules);
-    report_v["media"] =
-        json!({ "selected": selection.media, "copied": media_copied, "failed": media_failed });
+    report_v["media"] = json!({
+        "selected": selection.media,
+        "copied": media_report.copied,
+        "failed": media_report.failed,
+    });
     // La nota acompaña al estado: con `ignored`, «súbelo en Ajustes → Negocio» diría justo lo
     // contrario de lo que acaba de decidirse, y el usuario acabaría instalándose a mano el
     // certificado ajeno que el import se negó a ofrecerle.

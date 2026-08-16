@@ -399,6 +399,18 @@ describe('what the owner is told afterwards', () => {
     expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(false);
   });
 
+  it('a 98/182 media result is partial and sends the owner to the report', async () => {
+    importBlueprint.mockResolvedValue({
+      sections: [{ section: 'media', status: 'Skipped' }],
+      media: { selected: true, copied: 98, failed: 182 },
+      installed_modules: [],
+    });
+    const w = await outcomeOf(mountCard());
+
+    expect(w.find('[data-testid="hero-failed"]').text()).toContain(enCatalogue.setup.hero.partMedia);
+    expect(w.find('[data-testid="hero-see-report"]').exists()).toBe(true);
+  });
+
   // An app that is merely unsubscribed is a purchase decision, not a breakage (ADR-0060, hub#409) —
   // and there IS a report saying which one, so this door stays open for it too.
   it('offers the report when an app is only blocked on the plan', async () => {

@@ -269,16 +269,16 @@ export function importOutcome(report: ImportReport): HeroOutcome {
   }
 
   // Media is materialised by the server, not by the engine, which reports its row as `Skipped` and
-  // the real result in `report.media` — the same rule the full report follows. Only a media section
-  // where NOTHING copied counts: a couple of missing photos is not a business that cannot open, and
-  // the count of them is in the full report.
+  // the real result in `report.media` — the same rule the full report follows. ANY missing object
+  // keeps the import out of `ready`: product rows already point at those paths, so even a partial
+  // copy leaves broken catalogue tiles and must lead the owner to the persisted report/retry.
   const media = report.media;
   const failedSections = (report.sections ?? [])
     .filter((s) => !(media && s.section === 'media') && sectionStatusInfo(s.status).kind === 'failed')
     .map((s) => s.section);
   // The server's verdict on the images goes in under the same name the engine would have used, so
   // the card has ONE list to put into words and the photos are still counted exactly once.
-  if (media && media.copied === 0 && media.failed > 0) failedSections.push('media');
+  if (media && media.failed > 0) failedSections.push('media');
 
   if (!blockedApps.length && !failedApps.length && !failedSections.length) return { kind: 'ready' };
   return { kind: 'partial', blockedApps, failedApps, failedSections };
