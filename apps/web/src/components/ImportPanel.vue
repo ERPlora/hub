@@ -637,8 +637,9 @@ onMounted(() => {
 
 // ── hub#763 — recuperación del último informe al montar ───────────────────────
 // El informe del import vive persistido en el runtime (una fila por `batch_id`); al montar la
-// pestaña Datos lo pedimos. Si el último import NO quedó limpio (algo falló, se descartó o entró a
-// medias, o un módulo no se instaló), lo pintamos en el paso `report` en vez del catálogo — es lo
+// pestaña Datos lo pedimos. Si el último import NO quedó limpio (algo falló, media quedó incompleta,
+// se descartó o entró a medias, o un módulo no se instaló), lo pintamos en `report` en vez del
+// catálogo — es lo
 // que el Dashboard anunció y a lo que el admin vino. Un import totalmente aplicado no se muestra:
 // ya está hecho, y el catálogo es lo siguiente que el admin quiere ver.
 const recoveredReport = ref<StoredImportReport | null>(null);
@@ -657,7 +658,8 @@ function reportWarrantsAttention(r: ImportReport): boolean {
     const info = moduleInstallStatusInfo(m);
     return info.kind === 'failed' || info.kind === 'blocked';
   });
-  return sectionNeedsAttention || moduleNeedsAttention;
+  const mediaNeedsAttention = (r.media?.failed ?? 0) > 0;
+  return sectionNeedsAttention || moduleNeedsAttention || mediaNeedsAttention;
 }
 
 async function loadRecoveredReport(): Promise<void> {
@@ -896,8 +898,8 @@ const visual = {
 // para no mentir con un «Saltado» cuando las imágenes sí se copiaron (informe de review, hallazgo #1).
 function mediaStatus(m: NonNullable<ImportReport['media']>): { kind: 'applied' | 'skipped' | 'failed'; reason?: string } {
   const reason = m.failed > 0 ? t('importPage.mediaFailed', { n: m.failed }) : undefined;
-  if (m.copied > 0) return { kind: 'applied', reason };
   if (m.failed > 0) return { kind: 'failed', reason };
+  if (m.copied > 0) return { kind: 'applied' };
   return { kind: 'skipped' }; // seleccionada pero sin ficheros que copiar
 }
 

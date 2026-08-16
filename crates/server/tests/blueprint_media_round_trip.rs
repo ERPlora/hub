@@ -23,6 +23,7 @@ use std::sync::{Arc, Mutex};
 use axum::body::Body;
 use axum::extract::{Multipart, Query, State};
 use axum::http::{Request, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use erplora_db::testutil::fresh_db;
@@ -44,6 +45,14 @@ const LOG_BYTES: &[u8] = b"BOOT-LOG-linea";
 #[derive(Default)]
 struct CloudState {
     uploads: Mutex<Vec<(String, String, Vec<u8>)>>,
+    /// Número de ficheros recibidos por petición, para fijar el límite del batch en el test.
+    upload_batches: Mutex<Vec<(String, usize)>>,
+    /// Nombres que el Object Storage de mentira rechaza; el resto del multipart sí se guarda.
+    rejected_names: Mutex<std::collections::HashSet<String>>,
+    /// Próximas peticiones que fallan enteras con 502 antes de escribir nada.
+    transient_failures: Mutex<usize>,
+    /// MIME observado por nombre, separado de `uploads` para no romper la evidencia histórica.
+    upload_mimes: Mutex<Vec<(String, String)>>,
     /// Su propia dirección, para poder firmar URLs hacia sí mismo.
     base: Mutex<String>,
 }
@@ -113,26 +122,64 @@ async fn cloud_object(Query(q): Query<PathQ>) -> Vec<u8> {
 }
 
 /// `POST …/media/` — la subida multipart (`folder` + `files`). Guarda lo recibido como evidencia.
-async fn cloud_upload(State(st): State<Arc<CloudState>>, mut mp: Multipart) -> Json<Value> {
+async fn cloud_upload(State(st): State<Arc<CloudState>>, mut mp: Multipart) -> Response {
     let mut folder = String::new();
-    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut files: Vec<(String, String, Vec<u8>)> = Vec::new();
     while let Ok(Some(field)) = mp.next_field().await {
         match field.name() {
             Some("folder") => folder = field.text().await.unwrap_or_default(),
             Some("files") => {
                 let name = field.file_name().map(str::to_string).unwrap_or_default();
+                let mime = field.content_type().map(str::to_string).unwrap_or_default();
                 if let Ok(b) = field.bytes().await {
-                    files.push((name, b.to_vec()));
+                    files.push((name, mime, b.to_vec()));
                 }
             }
             _ => {}
         }
     }
-    let mut log = st.uploads.lock().unwrap();
-    for (name, bytes) in files {
-        log.push((folder.clone(), name, bytes));
+    st.upload_batches
+        .lock()
+        .unwrap()
+        .push((folder.clone(), files.len()));
+    {
+        let mut remaining = st.transient_failures.lock().unwrap();
+        if *remaining > 0 {
+            *remaining -= 1;
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": "temporary edge failure" })),
+            )
+                .into_response();
+        }
     }
-    Json(json!({ "ok": true }))
+    let rejected = st.rejected_names.lock().unwrap().clone();
+    let mut saved = 0usize;
+    let mut failed = 0usize;
+    for (name, mime, bytes) in files {
+        if rejected.contains(&name) {
+            failed += 1;
+            continue;
+        }
+        st.uploads
+            .lock()
+            .unwrap()
+            .push((folder.clone(), name.clone(), bytes));
+        st.upload_mimes.lock().unwrap().push((name, mime));
+        saved += 1;
+    }
+    if failed > 0 {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "error": "partial storage failure", "saved": saved, "failed": failed })),
+        )
+            .into_response();
+    }
+    (
+        StatusCode::CREATED,
+        Json(json!({ "success": true, "saved": saved })),
+    )
+        .into_response()
 }
 
 /// Levanta el Cloud de mentira y devuelve `(base_url, estado)`.
@@ -226,9 +273,62 @@ fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn build_media_zip(files: &[(String, Vec<u8>)]) -> Vec<u8> {
+    let sha256: serde_json::Map<String, Value> = files
+        .iter()
+        .map(|(path, bytes)| (path.clone(), json!(sha256_hex(bytes))))
+        .collect();
+    let manifest = json!({
+        "schema_version": 1, "name": "restaurante", "locale": "es",
+        "hub": { "name": "Demo", "country": "ES", "currency": "EUR" },
+        "created_at": "2026-08-16T00:00:00Z",
+        "modules": [], "sections": ["media"], "sha256": sha256,
+    })
+    .to_string();
+    let mut sources = Vec::with_capacity(files.len() + 1);
+    sources.push(("manifest.json".to_string(), manifest.into_bytes()));
+    sources.extend(files.iter().cloned());
+    let refs: Vec<(&str, &[u8])> = sources
+        .iter()
+        .map(|(path, bytes)| (path.as_str(), bytes.as_slice()))
+        .collect();
+    build_zip(&refs)
+}
+
 async fn body_json(resp: axum::response::Response) -> Value {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     serde_json::from_slice(&bytes).unwrap()
+}
+
+async fn import_zip(app: Router, zip: Vec<u8>) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/hub/import/inspect")
+                .header("content-type", "application/octet-stream")
+                .header("x-hub-id", "hub-test")
+                .body(Body::from(zip))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let resp = app
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": { "media": true } }),
+        ))
+        .await
+        .unwrap();
+    let status = resp.status();
+    (status, body_json(resp).await)
 }
 
 // ─────────────────────────── EXPORT: las imágenes entran en el zip ───────────────────────────
@@ -385,8 +485,163 @@ async fn el_import_sube_las_imagenes_del_zip_al_gestor_media() {
     assert_eq!(subidas[0].0, "catalogo", "conservando su carpeta");
     assert_eq!(subidas[0].1, "cafe.webp", "y su nombre");
     assert_eq!(subidas[0].2, IMAGE_BYTES, "con los bytes del bundle");
+    assert_eq!(
+        state.upload_mimes.lock().unwrap().as_slice(),
+        &[("cafe.webp".to_string(), "image/webp".to_string())],
+        "cada parte conserva el MIME derivado de su nombre"
+    );
 
     // El informe cuenta lo que pasó de verdad: una copiada, ninguna fallida.
-    assert_eq!(report["report"]["media"]["copied"], json!(1), "{}", report["report"]["media"]);
-    assert_eq!(report["report"]["media"]["failed"], json!(0), "{}", report["report"]["media"]);
+    assert_eq!(
+        report["report"]["media"]["copied"],
+        json!(1),
+        "{}",
+        report["report"]["media"]
+    );
+    assert_eq!(
+        report["report"]["media"]["failed"],
+        json!(0),
+        "{}",
+        report["report"]["media"]
+    );
+}
+
+/// Regresión del restaurante real: con una petición por imagen, el edge dejó pasar ~100 y las
+/// siguientes 182 nunca llegaron. El contrato del Cloud acepta varios `files`, así que 123 objetos
+/// de una carpeta deben cruzar en 4 peticiones (40 + 40 + 40 + 3), con bytes y MIME intactos.
+#[tokio::test]
+async fn el_import_agrupa_mas_de_cien_imagenes_en_lotes_de_hasta_cuarenta() {
+    let (cloud, state) = spawn_cloud().await;
+    let app = make_app(cloud, "import_123").await;
+    let files: Vec<(String, Vec<u8>)> = (0..123)
+        .map(|i| {
+            (
+                format!("media/catalogo/plato-{i:03}.webp"),
+                format!("WEBP-plato-{i:03}").into_bytes(),
+            )
+        })
+        .collect();
+
+    let (status, body) = import_zip(app, build_media_zip(&files)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["report"]["media"]["copied"], json!(123), "{body}");
+    assert_eq!(body["report"]["media"]["failed"], json!(0), "{body}");
+
+    let batches = state.upload_batches.lock().unwrap().clone();
+    assert_eq!(
+        batches,
+        vec![
+            ("catalogo".to_string(), 40),
+            ("catalogo".to_string(), 40),
+            ("catalogo".to_string(), 40),
+            ("catalogo".to_string(), 3),
+        ],
+        "el import no debe volver a una llamada HTTP por fichero"
+    );
+    let uploads = state.uploads.lock().unwrap().clone();
+    assert_eq!(uploads.len(), 123);
+    for (i, (_, name, bytes)) in uploads.iter().enumerate() {
+        assert_eq!(name, &format!("plato-{i:03}.webp"));
+        assert_eq!(bytes, &format!("WEBP-plato-{i:03}").into_bytes());
+    }
+    assert!(state
+        .upload_mimes
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(_, mime)| mime == "image/webp"));
+}
+
+/// El Cloud procesa todos los ficheros de un multipart y en un rechazo no transitorio devuelve cuántos
+/// quedaron guardados. El Hub debe usar esos contadores —no marcar todo el lote como copiado ni
+/// como fallido— y continuar con los lotes posteriores.
+#[tokio::test]
+async fn el_import_cuenta_un_rechazo_parcial_y_continua_el_siguiente_lote() {
+    let (cloud, state) = spawn_cloud().await;
+    state
+        .rejected_names
+        .lock()
+        .unwrap()
+        .insert("plato-010.webp".to_string());
+    let app = make_app(cloud, "import_partial").await;
+    let files: Vec<(String, Vec<u8>)> = (0..45)
+        .map(|i| {
+            (
+                format!("media/catalogo/plato-{i:03}.webp"),
+                format!("WEBP-plato-{i:03}").into_bytes(),
+            )
+        })
+        .collect();
+
+    let (status, body) = import_zip(app, build_media_zip(&files)).await;
+    assert_eq!(status, StatusCode::OK, "el import es best-effort: {body}");
+    assert_eq!(body["report"]["media"]["copied"], json!(44), "{body}");
+    assert_eq!(body["report"]["media"]["failed"], json!(1), "{body}");
+    assert_eq!(
+        state.upload_batches.lock().unwrap().as_slice(),
+        &[("catalogo".to_string(), 40), ("catalogo".to_string(), 5)],
+        "un rechazo parcial no debe abortar los lotes siguientes"
+    );
+    let uploads = state.uploads.lock().unwrap();
+    assert_eq!(uploads.len(), 44);
+    assert!(!uploads.iter().any(|(_, name, _)| name == "plato-010.webp"));
+    assert!(uploads.iter().any(|(_, name, _)| name == "plato-044.webp"));
+}
+
+/// 408/429/5xx se pueden repetir porque cada fichero reemplaza la misma ruta. El multipart se
+/// reconstruye y el tercer intento verde es el único que se contabiliza.
+#[tokio::test]
+async fn el_import_reintenta_un_lote_transitorio_de_forma_acotada() {
+    let (cloud, state) = spawn_cloud().await;
+    *state.transient_failures.lock().unwrap() = 2;
+    let app = make_app(cloud, "import_retry").await;
+    let files: Vec<(String, Vec<u8>)> = (0..5)
+        .map(|i| {
+            (
+                format!("media/catalogo/plato-{i:03}.webp"),
+                format!("WEBP-plato-{i:03}").into_bytes(),
+            )
+        })
+        .collect();
+
+    let (status, body) = import_zip(app, build_media_zip(&files)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["report"]["media"]["copied"], json!(5), "{body}");
+    assert_eq!(body["report"]["media"]["failed"], json!(0), "{body}");
+    assert_eq!(
+        state.upload_batches.lock().unwrap().as_slice(),
+        &[
+            ("catalogo".to_string(), 5),
+            ("catalogo".to_string(), 5),
+            ("catalogo".to_string(), 5),
+        ],
+        "dos fallos + un éxito, nunca reintentos sin límite"
+    );
+    assert_eq!(state.uploads.lock().unwrap().len(), 5);
+}
+
+/// Si los tres intentos del primer lote fallan, su resultado es desconocido y el informe marca
+/// los 40 como fallidos. El lote siguiente continúa y puede quedar verde: nunca hay falso éxito.
+#[tokio::test]
+async fn el_import_marca_el_lote_completo_tras_agotar_reintentos() {
+    let (cloud, state) = spawn_cloud().await;
+    *state.transient_failures.lock().unwrap() = 3;
+    let app = make_app(cloud, "import_retry_exhausted").await;
+    let files: Vec<(String, Vec<u8>)> = (0..45)
+        .map(|i| {
+            (
+                format!("media/catalogo/plato-{i:03}.webp"),
+                format!("WEBP-plato-{i:03}").into_bytes(),
+            )
+        })
+        .collect();
+
+    let (status, body) = import_zip(app, build_media_zip(&files)).await;
+    assert_eq!(status, StatusCode::OK, "el import global sigue siendo best-effort: {body}");
+    assert_eq!(body["report"]["media"]["copied"], json!(5), "{body}");
+    assert_eq!(body["report"]["media"]["failed"], json!(40), "{body}");
+    assert_eq!(state.upload_batches.lock().unwrap().len(), 4);
+    let uploads = state.uploads.lock().unwrap();
+    assert_eq!(uploads.len(), 5);
+    assert!(uploads.iter().any(|(_, name, _)| name == "plato-044.webp"));
 }

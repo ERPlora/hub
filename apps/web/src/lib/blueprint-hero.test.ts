@@ -389,11 +389,14 @@ describe('what the owner is told happened', () => {
     ).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedSections: ['media'] });
   });
 
-  it('images that mostly copied do not raise an alarm', () => {
-    // The full report at Settings › Data has the count; a couple of missing photos is not a
-    // business that cannot open.
-    expect(importOutcome(report({ media: { selected: true, copied: 9, failed: 1 } }))).toEqual({
-      kind: 'ready',
+  it('a partial media copy is never ready — including the observed 98/182 split', () => {
+    // Product rows already point at every media path. Calling this ready would leave 182 broken
+    // catalogue tiles while hiding the persisted report that can retry them.
+    expect(importOutcome(report({ media: { selected: true, copied: 98, failed: 182 } }))).toEqual({
+      kind: 'partial',
+      blockedApps: [],
+      failedApps: [],
+      failedSections: ['media'],
     });
   });
 
