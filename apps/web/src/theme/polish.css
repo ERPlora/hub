@@ -368,6 +368,32 @@ ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(scroll) {
   border-radius: 25px;
 }
 
+/* ── Modo inmersivo: la pantalla entera para vender (ADR-0048) ─────────────────────────────── */
+/* La marca la pone `lib/immersive.ts` cuando el módulo activo pide el control `fullscreen`, y solo
+   si su entrada de `navigation[]` lo declaró. Aquí se hace el trabajo: fuera el chrome del shell.
+   Va la topbar TAMBIÉN, no solo el menú y el tabbar: lo que se pidió es «solo la pantalla de
+   venta», y es lo que hacen las cajas del mercado (Odoo POS, Square, Lightspeed). La salida NO
+   depende de nada de esto — vive en el ⋮ del propio TPV, que es lo único que sigue en pie— y
+   además Esc devuelve el chrome (`fullscreenchange`). */
+html.immersive ion-split-pane > ion-menu.dash-menu { display: none; }
+html.immersive ion-router-outlet#main > .ion-page > ion-header.app-topbar { display: none; }
+html.immersive ion-router-outlet#main > .ion-page > ion-footer { display: none; }
+/* La tarjeta redondeada del shell es chrome también: a sangre, para que la rejilla de productos se
+   quede con todo el lienzo. */
+html.immersive ion-router-outlet#main.split-pane-main > .ion-page > ion-content {
+  /* Con unidad: Ionic las consume como longitud (`padding-top: var(--padding-top)`), y una var sin
+     unidad viaja tal cual — un `0` pelado funciona ahí, pero no en un `calc()` de nadie. */
+  --padding-start: 0px;
+  --padding-end: 0px;
+  --padding-top: 0px;
+  --padding-bottom: 0px;
+  border-radius: 0;
+}
+html.immersive ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(background),
+html.immersive ion-router-outlet#main.split-pane-main > .ion-page > ion-content::part(scroll) {
+  border-radius: 0;
+}
+
 /* ── Layout interior compartido para páginas legibles/de detalle ───────────────────────── */
 /* AppPage lo aplica solo cuando la vista lo pide. El ion-content ya posee el gutter responsive;
    este wrapper no vuelve a limitar ni centrar el ancho disponible. */

@@ -119,6 +119,7 @@ import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
 import { isModuleBlocked, resolveEntitlement } from '../lib/entitlement';
+import { chromeControlsFor, installChrome } from '../lib/immersive';
 import type { ModuleBilling, ModuleSettingsDef } from '@erplora/module-types';
 
 /** Id de la pestaña sintética "Plan" auto-inyectada para módulos con `billing`. */
@@ -160,6 +161,14 @@ const billing = ref<ModuleBilling | null>(null);
  * `settings` del módulo se pinta con el FORM GENÉRICO (ModuleSettingsForm) en vez del WC declarado.
  */
 const settings = ref<ModuleSettingsDef | null>(null);
+/**
+ * Controles de chrome que la pestaña ACTIVA declara en su `navigation[].chrome` (ADR-0048, Nivel 1).
+ *
+ * Sale del `module.json` CRUDO (`loadManifest`) porque `GET /api/navigation` todavía no re-sirve
+ * `chrome` — el mismo pendiente que `widgets` y `provides_slots`. Es la AUTORIDAD: el WC pide, pero
+ * el shell solo atiende lo que esta lista declara.
+ */
+const chromeControls = ref<string[]>([]);
 /** ¿Está activa la pestaña sintética "Plan"? */
 const isPlanTab = computed(() => activeNavId.value === PLAN_TAB_ID);
 /** ¿Módulo de pago bloqueado por la revalidación híbrida? (bloque `revalidation`, ADR-0114 §6). */
@@ -233,6 +242,9 @@ async function mount(): Promise<void> {
   status.value = 'loading';
   // Cada montaje empieza SIN guard: o se vuelve a evaluar abajo, o no aplica (p. ej. pestaña Plan).
   protectsGuard.value = null;
+  // Y sin chrome concedido: las pestañas sintéticas (Plan, Ajustes) y las que no lo declaran no
+  // ofrecen nada, y el watcher de `installChrome` devuelve el chrome del shell al vaciarse.
+  chromeControls.value = [];
   clearProtectsSubscription();
   try {
     const menu = await loadMenu();
@@ -340,6 +352,9 @@ async function mount(): Promise<void> {
       el.client = client.forModule(moduleId);
       outlet.value.appendChild(el);
     }
+    // Lo que esta pestaña puede pedirle al shell. Se concede DESPUÉS de montar: `installChrome`
+    // observa el outlet, así que el anuncio llega al WC recién puesto sin que la vista lo toque.
+    chromeControls.value = chromeControlsFor(manifest, entry.nav.id);
     status.value = 'ready';
     // Un navId retirado o mal escrito no puede dejar la URL afirmando una pestaña mientras se
     // muestra otra. Canonizamos al primer tab real (también cubre bookmarks de versiones viejas).
@@ -376,8 +391,12 @@ async function revealActiveTab(): Promise<void> {
   });
 }
 
+/** Limpieza del canal de chrome con el WC (ADR-0048); también devuelve el chrome al desmontar. */
+let stopChrome: (() => void) | null = null;
+
 onMounted(() => {
   window.addEventListener('focus', recheckEntitlement);
+  if (outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
   void mount().then(revealActiveTab);
 });
 watch(
@@ -389,6 +408,10 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
+  // Antes que nada: salir del modo inmersivo. Irse del módulo con el chrome escondido dejaría la
+  // pantalla siguiente sin menú y sin el ⋮ del TPV, que era lo único que sabía devolverlo.
+  stopChrome?.();
+  stopChrome = null;
   mountGeneration += 1;
   clearProtectsSubscription();
   outlet.value?.replaceChildren();
