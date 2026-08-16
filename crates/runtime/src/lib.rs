@@ -55,6 +55,7 @@ pub mod print_queue;
 pub mod print_routes;
 pub mod print_stations;
 pub mod producer_facts;
+pub mod public_claim;
 pub mod queries;
 pub mod registry;
 pub mod reset;

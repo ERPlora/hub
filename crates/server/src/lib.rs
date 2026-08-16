@@ -63,6 +63,7 @@ pub mod flow_io;
 pub mod flows_api;
 pub mod hub_users;
 pub mod login_throttle;
+pub mod public_door;
 pub mod readiness;
 pub mod reset;
 pub mod inbound_poll;
@@ -1633,6 +1634,14 @@ pub fn app(state: AppState) -> Router {
         // Reporte de errores del FRONTEND (same-origin, sin auth cloud): el web app postea sus
         // errores JS aquí y el runtime los funnelea al registro global → Cloud (el secreto de
         // máquina nunca toca el navegador). Ver `frontend_error_report`.
+        // hub#963 — the public door. `/p/:locator` is the only path in this router that answers
+        // somebody with NO session: the diner holding a ticket. Its authorisation is the locator
+        // itself (`public_door`), and the mint below is the session-gated side of the same pair.
+        .route(
+            "/p/:locator",
+            get(public_door::show).post(public_door::redeem),
+        )
+        .route("/api/hub/public-claims", post(public_door::mint_claim))
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
         .route("/api/auth/badge", post(auth_badge))
@@ -1850,7 +1859,14 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
+    // `/p/...` (hub#963) is in the allow-list for the same reason the three above are: the person
+    // on the other side is a CUSTOMER holding a printed ticket. They cannot enrol a device, and a
+    // hub that already put a locator on paper has to honour it whatever state its enrolment is in.
+    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context")
+        || public_door::is_public_path(path)
+        || st.is_dev_hub()
+        || st.machine_registered()
+    {
         return next.run(request).await;
     }
     (
@@ -3398,7 +3414,7 @@ fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Respons
 }
 
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
-fn unauthorized(e: auth::AuthError) -> Response {
+pub(crate) fn unauthorized(e: auth::AuthError) -> Response {
     (
         StatusCode::UNAUTHORIZED,
         Json(json!({ "ok": false, "error": e.message() })),
