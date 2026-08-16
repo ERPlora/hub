@@ -10,6 +10,12 @@
 //! always shows). **The front is not in the conversation** — it receives the catalogue already
 //! filtered, so a query param from the page cannot widen what a till is offered.
 
+//! ⚠️ Cada aserción de aquí fija la query **entera**, así que también ve el `lang=` que viaja
+//! desde `hub_settings.language` (hub#1003, ADR-0364) — el respaldo que usa el runtime cuando la
+//! petición no trae `?locale=`, como es el caso de estos tests. El sujeto sigue siendo el país: si
+//! el filtro de país se rompe, estos tests siguen cayendo. El idioma tiene los suyos, en
+//! `crates/cloud-client` y en `apps/web`.
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode, Uri};
 use axum::routing::get;
@@ -96,7 +102,7 @@ async fn a_registered_hub_asks_the_marketplace_about_its_own_country() {
 
     assert_eq!(
         seen.lock().unwrap().clone().unwrap(),
-        "countries=FR",
+        "countries=FR&lang=es",
         "the catalogue must be asked about the country the hub has stored"
     );
     task.abort();
@@ -128,7 +134,10 @@ async fn a_region_travels_alongside_the_country() {
 
     ask_catalogue(rt, config(url, "real-hub", Some("machine-secret"), "region")).await;
 
-    assert_eq!(seen.lock().unwrap().clone().unwrap(), "countries=ES&region=PV");
+    assert_eq!(
+        seen.lock().unwrap().clone().unwrap(),
+        "countries=ES&region=PV&lang=es"
+    );
     task.abort();
 }
 
@@ -150,7 +159,7 @@ async fn the_demo_catalogue_is_filtered_by_country_too() {
 
     ask_catalogue(rt, config(url, DEV_HUB_ID, None, "demo")).await;
 
-    assert_eq!(seen.lock().unwrap().clone().unwrap(), "countries=PT");
+    assert_eq!(seen.lock().unwrap().clone().unwrap(), "countries=PT&lang=es");
     task.abort();
 }
 

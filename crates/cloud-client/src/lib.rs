@@ -135,6 +135,62 @@ impl CountryFilter {
     }
 }
 
+/// **What the catalogue is asked about**: where the hub is, and in which language (hub#1003).
+///
+/// The two facets are separate questions with separate reasons — the country decides *which
+/// modules* a hub may be offered (ADR-0062: a hub in France must not be shown VeriFactu), the
+/// language only decides *how they are spelled* (ADR-0364). They travel together because they end
+/// up in the same query string, and **that is exactly why this type exists**: one place knows
+/// whether the string has been opened with `?` yet. Appending `&lang=` from the call site produces
+/// `…?countries=ES?lang=es` for every hub that declares a country — that is, every real one, and
+/// none of the ones a no-filter test covers.
+///
+/// Both come from the hub's own settings, never from the request: a page cannot widen what its
+/// till is offered, and it does not have to know the rule.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CatalogQuery {
+    country: CountryFilter,
+    /// Bare lowercase primary subtag (`es`), or `""` for "the Cloud's source language".
+    language: String,
+}
+
+impl CatalogQuery {
+    /// Normalises the language on the way in: `es-ES`, `es_ES` and ` ES ` are all `es`, and
+    /// anything not language-shaped becomes `""`.
+    ///
+    /// Regional variants collapse because the Cloud collapses them too — storing a translation per
+    /// region would ask every module author to guess which markets their customers are in. And a
+    /// setting is a place a human can type into, so junk is **dropped rather than sent**: a query
+    /// param the server cannot parse is worse than no query param at all.
+    pub fn new(country: CountryFilter, language: &str) -> Self {
+        let primary = language
+            .trim()
+            .replace('_', "-")
+            .split('-')
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        let language = if primary.chars().all(|c| c.is_ascii_alphabetic())
+            && (2..=3).contains(&primary.chars().count())
+        {
+            primary
+        } else {
+            String::new()
+        };
+        Self { country, language }
+    }
+
+    /// The whole query string, `?` and `&` included — `""` when there is nothing to ask.
+    fn query(&self) -> String {
+        let country = self.country.query();
+        if self.language.is_empty() {
+            return country;
+        }
+        let separator = if country.is_empty() { '?' } else { '&' };
+        format!("{country}{separator}lang={}", self.language)
+    }
+}
+
 /// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
 /// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
 /// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
@@ -198,9 +254,9 @@ impl CloudClient {
     /// Lista de módulos del marketplace para el hub (con JWT de usuario). §2.2.
     ///
     /// Filtrada por el país del hub (ADR-0062, hub#69) — ver [`CountryFilter`].
-    pub fn marketplace_modules(&self, auth: &Auth, country: &CountryFilter) -> PreparedRequest {
+    pub fn marketplace_modules(&self, auth: &Auth, catalog: &CatalogQuery) -> PreparedRequest {
         self.get(
-            &format!("/api/v1/marketplace/modules/{}", country.query()),
+            &format!("/api/v1/marketplace/modules/{}", catalog.query()),
             auth,
         )
     }
@@ -209,11 +265,8 @@ impl CloudClient {
     ///
     /// Lleva el MISMO filtro de país que su hermana de arriba: una demo también está en un país,
     /// y ofrecerle el régimen fiscal de otro sería enseñar un módulo que no puede usar.
-    pub fn public_marketplace_modules(&self, country: &CountryFilter) -> PreparedRequest {
-        self.public_get(&format!(
-            "/api/v1/marketplace/catalog/{}",
-            country.query()
-        ))
+    pub fn public_marketplace_modules(&self, catalog: &CatalogQuery) -> PreparedRequest {
+        self.public_get(&format!("/api/v1/marketplace/catalog/{}", catalog.query()))
     }
 
     /// Which build of the installable app the Cloud publishes right now (hub#400).
@@ -972,7 +1025,7 @@ mod tests {
             hub_id: "h1".into(),
             access: "abc".into(),
         };
-        let r = c.marketplace_modules(&auth, &CountryFilter::none());
+        let r = c.marketplace_modules(&auth, &CatalogQuery::new(CountryFilter::none(), ""));
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/modules/");
         assert!(r
             .headers
@@ -1042,7 +1095,7 @@ mod tests {
     #[test]
     fn public_marketplace_catalog_has_no_hub_credentials() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::none());
+        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::none(), ""));
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
         assert!(r.headers.is_empty());
     }
@@ -1060,7 +1113,7 @@ mod tests {
             hub_id: "h1".into(),
             token: "tok".into(),
         };
-        let r = c.marketplace_modules(&auth, &CountryFilter::new("ES", ""));
+        let r = c.marketplace_modules(&auth, &CatalogQuery::new(CountryFilter::new("ES", ""), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/modules/?countries=ES"
@@ -1079,7 +1132,8 @@ mod tests {
     #[test]
     fn the_country_prefix_is_stripped_from_the_region_the_hub_stores() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::new("ES", "ES-PV"));
+        let r =
+            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", "ES-PV"), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV"
@@ -1089,7 +1143,8 @@ mod tests {
     #[test]
     fn the_region_refines_the_country_when_the_hub_declares_one() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::new("ES", "PV"));
+        let r =
+            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", "PV"), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV",
@@ -1103,11 +1158,95 @@ mod tests {
     #[test]
     fn a_prefix_from_another_country_is_not_stripped() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::new("PT", "ES-PV"));
+        let r =
+            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("PT", "ES-PV"), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/catalog/?countries=PT&region=ES-PV"
         );
+    }
+
+    // ── The catalogue is asked IN A LANGUAGE (hub#1003, saas#1457, ADR-0364) ───────────────────
+    //
+    // A Spanish hub listed «Añadir apps» with the titles and descriptions in English inside an
+    // interface that is translated whole. The data travels translated now — the Cloud serves the
+    // catalogue per language — but only for a caller that says which one. Silence means English.
+
+    #[test]
+    fn the_catalogue_is_asked_in_the_hubs_language() {
+        let c = CloudClient::new("https://erplora.com");
+        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::none(), "es"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?lang=es"
+        );
+    }
+
+    /// 🔴 **Where this breaks quietly.** `CountryFilter::query()` already opens the query string
+    /// with `?` when there IS a filter and returns `""` when there is not, so appending `?lang=`
+    /// produces `…?countries=ES?lang=es` for every hub that declares a country — i.e. all of them
+    /// in production, and none of them in the test that only checks the no-filter case.
+    #[test]
+    fn the_language_joins_an_existing_filter_with_an_ampersand() {
+        let c = CloudClient::new("https://erplora.com");
+        let r =
+            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", "PV"), "es"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV&lang=es"
+        );
+    }
+
+    #[test]
+    fn a_hub_that_names_no_language_asks_exactly_as_before() {
+        let c = CloudClient::new("https://erplora.com");
+        let r =
+            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", ""), ""));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES",
+            "no language = the Cloud serves its source language, which is today's behaviour"
+        );
+    }
+
+    #[test]
+    fn the_language_travels_on_the_credentialled_catalogue_too() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "tok".into(),
+        };
+        let r =
+            c.marketplace_modules(&auth, &CatalogQuery::new(CountryFilter::new("ES", ""), "es"));
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/marketplace/modules/?countries=ES&lang=es"
+        );
+    }
+
+    /// The hub stores `language` as a bare code, but a setting is a place a human can type into.
+    /// A regional tag is the language it belongs to — the Cloud collapses it the same way — and
+    /// anything that is not language-shaped is dropped rather than sent, because a query param the
+    /// server cannot parse is worse than no query param.
+    #[test]
+    fn the_language_is_normalised_before_it_goes_on_the_wire() {
+        let c = CloudClient::new("https://erplora.com");
+        for (stored, expected) in [
+            (" ES ", "?lang=es"),
+            ("es-ES", "?lang=es"),
+            ("es_ES", "?lang=es"),
+            ("", ""),
+            ("   ", ""),
+            ("not a language", ""),
+            ("es&countries=FR", ""),
+        ] {
+            let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::none(), stored));
+            assert_eq!(
+                r.url,
+                format!("https://erplora.com/api/v1/marketplace/catalog/{expected}"),
+                "stored language {stored:?}"
+            );
+        }
     }
 
     /// A region with no country is NOT sent: the SaaS ignores it (a region only means something
@@ -1115,7 +1254,7 @@ mod tests {
     #[test]
     fn a_region_without_a_country_is_not_sent_at_all() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::new("", "PV"));
+        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("", "PV"), ""));
         assert_eq!(r.url, "https://erplora.com/api/v1/marketplace/catalog/");
     }
 
@@ -1125,7 +1264,7 @@ mod tests {
     #[test]
     fn the_country_is_normalised_before_it_travels() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CountryFilter::new(" fr ", " oc "));
+        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new(" fr ", " oc "), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/catalog/?countries=FR&region=OC"

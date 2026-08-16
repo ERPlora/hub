@@ -768,7 +768,15 @@ function capabilityIds(raw: unknown): string[] {
 /** Catálogo real del Marketplace vía el runtime local. Un Hub real firma con su token de máquina;
  *  Demo usa el endpoint público de metadatos del SaaS. Nunca hay una lista local alternativa. */
 export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
-  const data = await runtimeGet<unknown>('/api/marketplace/catalog');
+  // `?locale=` (ADR-0055, el mismo parámetro que `/api/navigation`): el Cloud sirve el catálogo
+  // por idioma (ADR-0364) pero solo a quien dice en cuál lo quiere — callarse significa inglés, y
+  // eso era «Añadir apps» en inglés dentro de una interfaz traducida entera (hub#1003).
+  //
+  // Va el idioma ACTIVO y no un ajuste guardado: es un hecho sobre quien está leyendo ahora, y eso
+  // solo lo sabe esta página. El `language` del hub es el respaldo, y lo pone el runtime.
+  const data = await runtimeGet<unknown>(
+    `/api/marketplace/catalog?locale=${encodeURIComponent(getLocale())}`,
+  );
   const items = Array.isArray(data)
     ? data
     : Array.isArray((data as { results?: unknown[] }).results)

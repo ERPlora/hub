@@ -689,6 +689,26 @@ impl Runtime {
         (read("country_code"), read("region_code"))
     }
 
+    /// **Which language this hub reads in** (hub#1003), from `hub_settings.language`.
+    ///
+    /// Read here and not taken from the request for the same reason the country is: the browser is
+    /// not in the conversation. `Accept-Language` describes the *device* — and the device is a till
+    /// in a back room whose locale says nothing about who is standing at it.
+    ///
+    /// Tolerant on purpose, like its neighbour: unreadable settings answer `""`, which the caller
+    /// turns into "ask in the source language". Not knowing which language to ask in is a reason to
+    /// show the catalogue in English, never a reason not to show it.
+    pub async fn language(&self) -> String {
+        let Ok(settings) = settings::get_all(self.db.as_ref(), &self.hub_id).await else {
+            return String::new();
+        };
+        settings
+            .get("language")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    }
+
     /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
     /// cierre, para que el cliente sepa cuál de los tres se negó.
     fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {
