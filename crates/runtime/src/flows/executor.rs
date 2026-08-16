@@ -35,9 +35,9 @@ use serde_json::{json, Map, Value as Json};
 
 use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::{self, FlowDefinition, StepDef, StepSpec};
+use crate::flows::def::{self, FlowDefinition, PastDuePolicy, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
-use crate::flows::{approvals, grants, http, notify, query, store, triggers};
+use crate::flows::{approvals, grants, http, notify, query, store, triggers, waits};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
 
 /// How many runs one tick advances. The tick happens every second, so this is a throughput knob,
@@ -320,8 +320,8 @@ async fn advance_run(
             Outcome::Stopped => {
                 return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None)
             }
-            Outcome::Sleep { wake_at } => {
-                return sleep_until(db, hub_id, &run_id, &wake_at).await.map(|()| None)
+            Outcome::Sleep { wake_at, arm } => {
+                return sleep_until(db, hub_id, &run_id, &wake_at, &arm).await.map(|()| None)
             }
             Outcome::Failed { error } => {
                 // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
@@ -368,7 +368,12 @@ enum Outcome {
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
     /// flow working exactly as written.
     Stopped,
-    Sleep { wake_at: String },
+    /// The run parks as a row. `arm` is the wait's OTHER exits (hub#951), inserted in the same
+    /// transaction as the sleep so there is no window in which one of them exists without the other.
+    Sleep {
+        wake_at: String,
+        arm: Vec<(String, Params)>,
+    },
     Failed { error: String },
     /// **The pause** (hub#950). The question is already written to `_flow_approvals` and the step
     /// row is `running`; what is left is to park the run, and that is done through the seam the
@@ -440,44 +445,124 @@ async fn run_step(
             }
         }
 
-        StepSpec::Delay { seconds, until } => {
-            let wake_at = match (seconds, until) {
-                (Some(s), _) => (chrono::Utc::now() + chrono::Duration::seconds(*s)).to_rfc3339(),
+        StepSpec::Delay(delay) => {
+            // A step that fails says why AT the step, so the history explains the run.
+            macro_rules! refuse {
+                ($error:expr) => {{
+                    let error = $error;
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    return Ok(Outcome::Failed { error });
+                }};
+            }
+
+            let clock = chrono::Utc::now();
+            let instant = match (&delay.seconds, &delay.until) {
+                (Some(s), _) => clock + chrono::Duration::seconds(*s),
                 (None, Some(path)) => {
                     let value = def::resolve(&json!(path), scope);
-                    // **Normalised to UTC before it is persisted** (hub#970): `wake_sleeping`
-                    // compares this against `:now` as TEXT, so an instant that keeps the offset it
-                    // was written in sorts by its wall clock instead of by when it happens — two
-                    // hours late in Spanish summer, and EARLY with a negative offset.
-                    match value.as_str().and_then(|s| {
-                        chrono::DateTime::parse_from_rfc3339(s)
-                            .ok()
-                            .map(|d| store::to_utc_rfc3339(&d))
-                    }) {
-                        Some(instant) => instant,
-                        None => {
-                            let error = format!(
-                                "step `{}`: `until` resolved to {value}, which is not an RFC-3339 \
-                                 instant",
-                                step.id
-                            );
-                            write_step(
-                                db, hub_id, run_id, index, step, STEP_FAILED, &json!({}),
-                                &json!({}), &error, &now,
-                            )
-                            .await?;
-                            return Ok(Outcome::Failed { error });
-                        }
-                    }
+                    let Some(parsed) = value
+                        .as_str()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    else {
+                        refuse!(format!(
+                            "step `{}`: `until` resolved to {value}, which is not an RFC-3339 \
+                             instant",
+                            step.id
+                        ));
+                    };
+                    // **The offset of Salesforce's Scheduled Paths** (hub#951): «24 h before the
+                    // appointment» is the instant of the thing, shifted. Seconds and not calendar
+                    // units, so a −24 h across a DST change lands an hour off on the wall clock —
+                    // the price of not having calendar arithmetic, and it is said on the screen.
+                    parsed.with_timezone(&chrono::Utc)
+                        + chrono::Duration::seconds(delay.offset_seconds)
                 }
                 (None, None) => unreachable!("parse refuses a delay with neither"),
             };
-            let output = json!({ "wake_at": wake_at });
+
+            // **The horizon** (hub#951). There was no ceiling: an `until` resolving to the year
+            // 3000 slept as a row every retention rule exempts. Refused and not shortened, for the
+            // same reason `limit` is refused above its ceiling — a wait nobody meant is worse than
+            // a run that says why it stopped.
+            let horizon = delay.horizon_seconds();
+            if instant > clock + chrono::Duration::seconds(horizon) {
+                refuse!(format!(
+                    "{}: step `{}` would wait until {}, past the {horizon} s this wait may cover",
+                    def::ERR_DELAY_HORIZON,
+                    step.id,
+                    instant.to_rfc3339()
+                ));
+            }
+
+            // **The instant has already gone by.** Salesforce runs the scheduled path immediately;
+            // the default here is the restrictive one, because the literal case is a reminder whose
+            // hour went by and sending it late is worse than not sending it.
+            if instant <= clock {
+                match delay.past_due {
+                    PastDuePolicy::Skip => {
+                        let output = json!({ "past_due": true, "skipped": true });
+                        write_step(
+                            db, hub_id, run_id, index, step, STEP_STOPPED, &json!({}), &output, "",
+                            &now,
+                        )
+                        .await?;
+                        return Ok(Outcome::Stopped);
+                    }
+                    PastDuePolicy::Fail => {
+                        refuse!(format!(
+                            "{}: step `{}` resolved to {}, which had already passed",
+                            def::ERR_DELAY_PAST_DUE,
+                            step.id,
+                            instant.to_rfc3339()
+                        ));
+                    }
+                    PastDuePolicy::ContinueNow => {
+                        let output = json!({ "past_due": true, "wake_at": Json::Null });
+                        write_step(
+                            db, hub_id, run_id, index, step, STEP_DONE, &json!({}), &output, "",
+                            &now,
+                        )
+                        .await?;
+                        return Ok(Outcome::Continue { output });
+                    }
+                }
+            }
+
+            // **Normalised to UTC before it is persisted** (hub#970): `wake_sleeping` compares this
+            // against `:now` as TEXT, so an instant that keeps the offset it was written in sorts
+            // by its wall clock instead of by when it happens — two hours late in Spanish summer,
+            // and EARLY with a negative offset.
+            let wake_at = instant.to_rfc3339();
+
+            // The waits are built BEFORE anything is written, so a hook whose correlation this run
+            // cannot resolve stops the step instead of arming half of them.
+            let arm = match waits::arm_ops(
+                hub_id,
+                flow_id,
+                run_id,
+                &step.id,
+                // The index the run will be parked ON: the step counter advances with the sleep
+                // (waking resumes AFTER the delay), and the conditional update every exit of this
+                // wait uses names that number.
+                index + 1,
+                delay,
+                scope,
+                &now,
+            ) {
+                Ok(arm) => arm,
+                Err(e) => refuse!(format!("step `{}`: {}", step.id, error_text(&e))),
+            };
+
+            let output = json!({ "wake_at": wake_at, "waits": arm.len() });
             write_step(db, hub_id, run_id, index, step, STEP_SLEEPING, &json!({}), &output, "", &now)
                 .await?;
             // The step index advances with the sleep: waking up resumes AFTER the delay, not on it.
             persist_step_index(db, hub_id, run_id, index + 1).await?;
-            Ok(Outcome::Sleep { wake_at })
+            Ok(Outcome::Sleep { wake_at, arm })
         }
 
         StepSpec::Command { command, params } => {
@@ -907,27 +992,46 @@ async fn persist_vars(
     Ok(())
 }
 
+/// Puts the run to sleep **and arms the wait's other exits in the same transaction** (hub#951).
+///
+/// The atomicity is the whole point. Arming before the row says `sleeping` would leave a window
+/// where a cancelling event finds an armed wait whose run is still `running`: the conditional
+/// update affects zero rows, the event is marked delivered, and the cancellation is lost for good.
+/// Arming after would leave the opposite window, a run asleep with no way out but its clock. In one
+/// transaction there is no window — and a `delay` with no hooks is exactly the statement it always
+/// was.
 async fn sleep_until(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     run_id: &str,
     wake_at: &str,
+    arm: &[(String, Params)],
 ) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("wake_at".into(), json!(wake_at));
     p.insert("now".into(), json!(now_rfc3339()));
-    db.execute(
+    let sleep = (
         "UPDATE _flow_runs SET status = 'sleeping', wake_at = :wake_at, \
                                claim_expires_at = NULL, updated_at = :now \
-         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
-        &p,
-    )
-    .await?;
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+            .to_string(),
+        p,
+    );
+    if arm.is_empty() {
+        db.execute(&sleep.0, &sleep.1).await?;
+        return Ok(());
+    }
+    let mut ops = vec![sleep];
+    ops.extend_from_slice(arm);
+    db.execute_tx(&ops).await?;
     Ok(())
 }
 
+/// A run reaches a terminal status — and every wait it had armed stops being armed with it
+/// (hub#951). A wait outliving its run would be looked at on every delivery of its event, forever,
+/// to affect zero rows each time.
 async fn finish(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -935,18 +1039,23 @@ async fn finish(
     status: &str,
     error: &str,
 ) -> Result<()> {
+    let now = now_rfc3339();
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(status));
     p.insert("error".into(), json!(error));
-    p.insert("now".into(), json!(now_rfc3339()));
-    db.execute(
-        "UPDATE _flow_runs SET status = :status, last_error = :error, finished_at = :now, \
-                               claim_expires_at = NULL, updated_at = :now \
-         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
-        &p,
-    )
+    p.insert("now".into(), json!(now.clone()));
+    db.execute_tx(&[
+        (
+            "UPDATE _flow_runs SET status = :status, last_error = :error, finished_at = :now, \
+                                   claim_expires_at = NULL, updated_at = :now \
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+                .to_string(),
+            p,
+        ),
+        waits::disarm_run_op(hub_id, run_id, &now),
+    ])
     .await?;
     Ok(())
 }
@@ -2112,7 +2221,7 @@ mod tests {
 
         // Now the neighbour asks for every write this file performs, naming OUR run.
         finish(&db, OTHER, &run_id, store::STATUS_FAILED, "not yours").await.unwrap();
-        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00").await.unwrap();
+        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00", &[]).await.unwrap();
         persist_vars(&db, OTHER, &run_id, 99, &json!({ "steps": { "x": 1 } })).await.unwrap();
         persist_step_index(&db, OTHER, &run_id, 98).await.unwrap();
         complete_step(&db, OTHER, &run_id, 0, &json!({ "stolen": true }), "2020-01-01T00:00:00+00:00")
@@ -2167,11 +2276,16 @@ mod tests {
     // hour on the message.
 
     /// A flow that waits for `input.when` and then writes a note.
-    fn wait_until_flow() -> Json {
+    ///
+    /// `past_due_policy` is explicit because hub#951 made the DEFAULT `skip`: an instant that has
+    /// already gone by ends the run instead of sleeping, so these guards — which are about what a
+    /// SLEEPING run compares against — have to say which of the three answers they are testing.
+    fn wait_until_flow(past_due: &str) -> Json {
         json!({
             "schema_version": 1,
             "steps": [
-                { "id": "wait", "kind": "delay", "until": "input.when" },
+                { "id": "wait", "kind": "delay", "until": "input.when",
+                  "past_due_policy": past_due },
                 { "id": "write", "kind": "command", "command": "notes.note.add",
                   "params": { "text": "later" } }
             ]
@@ -2179,7 +2293,15 @@ mod tests {
     }
 
     async fn park_until(db: &dyn DatabaseAdapter, when: &str) -> (String, String) {
-        let flow_id = flow(db, wait_until_flow()).await;
+        park_until_with(db, when, "continue_now").await
+    }
+
+    async fn park_until_with(
+        db: &dyn DatabaseAdapter,
+        when: &str,
+        past_due: &str,
+    ) -> (String, String) {
+        let flow_id = flow(db, wait_until_flow(past_due)).await;
         grant(db, &flow_id, "notes.note.add").await;
         let run_id =
             start_manual_run(db, HUB, &flow_id, &json!({ "when": when }), "hub_user:1")
@@ -2195,40 +2317,75 @@ mod tests {
             .to_rfc3339()
     }
 
-    /// A moment already past, written with a POSITIVE offset. Its text sorts AFTER `now`, so the
-    /// string comparison keeps the run asleep for the length of the offset.
+    /// A moment already past, written with a POSITIVE offset. Its TEXT sorts after `now`, which is
+    /// what used to keep the run asleep for the length of the offset.
+    ///
+    /// Since hub#951 this case never reaches the SQL comparison at all: «has this instant passed?»
+    /// is answered in Rust, over `DateTime`, before anything is stored — so the offset cannot get a
+    /// vote. What the run does next is now the author's choice, and `continue_now` is the one that
+    /// asks the same question this test always asked.
     #[tokio::test]
-    async fn a_delay_until_a_past_instant_written_in_another_zone_wakes_on_the_next_tick() {
+    async fn a_delay_until_a_past_instant_written_in_another_zone_does_not_oversleep() {
         let db = db().await;
         let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
         let (flow_id, run_id) = park_until(&db, &due).await;
-        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
 
-        // What was stored has to be an instant the clock can compare, not the text it was given.
-        let stored = raw_run(&db, &run_id).await["wake_at"].as_str().unwrap().to_string();
-        assert!(stored.ends_with("+00:00"), "stored with an offset of its own: {stored}");
-
-        tick(&db, &registry(), HUB).await.unwrap();
         assert_eq!(
             notes(&db).await,
             vec!["later"],
-            "the instant passed a minute ago: the run resumes"
+            "the instant passed a minute ago: the run carries on, it does not sleep +02:00 hours"
         );
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
+        assert_eq!(
+            raw_run(&db, &run_id).await["wake_at"],
+            Json::Null,
+            "and it never parked: an instant already gone by is decided, not stored"
+        );
+    }
+
+    /// And the restrictive default, which is the other half of the same decision (hub#951): the
+    /// same past instant, with nobody writing a policy, does NOT send the reminder.
+    #[tokio::test]
+    async fn the_same_past_instant_is_skipped_when_the_document_says_nothing() {
+        let db = db().await;
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let (flow_id, _) = park_until_with(&db, &due, def::PastDuePolicy::default().as_str()).await;
+
+        assert!(notes(&db).await.is_empty(), "a reminder whose hour went by is not sent");
         assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
     }
 
-    /// The other sign, and the worse one: a future moment written with a NEGATIVE offset sorts
-    /// BEFORE `now`, so the run wakes early — a reminder sent before the thing it reminds of.
-    /// One control can be right by accident; two with opposite signs cannot.
+    /// **The storage half of hub#970, which is the one that survives.** A run that really does
+    /// sleep must store an instant the clock can compare, not the text it was given: `wake_sleeping`
+    /// compares `wake_at <= :now` over TEXT, and that is only the same question while every string
+    /// in the column is UTC.
+    ///
+    /// Both signs, because one control can be right by accident: `+02:00` sorted two hours LATE
+    /// (the run overslept) and `-05:00` sorted five hours EARLY (a reminder before the thing it
+    /// reminds of). The second assertion is the bug itself, reproduced as a comparison.
     #[tokio::test]
-    async fn a_delay_until_a_future_instant_in_a_western_zone_does_not_wake_early() {
-        let db = db().await;
-        let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(1), -5);
-        let (flow_id, _) = park_until(&db, &later).await;
+    async fn a_sleeping_run_stores_its_instant_in_utc_whatever_zone_it_arrived_in() {
+        for hours in [2, -5] {
+            let db = db().await;
+            let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(6), hours);
+            let (flow_id, run_id) = park_until(&db, &later).await;
+            assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
 
-        tick(&db, &registry(), HUB).await.unwrap();
-        assert!(notes(&db).await.is_empty(), "the instant has not arrived yet");
-        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+            let stored = raw_run(&db, &run_id).await["wake_at"].as_str().unwrap().to_string();
+            assert!(stored.ends_with("+00:00"), "stored with an offset of its own: {stored}");
+
+            // The question `wake_sleeping` asks, at a moment safely after the instant. The stored
+            // text answers it; the text as it arrived does not — that IS hub#970.
+            let after = (chrono::Utc::now() + chrono::Duration::hours(7)).to_rfc3339();
+            assert!(stored <= after, "{stored} vs {after}");
+            if hours > 0 {
+                assert!(later > after, "the raw `{later}` sorts late: the run would oversleep");
+            }
+
+            tick(&db, &registry(), HUB).await.unwrap();
+            assert!(notes(&db).await.is_empty(), "the instant has not arrived yet");
+            assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+        }
     }
 
     /// The runs that were parked BEFORE this fix are still in the table with their offset, and
@@ -2237,10 +2394,14 @@ mod tests {
     #[tokio::test]
     async fn a_run_parked_before_the_fix_is_repaired_at_boot_and_then_wakes() {
         let db = db().await;
-        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
-        let (flow_id, run_id) = park_until(&db, &due).await;
+        // Parked on a FUTURE instant, because that is the only way a run sleeps at all now
+        // (hub#951) — and then rewound by hand to the shape the old code wrote for a delay that
+        // was already due: the instant, with its origin offset.
+        let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(6), 2);
+        let (flow_id, run_id) = park_until(&db, &later).await;
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
 
-        // Rewind it to the shape the old code wrote: the instant, with its origin offset.
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
         let mut p = Params::new();
         p.insert("id".into(), json!(run_id));
         p.insert("wake_at".into(), json!(due));

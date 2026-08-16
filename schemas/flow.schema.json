@@ -290,6 +290,41 @@
         "vars": {
           "$ref": "#/$defs/mapping",
           "description": "Solo `kind: notify` — el texto y sus variables, mapeados contra el run (`vars.text` es lo que dice un email o un WhatsApp libre). Un `{{secret.X}}` aquí se RECHAZA al guardar: sería una credencial enviada a un cliente."
+        },
+        "offset_seconds": {
+          "type": "integer",
+          "description": "Solo `kind: delay` (hub#951) — segundos que se SUMAN al instante de `until` (negativo = antes). Es el `Offset` de las *Scheduled Paths* de Salesforce, que es donde converge el mercado: la espera se expresa contra un CAMPO de fecha de la cosa («24 h antes de la cita»), no escribiendo una fecha. **En segundos y no «1 mes»**: un desplazamiento de calendario es una operación que el lenguaje congelado no tiene, y Salesforce sí la ofrece — es una limitación consciente de v1. Consecuencia que hay que enseñar en pantalla: un −24 h que cruza un cambio de hora cae una hora desplazado en reloj local. Con `seconds` se RECHAZA al guardar: «dentro de una hora, menos un día» es una contradicción, no una precedencia."
+        },
+        "max_wait": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7776000,
+          "description": "Solo `kind: delay` (hub#951) — techo de ESTA espera, en segundos. Por defecto y como máximo **90 días** (7 776 000 s), el número de Shopify Flow, el más generoso de las diez referencias estudiadas. Se rechaza por encima al guardar (`flow.delay_horizon`) y el run FALLA con el mismo código si el `until` resuelve más allá: **antes no había techo ninguno** y un `until` al año 3000 dormía como una fila que todas las reglas de retención eximen a propósito."
+        },
+        "past_due_policy": {
+          "enum": [
+            "continue_now",
+            "skip",
+            "fail"
+          ],
+          "default": "skip",
+          "description": "Solo `kind: delay` (hub#951) — qué pasa si el instante resuelto YA pasó. `skip` (POR DEFECTO): el run TERMINA (`done`), como una guarda que no pasa. `continue_now`: sigue con el paso siguiente ahora mismo — el comportamiento de Salesforce, para quien lo escriba. `fail`: el run falla con `flow.delay_past_due`. El defecto NO es el de Salesforce a propósito: manda la regla propia del kernel (la misma que hace `manual` el defecto de `policy`), porque el caso literal es un recordatorio cuya hora ya pasó y mandarlo tarde es peor que no mandarlo. Se aplica igual cuando un `reschedule_on` mueve la espera a un instante ya vencido: una sola lectura de la clave, no dos."
+        },
+        "cancel_on": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/wait_hook"
+          },
+          "description": "Solo `kind: delay` (hub#951) — eventos que SACAN al run de la espera: el run queda `cancelled` y sus esperas hermanas se desarman. Es la salida que le faltaba a la primitiva: hasta aquí una espera tenía un único camino de salida, su reloj, y el recordatorio de una cita cancelada se mandaba igual (el hilo de la comunidad de Square es exactamente eso). Máximo 5 — se cotejan en el camino caliente de CADA evento entregado en el hub."
+        },
+        "reschedule_on": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/wait_hook"
+          },
+          "description": "Solo `kind: delay` (hub#951) — eventos que MUEVEN la espera a un instante nuevo, tomado del propio evento (`until`) con el mismo `offset_seconds` reaplicado: «24 h antes» sigue siendo 24 h antes cuando la cita se mueve. No queda un timer viejo porque no hay cola de timers — un run dormido tiene UN `wake_at` y moverlo es escribir una columna. Máximo 5, y como mucho 20 movimientos por espera (`flow.max_reschedules`): un evento que no para de llegar es un run que no acaba nunca."
         }
       }
     },
@@ -327,6 +362,38 @@
         "field": {
           "type": "string",
           "description": "La COLUMNA de esa fila que es el destinatario (`phone`, `email`). Un nombre de columna, no una ruta."
+        }
+      }
+    },
+    "wait_hook": {
+      "type": "object",
+      "required": [
+        "event",
+        "correlate"
+      ],
+      "additionalProperties": false,
+      "description": "Una salida de la espera (hub#951): un evento público, un filtro opcional sobre él y la CORRELACIÓN que lo hace ser sobre ESTE run. La forma es la transición programada de NetSuite SuiteFlow: la espera es un estado con varias salidas y la primera transición atómica se lleva el run — todas las salidas (incluido el reloj) son el mismo `UPDATE` condicional, así que «nunca las dos» no cuesta ni un lock. El kernel solo conoce el nombre del evento y una clave: no sabe qué es una cita, ni una factura, ni un pago.",
+      "properties": {
+        "event": {
+          "type": "string",
+          "description": "Nombre del evento público, cotejado en el relay igual que el de un trigger."
+        },
+        "filter": {
+          "$ref": "#/$defs/condition",
+          "description": "Filtro declarativo opcional sobre el payload del evento (rutas `event.<campo>`). Sin filtro, cualquier ocurrencia del evento que correlacione."
+        },
+        "correlate": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 3,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mapa `{<ruta EN EL EVENTO que llega>: <ruta EN ESTE run>}`, y todas las parejas tienen que casar. **Es lo que hace que «esta cita» signifique esta**: sin él, la primera cancelación de cualquier cita se llevaría por delante todos los recordatorios armados del hub. Solo RUTAS a los dos lados y en el lenguaje congelado — una plantilla `{{…}}` del lado del evento sería una clave de correlación que escribe quien emite el evento, y un literal del lado del run correlacionaría contra una constante. La izquierda arranca en `event.`; la derecha, en `input.` o `steps.`. Se guarda solo el VALOR correlacionado, jamás el payload."
+        },
+        "until": {
+          "$ref": "#/$defs/path",
+          "description": "Solo en `reschedule_on`, y ahí OBLIGATORIO — ruta, **en el evento que llega**, al instante nuevo. En `cancel_on` se rechaza al guardar: una espera cancelada no tiene instante nuevo y la clave no la leería nadie (la lección de hub#521)."
         }
       }
     }

@@ -165,6 +165,9 @@ pub struct PruneReport {
     pub run_steps: u64,
     /// `_flow_approvals` rows removed with those runs (hub#972).
     pub approvals: u64,
+    /// `_flow_run_waits` rows removed with those runs (hub#951). A wait is a child of its run in
+    /// the same sense a step is: it only ever meant «while this run sleeps».
+    pub waits: u64,
     /// `_elevation_audit` receipts removed on their OWN four-year clock (hub#903).
     pub receipts: u64,
 }
@@ -177,6 +180,7 @@ impl PruneReport {
             + self.runs
             + self.run_steps
             + self.approvals
+            + self.waits
             + self.receipts
     }
 
@@ -194,6 +198,7 @@ impl PruneReport {
         self.runs += other.runs;
         self.run_steps += other.run_steps;
         self.approvals += other.approvals;
+        self.waits += other.waits;
         self.receipts += other.receipts;
     }
 }
@@ -240,10 +245,13 @@ WITH doomed AS (\
   DELETE FROM _flow_run_steps WHERE run_id IN (SELECT id FROM doomed) RETURNING id\
 ), approvals AS (\
   DELETE FROM _flow_approvals WHERE run_id IN (SELECT id FROM doomed) RETURNING id\
+), waits AS (\
+  DELETE FROM _flow_run_waits WHERE run_id IN (SELECT id FROM doomed) RETURNING id\
 ), runs AS (\
   DELETE FROM _flow_runs WHERE id IN (SELECT id FROM doomed) RETURNING id\
 ) SELECT (SELECT COUNT(*) FROM steps) AS steps, (SELECT COUNT(*) FROM runs) AS runs, \
-         (SELECT COUNT(*) FROM approvals) AS approvals";
+         (SELECT COUNT(*) FROM approvals) AS approvals, \
+         (SELECT COUNT(*) FROM waits) AS waits";
 
 /// The approval receipts past their OWN window (hub#903).
 ///
@@ -300,6 +308,7 @@ pub async fn prune_once(
         runs: cell(&runs, "runs"),
         run_steps: cell(&runs, "steps"),
         approvals: cell(&runs, "approvals"),
+        waits: cell(&runs, "waits"),
         receipts: cell(&receipts, "receipts"),
     })
 }

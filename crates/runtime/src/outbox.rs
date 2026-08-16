@@ -437,6 +437,26 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         }
     }
 
+    // ── ESPERAS de flujo (hub#951) ──────────────────────────────────────────────────────────
+    // El hermano del bloque de abajo, y la única pieza del kernel que puede mover un run que YA
+    // está vivo: `triggers::on_event` solo sabe INSERTAR uno. Una espera (`delay`) tenía hasta
+    // ahora una sola salida —su reloj—, así que el recordatorio de una cita cancelada se mandaba
+    // igual. Aquí es donde el evento que la cancela (o la que la reprograma) llega hasta ella.
+    //
+    // Va ANTES de los triggers a propósito: cancelar una espera viva no depende de que el mismo
+    // evento arranque además flujos nuevos, y el orden inverso dejaría el trabajo caro (insertar
+    // runs) por delante del barato (un UPDATE condicional sobre un índice parcial).
+    //
+    // Misma infra que todo lo de arriba: idempotencia por `_event_delivery` con un listener
+    // sintético `_flow_wait:<id>`, y un fallo aquí NO impide entregar la fila por lo demás.
+    if let Err(e) = crate::flows::waits::on_event(db, &ctx.hub_id, &id, &event_name, &payload).await
+    {
+        failures += 1;
+        if first_err.is_none() {
+            first_err = Some(format!("flow waits: {e}"));
+        }
+    }
+
     // ── Triggers de FLUJO (ADR-0283 §3, hub#661) ────────────────────────────────────────────
     // Un evento entregado puede además arrancar flujos. Aquí SOLO se inserta la fila `_flow_runs`
     // (transaccional, idempotente por `_event_delivery` con un listener sintético `_flow:<id>`):

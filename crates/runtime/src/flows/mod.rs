@@ -33,6 +33,9 @@
 //!   carries it to the outbox (hub#821);
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
+//! - [`waits`] — the OTHER exits of a `delay` (hub#951): the events that cancel a sleeping run and
+//!   the events that move it. `triggers` can only insert a run; this is the only thing in the
+//!   kernel that can move one that is already alive;
 //! - [`executor`] — the tick that advances runs, and the claim → I/O → complete seam;
 //! - [`agent`] — the parked `ai` step the server-side agent runner performs (hub#665);
 //! - [`approvals`] — the write a model proposed, waiting for a person (ADR-0283 D3);
@@ -51,6 +54,7 @@ pub mod schema;
 pub mod secrets;
 pub mod store;
 pub mod triggers;
+pub mod waits;
 
 pub use agent::AiRequest;
 pub use approvals::{Approval, ExpirySweepReport, NewApproval};
