@@ -150,7 +150,50 @@ async fn the_flow_tables_land_with_the_row_contract() {
                 "decided_by",
                 "decided_at",
                 "expires_at",
+                // hub#972 — what happens to the RUN if nobody answers before `expires_at`. A
+                // column and not a constant: the sweep obeys the row, so the generic `approval`
+                // step can set it per document without the kernel growing a second branch.
+                "on_expire",
                 "error",
+                // hub#950 — the table stops being «what a model proposed» and holds BOTH kinds.
+                // `kind` is the branch (`command` | `decision`); the rest is what a question needs
+                // that a payload does not. `title`/`summary` are stored ALREADY TEMPLATED, which is
+                // what makes «editing the flow does not mutate a live request» true for free —
+                // exactly the property `payload` has. `on_reject` is the sister of `on_expire` and
+                // is a column for the same reason: the policy applied is the one that was in force
+                // when the question was ASKED.
+                "kind",
+                "title",
+                "summary",
+                "assignee_role",
+                "comment",
+                "on_reject",
+            ],
+        ),
+        // hub#951 — the OTHER exits of a `delay`. `step_index` is load-bearing and not
+        // descriptive: it goes in the WHERE of every transition, and that is what makes «one
+        // transition wins, never both» a property of the UPDATE instead of a lock. `correlate`
+        // holds the RESOLVED ids and nothing else — never the payload of the event.
+        (
+            "_flow_run_waits",
+            &[
+                "id",
+                "run_id",
+                "flow_id",
+                "step_id",
+                "step_index",
+                "kind",
+                "event_name",
+                "filter",
+                "correlate",
+                "correlate_key",
+                "correlate_value",
+                "until_path",
+                "offset_seconds",
+                "max_wait",
+                "past_due_policy",
+                "reschedules",
+                "status",
             ],
         ),
     ];

@@ -718,6 +718,98 @@ async fn enforce_tax_id_freeze(
     })
 }
 
+/// **The country is frozen once the hub went live** (ADR-0273, hub#69).
+///
+/// Sibling of [`enforce_tax_id_freeze`] and tolerant in exactly the same way — no profile, or a
+/// profile that cannot be read, is not "I don't know whether it went live", it is that nothing says
+/// it did. And it gives nothing away: making that read fail needs access to the database, and with
+/// access to the database `hub_settings` is written directly without passing this door.
+///
+/// The trigger is different from the tax id's, though, and on purpose: the tax id freezes at the
+/// FIRST RECORD (`first_record_at` — the damage is done by the record) while the country freezes at
+/// the GO-LIVE itself ([`FiscalStatus::is_frozen`]). By the time a hub is `ACTIVE` it has already
+/// declared to a tax authority which regime it operates under; changing the country then changes
+/// which regime the core resolves, and the chain that is already anchored does not move with it.
+async fn enforce_country_freeze(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    incoming: &str,
+) -> Result<()> {
+    let profile = match crate::fiscal_profile::load(db, hub_id).await {
+        Ok(Some(p)) => p,
+        Ok(None) | Err(_) => return Ok(()),
+    };
+    if !profile.status.is_frozen() {
+        return Ok(()); // still setting itself up: saying where the business is is the normal case
+    }
+    let current = stored_value(db, hub_id, "country_code").await?;
+    // The anchor is the profile's own copy; while it is empty the effective anchor is whatever the
+    // hub has set — same rule as the tax id, and it keeps a half-written profile from locking a
+    // country nobody chose.
+    let anchor = if profile.country_code.is_empty() {
+        current.clone()
+    } else {
+        profile.country_code.clone()
+    };
+    if incoming == current || incoming == anchor {
+        return Ok(()); // not a change: the form posts the country with everything else
+    }
+    Err(RuntimeError::HubCountryFrozen {
+        frozen_to: anchor,
+        since: profile.activated_at,
+    })
+}
+
+/// **Seeds `country_code` from the country the SaaS acuñó at provisioning** (ADR-0207, hub#69).
+///
+/// `HUB_COUNTRY` is injected into the container's env by both Hetzner builders and, until this
+/// existed, **nobody read it**: the country the owner picked in `/start/` never reached the hub, so
+/// `country_code` stayed at its `ES` default and every hub in the fleet claimed to be Spanish. That
+/// is not cosmetic — it is the first input of the tax engine (ADR-0085) and it decides which fiscal
+/// regime the marketplace offers (ADR-0062).
+///
+/// **Never overwrites**, like [`ensure_demo_fiscal_identity`]: only a hub with no row of its own is
+/// seeded. The env is the SUGGESTION the SaaS made at the alta — ADR-0207 calls it *corregible* —
+/// so an owner who corrected it in Ajustes, or a restore that brought a country along, outranks it.
+///
+/// An absent, blank or non-ISO value seeds **nothing** rather than persisting garbage: a bad row
+/// here would also block the real answer from ever being seeded. Returns whether it wrote, so the
+/// boot can say so once instead of every time.
+pub async fn ensure_provisioned_country(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    country: &str,
+) -> Result<bool> {
+    if country.trim().is_empty() {
+        return Ok(false);
+    }
+    // Through the SAME validator as the PUT: one definition of what a country is.
+    let Ok(normalized) = validate_country(&json!(country)) else {
+        return Ok(false);
+    };
+    if !stored_value(db, hub_id, "country_code").await?.trim().is_empty() {
+        return Ok(false); // already answered — a default must not outrank a decision
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!("country_code"));
+    p.insert("value".into(), json!(normalized));
+    p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("updated_by".into(), json!(PROVISIONED_COUNTRY_AUTHOR));
+    db.execute(
+        "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+          VALUES (:hub_id, :key, :value, :now, :updated_by) \
+          ON CONFLICT (hub_id, key) DO UPDATE SET \
+            value = :value, updated_at = :now, updated_by = :updated_by",
+        &p,
+    )
+    .await?;
+    Ok(true)
+}
+
+/// Who the audit trail says wrote the seeded country: the deployment, not a person.
+const PROVISIONED_COUNTRY_AUTHOR: &str = "system:provisioning";
+
 /// Lee TODOS los settings conocidos de `hub_id`: las filas persistidas mezcladas sobre los defaults
 /// (claves sin fila → su default). Una fila cuya clave ya no es conocida se ignora; una fila cuyo
 /// valor ya no valida degrada al default (lectura nunca rompe). Devuelve un objeto JSON
@@ -846,6 +938,14 @@ pub async fn set_many(
     //     fiscal profile, nor depend on it being readable.
     if let Some((_, incoming)) = normalized.iter().find(|(k, _)| *k == "business_tax_id") {
         enforce_tax_id_freeze(db, hub_id, incoming).await?;
+    }
+
+    // 1c) And the COUNTRY is frozen once this hub went live (ADR-0273, hub#69). Same shape and same
+    //     reasons as its neighbour above: after validation (so `"es"` is not a different country
+    //     from `ES`) and only when the batch carries the key, so no other settings write pays for
+    //     a read of the fiscal profile.
+    if let Some((_, incoming)) = normalized.iter().find(|(k, _)| *k == "country_code") {
+        enforce_country_freeze(db, hub_id, incoming).await?;
     }
 
     // 2) Upsert por clave (mismo SQL en SQLite y Postgres: ON CONFLICT sobre la PK compuesta).
@@ -1632,6 +1732,167 @@ mod tests {
         assert!(rt.ensure_demo_fiscal_identity().await.unwrap());
         let all = get_all(rt.db(), "hub-demo").await.unwrap();
         assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
+    }
+
+    // ── `HUB_COUNTRY`: the country the SaaS acuñó at provisioning (ADR-0207, hub#69) ───────────
+    //
+    // The env var has been injected by both Hetzner builders since ADR-0207 and **nobody read it**
+    // (`grep -rn HUB_COUNTRY hub/` = 0). So the country the owner picked in `/start/` never reached
+    // the hub, `country_code` stayed at its `ES` default, and every hub in the fleet claimed to be
+    // Spanish — which is the first input of the tax engine (ADR-0085) and of which fiscal regime
+    // the marketplace offers.
+
+    #[tokio::test]
+    async fn the_provisioned_country_is_seeded_at_boot() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        assert!(ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap());
+        assert_eq!(get_all(&db, "hub-1").await.unwrap()["country_code"], json!("FR"));
+    }
+
+    /// **Never overwrites.** A default must not outrank a decision: once there is a row, somebody
+    /// (the owner in Ajustes, a restore) said where this hub is, and the env is the SUGGESTION the
+    /// SaaS made at provisioning — ADR-0207 calls it "corregible" on purpose.
+    #[tokio::test]
+    async fn a_country_already_answered_is_not_overwritten_by_the_env() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        set_many(&db, "hub-1", &map(&[("country_code", json!("PT"))]), "owner", false)
+            .await
+            .unwrap();
+
+        assert!(!ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap());
+        assert_eq!(get_all(&db, "hub-1").await.unwrap()["country_code"], json!("PT"));
+    }
+
+    /// A second boot writes nothing, and an absent/blank env is not a country: it must not stamp a
+    /// row that then blocks the real answer from ever being seeded.
+    #[tokio::test]
+    async fn an_absent_or_invalid_env_seeds_nothing() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        assert!(!ensure_provisioned_country(&db, "hub-1", "").await.unwrap());
+        assert!(!ensure_provisioned_country(&db, "hub-1", "  ").await.unwrap());
+        assert!(
+            !ensure_provisioned_country(&db, "hub-1", "Spain").await.unwrap(),
+            "not an ISO-3166-1 alpha-2 code: refused, not persisted as garbage"
+        );
+
+        assert!(ensure_provisioned_country(&db, "hub-1", "fr").await.unwrap());
+        assert_eq!(
+            get_all(&db, "hub-1").await.unwrap()["country_code"],
+            json!("FR"),
+            "normalised through the same validator as the PUT"
+        );
+        assert!(
+            !ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap(),
+            "the second boot writes nothing"
+        );
+    }
+
+    // ── The country FREEZES at go-live (ADR-0273) ─────────────────────────────────────────────
+    //
+    // `FiscalProfile.country_code` is documented as "frozen once ACTIVE" and the freeze existed
+    // nowhere: `PUT /api/settings` happily moved the country of a hub that was already filing to
+    // the AEAT. The country decides WHICH regime applies, so moving it after go-live points a live
+    // fiscal chain at another country's rules — with the records already emitted hanging off it.
+
+    #[tokio::test]
+    async fn the_country_cannot_be_changed_once_the_hub_went_live() {
+        let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-live");
+        rt.ensure_system_tables().await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-live").await.unwrap();
+        activate(rt.db(), "hub-live").await;
+
+        let err = set_many(
+            rt.db(),
+            "hub-live",
+            &map(&[("country_code", json!("FR"))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .expect_err("a hub that went live cannot move country");
+        assert!(
+            matches!(err, RuntimeError::HubCountryFrozen { .. }),
+            "expected HubCountryFrozen, got {err:?}"
+        );
+        assert_eq!(
+            get_all(rt.db(), "hub-live").await.unwrap()["country_code"],
+            json!("ES"),
+            "the whole PUT is refused: nothing landed"
+        );
+    }
+
+    /// Re-sending the SAME country is not a change and must pass — Ajustes posts the country
+    /// alongside other keys, and refusing the no-op would freeze the rest of the form with it.
+    #[tokio::test]
+    async fn resending_the_same_country_after_go_live_is_not_a_change() {
+        let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-live");
+        rt.ensure_system_tables().await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-live").await.unwrap();
+        activate(rt.db(), "hub-live").await;
+
+        set_many(
+            rt.db(),
+            "hub-live",
+            &map(&[("country_code", json!("es")), ("currency", json!("USD"))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .expect("the same country, normalised, is a no-op and the batch goes through");
+        assert_eq!(get_all(rt.db(), "hub-live").await.unwrap()["currency"], json!("USD"));
+    }
+
+    /// 🔴 The other direction: before go-live the country is FREE. This is the ordinary case — the
+    /// owner correcting what `/start/` guessed — and a freeze that caught it would break the setup
+    /// of every hub instead of protecting the few that are filing.
+    #[tokio::test]
+    async fn before_go_live_the_country_is_free_to_change() {
+        let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-setup");
+        rt.ensure_system_tables().await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-setup").await.unwrap();
+
+        set_many(
+            rt.db(),
+            "hub-setup",
+            &map(&[("country_code", json!("FR"))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .expect("a hub still setting itself up may say where it is");
+        assert_eq!(
+            get_all(rt.db(), "hub-setup").await.unwrap()["country_code"],
+            json!("FR")
+        );
+    }
+
+    /// Turns a hub into one that HAS gone live (ADR-0273): `ACTIVE`, in production, with a first
+    /// record already sent to the real tax authority.
+    async fn activate(db: &dyn DatabaseAdapter, hub_id: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        db.execute(
+            "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
+               taxpayer_id = 'B12345678', activated_at = '2026-08-01T09:00:00Z', \
+               first_record_at = '2026-08-01T09:05:00Z' WHERE hub_id = :hub_id",
+            &p,
+        )
+        .await
+        .expect("go live");
+    }
+
+    /// `[("k", v)]` → the partial map a `PUT /api/settings` carries.
+    fn map(pairs: &[(&str, Value)]) -> serde_json::Map<String, Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), v.clone()))
+            .collect()
     }
 
     #[tokio::test]

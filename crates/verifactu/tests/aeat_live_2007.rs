@@ -45,6 +45,17 @@ fn config() -> Json {
         "software_name": env("ERPLORA_ISSUER_NAME"),
         "software_nif": env("ERPLORA_ISSUER_NIF"),
         "environment": "testing",
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
     })
 }
 
@@ -90,7 +101,7 @@ fn banner(title: &str) {
 
 /// Postea un alta y devuelve `(cuerpo_crudo, respuesta_parseada)`, imprimiendo ambos enteros.
 async fn send_alta(record: &Json, prev: Option<&Json>, label: &str) -> (String, aeat::AeatResponse) {
-    let xml = aeat::build_soap(record, &config(), prev, "hub-ensayo-2007");
+    let xml = aeat::build_soap(record, &config(), prev, "hub-ensayo-2007").expect("declarable");
     banner(&format!("{label} — XML ENVIADO"));
     println!("{xml}");
 

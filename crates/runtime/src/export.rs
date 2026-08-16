@@ -29,6 +29,19 @@ pub const HUB_ID_PLACEHOLDER: &str = "__HUB_ID__";
 /// before importing shows that the bundle brings a role set.
 pub const ROLES_SECTION: &str = "roles";
 
+/// Section that carries the **capability grants** of each module (hub#473). Like [`ROLES_SECTION`]
+/// it has **no `data/*.sql`**: the keys travel in [`BlueprintManifest::capability_grants`] and the
+/// import re-grants them through `capabilities::set_grant`, never as SQL. Listed in `sections` so
+/// the inventory the user confirms before importing shows that the bundle brings permissions.
+pub const CAPABILITY_GRANTS_SECTION: &str = "capabilities";
+
+/// Section that carries the **automation kernel** of the hub (hub#986 — ADR-0345 §2bis). Like
+/// [`ROLES_SECTION`] and [`CAPABILITY_GRANTS_SECTION`] it has **no `data/*.sql`**: the flows travel
+/// as declarative documents in [`BlueprintManifest::flows`] and the import saves each one through
+/// `flows::store::create`, the very door `POST /flows` uses. Listed in `sections` so the inventory
+/// the user confirms before importing shows that the bundle brings automations.
+pub const FLOWS_SECTION: &str = "flows";
+
 /// Metadatos del hub de origen (informativos; el import NO los aplica como datos).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HubMeta {
@@ -187,6 +200,43 @@ pub fn is_portable_setting(key: &str) -> bool {
     PORTABLE_SETTING_KEYS.contains(&key)
 }
 
+/// One permission of a flow, as it travels: the same `{kind, value}` pair the owner's screen sends
+/// to `PUT …/flows/<id>/grants` (hub#986).
+///
+/// A pair and not a row of `_flow_grants`: that table is what decides, with nobody watching, which
+/// commands an automation may run and which URLs it may dial (ADR-0283 §2, default-deny). The
+/// import re-makes each pair through `flows::grants::replace`, so a bundle gets the guards a click
+/// gets — a grant naming a command this hub does not have is refused there, not stored here.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowGrantSpec {
+    /// `command`, `query`, `notify`, `http`, `recipient_query` (`flows::grants::GrantKind`).
+    pub kind: String,
+    pub value: String,
+}
+
+/// One automation as it travels in a **backup** (hub#986): the document its owner wrote, plus the
+/// keys of what it was allowed to do.
+///
+/// `_flow_triggers` is **not** here, and that is not an omission: the triggers are part of the
+/// `definition`, and saving it re-materialises them (`flows::store::seed_triggers`). Carrying the
+/// rows would have carried `next_run`/`last_run` too — the schedule of ANOTHER installation,
+/// computed under a timezone the destination may not even have.
+///
+/// Neither is the flow's `id`: it is the row identity of one installation, and what the owner reads
+/// (and what the import matches on, so restoring twice does not duplicate) is the NAME plus the
+/// document.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FlowSpec {
+    pub name: String,
+    /// Whether it was ARMED in the origin. It is a wish, not an order: the import arms a flow only
+    /// once its authority is back (see `import::apply_flows`).
+    pub enabled: bool,
+    /// The versioned document (`flow.schema.json`), exactly as the owner saved it.
+    pub definition: serde_json::Value,
+    #[serde(default)]
+    pub grants: Vec<FlowGrantSpec>,
+}
+
 /// `manifest.json` del bundle — fuente de verdad del contenido (a prueba de renombres del zip).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BlueprintManifest {
@@ -221,6 +271,44 @@ pub struct BlueprintManifest {
     /// the four published blueprints do today.
     #[serde(default)]
     pub active_roles: Vec<String>,
+    /// Capabilities the hub had **granted** to each module (`module_id` → capability keys), so
+    /// that restoring a backup does not come back with every module denied (hub#473).
+    ///
+    /// Declarative, exactly like [`active_roles`](Self::active_roles) and for the same reason,
+    /// only sharper: `_module_capability_grants` is the table that decides whether a module may
+    /// read the signing certificate or reach the network (ADR-0079). A `data/capabilities.sql`
+    /// would have handed any bundle raw INSERTs into it. As keys, the import walks them through
+    /// `capabilities::set_grant` — the same door the administrator's switch uses — so a capability
+    /// the module INSTALLED HERE does not declare is refused.
+    ///
+    /// Only a **backup** carries them, and only the hub restoring its own copy applies them
+    /// (`is_same_hub`): a grant is an approval of THIS deployment's owner over the host's own
+    /// primitives, not vocabulary of a business — which is why the role set travels in both
+    /// purposes (ADR-0242 §8) and this does not.
+    ///
+    /// `#[serde(default)]` ⇒ a bundle older than this field restores no grants, which is what
+    /// every bundle produced so far does.
+    #[serde(default)]
+    pub capability_grants: BTreeMap<String, Vec<String>>,
+    /// The **automations** the hub was running, as documents (hub#986). Without them, restoring a
+    /// backup gave the business back its data and not the work it had automated — the flow that
+    /// reorders stock, the one that chases an unpaid invoice — with an import report that said
+    /// everything landed.
+    ///
+    /// Only a **backup** carries them: a flow document is the origin's own — the URLs its `http`
+    /// steps dial, the texts it sends, the reads it names — and a published template is an artefact
+    /// for somebody else's business. Pre-made automations in a catalogue are a product decision with
+    /// its own review, not something an export form turns on for every download.
+    ///
+    /// Their `grants`, on the other hand, are only re-made when the bundle is **this hub's own copy**
+    /// (`is_same_hub`), exactly like [`capability_grants`](Self::capability_grants): the definition is
+    /// vocabulary of a business, the authority is the approval of ONE deployment's owner. A flow that
+    /// arrives without its authority arrives PAUSED.
+    ///
+    /// `#[serde(default)]` ⇒ a bundle older than this field restores no flows, which is what every
+    /// bundle produced so far does.
+    #[serde(default)]
+    pub flows: Vec<FlowSpec>,
     /// SHA256 hex por fichero del bundle (ruta relativa → hash). Verificado al importar.
     pub sha256: BTreeMap<String, String>,
 }
@@ -480,6 +568,54 @@ pub async fn export_hub(
         sections.push(ROLES_SECTION.to_string());
     }
 
+    // ── Los PERMISOS que cada módulo tenía concedidos (hub#473) ──────────────
+    // Mismo patrón que los roles —CLAVES declarativas en el manifest, nunca filas de
+    // `_module_capability_grants`— y por una razón más fuerte: esa tabla es la que decide si un
+    // módulo puede leer el certificado de firma o salir a la red (ADR-0079). Al importar, cada
+    // par pasa por `capabilities::set_grant`, la misma puerta que el interruptor del administrador.
+    //
+    // Sin casilla (una casilla no es un control, ADR-0195) pero SÍ con `purpose`, al revés que los
+    // roles: un rol es vocabulario del negocio; un grant es la aprobación del dueño de ESTE
+    // despliegue sobre los primitivos del host. Una plantilla pública que llegara con `certificate`
+    // concedida sería el marketplace decidiendo que un módulo puede usar tu clave de firma.
+    //
+    // Hoy restaurar un backup dejaba TODOS los módulos denegados (default-deny) y nadie lo decía:
+    // el restore parecía completo y el hub no podía firmar.
+    let capability_grants = if carries_identity {
+        crate::capabilities::granted_by_module(db, hub_id).await.unwrap_or_default()
+    } else {
+        BTreeMap::new()
+    };
+    if !capability_grants.is_empty() {
+        sections.push(CAPABILITY_GRANTS_SECTION.to_string());
+    }
+
+    // ── Las AUTOMATIZACIONES del negocio (hub#986) ───────────────────────────
+    // Third table of the same family, and the one ADR-0345 §2bis left written down as ⚠️: the
+    // definition of a flow is of the BUSINESS —lo escribió su dueño— so a backup that does not
+    // carry it gives the hub back its data and not the work it had automated. Como los roles y los
+    // permisos, viaja DECLARATIVO: el documento y las claves de sus grants, nunca filas de `_flow`
+    // ni de `_flow_grants` en un `data/*.sql`.
+    //
+    // Lo que NO sale, y no por olvido (ADR-0345 §2bis, tabla por tabla):
+    // - `_flow_secrets` — credenciales, y encima selladas con la clave maestra del ENTORNO: el
+    //   sobre viajaría y la llave no. Ni el valor ni el nombre.
+    // - `_flow_runs`/`_flow_run_steps`/`_flow_approvals` — historial de ejecución de ESTA
+    //   instalación, mismo criterio que `_elevation_audit`.
+    // - `_flow_triggers` — no porque no importen, sino porque SON parte del documento: el destino
+    //   los re-materializa con `seed_triggers` sobre su propio reloj.
+    //
+    // Solo en un `backup`, como los grants de módulo: un documento de flujo lleva las URLs a las
+    // que sale, los textos que manda y las lecturas que nombra — todo del negocio de origen.
+    let flows = if carries_identity {
+        collect_flows(db, hub_id).await
+    } else {
+        Vec::new()
+    };
+    if !flows.is_empty() {
+        sections.push(FLOWS_SECTION.to_string());
+    }
+
     // ── Manifest (fuente de verdad) + integridad ─────────────────────────────
     let mut sha256 = BTreeMap::new();
     for (path, bytes) in &files {
@@ -500,9 +636,36 @@ pub async fn export_hub(
         modules: manifest_modules,
         sections,
         active_roles,
+        capability_grants,
+        flows,
         sha256,
     };
     Ok(ExportBundle { manifest, files })
+}
+
+/// The flows of `hub_id` with their grants, read through the kernel's own listing doors so the
+/// export sees exactly what the owner's screen sees — soft-deleted flows out, revoked grants out,
+/// and every read scoped to this hub (the database is shared: `tenancy.md`).
+///
+/// Best-effort like the rest of the export: a kernel that cannot be read (an old schema, a table
+/// that is not there yet) yields no flows instead of losing the whole backup.
+async fn collect_flows(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Vec<FlowSpec> {
+    let mut out = Vec::new();
+    for flow in crate::flows::store::list(db, hub_id).await.unwrap_or_default() {
+        let grants = crate::flows::grants::list(db, hub_id, &flow.id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|g| FlowGrantSpec { kind: g.kind, value: g.value })
+            .collect();
+        out.push(FlowSpec {
+            name: flow.name,
+            enabled: flow.enabled,
+            definition: flow.definition,
+            grants,
+        });
+    }
+    out
 }
 
 /// Una tabla del módulo y cuántas filas volcaría el export (hub#534).
@@ -745,6 +908,11 @@ pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str
 /// identidad técnica y cambia de instalación a instalación. Sale del CATÁLOGO de la BD del hub
 /// DESTINO (no se adivina por el nombre ni se declara en el manifest de módulo): lo que decide si
 /// un INSERT choca es el índice que está creado ahí, no lo que diga un fichero.
+///
+/// …**salvo la que declara el propio SEED de un módulo** ([`seeded_only`](Self::seeded_only),
+/// hub#842): hay claves que la BD no puede expresar como índice único porque no son únicas para el
+/// negocio, y aun así identifican la fila que el módulo SIEMBRA. Ver [`crate::seed::declared_natural_keys`].
+#[derive(Debug, Clone)]
 pub(crate) struct NaturalKey {
     /// Columnas del índice único.
     pub(crate) cols: Vec<String>,
@@ -759,6 +927,17 @@ pub(crate) struct NaturalKey {
     /// default (`false`, NULLS DISTINCT) un NULL no choca nunca y la clave se descarta para esa
     /// fila, como siempre.
     pub(crate) nulls_not_distinct: bool,
+    /// La clave la declara el **seed del módulo**, no un índice único de la BD (hub#842). Cambia
+    /// contra QUÉ pregunta la guarda: no contra cualquier fila equivalente, sino solo contra la
+    /// que **sembró el módulo** (`created_by = 'system'`, el marcador uniforme que pone
+    /// [`crate::seed::apply_module_seed`] y que ya distingue lo sembrado de lo que crea un usuario
+    /// — ver [`is_module_seeded`]).
+    ///
+    /// La diferencia no es cosmética: `(hub_id, type)` identifica la forma de pago que el seed
+    /// planta, pero **no** es única para el negocio (una peluquería puede cobrar con `Visa` y con
+    /// `Amex`, las dos `card`). Preguntando solo por lo sembrado, la fila del bundle cede ante el
+    /// `Cash` del módulo y no ante el `Visa` del dueño.
+    pub(crate) seeded_only: bool,
 }
 
 /// Claves naturales DECLARADAS por `table` en la BD (índices únicos no primarios), leídas del
@@ -812,7 +991,7 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
                 Some(expr) => parse_index_predicate(expr)?,
             };
             let nulls_not_distinct = truthy(r.get("nnd"));
-            Some(NaturalKey { cols, predicate, nulls_not_distinct })
+            Some(NaturalKey { cols, predicate, nulls_not_distinct, seeded_only: false })
         })
         .collect()
 }
@@ -1143,6 +1322,11 @@ mod tests {
             modules: vec![ManifestModule { id: "taxes".into(), version: "2.1.1".into(), with_data: true }],
             sections: vec!["hub_settings".into(), "modules/taxes".into()],
             active_roles: Vec::new(),
+            capability_grants: BTreeMap::from([(
+                "verifactu".to_string(),
+                vec!["certificate".to_string(), "network".to_string()],
+            )]),
+            flows: Vec::new(),
             sha256: BTreeMap::from([("data/taxes.sql".into(), "ab".repeat(32))]),
         };
         let json = serde_json::to_string(&m).unwrap();

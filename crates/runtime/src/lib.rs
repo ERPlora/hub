@@ -30,6 +30,7 @@ pub mod export;
 pub mod fiscal_profile;
 pub mod flows;
 pub mod host_notify;
+pub mod host_print;
 pub mod hub_meta;
 pub mod hub_users;
 pub mod identity;
@@ -51,6 +52,10 @@ pub mod pin_policy;
 pub mod print_drain;
 pub mod print_hosts;
 pub mod print_queue;
+pub mod print_routes;
+pub mod print_stations;
+pub mod producer_facts;
+pub mod public_claim;
 pub mod queries;
 pub mod registry;
 pub mod reset;
@@ -657,6 +662,53 @@ impl Runtime {
         settings::ensure_demo_fiscal_identity(self.db.as_ref(), &self.hub_id).await
     }
 
+    /// Seeds `country_code` with the country the SaaS acuñó at provisioning (`HUB_COUNTRY`,
+    /// ADR-0207). Never overwrites an answer this hub already has — see
+    /// [`settings::ensure_provisioned_country`].
+    pub async fn ensure_provisioned_country(&self, country: &str) -> Result<bool> {
+        settings::ensure_provisioned_country(self.db.as_ref(), &self.hub_id, country).await
+    }
+
+    /// **Where this hub is** (ADR-0062, hub#69): `(country_code, region_code)` from `hub_settings`,
+    /// which is what the marketplace catalogue has to be asked about.
+    ///
+    /// Tolerant on purpose — a hub whose settings cannot be read answers `("", "")`, which the
+    /// caller turns into "no filter". A failure here must not empty the shelf: not being able to
+    /// tell where a hub is is a reason to show everything, never to show nothing.
+    pub async fn country_and_region(&self) -> (String, String) {
+        let Ok(settings) = settings::get_all(self.db.as_ref(), &self.hub_id).await else {
+            return (String::new(), String::new());
+        };
+        let read = |key: &str| {
+            settings
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        };
+        (read("country_code"), read("region_code"))
+    }
+
+    /// **Which language this hub reads in** (hub#1003), from `hub_settings.language`.
+    ///
+    /// Read here and not taken from the request for the same reason the country is: the browser is
+    /// not in the conversation. `Accept-Language` describes the *device* — and the device is a till
+    /// in a back room whose locale says nothing about who is standing at it.
+    ///
+    /// Tolerant on purpose, like its neighbour: unreadable settings answer `""`, which the caller
+    /// turns into "ask in the source language". Not knowing which language to ask in is a reason to
+    /// show the catalogue in English, never a reason not to show it.
+    pub async fn language(&self) -> String {
+        let Ok(settings) = settings::get_all(self.db.as_ref(), &self.hub_id).await else {
+            return String::new();
+        };
+        settings
+            .get("language")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    }
+
     /// Cierra una puerta en un hub de demo (ADR-0197 §4). Devuelve el error con el SUJETO del
     /// cierre, para que el cliente sepa cuál de los tres se negó.
     fn refuse_if_demo(&self, lock: DemoLock) -> Result<()> {
@@ -868,6 +920,11 @@ impl Runtime {
         // propósito: un índice no cambia la forma del dato y `IF NOT EXISTS` no cuesta nada en el
         // segundo arranque — mismo criterio que las columnas del outbox por su `ENSURE_TABLES`.
         flows::store::ensure_indexes(self.db.as_ref()).await?;
+        // 2a-bis) The `wake_at` of the runs parked before hub#970, re-written in UTC. Same
+        // criterion as 2b below: an invariant over data, not a schema change — the write side is
+        // already fixed, but a run that is ALREADY asleep is only ever read by the very comparison
+        // the offset breaks, so nothing else would reach it. Re-running it is a no-op.
+        flows::store::normalize_wake_at(self.db.as_ref(), &self.hub_id).await?;
         // 2b) The device row an id that names the HUB left behind (hub#454). Not a versioned
         // migration on purpose: it is an invariant, not a schema change — it must also clean a
         // database restored from a backup taken before the fix, and re-running it is a no-op.
@@ -934,6 +991,39 @@ impl Runtime {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
     }
 
+    // ── Print stations: the destinations themselves, as rows (hub#457) ─────────────────────────
+
+    /// Every printing destination of this hub, by key. This is what a selector shows and what the
+    /// refusal of an unknown role names.
+    pub async fn print_stations(&self) -> Result<Vec<print_stations::PrintStation>> {
+        print_stations::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Adds a station ("Barra de la terraza"). An empty `key` is derived from the label.
+    pub async fn create_print_station(
+        &self,
+        key: &str,
+        label: &str,
+    ) -> Result<print_stations::PrintStation> {
+        print_stations::create(self.db.as_ref(), &self.hub_id, key, label).await
+    }
+
+    /// Renames a station — the label only; the key is what every queued job already carries.
+    /// `None` = no such station in this hub.
+    pub async fn rename_print_station(
+        &self,
+        id: &str,
+        label: &str,
+    ) -> Result<Option<print_stations::PrintStation>> {
+        print_stations::rename(self.db.as_ref(), &self.hub_id, id, label).await
+    }
+
+    /// Removes a station and the host registrations that pointed at it. Refuses while it still
+    /// has unfinished work, and always for `receipt` — see [`print_stations::delete`].
+    pub async fn delete_print_station(&self, id: &str) -> Result<print_stations::DeleteOutcome> {
+        print_stations::delete(self.db.as_ref(), &self.hub_id, id).await
+    }
+
     // ── Print hosts: who drains each printer role (ADR-0196 §6, hub#342) ───────────────────────
 
     /// Registers `device_id` as a print host of `role` (or refreshes a registration it had).
@@ -982,6 +1072,34 @@ impl Runtime {
     /// grow in silence.
     pub async fn print_coverage(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
         print_hosts::coverage(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// The stations that are stuck: work waiting, nobody draining, past the threshold (hub#987).
+    /// The cheap question a badge on every screen is allowed to ask — see [`print_hosts::undrained`].
+    pub async fn print_undrained(&self) -> Result<Vec<print_hosts::RoleCoverage>> {
+        print_hosts::undrained(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// This hub's `documentType → station` map (hub#987): where each kind of document comes out.
+    pub async fn print_routes(&self) -> Result<Vec<print_routes::PrintRoute>> {
+        print_routes::list(self.db.as_ref(), &self.hub_id).await
+    }
+
+    /// Points a document type at a station. The merchant's decision, not a module's.
+    pub async fn set_print_route(
+        &self,
+        document_type: &str,
+        station_key: &str,
+        actor: &str,
+    ) -> Result<print_routes::PrintRoute> {
+        print_routes::set(
+            self.db.as_ref(),
+            &self.hub_id,
+            document_type,
+            station_key,
+            actor,
+        )
+        .await
     }
 
     // ── Draining the queue: who may pull, and who may close (ADR-0196 §6, hub#343) ─────────────
@@ -1045,6 +1163,31 @@ impl Runtime {
     /// Usuarios activos del hub con PIN (para mostrar el grid de login local). `(id, name, role)`.
     pub async fn list_pin_users(&self) -> Result<Vec<(String, String, String)>> {
         identity::list_pin_users(self.db.as_ref(), &self.hub_id).await
+    }
+
+    // ── Placa de empleado (hub#658). Hermana del PIN: ver `identity`. ───────────────────────
+
+    /// Resuelve una **placa** a su dueño activo. La placa sustituye al par (nombre, PIN) del
+    /// pinpad, nunca al PIN.
+    pub async fn verify_badge(&self, badge: &str) -> Result<Option<identity::BadgeMatch>> {
+        identity::verify_badge(self.db.as_ref(), &self.hub_id, badge).await
+    }
+
+    /// Fija (o **retira**, con `badge` vacío) la placa de un usuario. No toca su PIN.
+    pub async fn set_user_badge(&self, user_id: &str, badge: &str) -> Result<()> {
+        identity::set_badge(self.db.as_ref(), &self.hub_id, user_id, badge).await
+    }
+
+    /// `true` si esta placa ya es de **otro** usuario activo del hub.
+    pub async fn badge_is_taken(&self, badge: &str, excluding_id: Option<&str>) -> Result<bool> {
+        identity::badge_is_taken(self.db.as_ref(), &self.hub_id, badge, excluding_id).await
+    }
+
+    /// La clave HMAC con la que este hub indexa sus placas (se acuña en la primera llamada).
+    /// Expuesta para que la capa HTTP pueda derivar el índice de una placa **sin** verla en claro
+    /// más allá de la petición — p. ej. para limitar los intentos por tarjeta en el login.
+    pub async fn badge_index_key(&self) -> Result<Vec<u8>> {
+        identity::badge_index_key(self.db.as_ref(), &self.hub_id).await
     }
 
     /// **The manager approves one action** (hub#361, PLAN paso 2b rules 2 and 4).
@@ -1118,16 +1261,35 @@ impl Runtime {
             ));
         }
 
-        let approver = identity::verify_pin(self.db.as_ref(), &self.hub_id, req.approver_name, req.pin)
-            .await?
-            // One answer for an unknown name, a wrong PIN and a deactivated user: a dialog at the
-            // counter must not become a way to find out who works here.
-            .ok_or_else(|| {
-                reject(
-                    "rejected",
-                    "those details do not approve this action. Check the name and the PIN.",
-                )
-            })?;
+        // **Two presentations of one identity** (hub#658). The PIN resolves NAME + digits; a badge
+        // resolves the person on its own. Both land on the same `hub_user`, and everything below
+        // this point — including the `approver_cannot` check, which is what rule 5 actually is —
+        // reads the ROLE, never how the person proved they were standing there.
+        //
+        // One answer for all the ways this can fail — an unknown name, a wrong PIN, a card nobody
+        // carries, a deactivated user: a dialog at the counter must not become a way to find out
+        // who works here, nor which cards this shop has issued.
+        let rejected = || {
+            reject(
+                "rejected",
+                "those details do not approve this action. Check the name and the PIN.",
+            )
+        };
+        let (approver, credential) = match req.credential {
+            elevation::ApproverCredential::Pin { name, pin } => (
+                identity::verify_pin(self.db.as_ref(), &self.hub_id, name, pin)
+                    .await?
+                    .ok_or_else(rejected)?,
+                identity::Credential::pin(),
+            ),
+            elevation::ApproverCredential::Badge { badge } => {
+                let matched = identity::verify_badge(self.db.as_ref(), &self.hub_id, badge)
+                    .await?
+                    .ok_or_else(rejected)?;
+                let credential = identity::Credential::badge(&matched.badge_index);
+                (matched.user, credential)
+            }
+        };
 
         if !permissions::has(
             &RequestContext::new(
@@ -1153,6 +1315,7 @@ impl Runtime {
                 permission: permission.clone(),
             },
             &approver.id,
+            credential,
         );
         Ok(elevation::ElevationApproval {
             token,
@@ -1288,6 +1451,26 @@ impl Runtime {
         device_id: Option<&str>,
     ) -> Result<String> {
         identity::create_session(self.db.as_ref(), &self.hub_id, user_id, ttl_secs, device_id).await
+    }
+
+    /// [`Runtime::create_session`] dejando escrito **con qué se probó la identidad** (hub#658):
+    /// es la mitad de la traza que vive en el login. Lo usa la capa HTTP en cada puerta de login.
+    pub async fn create_session_with_credential(
+        &self,
+        user_id: &str,
+        ttl_secs: i64,
+        device_id: Option<&str>,
+        credential: &identity::Credential,
+    ) -> Result<String> {
+        identity::create_session_with_credential(
+            self.db.as_ref(),
+            &self.hub_id,
+            user_id,
+            ttl_secs,
+            device_id,
+            credential,
+        )
+        .await
     }
 
     /// Aplica el límite de dispositivos del plan ANTES de abrir sesión (ADR-0154): con
@@ -1810,9 +1993,15 @@ impl Runtime {
     }
 
     /// Closes a dead-letter for good, keeping the row (auditable). `discarded_by` is the identity
-    /// the HTTP layer resolved from the session. `false` if there is no such dead-letter here.
-    pub async fn discard_dead_event(&self, id: &str, discarded_by: &str) -> Result<bool> {
-        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by).await
+    /// the HTTP layer resolved from the session; `reason` is why the person closed it (hub#955),
+    /// optional and stored clamped. `false` if there is no such dead-letter here.
+    pub async fn discard_dead_event(
+        &self,
+        id: &str,
+        discarded_by: &str,
+        reason: &str,
+    ) -> Result<bool> {
+        outbox::discard(self.db.as_ref(), &self.hub_id, id, discarded_by, reason).await
     }
 
     /// Puts EVERY dead-letter of this hub back in front of the relay at once (bulk retry, hub#660).
@@ -2226,6 +2415,60 @@ impl Runtime {
         flows::approvals::get(self.db.as_ref(), &self.hub_id, id).await
     }
 
+    /// **Who may answer this question** (hub#950), resolved server-side at the moment of deciding
+    /// and never taken from the request.
+    ///
+    /// The document names a **role** — Odoo's `Allowed Group` — because naming a person is a flow
+    /// that stops working the day they leave, the hole Business Central had to invent a
+    /// "substitute" for. An empty role means what the tray has always meant: whoever administers
+    /// the hub.
+    ///
+    /// **An administrator always counts**, even when another role was named, and that is the
+    /// deliberate half. The alternative is a question that becomes undecidable the day its role has
+    /// nobody left in it — no approve, no reject, and a run parked until the sweep: the orphaned
+    /// approval every Power Automate forum is full of and that hub#979 exists to stop. It is also
+    /// what Business Central's *approval administrator* and Salesforce's delegated approver are
+    /// for. Delegation proper (BC's `Delegate After`) is out of v1.
+    ///
+    /// The role is read from `hub_user` by the id inside `decided_by`, so it is this hub's current
+    /// answer and not whatever a session claimed when it was opened.
+    async fn ensure_may_decide(&self, approval: &flows::Approval, decided_by: &str) -> Result<()> {
+        if approval.assignee_role.trim().is_empty() {
+            return Ok(());
+        }
+        let user_id = decided_by.strip_prefix("hub_user:").unwrap_or(decided_by);
+        let role = hub_users::get(self.db.as_ref(), &self.hub_id, user_id)
+            .await?
+            .map(|u| u.role)
+            .unwrap_or_default();
+        if role.eq_ignore_ascii_case(approval.assignee_role.trim())
+            || hub_users::is_admin_role(&role)
+        {
+            return Ok(());
+        }
+        Err(RuntimeError::Domain {
+            code: flows::approvals::ERR_APPROVAL_NOT_YOURS.to_string(),
+            message: format!(
+                "this approval is addressed to `{}` and `{decided_by}` is `{}`; nothing was \
+                 decided and the question is still waiting for somebody who may answer it",
+                approval.assignee_role,
+                if role.is_empty() { "unknown" } else { &role }
+            ),
+        })
+    }
+
+    /// What an `approval` step leaves in `steps.<id>` — the four fields the steps written after it
+    /// read, and the reason the three branches of the original contract compose out of a LINEAR
+    /// document: `condition` on `steps.approve.decision` IS the branch.
+    fn decision_output(&self, decided: &flows::Approval) -> Json {
+        json!({
+            "decision": decided.status,
+            "decided_by": decided.decided_by,
+            "decided_at": decided.decided_at.clone().unwrap_or_default(),
+            "comment": decided.comment,
+        })
+    }
+
     pub async fn list_flow_approvals(
         &self,
         status: Option<&str>,
@@ -2250,31 +2493,80 @@ impl Runtime {
     ///
     /// `decided_by` is the caller's job to resolve from the SESSION; this method never reads it
     /// from a body (same rule as `discarded_by` in `outbox_admin.rs`).
+    ///
+    /// **Two kinds go through here** since hub#950, and the branch is the row's (`kind`), never the
+    /// caller's: a `command` is a write a model proposed and approving RUNS it; a `decision` is a
+    /// question an `approval` step asked, and approving runs **nothing** — it records an answer and
+    /// lets the run carry on to the step that does the work. Everything around that one difference
+    /// is shared on purpose: one tray, one «decided once» rule, one expiry sweep, one audit.
     pub async fn decide_flow_approval(
         &self,
         id: &str,
         approve: bool,
         decided_by: &str,
+        comment: &str,
     ) -> Result<flows::Approval> {
+        // **Who, before what.** The role is checked against the row as it stands and BEFORE
+        // `claim_pending`, so somebody this question was not addressed to gets `not_yours` rather
+        // than «already decided by Marta at 04:12» — an authorisation failure must not be a way to
+        // read the row it refuses. Today the HTTP tray is admin-only and both callers would see
+        // that anyway; the day the module `flows` opens the tray to the role that was named, this
+        // order is what stops it being a disclosure.
+        let approval = self.get_flow_approval(id).await?;
+        self.ensure_may_decide(&approval, decided_by).await?;
         let approval = flows::approvals::claim_pending(self.db.as_ref(), &self.hub_id, id).await?;
 
         if !approve {
-            let decided = flows::approvals::mark_decided(
+            let decided = flows::approvals::mark_decided_with_comment(
                 self.db.as_ref(),
                 &self.hub_id,
                 id,
                 flows::approvals::STATUS_REJECTED,
                 decided_by,
                 "",
+                comment,
+            )
+            .await?;
+            // **What a refusal costs is the ROW's answer, not this method's** (hub#950). For a
+            // model's proposal it is always `cancel`, which is exactly what a rejection has always
+            // done; for an `approval` step the document chose, and `continue` is what makes the
+            // «rejected» branch composable out of a linear document.
+            let result = match flows::approvals::RejectPolicy::parse(&approval.on_reject) {
+                flows::approvals::RejectPolicy::Continue => {
+                    flows::IoResult::Done(self.decision_output(&decided))
+                }
+                flows::approvals::RejectPolicy::Cancel => flows::IoResult::Cancelled(
+                    if approval.kind == flows::approvals::KIND_DECISION {
+                        format!("`{}` was rejected by `{decided_by}`", approval.title)
+                    } else {
+                        format!("`{}` was rejected by `{decided_by}`", approval.command)
+                    },
+                ),
+            };
+            self.complete_flow_io(&approval.run_id, &approval.step_id, result)
+                .await?;
+            return Ok(decided);
+        }
+
+        // **A decision executes nothing.** No grant is re-checked because none was ever spent: the
+        // step asked a question, and the write — if there is one — is a later step with its own
+        // grant, re-read when the tick reaches it. Putting a grant check here would gate the
+        // ANSWER on a capability the answer does not use.
+        if approval.kind == flows::approvals::KIND_DECISION {
+            let decided = flows::approvals::mark_decided_with_comment(
+                self.db.as_ref(),
+                &self.hub_id,
+                id,
+                flows::approvals::STATUS_APPROVED,
+                decided_by,
+                "",
+                comment,
             )
             .await?;
             self.complete_flow_io(
                 &approval.run_id,
                 &approval.step_id,
-                flows::IoResult::Cancelled(format!(
-                    "`{}` was rejected by `{decided_by}`",
-                    approval.command
-                )),
+                flows::IoResult::Done(self.decision_output(&decided)),
             )
             .await?;
             return Ok(decided);
@@ -2338,13 +2630,14 @@ impl Runtime {
 
         match outcome {
             Ok(result) => {
-                let decided = flows::approvals::mark_decided(
+                let decided = flows::approvals::mark_decided_with_comment(
                     self.db.as_ref(),
                     &self.hub_id,
                     id,
                     flows::approvals::STATUS_APPROVED,
                     decided_by,
                     "",
+                    comment,
                 )
                 .await?;
                 // The step's output is the WHOLE turn: what the model produced before it
@@ -2368,13 +2661,14 @@ impl Runtime {
                 // The person DID approve; what broke is the command. Both facts are recorded, and
                 // the error is returned so the tray shows a failure instead of a green tick.
                 let message = format!("{e}");
-                flows::approvals::mark_decided(
+                flows::approvals::mark_decided_with_comment(
                     self.db.as_ref(),
                     &self.hub_id,
                     id,
                     flows::approvals::STATUS_APPROVED,
                     decided_by,
                     &message,
+                    comment,
                 )
                 .await?;
                 self.complete_flow_io(
@@ -2386,6 +2680,114 @@ impl Runtime {
                 Err(e)
             }
         }
+    }
+
+    /// **Closes the proposals nobody answered** (hub#972) — the active sweep the TTL never had.
+    ///
+    /// `expires_at` was read only by `claim_pending`, so a proposal past its 72 h could be neither
+    /// approved nor rejected (both go through that door) and its run sat in `waiting_approval` for
+    /// ever: exempt from the 90-day prune, holding a verbatim `payload` that can carry a customer's
+    /// personal details. There was no action a person could take, in a hub with no way to reach the
+    /// database.
+    ///
+    /// What it does per swept row is decided by the ROW (`on_expire`, [`flows::approvals::ExpiryPolicy`]),
+    /// never by this method: `reject`/`cancel` end the run, `continue` resumes it at the next step.
+    /// The default is the conservative one — the steps written after an `ai` step assumed it acted.
+    /// Whatever the policy, **nothing the model proposed is executed**: an expiry is the opposite of
+    /// an approval.
+    ///
+    /// A run that has moved on (or been deleted) since is skipped and counted as `stranded` rather
+    /// than aborting the pass: the proposal is already closed, and one broken run must not stop the
+    /// hub from closing the rest.
+    ///
+    /// **One bounded pass** (`SWEEP_BATCH` proposals), like [`retention::prune_once`] and for the
+    /// same reason: the caller holds the runtime lock the tills are queueing behind, and it re-takes
+    /// it per pass instead of keeping it for a whole catch-up. Driven by the hourly retention tick
+    /// in `crates/server`, **before** the prune, so a run that becomes terminal here can be pruned
+    /// in the same hour it stops being live.
+    pub async fn sweep_expired_flow_approvals(&self) -> Result<flows::ExpirySweepReport> {
+        let now = registry::now_rfc3339();
+        let mut report = flows::ExpirySweepReport::default();
+        let swept = flows::approvals::sweep_expired(
+            self.db.as_ref(),
+            &self.hub_id,
+            &now,
+            flows::approvals::SWEEP_BATCH,
+        )
+        .await?;
+        for approval in &swept {
+            report.expired += 1;
+            let resumed = matches!(approval.on_expire, flows::approvals::ExpiryPolicy::Continue);
+            let is_decision = approval.kind == flows::approvals::KIND_DECISION;
+            // A question has no command to name; what it had was a title, and the sweep brings it
+            // back with the row.
+            let subject = if is_decision {
+                approval.title.clone()
+            } else {
+                approval.command.clone()
+            };
+            let result = if resumed {
+                // **The two kinds leave a different shape**, and each is the shape its step's
+                // readers already know. A `decision` leaves the same four fields it would have
+                // left had somebody answered — so `steps.<id>.decision` reads `expired` and the
+                // `condition` after it is n8n's «no answer» path. A model's turn keeps its own
+                // output, closed with how it ended.
+                let output = if is_decision {
+                    json!({
+                        "decision": flows::approvals::STATUS_EXPIRED,
+                        "decided_by": flows::approvals::DECIDED_BY_EXPIRY,
+                        "decided_at": approval.expires_at,
+                        "comment": "",
+                    })
+                } else {
+                    let mut output = self.parked_step_output(&approval.run_id).await;
+                    if let Some(map) = output.as_object_mut() {
+                        map.insert("status".into(), json!(flows::approvals::STATUS_EXPIRED));
+                        map.insert("approval_id".into(), json!(approval.id));
+                        map.insert("command".into(), json!(approval.command));
+                    }
+                    output
+                };
+                flows::IoResult::Done(output)
+            } else {
+                flows::IoResult::Cancelled(format!(
+                    "`{subject}` was never decided: it expired at {} and `on_expire` is `{}`",
+                    approval.expires_at,
+                    approval.on_expire.as_str()
+                ))
+            };
+            match self
+                .complete_flow_io(&approval.run_id, &approval.step_id, result)
+                .await
+            {
+                Ok(()) if resumed => report.runs_resumed += 1,
+                Ok(()) => report.runs_stopped += 1,
+                Err(e) => {
+                    report.stranded += 1;
+                    eprintln!(
+                        "flows: approval {} expired but its run {} could not be closed: {e}",
+                        approval.id, approval.run_id
+                    );
+                }
+            }
+            // Ephemeral, WS-only, exactly like `flow.approval.created`: a tray left open all
+            // night has to stop showing a question that can no longer be answered, and the
+            // SCREEN is the module `flows`'s job.
+            let mut payload = Params::new();
+            payload.insert("approval_id".into(), Json::from(approval.id.clone()));
+            payload.insert("flow_id".into(), Json::from(approval.flow_id.clone()));
+            payload.insert("run_id".into(), Json::from(approval.run_id.clone()));
+            payload.insert("command".into(), Json::from(approval.command.clone()));
+            payload.insert("expires_at".into(), Json::from(approval.expires_at.clone()));
+            payload.insert("on_expire".into(), Json::from(approval.on_expire.as_str()));
+            events::notify_sink(
+                &self.registry,
+                registry::EventSource::Core,
+                flows::approvals::EVENT_APPROVAL_EXPIRED,
+                &payload,
+            );
+        }
+        Ok(report)
     }
 
     /// Catch-up del scheduler al **arrancar** (Tauri/local): ejecuta una sola vez las tareas con

@@ -498,10 +498,24 @@ jobs:
                    android.permission.CHANGE_WIFI_MULTICAST_STATE \
                    android.permission.ACCESS_LOCAL_NETWORK \
                    android.permission.POST_NOTIFICATIONS \
-                   android.permission.BLUETOOTH_CONNECT; do
+                   android.permission.BLUETOOTH_CONNECT \
+                   android.permission.NFC; do
             echo "$PERMISOS" | grep -q "name='$P'" \
               || { echo "::error::el APK NO declara $P — el hardware moriría EN SILENCIO (hub#337)"; exit 1; }
           done
+          # 🔴 El permiso NFC arrastra un requisito IMPLÍCITO de `android.hardware.nfc` (hub#988):
+          # Play esconde la app de todo dispositivo sin chip —las tablets baratas de mostrador, que
+          # son justo las que no tienen lector USB— salvo que el manifest diga que es opcional. Solo
+          # el manifest FUSIONADO lo sabe, y `dump badging` es quien lo lee. Un `uses-feature` que
+          # se cuele como obligatorio no rompe nada: adelgaza la ficha de la tienda en silencio.
+          #
+          # El ` ?` del patrón NO es descuido: aapt1 imprime `uses-feature-not-required:name=` y
+          # aapt2 mete un espacio tras los dos puntos. Sin él, este control pasaría siempre —
+          # comprobado contra dos APKs de prueba, uno con `required="false"` y otro con `"true"`,
+          # porque un guard que nunca caza nada es peor que no tenerlo.
+          BADGING=$("$AAPT" dump badging "$APK")
+          echo "$BADGING" | grep -qE "uses-feature-not-required: ?name='android.hardware.nfc'" \
+            || { echo "::error::el APK EXIGE android.hardware.nfc — Play lo ocultaría de las tablets sin chip (hub#988)"; echo "$BADGING" | grep -i nfc; exit 1; }
 
       - name: Stage artifacts
         run: |
@@ -666,3 +680,68 @@ jobs:
           fi
 
           echo "Subido a s3://erplora-saas/downloads/app/${VERSION}/ (Hetzner Object Storage)"
+
+  # ------------------------------------------------------------------------------
+  # Release gate (hub#895) — «tag verde» tiene que volver a significar «publicado».
+  #
+  # Cada job de publicación está gateado por una Variable del repo, y una Variable vacía
+  # deja el job en `skipped`. Un job saltado NO colorea el run: tres tags seguidos (el
+  # último v1.0.3, hub#839) terminaron EN VERDE sin publicar nada, y desde fuera el run
+  # que lo subió todo y el que no subió nada eran idénticos.
+  #
+  # Este job es el último y mira el resultado de TODOS los demás:
+  #   · canal publicado                          → bien
+  #   · canal saltado con su Variable vacía      → ROJO, nombrando la Variable
+  #   · canal DECLARADO pendiente                → verde, pero dicho en voz alta
+  #   · canal en failure/cancelled               → ROJO (declarar excusa un skip, nunca un fallo)
+  #   · canal OBLIGATORIO (sin Variable que lo gatee) → no se puede declarar pendiente
+  #
+  # Declarar un canal = Variable `RELEASE_CHANNELS_PENDING` (lista separada por comas:
+  # `store`, `play`). Es la diferencia entre «sabemos que Play aún no está enchufado» y
+  # «nadie se dio cuenta». Hoy: MICROSOFT_STORE_PRODUCT_ID se retiró a propósito y la
+  # decisión de restaurarla es de Ioan (hub#392); PLAY_PACKAGE_NAME espera la primera
+  # subida manual que exige Google (hub#308). Mientras esas dos sigan así, la Variable
+  # debe valer `store,play` — y el run lo dirá en cada tag con un warning, que es
+  # exactamente lo que se pedía: hacer VISIBLE el estado, no ocultarlo.
+  #
+  # `upload-s3` NO lleva Variable: es obligatorio. Es quien escribe `latest.json`, lo
+  # único contra lo que la app instalada compara su versión (hub#400); sin él la flota
+  # se queda sin canal de actualización.
+  #
+  # La decisión vive en `scripts/release-gate.sh` porque ahí SÍ se puede probar
+  # (`scripts/release-gate.test.sh`, 25 casos): dentro del YAML solo se ejecutaría en un
+  # tag, que no se puede re-lanzar. El cableado —`always()`, `needs` completo, y que el
+  # resultado de cada job llegue de verdad al script— lo guarda
+  # `apps/tauri/src-tauri/tests/release_gate.rs`.
+  # ------------------------------------------------------------------------------
+  release-gate:
+    name: Release gate
+    # TODOS los jobs: los de publicación porque son lo que se juzga, y los de build porque
+    # un build en rojo salta a los de publicación y el gate tiene que señalar la causa real
+    # en vez de mandar a nadie a buscar una Variable que está perfectamente puesta.
+    needs: [build, build-android, publish-store, publish-play, upload-s3]
+    # `always()` es el fondo del asunto: sin él, el gate hereda «solo si todos los `needs`
+    # fueron success» y los jobs saltados lo saltarían a él también — la guarda desaparecería
+    # justo en la situación para la que se escribió. Solo en tags: un dispatch manual puede
+    # no publicar nada a propósito (`-f publish=false`).
+    if: always() && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that every expected channel actually published
+        shell: bash
+        env:
+          RELEASE_CHANNELS_PENDING: ${{ vars.RELEASE_CHANNELS_PENDING }}
+          # id | nombre | resultado del job | Variable que lo gatea | ¿puesta? | referencia
+          # Sin Variable que lo gatee = canal OBLIGATORIO (no se puede declarar pendiente).
+          CHANNELS: |
+            store|Microsoft Store|${{ needs.publish-store.result }}|MICROSOFT_STORE_PRODUCT_ID|${{ vars.MICROSOFT_STORE_PRODUCT_ID != '' }}|hub#392
+            play|Google Play|${{ needs.publish-play.result }}|PLAY_PACKAGE_NAME|${{ vars.PLAY_PACKAGE_NAME != '' }}|hub#308
+            s3|Object Storage (latest.json)|${{ needs.upload-s3.result }}|||hub#400
+          # id | nombre | resultado del job
+          BUILDS: |
+            build|Desktop bundles (linux/windows/macos)|${{ needs.build.result }}
+            build-android|Android AAB + APK|${{ needs.build-android.result }}
+        run: ./scripts/release-gate.sh

@@ -111,9 +111,12 @@ COPY --from=frontend /app/apps/web/dist /app/web
 #                  wasmtime/extism crea su cache de compilación en $HOME/.cache/wasmtime.
 #                  Sin esto, los handlers WASM de los módulos fallan ("failed to create
 #                  cache directory"). /tmp es escribible. Aplica a TODOS los hubs.
+#   MALLOC_ARENA_MAX=2 — limita las arenas de glibc para que el pico de RAM del boot no se
+#                        quede retenido como RSS (hub#981).
 ENV HUB_BIND=0.0.0.0:8787 \
     HUB_WEB_DIR=/app/web \
-    HOME=/tmp
+    HOME=/tmp \
+    MALLOC_ARENA_MAX=2
 
 USER erplora
 EXPOSE 8787

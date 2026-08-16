@@ -71,10 +71,52 @@ describe('sectionDiscardCode · motivo traducible vs prosa heredada', () => {
     expect(sectionDiscardCode('numbering_not_portable')).toBe('numbering_not_portable');
   });
 
+  // hub#473 — un bundle de OTRO hub traía los permisos que su dueño había concedido a sus módulos
+  // (`certificate`, `network`…). Se descartan enteros: un fichero descargado no concede acceso al
+  // certificado de firma de este hub. Con su código, para que la fila no enseñe la cadena cruda.
+  it('reconoce el código de unos permisos de módulo que no son de este hub', () => {
+    expect(sectionDiscardCode('capability_grants_not_portable')).toBe(
+      'capability_grants_not_portable',
+    );
+  });
+
+  // hub#473 — el backup DE ESTE hub pidió reconceder permisos que ya no se pueden conceder: el
+  // módulo se actualizó y dejó de pedirlos, o no está instalado. El resto sí entró.
+  it('reconoce el código de unos permisos que ya no se pueden conceder', () => {
+    expect(sectionDiscardCode('capabilities_not_grantable')).toBe('capabilities_not_grantable');
+  });
+
   // ADR-0273 D8 / hub#560 — el runtime ya emitía este código y el shell no lo conocía: se pintaba
   // en crudo. Mismo contrato que los demás.
   it('reconoce el código de una sección sobre una tabla de sistema del hub', () => {
     expect(sectionDiscardCode('system_table_not_portable')).toBe('system_table_not_portable');
+  });
+
+  // hub#380 — el motivo dejó de ser prosa que nombraba VeriFactu: ahora es el código del flag
+  // `installation_bound_data` del module.json, así que sirve igual para TicketBai o NF525 y la
+  // frase la pone el shell traducida.
+  it('reconoce el código de unos datos ligados a otra instalación', () => {
+    expect(sectionDiscardCode('installation_bound_data')).toBe('installation_bound_data');
+  });
+
+  // hub#986 — un bundle de OTRO hub trae las automatizaciones del negocio (los documentos SÍ
+  // aterrizan), pero no lo que se les permitía hacer: qué comandos ejecutan, a qué URLs salen. Eso
+  // lo aprueba el dueño de ESTE despliegue, así que llegan en pausa y la fila lo dice.
+  it('reconoce el código de unos permisos de flujo que no son de este hub', () => {
+    expect(sectionDiscardCode('flow_grants_not_portable')).toBe('flow_grants_not_portable');
+  });
+
+  // hub#986 — el backup DE ESTE hub pidió devolverle a un flujo un permiso que aquí ya no existe
+  // (el módulo no volvió, o renombró el comando). El flujo se restaura DESHABILITADO: armado sin
+  // su permiso moriría en cada ejecución, de madrugada y sin nadie mirando.
+  it('reconoce el código de unos flujos restaurados en pausa', () => {
+    expect(sectionDiscardCode('flows_paused_without_grants')).toBe('flows_paused_without_grants');
+  });
+
+  // hub#986 — el import guarda por la MISMA puerta que `POST /flows`, así que un documento que el
+  // hub rechazaría en la pantalla tampoco entra por un zip. Se cuenta y el resto sí aterriza.
+  it('reconoce el código de un documento de flujo que este hub no puede guardar', () => {
+    expect(sectionDiscardCode('flows_not_restorable')).toBe('flows_not_restorable');
   });
 
   it('un motivo en prosa NO es un código: se pinta tal cual', () => {

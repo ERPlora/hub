@@ -12,8 +12,11 @@
 //! This file is the seam. Change one side without the other and it goes red, naming the value.
 use std::collections::BTreeSet;
 
+use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, StepKind, TriggerKind, DEFAULT_MAX_ITERS, MAX_ITERS_CAP, SCHEMA_VERSION,
+    AiPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
+    DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS, MAX_DELAY_HORIZON,
+    MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -50,7 +53,7 @@ fn keys_at(schema: &serde_json::Value, pointer: &str) -> BTreeSet<String> {
 }
 
 #[test]
-fn the_step_kinds_are_the_same_six_on_both_sides() {
+fn the_step_kinds_are_the_same_on_both_sides() {
     let declared = enum_at(&schema(), "/$defs/step/properties/kind");
     let known: BTreeSet<String> = StepKind::ALL
         .iter()
@@ -87,6 +90,250 @@ fn the_keys_of_an_http_step_are_declared_on_both_sides() {
         }]
     }));
     assert!(accepted.is_ok(), "{accepted:?}");
+}
+
+/// hub#954 — the `query` step. Three halves have to agree, and each for its own reason:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **`result` vocabulary**, because `rows` is the value everybody will reach for and it is
+///   deliberately absent from v1 (the mapping language cannot index an array), so a schema that
+///   offered it would have an editor saving a mapping the kernel resolves to nothing;
+/// - the **ceiling**, because the runtime REFUSES above it instead of clamping, and a schema that
+///   allowed more would move that refusal from the editor to a background tick at 3 AM.
+#[test]
+fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in ["query", "params", "result", "limit"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of a `query` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/result"),
+        QueryResult::ALL
+            .iter()
+            .map(|r| r.as_str().to_string())
+            .collect::<BTreeSet<String>>(),
+        "`rows` is not in v1 on either side: `resolve_path` cannot walk `steps.x.rows.0.total`, \
+         and a mapping the kernel resolves to nothing is a lie the editor would help write"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/result/default"),
+        Some(&serde_json::json!(QueryResult::First.as_str()))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/limit/maximum"),
+        Some(&serde_json::json!(MAX_QUERY_ROWS)),
+        "the runtime refuses above the ceiling; a schema that allowed more would move that \
+         refusal off the screen where it was typed"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/limit/minimum"),
+        Some(&serde_json::json!(1))
+    );
+
+    // And the runtime really does accept exactly these keys, and really does refuse a bigger read.
+    let step = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "week", "kind": "query", "query": "sales.summary",
+            "params": { "from": "input.from" }
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(step(serde_json::json!({ "result": "first", "limit": 50 })).is_ok());
+    assert!(step(serde_json::json!({ "result": "count" })).is_ok());
+    assert!(step(serde_json::json!({ "result": "rows" })).is_err());
+    assert!(step(serde_json::json!({ "limit": MAX_QUERY_ROWS + 1 })).is_err());
+}
+
+/// hub#951 — the extended `delay`. Four halves have to agree, and each for its own reason:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **`past_due_policy` vocabulary** and its default, because it is what a document says
+///   should happen when the instant already went by, and the default is deliberately NOT the
+///   market's (`skip`, not Salesforce's «run it now»);
+/// - the **horizon**, because the runtime REFUSES above it instead of clamping — a schema that
+///   allowed a year would move that refusal from the editor to a row asleep for a year;
+/// - the **hook shape**, because `correlate` is the half that makes a cancellation about ONE
+///   appointment, and an editor that let it be omitted would help write a flow that cancels
+///   everybody's reminder.
+#[test]
+fn the_extended_delay_is_declared_with_the_same_horizon_the_runtime_refuses_above() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in [
+        "seconds",
+        "until",
+        "offset_seconds",
+        "max_wait",
+        "past_due_policy",
+        "cancel_on",
+        "reschedule_on",
+    ] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of a `delay` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/past_due_policy"),
+        PastDuePolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/past_due_policy/default"),
+        Some(&serde_json::json!(PastDuePolicy::Skip.as_str())),
+        "the restrictive default is the contract: a reminder whose hour went by is not sent"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/max_wait/maximum"),
+        Some(&serde_json::json!(MAX_DELAY_HORIZON))
+    );
+    for list in ["cancel_on", "reschedule_on"] {
+        assert_eq!(
+            schema.pointer(&format!("/$defs/step/properties/{list}/maxItems")),
+            Some(&serde_json::json!(MAX_WAIT_HOOKS)),
+            "`{list}` is matched on the hot path of every event delivered in the hub"
+        );
+        assert_eq!(
+            schema.pointer(&format!("/$defs/step/properties/{list}/items/$ref")),
+            Some(&serde_json::json!("#/$defs/wait_hook"))
+        );
+    }
+    assert_eq!(
+        schema.pointer("/$defs/wait_hook/required"),
+        Some(&serde_json::json!(["event", "correlate"])),
+        "an uncorrelated hook cancels every armed wait in the hub, so it is required on both sides"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/wait_hook/properties/correlate/maxProperties"),
+        Some(&serde_json::json!(MAX_CORRELATE_PAIRS))
+    );
+
+    // And the runtime really does accept exactly these, and really does refuse past the horizon.
+    let delay = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({ "id": "w", "kind": "delay", "until": "input.at" });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(delay(serde_json::json!({
+        "offset_seconds": -86400, "max_wait": 604800, "past_due_policy": "skip",
+        "cancel_on": [{ "event": "a.cancelled", "correlate": { "event.id": "input.id" } }],
+        "reschedule_on": [{ "event": "a.moved", "correlate": { "event.id": "input.id" },
+                            "until": "event.at" }]
+    }))
+    .is_ok());
+    assert!(delay(serde_json::json!({ "max_wait": MAX_DELAY_HORIZON + 1 })).is_err());
+    assert!(delay(serde_json::json!({ "past_due_policy": "run_anyway" })).is_err());
+    assert!(delay(serde_json::json!({ "cancel_on": [{ "event": "a.b" }] })).is_err());
+}
+
+/// hub#950 — the `approval` step, the eighth kind. Three halves have to agree:
+///
+/// - the **keys**, because the runtime refuses one it does not know;
+/// - the **two policy vocabularies**, because they are what a document says should happen when the
+///   answer is «no» or when there is no answer at all — a schema offering a value the hub degrades
+///   to something else would have an editor promising a branch the kernel will not take;
+/// - the **ceiling on `expires_in`**, because the runtime REFUSES above it instead of clamping, and
+///   a schema that allowed a year would move that refusal from the editor to a sweep at 3 AM.
+#[test]
+fn the_approval_step_is_declared_with_the_same_policies_and_the_same_ceiling() {
+    let schema = schema();
+    let declared = keys_at(&schema, "/$defs/step/properties");
+    for key in ["title", "summary", "assignee", "expires_in", "on_expire", "on_reject"] {
+        assert!(
+            declared.contains(key),
+            "the schema must declare `{key}` of an `approval` step; it has {declared:?}"
+        );
+    }
+
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/on_expire"),
+        ExpiryPolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/on_expire/default"),
+        Some(&serde_json::json!(ExpiryPolicy::Reject.as_str())),
+        "silence is read as a refusal, because the steps after an approval assumed it was granted"
+    );
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/on_reject"),
+        RejectPolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/on_reject/default"),
+        Some(&serde_json::json!(RejectPolicy::Cancel.as_str()))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/expires_in/maximum"),
+        Some(&serde_json::json!(MAX_APPROVAL_TTL_SECONDS))
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/expires_in/default"),
+        Some(&serde_json::json!(DEFAULT_APPROVAL_TTL_SECONDS))
+    );
+
+    // The assignee is a ROLE and there is no shape in which a person can be named — the same
+    // closed-object property that makes a `notify` recipient impossible to write by hand.
+    assert_eq!(
+        keys_at(&schema, "/$defs/assignee/properties"),
+        BTreeSet::from(["role".to_string()])
+    );
+    assert_eq!(
+        schema
+            .pointer("/$defs/assignee/additionalProperties")
+            .and_then(|v| v.as_bool()),
+        Some(false),
+        "an extra key in `assignee` is refused on both sides: that object is the only way a \
+         question names who may answer it, and it must not grow one that reads like a user id"
+    );
+
+    // And the runtime really does accept exactly these, and really does refuse a longer wait.
+    let step = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "approve", "kind": "approval", "title": "¿Aprobamos {{input.what}}?"
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(step(serde_json::json!({
+        "summary": "Importe {{input.total}} €",
+        "assignee": { "role": "manager" },
+        "expires_in": MAX_APPROVAL_TTL_SECONDS,
+        "on_expire": "continue",
+        "on_reject": "continue"
+    }))
+    .is_ok());
+    assert!(step(serde_json::json!({ "expires_in": MAX_APPROVAL_TTL_SECONDS + 1 })).is_err());
+    assert!(step(serde_json::json!({ "assignee": { "user": "hub_user:7" } })).is_err());
 }
 
 #[test]

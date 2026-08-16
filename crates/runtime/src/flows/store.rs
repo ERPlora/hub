@@ -138,6 +138,25 @@ fn check_commands(registry: &Registry, def: &FlowDefinition) -> Result<()> {
     Ok(())
 }
 
+/// **The save-time half of hub#954.** A `query` step naming a read the registry does not have is
+/// a step this hub can never perform, so it is refused here rather than stored to fail at 3 AM.
+///
+/// It is deliberately STRICTER than [`check_commands`], and the asymmetry is the same one
+/// `grants::replace` already draws: an unknown command is forgiven there because a `command` step
+/// may name a module that is not installed yet and the grant is what actually opens the door,
+/// while an unknown QUERY is refused because a grant naming nothing reads like a permission and is
+/// not one. A step naming nothing reads like a read and is not one either.
+fn check_queries(registry: &Registry, def: &FlowDefinition) -> Result<()> {
+    for step in &def.steps {
+        if let StepSpec::Query(spec) = &step.spec {
+            if registry.get_query(&spec.query).is_none() {
+                return Err(RuntimeError::QueryNotFound(spec.query.clone()));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn create(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -149,6 +168,7 @@ pub async fn create(
     // instead of at the screen where it was written.
     let def = FlowDefinition::parse(&new.definition)?;
     check_commands(registry, &def)?;
+    check_queries(registry, &def)?;
     let id = new_id();
     let now = now_rfc3339();
     let mut p = Params::new();
@@ -182,6 +202,7 @@ pub async fn update(
 ) -> Result<Flow> {
     let def = FlowDefinition::parse(&new.definition)?;
     check_commands(registry, &def)?;
+    check_queries(registry, &def)?;
     get(db, hub_id, id).await?; // 404 before mutating, and scoped to this hub.
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -300,6 +321,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str, by: &str) 
         },
     )
     .await?;
+    // And the waits those sleeping runs had armed (hub#951). A wait outliving the flow that armed
+    // it would be looked at on every delivery of its event, forever, to affect zero rows each time
+    // — and it would keep the deleted flow's business event on a hot path nobody can explain.
+    crate::flows::waits::disarm_flow(db, hub_id, id).await?;
     grants::revoke_all(db, hub_id, id, by).await
 }
 
@@ -426,10 +451,11 @@ pub async fn seed_triggers(
         }
         let mut p = Params::new();
         p.insert("id".into(), json!(row["id"].as_str().unwrap_or_default()));
+        p.insert("hub_id".into(), json!(hub_id));
         p.insert("now".into(), json!(now));
         db.execute(
             "UPDATE _flow_triggers SET deleted_at = :now, enabled = 0, updated_at = :now \
-             WHERE id = :id",
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -605,6 +631,66 @@ pub async fn ensure_indexes(db: &dyn DatabaseAdapter) -> Result<()> {
     )
     .await?;
     Ok(())
+}
+
+/// **Re-writes the `wake_at` of runs parked with a non-UTC offset** (hub#970).
+///
+/// `wake_sleeping` asks the database `wake_at <= :now`, and the column is TEXT: the comparison is
+/// lexicographic, so it only answers «has this instant arrived?» while every string in it is UTC.
+/// `delay.until` used to store the instant with the offset it was written in — `trigger.at`
+/// documents that the offset IS part of the instant — so `…T09:00:00+02:00` sorted two hours late
+/// and a `-05:00` sorted five hours early. The write side is fixed at the source
+/// (`executor::run_step`), but the runs already asleep would never be touched again: the only
+/// thing that reads a sleeping run is the comparison the offset breaks.
+///
+/// Not a numbered migration, on purpose — same criterion as [`ensure_indexes`] and
+/// `identity::forget_hub_id_as_device`: it repairs an INVARIANT over data, not the shape of the
+/// schema, so it must also reach a database restored from a backup taken before the fix, and
+/// running it twice is a no-op (a `wake_at` already in UTC re-writes to itself).
+///
+/// Bounded by construction: only `sleeping` runs of this hub have a `wake_at` at all, and a hub
+/// has as many of those as it has delays in flight.
+pub async fn normalize_wake_at(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    let parked = db
+        .query(
+            "SELECT id, wake_at FROM _flow_runs \
+             WHERE hub_id = :hub_id AND status = :status AND wake_at IS NOT NULL \
+               AND deleted_at IS NULL AND wake_at NOT LIKE '%+00:00'",
+            &{
+                let mut q = p.clone();
+                q.insert("status".into(), json!(STATUS_SLEEPING));
+                q
+            },
+        )
+        .await?;
+    for row in &parked.rows {
+        let raw = row["wake_at"].as_str().unwrap_or_default();
+        // Anything that is not an instant is left exactly as it is: this repairs a zone, it does
+        // not invent a wake-up time for a row nobody can read.
+        let Ok(instant) = chrono::DateTime::parse_from_rfc3339(raw) else {
+            continue;
+        };
+        let mut q = Params::new();
+        q.insert("id".into(), json!(row["id"].as_str().unwrap_or_default()));
+        q.insert("hub_id".into(), json!(hub_id));
+        q.insert("wake_at".into(), json!(to_utc_rfc3339(&instant)));
+        db.execute(
+            "UPDATE _flow_runs SET wake_at = :wake_at \
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
+            &q,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// **An instant, as this kernel writes instants: UTC** (flows.md §3.2 — "UTC inside, the business
+/// clock on screen"). The one place that turns a `DateTime<FixedOffset>` into a `wake_at`, so the
+/// write path and the boot repair cannot disagree about what the column holds.
+pub(crate) fn to_utc_rfc3339(instant: &chrono::DateTime<chrono::FixedOffset>) -> String {
+    instant.with_timezone(&chrono::Utc).to_rfc3339()
 }
 
 /// The runs one event started — the forward half of «this sale set off these steps».
@@ -897,6 +983,44 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string()
+    }
+
+    /// **hub#954** — a `query` step naming a read that does not exist is refused AT SAVE, the same
+    /// rule a `query` grant follows (`grants::replace`): a grant naming nothing reads like a
+    /// permission and is not one, and a step naming nothing reads like a read and is not one
+    /// either. Stored, it would be a flow that fails at 3 AM instead of on the screen.
+    #[tokio::test]
+    async fn a_query_step_naming_a_read_that_does_not_exist_is_refused_at_save() {
+        let db = db().await;
+        let mut reg = registry();
+        reg.queries.insert(
+            "sales.summary".into(),
+            test_support::query("sales", "sales.view_sale", "SELECT 1 AS n"),
+        );
+
+        let flow = |query: &str| NewFlow {
+            name: "Report".into(),
+            enabled: true,
+            definition: json!({
+                "schema_version": 1,
+                "steps": [{ "id": "week", "kind": "query", "query": query }]
+            }),
+        };
+
+        let err = create(&db, HUB, &reg, &flow("sales.nope"), "hub_user:1")
+            .await
+            .expect_err("a read nothing performs is refused where it was typed");
+        assert!(format!("{err}").contains("sales.nope"), "{err}");
+
+        // …and the one that does exist saves.
+        let ok = create(&db, HUB, &reg, &flow("sales.summary"), "hub_user:1")
+            .await
+            .unwrap();
+        // The same rule on the way back in.
+        let err = update(&db, HUB, &ok.id, &reg, &flow("sales.nope"), "hub_user:1")
+            .await
+            .expect_err("an update is a save too");
+        assert!(format!("{err}").contains("sales.nope"), "{err}");
     }
 
     #[tokio::test]

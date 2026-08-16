@@ -51,6 +51,16 @@
 //! queue forever. Every claim carries a **lease**; once it expires the job returns to `pending`
 //! (see [`reclaim_expired`]) so a crashed print host does not strand the ticket.
 //!
+//! ## The role is a STATION, resolved — not a string, compared (hub#457)
+//!
+//! `role` used to be stored exactly as it arrived and matched literally against what a print host
+//! had registered, so `Kitchen`, `kitchen` and `kitchn` were **three queues** and the third one
+//! never had a host. Since hub#457 it is [resolved](crate::print_stations::resolve) against
+//! `_print_station`: what gets stored is the station's own `key` and `id`, an unknown one is a
+//! **422 naming the stations this hub has**, and [`claim_next`] filters by `station_id` — its
+//! parameter is not even a word any more. Same shape as the [`DOCUMENT_TYPES`] guard below,
+//! applied to the field that was missing it.
+//!
 //! This module is the queue only. Registering a print host for a role (hub#342), draining it over
 //! the WS (hub#343) and the `sdk.print` producer path (hub#344) are separate work.
 use erplora_db::{DatabaseAdapter, Params};
@@ -133,7 +143,15 @@ pub enum EnqueueOutcome {
 pub struct NewPrintJob {
     /// Idempotency key chosen by the producer. Two enqueues with the same one are one job.
     pub job_id: String,
-    /// Printer role: `receipt` (default of the shell), `kitchen`, `bar`, …
+    /// **Override of the station, in deprecation** (hub#987). Empty — the normal shape now — means
+    /// "the hub decides", and [`crate::print_routes::route_for`] resolves it from
+    /// [`document_type`](Self::document_type). A producer that still names one gets exactly that
+    /// station, so nothing published broke the day the map landed.
+    ///
+    /// It is `#[serde(default)]` and not `Option` on purpose: absent and `""` mean the same thing
+    /// ("I am not naming a printer"), and two spellings of one meaning is how the sloppy-input bug
+    /// of hub#457 got in.
+    #[serde(default)]
     pub role: String,
     /// Which document this is, from [`DOCUMENT_TYPES`]. Not the same axis as `role`: the role says
     /// *which printer*, this says *what shape* — an `invoice` can come out of the receipt printer.
@@ -189,24 +207,41 @@ pub async fn enqueue(
     job: &NewPrintJob,
 ) -> Result<EnqueueOutcome> {
     let job_id = job.job_id.trim();
-    let role = job.role.trim();
     if job_id.is_empty() {
         return Err(invalid("job_id is required (it is the idempotency key)"));
-    }
-    if role.is_empty() {
-        return Err(invalid("role is required (which printer prints this)"));
     }
     let document_type = job.document_type.trim();
     // The vocabulary is CLOSED, and that is the point of this guard. An unknown document type
     // used to map to `Generic`, so a typo (`kitchn`) printed a nameless list of key/value pairs
     // where the kitchen expected an order — a failure nobody saw until the plate was missing.
     // Here it is a refusal, with the accepted names in the message.
+    //
+    // It runs BEFORE the station is resolved (hub#987) because since the map exists the document
+    // type is what *decides* the station: routing an unvalidated word would be looking up a key
+    // that cannot be in the map and falling open on a payload that should have been refused.
     if !DOCUMENT_TYPES.contains(&document_type) {
         return Err(invalid(format!(
             "unknown document type `{document_type}` (expected one of {})",
             DOCUMENT_TYPES.join(", ")
         )));
     }
+    // **Two doors, and they fail in opposite directions on purpose** (hub#987).
+    //
+    // `role` named  → [`crate::print_stations::resolve`], which REFUSES an unknown one with a 422
+    //   naming this hub's stations (hub#457). The producer is a human or a UI here, so the typo has
+    //   to be visible — the fail-open must not relax this.
+    // `role` empty  → [`crate::print_routes::route_for`], which NEVER refuses. The job said only
+    //   what it *is*; there is no typo to show anybody, and the only choice left is paper somewhere
+    //   or paper nowhere. It falls open to `receipt`, the station a hub cannot delete.
+    //
+    // Either way what gets stored is the station's own `key` and `id`, so `Kitchen`, ` kitchen ` and
+    // `kitchen` are one queue and `claim_next` — which filters by id — finds the job.
+    let station = if job.role.trim().is_empty() {
+        crate::print_routes::route_for(db, hub_id, document_type).await?
+    } else {
+        crate::print_stations::resolve(db, hub_id, &job.role).await?
+    };
+    let role = station.key.as_str();
     // The renderer reads the document BY KEY (`data.get("items")`, `data.get("total")`). Handed an
     // array, a string or a number it finds nothing, renders every default and prints a blank ticket
     // without erroring — the same silent failure one layer down.
@@ -236,6 +271,7 @@ pub async fn enqueue(
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("job_id".into(), json!(job_id));
     p.insert("role".into(), json!(role));
+    p.insert("station_id".into(), json!(station.id));
     p.insert("document_type".into(), json!(document_type));
     p.insert("document".into(), json!(document));
     p.insert("format".into(), json!(job.format));
@@ -245,8 +281,10 @@ pub async fn enqueue(
     let res = db
         .execute(
             "INSERT INTO _print_queue \
-             (hub_id, job_id, role, document_type, document, format, status, attempts, created_at) \
-             VALUES (:hub_id, :job_id, :role, :document_type, :document, :format, 'pending', 0, :now) \
+             (hub_id, job_id, role, station_id, document_type, document, format, status, \
+              attempts, created_at) \
+             VALUES (:hub_id, :job_id, :role, :station_id, :document_type, :document, :format, \
+                     'pending', 0, :now) \
              ON CONFLICT (hub_id, job_id) DO NOTHING",
             &p,
         )
@@ -258,15 +296,20 @@ pub async fn enqueue(
     })
 }
 
-/// Hands the oldest `pending` job of `role` to a print host, leasing it for `lease_seconds`.
+/// Hands the oldest `pending` job of a **station** to a print host, leasing it for `lease_seconds`.
 ///
-/// `FOR UPDATE SKIP LOCKED` makes the hand-out atomic: two hosts of the same role racing on the
+/// **The parameter is a `station_id`, not a word** (hub#457), and that is the point: the hand-out
+/// can no longer be missed because two sides spelled the destination differently. There is nothing
+/// to spell — the caller had to resolve a station first ([`crate::print_stations::resolve`]), and
+/// an unresolvable one never gets this far.
+///
+/// `FOR UPDATE SKIP LOCKED` makes the hand-out atomic: two hosts of the same station racing on the
 /// same queue take **different** jobs, never the same ticket twice. The claim burns one attempt, so
 /// a host that takes the job and disappears cannot keep it circulating forever.
 pub async fn claim_next(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
-    role: &str,
+    station_id: &str,
     claimed_by: &str,
     lease_seconds: i64,
 ) -> Result<Option<PrintJob>> {
@@ -274,7 +317,7 @@ pub async fn claim_next(
         (chrono::Utc::now() + chrono::Duration::seconds(lease_seconds)).to_rfc3339();
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    p.insert("role".into(), json!(role));
+    p.insert("station_id".into(), json!(station_id));
     p.insert("claimed_by".into(), json!(claimed_by));
     p.insert("lease".into(), json!(lease_expires_at));
     let sql = format!(
@@ -282,12 +325,29 @@ pub async fn claim_next(
            claimed_by = :claimed_by, lease_expires_at = :lease \
          WHERE hub_id = :hub_id AND job_id = ( \
            SELECT job_id FROM _print_queue \
-           WHERE hub_id = :hub_id AND role = :role AND status = '{STATUS_PENDING}' \
+           WHERE hub_id = :hub_id AND station_id = :station_id AND status = '{STATUS_PENDING}' \
            ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) \
          RETURNING {JOB_COLUMNS}"
     );
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.first().map(row_to_job))
+}
+
+/// Test-only sugar: resolve `role` to its station and claim from it.
+///
+/// It exists so the suites written before hub#457 keep reading as "claim the kitchen's next job"
+/// instead of threading an id through every case. Production code resolves explicitly — see
+/// [`crate::print_drain::claim`], which must check the caller against the registry on the way.
+#[cfg(test)]
+pub(crate) async fn claim_next_role(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    role: &str,
+    claimed_by: &str,
+    lease_seconds: i64,
+) -> Result<Option<PrintJob>> {
+    let station = crate::print_stations::resolve(db, hub_id, role).await?;
+    claim_next(db, hub_id, &station.id, claimed_by, lease_seconds).await
 }
 
 /// The host confirms the job came out of the printer. Terminal: it is never handed out again, and
@@ -471,6 +531,139 @@ mod tests {
         list(db, hub_id, None, None, 100).await.unwrap()
     }
 
+    /// A job that says only WHAT it is — the shape hub#987 makes normal, with the hub deciding
+    /// where it comes out.
+    fn routed_job(job_id: &str, document_type: &str) -> NewPrintJob {
+        NewPrintJob {
+            job_id: job_id.into(),
+            role: String::new(),
+            document_type: document_type.into(),
+            document: json!({ "total": 12.5 }),
+            format: FORMAT_RECEIPT.into(),
+        }
+    }
+
+    /// The station a queued job really landed on.
+    async fn landed_on(db: &PgAdapter, hub_id: &str, job_id: &str) -> String {
+        all(db, hub_id)
+            .await
+            .into_iter()
+            .find(|j| j.job_id == job_id)
+            .expect("the job was queued")
+            .role
+    }
+
+    /// **The module says WHAT, the hub says WHERE** (hub#987). A producer that names no station gets
+    /// routed by its document type — so `sales` can stop shipping `role: 'receipt'` and a kitchen
+    /// order still reaches the kitchen.
+    #[tokio::test]
+    async fn a_job_that_names_no_station_is_routed_by_its_document_type() {
+        let db = queue_db().await;
+
+        enqueue(&db, "h1", &routed_job("j-kitchen", "kitchen_order"))
+            .await
+            .unwrap();
+        enqueue(&db, "h1", &routed_job("j-ticket", "receipt"))
+            .await
+            .unwrap();
+        enqueue(&db, "h1", &routed_job("j-label", "barcode_label"))
+            .await
+            .unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j-kitchen").await, "kitchen");
+        assert_eq!(landed_on(&db, "h1", "j-ticket").await, "receipt");
+        assert_eq!(landed_on(&db, "h1", "j-label").await, "label");
+    }
+
+    /// …and the hub's map is what decides it, not a constant: re-point the document type and the
+    /// next identical job comes out somewhere else, with no module touched.
+    #[tokio::test]
+    async fn re_pointing_the_map_moves_the_next_job_without_touching_a_module() {
+        let db = queue_db().await;
+        crate::print_routes::set(&db, "h1", "kitchen_order", "bar", "u1")
+            .await
+            .unwrap();
+
+        enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j1").await, "bar");
+    }
+
+    /// `role` survives as a **full override** (in deprecation, hub#987): a producer that still sends
+    /// one gets exactly what it asked for, so nothing published breaks on the day this lands.
+    #[tokio::test]
+    async fn an_explicit_role_still_overrides_the_map() {
+        let db = queue_db().await;
+
+        // The map says `kitchen_order` → `kitchen`; this producer insists on the bar.
+        let mut job = routed_job("j1", "kitchen_order");
+        job.role = "bar".into();
+        enqueue(&db, "h1", &job).await.unwrap();
+
+        assert_eq!(landed_on(&db, "h1", "j1").await, "bar");
+    }
+
+    /// **The door does NOT relax.** The fail-open is for a job that lost its destination, never for
+    /// a producer that named one that does not exist: there the producer is a human or a UI, and the
+    /// typo has to be visible. Still a 422 naming this hub's real stations (hub#457).
+    #[tokio::test]
+    async fn an_explicit_unknown_station_is_still_refused_at_the_door() {
+        let db = queue_db().await;
+        let mut job = routed_job("j1", "kitchen_order");
+        job.role = "kitchn".into();
+
+        let err = enqueue(&db, "h1", &job).await.unwrap_err();
+
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "naming a station that does not exist is a bad payload, not a routing gap: {err}"
+        );
+        assert!(err.to_string().contains("kitchen"), "{err}");
+        assert!(all(&db, "h1").await.is_empty(), "and nothing was queued");
+    }
+
+    /// **Fail OPEN** (hub#987, the market decision of hub#457). The merchant deleted the station its
+    /// kitchen orders were routed to. The next order must come out at the counter — late, loud and
+    /// on paper — and never be dropped the way Clover and Loyverse drop it.
+    #[tokio::test]
+    async fn a_job_whose_route_broke_comes_out_at_the_counter_not_nowhere() {
+        let db = queue_db().await;
+        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        crate::print_routes::set(&db, "h1", "kitchen_order", "bar", "u1")
+            .await
+            .unwrap();
+        crate::print_stations::delete(&db, "h1", &bar.id).await.unwrap();
+
+        let outcome = enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        assert_eq!(outcome, EnqueueOutcome::Queued, "the job is NOT refused");
+        assert_eq!(
+            landed_on(&db, "h1", "j1").await,
+            crate::print_stations::PROTECTED_KEY,
+            "a job that already got in and lost its destination falls open to `receipt`"
+        );
+    }
+
+    /// A job carries the station it landed on as a resolved `station_id`, whichever door routed it.
+    /// Without that, `claim_next` — which filters by id — would never hand out a routed job.
+    #[tokio::test]
+    async fn a_routed_job_is_claimable_by_the_host_of_the_station_it_landed_on() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
+            .await
+            .unwrap();
+
+        let claimed = claim_next_role(&db, "h1", "kitchen", "till-1", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .expect("the kitchen's host finds the order the map sent there");
+        assert_eq!(claimed.job_id, "j1");
+    }
+
     /// **The idempotency guard.** Enqueueing the same `jobId` twice is ONE job: the second call is
     /// a no-op that reports `Duplicate`, and it does not overwrite the document already queued
     /// (a retry must never mutate the ticket the printer is about to produce).
@@ -523,7 +716,7 @@ mod tests {
         // job is still there, still claimable.
         let db = test_db.adapter().await;
         crate::system_migrations::apply(&db, "h1").await.unwrap();
-        let claimed = claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        let claimed = claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the job waited across the restart");
@@ -540,12 +733,12 @@ mod tests {
             .await
             .unwrap();
 
-        let first = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let first = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap();
         assert_eq!(first.map(|j| j.job_id), Some("j1".to_string()));
 
-        let second = claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+        let second = claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap();
         assert!(second.is_none(), "two hosts must not print the same ticket");
@@ -558,7 +751,7 @@ mod tests {
         enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -566,7 +759,7 @@ mod tests {
 
         // Neither directly…
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -615,7 +808,7 @@ mod tests {
     async fn confirming_an_already_terminal_job_is_also_a_no() {
         let db = queue_db().await;
         enqueue(&db, "h1", &job("j1", "receipt", "T-1")).await.unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -637,7 +830,7 @@ mod tests {
         enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -648,7 +841,7 @@ mod tests {
             .unwrap();
         assert_eq!(again, EnqueueOutcome::Duplicate);
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -669,7 +862,7 @@ mod tests {
         assert_eq!(listed, ["j1", "j2", "j3"], "the queue order is observable");
 
         let mut handed = Vec::new();
-        while let Some(j) = claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        while let Some(j) = claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
         {
@@ -687,14 +880,14 @@ mod tests {
             .unwrap();
 
         assert!(
-            claim_next(&db, "h1", "bar", "host-bar", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "bar", "host-bar", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none(),
             "a bar host must not drain the kitchen queue"
         );
         assert!(
-            claim_next(&db, "h1", "kitchen", "host-kitchen", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "kitchen", "host-kitchen", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_some()
@@ -711,12 +904,12 @@ mod tests {
             .unwrap();
 
         // Lease already in the past = the host took it and never came back.
-        claim_next(&db, "h1", "receipt", "dead-host", -1)
+        claim_next_role(&db, "h1", "receipt", "dead-host", -1)
             .await
             .unwrap()
             .unwrap();
         assert!(
-            claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none(),
@@ -724,7 +917,7 @@ mod tests {
         );
 
         assert_eq!(reclaim_expired(&db, "h1").await.unwrap(), 1);
-        let back = claim_next(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
+        let back = claim_next_role(&db, "h1", "receipt", "host-b", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the job waits for the next host instead of being lost");
@@ -742,7 +935,7 @@ mod tests {
             .unwrap();
 
         for _ in 0..(MAX_ATTEMPTS - 1) {
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .expect("still retryable");
@@ -753,7 +946,7 @@ mod tests {
             assert_eq!(all(&db, "h1").await[0].status, STATUS_PENDING);
         }
 
-        claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("last hand-out");
@@ -767,7 +960,7 @@ mod tests {
         assert_eq!(dead.attempts, MAX_ATTEMPTS);
         assert_eq!(dead.last_error, "out of paper", "the reason is observable");
         assert!(
-            claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_none()
@@ -793,12 +986,12 @@ mod tests {
         );
 
         assert!(
-            claim_next(&db, "h2", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+            claim_next_role(&db, "h2", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
                 .await
                 .unwrap()
                 .is_some()
         );
-        let h1 = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let h1 = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("h1 still has its own job");
@@ -859,7 +1052,7 @@ mod tests {
         enqueue(&db, "h1", &job("j2", "kitchen", "K-2"))
             .await
             .unwrap();
-        claim_next(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
+        claim_next_role(&db, "h1", "kitchen", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
@@ -880,15 +1073,22 @@ mod tests {
         );
     }
 
-    /// A job without an id, without a role or without a document is rejected before it reaches the
-    /// database: an empty `jobId` would silently break the idempotency key for every other job.
+    /// A job without an id or without a document is rejected before it reaches the database: an
+    /// empty `jobId` would silently break the idempotency key for every other job.
+    ///
+    /// ⚠️ **An empty `role` used to be on this list and deliberately is not any more** (hub#987).
+    /// It was right while `role` was the only way to say where a job went; now it is the *normal*
+    /// way to say "the hub decides", and the map routes it by document type
+    /// ([`tests::a_job_that_names_no_station_is_routed_by_its_document_type`]). What is still
+    /// refused is naming a station that does not exist — see
+    /// [`tests::an_explicit_unknown_station_is_still_refused_at_the_door`], which is where that
+    /// half of the guard moved.
     #[tokio::test]
-    async fn a_job_without_id_role_or_document_is_rejected() {
+    async fn a_job_without_id_or_document_is_rejected() {
         let db = queue_db().await;
 
         for bad in [
             job("", "receipt", "T-1"),
-            job("j1", "", "T-1"),
             NewPrintJob {
                 job_id: "j1".into(),
                 role: "receipt".into(),
@@ -945,7 +1145,7 @@ mod tests {
         .await
         .unwrap();
 
-        let claimed = claim_next(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
+        let claimed = claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .expect("the host claims the ticket");
@@ -1186,5 +1386,85 @@ mod tests {
         };
         assert!(enqueue(&db, "h1", &bad).await.is_err());
         assert!(all(&db, "h1").await.is_empty());
+    }
+
+    // ── Stations as rows (hub#457) ─────────────────────────────────────────────────────────────
+
+    /// **The bug this issue is about.** `kitchn` is not a case variant of anything, so no amount of
+    /// `to_lowercase` would have caught it: it used to open a queue of its own that no host could
+    /// ever drain, and the plate went missing. Resolved against the station table it is simply not
+    /// a destination, and the refusal — a 422, like the sibling `documentType` guard right above —
+    /// names the ones that are.
+    #[tokio::test]
+    async fn a_job_for_a_station_this_hub_does_not_have_is_refused_naming_the_real_ones() {
+        let db = queue_db().await;
+        let err = enqueue(&db, "h1", &job("j1", "kitchn", "K-1"))
+            .await
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("kitchn"), "it says what was rejected: {msg}");
+        assert!(
+            msg.contains("kitchen"),
+            "and what this hub really has, so the typo is visible: {msg}"
+        );
+        assert!(
+            all(&db, "h1").await.is_empty(),
+            "a ticket nobody can print must not be queued at all"
+        );
+    }
+
+    /// **`Kitchen` and `kitchen` are ONE queue now.** The case tolerance stays at the door and the
+    /// row is stored against the station, so a job enqueued with stray case is handed to the host
+    /// registered with the canonical spelling — which before was the second of the three ways to
+    /// open an orphan queue.
+    #[tokio::test]
+    async fn a_job_enqueued_with_stray_case_lands_in_the_canonical_station() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j1", "  Kitchen ", "K-1"))
+            .await
+            .unwrap();
+
+        let jobs = all(&db, "h1").await;
+        assert_eq!(
+            jobs[0].role, "kitchen",
+            "what is stored is the STATION's key, never the string that was typed"
+        );
+
+        let station = crate::print_stations::resolve(&db, "h1", "kitchen")
+            .await
+            .unwrap();
+        let claimed = claim_next(&db, "h1", &station.id, "host-a", DEFAULT_LEASE_SECONDS)
+            .await
+            .unwrap()
+            .expect("the host of the kitchen station takes it");
+        assert_eq!(claimed.job_id, "j1");
+    }
+
+    /// The hand-out is by **station id**, not by a word. Two stations of one hub never see each
+    /// other's work, and the filter cannot be defeated by how anybody spells anything.
+    #[tokio::test]
+    async fn claiming_is_scoped_to_the_station_and_never_to_a_spelling() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j-bar", "bar", "B-1")).await.unwrap();
+        let kitchen = crate::print_stations::resolve(&db, "h1", "kitchen")
+            .await
+            .unwrap();
+
+        assert!(
+            claim_next(&db, "h1", &kitchen.id, "host-a", DEFAULT_LEASE_SECONDS)
+                .await
+                .unwrap()
+                .is_none(),
+            "the kitchen does not take the bar's ticket"
+        );
+        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        assert_eq!(
+            claim_next(&db, "h1", &bar.id, "host-b", DEFAULT_LEASE_SECONDS)
+                .await
+                .unwrap()
+                .expect("the bar does")
+                .job_id,
+            "j-bar"
+        );
     }
 }

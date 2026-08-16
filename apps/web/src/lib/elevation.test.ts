@@ -31,6 +31,13 @@ function ask(payload: Record<string, unknown> = { sale_id: 's1' }): ElevationAsk
       approverName: 'Sofía',
       expiresInSeconds: 120,
     }),
+    approveWithBadge: async () => ({
+      token: 'tok',
+      permission: 'till.void_sale',
+      approvedBy: 'u-sofia',
+      approverName: 'Sofía',
+      expiresInSeconds: 120,
+    }),
   };
 }
 

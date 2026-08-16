@@ -178,7 +178,8 @@ impl DomainError {
 ///
 /// El host valida y ejecuta `operations` en orden dentro de una transacción y luego emite
 /// `events`. `error`, si viene, aborta la transacción entera ANTES de aplicar nada (hub#139).
-/// Nunca contiene SQL crudo ni filas de BD.
+/// `result`, si viene, viaja al caller como el **valor devuelto** por el handler (hub#70) sin
+/// mezclarse con las intenciones. Nunca contiene SQL crudo ni filas de BD.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Output {
     /// Operaciones SQL (por nombre de command + params) a ejecutar.
@@ -191,6 +192,39 @@ pub struct Output {
     /// discards `operations`/`events` and surfaces the code to the caller.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<DomainError>,
+    /// **Value the handler RETURNS to the caller** (hub#70). Absent in older guests.
+    ///
+    /// Until this field existed the guest's computation was discarded: a command could only
+    /// describe writes, so anything the caller needed to *know* (`schedules.is_open`, the id of
+    /// the sale just created) had to be recomputed client-side over rows the caller itself
+    /// supplied — which means the caller could forge it. That is a security property, not a
+    /// convenience: the answer must come from the sandboxed handler over host-provided data.
+    ///
+    /// It is **not** an operation and **not** an event: it is never persisted, never emitted, and
+    /// never contributes an id to `new_ids`. `Some(Value::Null)` ("no match") is a real answer and
+    /// differs from `None` ("this handler returns nothing"). The host caps its serialised size and
+    /// **rejects** an oversized result instead of truncating it (see
+    /// `erplora_runtime::commands::MAX_RESULT_BYTES`): a silently shortened authoritative answer is
+    /// worse than no answer.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_present_result",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub result: Option<Value>,
+}
+
+/// Keeps `"result": null` distinguishable from an absent `result`.
+///
+/// Plain `Option<Value>` collapses both to `None` (serde reads a JSON `null` as "no value"), which
+/// would erase the difference between *"the handler answers: nothing matched"* and *"this handler
+/// returns nothing"* the moment the output crossed the host↔guest wire. `#[serde(default)]` still
+/// covers the absent case, so an old guest that never writes the key keeps deserialising.
+fn deserialize_present_result<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Value::deserialize(deserializer).map(Some)
 }
 
 impl Output {
@@ -215,6 +249,13 @@ impl Output {
     /// event present in this same output (hub#139).
     pub fn with_error(mut self, error: DomainError) -> Self {
         self.error = Some(error);
+        self
+    }
+
+    /// Returns a value to the caller (hub#70), on top of whatever operations/events this output
+    /// also carries. Setting it twice keeps the last value.
+    pub fn with_result(mut self, result: impl Into<Value>) -> Self {
+        self.result = Some(result.into());
         self
     }
 }
@@ -317,6 +358,64 @@ mod tests {
             v.get("error").is_none(),
             "absent rejection must not serialize an `error` key"
         );
+    }
+
+    // ── hub#70: the result channel ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn output_round_trips_a_result() {
+        // A handler must be able to RETURN a computed value (`schedules.is_open`), not only
+        // intentions. Without it the caller supplies the rows and can forge the answer.
+        let out = Output::new().with_result(json!({"open": true, "closes_at": "20:00"}));
+        let back: Output = serde_json::from_slice(&serde_json::to_vec(&out).unwrap()).unwrap();
+        assert_eq!(back.result, out.result);
+        assert_eq!(back.result.unwrap()["open"], json!(true));
+    }
+
+    #[test]
+    fn result_accepts_any_json_shape_including_a_bare_scalar() {
+        // `is_open` answers a bool, `bulk_create_special_days` a list, a checkout an object.
+        for value in [json!(true), json!([1, 2, 3]), json!("ok"), json!(null)] {
+            let out = Output::new().with_result(value.clone());
+            let back: Output = serde_json::from_str(&serde_json::to_string(&out).unwrap()).unwrap();
+            assert_eq!(back.result, Some(value));
+        }
+    }
+
+    #[test]
+    fn result_is_independent_of_operations_and_events() {
+        // The result is NOT an operation and NOT an event: a handler can both write and answer.
+        let out = sample_output().with_result(json!({"sale_id": "s-1"}));
+        let v: Value = serde_json::to_value(&out).unwrap();
+        assert_eq!(v["operations"].as_array().unwrap().len(), 1);
+        assert_eq!(v["events"].as_array().unwrap().len(), 1);
+        assert_eq!(v["result"]["sale_id"], "s-1");
+    }
+
+    #[test]
+    fn result_field_is_backwards_compatible_with_old_guests_and_hosts() {
+        // Same versioning pattern as `error` (hub#139): additive, `#[serde(default)]`, and absent
+        // unless set — an old guest keeps deserialising, and an old host sees the same JSON.
+        let out: Output = serde_json::from_str(r#"{"operations":[],"events":[]}"#).unwrap();
+        assert!(out.result.is_none());
+        let v: Value = serde_json::to_value(sample_output()).unwrap();
+        assert!(
+            v.get("result").is_none(),
+            "a handler that returns nothing must not serialize a `result` key"
+        );
+    }
+
+    #[test]
+    fn a_null_result_is_distinguishable_from_no_result() {
+        // `Some(Json::Null)` is an answer ("no match"), `None` is "this handler answers nothing".
+        let explicit = Output::new().with_result(Value::Null);
+        assert_eq!(explicit.result, Some(Value::Null));
+        let v: Value = serde_json::to_value(&explicit).unwrap();
+        assert!(v.get("result").is_some(), "an explicit null must be sent");
+        assert!(v["result"].is_null());
+        // …and it must survive the wire as an answer, not collapse back into "no answer".
+        let back: Output = serde_json::from_str(r#"{"result":null}"#).unwrap();
+        assert_eq!(back.result, Some(Value::Null));
     }
 
     #[test]

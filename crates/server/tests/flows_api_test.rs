@@ -369,7 +369,12 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
             request("POST", "/api/hub/flows", Some(&f.admin), Some(body)),
         )
         .await;
-        assert_eq!(response.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "hub#734: a document the server cannot accept is a `400`, never a `409` — nothing \
+             about it will change by retrying"
+        );
         let json = body_json(response).await;
         assert_eq!(
             json["error"]["code"], code,
@@ -474,8 +479,9 @@ async fn a_trigger_the_engine_cannot_read_is_refused_at_the_door_with_its_stable
         .await;
         assert_eq!(
             response.status(),
-            StatusCode::CONFLICT,
-            "a trigger the engine cannot read must not be saved as active"
+            StatusCode::BAD_REQUEST,
+            "a trigger the engine cannot read must not be saved as active — and it is the \
+             DOCUMENT that is wrong, so `400` (hub#734)"
         );
         let json = body_json(response).await;
         assert_eq!(
@@ -565,7 +571,7 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
         ),
     )
     .await;
-    assert_eq!(no_transport.status(), StatusCode::CONFLICT);
+    assert_eq!(no_transport.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
         body_json(no_transport).await["error"]["code"],
         "flow.invalid_notify_grant"
@@ -582,7 +588,7 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
         ),
     )
     .await;
-    assert_eq!(loose_recipient.status(), StatusCode::CONFLICT);
+    assert_eq!(loose_recipient.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
         body_json(loose_recipient).await["error"]["code"],
         "flow.invalid_recipient_grant"
@@ -599,7 +605,78 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
         ),
     )
     .await;
-    assert_eq!(typo.status(), StatusCode::CONFLICT);
+    assert_eq!(typo.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(typo).await["error"]["code"],
+        "flow.unknown_grant_kind"
+    );
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
+/// **hub#954 — the `query` step is judged at the door, not at 3 AM.**
+///
+/// Three refusals, and each is a different question with a different remedy, so each keeps its own
+/// status: a `limit` bigger than the ceiling is a wrong DOCUMENT (`400`), a read that does not
+/// exist is a `404` — the very answer the `query` grant door already gives for the same mistake —
+/// and the good document saves. What must never happen is the fourth case: `201 Created` on a step
+/// that reads two hundred rows when it says a thousand.
+#[tokio::test]
+async fn a_query_step_is_refused_at_the_save_door_for_its_limit_and_for_a_read_that_is_not_there() {
+    let f = fixture_with_modules().await;
+
+    let flow = |step: Value| {
+        json!({
+            "name": "Report",
+            "definition": { "schema_version": 1, "steps": [step] }
+        })
+    };
+    let post = |body: Value| {
+        send(
+            &f.router,
+            request("POST", "/api/hub/flows", Some(&f.admin), Some(body)),
+        )
+    };
+
+    // 1. Above the ceiling. Refused, not clamped — and it is the document that is wrong, so `400`.
+    let over = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.slots.list", "limit": 1000
+    })))
+    .await;
+    assert_eq!(over.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body_json(over).await["error"]["code"],
+        "flow.limit_out_of_range",
+        "the editor programs against the CODE so it can point at the field"
+    );
+
+    // 2. A read nothing in this hub performs. Same answer the grants door gives it (`404`): a
+    // different question from «that one is internal», and a different remedy.
+    let missing = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.nope.list"
+    })))
+    .await;
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+
+    // 3. …and the document that is right lands.
+    let ok = post(flow(json!({
+        "id": "week", "kind": "query", "query": "agenda.slots.list",
+        "result": "count", "limit": 50
+    })))
+    .await;
+    assert_eq!(ok.status(), StatusCode::CREATED, "the good one saves");
+
+    let listed = body_json(send(
+        &f.router,
+        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    )
+    .await)
+    .await;
+    assert_eq!(
+        listed["data"].as_array().unwrap().len(),
+        1,
+        "only the good one landed: {listed}"
+    );
 
     std::fs::remove_dir_all(f.temp).ok();
 }
@@ -635,7 +712,10 @@ async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door(
         ),
     )
     .await;
-    assert_eq!(saved.status(), StatusCode::CONFLICT);
+    // hub#734: `403`, the same status the dispatcher gives `RuntimeError::InternalCommand`. The
+    // command EXISTS and this door is not its own — that is a refusal, not a conflict and not a
+    // typo in the document.
+    assert_eq!(saved.status(), StatusCode::FORBIDDEN);
     assert_eq!(
         body_json(saved).await["error"]["code"],
         "flow.internal_command"
@@ -663,7 +743,7 @@ async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door(
         ),
     )
     .await;
-    assert_eq!(granted.status(), StatusCode::CONFLICT);
+    assert_eq!(granted.status(), StatusCode::FORBIDDEN);
     assert_eq!(
         body_json(granted).await["error"]["code"],
         "flow.internal_command"
@@ -897,6 +977,9 @@ async fn a_disabled_flow_refuses_to_be_run_by_hand() {
         request("POST", &format!("/api/hub/flows/{id}/run"), Some(&f.admin), None),
     )
     .await;
+    // …and THIS one keeps its `409` (hub#734): the flow exists, the request is well formed and the
+    // caller is allowed — it conflicts with the state of the flow, which is what `409` means. It is
+    // the reference case that the sweep of the family did not turn every refusal into a `400`.
     assert_eq!(response.status(), StatusCode::CONFLICT);
     assert_eq!(body_json(response).await["error"]["code"], "flow.disabled");
 
@@ -957,7 +1040,7 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
         ),
     )
     .await;
-    assert_eq!(bad.status(), StatusCode::CONFLICT);
+    assert_eq!(bad.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
         body_json(bad).await["error"]["code"],
         "flow.invalid_secret_name"
@@ -975,6 +1058,20 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
     )
     .await;
     assert_eq!(body_json(empty).await["data"].as_array().unwrap().len(), 0);
+
+    // hub#734 — the row that gave the issue its title. A secret that is not there is a `404`, the
+    // same answer a flow that is not there gets. It used to be a `409`, which told the editor to
+    // retry a delete of something that will never exist.
+    let ghost = send(
+        &f.router,
+        request("DELETE", "/api/hub/flows/secrets/NO_SUCH_SECRET", Some(&f.admin), None),
+    )
+    .await;
+    assert_eq!(ghost.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        body_json(ghost).await["error"]["code"],
+        "flow.secret_not_found"
+    );
 
     std::fs::remove_dir_all(f.temp).ok();
 }
@@ -1027,7 +1124,7 @@ async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
         ),
     )
     .await;
-    assert_eq!(loose.status(), StatusCode::CONFLICT);
+    assert_eq!(loose.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
         body_json(loose).await["error"]["code"],
         "flow.invalid_http_pattern"
@@ -1084,7 +1181,7 @@ async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
         ),
     )
     .await;
-    assert_eq!(by_hand.status(), StatusCode::CONFLICT);
+    assert_eq!(by_hand.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
         body_json(by_hand).await["error"]["code"],
         "flow.invalid_definition"

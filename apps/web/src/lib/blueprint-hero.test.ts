@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_OFFERS,
   heroOffers,
+  heroPart,
   heroSelection,
   heroVisible,
   hubIsEmpty,
@@ -314,14 +315,14 @@ describe('what the owner is told happened', () => {
         ],
       }),
     );
-    expect(outcome).toEqual({ kind: 'partial', blockedApps: ['invoice'], failedApps: [], failedParts: 0 });
+    expect(outcome).toEqual({ kind: 'partial', blockedApps: ['invoice'], failedApps: [], failedSections: [] });
   });
 
   it('an app that could not be installed at all IS one', () => {
     const outcome = importOutcome(
       report({ installed_modules: [{ id: 'pos', version: '1.0.0', status: 'failed', error: 'boom' }] }),
     );
-    expect(outcome).toEqual({ kind: 'partial', blockedApps: [], failedApps: ['pos'], failedParts: 0 });
+    expect(outcome).toEqual({ kind: 'partial', blockedApps: [], failedApps: ['pos'], failedSections: [] });
   });
 
   it('an app already installed is not news', () => {
@@ -348,17 +349,44 @@ describe('what the owner is told happened', () => {
     ).toEqual({ kind: 'ready' });
   });
 
-  it('a section that failed counts, without printing our own name for it', () => {
+  // hub#899 — the count used to be all the card got, and the reason written here was that the
+  // engine's names are ours, not words the owner ever chose. True about the raw key, and it left
+  // her reading «something else did not go in» on the one screen where she is checking whether her
+  // business is inside. The KEY travels; putting it into her words is the card's job.
+  it('a section that failed is NAMED, not just counted', () => {
     const outcome = importOutcome(
       report({ sections: [{ section: 'hub_settings', status: { Failed: 'db down' } }] }),
     );
-    expect(outcome).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedParts: 1 });
+    expect(outcome).toEqual({
+      kind: 'partial',
+      blockedApps: [],
+      failedApps: [],
+      failedSections: ['hub_settings'],
+    });
   });
 
-  it('images that ALL failed count as one part that did not go in', () => {
+  it('names EVERY part that did not go in, in the engine\'s order', () => {
+    const outcome = importOutcome(
+      report({
+        sections: [
+          { section: 'hub_settings', status: { Failed: 'db down' } },
+          { section: 'roles', status: 'Applied' },
+          { section: 'modules/hairdressing', status: { Failed: 'sql error' } },
+        ],
+      }),
+    );
+    expect(outcome).toEqual({
+      kind: 'partial',
+      blockedApps: [],
+      failedApps: [],
+      failedSections: ['hub_settings', 'modules/hairdressing'],
+    });
+  });
+
+  it('images that ALL failed are one part that did not go in, named as such', () => {
     expect(
       importOutcome(report({ media: { selected: true, copied: 0, failed: 4 } })),
-    ).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedParts: 1 });
+    ).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedSections: ['media'] });
   });
 
   it('images that mostly copied do not raise an alarm', () => {
@@ -403,7 +431,7 @@ describe('what the owner is told happened', () => {
           media: { selected: true, copied: 0, failed: 3 },
         }),
       ),
-    ).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedParts: 1 });
+    ).toEqual({ kind: 'partial', blockedApps: [], failedApps: [], failedSections: ['media'] });
   });
 
   it('reads a report with no keys at all as ready rather than inventing trouble', () => {
@@ -424,7 +452,43 @@ describe('what the owner is told happened', () => {
       kind: 'partial',
       blockedApps: ['invoice'],
       failedApps: ['pos'],
-      failedParts: 1,
+      failedSections: ['hub_settings'],
     });
+  });
+});
+
+// hub#899 — «Casi: algo no ha entrado. Hay algo MÁS que no ha entrado»: two «somethings» and not
+// one clue, at the minute the owner is checking whether her business is inside. The section keys
+// are the engine's (`hub_settings`, `modules/hairdressing`) and painting them raw would be no
+// better, so each one is resolved to what it IS — a part of the hub with words of its own, or the
+// data of an app, which the card then names the way she knows the app.
+describe('putting a part of the template into the owner\'s words', () => {
+  it('a part of the hub carries the key of its own sentence', () => {
+    expect(heroPart('hub_settings')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partSettings' });
+    expect(heroPart('media')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partMedia' });
+    expect(heroPart('roles')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partRoles' });
+    expect(heroPart('fiscal')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partFiscal' });
+    expect(heroPart('hub_users')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partTeam' });
+  });
+
+  it('reads the short spelling of a section too', () => {
+    // The engine writes `hub_settings`/`hub_users`; a bundle may carry the short name in its
+    // manifest, and the report at Settings › Data already reads both as the same thing.
+    expect(heroPart('settings')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partSettings' });
+    expect(heroPart('users')).toEqual({ kind: 'named', i18nKey: 'setup.hero.partTeam' });
+  });
+
+  it('a `modules/<id>` part is the DATA of that app, and travels with its id', () => {
+    // Not «the app did not go in» — that is `failedApps`, and the app may well be installed and
+    // running with an empty catalogue. Telling them apart is the difference between «reinstall it»
+    // and «your services are missing».
+    expect(heroPart('modules/hairdressing')).toEqual({ kind: 'app_data', moduleId: 'hairdressing' });
+  });
+
+  it('a section this shell does not know is handed back whole, never swallowed', () => {
+    // A runtime newer than the shell. Painting its key is what the full report at Settings › Data
+    // already does with an unknown section; dropping it silently would be the one thing worse than
+    // an ugly name — a part that failed and nobody ever mentioned.
+    expect(heroPart('something_new')).toEqual({ kind: 'unknown', section: 'something_new' });
   });
 });

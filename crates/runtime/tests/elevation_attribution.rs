@@ -76,12 +76,7 @@ fn ticket() -> Params {
 async fn approve(rt: &Runtime, command: &str, payload: &Params) -> String {
     rt.approve_elevation(
         &cashier(),
-        ElevationRequest {
-            approver_name: "Sofía",
-            pin: MANAGER_PIN,
-            command,
-            payload,
-        },
+        ElevationRequest::with_pin("Sofía", MANAGER_PIN, command, payload),
     )
     .await
     .expect("the manager approves")
@@ -92,12 +87,7 @@ async fn approve(rt: &Runtime, command: &str, payload: &Params) -> String {
 async fn manager_id(rt: &Runtime) -> String {
     rt.approve_elevation(
         &cashier(),
-        ElevationRequest {
-            approver_name: "Sofía",
-            pin: MANAGER_PIN,
-            command: "till.sale.take_payment",
-            payload: &ticket(),
-        },
+        ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.sale.take_payment", &ticket()),
     )
     .await
     .expect("the manager approves")
@@ -471,6 +461,71 @@ async fn an_admin_reads_the_audit_with_names_resolved() {
     assert!(
         !rows[0]["payload_fingerprint"].as_str().unwrap_or_default().is_empty(),
         "the fingerprint travels"
+    );
+}
+
+/// hub#903 (ADR-0351, rule R2) — **an employee is never deleted, they are deactivated**, and the
+/// receipts they signed stay on record WITH their name.
+///
+/// This is the market's answer, unanimously: of eleven references, six forbid deleting an employee
+/// who has history at all (Business Central, NetSuite, Square, Clover, and SAP B1 / Odoo in all
+/// but name), and the five that allow it keep the trail anyway — Toast («information about deleted
+/// employees remains available in reports»), Shopify, Fresha, Vagaro, and Lightspeed, which is the
+/// only one that anonymises. **Nobody cascades, and nobody nulls the attribution on purpose.**
+///
+/// The hub already behaves this way — `DELETE /api/hub/users/:id` is routed to `deactivate_user`,
+/// an `is_active = 0` — but nothing said so and nothing held it in place. This test is the lock:
+/// a refactor that turned the deactivation into a real delete would take a manager's four years of
+/// approvals with it, and today only this test would notice.
+///
+/// Anonymising instead is deliberately NOT done. Art. 17.3.b/e GDPR shields the receipt from an
+/// erasure request while the period runs, and what the law grants afterwards is *bloqueo* (art. 32
+/// LOPDGDD) — which in a hub collapses into the four-year prune, because the row is already
+/// invisible outside this admin-only query. **The prune IS the erasure**; anonymising early would
+/// destroy the evidence with nobody entitled to ask for it.
+#[tokio::test]
+async fn a_deactivated_manager_keeps_their_name_on_every_receipt_they_signed() {
+    let (db, rt) = fresh_hub().await;
+    let token = approve(&rt, "till.sale.take_payment", &ticket()).await;
+    rt.execute_command(
+        "till.sale.take_payment",
+        &ticket(),
+        &cashier().with_elevation_token(&token),
+    )
+    .await
+    .expect("the approved payment");
+
+    // She leaves the company. This is the strongest thing the hub can do to a person: there is no
+    // delete, by decision.
+    let manager = manager_id(&rt).await;
+    let row = rt
+        .update_hub_user(
+            &manager,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                is_active: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("the manager is deactivated");
+    assert!(!row.is_active, "she is out: {row:?}");
+
+    // The receipt is untouched — same row, same two ids.
+    let rows = recorded(&db).await;
+    assert_eq!(rows.len(), 1, "the receipt did not leave with her");
+    assert_eq!(rows[0]["approved_by"], json!(manager));
+
+    // And the screen still names her. The JOIN is on the id and asks nothing about `is_active`, so
+    // «who authorised this» keeps its answer instead of degrading to a UUID the day she leaves.
+    let read = rt
+        .execute_query("hub.approvals.list", &Params::new(), &admin())
+        .await
+        .expect("an admin may read the audit");
+    assert_eq!(read.len(), 1);
+    assert_eq!(
+        read[0]["approved_by_name"],
+        json!("Sofía"),
+        "a former employee is still the person who said yes"
     );
 }
 

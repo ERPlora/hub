@@ -19,9 +19,17 @@ use serde_json::{json, Value};
 
 fn config() -> Value {
     json!({
-        "software_name": "ERPLORA CLOUD SL",
-        "software_nif": "B27593136",
-        "software_version": "1.0.0",
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
     })
 }
 
@@ -49,7 +57,7 @@ fn alta(invoice_type: &str, recipient_nif: &str) -> Value {
 }
 
 fn xml_de(record: &Value) -> String {
-    aeat::build_soap(record, &config(), None, "hub-1")
+    aeat::build_soap(record, &config(), None, "hub-1").expect("el registro se puede declarar")
 }
 
 // ── El XML que el módulo genera es válido ─────────────────────────────────────────────────
@@ -87,7 +95,8 @@ fn el_alta_encadenada_pasa_la_validacion() {
     });
     let mut rec = alta("F2", "");
     rec["is_first_record"] = json!(0);
-    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1")
+        .expect("el registro se puede declarar");
     assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
 
     xsd::validate_registro(&xml)
@@ -107,7 +116,8 @@ fn la_anulacion_encadenada_pasa_la_validacion() {
     let mut rec = alta("F1", "B12345678");
     rec["record_type"] = json!("anulacion");
     rec["is_first_record"] = json!(0);
-    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1");
+    let xml = aeat::build_soap(&rec, &config(), Some(&previo), "hub-1")
+        .expect("el registro se puede declarar");
     assert!(xml.contains("<sum1:RegistroAnterior>"), "{xml}");
 
     xsd::validate_registro(&xml).expect("una anulación encadenada también debe pasar el gate");
@@ -259,7 +269,13 @@ fn el_orden_del_validador_sale_del_xsd_oficial() {
 /// Sustituye el bloque `Desglose` del XML por uno construido a mano, para poder probar detalles
 /// que el módulo nunca generaría (y que otro caller sí podría construir).
 fn con_desglose(detalle: &str) -> String {
-    let xml = xml_de(&alta("F2", ""));
+    con_desglose_de("F2", "", detalle)
+}
+
+/// Same, choosing the invoice type and recipient: §15.8 only bites on `F2`, so its tests need an
+/// `F1` counterexample built the same way.
+fn con_desglose_de(tipo: &str, nif: &str, detalle: &str) -> String {
+    let xml = xml_de(&alta(tipo, nif));
     let ini = xml.find("<sum1:Desglose>").expect("Desglose");
     let fin = xml.find("</sum1:Desglose>").expect("cierre") + "</sum1:Desglose>".len();
     format!(
@@ -508,4 +524,146 @@ fn el_orden_del_detalle_sale_del_xsd_oficial() {
         .filter(|e| *e != "CalificacionOperacion" && *e != "OperacionExenta")
         .collect();
     assert_eq!(del_esquema, sin_choice);
+}
+
+// ── §15.8: the 3,000 EUR ceiling of a simplified invoice (hub#297) ────────────────────────
+//
+// «Cuando TipoFactura sea "F2", se validará que Ʃ (BaseImponibleOimporteNoSujeto +
+// CuotaRepercutida) de todas las líneas de detalle no sea superior a 3.000,00 euros. Se admitirá
+// un error de +10,00 euros.» — Validaciones AEAT v1.2.2, §15.8.
+//
+// Unlike the 400 EUR ceiling of the simplified invoice (ADR-0184), which is the merchant's
+// obligation and is deliberately NOT enforced, this one is a **certain rejection** by the
+// service — and a rejection arrives with the chain number already spent.
+
+/// One 21 % VAT line with the given base and tax amount, as the AEAT formats them.
+fn linea_iva(base: &str, cuota: &str) -> String {
+    format!(
+        "<sum1:DetalleDesglose>\
+         <sum1:Impuesto>01</sum1:Impuesto>\
+         <sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+         <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+         <sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>\
+         <sum1:BaseImponibleOimporteNoSujeto>{base}</sum1:BaseImponibleOimporteNoSujeto>\
+         <sum1:CuotaRepercutida>{cuota}</sum1:CuotaRepercutida>\
+         </sum1:DetalleDesglose>"
+    )
+}
+
+/// Inserts an element as a DIRECT child of `RegistroAlta`, right before `marcador` (which must be
+/// a direct child too, so the new element lands at the depth the validator reads).
+fn con_elemento_antes_de(xml: &str, marcador: &str, elemento: &str) -> String {
+    let out = xml.replacen(marcador, &format!("{elemento}{marcador}"), 1);
+    assert_ne!(out, *xml, "el marcador `{marcador}` no está en el sobre");
+    out
+}
+
+/// The case that pays for this rule: a 3.630 € simplified ticket. Today it reaches the AEAT, gets
+/// rejected, and the invoice number is already burnt.
+#[test]
+fn una_f2_por_encima_de_3000_no_llega_a_la_aeat() {
+    let xml = con_desglose(&linea_iva("3000.00", "630.00"));
+    let err = xsd::validate_registro(&xml).expect_err("una F2 de 3.630 € es un rechazo seguro");
+    let msg = err.to_string();
+    assert!(msg.contains("15.8"), "la referencia, para buscarla: {msg}");
+    assert!(msg.contains("F2"), "{msg}");
+    assert!(msg.contains("3.000") || msg.contains("3000"), "{msg}");
+}
+
+/// The threshold is 3.000 € **plus the +10 € margin the AEAT admits**: 3.010,00 € passes and
+/// 3.010,01 € does not. Getting this off by one cent either lets a rejection through or blocks a
+/// legitimate sale.
+#[test]
+fn el_limite_de_la_f2_esta_en_3010_exactos_e_inclusive() {
+    // 2.487,60 × 21 % = 522,40 → 3.010,00 exactos.
+    xsd::validate_registro(&con_desglose(&linea_iva("2487.60", "522.40")))
+        .expect("3.010,00 € es el último importe admitido (3.000 + los 10 € de tolerancia)");
+
+    let err = xsd::validate_registro(&con_desglose(&linea_iva("2487.61", "522.40")))
+        .expect_err("3.010,01 € ya se pasa");
+    assert!(err.to_string().contains("15.8"), "{err}");
+}
+
+/// The tolerance is not decorative: between 3.000 € and 3.010 € the AEAT admits the record, so
+/// the validator must not block it.
+#[test]
+fn una_f2_de_3005_pasa_por_la_tolerancia_de_10_euros() {
+    // 2.483,47 × 21 % = 521,53 → 3.005,00.
+    xsd::validate_registro(&con_desglose(&linea_iva("2483.47", "521.53")))
+        .expect("3.005 € entra por la tolerancia de +10 € (§15.8)");
+}
+
+/// §15.8 adds up **every** detail line. Checking line by line would let a two-line ticket through.
+#[test]
+fn el_limite_de_la_f2_suma_todas_las_lineas() {
+    let una = linea_iva("1500.00", "315.00"); // 1.815 € — por sí sola, muy por debajo
+    xsd::validate_registro(&con_desglose(&una)).expect("una sola línea de 1.815 € es válida");
+
+    let dos = format!("{una}{una}"); // 3.630 €
+    let err = xsd::validate_registro(&con_desglose(&dos)).expect_err("dos líneas suman 3.630 €");
+    assert!(err.to_string().contains("15.8"), "{err}");
+}
+
+/// The rule is scoped to `F2`. A complete invoice has no ceiling — blocking one would stop the
+/// normal way of billing above 3.000 €, which is exactly what the operator has to do instead.
+#[test]
+fn el_limite_de_3000_no_aplica_a_una_factura_completa() {
+    let xml = con_desglose_de("F1", "B12345678", &linea_iva("3000.00", "630.00"));
+    xsd::validate_registro(&xml).expect("una F1 de 3.630 € es perfectamente válida");
+}
+
+/// First exception of §15.8: a billing agreement (`NumRegistroAcuerdoFacturacion`). The module
+/// does not emit it today, but the rule has to know about it or it will block a legitimate sale
+/// the day it does.
+#[test]
+fn el_acuerdo_de_facturacion_exime_del_limite_de_la_f2() {
+    let base = con_desglose(&linea_iva("3000.00", "630.00"));
+    assert!(
+        xsd::validate_registro(&base).is_err(),
+        "sin acuerdo, se rechaza"
+    );
+
+    let con_acuerdo = con_elemento_antes_de(
+        &base,
+        "<sum1:TipoHuella>",
+        "<sum1:NumRegistroAcuerdoFacturacion>ACU-001</sum1:NumRegistroAcuerdoFacturacion>",
+    );
+    xsd::validate_registro(&con_acuerdo).expect("con acuerdo de facturación §15.8 no aplica");
+}
+
+/// Second exception: `FacturaSinIdentifDestinatarioArt61d = "S"`. Only `"S"` exempts — an `"N"`
+/// (the other value of the enumeration) is a normal F2 and keeps the ceiling.
+#[test]
+fn el_articulo_61d_exime_del_limite_de_la_f2_solo_con_s() {
+    let base = con_desglose(&linea_iva("3000.00", "630.00"));
+    let art61d = |v: &str| {
+        con_elemento_antes_de(
+            &base,
+            "<sum1:Desglose>",
+            &format!(
+                "<sum1:FacturaSinIdentifDestinatarioArt61d>{v}\
+                 </sum1:FacturaSinIdentifDestinatarioArt61d>"
+            ),
+        )
+    };
+    xsd::validate_registro(&art61d("S")).expect("con art. 61.d = S, §15.8 no aplica");
+    assert!(
+        xsd::validate_registro(&art61d("N")).is_err(),
+        "`N` no es una excepción: sigue siendo una F2 con su techo"
+    );
+}
+
+/// The two exceptions are named after the **official XSD**, not after the prose of the validations
+/// document (which writes `Articulo61d` while the schema says `Art61d`). A typo here would make
+/// the exception silently unreachable.
+#[test]
+fn los_nombres_de_las_excepciones_del_15_8_salen_del_xsd_oficial() {
+    let xsd_src = include_str!("../schemas/aeat/SuministroInformacion.xsd");
+    let del_esquema = xsd::sequence_of(xsd_src, "RegistroFacturacionAltaType").expect("secuencia");
+    for nombre in xsd::F2_LIMIT_EXEMPTIONS {
+        assert!(
+            del_esquema.iter().any(|e| e == nombre),
+            "`{nombre}` no está en el xs:sequence oficial: {del_esquema:?}"
+        );
+    }
 }

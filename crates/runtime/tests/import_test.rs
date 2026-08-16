@@ -253,6 +253,8 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
             role: "admin".into(),
             pin: "4821".into(),
             email: "demo@example.com".into(),
+            badge: String::new(),
+
             local: false,
         },
     )
@@ -328,6 +330,7 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
                 pin: pin.into(),
                 // Usuario de CUENTA: sin la casilla «Local user» el alta pide email (hub#356).
                 email: format!("{}@example.com", name.to_lowercase()),
+                badge: String::new(),
                 local: false,
             },
         )
@@ -357,6 +360,8 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
             role: "manager".into(),
             pin: "4821".into(),
             email: "encargada@example.com".into(),
+            badge: String::new(),
+
             local: false,
         },
     )
@@ -423,6 +428,8 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
             role: "manager".into(),
             pin: "4821".into(),
             email: "encargada@example.com".into(),
+            badge: String::new(),
+
             local: false,
         },
     )
@@ -935,7 +942,7 @@ async fn las_series_de_facturacion_del_destino_sobreviven_al_import() {
 /// serie define **cómo numera un negocio lo que declara a Hacienda** y `invoice_series_allocation`
 /// es el libro de números ya entregados que el RD 1007/2023 exige sin huecos ni duplicados. De
 /// otra instalación, aquí, son numeración ajena — la misma regla que ya se aplica a la cadena
-/// VeriFactu (`chain_not_portable`, ADR-0202 §4.2).
+/// VeriFactu (`installation_bound_not_portable`, ADR-0202 §4.2 generalizada por hub#380).
 #[tokio::test]
 async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
     if !erplora_runtime::require_modules_workspace() { return; }

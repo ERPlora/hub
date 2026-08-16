@@ -5,8 +5,15 @@
 //! cumulative snapshot to the SaaS. If the sales module/table is unavailable,
 //! `orders_today` is omitted: the Cloud must not turn a read failure into a
 //! fabricated zero.
+//!
+//! The same snapshot carries the **VeriFactu contingency queue** (hub#326) — how many records
+//! the AEAT has not received and since when — so a hub that stopped remitting is visible from
+//! the fleet panel and not only from its own dashboard. The count comes from the engine
+//! (`erplora_verifactu::contingency_queue`), the same query that blocks an uninstall (hub#314),
+//! so the alert and the refusal can never disagree.
 
 use erplora_db::{DatabaseAdapter, Params};
+use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -59,6 +66,28 @@ pub struct DailyUsageHeartbeat {
     /// dentro del binario, así que no existe el caso de «no la sé». Va **sin** el `v`: el prefijo
     /// es para leerlo en un panel, no para que el Cloud tenga que quitarlo antes de comparar.
     pub hub_version: String,
+    /// How many VeriFactu records the AEAT has NOT received yet (hub#326).
+    ///
+    /// Without it a hub that stopped remitting is indistinguishable from a healthy one: the
+    /// operator sees the pending KPI on their own dashboard, and nobody else does. It rides this
+    /// request for the same reason everything else here does — the beat already carries the
+    /// machine credential at the right cadence.
+    ///
+    /// Same `Option` contract as the fields above, and it matters here more than anywhere: an
+    /// explicit **`0`** is «this hub owes the tax agency nothing», and **absent** is «I could not
+    /// count it» — a hub with no `verifactu` module installed, or one whose table would not read.
+    /// A fabricated `0` would paint a hub nobody can measure as compliant, which is the exact
+    /// blindness this field exists to remove.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifactu_pending_depth: Option<u64>,
+    /// `created_at` of the oldest record still waiting, absent when the queue is empty or unknown.
+    ///
+    /// Depth alone cannot raise an alert: four records queued during a lunch service are normal,
+    /// and four queued since last Tuesday are a hub whose certificate expired. **The hub does not
+    /// decide the threshold** — it reports the wait, and the SaaS decides what «stuck» means, so
+    /// changing that answer does not need a fleet-wide image bump.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifactu_oldest_pending_at: Option<String>,
 }
 
 /// What the control plane answered to a heartbeat (ADR-0202 §2.5 — hub#318).
@@ -75,6 +104,17 @@ pub struct HeartbeatResponse {
     /// a proxy can answer something that is not JSON at all. Reading either as `0` would be reading
     /// «the control plane has no certificate» out of silence.
     pub cert_version: Option<i64>,
+    /// The manufacturer's half of `SistemaInformatico` (ADR-0202 §5.1 — hub#323), when the block
+    /// came and was valid.
+    ///
+    /// It rides the beat instead of being announced: ~80 bytes of PUBLIC data, so a version
+    /// number to trigger a fetch would cost more —in bytes, in state and in one more state
+    /// machine on this side— than the payload it would be guarding. The certificate is versioned
+    /// precisely because it is the opposite: a private key that cannot travel in a 60-second loop.
+    ///
+    /// `None` again means «nothing was announced», and it is NOT a set of defaults: there are
+    /// none for a legal declaration. The engine refuses to build an envelope it cannot fill.
+    pub producer: Option<ProducerFacts>,
 }
 
 impl HeartbeatResponse {
@@ -85,15 +125,23 @@ impl HeartbeatResponse {
     /// a body this hub cannot understand must not turn into an error that stops the clock. The
     /// certificate announcement is an extra that rides along, and it degrades to «no news».
     pub fn parse(body: &str) -> Self {
-        let announced = serde_json::from_str::<Value>(body)
-            .ok()
-            .and_then(|value| value.get("cert_version").and_then(Value::as_i64))
+        let Ok(body) = serde_json::from_str::<Value>(body) else {
+            return Self::default();
+        };
+        let announced = body
+            .get("cert_version")
+            .and_then(Value::as_i64)
             // A negative version cannot exist (`DelegatedCertificate.version` starts at 0 and only
             // grows). Treating it as an announcement would make the hub chase a version nobody can
             // serve, once per heartbeat, against a budgeted endpoint.
             .filter(|version| *version >= 0);
+        // `ProducerFacts::parse` is the validation, and it is deliberately all-or-nothing: these
+        // fields are identical across the fleet, so one bad character is AEAT error 1100 on every
+        // record of every hub. A block that would be rejected is treated as no block, which keeps
+        // whatever this hub already had.
         Self {
             cert_version: announced,
+            producer: body.get("producer").and_then(ProducerFacts::parse),
         }
     }
 }
@@ -142,6 +190,23 @@ pub async fn collect_daily_usage(
         .and_then(|result| result.rows.into_iter().next())
         .and_then(|row| value_as_u64(&row["terminals"]));
 
+    // La cola de contingencia de VeriFactu (hub#326). La cuenta el MOTOR, no una copia de su SQL
+    // aquí: el número que alerta al SaaS y el que bloquea una desinstalación (hub#314) salen de la
+    // misma consulta, así que no pueden discrepar. Un `Err` —hub sin el módulo, tabla ilegible— se
+    // convierte en «no lo sé» (campo ausente), nunca en un `0`.
+    let queue = erplora_verifactu::contingency_queue(
+        hub_id,
+        &erplora_runtime::native::DbHost {
+            db,
+            storage: None,
+            hub_id,
+            module_id: "verifactu",
+            static_folder: None,
+        },
+    )
+    .await
+    .ok();
+
     DailyUsageHeartbeat {
         orders_today,
         last_sale_at,
@@ -158,6 +223,8 @@ pub async fn collect_daily_usage(
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
         hub_version: crate::version::HUB_VERSION.to_string(),
+        verifactu_pending_depth: queue.as_ref().map(|q| q.depth),
+        verifactu_oldest_pending_at: queue.and_then(|q| q.oldest_pending_at),
     }
 }
 
@@ -182,7 +249,16 @@ pub async fn send_heartbeat(
     // caller may confirm it. The body is a bonus, so a truncated read degrades to «nothing
     // announced» rather than undoing a heartbeat that the Cloud already recorded.
     let body = response.text().await.unwrap_or_default();
-    Ok(HeartbeatResponse::parse(&body))
+    let answer = HeartbeatResponse::parse(&body);
+    // The manufacturer's facts are installed HERE and not by each caller (ADR-0202 §5.1 —
+    // hub#323): both the boot announce and the 60-second loop go through this function, so the
+    // boot one doubles as the pull the fiscal endpoint exists for, and there is no second place
+    // that can forget. Nothing below the host learns that a control plane exists — the engine
+    // reads the cache through `NativeHost::producer_facts`.
+    if let Some(facts) = answer.producer.clone() {
+        ProducerFactsCache::global().store(facts);
+    }
+    Ok(answer)
 }
 
 fn value_as_u64(value: &Value) -> Option<u64> {
@@ -301,6 +377,8 @@ mod tests {
             cert_version: Some(4),
             cert_not_after: Some("2028-06-10".into()),
         hub_version: crate::version::HUB_VERSION.to_string(),
+        verifactu_pending_depth: Some(2),
+        verifactu_oldest_pending_at: Some("2026-07-25T08:00:00Z".into()),
     };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -324,6 +402,9 @@ mod tests {
                 "cert_version": 4,
                 "cert_not_after": "2028-06-10",
                 "hub_version": crate::version::HUB_VERSION,
+                // hub#326: the queue the SaaS alerts on travels under these exact names.
+                "verifactu_pending_depth": 2,
+                "verifactu_oldest_pending_at": "2026-07-25T08:00:00Z",
             })
         );
         server.abort();
@@ -342,6 +423,8 @@ mod tests {
             cert_version: None,
             cert_not_after: None,
         hub_version: crate::version::HUB_VERSION.to_string(),
+        verifactu_pending_depth: None,
+        verifactu_oldest_pending_at: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
@@ -363,6 +446,8 @@ mod tests {
             cert_version: Some(0),
             cert_not_after: None,
         hub_version: crate::version::HUB_VERSION.to_string(),
+        verifactu_pending_depth: None,
+        verifactu_oldest_pending_at: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert_eq!(body, json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION}));
@@ -384,6 +469,8 @@ mod tests {
             cert_version: None,
             cert_not_after: None,
         hub_version: crate::version::HUB_VERSION.to_string(),
+        verifactu_pending_depth: None,
+        verifactu_oldest_pending_at: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
@@ -397,7 +484,8 @@ mod tests {
         assert_eq!(
             HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 4}"#),
             HeartbeatResponse {
-                cert_version: Some(4)
+                cert_version: Some(4),
+                producer: None,
             }
         );
         // `0` es un anuncio de pleno derecho: «no he subido nada» (y el hub NO debe pedir el GET).
@@ -427,6 +515,56 @@ mod tests {
         assert_eq!(HeartbeatResponse::parse("<html>502</html>").cert_version, None);
         assert_eq!(HeartbeatResponse::parse("").cert_version, None);
         assert_eq!(HeartbeatResponse::parse("[]").cert_version, None);
+    }
+
+    // ── The manufacturer's facts ride the beat (ADR-0202 §5.1 — hub#323) ─────────────────────
+    //
+    // `SistemaInformatico` needs seven fields this hub cannot know: the manufacturer's identity
+    // and `IndicadorMultiplesOT`, which the AEAT computes per ACCOUNT. They are ~80 bytes and
+    // public, so they travel inline every minute instead of being announced by a version number
+    // the hub would then have to go and fetch.
+
+    fn served_producer_body() -> String {
+        r#"{"ok": true, "producer": {
+             "NombreRazon": "ERPLORA CLOUD SL", "NIF": "B27593136",
+             "NombreSistemaInformatico": "ERPlora Hub", "IdSistemaInformatico": "EC",
+             "TipoUsoPosibleSoloVerifactu": "S", "TipoUsoPosibleMultiOT": "S",
+             "IndicadorMultiplesOT": "S"}}"#
+            .to_string()
+    }
+
+    /// 🔴 hub#323: the block was served (saas#1128) and the hub threw it away, so every record
+    /// kept declaring a hardcoded `IndicadorMultiplesOT = N`.
+    #[test]
+    fn the_beat_carries_the_manufacturer_s_facts() {
+        let facts = HeartbeatResponse::parse(&served_producer_body())
+            .producer
+            .expect("the block the SaaS serves must be read");
+
+        assert_eq!(facts.nombre_razon, "ERPLORA CLOUD SL");
+        assert_eq!(facts.nombre_sistema_informatico, "ERPlora Hub");
+        assert_eq!(
+            facts.indicador_multiples_ot, "S",
+            "this is the field only the control plane can compute"
+        );
+    }
+
+    /// A control plane from before saas#1128 says nothing, and nothing is not a set of defaults:
+    /// the hub keeps whatever it already had rather than inventing a legal declaration.
+    #[test]
+    fn a_beat_without_the_block_announces_no_facts() {
+        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#).producer.is_none());
+        assert!(HeartbeatResponse::parse("<html>502</html>").producer.is_none());
+    }
+
+    /// A block that would be rejected by the AEAT is not installed. These facts are identical for
+    /// the whole fleet, so one bad field is error 1100 on every record of every hub — keeping the
+    /// previous ones beats adopting a broken identity.
+    #[test]
+    fn a_block_the_aeat_would_reject_is_not_adopted() {
+        let broken = served_producer_body().replace(r#""IdSistemaInformatico": "EC""#, r#""IdSistemaInformatico": "ERPLORA-001""#);
+
+        assert!(HeartbeatResponse::parse(&broken).producer.is_none());
     }
 
     /// A version that cannot exist is not an announcement. `DelegatedCertificate.version` starts at
@@ -468,6 +606,8 @@ mod tests {
                 cert_version: Some(0),
                 cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
         },
         )
         .await
@@ -518,6 +658,8 @@ mod tests {
                 cert_version: Some(4),
                 cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
         },
         )
         .await
@@ -546,6 +688,8 @@ mod tests {
             cert_version: None,
             cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
         };
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
@@ -581,5 +725,104 @@ mod tests {
         let usage = collect_daily_usage(&db, "hub-1", "2026-08-08T10:00:00Z").await;
 
         assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
+    }
+
+    // ── The VeriFactu contingency queue (hub#326) ─────────────────────────────────────────────
+
+    /// A `sales_sale`/`hub_session` pair plus the fiscal records this hub still owes the AEAT.
+    async fn db_with_verifactu_records(records: &str) -> erplora_db::PgAdapter {
+        let db = fresh_db().await;
+        db.execute_batch(&format!(
+            "CREATE TABLE sales_sale (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, status TEXT NOT NULL, \
+               is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
+             );\
+             CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
+             );\
+             CREATE TABLE verifactu_record (\
+               id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, status TEXT NOT NULL, \
+               is_deleted BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL\
+             );{records}"
+        ))
+        .await
+        .unwrap();
+        db
+    }
+
+    /// **The whole point of hub#326.** A hub that stopped remitting looks perfectly healthy from
+    /// the SaaS today: nothing in the heartbeat says how many records the AEAT is still missing,
+    /// nor for how long. Both travel now — the depth, and WHEN the oldest one got queued, which
+    /// is what separates a busy lunch service from a hub whose certificate expired last week.
+    #[tokio::test]
+    async fn the_heartbeat_carries_the_contingency_queue_depth_and_its_oldest_entry() {
+        let db = db_with_verifactu_records(
+            "INSERT INTO verifactu_record VALUES\
+               ('r1', 'hub-a', 'pending', 0, '2026-08-01T09:00:00Z'),\
+               ('r2', 'hub-a', 'retry', 0, '2026-08-03T10:00:00Z'),\
+               ('r3', 'hub-a', 'error', 0, '2026-08-04T10:00:00Z'),\
+               ('r4', 'hub-a', 'rejected', 0, '2026-08-05T10:00:00Z'),\
+               ('sent', 'hub-a', 'accepted', 0, '2026-07-01T10:00:00Z'),\
+               ('gone', 'hub-a', 'pending', 1, '2026-07-02T10:00:00Z'),\
+               ('next-door', 'hub-b', 'pending', 0, '2026-06-01T10:00:00Z');",
+        )
+        .await;
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z").await;
+        let body = serde_json::to_value(&usage).unwrap();
+
+        assert_eq!(
+            body["verifactu_pending_depth"],
+            json!(4),
+            "the four states short of `accepted` are records the AEAT does not have; the accepted \
+             one, the soft-deleted one and the neighbour hub's are not this hub's queue: {body}"
+        );
+        assert_eq!(
+            body["verifactu_oldest_pending_at"],
+            json!("2026-08-01T09:00:00Z"),
+            "the SaaS decides what «stuck» means; the hub reports the wait it can measure: {body}"
+        );
+    }
+
+    /// **An empty queue is an explicit `0`.** Same contract as `cert_version`: absent means «I
+    /// could not count it». If a drained hub simply said nothing, the fleet panel could not tell
+    /// it apart from one whose database it cannot read — which is the alert this issue exists for.
+    #[tokio::test]
+    async fn a_hub_that_owes_the_aeat_nothing_reports_an_explicit_zero() {
+        let db = db_with_verifactu_records(
+            "INSERT INTO verifactu_record VALUES\
+               ('sent', 'hub-a', 'accepted', 0, '2026-07-01T10:00:00Z');",
+        )
+        .await;
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z").await;
+        let body = serde_json::to_value(&usage).unwrap();
+
+        assert_eq!(body["verifactu_pending_depth"], json!(0));
+        assert!(
+            body.get("verifactu_oldest_pending_at").is_none(),
+            "an empty queue has no oldest entry — a date here would be a wait nobody is doing: {body}"
+        );
+    }
+
+    /// **No module, no number.** A hub without `verifactu` installed has no such table, and a
+    /// read that cannot happen is silence — never a fabricated `0`, which would tell the SaaS
+    /// that a queue it has never seen is under control.
+    #[tokio::test]
+    async fn a_hub_without_the_verifactu_module_says_nothing_instead_of_zero() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE hub_session (\
+               token TEXT PRIMARY KEY, hub_id TEXT NOT NULL, device_id TEXT, expires_at TEXT NOT NULL\
+             );",
+        )
+        .await
+        .unwrap();
+
+        let usage = collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z").await;
+        let body = serde_json::to_value(&usage).unwrap();
+
+        assert!(body.get("verifactu_pending_depth").is_none(), "{body}");
+        assert!(body.get("verifactu_oldest_pending_at").is_none(), "{body}");
     }
 }

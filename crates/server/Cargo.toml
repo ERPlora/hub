@@ -48,6 +48,10 @@ zip = "2"
 sha2 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 base64 = "0.22"
+# hub#981: la descarga del zip de módulo se vuelca en streaming a un temp file en la caché de
+# módulos (mismo volumen que la extracción); `NamedTempFile` se borra solo en TODOS los caminos
+# de fallo, así que una verificación fallida nunca deja restos.
+tempfile = "3"
 
 [dev-dependencies]
 # `test-util` = helper de esquema Postgres efímero por test (ADR-0154): los tests del server

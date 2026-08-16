@@ -32,6 +32,21 @@ pub const REMINDER_DUE_SUFFIX: &str = ".reminder.due";
 /// No es un command de módulo: lo entrega el runtime vía el transporte de notificación.
 pub const HOST_NOTIFY_LISTENER: &str = "host.notify";
 
+/// Sufijo convencional de los eventos que el **listener-host** de `host.print` consume (hub#957,
+/// decisión de Ioan del 2026-08-15): un command de módulo emite `<algo>.print.due` con la intención
+/// `{jobId, role, documentType, document, format}` y el relay la encola en la cola de impresión del
+/// hub (ADR-0196 §6).
+///
+/// El sufijo es **`.print.due`**, calcado del de arriba y por su misma razón: «due» es lo que un
+/// evento del outbox significa en este hub —algo que toca hacer y que el relay se encarga de que
+/// ocurra— y compartir la forma hace que el segundo listener-host se lea como lo que es, el gemelo
+/// del primero, y no como un mecanismo aparte que hay que aprender.
+pub const PRINT_DUE_SUFFIX: &str = ".print.due";
+
+/// Nombre del listener sintético de impresión en `_event_delivery` (idempotencia del encolado).
+/// Espejo de [`HOST_NOTIFY_LISTENER`]: tampoco es un command de módulo.
+pub const HOST_PRINT_LISTENER: &str = "host.print";
+
 /// El evento que encola un step `notify` de un flujo (hub#821). Lleva el sufijo de arriba a
 /// propósito: es el MISMO camino de entrega que el de un módulo —transporte, reintentos, backoff,
 /// dead-letter— y lo único que cambia es cómo se autorizó el destinatario.
@@ -67,10 +82,10 @@ const LEASE_SECONDS: i64 = 300;
 ///
 /// New columns arrive here as `ALTER TABLE … ADD COLUMN IF NOT EXISTS` and **not** as a numbered
 /// system migration. That is this table's own pattern (`module_id` in ADR-0168, `discarded_at/by`
-/// in hub#660, `run_id`/`parent_event_id` in hub#666) and it is deliberate: these tables are
-/// created by the runtime before the migration engine runs at all — a hub with zero modules still
-/// has an outbox — so their shape cannot depend on a numbered version. It also keeps additive
-/// columns out of the way of the number races between parallel branches.
+/// in hub#660, `run_id`/`parent_event_id` in hub#666, `discard_reason` in hub#955) and it is
+/// deliberate: these tables are created by the runtime before the migration engine runs at all — a
+/// hub with zero modules still has an outbox — so their shape cannot depend on a numbered version.
+/// It also keeps additive columns out of the way of the number races between parallel branches.
 ///
 /// `ix_outbox_prune` backs the retention sweep (hub#699, `crate::retention`), which scans by
 /// terminal age and not by `next_attempt_at`, so `ix_outbox_due` does not serve it. It is
@@ -89,12 +104,13 @@ CREATE TABLE IF NOT EXISTS _event_outbox (\
   attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT NOT NULL, \
   last_error TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, delivered_at TEXT, \
   module_id TEXT NOT NULL DEFAULT '', claim_expires_at TEXT, \
-  discarded_at TEXT, discarded_by TEXT, \
+  discarded_at TEXT, discarded_by TEXT, discard_reason TEXT NOT NULL DEFAULT '', \
   run_id TEXT NOT NULL DEFAULT '', parent_event_id TEXT NOT NULL DEFAULT '');\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS module_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS claim_expires_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
+ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS run_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS parent_event_id TEXT NOT NULL DEFAULT '';\
 ALTER TABLE _event_outbox ADD COLUMN IF NOT EXISTS failure_kind TEXT NOT NULL DEFAULT '';\
@@ -108,7 +124,10 @@ CREATE INDEX IF NOT EXISTS ix_outbox_prune \
 CREATE INDEX IF NOT EXISTS ix_outbox_name ON _event_outbox (hub_id, event_name, created_at);\
 CREATE TABLE IF NOT EXISTS _event_delivery (\
   event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
-  PRIMARY KEY (event_id, listener_command));";
+  hub_id TEXT NOT NULL, \
+  PRIMARY KEY (event_id, listener_command));\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);";
 
 /// Crea las tablas de sistema del outbox (idempotente), como `migrations::ensure_table`.
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
@@ -210,13 +229,14 @@ pub async fn insert_core_event_once(
 
 /// `INSERT` del marcador de entrega (event_id, listener). El relay lo añade a la transacción
 /// del listener → si el listener commitea, la entrega queda registrada atómicamente.
-fn delivery_op(event_id: &str, listener: &str) -> (String, Params) {
+pub(crate) fn delivery_op(hub_id: &str, event_id: &str, listener: &str) -> (String, Params) {
     let mut p = Params::new();
     p.insert("event_id".into(), json!(event_id));
     p.insert("listener_command".into(), json!(listener));
     p.insert("delivered_at".into(), json!(now_rfc3339()));
-    let sql = "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) \
-        VALUES (:event_id, :listener_command, :delivered_at)";
+    p.insert("hub_id".into(), json!(hub_id));
+    let sql = "INSERT INTO _event_delivery (event_id, listener_command, delivered_at, hub_id) \
+        VALUES (:event_id, :listener_command, :delivered_at, :hub_id)";
     (sql.to_string(), p)
 }
 
@@ -349,11 +369,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     let mut failures = 0usize;
     let mut permanent: Option<&'static str> = None;
     for listener in &listeners {
-        if delivery_exists(db, &id, listener).await? {
+        if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
         }
         // Efectos del listener + sus eventos en cascada + el marcador de entrega → UNA transacción.
-        let extra = [delivery_op(&id, listener)];
+        let extra = [delivery_op(&ctx.hub_id, &id, listener)];
         // Origin::Internal (hub#131, hub#145): el relay es el propio runtime entregando un
         // listener de evento — nunca un caller externo — así que un listener `_`-prefijado o
         // `internal:true` DEBE ejecutar aquí igual que uno público.
@@ -396,6 +416,44 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
+        }
+    }
+
+    // ── Listener-host de `host.print` (hub#957) ─────────────────────────────────────────────
+    // El gemelo del de arriba. Un evento `*.print.due` además encola el documento en la cola de
+    // impresión del hub (ADR-0196 §6). Reusa la MISMA infra: idempotencia por `_event_delivery`
+    // (listener sintético `host.print`) y, si la cola rechaza el trabajo, reintento/backoff/
+    // dead-letter — que es lo que hace que un tipo de documento equivocado se vea en vez de
+    // perderse. Encolar ES la entrega: que salga papel depende del host de impresión, y si no hay
+    // ninguno registrado el trabajo espera (`print_hosts.rs`), no falla.
+    if event_name.ends_with(PRINT_DUE_SUFFIX) {
+        let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
+        if let Err(e) = deliver_host_print(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
+        {
+            failures += 1;
+            if first_err.is_none() {
+                first_err = Some(format!("{HOST_PRINT_LISTENER}: {e}"));
+            }
+        }
+    }
+
+    // ── ESPERAS de flujo (hub#951) ──────────────────────────────────────────────────────────
+    // El hermano del bloque de abajo, y la única pieza del kernel que puede mover un run que YA
+    // está vivo: `triggers::on_event` solo sabe INSERTAR uno. Una espera (`delay`) tenía hasta
+    // ahora una sola salida —su reloj—, así que el recordatorio de una cita cancelada se mandaba
+    // igual. Aquí es donde el evento que la cancela (o la que la reprograma) llega hasta ella.
+    //
+    // Va ANTES de los triggers a propósito: cancelar una espera viva no depende de que el mismo
+    // evento arranque además flujos nuevos, y el orden inverso dejaría el trabajo caro (insertar
+    // runs) por delante del barato (un UPDATE condicional sobre un índice parcial).
+    //
+    // Misma infra que todo lo de arriba: idempotencia por `_event_delivery` con un listener
+    // sintético `_flow_wait:<id>`, y un fallo aquí NO impide entregar la fila por lo demás.
+    if let Err(e) = crate::flows::waits::on_event(db, &ctx.hub_id, &id, &event_name, &payload).await
+    {
+        failures += 1;
+        if first_err.is_none() {
+            first_err = Some(format!("flow waits: {e}"));
         }
     }
 
@@ -515,7 +573,7 @@ async fn deliver_host_notify(
     let Some(transport) = &registry.notify_transport else {
         return Ok(()); // capacidad no disponible: no se envía nada (ni se reintenta).
     };
-    if delivery_exists(db, event_id, HOST_NOTIFY_LISTENER).await? {
+    if delivery_exists(db, hub_id, event_id, HOST_NOTIFY_LISTENER).await? {
         return Ok(()); // ya enviado en un intento previo (idempotencia)
     }
     let intent = NotifyIntent::from_event_payload(payload)?;
@@ -575,7 +633,70 @@ async fn deliver_host_notify(
     let routing = host_notify::route_channel(intent.channel, premium);
     transport.send(&intent, routing).await?;
     // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
-    let (sql, p) = delivery_op(event_id, HOST_NOTIFY_LISTENER);
+    let (sql, p) = delivery_op(hub_id, event_id, HOST_NOTIFY_LISTENER);
+    db.execute(&sql, &p).await?;
+    Ok(())
+}
+
+/// Encola un evento `*.print.due` en la cola de impresión del hub (hub#957), con idempotencia por
+/// `_event_delivery` (listener sintético [`HOST_PRINT_LISTENER`]). El marcador se escribe SOLO tras
+/// encolar con éxito → un fallo deja la fila para reintento (no marca entregado).
+///
+/// **Dos puertas antes de que se encole nada** (el gemelo de las tres de `host.notify`, ver
+/// [`crate::host_print`] para por qué son dos y no tres):
+///  1. el evento viene **atribuido** a un módulo emisor (`_event_outbox.module_id`): sin nombre no
+///     hay a quién exigirle la capability, así que no se imprime;
+///  2. ese módulo tiene la capability `printer` **declarada y concedida**
+///     ([`crate::capabilities::require`], default-deny). Es la que ya existía — no se inventa una
+///     nueva para lo mismo.
+///
+/// **No hay puerta de flujo** (la cuarta de `host.notify`, hub#821) y no debe haberla: el kernel no
+/// emite nada acabado en `.print.due`. Un flujo llega aquí ejecutando el command de un módulo, y lo
+/// que se autoriza es ese módulo. Una fila sin `module_id` —lo único que el kernel produce— se
+/// rechaza por la puerta 1.
+///
+/// **Un duplicado es un éxito**: `print_queue::enqueue` es idempotente por `job_id`
+/// (`ON CONFLICT DO NOTHING`, sin reescribir el documento ya encolado), así que reenviar el mismo
+/// trabajo marca la entrega igual y no saca un segundo tique.
+///
+/// **Sin host de impresión registrado el trabajo espera.** La cola no consulta el registro de hosts
+/// a propósito (`print_hosts.rs`: negarse a encolar porque no hay nadie escuchando sería el fallo
+/// de la cola-en-el-dispositivo otra vez), y lo que hace que la espera no sea silenciosa ya existe:
+/// `print_hosts::coverage` — aviso, nunca puerta.
+async fn deliver_host_print(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    event_id: &str,
+    module_id: &str,
+    hub_id: &str,
+    payload: &Params,
+) -> Result<()> {
+    if delivery_exists(db, hub_id, event_id, HOST_PRINT_LISTENER).await? {
+        return Ok(()); // ya encolado en un intento previo (idempotencia)
+    }
+    // Puerta 1 — atribución.
+    if module_id.trim().is_empty() {
+        return Err(RuntimeError::Print(
+            "evento de impresión sin módulo emisor atribuido: no se puede comprobar la capability \
+             `printer` → no se encola"
+                .to_string(),
+        ));
+    }
+    // Puerta 2 — capability del MÓDULO emisor (declarada + concedida, default-deny).
+    crate::capabilities::require(
+        db,
+        registry,
+        module_id,
+        hub_id,
+        crate::manifest::CapabilityKind::Printer,
+    )
+    .await?;
+
+    let job = crate::host_print::PrintIntent::from_event_payload(payload)?.into_job();
+    // La cola valida el resto (vocabulario del documento, forma y tamaño, papel) y es idempotente
+    // por `job_id`: `Duplicate` es un éxito, no un error.
+    crate::print_queue::enqueue(db, hub_id, &job).await?;
+    let (sql, p) = delivery_op(hub_id, event_id, HOST_PRINT_LISTENER);
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -652,13 +773,20 @@ fn parse_payload(row: &Json) -> Params {
         .unwrap_or_default()
 }
 
-async fn delivery_exists(db: &dyn DatabaseAdapter, event_id: &str, listener: &str) -> Result<bool> {
+async fn delivery_exists(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    event_id: &str,
+    listener: &str,
+) -> Result<bool> {
     let mut p = Params::new();
     p.insert("event_id".into(), json!(event_id));
     p.insert("listener_command".into(), json!(listener));
+    p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT 1 AS ok FROM _event_delivery WHERE event_id = :event_id AND listener_command = :listener_command",
+            "SELECT 1 AS ok FROM _event_delivery WHERE event_id = :event_id \
+               AND listener_command = :listener_command AND hub_id = :hub_id",
             &p,
         )
         .await?;
@@ -1016,12 +1144,14 @@ pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<R
 /// no maximum age at all.
 ///
 /// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
-/// something the caller sent in the body.
+/// something the caller sent in the body. `reason`, on the other hand, IS the caller's — it is the
+/// one thing only the person closing the row knows (see [`clamp_discard_reason`]).
 pub async fn discard(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     id: &str,
     discarded_by: &str,
+    reason: &str,
 ) -> Result<bool> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
@@ -1029,16 +1159,37 @@ pub async fn discard(
     p.insert("status".into(), json!(STATUS_DEAD));
     p.insert("discarded".into(), json!(STATUS_DISCARDED));
     p.insert("by".into(), json!(discarded_by));
+    p.insert("reason".into(), json!(clamp_discard_reason(reason)));
     p.insert("now".into(), json!(now_rfc3339()));
     let res = db
         .execute(
             "UPDATE _event_outbox SET status = :discarded, discarded_at = :now, discarded_by = :by, \
-             claim_expires_at = NULL \
+             discard_reason = :reason, claim_expires_at = NULL \
              WHERE id = :id AND hub_id = :hub_id AND status = :status",
             &p,
         )
         .await?;
     Ok(res.affected > 0)
+}
+
+/// How much of a discard reason is kept, in characters.
+///
+/// Long enough for the sentence an operator actually writes («duplicada: la factura se registró a
+/// mano»), short enough that the field cannot become a place to paste a stack trace. This text
+/// arrives from a request body and lands in a row the relay scans and retention keeps for ninety
+/// days: unbounded free text there is not an audit trail, it is a hole.
+pub const MAX_DISCARD_REASON: usize = 500;
+
+/// The reason as it gets STORED: trimmed and capped at [`MAX_DISCARD_REASON`] characters.
+///
+/// Trimmed because a text area hands back the whitespace around what was typed, and «duplicada» and
+/// « duplicada » are not two different decisions. Cut on a **character** boundary and never on a
+/// byte one: half an `é` is a panic in Rust and mojibake everywhere else, and this text is Spanish.
+///
+/// Public because the HTTP layer echoes the stored value back to the caller (hub#955): one
+/// implementation, so what the tray renders and what the row holds cannot drift apart.
+pub fn clamp_discard_reason(reason: &str) -> String {
+    reason.trim().chars().take(MAX_DISCARD_REASON).collect()
 }
 
 /// Puts **every** dead-letter of this hub back in front of the relay at once — the bulk gesture
@@ -2129,7 +2280,7 @@ mod tests {
         let (db, mut reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
 
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "").await.unwrap());
 
         // The row is conserved, with its audit stamp.
         let mut p = Params::new();
@@ -2177,6 +2328,79 @@ mod tests {
         assert!(list_dead(&db, "h1", 50).await.unwrap().is_empty());
     }
 
+    /// Reads back the stored `discard_reason` of one row.
+    async fn reason_of(db: &dyn DatabaseAdapter, id: &str) -> String {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        let rows = db
+            .query("SELECT discard_reason FROM _event_outbox WHERE id = :id", &p)
+            .await
+            .unwrap()
+            .rows;
+        rows[0]["discard_reason"].as_str().unwrap_or_default().to_string()
+    }
+
+    /// **A decision that does not say WHY is half a record** (hub#955).
+    ///
+    /// The row already survived the gesture stamped with who closed it and when. What it could not
+    /// answer was the only question anybody asks six months later: why. Without it the sole reading
+    /// left of a closed dead-letter is «somebody discarded this», which is the half that needed no
+    /// storing. The reason is stored TRIMMED — a text area hands back the whitespace the operator
+    /// typed around it, and «duplicada» and « duplicada » are not two different decisions.
+    #[tokio::test]
+    async fn discard_records_why_it_was_closed() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+
+        assert!(discard(
+            &db,
+            "h1",
+            &id,
+            "hub_user:admin-1",
+            "  duplicada: la factura se registró a mano  "
+        )
+        .await
+        .unwrap());
+
+        assert_eq!(
+            reason_of(&db, &id).await,
+            "duplicada: la factura se registró a mano",
+            "the reason survives the click, trimmed"
+        );
+    }
+
+    /// The reason is **optional** and **bounded**. Optional because the gesture existed before it
+    /// did and demanding an essay to close a row is how a queue stops being drained; bounded
+    /// because this text arrives from a request body and the row is kept for ninety days —
+    /// unbounded free text on a table the relay scans is not an audit trail, it is a hole. Absent
+    /// reads back as the empty string, never NULL: every other additive column of this table
+    /// carries a `NOT NULL DEFAULT ''` and a reader should not have to know which.
+    #[tokio::test]
+    async fn a_discard_reason_is_optional_and_bounded() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "   ").await.unwrap());
+        assert_eq!(
+            reason_of(&db, &id).await,
+            "",
+            "no reason given is the empty string — the row is closed all the same"
+        );
+
+        // A caller that pastes a log into the field gets a bounded column, cut on a CHARACTER
+        // boundary: truncating «é» in the middle is a panic in Rust and mojibake everywhere else.
+        let (db2, _reg2) = hub_with_a_dead_letter().await;
+        let id2 = dead_id(&db2).await;
+        let essay = "é".repeat(MAX_DISCARD_REASON + 50);
+        assert!(discard(&db2, "h1", &id2, "hub_user:admin-1", &essay).await.unwrap());
+        let stored = reason_of(&db2, &id2).await;
+        assert_eq!(
+            stored.chars().count(),
+            MAX_DISCARD_REASON,
+            "the stored reason is capped at {MAX_DISCARD_REASON} characters"
+        );
+        assert!(stored.chars().all(|c| c == 'é'), "and cut where a character ends");
+    }
+
     /// Neither gesture crosses hubs, and neither invents a row: an unknown id is simply `false`.
     #[tokio::test]
     async fn retry_and_discard_are_scoped_to_the_hub() {
@@ -2188,9 +2412,9 @@ mod tests {
             RetryOutcome::NotFound,
             "another hub cannot replay it"
         );
-        assert!(!discard(&db, "other-hub", &id, "hub_user:x").await.unwrap());
+        assert!(!discard(&db, "other-hub", &id, "hub_user:x", "").await.unwrap());
         assert_eq!(retry(&db, "h1", "no-such-event").await.unwrap(), RetryOutcome::NotFound);
-        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x").await.unwrap());
+        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x", "").await.unwrap());
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
             1,
@@ -2802,5 +3026,248 @@ mod tests {
         // The bell drops to zero once the admin clears the queue.
         retry_all(&db, "h1").await.unwrap();
         assert_eq!(count_dead(&db, "h1").await.unwrap(), 0, "the bell clears when nothing is dead");
+    }
+
+    // ── Listener-host de `host.print` (hub#957) ─────────────────────────────────────────────
+    //
+    // El gemelo de `host.notify`. Un flujo llega a la cola de impresión por la puerta que ya
+    // tiene: un step `command` ejecuta un command de módulo, el command emite `<algo>.print.due`
+    // y el relay lo encola. El lenguaje del flujo no se toca (ADR-0283 D1).
+
+    /// El mismo esquema de sistema que [`db_for_notify`]: `_print_queue` y `_print_host` los
+    /// levanta `system_migrations::apply`, igual que los grants de capability y los ajustes.
+    async fn db_for_print() -> PgAdapter {
+        db_for_notify().await
+    }
+
+    /// Registry con el módulo `labels` instalado, su command emisor y la capability `printer`
+    /// **declarada**. Declararla no es concederla: el grant va aparte ([`authorize_print`]), y el
+    /// caso «ni siquiera la declara» lo cubre la puerta de emisión (`commands.rs`).
+    fn registry_for_print() -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("labels".into(), ModuleStatus::Active);
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"labels","name":"Labels","version":"1.0.0",
+                    "capabilities":{"printer":{}}}"#,
+            )
+            .unwrap(),
+        );
+        reg.commands.insert(
+            "labels.print".into(),
+            cmd("labels", "INSERT INTO t (n) VALUES (1);", vec!["labels.print.due".into()]),
+        );
+        reg
+    }
+
+    /// La intención de impresión que viaja en el payload del evento: la misma forma camelCase que
+    /// `NewPrintJob` (el productor que ya existe, `apps/web/src/lib/print.ts`).
+    fn print_payload(job_id: &str) -> Params {
+        let mut p = Params::new();
+        p.insert("jobId".into(), json!(job_id));
+        p.insert("role".into(), json!("receipt"));
+        p.insert("documentType".into(), json!("barcode_label"));
+        p.insert("document".into(), json!({ "sku": "A-1", "name": "Cafe" }));
+        p
+    }
+
+    async fn authorize_print(db: &PgAdapter, reg: &Registry) {
+        crate::capabilities::set_grant(db, reg, "h1", "labels", "printer", true, "hub_user:admin")
+            .await
+            .unwrap();
+    }
+
+    async fn queued_jobs(db: &PgAdapter) -> Vec<crate::print_queue::PrintJob> {
+        crate::print_queue::list(db, "h1", None, None, 50).await.unwrap()
+    }
+
+    /// **El hueco de hub#957 cerrado.** Un evento `*.print.due` de un módulo con la capability
+    /// `printer` concedida acaba como un trabajo en la cola de impresión del hub, exactamente una
+    /// vez, con su marcador en `_event_delivery` (idempotente al re-drenar).
+    #[tokio::test]
+    async fn print_due_event_queues_the_document_once() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+        authorize_print(&db, &reg).await;
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        assert!(queued_jobs(&db).await.is_empty(), "no se encola inline; va por el relay");
+
+        drain(&db, &reg).await.unwrap();
+        let jobs = queued_jobs(&db).await;
+        assert_eq!(jobs.len(), 1, "una entrega por el listener-host");
+        assert_eq!(jobs[0].job_id, "job-1");
+        assert_eq!(jobs[0].role, "receipt");
+        assert_eq!(jobs[0].document_type, "barcode_label");
+        assert_eq!(jobs[0].document["sku"], json!("A-1"));
+        assert_eq!(jobs[0].format, crate::print_queue::FORMAT_RECEIPT, "formato por defecto");
+        assert_eq!(jobs[0].status, crate::print_queue::STATUS_PENDING);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'").await,
+            1
+        );
+
+        // Idempotencia del relay: re-drenar no encola un segundo tique.
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(queued_jobs(&db).await.len(), 1, "idempotente (marcador host.print)");
+    }
+
+    /// **Default-deny, como `notify`.** El módulo declara `printer` pero NADIE se la concede: el
+    /// evento existe y se entrega a sus listeners, pero no sale papel.
+    #[tokio::test]
+    async fn print_due_without_a_granted_printer_capability_queues_nothing() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        assert!(
+            queued_jobs(&db).await.is_empty(),
+            "sin grant de `printer` no se encola nada"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'").await,
+            0,
+            "no hay entrega que marcar"
+        );
+    }
+
+    /// **Atribución.** Una fila sin módulo emisor (lo que produce el kernel, `insert_core_event_once`
+    /// o un flujo) no tiene a quién exigirle la capability, así que no imprime: la puerta de papel
+    /// se abre para un MÓDULO, y un flujo llega a ella ejecutando el command de uno.
+    #[tokio::test]
+    async fn print_due_without_an_attributed_module_queues_nothing() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+        authorize_print(&db, &reg).await;
+
+        let mut p = Params::new();
+        p.insert("id".into(), json!("ev-1"));
+        p.insert("payload".into(), json!(Json::Object(print_payload("job-1")).to_string()));
+        p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, run_id, payload, status, \
+              attempts, next_attempt_at, last_error, created_at) \
+             VALUES (:id, 'h1', '', '[]', 'flow.print.due', '', 'run-1', :payload, 'pending', 0, \
+                     :at, '', :at)",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        process_once(&db, &reg).await.unwrap();
+        assert!(
+            queued_jobs(&db).await.is_empty(),
+            "sin módulo atribuido no se puede comprobar la capability → no hay papel"
+        );
+        // Y lo NIEGA la puerta de atribución, con su motivo: sin esta aserción el test pasaría
+        // igual con la puerta borrada (la de capability también rechaza un módulo vacío), y el
+        // mensaje que un operador lee en el dead-letter diría otra cosa.
+        assert!(
+            one_text(&db, "SELECT last_error AS c FROM _event_outbox WHERE id='ev-1'")
+                .await
+                .contains("sin módulo emisor atribuido"),
+            "el error nombra la atribución que falta, no una capability de nadie"
+        );
+    }
+
+    /// **`jobId` = idempotencia, y ya estaba construida** (`ON CONFLICT DO NOTHING`). Dos eventos
+    /// distintos que nombran el mismo trabajo son UN tique, y el segundo no reescribe el documento
+    /// que el primero encoló.
+    #[tokio::test]
+    async fn two_print_due_events_with_the_same_job_id_are_one_ticket() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+        authorize_print(&db, &reg).await;
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        let mut second = print_payload("job-1");
+        second.insert("document".into(), json!({ "sku": "OTRO" }));
+        crate::commands::execute(&db, &reg, "labels.print", &second, &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        let jobs = queued_jobs(&db).await;
+        assert_eq!(jobs.len(), 1, "el mismo jobId es un solo trabajo");
+        assert_eq!(jobs[0].document["sku"], json!("A-1"), "el duplicado no reescribe el documento");
+        // Las DOS filas de outbox quedan entregadas: la segunda no es un fallo, es un duplicado.
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            2
+        );
+    }
+
+    /// **Sin host de impresión registrado el trabajo ESPERA** — no falla, no se pierde y no
+    /// inventa una alerta nueva: `print_queue::enqueue` no consulta el registro de hosts a
+    /// propósito (`print_hosts.rs`), y lo que ya existe para que la espera no sea silenciosa es
+    /// `print_hosts::coverage` (aviso, nunca puerta).
+    #[tokio::test]
+    async fn a_print_due_with_no_registered_host_waits_in_the_queue() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+        authorize_print(&db, &reg).await;
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+
+        let jobs = queued_jobs(&db).await;
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].status, crate::print_queue::STATUS_PENDING, "espera, no muere");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "la fila del evento queda entregada: encolar ES la entrega, imprimir es del host"
+        );
+
+        let coverage = crate::print_hosts::coverage(&db, "h1").await.unwrap();
+        assert_eq!(coverage.len(), 1);
+        assert_eq!(coverage[0].role, "receipt");
+        assert_eq!(coverage[0].waiting, 1);
+        assert_eq!(coverage[0].live_hosts, 0, "nadie imprime `receipt` y hay trabajo esperando");
+    }
+
+    /// Un documento que la cola rechaza (vocabulario cerrado de `document_type`) NO se encola en
+    /// silencio: el listener-host falla y la fila sigue la escalera de reintentos del relay hasta
+    /// el dead-letter, donde un operador lo ve. Es el mismo trato que un transporte de `notify`
+    /// que no entrega.
+    #[tokio::test]
+    async fn a_print_due_with_an_unknown_document_type_fails_loudly() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+        authorize_print(&db, &reg).await;
+
+        let mut payload = print_payload("job-1");
+        payload.insert("documentType".into(), json!("kitchn"));
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &payload, &ctx, &Grants::new())
+            .await
+            .unwrap();
+
+        process_once(&db, &reg).await.unwrap();
+        assert!(queued_jobs(&db).await.is_empty(), "un tipo desconocido no se encola");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1").await,
+            1,
+            "la fila se difiere con su error, no se marca entregada"
+        );
+        assert!(
+            one_text(&db, "SELECT last_error AS c FROM _event_outbox").await.contains("host.print"),
+            "el error dice qué puerta lo rechazó"
+        );
     }
 }

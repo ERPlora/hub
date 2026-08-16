@@ -49,6 +49,22 @@
                       <HubIcon slot="start" name="person-outline" />
                       <ion-label>{{ t('sidebar.profile') }}</ion-label>
                     </ion-item>
+                    <!-- «Cambiar de usuario» (hub#456): el relevo de turno SIN salir de la venta.
+                         Va justo encima de «Cerrar sesión» a propósito: son la misma decisión
+                         («se pone otro en esta caja») y el estándar del sector (Square, Toast;
+                         decisión #658) pone la barata al lado de la cara. Solo aparece donde el
+                         relevo se ofrece —caja `shared`, dispositivo de confianza y dial que
+                         todavía pregunta—; `openUserSwitch` lo vuelve a comprobar. -->
+                    <ion-item
+                      v-if="userSwitchOffered"
+                      button
+                      data-testid="switch-user-item"
+                      :detail="false"
+                      @click="onSwitchUser"
+                    >
+                      <HubIcon slot="start" name="swap-horizontal-outline" />
+                      <ion-label>{{ t('userSwitch.menu') }}</ion-label>
+                    </ion-item>
                     <ion-item button :detail="false" @click="onLogout">
                       <HubIcon slot="start" name="log-out-outline" />
                       <ion-label>{{ t('sidebar.signOut') }}</ion-label>
@@ -149,6 +165,11 @@
            encargado aprueba igual venga la acción de la app que venga, y ninguna se lo deja sin
            poner. Dentro del gate: quien no ha entrado no tiene acción que elevar. -->
       <ElevationDialog />
+      <!-- El relevo de turno (hub#456): la rejilla de caras + pinpad ENCIMA del shell, sin
+           desmontarlo. Se monta UNA vez, aquí, para que el gesto exista esté donde esté el cajero
+           cuando cambia el turno; y por eso mismo no navega: salir a /login es lo que perdía la
+           venta en curso. Dentro del gate: sin sesión no hay caja que relevar. -->
+      <UserSwitchOverlay />
     </AuthenticatedChrome>
   </ion-app>
 </template>
@@ -169,6 +190,7 @@ import HubIcon from './components/HubIcon.vue';
 import AuthenticatedChrome from './components/AuthenticatedChrome.vue';
 import AssistantDrawer from './components/AssistantDrawer.vue';
 import ElevationDialog from './components/ElevationDialog.vue';
+import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav } from './lib/nav';
@@ -183,12 +205,17 @@ import { PROFILE_ROUTE } from './lib/routes';
 import { apiDocsEnabled } from './lib/api-docs';
 import { getHubSettings } from './lib/hub-settings';
 import { installIdleLogout } from './lib/idle-logout';
+import { installBadgeScanner } from './lib/badge-scanner';
+import { installNfcBadgeReader } from './lib/nfc-badge';
+import { loadDeviceMode } from './lib/device-mode';
+import { openUserSwitch, userSwitchOffered } from './lib/user-switch';
 import { bootHubLanguage } from './i18n';
 import { getUserProfile } from './lib/user-profile';
 import { getClient } from './lib/runtime';
 import { refreshSetupStatus } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
+import { bootUndrainedPrintingWatch } from './lib/print-alert';
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }
@@ -264,6 +291,12 @@ const initials = computed<string>(() => {
 // Resuelve el entitlement (§2.10) ANTES de pintar la nav de módulos: solo se montan los que el
 // hub puede usar. AppsPage refresca la nav al recibir el evento WS `module.installed`.
 async function gateAndRefresh(): Promise<void> {
+  // Qué clase de dispositivo es este (hub#357) — DENTRO de la sesión, no solo en el login.
+  // Hasta hub#456 solo lo preguntaba `LoginPage`: al recargar una caja con sesión viva, el shell
+  // se quedaba con los valores estrictos por defecto («sin confianza») el resto del día, así que
+  // el relevo de turno no se ofrecía nunca en el único dispositivo para el que existe —y el
+  // detector de inactividad (hub#628) leía un dial viejo—. Nunca lanza y falla hacia `shared`.
+  void loadDeviceMode();
   await resolveEntitlement();
   await refreshModuleNav();
   // Settings del hub (moneda/idioma/doc-API): GET exige sesión, así que se carga aquí (post-login),
@@ -290,6 +323,10 @@ async function gateAndRefresh(): Promise<void> {
   // admin vea, sin ir a buscarlo, que hay eventos caídos. Solo arranca para admin (el propio
   // watcher se filtra por rol), igual que el de actualizaciones solo arranca en Tauri.
   bootDeadLetterWatch();
+  // Impresión sin drenar (hub#987): la otra fuente de la campana. A diferencia de la anterior NO se
+  // filtra por rol — quien está en el mostrador es quien puede encender la caja y quien se va a
+  // quedar sin darle el tique al cliente, así que el aviso tiene que llegarle a él.
+  bootUndrainedPrintingWatch();
 
   // La nav de módulos se refresca GLOBALMENTE al instalarse un módulo. El único oyente de
   // `module.installed` vivía en AppsPage (montada solo en /apps): instalar desde el DRAWER del
@@ -326,6 +363,21 @@ installIdleLogout(() => {
   logout();
   void router.replace('/login');
 });
+// **El lector de placas escucha AQUÍ, en el shell** (hub#658), y no en la pantalla que la espera.
+// Un lector RFID/NFC es un teclado: la ráfaga se reconoce por su VELOCIDAD, nunca porque un campo
+// tenga el foco. El foro de Odoo es el archivo de por qué — con captura por foco, el número cae en
+// el buscador y el Enter final «pulsa» el botón que haya bajo el ratón. En el mostrador nadie hace
+// clic antes de pasar la tarjeta.
+//
+// `App.vue` no se desmonta nunca, así que esta instalación es única y no se deshace. Quién atiende
+// cada tarjeta lo deciden las pantallas suscritas (`onBadgeScan`), y manda la última.
+installBadgeScanner();
+// …y la MISMA placa por el lector NFC del propio aparato, donde lo haya (hub#988). En una tablet no
+// hay lector USB y el lector lleva dentro desde el primer día: hasta ahora, sin usar. No es una
+// segunda vía de entrega — sale por la misma puerta (`deliverBadge`), así que ninguna pantalla sabe
+// de dónde vino la tarjeta. Solo lee mientras alguien la espera; fuera de la app instalada, y en un
+// aparato sin lector, no hace absolutamente nada.
+installNfcBadgeReader();
 // La franja bloqueante NO se puede descartar (hub#374): la única forma de que desaparezca es que el
 // hub deje de estar bloqueado, así que el documento se relee al navegar. Es también lo que detecta
 // un gate que APARECE a mitad de sesión —instalar el módulo que pide certificado añade un ⛔ que en
@@ -357,6 +409,12 @@ function openUserMenuFromKeyboard(event: KeyboardEvent): void {
 // cierre sin await deja la ruta nueva debajo del menú abierto y hace que Perfil parezca inerte.
 async function goProfile(): Promise<void> {
   await runAfterShellMenuCloses(() => router.push(PROFILE_ROUTE));
+}
+
+/** Relevo de turno (hub#456): cierra el drawer y abre el overlay ENCIMA de lo que hubiera.
+ *  Ni `logout()` ni `router.replace`: la venta en curso se queda exactamente donde está. */
+async function onSwitchUser(): Promise<void> {
+  await runAfterShellMenuCloses(() => openUserSwitch());
 }
 
 async function onLogout(): Promise<void> {

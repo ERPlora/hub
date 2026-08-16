@@ -33,6 +33,9 @@
 //!   carries it to the outbox (hub#821);
 //! - [`store`] — the CRUD the REST layer sits on, plus materialising triggers;
 //! - [`triggers`] — event matching in the relay, and the cron/`at` clock;
+//! - [`waits`] — the OTHER exits of a `delay` (hub#951): the events that cancel a sleeping run and
+//!   the events that move it. `triggers` can only insert a run; this is the only thing in the
+//!   kernel that can move one that is already alive;
 //! - [`executor`] — the tick that advances runs, and the claim → I/O → complete seam;
 //! - [`agent`] — the parked `ai` step the server-side agent runner performs (hub#665);
 //! - [`approvals`] — the write a model proposed, waiting for a person (ADR-0283 D3);
@@ -46,14 +49,19 @@ pub mod grants;
 pub mod http;
 pub mod net;
 pub mod notify;
+pub mod query;
 pub mod schema;
 pub mod secrets;
 pub mod store;
 pub mod triggers;
+pub mod waits;
 
 pub use agent::AiRequest;
-pub use approvals::{Approval, NewApproval};
-pub use def::{AiPolicy, AiStep, Condition, FlowDefinition, StepKind, TriggerKind, SCHEMA_VERSION};
+pub use approvals::{Approval, ExpirySweepReport, NewApproval};
+pub use def::{
+    AiPolicy, AiStep, Condition, FlowDefinition, QueryResult, QueryStep, StepKind, TriggerKind,
+    MAX_QUERY_ROWS, SCHEMA_VERSION,
+};
 pub use executor::{tick, IoResult, PendingIo, TickReport};
 pub use http::HttpRequest;
 pub use schema::{flow_schema, FLOW_SCHEMA_JSON};
@@ -150,6 +158,7 @@ mod tests {
             def::ERR_STEP_KIND_NOT_AVAILABLE,
             def::ERR_UNKNOWN_OPERATOR,
             def::ERR_SECRET_NOT_AVAILABLE,
+            def::ERR_LIMIT_OUT_OF_RANGE,
             grants::ERR_GRANT_DENIED,
             grants::ERR_UNKNOWN_GRANT_KIND,
             grants::ERR_INVALID_HTTP_PATTERN,

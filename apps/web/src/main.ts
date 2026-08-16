@@ -66,6 +66,9 @@ import '@erplora/outfitkit/ok-data-table';
 import '@erplora/outfitkit/ok-app-launcher';
 // Dashboard / métricas de la pantalla /system (gauge, KPIs, stat, sparkline, pill de estado, vacío).
 import '@erplora/outfitkit/ok-gauge';
+// Paneles de uso con serie (CPU/RAM/conexiones) de /system: serie del SaaS proxied por el
+// runtime (saas#1511). Requiere el bump de @erplora/outfitkit que publica ok-resource-usage.
+import '@erplora/outfitkit/ok-resource-usage';
 import '@erplora/outfitkit/ok-kpi';
 import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';

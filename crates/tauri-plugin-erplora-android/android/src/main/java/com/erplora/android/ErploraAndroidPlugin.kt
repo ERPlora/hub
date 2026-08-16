@@ -241,6 +241,87 @@ class ErploraAndroidPlugin(private val activity: Activity) : Plugin(activity) {
         }.start()
     }
 
+    /**
+     * `nfcRead` — opens NFC reader mode and answers with the badge of the first card tapped
+     * (hub#988).
+     *
+     * The counter reads badges through a USB reader that types the number like a keyboard; a
+     * tablet has no such reader and, until this existed, could not enrol or read a card at all
+     * even though the hardware was already inside it. What comes back is the same KIND of string
+     * the wedge types (`NfcBadge.toBadge`), so the shell hands it to the very subscribers the
+     * keyboard path feeds: one badge path, two origins.
+     *
+     * The window is bounded and the answer is always exactly one. Nothing tapped resolves with the
+     * key ABSENT, because that is the ordinary outcome of a poll and not a failure — the shell
+     * calls this in a loop while a screen waits for a card, and an error every fifteen seconds
+     * would bury the real ones.
+     *
+     * Reader mode is closed on every exit. Left open it survives the screen that asked for it, and
+     * the next tap is delivered to a callback whose `invoke` is long since resolved — the tap the
+     * user makes and nothing answers.
+     *
+     * The three refusals stay apart on purpose: no reader, reader switched off, and a card that
+     * randomises its id are three different things to do about it, and one shared "it did not
+     * work" would send a user to a settings toggle their tablet does not have (hub#338).
+     */
+    @Command
+    fun nfcRead(invoke: Invoke) {
+        val adapter = android.nfc.NfcAdapter.getDefaultAdapter(activity)
+        if (adapter == null) {
+            invoke.reject("this device has no NFC reader", NfcBadge.NFC_UNAVAILABLE)
+            return
+        }
+        if (!adapter.isEnabled) {
+            invoke.reject("NFC is switched off on this device", NfcBadge.NFC_DISABLED)
+            return
+        }
+
+        val requested = invoke.getArgs().let { if (it.has("timeoutMs")) it.optLong("timeoutMs") else null }
+        val timeout = NfcBadge.clampTimeout(requested)
+
+        // ONE answer, whoever gets there first: the tap and the deadline race, and resolving an
+        // `invoke` twice throws on the second. `AtomicBoolean` and not a flag — the callback runs
+        // on a binder thread and the deadline on the main looper.
+        val answered = java.util.concurrent.atomic.AtomicBoolean(false)
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+        val close = { main.post { runCatching { adapter.disableReaderMode(activity) } } }
+
+        val callback = android.nfc.NfcAdapter.ReaderCallback { tag ->
+            if (!answered.compareAndSet(false, true)) return@ReaderCallback
+            close()
+            val badge = NfcBadge.badgeOf(tag?.id)
+            if (badge == null) {
+                invoke.reject(
+                    "this card answers with a new id on every tap",
+                    NfcBadge.NFC_RANDOM_UID,
+                )
+            } else {
+                invoke.resolve(JSObject().put("badge", badge))
+            }
+        }
+
+        main.post {
+            try {
+                adapter.enableReaderMode(activity, callback, NfcBadge.READER_FLAGS, null)
+            } catch (e: Exception) {
+                // Reader mode needs a RESUMED activity: asked for from the background it throws,
+                // and swallowing that would leave the caller waiting out the whole window for a
+                // reader that was never opened.
+                if (answered.compareAndSet(false, true)) invoke.reject(e.message ?: e.toString(), e)
+            }
+        }
+
+        main.postDelayed({
+            if (answered.compareAndSet(false, true)) {
+                close()
+                // Nothing tapped. An EMPTY answer, not a refusal: `put(key, null)` on org.json
+                // removes the key, so the absence is written by simply not putting it.
+                invoke.resolve(JSObject())
+            }
+        }, timeout)
+    }
+
     private fun concedidos(): Set<String> =
         PermissionPolicy.required()
             .filter { ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED }

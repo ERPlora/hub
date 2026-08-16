@@ -45,6 +45,11 @@ export default {
     noNotifications: 'All caught up. No notifications.',
     deadLettersTitle: 'Failed events',
     deadLettersBody: '{count} event(s) the relay could not deliver. Review and resend them.',
+    // Undrained printing (hub#987). It names the station because "printing is stuck" sends the
+    // owner to look at four printers; "the kitchen is stuck" sends them to one.
+    printingStalledTitle: 'Nothing is printing “{station}”',
+    printingStalledBody:
+      '{count} document(s) waiting for {minutes} min. Check the till that prints there is on.',
     // Name of the overflow menu the toolbar folds into on a phone. It is icon-only, so this is the
     // only thing a screen reader has to announce it with.
     more: 'More options',
@@ -117,6 +122,14 @@ export default {
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
   // said at all.
+  // hub#988 — the badge read off the device's own NFC reader. Two sentences, because only these
+  // two are worth interrupting for: a device with no reader says nothing at all (the USB reader
+  // keeps working exactly as before, so there is nothing for the user to do about it).
+  badge: {
+    nfcDisabled: 'NFC is switched off on this device. Turn it on to read cards by tapping them.',
+    nfcRandomUid:
+      'This card gives a different number every time it is read, so it cannot be used as a badge. Try another card.',
+  },
   download: {
     savedTo: 'Saved to {path}',
     noPlaceToSave: 'This app cannot save files on a phone or tablet. Open your business in a browser to download it.',
@@ -217,6 +230,26 @@ export default {
       // a hairdresser to hunt for a needle. The generic line above is left for the case where the
       // failure is not an app and no name would mean anything to her.
       failedApps: 'These did not go in: {apps}. You can see the detail and try again in Settings › Data.',
+      // hub#899 — the other half of the same complaint. When what broke was a SECTION of the
+      // template there was no app to name, so the card fell back to «something else did not go in»:
+      // two «somethings» in one card, at the minute she is checking whether her business is inside.
+      // She could not tell a missing service from a missing till, so she could not decide whether to
+      // start working or import again. Each part is named below, in her words and never by our key.
+      failedParts: 'This did not go in: {parts}. You can see the detail and try again in Settings › Data.',
+      failedAppsAndParts:
+        'These did not go in: {apps}. Nor did {parts}. You can see the detail and try again in Settings › Data.',
+      // The parts of the hub a template carries, as the owner would name them. They read inside a
+      // sentence («This did not go in: the images»), which is why they are lower case and not the
+      // table headings the full report uses.
+      partSettings: 'the settings of the business',
+      partTeam: 'the people',
+      partRoles: 'the roles and what each one may do',
+      partFiscal: 'the tax details',
+      partMedia: 'the images',
+      // `modules/<id>` is the app's DATA — its catalogue, its services, its prices — and the app
+      // itself may be installed and running. Saying the app did not go in would send her to
+      // reinstall something that is already there.
+      partAppData: 'the data of {app}',
       notStartedTitle: 'That template could not be opened',
       notStartedBody: 'Nothing changed in your business. Try again, or load it from Settings › Data.',
       interruptedTitle: 'The set-up did not finish',
@@ -457,6 +490,8 @@ export default {
         'A demo always stays in the tax authority’s test environment. Create your own business at erplora.com to file for real.',
       business_tax_id_frozen:
         'The tax id can no longer be changed: this business has already issued under it.',
+      hub_country_frozen:
+        'The country can no longer be changed: this business already files under its tax rules. Get in touch with us if the business really did move.',
     },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',
@@ -737,6 +772,8 @@ export default {
     actionDeactivate: 'Deactivate',
     access: {
       pin: 'Local PIN',
+      pin_badge: 'PIN + badge',
+      badge: 'Badge',
       cloud: 'Online account',
       // Exists as a person in the business, but cannot sign in to the Hub.
       none: 'No sign-in',
@@ -885,6 +922,20 @@ export default {
     pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
+    // hub#658 — the badge, sibling of the PIN. Both words matter: «badge» is what the sector calls
+    // the card, and «remove» (not «reset») says what the button does — the PIN is untouched.
+    badge: 'Badge',
+    badgeHelp:
+      'Swipe the card and it fills in on its own — no need to click here first. You can also type the number, for a key fob or an engraved tag.',
+    badgeSetHelp:
+      'They already carry a badge. Swipe a new card to replace it, or leave this blank to keep the current one.',
+    // hub#988 — shown INSTEAD of the two above where the device can read a card by itself. Only
+    // there: promising a tap on a machine with no reader is worse than not mentioning it.
+    badgeNfcHelp:
+      'Tap the card on this device — or swipe it on the reader — and it fills in on its own. You can also type the number, for a key fob or an engraved tag.',
+    badgeNfcSetHelp:
+      'They already carry a badge. Tap or swipe a new card to replace it, or leave this blank to keep the current one.',
+    clearBadge: 'Remove badge',
     localUser: 'Local user',
     localUserHelp:
       'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
@@ -907,6 +958,11 @@ export default {
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
       local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
       name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+      badge_shape: 'A badge is between 4 and 64 characters: letters, digits, «-» and «_».',
+      badge_in_use: 'Another active user already carries this badge. A badge says who is at the till, so no two people can share one.',
+      // hub#658 — the badge may never be somebody's ONLY way in: a lost card would lock them out
+      // of their own till (Square does not allow it either, and Lightspeed L-Series is why).
+      badge_without_fallback: 'A badge cannot be their only way in: a lost card would lock them out. Keep their PIN, give them an account, or remove the badge as well.',
     },
     activeUser: 'Active user',
     required: 'Required field',
@@ -927,8 +983,6 @@ export default {
     database: 'Database',
     memory: 'Memory',
     connections: 'Connections',
-    connectionsOf: 'of {limit}',
-    connectionsActive: 'active',
     // The printer card's headline, status word and status sentence used to live here, naming a
     // process («Bridge») instead of the thing on the counter. They now come from `system.health.*`
     // (hub#375). What is left below is the INSTALL flow, which is still about a piece of software
@@ -992,6 +1046,13 @@ export default {
     resourcesCloud: 'Cloud resources',
     resourcesSystem: 'System resources',
     sourceCloud: 'Cloud',
+    // Usage-series range selector (saas#1511). The contract stops at 3 days on purpose.
+    usageRange3h: '3 h',
+    usageRange24h: '24 h',
+    usageRange3d: '3 days',
+    usageRangeLabel3h: 'Last 3 hours',
+    usageRangeLabel24h: 'Last 24 hours',
+    usageRangeLabel3d: 'Last 3 days',
     databaseShared: 'Shared database',
     colTime: 'Time',
     colLevel: 'Level',
@@ -1115,6 +1176,11 @@ export default {
     signInWithEmail: 'Sign in with email',
     changeUser: 'Change user',
     pinIncorrect: 'Incorrect PIN',
+    // hub#658 — one sentence for every way a badge can be refused, on purpose: the login door must
+    // not become the way to find out which cards this business has issued.
+    orSwipeBadge: '…or swipe your badge — no need to tap your name first.',
+    badgeRejected: 'That badge does not open anything here. Use your PIN, or ask an administrator.',
+    badgeTooManyAttempts: 'Too many failed attempts with this badge. Wait a few minutes, or use your PIN.',
     // hub#330. Shown INSTEAD of «Incorrect PIN» when the refusal was about the device, not the
     // digits. Saying "incorrect PIN" to somebody whose PIN is correct is the worst answer available:
     // they retype it, and nothing on the screen names the one gesture that fixes it.
@@ -1161,6 +1227,9 @@ export default {
   elevation: {
     title: 'Approval needed',
     lead: 'Ask a manager to enter their PIN to approve this.',
+    // hub#658 — swiping the card IS the approval (Toast, Aloha, Square). Said up front, in both
+    // steps, because a badge needs nobody tapped on the grid first: it resolves the whole person.
+    orSwipeBadge: '…or swipe their badge — no need to tap anything first.',
     chooseApprover: 'Who is approving?',
     approverName: 'Their name',
     approverNamePlaceholder: 'Type their name',
@@ -1177,6 +1246,29 @@ export default {
     notRequired: 'This no longer needs approval. Close this and try again.',
     tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
     failed: 'The approval could not be sent. Check the connection and try again.',
+  },
+  // hub#456 — the shift changes in the middle of a ticket. Every line here is read by somebody with
+  // a queue in front of them, and the first job of the copy is to say that pressing this does NOT
+  // lose the sale: without that sentence a cashier finishes the ticket under the wrong name, which
+  // is the behaviour this feature exists to end.
+  userSwitch: {
+    menu: 'Switch user',
+    title: 'Switch user',
+    lead: 'The sale stays open. From now on it is recorded under whoever signs in here.',
+    chooseUser: 'Who is taking over?',
+    userName: 'Their name',
+    userNamePlaceholder: 'Type their name',
+    continue: 'Continue',
+    cancel: 'Cancel',
+    someoneElse: 'Someone else',
+    // The confirmation: the till belongs to somebody else now, and the next lines of this sale
+    // carry their name.
+    nowServing: 'Now serving as {name}',
+    rejected: 'Those details did not work. Check the name and the PIN, and try again.',
+    deviceNotEnrolled:
+      'This device is not set up for PINs yet. Sign in once with an ERPlora account on it, and the PIN will work from then on.',
+    deviceUnidentified: 'This device could not identify itself. Reload the page and try again.',
+    tooManyAttempts: 'Too many failed attempts. Wait a few minutes and try again.',
   },
   activation: {
     title: 'Activation required',
@@ -1266,6 +1358,14 @@ export default {
     // hub#354 — the job titles the template switches on (Waiter, Kitchen…). A vertical brings its
     // own role set; the people who fill it are never in the file.
     sectionRoles: 'Roles',
+    // hub#473 — the permissions each app had been given over this hub's own hardware and keys
+    // (printer, signing certificate, internet, notifications). A backup brings them back so the
+    // apps work again after a restore; a downloaded template never carries any.
+    sectionCapabilities: 'App permissions',
+    // hub#986 — the automations the owner wrote («when a big sale closes, note it on the
+    // customer»). A backup brings the documents back; what each one is allowed to do is granted
+    // again only on the terminal that granted it.
+    sectionFlows: 'Automations',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'includes data',
@@ -1327,6 +1427,32 @@ export default {
     // (RD 1007/2023: no gaps, no duplicates). Yours are untouched; set them up here if you have not.
     reasonNumberingNotPortable:
       'Invoice numbering discarded: {n}. Series and the numbers already issued belong to the business that created the file. Your own numbering is untouched — set up your series in Settings if you have not yet.',
+    // hub#380 — the app declares `installation_bound_data`: its records are chained to the till
+    // that issued them (a VeriFactu chain, a TicketBai one), so they only ever come back to it.
+    reasonInstallationBoundData:
+      'Records discarded: {n}. This app keeps an official record chained to the till that issued it, so it only travels back to that same till. Yours starts its own — nothing here has been changed.',
+    // hub#473 — the file came from ANOTHER hub and brought the permissions its owner had given to
+    // its apps. Those are decisions about THIS terminal's printer, certificate and internet access,
+    // so a downloaded file never makes them: you grant them here, once, and only if you want to.
+    reasonCapabilityGrantsNotPortable:
+      "App permissions discarded: {n}. Access to your printer, your signing certificate and the internet is granted on this terminal only. Nothing was allowed \u2014 grant what you need in Settings \u203a Permissions.",
+    // hub#473 — this hub's OWN backup asked to restore permissions it can no longer grant: the app
+    // was updated and stopped asking for them, or it is not installed here.
+    reasonCapabilitiesNotGrantable:
+      'Permissions not restored: {n}. Those apps no longer ask for them, or are not installed here. Everything else was given back.',
+    // hub#986 — the file came from ANOTHER hub. Its automations are the owner's work and do come
+    // back, but what each one may DO — which actions it runs, which addresses it writes to — is
+    // granted on this terminal only, so they arrive switched off.
+    reasonFlowGrantsNotPortable:
+      'Automations restored, but switched off. What each one is allowed to do is granted on this terminal only — review them in Automations and turn on the ones you want.',
+    // hub#986 — this hub's OWN backup asked to give an automation back a permission that no longer
+    // exists here: the app did not come back, or its new version renamed the action.
+    reasonFlowsPausedWithoutGrants:
+      'Some automations came back switched off: a permission they had is no longer available here. Open Automations to see what each one is missing.',
+    // hub#986 — the import saves through the same door as the editor, so a document this hub would
+    // refuse on screen does not get in from a file either.
+    reasonFlowsNotRestorable:
+      'Automations discarded: {n}. Their instructions name something that is not here, so they could not be saved. The rest came back.',
     done: 'Go to home',
   },
   moduleView: {

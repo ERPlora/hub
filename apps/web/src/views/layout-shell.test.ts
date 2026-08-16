@@ -47,11 +47,14 @@ describe('shared Hub page alignment', () => {
     expect(source).toContain('<slot v-else />');
   });
 
-  it('uses the same centered 72rem contract as the Cloud dashboard', () => {
+  it('leaves readable destinations unconstrained inside the shared page gutter', () => {
     const source = polishSource();
-    expect(source).toMatch(/\.hub-detail-shell\s*\{[\s\S]*?width:\s*min\(100%, 72rem\)/);
-    expect(source).toMatch(/\.hub-detail-shell\s*\{[\s\S]*?min-width:\s*0/);
-    expect(source).toMatch(/\.hub-detail-shell\s*\{[\s\S]*?margin-inline:\s*auto/);
+    const detailRule = source.match(/\.hub-detail-shell\s*\{([\s\S]*?)\}/)?.[1] ?? '';
+    expect(detailRule).toMatch(/min-width:\s*0/);
+    expect(detailRule).not.toMatch(/^\s*width\s*:/m);
+    expect(detailRule).not.toMatch(/^\s*max-width\s*:/m);
+    expect(detailRule).not.toContain('72rem');
+    expect(detailRule).not.toMatch(/margin-inline:\s*auto/);
     expect(source).toMatch(/\.hub-detail-shell--fill\s*\{[\s\S]*?height:\s*100%/);
   });
 });

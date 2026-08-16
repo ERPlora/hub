@@ -99,9 +99,21 @@ async fn two_hubs_with_the_same_nif_get_distinct_installation_numbers_and_fresh_
     assert_eq!(rec_b["is_first_record"], json!(1), "{rec_b}");
 
     // The XML declares each installation's own UUID, and both open with PrimerRegistro=S.
-    let config = json!({});
-    let xml_a = aeat::build_soap(&rec_a, &config, None, HUB_A);
-    let xml_b = aeat::build_soap(&rec_b, &config, None, HUB_B);
+    let config = json!({
+        // Hechos del productor tal y como los sirve el plano de control (hub#323): sin ellos
+        // no hay `SistemaInformatico`, y por tanto no hay sobre que validar.
+        "producer_facts": {
+            "NombreRazon": "ERPLORA CLOUD SL",
+            "NIF": "B27593136",
+            "NombreSistemaInformatico": "ERPlora Hub",
+            "IdSistemaInformatico": "EC",
+            "TipoUsoPosibleSoloVerifactu": "S",
+            "TipoUsoPosibleMultiOT": "S",
+            "IndicadorMultiplesOT": "N",
+        },
+    });
+    let xml_a = aeat::build_soap(&rec_a, &config, None, HUB_A).expect("declarable");
+    let xml_b = aeat::build_soap(&rec_b, &config, None, HUB_B).expect("declarable");
     assert!(
         xml_a.contains(&format!("<sum1:NumeroInstalacion>{HUB_A}</sum1:NumeroInstalacion>")),
         "hub A must declare ITS hub_id as NumeroInstalacion: {xml_a}"

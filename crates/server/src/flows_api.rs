@@ -29,7 +29,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use erplora_runtime::flows::{approvals, grants, store, NewFlow};
+use erplora_runtime::flows::{agent, approvals, grants, secrets, store, NewFlow};
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::RuntimeError;
 use serde_json::{json, Value};
@@ -65,23 +65,90 @@ fn bad_request(code: &str, message: &str) -> Response {
         .into_response()
 }
 
-/// The kernel's own errors, given the HTTP status they mean.
+/// The HTTP status a `flow.*` code means — **the whole family, by rule** (hub#734).
 ///
-/// `RuntimeError::Domain` maps to `409` everywhere else, which is right for a business conflict
-/// and wrong for these two: asking for a flow that is not in this hub is a `404` (and answering
-/// `409` would make a caller retry something that will never exist), and a flow acting without a
-/// grant is a `403`. Everything else — an invalid document, an unknown `schema_version` — is a
-/// genuine conflict with what this hub accepts, so it falls through unchanged.
+/// Every refusal of the kernel travels as `RuntimeError::Domain` (§13.8), and `Domain` is `409`
+/// everywhere else in the hub. That is right for a business conflict and was wrong for almost
+/// everything here: a `schema_version` this core does not know, an unreadable `cron`, a secret name
+/// that does not exist — all of them answered `409 Conflict`, which tells a caller to retry
+/// something that will never change. §9 says this contract FREEZES, and a frozen contract has to be
+/// programmable: the editor of flows decides what to paint from the status before it looks at the
+/// code.
+///
+/// The mapping is **by family, not case by case**, so a code added tomorrow lands somewhere sane
+/// without anybody remembering this function:
+///
+/// - `…not_found` → **404**. It does not exist — flow, approval, secret, recipient.
+/// - `…_kind_not_available` → **501**. A *kind* of the frozen vocabulary this core cannot execute
+///   yet. Not `flow.secret_not_available`, which is the rule «a secret is only readable from an
+///   `http` step» and is a plain document error.
+/// - everything else under `flow.` → **400**. The overwhelming majority: the document, the grant or
+///   the name the caller sent is one the server cannot accept.
+///
+/// …and four exceptions ahead of the rule, each one a status the family default would get wrong:
+///
+/// - **403** for the three refusals by authority (`grant_denied`, `internal_command` — the latter
+///   with the same status the dispatcher gives `RuntimeError::InternalCommand` — and
+///   `approval_not_yours`, hub#950: authenticated, just not who the question was addressed to);
+/// - **409** for the real conflicts, the ones `409` was always for: the request is well formed, the
+///   caller is allowed, and the STATE says no;
+/// - **409** for `secrets_key_missing` — this hub is not set up to hold secrets, the same shape as
+///   `fiscal_precondition_failed`, with a remedy that is a deploy setting and not the request;
+/// - **500** for `secret_unreadable` — a row of this hub that will not decrypt is nobody's request.
+///
+/// A code that is **not** `flow.*` falls through to [`crate::err_response`] unchanged: a module's
+/// domain error reaching here through `POST …/run` keeps the one table it has everywhere else.
+///
+/// One whole class of `flow.*` code is deliberately absent: the **step-failure classifications**
+/// — `flow.definition_gone`, `flow.io_step_gone`, `flow.step_output_lost` (`flows::executor`),
+/// `flow.http_timeout`, `flow.http_blocked`, `flow.http_status` (`flow_io`), `flow.agent_timeout`,
+/// `flow.agent_upstream`, `flow.agent_max_iters` (`agent_runner`) and `flow.release_revoked`
+/// (`outbox`). They are stamped on a run row or an outbox row by a background tick; `POST …/run`
+/// answers `202` long before any of them exists, so none of them can ever be the body of a
+/// response here. Giving them a status would advertise a door they do not have.
+fn flow_status(code: &str) -> Option<StatusCode> {
+    // The namespace gate comes FIRST, before any suffix is looked at: a module's `not_found` is not
+    // this kernel's, and the suffix rules below would happily claim it.
+    if !code.starts_with("flow.") {
+        return None;
+    }
+    let status = match code {
+        // …and the third refusal by authority (hub#950): the caller authenticated, and is simply
+        // not who the question was addressed to. `403` and not `409`: the state is fine, the
+        // person is not the one who may change it.
+        grants::ERR_GRANT_DENIED
+        | grants::ERR_INTERNAL_COMMAND
+        | approvals::ERR_APPROVAL_NOT_YOURS => StatusCode::FORBIDDEN,
+        approvals::ERR_APPROVAL_ALREADY_DECIDED
+        | approvals::ERR_APPROVAL_EXPIRED
+        | store::ERR_FLOW_DELETED
+        | agent::ERR_NOT_IN_FLIGHT
+        | ERR_FLOW_DISABLED
+        | secrets::ERR_SECRETS_KEY_MISSING => StatusCode::CONFLICT,
+        secrets::ERR_SECRET_UNREADABLE => StatusCode::INTERNAL_SERVER_ERROR,
+        // `flow.not_found` has a `.` where the others have a `_`, so the suffix is matched without
+        // it — and no code in the namespace ends in `not_found` meaning anything else.
+        _ if code.ends_with("not_found") => StatusCode::NOT_FOUND,
+        _ if code.ends_with("_kind_not_available") => StatusCode::NOT_IMPLEMENTED,
+        _ => StatusCode::BAD_REQUEST,
+    };
+    Some(status)
+}
+
+/// The one refusal of the family that the runtime spells inline (`flows::executor`) instead of
+/// exporting: a manual run of a flow whose author turned it off. Named here so [`flow_status`] can
+/// list it with the other conflicts instead of matching a bare string.
+///
+/// It is a copy of a literal, so it can drift — and what stops it is not a comment:
+/// `tests/flows_api_test.rs::a_disabled_flow_refuses_to_be_run_by_hand` asks the real router and
+/// would answer `400` the day the runtime renames it, because it would fall to the family default.
+/// Publishing it from the runtime is the proper fix and belongs with whoever owns that file.
+const ERR_FLOW_DISABLED: &str = "flow.disabled";
+
+/// The kernel's own errors, given the HTTP status [`flow_status`] says they mean.
 fn flow_err(e: RuntimeError) -> Response {
     if let RuntimeError::Domain { code, message } = &e {
-        let status = match code.as_str() {
-            store::ERR_FLOW_NOT_FOUND | approvals::ERR_APPROVAL_NOT_FOUND => {
-                Some(StatusCode::NOT_FOUND)
-            }
-            grants::ERR_GRANT_DENIED => Some(StatusCode::FORBIDDEN),
-            _ => None,
-        };
-        if let Some(status) = status {
+        if let Some(status) = flow_status(code) {
             return (
                 status,
                 Json(json!({ "ok": false, "error": { "code": code, "message": message } })),
@@ -536,8 +603,9 @@ pub async fn approve(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<Value>>,
 ) -> Response {
-    decide(st, headers, id, true).await
+    decide(st, headers, id, true, comment_of(body)).await
 }
 
 /// `POST /api/hub/flows/approvals/{id}/reject` — nothing runs, and the run stops: the steps written
@@ -546,14 +614,32 @@ pub async fn reject(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<Value>>,
 ) -> Response {
-    decide(st, headers, id, false).await
+    decide(st, headers, id, false, comment_of(body)).await
 }
 
-async fn decide(st: AppState, headers: HeaderMap, id: String, approve: bool) -> Response {
+/// The optional `{"comment": "…"}` (hub#950) — what the person typed while deciding, which ends up
+/// on the row and in `steps.<id>.comment`.
+///
+/// `Option<Json<Value>>` because these two routes have always been called with **no body at all**,
+/// and a required extractor would answer `400` to every existing caller. Anything that is not a
+/// string is the empty comment: a decision must never fail over the note attached to it.
+fn comment_of(body: Option<Json<Value>>) -> String {
+    body.and_then(|Json(v)| v.get("comment").and_then(|c| c.as_str()).map(str::to_string))
+        .unwrap_or_default()
+}
+
+async fn decide(
+    st: AppState,
+    headers: HeaderMap,
+    id: String,
+    approve: bool,
+    comment: String,
+) -> Response {
     let (arc, who) = admin_session!(st, headers);
     let rt = arc.lock().await;
-    match rt.decide_flow_approval(&id, approve, &who).await {
+    match rt.decide_flow_approval(&id, approve, &who, &comment).await {
         Ok(approval) => Json(json!({ "ok": true, "data": approval })).into_response(),
         Err(e) => flow_err(e),
     }
@@ -579,5 +665,77 @@ mod tests {
         assert!(new_flow(&json!({ "definition": {} })).is_err());
         assert!(new_flow(&json!({ "name": "   ", "definition": {} })).is_err());
         assert!(new_flow(&json!({ "name": "W" })).is_err());
+    }
+
+    /// hub#734 — the whole `flow.` namespace against the status it must answer with.
+    ///
+    /// It lives here and not in `tests/flows_api_test.rs` because **half of this table has no
+    /// reachable door**: every grant kind and every step kind is available since hub#821/hub#665,
+    /// so nothing a request can carry produces a `…_kind_not_available` any more, and
+    /// `secret_unreadable` needs a row that will not decrypt. Those are exactly the entries a
+    /// router test cannot pin, and the ones a future kind would resurrect.
+    #[test]
+    fn every_error_code_of_the_kernel_answers_the_status_it_means() {
+        use erplora_runtime::flows::{def, http, notify};
+
+        let table = [
+            // Not there.
+            (store::ERR_FLOW_NOT_FOUND, StatusCode::NOT_FOUND),
+            (approvals::ERR_APPROVAL_NOT_FOUND, StatusCode::NOT_FOUND),
+            (secrets::ERR_SECRET_NOT_FOUND, StatusCode::NOT_FOUND),
+            (notify::ERR_RECIPIENT_NOT_FOUND, StatusCode::NOT_FOUND),
+            // Refused by an authority.
+            (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
+            (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),
+            // A kind of the frozen vocabulary this core cannot execute yet.
+            (def::ERR_STEP_KIND_NOT_AVAILABLE, StatusCode::NOT_IMPLEMENTED),
+            (grants::ERR_GRANT_KIND_NOT_AVAILABLE, StatusCode::NOT_IMPLEMENTED),
+            // Real conflicts: well formed, allowed, and the state says no.
+            (ERR_FLOW_DISABLED, StatusCode::CONFLICT),
+            (approvals::ERR_APPROVAL_ALREADY_DECIDED, StatusCode::CONFLICT),
+            (approvals::ERR_APPROVAL_EXPIRED, StatusCode::CONFLICT),
+            (store::ERR_FLOW_DELETED, StatusCode::CONFLICT),
+            (agent::ERR_NOT_IN_FLIGHT, StatusCode::CONFLICT),
+            (secrets::ERR_SECRETS_KEY_MISSING, StatusCode::CONFLICT),
+            // Not the caller's fault at all.
+            (secrets::ERR_SECRET_UNREADABLE, StatusCode::INTERNAL_SERVER_ERROR),
+            // …and the family default: what the caller sent cannot be accepted.
+            (def::ERR_UNKNOWN_SCHEMA_VERSION, StatusCode::BAD_REQUEST),
+            (def::ERR_INVALID_DEFINITION, StatusCode::BAD_REQUEST),
+            (def::ERR_UNKNOWN_OPERATOR, StatusCode::BAD_REQUEST),
+            (def::ERR_SECRET_NOT_AVAILABLE, StatusCode::BAD_REQUEST),
+            (def::ERR_INVALID_CRON, StatusCode::BAD_REQUEST),
+            (def::ERR_INVALID_AT, StatusCode::BAD_REQUEST),
+            (grants::ERR_UNKNOWN_GRANT_KIND, StatusCode::BAD_REQUEST),
+            (grants::ERR_INVALID_HTTP_PATTERN, StatusCode::BAD_REQUEST),
+            (grants::ERR_INVALID_NOTIFY_GRANT, StatusCode::BAD_REQUEST),
+            (grants::ERR_INVALID_RECIPIENT_GRANT, StatusCode::BAD_REQUEST),
+            (secrets::ERR_INVALID_SECRET_NAME, StatusCode::BAD_REQUEST),
+            (notify::ERR_RECIPIENT_AMBIGUOUS, StatusCode::BAD_REQUEST),
+            (notify::ERR_RECIPIENT_INVALID, StatusCode::BAD_REQUEST),
+            (http::ERR_HTTP_URL_INVALID, StatusCode::BAD_REQUEST),
+        ];
+
+        for (code, expected) in table {
+            assert_eq!(
+                flow_status(code),
+                Some(expected),
+                "`{code}` must answer {expected}"
+            );
+        }
+    }
+
+    /// The other half of the same contract: this door does not reclassify what is not its own. A
+    /// module's domain error arriving through `POST …/run` keeps the `409` it has everywhere else,
+    /// and it keeps it because `flow_status` declines rather than because it guessed right.
+    #[test]
+    fn a_code_from_outside_the_namespace_is_not_reclassified_here() {
+        assert_eq!(flow_status("stock.insufficient"), None);
+        assert_eq!(flow_status("not_found"), None, "a bare code is not a flow's");
+        let response = flow_err(RuntimeError::Domain {
+            code: "stock.insufficient".to_string(),
+            message: "no hay bastante".to_string(),
+        });
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 }

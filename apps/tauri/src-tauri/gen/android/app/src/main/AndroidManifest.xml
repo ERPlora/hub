@@ -35,6 +35,17 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 
+    <!-- Reading the staff badge off the device's own reader (hub#988). An install-time `normal`
+         permission: no dialog, so it is NOT in PermissionPolicy. -->
+    <uses-permission android:name="android.permission.NFC" />
+
+    <!-- 🔴 The line above narrows the store listing unless this one is here. Google Play adds an
+         IMPLICIT android.hardware.nfc requirement to any app declaring the NFC permission, and
+         hides it from every device without a chip — most cheap counter tablets. Saying the chip is
+         optional keeps the app installable there; the code already degrades to `nfc_unavailable`
+         and the badge keeps arriving through the USB reader. -->
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 

@@ -98,6 +98,24 @@ pub trait NativeHost: Send + Sync {
         crate::certificate::expiry_from_der(pkcs12_der, password)
     }
 
+    /// **The manufacturer's half of `SistemaInformatico`**, as the control plane last served it
+    /// (ADR-0202 §5.1 — hub#323), keyed by the literal AEAT element names.
+    ///
+    /// The engine needs seven fields it cannot know: the manufacturer's identity (one fact about
+    /// ERPlora, served from the SaaS so that correcting it is one line instead of rebuilding the
+    /// fleet) and `IndicadorMultiplesOT`, which the AEAT computes **per account** over how many
+    /// facturaciones its owner created — a hub can only see itself.
+    ///
+    /// Same split as the certificate: the module does not fetch anything and holds no cloud
+    /// credential. `erplora-server` fills the cache from the heartbeat and this is the window the
+    /// engine looks through, so nothing below the host learns that a control plane exists.
+    ///
+    /// Default: `Ok(None)` — «nobody has told this hub», which is NOT a set of defaults. There
+    /// are none for a legal declaration, and the engine refuses to build the envelope.
+    async fn producer_facts(&self) -> Result<Option<Json>> {
+        Ok(None)
+    }
+
     /// Escribe dentro de la carpeta `static_files` declarada por el módulo. La implementación real
     /// conoce el módulo que está ejecutándose y media el backend Local/Cloud; el plugin solo aporta
     /// una ruta relativa segura.
@@ -198,6 +216,12 @@ impl NativeHost for DbHost<'_> {
         Ok(crate::certificate::active_type(self.db, hub_id)
             .await?
             .map(|t| t.as_str().to_string()))
+    }
+
+    async fn producer_facts(&self) -> Result<Option<Json>> {
+        Ok(crate::producer_facts::ProducerFactsCache::global()
+            .current()
+            .map(|facts| facts.to_json()))
     }
 
     async fn write_static_file(

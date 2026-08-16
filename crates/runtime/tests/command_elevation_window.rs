@@ -104,12 +104,7 @@ async fn approve(
 ) -> String {
     rt.approve_elevation(
         requester,
-        ElevationRequest {
-            approver_name: "Sofía",
-            pin: MANAGER_PIN,
-            command,
-            payload,
-        },
+        ElevationRequest::with_pin("Sofía", MANAGER_PIN, command, payload),
     )
     .await
     .expect("the manager approves")
@@ -154,12 +149,7 @@ async fn a_wrong_pin_approves_nothing() {
     let err = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: "0000",
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", "0000", "till.sale.take_payment", &ticket()),
         )
         .await
         .expect_err("four wrong digits authorise nothing");
@@ -174,12 +164,7 @@ async fn a_wrong_pin_approves_nothing() {
     let unknown = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Nobody",
-                pin: MANAGER_PIN,
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Nobody", MANAGER_PIN, "till.sale.take_payment", &ticket()),
         )
         .await
         .expect_err("an unknown name approves nothing either");
@@ -199,12 +184,7 @@ async fn only_somebody_who_could_do_it_themselves_can_approve_it() {
     let err = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Nacho",
-                pin: CASHIER_PIN,
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Nacho", CASHIER_PIN, "till.sale.take_payment", &ticket()),
         )
         .await
         .expect_err("a cashier cannot approve their own way past the gate");
@@ -225,12 +205,7 @@ async fn an_admin_only_permission_is_never_approved_by_pin() {
     let err = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: MANAGER_PIN,
-                command: "till.settings.save",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.settings.save", &ticket()),
         )
         .await
         .expect_err("administering the till is not approved at the counter");
@@ -251,12 +226,7 @@ async fn an_internal_command_is_not_approvable_either() {
     let err = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: MANAGER_PIN,
-                command: "till._settle",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till._settle", &ticket()),
         )
         .await
         .expect_err("an internal command is invisible from outside");
@@ -276,12 +246,7 @@ async fn nothing_is_approved_for_somebody_who_already_holds_the_permission() {
     let err = rt
         .approve_elevation(
             &admin(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: MANAGER_PIN,
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.sale.take_payment", &ticket()),
         )
         .await
         .expect_err("there is nothing to approve");
@@ -302,12 +267,7 @@ async fn the_approved_action_carries_who_approved_it_alongside_who_ran_it() {
     let approval = rt
         .approve_elevation(
             &cashier(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: MANAGER_PIN,
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.sale.take_payment", &ticket()),
         )
         .await
         .expect("the manager approves");
@@ -693,12 +653,7 @@ async fn a_machine_principal_cannot_be_approved_at_all() {
     let err = rt
         .approve_elevation(
             &integration(),
-            ElevationRequest {
-                approver_name: "Sofía",
-                pin: MANAGER_PIN,
-                command: "till.sale.take_payment",
-                payload: &ticket(),
-            },
+            ElevationRequest::with_pin("Sofía", MANAGER_PIN, "till.sale.take_payment", &ticket()),
         )
         .await
         .expect_err("there is nobody at the till to approve for");

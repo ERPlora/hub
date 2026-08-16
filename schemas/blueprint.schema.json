@@ -40,7 +40,7 @@
     "sections": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, `modules/<id>` por cada módulo con datos y `roles` si el bundle trae juego de roles."
+      "description": "Secciones presentes en el bundle: `hub_users`, `hub_settings`, `fiscal`, `media`, `modules/<id>` por cada módulo con datos, `roles` si el bundle trae juego de roles, `capabilities` si trae los permisos concedidos a los módulos y `flows` si trae las automatizaciones del negocio."
     },
     "active_roles": {
       "type": "array",
@@ -51,6 +51,25 @@
       },
       "default": [],
       "description": "Juego de roles del vertical que el hub ENCIENDE al importar (hub#354): `waiter`, `kitchen`, `stylist`… Son CLAVES, nunca filas de `hub_role_activation`: el import las pasa por la misma puerta que el administrador (`roles::set_active`), así que un blueprint no puede acuñar un rol que ningún módulo instalado declare ni tocar los base/administrativos (`admin`/`owner`/`manager`/`employee`), que se rechazan. Aditivo: nunca apaga un rol que el hub ya tuviera encendido. Ausente ⇒ no preactiva nada."
+    },
+    "capability_grants": {
+      "type": "object",
+      "default": {},
+      "description": "Permisos módulo→host (ADR-0079) que el hub tenía CONCEDIDOS, por módulo (hub#473): `network`, `certificate`, `printer`, `notify`, `manage_flows`. Son CLAVES, nunca filas de `_module_capability_grants`: al importar, cada par pasa por `capabilities::set_grant` — la misma puerta que el interruptor del administrador —, así que una capability que el módulo instalado NO declare se rechaza y se cuenta. Solo lo lleva un `backup` y solo lo aplica el hub que restaura su propia copia (`hub.hub_id` == destino): un grant es la aprobación del dueño de ESE despliegue sobre los primitivos del host, no vocabulario del negocio (por eso los roles sí viajan en los dos propósitos y esto no). Aditivo: nunca revoca lo que el hub ya tuviera concedido. Ausente ⇒ no concede nada.",
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "type": "array",
+          "items": { "enum": ["network", "certificate", "printer", "notify", "manage_flows"] },
+          "description": "Capabilities concedidas a ese módulo. Solo las concedidas (`granted = 1`): un `no` es el estado por defecto (default-deny) y no necesita fila."
+        }
+      },
+      "additionalProperties": false
+    },
+    "flows": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/flowSpec" },
+      "description": "Las AUTOMATIZACIONES del negocio (kernel de flujos, ADR-0283) que el hub tenía escritas (hub#986): el flujo que repone stock, el que recuerda la cita, el que reclama la factura. Viajan como DOCUMENTOS declarativos, nunca como filas de `_flow`: al importar, cada uno se guarda por `flows::store::create` — la misma puerta que `POST /flows` —, así que un documento que este hub rechazaría en la pantalla tampoco entra por el zip. Sus disparadores NO van aparte: son parte del `definition` y el destino los re-materializa sobre su propio reloj. Solo lo lleva un `backup` (una plantilla publicada no trae automatizaciones de nadie). Aditivo: nunca borra un flujo que el hub ya tuviera. Ausente ⇒ no restaura ninguno. NO viajan `_flow_secrets` (credenciales selladas con la clave del entorno) ni `_flow_runs`/`_flow_run_steps`/`_flow_approvals` (historial de ejecución de esta instalación)."
     },
     "sha256": {
       "type": "object",
@@ -89,6 +108,48 @@
         "hub_id": {
           "type": "string",
           "description": "hub_id (UUID) del hub de ORIGEN. No se aplica como dato: el import lo usa para distinguir restaurar-en-el-mismo-hub (la cadena VeriFactu se aplica) de importar-en-otro-hub (la sección de datos de verifactu se descarta — ADR-0202 §4.2, NumeroInstalacion = hub_id). Ausente en bundles anteriores al campo (origen desconocido ⇒ descarte conservador)."
+        }
+      }
+    },
+    "flowSpec": {
+      "type": "object",
+      "description": "Una automatización tal como viaja (hub#986): el documento que escribió el dueño del negocio y las CLAVES de lo que se le permitía hacer. No lleva `id` —es la identidad de fila de UNA instalación— ni sus disparadores por separado: van dentro de `definition`.",
+      "required": ["name", "enabled", "definition"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre del flujo, que es lo que lee su dueño. El import empareja por nombre + documento: el mismo flujo restaurado dos veces es uno, no dos."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Si estaba ARMADO en el origen. Es un deseo, no una orden: el import arma el flujo solo cuando ha podido devolverle TODOS sus permisos; si falta alguno, aterriza deshabilitado y el informe lo dice con su código."
+        },
+        "definition": {
+          "type": "object",
+          "description": "El documento versionado del flujo (`flow.schema.json`): sus `triggers` y sus `steps`, tal cual se guardó."
+        },
+        "grants": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/flowGrantSpec" },
+          "description": "Lo que el flujo tenía PERMITIDO hacer (`_flow_grants`, default-deny — ADR-0283 §2). Claves, nunca filas: al importar, cada par pasa por `flows::grants::replace`, la misma puerta que la pantalla de permisos del flujo. Y solo lo aplica el hub que restaura su propia copia (`hub.hub_id` == destino): qué comandos ejecuta una automatización y a qué URLs sale es la aprobación del dueño de ESE despliegue. De otro hub el documento aterriza igual, pero PAUSADO."
+        }
+      }
+    },
+    "flowGrantSpec": {
+      "type": "object",
+      "description": "Un permiso de un flujo, con la misma forma `{kind, value}` que manda la pantalla a `PUT …/flows/<id>/grants`.",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["command", "query", "notify", "http", "recipient_query"],
+          "description": "Las cinco clases de ADR-0283 §2."
+        },
+        "value": {
+          "type": "string",
+          "description": "Qué se le permite: el comando (`crm.note.add`), la lectura (`crm.customer.list`), el canal (`email`), el patrón de URL (`https://host/path*`) o el `<query>#<campo>` del destinatario."
         }
       }
     },

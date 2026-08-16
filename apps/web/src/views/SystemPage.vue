@@ -26,47 +26,58 @@
              Postgres-only (ADR-0154): CPU/Memoria/Conexiones las mide el runtime según el despliegue
              (ECS Task Metadata / cgroup v2 del contenedor / sysinfo en dev) + Postgres. La BD es
              compartida por organización → sin "tamaño local": N/A.
-             La pill indica la fuente. CPU/Memoria/Conexiones = ok-gauge; BD = stat. -->
+             La pill indica la fuente. CPU/Memoria/Conexiones = ok-resource-usage (serie del
+             SaaS, saas#1511); BD = stat. -->
         <div class="block-header">
           <h3 class="block-header__title">{{ resourcesTitle }}</h3>
           <ok-status-pill v-if="resourcesSource" tone="info">{{ resourcesSource }}</ok-status-pill>
         </div>
-        <!-- A metric nobody reported is NOT 0% (hub#375). A ring sitting green at zero reads as
-             «measured, and all is well» — which is how a memory figure from the wrong cgroup shipped
-             as «64 MB» and nobody blinked (hub#229). When the runtime did not report it, the card
-             says so where the number would have been. -->
+        <!-- Range of the usage series (saas#1511). 3 days is the maximum on purpose: the SaaS
+             records no more, and offering a longer range would only pretend otherwise. -->
+        <ion-segment
+          class="usage-range"
+          :value="usageRange"
+          @ion-change="onUsageRangeChange"
+        >
+          <ion-segment-button v-for="r in USAGE_RANGES" :key="r" :value="r">
+            <ion-label>{{ t(RANGE_SHORT_KEYS[r]) }}</ion-label>
+          </ion-segment-button>
+        </ion-segment>
+        <!-- A metric nobody reported is NOT 0% (hub#375/ADR-0237). The panels get `known:false`
+             and paint their own «we could not read this» state — never a flat green line at zero.
+             The series comes from the SaaS (proxied by the runtime, machine token stays server-side,
+             ADR-0003); the instant reading of `/api/system` remains the `current` fallback, because
+             a value we DID measure locally is still a measurement even when the history is not. -->
         <ion-grid class="ion-no-padding resources-grid">
           <ion-row>
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content
-                  :class="['metric-card__content', { 'metric-stat': !cpuReading.known }]"
-                >
-                  <ok-gauge v-if="cpuReading.known" type="ring" label="CPU" :value="cpuReading.value" unit="%"
-                    :thresholds="usageThresholds" size="128"></ok-gauge>
-                  <template v-else>
-                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
-                    <div class="metric-stat__label">CPU</div>
-                    <div class="metric-stat__value">—</div>
-                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
-                  </template>
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    label="CPU"
+                    :unit="cpuUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="cpuPanel"
+                    :thresholds.prop="panelThresholds"
+                    :upgrade.prop="upgradeHint"
+                  ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
             </ion-col>
 
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content
-                  :class="['metric-card__content', { 'metric-stat': !memReading.known }]"
-                >
-                  <ok-gauge v-if="memReading.known" type="ring" :label="t('system.memory')" :value="memReading.value"
-                    unit="%" :thresholds="usageThresholds" size="128"></ok-gauge>
-                  <template v-else>
-                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
-                    <div class="metric-stat__label">{{ t('system.memory') }}</div>
-                    <div class="metric-stat__value">—</div>
-                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
-                  </template>
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    :label="t('system.memory')"
+                    :unit="ramUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="memPanel"
+                    :thresholds.prop="panelThresholds"
+                    :upgrade.prop="upgradeHint"
+                  ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -88,18 +99,16 @@
                  un cero REAL y un cero por no haber podido preguntar no son el mismo cero. -->
             <ion-col size="6" size-md="3">
               <ion-card class="ion-no-margin metric-card">
-                <ion-card-content
-                  :class="['metric-card__content', { 'metric-stat': !connectionsReading.known }]"
-                >
-                  <ok-gauge v-if="connectionsReading.known" type="ring" :label="t('system.connections')"
-                    :value="connectionsReading.value" unit="" :max="connectionsMax"
-                    color="var(--ion-color-primary)" :sublabel="connectionsLimitLabel" size="128"></ok-gauge>
-                  <template v-else>
-                    <HubIcon name="help-circle-outline" class="metric-stat__icon" />
-                    <div class="metric-stat__label">{{ t('system.connections') }}</div>
-                    <div class="metric-stat__value">—</div>
-                    <div class="metric-stat__sub">{{ t('system.health.notMeasured') }}</div>
-                  </template>
+                <ion-card-content class="metric-card__content metric-card__content--panel">
+                  <ok-resource-usage
+                    :label="t('system.connections')"
+                    :unit="connectionsUnit"
+                    :range-label="usageRangeLabel"
+                    :unreadable-label="t('system.health.notMeasured')"
+                    :metric.prop="connectionsPanel"
+                    :thresholds.prop="panelThresholds"
+                    :upgrade.prop="upgradeHint"
+                  ></ok-resource-usage>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -387,6 +396,13 @@ import PlanLimitsPanel from '../components/PlanLimitsPanel.vue';
 import { detectPeripherals, type BridgeStatus } from '../lib/bridge-transport';
 import { appDownloadUrl, type DownloadPlatform } from '../lib/app-update';
 import { fetchSystemInfo, type SystemInfo } from '../lib/system';
+import {
+  USAGE_RANGES,
+  fetchUsageSeries,
+  type SeriesMetric,
+  type UsageRange,
+  type UsageSeries,
+} from '../lib/system-usage';
 import { isTauri } from '../lib/device';
 import { openExternal } from '../lib/open-external';
 import {
@@ -537,17 +553,99 @@ const dbEngineLabel = computed<string>(() => {
 const cpu = computed(() => info.value?.cpu ?? null);
 const memory = computed(() => info.value?.memory ?? null);
 
-// Gauges: SOLO el % de uso (sin valores absolutos de vCPU/RAM — el cliente ve % de capacidad).
-// `known: false` = el runtime NO reportó la métrica → la tarjeta lo dice, no pinta un 0% verde.
+// Instant readings of `/api/system` (%, `known:false` = the runtime did not report it). They no
+// longer feed gauges: they are the `current` FALLBACK of the usage panels when the series does
+// not carry one — a value we did measure locally is still a measurement.
 const cpuReading = computed<Reading>(() => usagePercent(cpu.value));
 const memReading = computed<Reading>(() => usagePercent(memory.value));
-// Zonas de color del gauge de uso (verde→ámbar→rojo). Tokens de Ionic: conmutan en dark y
-// el SVG resuelve el `var()` al pintar el fill. Antes eran hex sueltos (#2dd36f/#ffc409/#eb445a).
-const usageThresholds = [
-  { to: 70, color: 'var(--ion-color-success)' },
-  { to: 90, color: 'var(--ion-color-warning)' },
-  { to: 100, color: 'var(--ion-color-danger)' },
-];
+
+// ── Usage series (saas#1511) ─────────────────────────────────────
+// The SaaS records the fleet's samples and serves them per hub; the runtime proxies them at
+// `GET /api/system/usage-series?range=` (machine token stays server-side, ADR-0003). `null` =
+// the series could not be read → the panels get `known:false` and say so themselves (ADR-0237).
+const usageRange = ref<UsageRange>('24h');
+const usageSeries = ref<UsageSeries | null>(null);
+
+async function loadUsageSeries(): Promise<void> {
+  usageSeries.value = await fetchUsageSeries(usageRange.value);
+}
+watch(usageRange, () => {
+  void loadUsageSeries();
+});
+function onUsageRangeChange(ev: CustomEvent<{ value?: string | number }>): void {
+  const value = ev.detail.value;
+  if (typeof value === 'string' && (USAGE_RANGES as readonly string[]).includes(value)) {
+    usageRange.value = value as UsageRange;
+  }
+}
+
+const RANGE_SHORT_KEYS: Record<UsageRange, string> = {
+  '3h': 'system.usageRange3h',
+  '24h': 'system.usageRange24h',
+  '3d': 'system.usageRange3d',
+};
+const RANGE_LABEL_KEYS: Record<UsageRange, string> = {
+  '3h': 'system.usageRangeLabel3h',
+  '24h': 'system.usageRangeLabel24h',
+  '3d': 'system.usageRangeLabel3d',
+};
+const usageRangeLabel = computed<string>(() => t(RANGE_LABEL_KEYS[usageRange.value]));
+
+/** The `.metric` JS prop of the fixed `ok-resource-usage` contract. */
+interface PanelMetric {
+  known: boolean;
+  current: number | null;
+  points: [number, number][];
+  status: string;
+  message: string | null;
+}
+
+/**
+ * Marries the series metric with the local instant reading. The SaaS `current` wins when it
+ * comes; the local one fills in when it does not. A series nobody could read is `known:false`
+ * — the panel paints its own unreadable state (ADR-0237) — but the instant value we DID
+ * measure still travels as `current`: measured is measured.
+ */
+function toPanelMetric(metric: SeriesMetric | undefined, local: Reading): PanelMetric {
+  const localCurrent = local.known ? local.value : null;
+  if (!metric?.known) {
+    return {
+      known: false,
+      current: localCurrent,
+      points: [],
+      status: 'unknown',
+      message: metric?.message ?? null,
+    };
+  }
+  return {
+    known: true,
+    current: metric.current ?? localCurrent,
+    points: metric.points ?? [],
+    status: metric.status ?? 'unknown',
+    message: metric.message ?? null,
+  };
+}
+
+const cpuPanel = computed<PanelMetric>(() =>
+  toPanelMetric(usageSeries.value?.metrics.cpu, cpuReading.value),
+);
+const memPanel = computed<PanelMetric>(() =>
+  toPanelMetric(usageSeries.value?.metrics.ram, memReading.value),
+);
+const connectionsPanel = computed<PanelMetric>(() =>
+  toPanelMetric(usageSeries.value?.metrics.db_connections, connectionsReading.value),
+);
+
+// Units come from the contract when the series answers; %/count are the honest defaults.
+const cpuUnit = computed<string>(() => usageSeries.value?.metrics.cpu.unit ?? '%');
+const ramUnit = computed<string>(() => usageSeries.value?.metrics.ram.unit ?? '%');
+const connectionsUnit = computed<string>(() => usageSeries.value?.metrics.db_connections.unit ?? '');
+
+// The 70/80 thresholds are the SaaS's verdict zones (fixed contract). One source of truth: the
+// old local [70/90/100] gauge zones retired with the gauges — panels must never contradict the
+// alerts the SaaS sends about the same numbers.
+const panelThresholds = computed(() => usageSeries.value?.thresholds ?? { warning: 70, critical: 80 });
+const upgradeHint = computed(() => usageSeries.value?.upgrade ?? { show: false, message: null, url: null });
 
 // Tamaño = headline. La BD Postgres es compartida por organización → sin "tamaño local".
 // Cuando no hay sizeLabel (cloud/backend compartido), mostramos el motor como headline
@@ -569,12 +667,6 @@ const dbSub = computed<string>(() => {
   return dbEngineLabel.value;
 });
 const connectionsReading = computed<Reading>(() => reportedCount(info.value?.database?.connections));
-const connectionsMax = computed<number>(() => info.value?.database?.connectionsLimit ?? 100);
-const connectionsLimitLabel = computed<string>(() =>
-  info.value?.database?.connectionsLimit != null
-    ? t('system.connectionsOf', { limit: info.value.database.connectionsLimit })
-    : t('system.connectionsActive')
-);
 
 const logs = computed(() => info.value?.logs ?? []);
 const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
@@ -796,6 +888,7 @@ watch(locale, () => {
 onMounted(() => {
   void refreshHardware();
   void loadSystemInfo();
+  void loadUsageSeries();
   void loadUpdateHistory();
 });
 </script>
@@ -854,6 +947,21 @@ onMounted(() => {
 /* Rejilla de métricas de Recursos: respiración inferior antes del bloque Bridge. */
 .resources-grid {
   margin-bottom: 16px;
+}
+
+/* Selector de rango de las series de uso (3h/24h/3d): compacto, alineado a la izquierda. */
+.usage-range {
+  width: auto;
+  max-width: 240px;
+  margin: 0 4px 8px;
+}
+
+/* Contenido de tarjeta con panel ok-resource-usage: el panel ocupa el ancho, sin centrar. */
+.metric-card__content--panel {
+  align-items: stretch;
+}
+.metric-card__content--panel ok-resource-usage {
+  width: 100%;
 }
 
 /* Estado de carga único del boot (centrado, aire). */

@@ -267,7 +267,7 @@ async fn approving_executes_exactly_the_proposed_command_and_the_run_continues()
         .unwrap();
 
     let decided = rt
-        .decide_flow_approval(&approval.id, true, "hub_user:owner")
+        .decide_flow_approval(&approval.id, true, "hub_user:owner", "")
         .await
         .unwrap();
 
@@ -333,7 +333,7 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
         .unwrap();
 
     let decided = rt
-        .decide_flow_approval(&approval.id, false, "hub_user:owner")
+        .decide_flow_approval(&approval.id, false, "hub_user:owner", "")
         .await
         .unwrap();
 
@@ -383,7 +383,7 @@ async fn a_grant_revoked_between_the_proposal_and_the_approval_refuses_the_appro
     grant(&rt, &flow_id, &[]).await;
 
     let err = rt
-        .decide_flow_approval(&approval.id, true, "hub_user:owner")
+        .decide_flow_approval(&approval.id, true, "hub_user:owner", "")
         .await
         .expect_err("an approval is not a stored permission that outlives its grant");
     assert!(
@@ -426,11 +426,11 @@ async fn an_approval_is_decided_once() {
         .await
         .unwrap();
 
-    rt.decide_flow_approval(&approval.id, true, "hub_user:owner")
+    rt.decide_flow_approval(&approval.id, true, "hub_user:owner", "")
         .await
         .unwrap();
     let err = rt
-        .decide_flow_approval(&approval.id, true, "hub_user:owner")
+        .decide_flow_approval(&approval.id, true, "hub_user:owner", "")
         .await
         .expect_err("the second press must not book a second appointment");
     // The stable CODE, not the prose: the module `flows` shows a different message for «somebody
@@ -512,7 +512,7 @@ async fn an_approval_of_another_hub_is_not_visible_here() {
     );
     assert!(
         neighbour
-            .decide_flow_approval(&approval.id, true, "hub_user:intruder")
+            .decide_flow_approval(&approval.id, true, "hub_user:intruder", "")
             .await
             .is_err(),
         "nor decide it"

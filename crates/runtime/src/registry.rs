@@ -227,6 +227,17 @@ pub struct Registry {
     /// `verifactu-gateway.md` §3.4 (2026-08-04, superseding ADR-0197 §2) a demo DOES carry the
     /// delegated certificate, so the environment pin below is what keeps it off the real AEAT.
     pub demo_hub: bool,
+    /// **Las claves naturales que el SEED de cada módulo declara** sobre sus propias tablas
+    /// (hub#842): `module_id → (tabla → claves)`. Las lee
+    /// [`crate::seed::declared_natural_keys`] del mismo texto que se va a sembrar, en
+    /// `installer::register_module`, así que existen para todo módulo registrado por cualquiera de
+    /// las tres puertas (arranque desde `modules_dir`, instalación desde el marketplace,
+    /// re-hidratación desde la caché) y no sobreviven a un módulo desinstalado.
+    ///
+    /// Vive en el Registry, y no en disco ni en `hub_module`, por lo mismo que el resto de lo que
+    /// aporta un módulo: su vida ES la del módulo instalado.
+    pub(crate) seed_natural_keys:
+        HashMap<String, HashMap<String, Vec<crate::export::NaturalKey>>>,
 }
 
 impl Registry {
@@ -236,6 +247,36 @@ impl Registry {
 
     pub fn is_installed(&self, module_id: &str) -> bool {
         self.installed.iter().any(|m| m.id == module_id)
+    }
+
+    /// Does the installed module declare that its data belongs to the installation that produced
+    /// it? ([`crate::manifest::Manifest::installation_bound_data`], hub#380.)
+    ///
+    /// Asked of the module installed **in the destination hub**, which is where the import engine
+    /// stands: the server installs the bundle's modules before the engine runs, so by then this is
+    /// the manifest the data would be applied against. A module nobody installed answers `false` —
+    /// its section cannot be applied anyway (`apply_section` fails it as not installed).
+    pub fn is_installation_bound(&self, module_id: &str) -> bool {
+        self.installed
+            .iter()
+            .any(|m| m.id == module_id && m.installation_bound_data)
+    }
+
+    /// Las claves naturales que algún módulo instalado declara, en su seed, sobre `table`
+    /// (hub#842).
+    ///
+    /// Se pregunta por TABLA y no por módulo a propósito: un módulo solo puede escribir sus
+    /// propias tablas (hub#633 lo valida al instalar), así que una tabla tiene un único dueño y la
+    /// respuesta no puede mezclar declaraciones de dos módulos. Preguntar por tabla, además, es lo
+    /// que sirve al import, que trabaja sobre el SQL de una sección y no siempre tiene un módulo
+    /// (`data/hub_user_profile.sql`).
+    pub(crate) fn seed_natural_keys_for(&self, table: &str) -> Vec<crate::export::NaturalKey> {
+        self.seed_natural_keys
+            .values()
+            .filter_map(|by_table| by_table.get(table))
+            .flatten()
+            .cloned()
+            .collect()
     }
 
     /// ¿Está el módulo instalado **y** activo?
@@ -546,6 +587,7 @@ impl Registry {
         self.commands.retain(|_, c| c.module_id != module_id);
         self.navigation.retain(|n| n.module_id != module_id);
         self.locales.remove(module_id);
+        self.seed_natural_keys.remove(module_id);
         for cmds in self.listeners.values_mut() {
             cmds.retain(|name| self.commands.contains_key(name));
         }
@@ -587,6 +629,7 @@ impl Registry {
                 .cloned()
                 .collect(),
             locales: self.locales.get(module_id).cloned().unwrap_or_default(),
+            seed_natural_keys: self.seed_natural_keys.get(module_id).cloned().unwrap_or_default(),
             // A listener belongs to the module that owns the command it fires (hub#659 makes that
             // the only shape a manifest can declare), so this is exactly the module's own share of
             // the map — the same rule `remove_module` uses to prune it.
@@ -625,6 +668,10 @@ impl Registry {
         self.commands.extend(snapshot.commands);
         self.navigation.extend(snapshot.navigation);
         self.set_locales(&module_id, snapshot.locales);
+        if !snapshot.seed_natural_keys.is_empty() {
+            self.seed_natural_keys
+                .insert(module_id.clone(), snapshot.seed_natural_keys);
+        }
         for (event, command) in snapshot.listeners {
             let listeners = self.listeners.entry(event).or_default();
             if !listeners.contains(&command) {
@@ -646,6 +693,8 @@ pub struct ModuleSnapshot {
     locales: HashMap<String, ModuleLocale>,
     /// `(event, command)` pairs whose command belongs to the module.
     listeners: Vec<(String, String)>,
+    /// The natural keys the module's seed declares, per table (hub#842).
+    seed_natural_keys: HashMap<String, Vec<crate::export::NaturalKey>>,
 }
 
 impl ModuleSnapshot {

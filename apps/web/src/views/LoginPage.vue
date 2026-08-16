@@ -228,6 +228,13 @@
               <!-- Paso: login por PIN -->
               <div v-else-if="step === 'pin'" class="step-form">
 
+                <!-- Se dice en los DOS pasos del pinpad: la placa no necesita que se elija a
+                     nadie antes (resuelve la persona entera) y tampoco que se toque este campo —
+                     la ráfaga la caza el listener global del shell (hub#658). -->
+                <ion-text color="medium" class="badge-hint">
+                  <p>{{ t('login.orSwipeBadge') }}</p>
+                </ion-text>
+
                 <!-- Paso 1: elegir usuario (cuando hay varios en el dispositivo) -->
                 <template v-if="!pinUser">
                   <ion-text color="medium" class="pin-choose-title">
@@ -335,7 +342,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -348,9 +355,10 @@ import { setUser, setHubSession, getHubSession } from '../lib/session';
 import type { LoginResult } from '../lib/cloud';
 import {
   cloudLogin, cloudLogin2fa, TwoFactorRequiredError, setTokens,
-  runtimeCloudSession, runtimePinLogin, runtimeSetPin,
+  runtimeBadgeLogin, runtimeCloudSession, runtimePinLogin, runtimeSetPin,
   googleLoginUrl, exchangeGoogleCode,
 } from '../lib/cloud';
+import { onBadgeScan } from '../lib/badge-scanner';
 import { config } from '../lib/config';
 import {
   hubContextReady,
@@ -728,12 +736,23 @@ async function handleGoogleCallback(): Promise<void> {
   }
 }
 
+// **La placa entra por el listener global del shell**, nunca por un campo con el foco (hub#658).
+// Esta pantalla solo se suscribe mientras está montada: si se va y deja el handler puesto, seguiría
+// abriendo sesiones desde debajo de la pantalla que la sustituyó.
+let stopBadgeScan: (() => void) | null = null;
 onMounted(() => {
+  stopBadgeScan = onBadgeScan((badge) => {
+    void signInWithBadge(badge);
+  });
   void handleGoogleCallback();
   // Qué clase de dispositivo es este lo dice el HUB (hub#357). Se pregunta aquí, antes de que
   // exista sesión alguna —esta pantalla ES quien decide si se pinta el pinpad—, y la respuesta
   // solo puede quitar fricción: mientras no llegue, o si falla, el dispositivo es `shared`.
   void loadDeviceMode();
+});
+onUnmounted(() => {
+  stopBadgeScan?.();
+  stopBadgeScan = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -827,6 +846,63 @@ async function checkPin(pin: string): Promise<void> {
   } finally {
     pinLoading.value = false;
   }
+}
+
+/**
+ * **Entrar pasando la placa** (hub#658). La tarjeta resuelve la identidad ENTERA — sustituye al par
+ * (nombre, PIN), no al PIN — así que no hay que elegir a nadie en la rejilla primero.
+ *
+ * Solo se atiende **donde se ofrece el pinpad** (`pinAvailable`): son la misma decisión de negocio
+ * —«esta caja pregunta quién está delante»— y aceptar tarjetas en un portátil marcado `personal`, o
+ * en un hub cuyo dial dice «nunca», sería abrir por la placa una puerta que el dueño cerró.
+ *
+ * Un rechazo cae en la MISMA frase que un PIN rechazado y deja la pantalla donde estaba: la placa es
+ * comodidad, y quedarse sin ella nunca puede dejar a nadie fuera — el pinpad sigue ahí.
+ */
+async function signInWithBadge(badge: string): Promise<void> {
+  // Solo en el paso donde la placa se OFRECE, y no simplemente «donde no estorba»: durante el alta
+  // de PIN o un desafío 2FA hay una conversación a medias en pantalla, y una tarjeta que la
+  // abandonase en silencio dejaría al usuario dentro sin entender qué pasó con lo que estaba
+  // haciendo. `pinAvailable` es la misma decisión de negocio que pinta el pinpad (modo del
+  // dispositivo + confianza + dial): aceptar tarjetas donde el dueño dijo que no se pregunte sería
+  // abrir por la placa una puerta que él cerró.
+  if (!pinAvailable.value || step.value !== 'pin' || pinLoading.value) return;
+  pinLoading.value = true;
+  pinError.value = false;
+  try {
+    const sess = await runtimeBadgeLogin(badge);
+    setHubSession(sess.token);
+    setUser({
+      id: sess.user.id,
+      name: sess.user.name,
+      email: trustedUsers.value.find((u) => u.id === sess.user.id)?.email ?? '',
+      role: sess.user.role,
+      permissions: sess.permissions,
+    });
+    await router.replace(redirectTarget());
+  } catch (err) {
+    pinErrorKey.value = badgeRefusalKey(err);
+    pinError.value = true;
+    if (mainPinpadRef.value) mainPinpadRef.value.value = '';
+  } finally {
+    pinLoading.value = false;
+  }
+}
+
+/**
+ * Qué frase se lleva una placa rechazada.
+ *
+ * Los dos códigos del device-trust se reutilizan tal cual —son del dispositivo, no de la
+ * credencial— y todo lo demás cae en «esa tarjeta no abre nada aquí». No hay una frase para «esa
+ * placa no existe» y otra para «su dueño está de baja», por lo mismo que en el PIN: la puerta de
+ * login no puede convertirse en la forma de averiguar qué tarjetas ha emitido este negocio.
+ */
+function badgeRefusalKey(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (code === 'device_untrusted') return 'login.deviceNotEnrolled';
+  if (code === 'device_unidentified') return 'login.deviceUnidentified';
+  if (code === 'too_many_attempts') return 'login.badgeTooManyAttempts';
+  return 'login.badgeRejected';
 }
 
 // ---------------------------------------------------------------------------
@@ -1017,6 +1093,12 @@ async function onSetupComplete(pin: string): Promise<void> {
 }
 
 /* ---- User grid (PIN selector) ---- */
+.badge-hint p {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
 .pin-choose-title {
   text-align: center;
 }

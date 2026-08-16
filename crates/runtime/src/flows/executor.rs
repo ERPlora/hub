@@ -35,9 +35,9 @@ use serde_json::{json, Map, Value as Json};
 
 use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::{self, FlowDefinition, StepDef, StepSpec};
+use crate::flows::def::{self, FlowDefinition, PastDuePolicy, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
-use crate::flows::{grants, http, notify, store, triggers};
+use crate::flows::{approvals, grants, http, notify, query, store, triggers, waits};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
 
 /// How many runs one tick advances. The tick happens every second, so this is a throughput knob,
@@ -231,9 +231,10 @@ async fn advance_run(
 
     // A step that committed but never recorded its output: the process died between the two
     // writes. Continuing would read `steps.<id>` as null in every later step.
-    if let Some(step_id) = interrupted_step(db, &run_id).await? {
+    if let Some(step_id) = interrupted_step(db, hub_id, &run_id).await? {
         return finish(
             db,
+            hub_id,
             &run_id,
             store::STATUS_FAILED,
             &format!(
@@ -253,6 +254,7 @@ async fn advance_run(
         Ok(_) => {
             return finish(
                 db,
+                hub_id,
                 &run_id,
                 store::STATUS_CANCELLED,
                 "the flow was disabled while this run was in flight",
@@ -263,6 +265,7 @@ async fn advance_run(
         Err(_) => {
             return finish(
                 db,
+                hub_id,
                 &run_id,
                 store::STATUS_CANCELLED,
                 &format!("{ERR_FLOW_GONE}: the flow was deleted while this run was in flight"),
@@ -278,7 +281,7 @@ async fn advance_run(
     let def = match FlowDefinition::parse(&flow.definition) {
         Ok(def) => def,
         Err(e) => {
-            return finish(db, &run_id, store::STATUS_FAILED, &format!("{e}"))
+            return finish(db, hub_id, &run_id, store::STATUS_FAILED, &format!("{e}"))
                 .await
                 .map(|()| None)
         }
@@ -286,7 +289,7 @@ async fn advance_run(
 
     for _ in 0..MAX_STEPS_PER_TICK {
         let Some(step) = def.steps.get(index as usize) else {
-            return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None);
+            return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None);
         };
         let scope = json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
 
@@ -307,7 +310,7 @@ async fn advance_run(
             Outcome::Continue { output } => {
                 set_step_output(&mut vars, &step.id, output);
                 index += 1;
-                persist_vars(db, &run_id, index, &vars).await?;
+                persist_vars(db, hub_id, &run_id, index, &vars).await?;
             }
             Outcome::Io { pending } => {
                 // The run keeps its lease: it is invisible to the next tick until the server
@@ -315,15 +318,30 @@ async fn advance_run(
                 return Ok(Some(pending));
             }
             Outcome::Stopped => {
-                return finish(db, &run_id, store::STATUS_DONE, "").await.map(|()| None)
+                return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None)
             }
-            Outcome::Sleep { wake_at } => {
-                return sleep_until(db, &run_id, &wake_at).await.map(|()| None)
+            Outcome::Sleep { wake_at, arm } => {
+                return sleep_until(db, hub_id, &run_id, &wake_at, &arm).await.map(|()| None)
             }
             Outcome::Failed { error } => {
                 // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
                 // and retrying a business command by itself is how a sale gets charged twice.
-                return finish(db, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
+                return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
+            }
+            // The question is asked; the run leaves the queue until somebody answers it. It goes
+            // out through `complete_io` — the same door the `ai` step's proposal parks through —
+            // so `waiting_approval` is written in exactly one place, and the resume path
+            // (`decide_flow_approval`, the expiry sweep) is the same one for both kinds.
+            Outcome::AwaitApproval => {
+                return complete_io(
+                    db,
+                    hub_id,
+                    &run_id,
+                    &step.id,
+                    IoResult::AwaitingApproval(json!({})),
+                )
+                .await
+                .map(|()| None)
             }
         }
     }
@@ -331,10 +349,11 @@ async fn advance_run(
     // Budget spent with steps left: back in the queue, lease released, resumes next tick.
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET status = 'pending', claim_expires_at = NULL, updated_at = :now \
-         WHERE id = :id",
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
@@ -349,8 +368,18 @@ enum Outcome {
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
     /// flow working exactly as written.
     Stopped,
-    Sleep { wake_at: String },
+    /// The run parks as a row. `arm` is the wait's OTHER exits (hub#951), inserted in the same
+    /// transaction as the sleep so there is no window in which one of them exists without the other.
+    Sleep {
+        wake_at: String,
+        arm: Vec<(String, Params)>,
+    },
     Failed { error: String },
+    /// **The pause** (hub#950). The question is already written to `_flow_approvals` and the step
+    /// row is `running`; what is left is to park the run, and that is done through the seam the
+    /// `ai` step has parked through since hub#665 rather than beside it. One place decides what
+    /// «this run is waiting for a person» means, and a second one would drift.
+    AwaitApproval,
 }
 
 #[allow(clippy::too_many_arguments)] // one step's worth of context; splitting it hides the seam
@@ -381,38 +410,159 @@ async fn run_step(
             })
         }
 
-        StepSpec::Delay { seconds, until } => {
-            let wake_at = match (seconds, until) {
-                (Some(s), _) => (chrono::Utc::now() + chrono::Duration::seconds(*s)).to_rfc3339(),
+        // **A read the flow performs itself** (hub#954). Like `condition`, it does no I/O and does
+        // not cross the `PendingIo` seam: it is a local `SELECT` with the flow's own context, and
+        // the ceiling on its rows is what keeps it a step the tick can afford under the global
+        // lock.
+        //
+        // It writes NOTHING, and that is why it needs no `committed` window the way a `command`
+        // does: a run reclaimed after an expired lease simply reads again, which is safe by
+        // construction (flows.md §13.4 is about writes).
+        StepSpec::Query(_) => {
+            match query::run(db, registry, hub_id, flow_id, run_id, step, scope).await {
+                Ok(query::Read {
+                    recorded_input,
+                    output,
+                }) => {
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_DONE, &recorded_input, &output, "",
+                        &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Continue { output })
+                }
+                Err(e) => {
+                    // Denied, or a read that failed. Nothing was written by it either way, and
+                    // the run says why at the step instead of carrying a null forward.
+                    let error = format!("step `{}`: {}", step.id, error_text(&e));
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    Ok(Outcome::Failed { error })
+                }
+            }
+        }
+
+        StepSpec::Delay(delay) => {
+            // A step that fails says why AT the step, so the history explains the run.
+            macro_rules! refuse {
+                ($error:expr) => {{
+                    let error = $error;
+                    write_step(
+                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
+                        &error, &now,
+                    )
+                    .await?;
+                    return Ok(Outcome::Failed { error });
+                }};
+            }
+
+            let clock = chrono::Utc::now();
+            let instant = match (&delay.seconds, &delay.until) {
+                (Some(s), _) => clock + chrono::Duration::seconds(*s),
                 (None, Some(path)) => {
                     let value = def::resolve(&json!(path), scope);
-                    match value.as_str().and_then(|s| {
-                        chrono::DateTime::parse_from_rfc3339(s).ok().map(|d| d.to_rfc3339())
-                    }) {
-                        Some(instant) => instant,
-                        None => {
-                            let error = format!(
-                                "step `{}`: `until` resolved to {value}, which is not an RFC-3339 \
-                                 instant",
-                                step.id
-                            );
-                            write_step(
-                                db, hub_id, run_id, index, step, STEP_FAILED, &json!({}),
-                                &json!({}), &error, &now,
-                            )
-                            .await?;
-                            return Ok(Outcome::Failed { error });
-                        }
-                    }
+                    let Some(parsed) = value
+                        .as_str()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    else {
+                        refuse!(format!(
+                            "step `{}`: `until` resolved to {value}, which is not an RFC-3339 \
+                             instant",
+                            step.id
+                        ));
+                    };
+                    // **The offset of Salesforce's Scheduled Paths** (hub#951): «24 h before the
+                    // appointment» is the instant of the thing, shifted. Seconds and not calendar
+                    // units, so a −24 h across a DST change lands an hour off on the wall clock —
+                    // the price of not having calendar arithmetic, and it is said on the screen.
+                    parsed.with_timezone(&chrono::Utc)
+                        + chrono::Duration::seconds(delay.offset_seconds)
                 }
                 (None, None) => unreachable!("parse refuses a delay with neither"),
             };
-            let output = json!({ "wake_at": wake_at });
+
+            // **The horizon** (hub#951). There was no ceiling: an `until` resolving to the year
+            // 3000 slept as a row every retention rule exempts. Refused and not shortened, for the
+            // same reason `limit` is refused above its ceiling — a wait nobody meant is worse than
+            // a run that says why it stopped.
+            let horizon = delay.horizon_seconds();
+            if instant > clock + chrono::Duration::seconds(horizon) {
+                refuse!(format!(
+                    "{}: step `{}` would wait until {}, past the {horizon} s this wait may cover",
+                    def::ERR_DELAY_HORIZON,
+                    step.id,
+                    instant.to_rfc3339()
+                ));
+            }
+
+            // **The instant has already gone by.** Salesforce runs the scheduled path immediately;
+            // the default here is the restrictive one, because the literal case is a reminder whose
+            // hour went by and sending it late is worse than not sending it.
+            if instant <= clock {
+                match delay.past_due {
+                    PastDuePolicy::Skip => {
+                        let output = json!({ "past_due": true, "skipped": true });
+                        write_step(
+                            db, hub_id, run_id, index, step, STEP_STOPPED, &json!({}), &output, "",
+                            &now,
+                        )
+                        .await?;
+                        return Ok(Outcome::Stopped);
+                    }
+                    PastDuePolicy::Fail => {
+                        refuse!(format!(
+                            "{}: step `{}` resolved to {}, which had already passed",
+                            def::ERR_DELAY_PAST_DUE,
+                            step.id,
+                            instant.to_rfc3339()
+                        ));
+                    }
+                    PastDuePolicy::ContinueNow => {
+                        let output = json!({ "past_due": true, "wake_at": Json::Null });
+                        write_step(
+                            db, hub_id, run_id, index, step, STEP_DONE, &json!({}), &output, "",
+                            &now,
+                        )
+                        .await?;
+                        return Ok(Outcome::Continue { output });
+                    }
+                }
+            }
+
+            // **Normalised to UTC before it is persisted** (hub#970): `wake_sleeping` compares this
+            // against `:now` as TEXT, so an instant that keeps the offset it was written in sorts
+            // by its wall clock instead of by when it happens — two hours late in Spanish summer,
+            // and EARLY with a negative offset.
+            let wake_at = instant.to_rfc3339();
+
+            // The waits are built BEFORE anything is written, so a hook whose correlation this run
+            // cannot resolve stops the step instead of arming half of them.
+            let arm = match waits::arm_ops(
+                hub_id,
+                flow_id,
+                run_id,
+                &step.id,
+                // The index the run will be parked ON: the step counter advances with the sleep
+                // (waking resumes AFTER the delay), and the conditional update every exit of this
+                // wait uses names that number.
+                index + 1,
+                delay,
+                scope,
+                &now,
+            ) {
+                Ok(arm) => arm,
+                Err(e) => refuse!(format!("step `{}`: {}", step.id, error_text(&e))),
+            };
+
+            let output = json!({ "wake_at": wake_at, "waits": arm.len() });
             write_step(db, hub_id, run_id, index, step, STEP_SLEEPING, &json!({}), &output, "", &now)
                 .await?;
             // The step index advances with the sleep: waking up resumes AFTER the delay, not on it.
-            persist_step_index(db, run_id, index + 1).await?;
-            Ok(Outcome::Sleep { wake_at })
+            persist_step_index(db, hub_id, run_id, index + 1).await?;
+            Ok(Outcome::Sleep { wake_at, arm })
         }
 
         StepSpec::Command { command, params } => {
@@ -448,7 +598,7 @@ async fn run_step(
                     hub_id, run_id, index, step, STEP_COMMITTED, &resolved_json, &json!({}), "",
                     &now,
                 ),
-                advance_index_op(run_id, index + 1, &now),
+                advance_index_op(hub_id, run_id, index + 1, &now),
             ];
 
             match commands::execute_at(
@@ -467,7 +617,7 @@ async fn run_step(
             .await
             {
                 Ok(output) => {
-                    complete_step(db, run_id, index, &output, &now).await?;
+                    complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
                 }
                 Err(e) => {
@@ -585,10 +735,10 @@ async fn run_step(
                             "",
                             &now,
                         ),
-                        advance_index_op(run_id, index + 1, &now),
+                        advance_index_op(hub_id, run_id, index + 1, &now),
                     ];
                     db.execute_tx(&ops).await?;
-                    complete_step(db, run_id, index, &output, &now).await?;
+                    complete_step(db, hub_id, run_id, index, &output, &now).await?;
                     Ok(Outcome::Continue { output })
                 }
                 Err(e) => {
@@ -605,17 +755,107 @@ async fn run_step(
                 }
             }
         }
+
+        // **The pause** (hub#950). It does no I/O, so it never crosses the claim → I/O → complete
+        // seam: everything happens here, under the lock, and what leaves the tick is a run that has
+        // stopped and a row a person can answer.
+        //
+        // Two properties are the whole step, and both live in this arm:
+        //
+        // 1. **The question is rendered NOW and stored.** `title`/`summary` are templated against
+        //    this run and written to the row, exactly like the `payload` of a model's proposal —
+        //    so editing (or deleting) the flow afterwards cannot change what the person in front
+        //    of the tray is agreeing to. That is the acceptance criterion «editing the flow does
+        //    not mutate requests already created», and it costs nothing extra.
+        // 2. **It asks once per run and step.** A tick that wrote the row and died before the run
+        //    was parked gets its lease reclaimed and comes back through here; without the lookup
+        //    the person would find the same question twice, and answering one would leave the
+        //    other hanging until the sweep.
+        StepSpec::Approval(spec) => {
+            let title = def::render(&spec.title, scope);
+            let summary = def::render(&spec.summary, scope);
+            let recorded_input = json!({
+                "title": title,
+                "summary": summary,
+                "assignee_role": spec.assignee_role,
+                "expires_in": spec.expires_in_seconds,
+                "on_expire": spec.on_expire.as_str(),
+                "on_reject": spec.on_reject.as_str(),
+            });
+
+            let already_asked = approvals::pending_for_step(db, hub_id, run_id, &step.id).await?;
+            let newly_asked = match already_asked {
+                Some(_) => None,
+                None => Some(
+                    approvals::create_decision(
+                        db,
+                        hub_id,
+                        &approvals::NewDecision {
+                            run_id: run_id.to_string(),
+                            flow_id: flow_id.to_string(),
+                            step_id: step.id.clone(),
+                            title: title.clone(),
+                            summary: summary.clone(),
+                            assignee_role: spec.assignee_role.clone(),
+                            expires_in_seconds: spec.expires_in_seconds,
+                            on_expire: spec.on_expire,
+                            on_reject: spec.on_reject,
+                        },
+                    )
+                    .await?,
+                ),
+            };
+
+            // `running` and not `waiting_approval`: the park is `complete_io`'s job, and it only
+            // accepts a result for a step the run is actually waiting on.
+            write_step(
+                db, hub_id, run_id, index, step, STEP_RUNNING, &recorded_input, &json!({}), "",
+                &now,
+            )
+            .await?;
+
+            // Ephemeral, WS-only — the same fact a model's proposal emits, so the tray lights up
+            // without polling. The SCREEN is the module `flows`'s job (ADR-0283 §7).
+            //
+            // **Only for a question that is actually new.** A replay of this step (the crash
+            // window above) is not a new question, and re-announcing it would light up the tray a
+            // second time for a row that has been sitting in it since Tuesday.
+            if let Some(asked) = newly_asked {
+                let mut payload = Params::new();
+                payload.insert("approval_id".into(), json!(asked.id));
+                payload.insert("flow_id".into(), json!(asked.flow_id));
+                payload.insert("run_id".into(), json!(asked.run_id));
+                payload.insert("kind".into(), json!(asked.kind));
+                payload.insert("title".into(), json!(asked.title));
+                payload.insert("summary".into(), json!(asked.summary));
+                payload.insert("assignee_role".into(), json!(asked.assignee_role));
+                crate::events::notify_sink(
+                    registry,
+                    crate::registry::EventSource::Core,
+                    approvals::EVENT_APPROVAL_CREATED,
+                    &payload,
+                );
+            }
+
+            Ok(Outcome::AwaitApproval)
+        }
     }
 }
 
 /// The id of a step this run committed without recording its output, if any.
-async fn interrupted_step(db: &dyn DatabaseAdapter, run_id: &str) -> Result<Option<String>> {
+async fn interrupted_step(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+) -> Result<Option<String>> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     let res = db
         .query(
             "SELECT step_id FROM _flow_run_steps \
-             WHERE run_id = :run_id AND status = 'committed' AND deleted_at IS NULL \
+             WHERE run_id = :run_id AND hub_id = :hub_id AND status = 'committed' \
+               AND deleted_at IS NULL \
              ORDER BY step_index LIMIT 1",
             &p,
         )
@@ -683,92 +923,139 @@ async fn write_step(
 /// Writes the output a `committed` step produced, closing the window described at the top.
 async fn complete_step(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     index: i64,
     output: &Json,
     now: &str,
 ) -> Result<()> {
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     p.insert("step_index".into(), json!(index));
     p.insert("output".into(), json!(output.to_string()));
     p.insert("now".into(), json!(now));
     db.execute(
         "UPDATE _flow_run_steps SET status = 'done', output = :output, finished_at = :now \
-         WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+         WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+           AND deleted_at IS NULL",
         &p,
     )
     .await?;
     Ok(())
 }
 
-fn advance_index_op(run_id: &str, next_index: i64, now: &str) -> (String, Params) {
+fn advance_index_op(hub_id: &str, run_id: &str, next_index: i64, now: &str) -> (String, Params) {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("step".into(), json!(next_index));
     p.insert("now".into(), json!(now));
     (
-        "UPDATE _flow_runs SET current_step = :step, updated_at = :now WHERE id = :id".to_string(),
+        "UPDATE _flow_runs SET current_step = :step, updated_at = :now \
+          WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+            .to_string(),
         p,
     )
 }
 
-async fn persist_step_index(db: &dyn DatabaseAdapter, run_id: &str, next: i64) -> Result<()> {
-    let (sql, p) = advance_index_op(run_id, next, &now_rfc3339());
+async fn persist_step_index(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+    next: i64,
+) -> Result<()> {
+    let (sql, p) = advance_index_op(hub_id, run_id, next, &now_rfc3339());
     db.execute(&sql, &p).await?;
     Ok(())
 }
 
 async fn persist_vars(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     next_index: i64,
     vars: &Json,
 ) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("step".into(), json!(next_index));
     p.insert("vars".into(), json!(vars.to_string()));
     p.insert("now".into(), json!(now_rfc3339()));
     db.execute(
         "UPDATE _flow_runs SET current_step = :step, vars = :vars, updated_at = :now \
-         WHERE id = :id",
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
         &p,
     )
     .await?;
     Ok(())
 }
 
-async fn sleep_until(db: &dyn DatabaseAdapter, run_id: &str, wake_at: &str) -> Result<()> {
+/// Puts the run to sleep **and arms the wait's other exits in the same transaction** (hub#951).
+///
+/// The atomicity is the whole point. Arming before the row says `sleeping` would leave a window
+/// where a cancelling event finds an armed wait whose run is still `running`: the conditional
+/// update affects zero rows, the event is marked delivered, and the cancellation is lost for good.
+/// Arming after would leave the opposite window, a run asleep with no way out but its clock. In one
+/// transaction there is no window — and a `delay` with no hooks is exactly the statement it always
+/// was.
+async fn sleep_until(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    run_id: &str,
+    wake_at: &str,
+    arm: &[(String, Params)],
+) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("wake_at".into(), json!(wake_at));
     p.insert("now".into(), json!(now_rfc3339()));
-    db.execute(
+    let sleep = (
         "UPDATE _flow_runs SET status = 'sleeping', wake_at = :wake_at, \
-                               claim_expires_at = NULL, updated_at = :now WHERE id = :id",
-        &p,
-    )
-    .await?;
+                               claim_expires_at = NULL, updated_at = :now \
+         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+            .to_string(),
+        p,
+    );
+    if arm.is_empty() {
+        db.execute(&sleep.0, &sleep.1).await?;
+        return Ok(());
+    }
+    let mut ops = vec![sleep];
+    ops.extend_from_slice(arm);
+    db.execute_tx(&ops).await?;
     Ok(())
 }
 
+/// A run reaches a terminal status — and every wait it had armed stops being armed with it
+/// (hub#951). A wait outliving its run would be looked at on every delivery of its event, forever,
+/// to affect zero rows each time.
 async fn finish(
     db: &dyn DatabaseAdapter,
+    hub_id: &str,
     run_id: &str,
     status: &str,
     error: &str,
 ) -> Result<()> {
+    let now = now_rfc3339();
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(status));
     p.insert("error".into(), json!(error));
-    p.insert("now".into(), json!(now_rfc3339()));
-    db.execute(
-        "UPDATE _flow_runs SET status = :status, last_error = :error, finished_at = :now, \
-                               claim_expires_at = NULL, updated_at = :now WHERE id = :id",
-        &p,
-    )
+    p.insert("now".into(), json!(now.clone()));
+    db.execute_tx(&[
+        (
+            "UPDATE _flow_runs SET status = :status, last_error = :error, finished_at = :now, \
+                                   claim_expires_at = NULL, updated_at = :now \
+             WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL"
+                .to_string(),
+            p,
+        ),
+        waits::disarm_run_op(hub_id, run_id, &now),
+    ])
     .await?;
     Ok(())
 }
@@ -854,12 +1141,14 @@ pub async fn complete_io(
 
     // The step this run is waiting on, and its status. Anything else means the answer is stale.
     let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
     p.insert("run_id".into(), json!(run_id));
     p.insert("step_index".into(), json!(index));
     let step_row = db
         .query(
             "SELECT step_id, status FROM _flow_run_steps \
-             WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+             WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+               AND deleted_at IS NULL",
             &p,
         )
         .await?;
@@ -884,6 +1173,7 @@ pub async fn complete_io(
     match result {
         IoResult::Done(output) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("output".into(), json!(output.to_string()));
@@ -896,33 +1186,37 @@ pub async fn complete_io(
             .await?;
 
             set_step_output(&mut vars, step_id, output);
-            persist_vars(db, run_id, index + 1, &vars).await?;
+            persist_vars(db, hub_id, run_id, index + 1, &vars).await?;
             // Back in the queue with the lease released: the next tick picks it up and runs the
             // rest of the flow under the lock, where it belongs.
             let mut p = Params::new();
             p.insert("id".into(), json!(run_id));
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_runs SET status = 'pending', claim_expires_at = NULL, \
-                                       updated_at = :now WHERE id = :id",
+                                       updated_at = :now \
+                 WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
                 &p,
             )
             .await?;
         }
         IoResult::Failed(error) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("error".into(), json!(error));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_run_steps SET status = 'failed', error = :error, finished_at = :now \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
             // v1 is `on_error: "stop"` — the same answer a failed command gets.
-            finish(db, run_id, store::STATUS_FAILED, &error).await?;
+            finish(db, hub_id, run_id, store::STATUS_FAILED, &error).await?;
         }
         // The turn stopped on a write a person has to authorise. What it produced so far is kept
         // on the step, so a decision taken hours later completes the WHOLE turn and not just its
@@ -930,39 +1224,45 @@ pub async fn complete_io(
         // `claim_next_run` selects, so no amount of ticking smuggles the write through.
         IoResult::AwaitingApproval(partial) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("output".into(), json!(partial.to_string()));
             p.insert("status".into(), json!(STEP_WAITING_APPROVAL));
             db.execute(
                 "UPDATE _flow_run_steps SET status = :status, output = :output \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
             let mut p = Params::new();
             p.insert("id".into(), json!(run_id));
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("status".into(), json!(store::STATUS_WAITING_APPROVAL));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_runs SET status = :status, claim_expires_at = NULL, \
-                                       updated_at = :now WHERE id = :id",
+                                       updated_at = :now \
+                 WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
                 &p,
             )
             .await?;
         }
         IoResult::Cancelled(reason) => {
             let mut p = Params::new();
+            p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
             p.insert("step_index".into(), json!(index));
             p.insert("now".into(), json!(now));
             db.execute(
                 "UPDATE _flow_run_steps SET status = 'stopped', finished_at = :now \
-                 WHERE run_id = :run_id AND step_index = :step_index AND deleted_at IS NULL",
+                 WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
+                   AND deleted_at IS NULL",
                 &p,
             )
             .await?;
-            finish(db, run_id, store::STATUS_CANCELLED, &reason).await?;
+            finish(db, hub_id, run_id, store::STATUS_CANCELLED, &reason).await?;
         }
     }
     Ok(())
@@ -1020,6 +1320,16 @@ mod tests {
                 "notes.add_note",
                 "INSERT INTO note (id, text) VALUES (:new_id, :text);",
                 vec![],
+            ),
+        );
+        // The read a `query` step performs (hub#954). Same module, same permission: what opens it
+        // for a flow is the grant, not the role of whoever wrote the flow.
+        reg.queries.insert(
+            "notes.note.find".into(),
+            test_support::query(
+                "notes",
+                "notes.view_note",
+                "SELECT id, text FROM note WHERE text = :text ORDER BY id",
             ),
         );
         reg
@@ -1203,6 +1513,156 @@ mod tests {
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[0].status, "done");
         assert!(steps[0].output.get("ok").is_some(), "the output is kept: {:?}", steps[0].output);
+    }
+
+    // ── the `query` step, end to end (hub#954) ────────────────────────────────────────────────
+
+    /// The whole point of the step: a later step maps a value the flow READ, with no model in the
+    /// middle. The read is a field at the root of `steps.<id>` because that is the only shape the
+    /// mapping language can walk.
+    #[tokio::test]
+    async fn a_query_step_reads_and_the_next_step_maps_what_it_found() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "write", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "one" } },
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "one" } },
+                    { "id": "guard", "kind": "condition",
+                      "when": { "steps.look.found": { "eq": true } } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "seen {{steps.look.text}} x{{steps.look.count}}" } }
+                ]
+            }),
+        )
+        .await;
+        grants::replace(
+            &db,
+            HUB,
+            &flow_id,
+            &registry(),
+            &[
+                (GrantKind::Command, "notes.note.add".to_string()),
+                (GrantKind::Query, "notes.note.find".to_string()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert_eq!(notes(&db).await, vec!["one", "seen one x1"]);
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(run.status, store::STATUS_DONE, "{}", run.last_error);
+        let (_, steps) = store::get_run(&db, HUB, &run.id).await.unwrap();
+        assert_eq!(steps[1].kind, "query");
+        assert_eq!(steps[1].status, "done");
+        assert_eq!(steps[1].output["found"], json!(true));
+        assert_eq!(steps[1].output["count"], json!(1));
+        assert_eq!(
+            steps[1].input["query"],
+            json!("notes.note.find"),
+            "the history says which read was performed: {:?}",
+            steps[1].input
+        );
+    }
+
+    /// A read nobody granted does not happen, and the run stops there saying so — the same default
+    /// answer a `command` step gets. The grant is re-read at the instant of the read, so revoking
+    /// it mid-run is what stops the next step.
+    #[tokio::test]
+    async fn without_a_query_grant_nothing_is_read_and_the_run_fails_naming_it() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "one" } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "should not happen" } }
+                ]
+            }),
+        )
+        .await;
+        // The COMMAND is granted and the read is not: the refusal is about the read.
+        grant(&db, &flow_id, "notes.note.add").await;
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert!(notes(&db).await.is_empty(), "the run stopped at the read");
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(run.status, store::STATUS_FAILED);
+        assert!(
+            run.last_error.contains(grants::ERR_GRANT_DENIED)
+                && run.last_error.contains("notes.note.find"),
+            "the failure names the missing grant: {}",
+            run.last_error
+        );
+    }
+
+    /// Zero rows is a fact, not a failure: the run carries on and a `condition` decides. That is
+    /// what makes «avísame SI hay stock bajo» writable — Zapier resolves the same case with a
+    /// Filter, and the step that failed on empty would make the sentence impossible.
+    #[tokio::test]
+    async fn a_read_that_finds_nothing_lets_a_condition_decide_instead_of_failing() {
+        let db = db().await;
+        let flow_id = flow(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "look", "kind": "query", "query": "notes.note.find",
+                      "params": { "text": "nobody" }, "result": "count" },
+                    { "id": "guard", "kind": "condition",
+                      "when": { "steps.look.found": { "eq": true } } },
+                    { "id": "echo", "kind": "command", "command": "notes.note.add",
+                      "params": { "text": "found something" } }
+                ]
+            }),
+        )
+        .await;
+        grants::replace(
+            &db,
+            HUB,
+            &flow_id,
+            &registry(),
+            &[
+                (GrantKind::Command, "notes.note.add".to_string()),
+                (GrantKind::Query, "notes.note.find".to_string()),
+            ],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        assert!(notes(&db).await.is_empty(), "the guard stopped it, the read did not");
+        let run = run_of(&db, &flow_id).await;
+        assert_eq!(
+            run.status,
+            store::STATUS_DONE,
+            "an empty read is the flow working: {}",
+            run.last_error
+        );
+        let (_, steps) = store::get_run(&db, HUB, &run.id).await.unwrap();
+        assert_eq!(steps[0].output, json!({ "count": 0, "found": false }));
     }
 
     #[tokio::test]
@@ -1667,5 +2127,296 @@ mod tests {
         );
         assert!(!dump.contains("sk-live-42"), "the credential is nowhere: {dump}");
         assert!(dump.contains("***"), "and its place is marked: {dump}");
+    }
+
+    // ── hub#735: every write of this file names the hub it was asked for ──────────────────────
+    //
+    // The neighbour in these tests is **alive**: it has its own flow, its own run and its own
+    // step, all written through the ordinary doors. A scoping test whose neighbour is an empty
+    // hub proves nothing — it cannot tell "the statement filtered" from "there was nothing to
+    // hit". Here the neighbour is both the caller (it asks for a write on a run that is not its
+    // own, and must get nothing) and a bystander (its own rows must come out untouched).
+
+    /// The neighbour hub, sharing this database with [`HUB`] (the row contract, not the deploy).
+    const OTHER: &str = "hub-exec-neighbour";
+
+    async fn flow_for(db: &dyn DatabaseAdapter, hub: &str, definition: Json) -> String {
+        store::create(
+            db,
+            hub,
+            &registry(),
+            &NewFlow {
+                name: "F".into(),
+                enabled: true,
+                definition,
+            },
+            "hub_user:1",
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    /// The whole row, straight from the table — no hub filter, so a test can see what a write
+    /// ACTUALLY did rather than what a scoped read is willing to show it.
+    async fn raw_run(db: &dyn DatabaseAdapter, run_id: &str) -> Json {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(run_id));
+        db.query("SELECT * FROM _flow_runs WHERE id = :id", &p)
+            .await
+            .unwrap()
+            .rows
+            .remove(0)
+    }
+
+    async fn raw_steps(db: &dyn DatabaseAdapter, run_id: &str) -> Vec<Json> {
+        let mut p = Params::new();
+        p.insert("run_id".into(), json!(run_id));
+        db.query(
+            "SELECT * FROM _flow_run_steps WHERE run_id = :run_id ORDER BY step_index",
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows
+    }
+
+    /// Two hubs, one database, both with a run in flight. Every write helper in this file is
+    /// asked, by the WRONG hub, to move a run that belongs to the other — and none of them may.
+    #[tokio::test]
+    async fn a_write_asked_for_by_another_hub_moves_nothing() {
+        let db = db().await;
+        let reg = registry();
+
+        // The neighbour is real: its own flow, its own run, its own step row.
+        let their_flow = flow_for(&db, OTHER, one_command_flow()).await;
+        grants::replace(
+            &db,
+            OTHER,
+            &their_flow,
+            &reg,
+            &[(GrantKind::Command, "notes.note.add".to_string())],
+            "hub_user:9",
+        )
+        .await
+        .unwrap();
+        let their_run =
+            store::start_run(&db, OTHER, &their_flow, "", "manual", "", &json!({}), 0, "t")
+                .await
+                .unwrap();
+        tick(&db, &reg, OTHER).await.unwrap();
+        let their_run_before = raw_run(&db, &their_run).await;
+        let their_steps_before = raw_steps(&db, &their_run).await;
+        assert_eq!(their_steps_before.len(), 1, "the neighbour really did run a step");
+
+        // And this hub has a run parked mid-flight.
+        let flow_id = flow(&db, one_command_flow()).await;
+        grant(&db, &flow_id, "notes.note.add").await;
+        let run_id = store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
+        tick(&db, &reg, HUB).await.unwrap();
+        let before = raw_run(&db, &run_id).await;
+        let steps_before = raw_steps(&db, &run_id).await;
+
+        // Now the neighbour asks for every write this file performs, naming OUR run.
+        finish(&db, OTHER, &run_id, store::STATUS_FAILED, "not yours").await.unwrap();
+        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00", &[]).await.unwrap();
+        persist_vars(&db, OTHER, &run_id, 99, &json!({ "steps": { "x": 1 } })).await.unwrap();
+        persist_step_index(&db, OTHER, &run_id, 98).await.unwrap();
+        complete_step(&db, OTHER, &run_id, 0, &json!({ "stolen": true }), "2020-01-01T00:00:00+00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            interrupted_step(&db, OTHER, &run_id).await.unwrap(),
+            None,
+            "and it cannot read our steps either"
+        );
+
+        assert_eq!(raw_run(&db, &run_id).await, before, "our run is untouched");
+        assert_eq!(raw_steps(&db, &run_id).await, steps_before, "our steps are untouched");
+        assert_eq!(
+            raw_run(&db, &their_run).await,
+            their_run_before,
+            "and the neighbour's own run did not move either"
+        );
+        assert_eq!(raw_steps(&db, &their_run).await, their_steps_before);
+    }
+
+    /// The same guarantee for the far side of the claim → I/O → complete seam: an answer handed
+    /// back by the wrong hub is dropped, and neither hub's rows move.
+    #[tokio::test]
+    async fn an_io_result_from_another_hub_is_refused() {
+        let db = db().await;
+        let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping")).await;
+        http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        let before = raw_run(&db, &run_id).await;
+        let steps_before = raw_steps(&db, &run_id).await;
+        let err = complete_io(&db, OTHER, &run_id, "call", IoResult::Done(json!({ "status": 200 })))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_IO_STEP_GONE),
+            "{err:?}"
+        );
+        assert_eq!(raw_run(&db, &run_id).await, before);
+        assert_eq!(raw_steps(&db, &run_id).await, steps_before);
+    }
+
+    // ── hub#970: `delay.until` sleeps until an INSTANT, not until a piece of text ──────────────
+    //
+    // `wake_sleeping` compares `wake_at <= :now` in SQL, over TEXT. That is only the same question
+    // as «has this instant arrived?» while every string in the column is UTC. An `until` arrives
+    // with the offset of wherever it was written (`trigger.at` says so explicitly: the offset is
+    // part of the instant), so a `+02:00` sorted two hours late and a `-05:00` sorted five hours
+    // early — silently: the run ends `done`, the history says nothing, and the only trace is the
+    // hour on the message.
+
+    /// A flow that waits for `input.when` and then writes a note.
+    ///
+    /// `past_due_policy` is explicit because hub#951 made the DEFAULT `skip`: an instant that has
+    /// already gone by ends the run instead of sleeping, so these guards — which are about what a
+    /// SLEEPING run compares against — have to say which of the three answers they are testing.
+    fn wait_until_flow(past_due: &str) -> Json {
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "wait", "kind": "delay", "until": "input.when",
+                  "past_due_policy": past_due },
+                { "id": "write", "kind": "command", "command": "notes.note.add",
+                  "params": { "text": "later" } }
+            ]
+        })
+    }
+
+    async fn park_until(db: &dyn DatabaseAdapter, when: &str) -> (String, String) {
+        park_until_with(db, when, "continue_now").await
+    }
+
+    async fn park_until_with(
+        db: &dyn DatabaseAdapter,
+        when: &str,
+        past_due: &str,
+    ) -> (String, String) {
+        let flow_id = flow(db, wait_until_flow(past_due)).await;
+        grant(db, &flow_id, "notes.note.add").await;
+        let run_id =
+            start_manual_run(db, HUB, &flow_id, &json!({ "when": when }), "hub_user:1")
+                .await
+                .unwrap();
+        tick(db, &registry(), HUB).await.unwrap();
+        (flow_id, run_id)
+    }
+
+    fn at_offset(instant: chrono::DateTime<chrono::Utc>, hours: i32) -> String {
+        instant
+            .with_timezone(&chrono::FixedOffset::east_opt(hours * 3600).expect("valid offset"))
+            .to_rfc3339()
+    }
+
+    /// A moment already past, written with a POSITIVE offset. Its TEXT sorts after `now`, which is
+    /// what used to keep the run asleep for the length of the offset.
+    ///
+    /// Since hub#951 this case never reaches the SQL comparison at all: «has this instant passed?»
+    /// is answered in Rust, over `DateTime`, before anything is stored — so the offset cannot get a
+    /// vote. What the run does next is now the author's choice, and `continue_now` is the one that
+    /// asks the same question this test always asked.
+    #[tokio::test]
+    async fn a_delay_until_a_past_instant_written_in_another_zone_does_not_oversleep() {
+        let db = db().await;
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let (flow_id, run_id) = park_until(&db, &due).await;
+
+        assert_eq!(
+            notes(&db).await,
+            vec!["later"],
+            "the instant passed a minute ago: the run carries on, it does not sleep +02:00 hours"
+        );
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
+        assert_eq!(
+            raw_run(&db, &run_id).await["wake_at"],
+            Json::Null,
+            "and it never parked: an instant already gone by is decided, not stored"
+        );
+    }
+
+    /// And the restrictive default, which is the other half of the same decision (hub#951): the
+    /// same past instant, with nobody writing a policy, does NOT send the reminder.
+    #[tokio::test]
+    async fn the_same_past_instant_is_skipped_when_the_document_says_nothing() {
+        let db = db().await;
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let (flow_id, _) = park_until_with(&db, &due, def::PastDuePolicy::default().as_str()).await;
+
+        assert!(notes(&db).await.is_empty(), "a reminder whose hour went by is not sent");
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
+    }
+
+    /// **The storage half of hub#970, which is the one that survives.** A run that really does
+    /// sleep must store an instant the clock can compare, not the text it was given: `wake_sleeping`
+    /// compares `wake_at <= :now` over TEXT, and that is only the same question while every string
+    /// in the column is UTC.
+    ///
+    /// Both signs, because one control can be right by accident: `+02:00` sorted two hours LATE
+    /// (the run overslept) and `-05:00` sorted five hours EARLY (a reminder before the thing it
+    /// reminds of). The second assertion is the bug itself, reproduced as a comparison.
+    #[tokio::test]
+    async fn a_sleeping_run_stores_its_instant_in_utc_whatever_zone_it_arrived_in() {
+        for hours in [2, -5] {
+            let db = db().await;
+            let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(6), hours);
+            let (flow_id, run_id) = park_until(&db, &later).await;
+            assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+
+            let stored = raw_run(&db, &run_id).await["wake_at"].as_str().unwrap().to_string();
+            assert!(stored.ends_with("+00:00"), "stored with an offset of its own: {stored}");
+
+            // The question `wake_sleeping` asks, at a moment safely after the instant. The stored
+            // text answers it; the text as it arrived does not — that IS hub#970.
+            let after = (chrono::Utc::now() + chrono::Duration::hours(7)).to_rfc3339();
+            assert!(stored <= after, "{stored} vs {after}");
+            if hours > 0 {
+                assert!(later > after, "the raw `{later}` sorts late: the run would oversleep");
+            }
+
+            tick(&db, &registry(), HUB).await.unwrap();
+            assert!(notes(&db).await.is_empty(), "the instant has not arrived yet");
+            assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+        }
+    }
+
+    /// The runs that were parked BEFORE this fix are still in the table with their offset, and
+    /// nothing would ever re-write them: a sleeping run is only read by the comparison that the
+    /// offset breaks. The boot repair is what reaches them (`store::normalize_wake_at`).
+    #[tokio::test]
+    async fn a_run_parked_before_the_fix_is_repaired_at_boot_and_then_wakes() {
+        let db = db().await;
+        // Parked on a FUTURE instant, because that is the only way a run sleeps at all now
+        // (hub#951) — and then rewound by hand to the shape the old code wrote for a delay that
+        // was already due: the instant, with its origin offset.
+        let later = at_offset(chrono::Utc::now() + chrono::Duration::hours(6), 2);
+        let (flow_id, run_id) = park_until(&db, &later).await;
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
+
+        let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
+        let mut p = Params::new();
+        p.insert("id".into(), json!(run_id));
+        p.insert("wake_at".into(), json!(due));
+        db.execute("UPDATE _flow_runs SET wake_at = :wake_at WHERE id = :id", &p)
+            .await
+            .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert!(
+            notes(&db).await.is_empty(),
+            "this is the bug, reproduced: the text sorts late, so the run oversleeps"
+        );
+
+        store::normalize_wake_at(&db, HUB).await.unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+        assert_eq!(notes(&db).await, vec!["later"]);
+        assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
     }
 }

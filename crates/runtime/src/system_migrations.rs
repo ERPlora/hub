@@ -1310,6 +1310,418 @@ ALTER TABLE _hub_fiscal_profile ADD COLUMN IF NOT EXISTS representation_at TEXT 
         kind: Kind::Expand,
         postgres: "ALTER TABLE hub_trusted_device ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT '';",
     },
+    // ── v45 — hub#972: qué le pasa al RUN cuando su aprobación caduca, escrito en la FILA ──────
+    // El TTL de 72 h solo se miraba al leer (`claim_pending`): una fila vencida no se podía ni
+    // aprobar ni rechazar —las dos vías pasan por ahí— y su run se quedaba en `waiting_approval`
+    // para siempre, exento de la poda de 90 días con el `payload` verbatim dentro (RGPD). El
+    // barrido que lo saca de ahí necesita saber QUÉ hacer, y esa respuesta no puede ser una
+    // constante en el código: el step `approval` genérico (hub#950) la elige **por documento**
+    // (`on_expire: reject | cancel | continue`), así que el dato viaja donde viaja la decisión —
+    // en la fila, junto al `payload` que también se guarda en vez de re-derivarse.
+    //
+    // `'reject'` por defecto, y es la respuesta conservadora a propósito: los steps escritos
+    // después de un `ai` asumían que la escritura ocurrió, así que «nadie contestó» se parece
+    // mucho más a un «no» que a un «sí». `continue` es opt-in de quien escribió el documento.
+    //
+    // Aditiva y re-ejecutable (`ADD COLUMN IF NOT EXISTS`), sin backfill: el DEFAULT ya deja a las
+    // filas existentes con la política que tendrían igualmente.
+    //
+    // ⚠️ El número es DECLARADO, no la posición en el slice, y hay varias ramas de flujos a la vez
+    // queriendo número: recompruébalo contra `origin/develop` justo antes de empujar (hub#573 hace
+    // que una versión en o por debajo del máximo aplicado ABORTE el arranque en vez de saltarse en
+    // silencio). Comprobado contra `origin/develop` 6a0e8e27.
+    SystemMigration {
+        version: 45,
+        name: "flow_approval_on_expire",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_expire TEXT NOT NULL DEFAULT 'reject';",
+    },
+    // ── v46 — hub#735: `_event_delivery` también es de un hub ────────────────────────────────
+    // Era la última tabla del radio del kernel de flujos **sin `hub_id` a nivel de esquema**, y no
+    // es una tabla cualquiera: es donde se escribe el marcador de idempotencia de cada entrega —
+    // el de los listeners de un módulo (`_event_delivery(event_id, listener_command)`) y el del
+    // disparador de un flujo, bajo el listener sintético `_flow:<trigger_id>`. Es la pieza que
+    // garantiza «un evento produce UN run», y estaba fuera del contrato de fila de `tenancy.md`.
+    //
+    // ⚠️ **El backfill NO adivina.** Sella `:hub_id` —el del despliegue— en los marcadores que no
+    // dicen de quién son, y eso es correcto **porque desde ADR-0201 cada hub es dueño de su propia
+    // base de datos** (`Hub.database_name` + rol propio): en una BD de un solo hub, «todo marcador
+    // es de este hub» es un hecho, no una conjetura. Es el mismo criterio y el mismo párrafo que
+    // la v42 escribió para `hub_user`/`hub_session`.
+    //
+    // **Y no se borra nada**: un marcador perdido no es espacio recuperado, es un listener que
+    // vuelve a correr y un evento que produce un segundo run.
+    //
+    // **La PK NO se recompone** a `(hub_id, event_id, listener_command)`, por la misma razón que
+    // v42 no la recompuso en `hub_user`: `event_id` es un UUID v4 y no puede chocar entre hubs, así
+    // que una clave más ancha no añadiría unicidad — y la ESTRECHA es más fuerte. Ampliarla sería
+    // permitir dos marcadores para el mismo evento con `hub_id` distinto, que es exactamente el
+    // «entregado dos veces» que esta tabla existe para impedir. Lo que faltaba era un `WHERE`.
+    //
+    // El índice `(hub_id, event_id)` es lo que hace respondible «los marcadores de este hub» sin
+    // recorrer la tabla entera; las lecturas calientes siguen entrando por la PK.
+    //
+    // ⚠️ **`NOT NULL` y no `DEFAULT ''`, a sabiendas de la ventana del start-first** (ADR-0269).
+    // Mientras el contenedor viejo sigue vivo, sus `INSERT` de marcador (sin `hub_id`) fallan: la
+    // transacción del listener hace **rollback entera**, así que no hay entrega a medias ni
+    // marcador huérfano, y la fila del outbox se reintenta con backoff hasta que el contenedor
+    // nuevo la coge. Un `DEFAULT ''` evitaría ese fallo y a cambio dejaría marcadores sin dueño que
+    // el lector scopeado **no vería nunca** y que chocarían con la PK para siempre: el evento
+    // reentregado, el listener corriendo dos veces y la fila muerta en dead-letter. El fallo
+    // transitorio es el que se puede desandar solo.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `UPDATE` acotados a
+    // `hub_id IS NULL`, `SET NOT NULL` idempotente y `CREATE INDEX IF NOT EXISTS`. Importa porque
+    // los fixtures rebobinan la tabla de control por versión y reaplican todo lo posterior sobre
+    // una BD que ya tiene los objetos.
+    //
+    // ⚠️ **v46, y nació como v45**: `flow_approval_on_expire` (hub#972) se llevó el 45 mientras
+    // esta rama estaba en vuelo, y el rebase lo destapó como conflicto — que es exactamente para
+    // lo que sirve tener el número a mano. `apply` aborta si una entrada cae en o por debajo del
+    // máximo ya aplicado, pero solo cuando un hub ya lleva el número más alto: tardísimo para
+    // enterarse. Recomprobado contra `origin/develop` en el push (hub#573); los huecos v15/v20/v24
+    // siguen libres e **inalcanzables**: cogerlos ES el fallo mudo.
+    SystemMigration {
+        version: 46,
+        name: "event_delivery_hub_scoped",
+        kind: Kind::Contract,
+        // El `CREATE … IF NOT EXISTS` de cabeza no es redundante: la tabla la pone
+        // `outbox::ensure_tables` (v0, el suelo) y en un hub real ya existe cuando esto corre —
+        // pero una migración que se cae si la tabla no está solo se puede aplicar en un orden, y
+        // este catálogo se reaplica entero sobre bases en cualquier estado.
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _event_delivery (\
+  event_id TEXT NOT NULL, listener_command TEXT NOT NULL, delivered_at TEXT NOT NULL, \
+  hub_id TEXT NOT NULL, \
+  PRIMARY KEY (event_id, listener_command));\
+ALTER TABLE _event_delivery ADD COLUMN IF NOT EXISTS hub_id TEXT;\
+UPDATE _event_delivery SET hub_id = :hub_id WHERE hub_id IS NULL;\
+ALTER TABLE _event_delivery ALTER COLUMN hub_id SET NOT NULL;\
+CREATE INDEX IF NOT EXISTS ix_event_delivery_hub ON _event_delivery (hub_id, event_id);",
+    },
+    // ── v47 — hub#457: las estaciones de impresión pasan a ser FILAS con id ───────────────────
+    // Hasta aquí «qué impresora imprime esto» viajaba como **cadena libre comparada literalmente**:
+    // `enqueue` guardaba el `role` que llegara, `register` registraba el `role` que llegara, y
+    // `claim_next` unía los dos lados con `role = :role`. Nadie comprobaba nunca que ambos hubieran
+    // tecleado lo mismo, así que `Kitchen`, `kitchen` y `kitchn` eran **tres colas distintas** — y
+    // la tercera no tenía host jamás, en silencio, hasta que faltaba el plato.
+    //
+    // La decisión es de MERCADO (12 referencias + foros, 15/08): Toast, Square, Lightspeed K, Odoo,
+    // Clover, Loyverse, Simphony, Epson y Star hacen todos lo mismo — `ítem → (FK) ESTACIÓN (id,
+    // nombre) ← (FK) impresora`. **Ni un solo sistema maduro compara una cadena tecleada al
+    // imprimir**: el vocabulario es ABIERTO (los nombres reales son *Grill*, *Frío*, *Barra 2*) y lo
+    // CERRADO es el enlace, porque es una FK elegida de un selector. Clover, la única referencia con
+    // el set cerrado, es la que tiene el foro lleno de comerciantes que no pueden expresar su local.
+    //
+    // Esta migración es **solo DDL**. La siembra de las cuatro estaciones de ADR-0196, la adopción
+    // de las que este hub ya tenga configuradas en hardware, el plegado de variantes de mayúsculas
+    // y el backfill de `station_id` viven en `print_stations::ensure_stations`, que corre en CADA
+    // arranque desde [`apply`]. El motivo no es estético: una migración de sistema se registra **por
+    // BASE DE DATOS**, así que un hub que llega a una BD cuyas migraciones ya corrieron no recibiría
+    // NADA — y ese es justo el hub legacy pre-ADR-0201 (varios hubs, una BD) que arrancaría sin
+    // poder imprimir absolutamente nada.
+    //
+    // `station_id` entra con `DEFAULT ''` y no `NOT NULL` sin defecto, a propósito y al revés que la
+    // v46: aquí la ventana del start-first (ADR-0269) no puede fallar en abierto. Un `INSERT` del
+    // contenedor viejo (sin `station_id`) escribe `''`, que **no resuelve a ninguna estación** — el
+    // trabajo espera y `ensure_stations` lo apunta a su estación en el siguiente arranque. Con `NOT
+    // NULL` a secas el encolado del contenedor viejo reventaría y la venta se quedaría sin tique.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): todo es `IF NOT EXISTS`. Importa porque los fixtures
+    // rebobinan la tabla de control por versión y reaplican lo posterior sobre una BD que ya tiene
+    // los objetos.
+    //
+    // ⚠️ El número es DECLARADO, no la posición en el slice. Hoy hay varias ramas de esta tanda
+    // pidiendo número (hub#658 estrena otra) y ya hubo una colisión en la v45: recomprobado contra
+    // `origin/develop` justo antes del push (hub#573 hace que una versión en o por debajo del máximo
+    // aplicado ABORTE el arranque en vez de saltarse en silencio). Los huecos v15/v20/v24 siguen
+    // libres e **inalcanzables**: cogerlos ES el fallo mudo.
+    SystemMigration {
+        version: 47,
+        name: "print_stations",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _print_station (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, key TEXT NOT NULL, \
+  label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_print_station_key ON _print_station (hub_id, key);\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS station_id TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _print_host ADD COLUMN IF NOT EXISTS station_id TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_print_queue_station ON _print_queue (hub_id, station_id, status, seq);\
+CREATE INDEX IF NOT EXISTS ix_print_host_station ON _print_host (hub_id, station_id, last_seen_at);",
+    },
+    // ── v48 — hub#658: la PLACA de empleado, hermana del PIN, y la traza de qué se usó ────────
+    // Decisión de mercado publicada en la issue (15 referencias). Tres cosas, y las tres aditivas:
+    //
+    // 1. **`hub_user.badge_index` + `hub_user.badge_hash`** — la credencial. Hermana de `pin_hash`,
+    //    en la MISMA fila, porque placa y PIN son dos presentaciones de la misma identidad. Dos
+    //    columnas y no una: el índice (HMAC-SHA256 con la clave del hub) es por lo que se BUSCA, el
+    //    argon2 es lo que PRUEBA. Copiar el patrón de `pin_is_taken` —recorrer las filas verificando
+    //    argon2— sería un argon2 por fila en cada tap de la puerta de login: con cuatro dígitos vale,
+    //    con una placa de alta entropía es un DoS contra la propia caja. El índice estrecha a una
+    //    fila en SQL; de ahí `ix_hub_user_badge`.
+    //
+    // 2. **`_hub_badge_key`** — la clave del hub con la que se deriva ese índice. Tabla propia y no
+    //    `hub_settings` a propósito: en settings la leería cualquiera que pueda leer la
+    //    configuración, y esa clave es lo único que impide construir el índice de un número de
+    //    tarjeta a voluntad (el espacio de UIDs EM4100/MIFARE es pequeño y público, así que un hash
+    //    sin clave se invierte con una tabla precalculada). Se acuña una vez, con aleatoriedad del
+    //    SO, la primera vez que alguien enrola una placa.
+    //
+    // 3. **`credential_kind` + `credential_ref` en `hub_session` y en `_elevation_audit`** — la
+    //    traza, que es el criterio de aceptación que más valor tiene de toda la issue: ningún
+    //    competidor la registra, y sin ella «alguien usó mi tarjeta» es estructuralmente
+    //    irresoluble porque el log solo dice el empleado. `credential_ref` guarda el **índice** de
+    //    la placa, nunca el número impreso: identifica QUÉ tarjeta se pasó sin que la auditoría se
+    //    convierta en una lista de credenciales vivas.
+    //
+    // ⚠️ **`DEFAULT ''`, no `'pin'`.** Las filas anteriores a esta versión no dicen con qué se
+    // entró, y «no consta» es una respuesta distinta de «fue el PIN»: rellenarlas con `'pin'` sería
+    // inventar el dato exacto que esta columna existe para poder disputar. Vacío = anterior a la
+    // traza. Y `DEFAULT ''` en vez de `NOT NULL` a secas porque en la ventana del start-first
+    // (ADR-0269) el contenedor viejo sigue insertando sesiones sin estas columnas — y ahí un fallo
+    // NO se desanda solo: sería un login rechazado, no un reintento con backoff como en la v46.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`
+    // y `CREATE INDEX IF NOT EXISTS`. Sin backfill: los DEFAULT ya dejan a las filas existentes
+    // exactamente como tienen que quedar (sin placa, sin credencial declarada).
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice.** Al escribirla el máximo en
+    // `origin/develop` era v46 y había otra rama de esta misma tanda (hub#457) tomando la v47, así
+    // que esta tomó la **v48** dejando el hueco a propósito — un hueco por delante es inalcanzable
+    // y por tanto inofensivo, mientras que un número repetido ABORTA el arranque (hub#573) y, si se
+    // cuela, deja la tabla sin crear en un hub ya desplegado. hub#457 se mergeó antes y ocupó su
+    // v47, así que el hueco duró lo que duró el rebase y el catálogo queda seguido. Recomprobado
+    // contra `origin/develop` en cada push.
+    SystemMigration {
+        version: 48,
+        name: "hub_user_badge_credential",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS badge_index TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN IF NOT EXISTS badge_hash TEXT NOT NULL DEFAULT '';\
+CREATE INDEX IF NOT EXISTS ix_hub_user_badge ON hub_user (hub_id, badge_index);\
+CREATE TABLE IF NOT EXISTS _hub_badge_key (\
+  hub_id TEXT NOT NULL, key_hex TEXT NOT NULL, created_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));\
+ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS credential_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_session ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_kind TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _elevation_audit ADD COLUMN IF NOT EXISTS credential_ref TEXT NOT NULL DEFAULT '';",
+    },
+    // ── v49 — hub#950: `_flow_approvals` deja de ser «lo que propuso un modelo» ────────────────
+    // La tabla nació para UNA cosa: la escritura que propone un step `ai` y que espera a que
+    // alguien la apruebe (v38). El step `approval` genérico necesita exactamente la misma fila —
+    // la misma bandeja, la misma regla de idempotencia, el mismo barrido de caducidad, la misma
+    // auditoría de quién decidió— pero SIN command que ejecutar: lo que se aprueba es una
+    // pregunta, y el trabajo lo hace el step siguiente.
+    //
+    // Se GENERALIZA la fila, no se bifurca la tabla. Una segunda tabla habría duplicado las cinco
+    // cosas de arriba para que difiriera una: qué ejecuta «aprobar». Eso es un `kind` y una rama
+    // en un método, no un esquema paralelo que se desincroniza a la primera corrección.
+    //
+    // - **`kind`** (`'command' | 'decision'`) — con DEFAULT `'command'`, que es lo que TODAS las
+    //   filas ya escritas son. Un default `'decision'` convertiría un `payload` guardado en una
+    //   pregunta que no ejecuta nada, tirando en silencio la escritura que alguien aprobó.
+    // - **`title` / `summary`** — la pregunta, YA TEMPLADA al crearla. Es la propiedad que hace
+    //   que editar el flujo no mute una solicitud viva, igual que el `payload` se guarda en vez de
+    //   re-derivarse: lo que lee la persona a las 9 es lo que se escribió a las 3.
+    // - **`assignee_role`** — un ROL, nunca una persona (el `Allowed Group` de Odoo). Nombrar a
+    //   alguien en un documento se rompe el día que se va, que es el agujero que Business Central
+    //   tuvo que parchear inventando el «sustituto».
+    // - **`comment`** — lo que tecleó quien decidió. Es media auditoría y es uno de los cuatro
+    //   campos que el step deja en `steps.<id>` para los pasos siguientes.
+    // - **`on_reject`** — qué le cuesta al run un «no», por el MISMO motivo que `on_expire` (v45)
+    //   es columna: la respuesta es de quien escribió el flujo y tiene que ser la que estaba en
+    //   vigor cuando se hizo la pregunta. `'cancel'` por defecto = lo que un rechazo hace hoy.
+    // - **`command` pasa a tener DEFAULT `''`** — una `decision` no ejecuta nada, y «vacío» es
+    //   cómo se dice eso. Se deja `NOT NULL`: un `NULL` sería un tercer estado que nadie lee.
+    //
+    // Aditiva y re-ejecutable (`ADD COLUMN IF NOT EXISTS`), sin backfill: los DEFAULT dejan a las
+    // filas existentes exactamente como ya son — propuestas de un modelo, sin pregunta, sin rol y
+    // canceladas al rechazarlas.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice**, y hay varias ramas de flujos a la
+    // vez queriendo número (la v45 nació v45, la v46 nació v45 y la v48 dejó un hueco a propósito
+    // por esto mismo). Recomprobado contra `origin/develop` justo antes de empujar: máximo v48
+    // (`hub_user_badge_credential`, hub#658). Una versión en o por debajo del máximo ya aplicado
+    // ABORTA el arranque (hub#573), y para cuando se nota el hub ya lleva el número más alto.
+    SystemMigration {
+        version: 49,
+        name: "flow_approval_generic_decision",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'command';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS assignee_role TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS comment TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _flow_approvals ADD COLUMN IF NOT EXISTS on_reject TEXT NOT NULL DEFAULT 'cancel';\
+ALTER TABLE _flow_approvals ALTER COLUMN command SET DEFAULT '';",
+    },
+    // ── v50 — hub#987: el mapa `documentType → estación`, la otra mitad del diagrama de la v47 ──
+    // La v47 convirtió el DESTINO en una fila y dejó sin construir la flecha de la izquierda:
+    //
+    //     tipo de documento ──(FK)──▶ ESTACIÓN (id, nombre) ◀──(FK)── impresora
+    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^                          esto ya estaba (v47 + hub#342)
+    //     esto es la v50
+    //
+    // Sin ella, `sales` llevaba `role: 'receipt'` a fuego e `inventory` `role: 'label'`: **un módulo
+    // de negocio nombrando el periférico del comerciante**, que es la fuga que señaló la decisión de
+    // mercado de hub#457. Un módulo no puede saber que ESTE restaurante manda sus comandas a *Grill*
+    // y sus chits a *Barra 2*; el hub sí, porque el hub es del comerciante. El eje que un módulo sí
+    // es competente para declarar ya viajaba en el mismo payload: `documentType` (vocabulario
+    // cerrado de 8). Es el *print class* de Simphony y el split recibos/comandas/etiquetas de Square.
+    //
+    // **Solo DDL**, y por el mismo motivo exacto que la v47: la siembra por hub vive en
+    // `print_routes::ensure_routes`, que corre desde [`apply`] en CADA arranque, porque una
+    // migración de sistema se registra **por BASE DE DATOS** y el hub legacy pre-ADR-0201 (varios
+    // hubs, una BD) que llega a una BD ya migrada no recibiría ninguna ruta.
+    //
+    // **Sin FK declarada hacia `_print_station`** a propósito. Una FK con `ON DELETE CASCADE`
+    // borraría la fila al borrar la estación y una `RESTRICT` impediría borrarla; las dos le quitan
+    // al comerciante la traza de que su mapa quedó roto. La fila **se queda colgando** y
+    // `print_routes::route_for` falla ABIERTO hacia `receipt` (la protegida), que es lo que pide
+    // hub#987: un trabajo sin destino sale por la caja, nunca por ningún sitio. `list` la devuelve
+    // con la estación vacía para que la pantalla la enseñe rota y el comerciante la reapunte.
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `CREATE TABLE IF NOT EXISTS`. Sin backfill — un hub sin
+    // filas está exactamente en el estado de fallo abierto, que es correcto, y `ensure_routes` lo
+    // siembra en el mismo arranque.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice**, y esta entrada es el caso de libro.
+    // Nació pidiendo la **v49** (el máximo en `origin/develop` era la v48) y, con la rama ya en
+    // vuelo, apareció hub#950 pidiendo también la 49. Se movió a la **v50** dejando el hueco POR
+    // DELANTE —la jugada de hub#658 con la v47, y la lección de la v46 al revés—: un hueco por
+    // delante es inalcanzable y por tanto inofensivo, mientras que un número repetido ABORTA el
+    // arranque (hub#573) de un hub ya desplegado. hub#950 se mergeó antes, así que el hueco duró lo
+    // que duró el rebase y el catálogo queda seguido: 47, 48, 49, 50. Recomprobado en cada rebase
+    // contra TODAS las ramas remotas, no solo `develop`. Los huecos v15/v20/v24 siguen libres e
+    // inalcanzables (cogerlos ES el fallo mudo que ya renumeró hub#341/#342/#470/#501).
+    SystemMigration {
+        version: 50,
+        name: "print_routes",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _print_route (\
+  hub_id TEXT NOT NULL, document_type TEXT NOT NULL, station_id TEXT NOT NULL, \
+  updated_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', \
+  PRIMARY KEY (hub_id, document_type));",
+    },
+    // ── v51 — hub#297: el techo de la factura SIMPLIFICADA, en la fila del régimen que lo impone ─
+    // La v27 dejó `_hub_fiscal_regime_registry` como **datos, no código**: qué régimen debe cada
+    // país. El techo de la simplificada es un dato del mismo tipo y de la misma fila —lo impone el
+    // régimen, no el runtime—, así que va aquí y no en un `match country_code` compilado. Francia
+    // el día que toque es una fila; una rebaja del importe es un `UPDATE`, no un despliegue.
+    //
+    // **`0` significa «este régimen NO pone techo», nunca «techo cero»** — y por eso la query lo
+    // devuelve como `null`. Un `0` que se leyera como importe pararía TODAS las ventas del hub, que
+    // es exactamente el fallo que un default numérico invita a cometer. Se elige `0` y no NULL en la
+    // columna por el contrato de fila (nada de NULLs: un tercer estado es una rama más por la que
+    // colarse); la traducción a `null` se hace una sola vez, en [`crate::fiscal_profile::limits`].
+    //
+    // **300000 = 3.000,00 € en céntimos, y NO son los 3.010,00 de `xsd.rs`.** El validador de red
+    // (§15.8, hub#964) valida contra el techo MÁS los 10,00 € de tolerancia, porque eso es lo que la
+    // AEAT rechaza de verdad. Lo que se publica aquí es el techo a secas: la tolerancia es holgura
+    // de redondeo de la agencia, no margen del comerciante, y un mostrador que se la gasta construye
+    // el producto sobre los decimales que la AEAT se guarda para sí. Dos capas, dos números, y
+    // ninguno enmascara al otro (el patrón de `print_queue.rs` con `DOCUMENT_TYPES`).
+    //
+    // ⚠️ **Re-ejecutable** (hub#342/#483): `ADD COLUMN IF NOT EXISTS` + un `UPDATE` que solo escribe
+    // donde aún no hay valor. `tests/access_email_backfill.rs` rebobina la tabla de control y repite
+    // todas las migraciones posteriores sobre una BD que ya tiene los objetos; un `ADD COLUMN` pelado
+    // falla 42701. Y la guarda `= 0` del `UPDATE` es lo que impide que un rearranque le pise al
+    // comerciante un techo que él hubiera movido.
+    //
+    // ⚠️ **v51: el siguiente número POR ENCIMA DEL MÁXIMO, recomprobado en el rebase.** `apply`
+    // compara contra el MÁXIMO aplicado, así que un número repetido ABORTA el arranque (hub#573) de
+    // un hub ya desplegado y uno por debajo se salta EN SILENCIO. Comprobado contra TODAS las ramas
+    // remotas (solo `develop` llega a la v50) y contra los 10 worktrees locales de la flota. Los
+    // huecos v15/v20/v24 siguen libres e inalcanzables: cogerlos ES el fallo mudo que ya renumeró
+    // hub#341/#342/#470/#501.
+    SystemMigration {
+        version: 51,
+        name: "fiscal_regime_simplified_limit",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _hub_fiscal_regime_registry \
+  ADD COLUMN IF NOT EXISTS simplified_invoice_max_cents BIGINT NOT NULL DEFAULT 0;\
+UPDATE _hub_fiscal_regime_registry SET simplified_invoice_max_cents = 300000 \
+  WHERE country_code = 'ES' AND regime_key = 'verifactu' AND simplified_invoice_max_cents = 0;",
+    },
+    // hub#963 — the public claim: the one row a stranger with no session can act on.
+    //
+    // `token_hash` and not the locator: a dump of this table must not hand over every open ticket
+    // in the hub. `UNIQUE (hub_id, kind, subject_id)` is what makes minting idempotent, so the POS
+    // can call it on every reprint and the customer's copy keeps working.
+    SystemMigration {
+        version: 52,
+        name: "public_claim",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _public_claim_key (\
+  hub_id TEXT NOT NULL, key_hex TEXT NOT NULL, created_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));\
+CREATE TABLE IF NOT EXISTS _public_claim (\
+  id TEXT NOT NULL, hub_id TEXT NOT NULL, token_hash TEXT NOT NULL, kind TEXT NOT NULL, \
+  subject_id TEXT NOT NULL, command TEXT NOT NULL, \
+  sealed_payload TEXT NOT NULL DEFAULT '{}', public_fields TEXT NOT NULL DEFAULT '[]', \
+  expires_at TEXT NOT NULL, redeemed_at TEXT, result_ref TEXT NOT NULL DEFAULT '', \
+  created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, \
+  PRIMARY KEY (id));\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_token ON _public_claim (hub_id, token_hash);\
+CREATE UNIQUE INDEX IF NOT EXISTS ux_public_claim_subject ON _public_claim (hub_id, kind, subject_id);",
+    },
+    // ── v53 — hub#951: `_flow_run_waits`, las OTRAS salidas de una espera ──────────────────────
+    // Hasta aquí una espera (`delay`) tenía UNA salida: su reloj. Nada podía despertar un run
+    // dormido salvo `wake_at`, así que un recordatorio de cita se mandaba igual aunque la cita se
+    // hubiera cancelado — el hilo de la comunidad de Square prueba que eso pasa en un producto de
+    // primera línea. Esta tabla es la forma que el mercado le da al problema (SuiteFlow): la espera
+    // es un ESTADO con varias salidas, y la primera transición atómica se lleva el run.
+    //
+    // **Solo el id correlacionado, jamás el payload** (criterio de retención de la issue). Una fila
+    // guarda el nombre del evento que la despierta y el VALOR que tiene que casar; el payload del
+    // evento que la disparó no se copia a ningún sitio.
+    //
+    // El índice es **parcial** y ese es el punto: el match corre en el camino caliente de CADA
+    // entrega de evento del hub. Con `WHERE status = 'armed'` el índice solo contiene las esperas
+    // vivas —un puñado— en vez de todo el histórico de esperas que ya se resolvieron.
+    //
+    // ⚠️ **El número es DECLARADO, no la posición en el slice — y este se movió DOS veces.** Nació
+    // pidiendo la **v39** (lo que decía la decisión publicada en la issue el 15/08); para cuando se
+    // implementó, ese número llevaba desde hub#821 ocupado por otra cosa y el máximo real era la
+    // v50, así que pasó a la **v51**. Con la rama ya en vuelo, hub#1000 mergeó ANTES con SU v51
+    // (`fiscal_regime_simplified_limit`, justo aquí arriba) y hub#1001 se rebasó a la v52 — de ahí
+    // la **v53**. Recomprobado contra TODAS las ramas remotas justo antes del push, no solo contra
+    // `develop`: un número repetido ABORTA el arranque de un hub ya desplegado (hub#573) y uno por
+    // debajo del máximo se salta EN SILENCIO.
+    //
+    // 🔴 **ORDEN DE MERGE, no solo número.** El hueco de la v52 es de hub#1001 y tiene que entrar
+    // ANTES que esta. `apply` aborta cuando una versión del catálogo está SIN REGISTRAR y por
+    // debajo del máximo aplicado: si esta v53 llegara primero a un hub, la v52 de hub#1001 caería
+    // luego por debajo de su máximo y ese hub NO volvería a arrancar. Un hueco por delante es
+    // inofensivo; un hueco que se rellena por detrás, no.
+    SystemMigration {
+        version: 53,
+        name: "flow_run_waits",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _flow_run_waits (\
+  id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, run_id TEXT NOT NULL, flow_id TEXT NOT NULL, \
+  step_id TEXT NOT NULL, step_index BIGINT NOT NULL, kind TEXT NOT NULL, \
+  event_name TEXT NOT NULL, filter TEXT NOT NULL DEFAULT '{}', \
+  correlate TEXT NOT NULL DEFAULT '{}', correlate_key TEXT NOT NULL DEFAULT '', \
+  correlate_value TEXT NOT NULL DEFAULT '', until_path TEXT NOT NULL DEFAULT '', \
+  offset_seconds BIGINT NOT NULL DEFAULT 0, max_wait BIGINT, \
+  past_due_policy TEXT NOT NULL DEFAULT 'skip', reschedules BIGINT NOT NULL DEFAULT 0, \
+  status TEXT NOT NULL DEFAULT 'armed', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
+  deleted_at TEXT);\
+CREATE INDEX IF NOT EXISTS ix_flow_wait_event \
+  ON _flow_run_waits (hub_id, event_name, correlate_value) \
+  WHERE status = 'armed' AND deleted_at IS NULL;\
+CREATE INDEX IF NOT EXISTS ix_flow_wait_run ON _flow_run_waits (hub_id, run_id);",
+    },
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -1394,6 +1806,20 @@ pub async fn apply(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<()> {
 
         db.execute_tx(&ops).await?;
     }
+
+    // Puesta a punto de las estaciones de impresión **de este hub** (hub#457). Va aquí y no dentro
+    // de la v47 porque una migración se registra por BASE DE DATOS y este paso es por HUB: en la BD
+    // compartida legacy (pre-ADR-0201) el segundo hub no vería nunca la siembra. Es idempotente y
+    // barato (cuatro filas como mucho), y siembra **solo si el hub no tiene ninguna** — un
+    // comerciante que borró `bar` no se lo encuentra de vuelta mañana.
+    crate::print_stations::ensure_stations(db, hub_id).await?;
+    // …y el mapa `documentType → estación` de este hub (hub#987). **Después** de las estaciones, no
+    // antes: una ruta apunta al `id` de una estación, así que sembrarla primero la dejaría colgando
+    // en el primer arranque. Misma razón que arriba para vivir aquí y no dentro de la v50: la
+    // migración se registra por BASE DE DATOS y esto es por HUB. Siembra **por hueco** (no «solo si
+    // no hay ninguna») para que un `documentType` nuevo de una versión futura llegue a su estación
+    // en un hub que ya existía, en vez de fallar abierto para siempre.
+    crate::print_routes::ensure_routes(db, hub_id).await?;
     Ok(())
 }
 
@@ -2947,6 +3373,76 @@ mod tests {
                 .unwrap_or_else(|e| panic!("`{statement}` no es re-ejecutable: {e}"));
         }
     }
+
+    /// **v46 sella el hub en los marcadores de idempotencia que ya existían** (hub#735).
+    ///
+    /// `_event_delivery` la crea el baseline v0 (`outbox::ensure_tables`), así que un hub **ya
+    /// desplegado** se simula quitándole la columna: es exactamente la forma que tiene hoy. Lo que
+    /// se comprueba es lo que importa de un marcador — que **sigue ahí**: perder uno no libera
+    /// espacio, hace que un listener vuelva a correr y que un evento produzca un segundo run.
+    #[tokio::test]
+    async fn la_v46_sella_el_hub_en_los_marcadores_ya_escritos_sin_perder_ninguno() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v46 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "event_delivery_hub_scoped")
+            .expect("el marcador por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v46.version)).await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        db.execute_batch("ALTER TABLE _event_delivery DROP COLUMN hub_id;")
+            .await
+            .unwrap();
+        // Dos marcadores de antes de que la columna existiera: el de un listener de módulo y el
+        // sintético de un disparador de flujo.
+        db.execute_batch(
+            "INSERT INTO _event_delivery (event_id, listener_command, delivered_at) VALUES \
+               ('evt-1', 'inventory._restock_on_void', '2026-01-01T00:00:00Z'), \
+               ('evt-1', '_flow:trigger-9', '2026-01-01T00:00:00Z');",
+        )
+        .await
+        .unwrap();
+
+        apply(&db, "hub-a").await.unwrap();
+
+        let rows = db
+            .query(
+                "SELECT count(*) AS c FROM _event_delivery WHERE hub_id = 'hub-a'",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.rows[0]["c"].as_i64(),
+            Some(2),
+            "los dos marcadores siguen ahí, y ahora dicen de qué hub son"
+        );
+    }
+
+    /// Re-ejecutable (regla hub#342/#483): el segundo pase es un no-op, no un error.
+    #[tokio::test]
+    async fn la_v46_se_puede_aplicar_dos_veces() {
+        use erplora_db::testutil::fresh_db;
+        let db = fresh_db().await;
+        let v46 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "event_delivery_hub_scoped")
+            .expect("el marcador por hub sigue en el catálogo");
+        hub_deployed_through(&db, previous_version_of(v46.version)).await;
+        crate::outbox::ensure_tables(&db).await.unwrap();
+        db.execute_batch("ALTER TABLE _event_delivery DROP COLUMN hub_id;")
+            .await
+            .unwrap();
+
+        apply_one(&db, "event_delivery_hub_scoped").await;
+        for statement in split_statements(v46.postgres) {
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!("hub-a"));
+            db.execute(&statement, &p)
+                .await
+                .unwrap_or_else(|e| panic!("`{statement}` no es re-ejecutable: {e}"));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2975,11 +3471,19 @@ mod kind_contract_tests {
 
     /// **El inventario: qué versiones NO admiten vuelta atrás.**
     ///
-    /// Cuatro de veintiséis. La issue decía «al menos dos» (las PK de `hub_module` y de
-    /// `_hub_certificate`) y se dejaba las dos peores:
+    /// Seis. La issue decía «al menos dos» (las PK de `hub_module` y de `_hub_certificate`) y se
+    /// dejaba las dos peores:
     ///
     /// - **v23** hace `DELETE FROM` — **borra datos**, no solo esquema;
     /// - **v25** hace `DROP COLUMN` — el binario anterior usaba esa columna.
+    ///
+    /// Las dos `SET NOT NULL` (v42, v46) están aquí por el mismo motivo por los dos lados: revertir
+    /// el binario deja una columna obligatoria que el código anterior no escribe, así que sus
+    /// `INSERT` fallan. Y en el despliegue start-first (ADR-0269) eso también dura lo que tarda el
+    /// contenedor viejo en morir: sus escrituras fallan y **hacen rollback** —ni entrega a medias
+    /// ni marcador huérfano—, y la fila del outbox se reintenta con backoff. Es la alternativa
+    /// segura frente a un `DEFAULT ''`, que dejaría marcadores sin dueño que el lector scopeado no
+    /// vería nunca y que chocarían con la PK para siempre.
     ///
     /// Sirve para dos cosas: un rollback **por debajo** de estas versiones no es seguro, y este
     /// test se rompe si alguien añade una quinta sin mirarlo.
@@ -2993,7 +3497,7 @@ mod kind_contract_tests {
 
         assert_eq!(
             no_vuelta,
-            vec![1, 14, 23, 25, 42],
+            vec![1, 14, 23, 25, 42, 46],
             "cambió el inventario de migraciones sin vuelta atrás. Si es una nueva: revisa que \
              de verdad haga falta, porque cada una es una versión por debajo de la cual el \
              rollback deja de ser seguro."
@@ -3028,9 +3532,54 @@ mod kind_contract_tests {
         // hub#564 y hub#571 pidieron las tres el v39. Y `hub_identity_hub_scoped` (v42, hub#497)
         // se llevó el 42 que había pedido el otorgamiento de representación, que pasó al v43.
         // + `hub_trusted_device_name` (v44, hub#494): el nombre que le pone el NEGOCIO al
-        // dispositivo. Ojo a la distancia entre 41 entradas y la v44 — **el número es declarado, no
-        // la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
+        // dispositivo. + `flow_approval_on_expire` (v45, hub#972): qué le pasa al run cuando su
+        // aprobación caduca, escrito en la fila. + `event_delivery_hub_scoped` (v46, hub#735): el
+        // marcador de idempotencia también dice de qué hub es — nació como v45 y el rebase lo
+        // destapó como conflicto contra hub#972, que es exactamente para lo que sirve tener el
+        // número a mano. Ojo a la distancia entre 43 entradas y la v46 — **el número es declarado,
+        // no la posición**: faltan la 15, la 20 y la 24, así que contar entradas para elegir el
         // siguiente número da un choque, no un hueco.
-        assert_eq!(MIGRATIONS.len(), 41, "el catálogo cambió de tamaño");
+        // + `print_stations` (v47, hub#457): las estaciones de impresión pasan a ser filas con id,
+        // y la cola y el registro de hosts apuntan a ellas por `station_id` en vez de comparar una
+        // cadena. Solo DDL — la siembra por hub vive en `print_stations::ensure_stations`, que
+        // corre desde `apply` en cada arranque porque una migración se registra por BASE DE DATOS
+        // y esto hace falta por HUB.
+        // + `hub_user_badge_credential` (v48, hub#658): la placa de empleado, hermana del PIN, y la
+        // traza de con qué se probó la identidad. Tomó el **48** dejando libre el 47 a propósito,
+        // porque hub#457 iba a por él en la misma tanda — y en efecto lo cogió y se mergeó antes,
+        // así que el hueco duró lo que duró el rebase. Es la lección de la v46 (que nació como v45 y
+        // chocó) aplicada **por delante** en vez de por detrás: un hueco no se puede coger por
+        // accidente, un número repetido sí, y ese aborta el arranque de un hub ya desplegado.
+        // + `flow_approval_generic_decision` (v49, hub#950): `_flow_approvals` deja de ser solo
+        // «lo que propuso un modelo» y gana `kind`, la pregunta ya templada (`title`/`summary`),
+        // el rol que puede contestarla, el comentario de quien decidió y `on_reject`. Se
+        // generaliza la fila; no se bifurca la tabla.
+        // + `print_routes` (v50, hub#987): el mapa `documentType → estación`, la otra mitad del
+        // diagrama que la v47 dejó a medias — el módulo dice QUÉ imprime y el hub decide DÓNDE sale.
+        // Solo DDL, y por el mismo motivo que la v47: la siembra por hub vive en
+        // `print_routes::ensure_routes`, que corre desde `apply` **después** de `ensure_stations`
+        // (una ruta apunta al `id` de una estación). Al escribirla el máximo era la v48 en
+        // `origin/develop` y en TODAS las ramas remotas — recomprobado contra el conjunto, no solo
+        // contra develop, que es donde el recuento a mano se ha equivocado antes.
+        // + `fiscal_regime_simplified_limit` (v51, hub#297): el techo de la factura simplificada
+        // baja a la fila del régimen que lo impone (`_hub_fiscal_regime_registry`), porque es un
+        // dato del mismo tipo que el régimen y no un `match` sobre el país compilado en el runtime.
+        // `0` = «este régimen no pone techo», y el `UPDATE` de siembra lleva guarda `= 0` para que
+        // un rearranque no le pise al comerciante un valor que él hubiera movido. Al escribirla el
+        // máximo era la v50 en `origin/develop` y en TODAS las ramas remotas, y también en los 10
+        // worktrees locales de la flota — que es donde vive el número que el remoto aún no ha visto.
+        // + `public_claim` (v52, hub#963; nació v51 y se movió en el rebase: hub#297 se llevó la 51): las dos tablas de la ÚNICA puerta del hub que contesta a
+        // alguien sin sesión — el cliente que se lleva el tique y quiere su factura. Se guarda el
+        // HASH del localizador, nunca el localizador: un volcado de la tabla no puede entregar
+        // todos los tiques abiertos del negocio. Al escribirla el máximo era la v50 en
+        // `origin/develop` y en TODAS las ramas remotas, recomprobado contra el conjunto.
+        // + `flow_run_waits` (v53, hub#951): las OTRAS salidas de un `delay` — los eventos que
+        // cancelan un run dormido y los que mueven su instante. Tabla nueva + un índice PARCIAL
+        // (`WHERE status = 'armed'`), porque el cotejo corre en el camino caliente de cada evento
+        // entregado. Su número se movió DOS veces (v39 en la decisión → v51 al implementarla →
+        // v53 cuando hub#1000 se llevó la v51 y hub#1001 la v52), que es justo por qué se
+        // recomprueba en el rebase y no al escribir. El hueco de la v52 es de hub#1001 y tiene que
+        // entrar ANTES: rellenar un hueco por DEBAJO del máximo ya aplicado aborta el arranque.
+        assert_eq!(MIGRATIONS.len(), 50, "el catálogo cambió de tamaño");
     }
 }

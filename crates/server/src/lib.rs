@@ -63,6 +63,7 @@ pub mod flow_io;
 pub mod flows_api;
 pub mod hub_users;
 pub mod login_throttle;
+pub mod public_door;
 pub mod readiness;
 pub mod reset;
 pub mod inbound_poll;
@@ -88,6 +89,7 @@ pub mod state;
 pub mod shutdown;
 pub mod system;
 pub mod system_metrics;
+pub mod usage_series;
 pub mod tenant;
 pub mod version;
 
@@ -726,6 +728,31 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
+    // **El PAÍS que el SaaS acuñó al aprovisionar** (`HUB_COUNTRY`, ADR-0207 — hub#69). Va AQUÍ,
+    // después del seed SQL (que también puede escribir `country_code`, y quien lo escribe manda
+    // sobre un default) y ANTES del perfil fiscal, que deriva el régimen del país: sembrarlo
+    // después dejaría el perfil calculado sobre el país equivocado hasta el siguiente arranque.
+    //
+    // Se lee del entorno aquí y no en `HubConfig` por lo mismo que `HUB_SEED_SQL` o
+    // `HUB_OWNER_EMAIL`: es una entrada de ARRANQUE que se consume una vez y no vuelve a hacer
+    // falta — a partir de este punto la autoridad es `hub_settings.country_code`, que es lo único
+    // que leen el motor de impuestos, la checklist y el filtro del marketplace.
+    //
+    // NUNCA pisa una respuesta que el hub ya tenga: el env es la SUGERENCIA del alta («corregible»,
+    // ADR-0207), y quien la corrigió en Ajustes manda sobre ella.
+    match state
+        .runtime
+        .lock()
+        .await
+        .ensure_provisioned_country(&std::env::var("HUB_COUNTRY").unwrap_or_default())
+        .await
+    {
+        Ok(true) => eprintln!("país: `country_code` sembrado desde HUB_COUNTRY (ADR-0207)"),
+        Ok(false) => {}
+        // No aborta el arranque: un hub que no abre es peor que un hub con el país por defecto.
+        Err(e) => eprintln!("✗ país: no se pudo sembrar el país del aprovisionamiento: {e}"),
+    }
+
     // **La DEMO arranca con su identidad fiscal ya puesta** (hub#684). Va AQUÍ, después del seed
     // (que escribe el `country_code`) y ANTES del perfil fiscal, que es quien deriva `READY` de
     // «identidad ∧ certificado»: sembrarla después dejaría el perfil calculado sobre un hub sin
@@ -859,14 +886,55 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             loop {
                 tick.tick().await;
                 let hub_id = st.hub_id();
-                let cutoff = (chrono::Utc::now()
-                    - chrono::Duration::days(erplora_runtime::retention::RETENTION_DAYS))
-                .to_rfc3339();
+
+                // **Antes de podar, cerrar lo que caducó** (hub#972). El TTL de 72 h de una
+                // aprobación solo se miraba al intentar decidirla, así que una propuesta que nadie
+                // contestó no se podía ni aprobar ni rechazar —las dos vías pasan por la misma
+                // puerta— y su run se quedaba en `waiting_approval` PARA SIEMPRE: exento de la poda
+                // de abajo, con el `payload` verbatim dentro (el nombre y el teléfono de una
+                // clienta). El barrido lo pasa a `expired`, aplica la política que dice la FILA
+                // (`on_expire`, defecto `reject`) y deja el run en estado terminal — que es lo que
+                // lo mete en la poda de 90 días, en esta misma vuelta.
+                //
+                // Pasadas acotadas con el lock cogido **por pasada**, igual que la poda de abajo:
+                // cerrar una propuesta no es un DELETE, es terminar (o reanudar) un run, y una
+                // bandeja con un año de abandono no puede quedarse el lock un minuto entero.
+                {
+                    let mut swept = erplora_runtime::flows::ExpirySweepReport::default();
+                    for _ in 0..erplora_runtime::retention::MAX_PASSES {
+                        let runtime = st.runtime.lock().await;
+                        let pass = runtime.sweep_expired_flow_approvals().await;
+                        drop(runtime);
+                        match pass {
+                            Ok(p) if p.is_empty() => break,
+                            Ok(p) => swept.merge(p),
+                            Err(e) => {
+                                tracing::warn!(error = %e, "flows: el barrido de aprobaciones caducadas falló");
+                                break;
+                            }
+                        }
+                    }
+                    if !swept.is_empty() {
+                        tracing::info!(
+                            expired = swept.expired,
+                            runs_stopped = swept.runs_stopped,
+                            runs_resumed = swept.runs_resumed,
+                            stranded = swept.stranded,
+                            "flows: propuestas caducadas cerradas"
+                        );
+                    }
+                }
+
+                // Dos relojes, uno por tabla (hub#903): el historial a 90 días y el RECIBO de una
+                // aprobación humana a cuatro años. Se calculan juntos al principio de la vuelta
+                // para que todas las pasadas de este tick midan contra el mismo instante.
+                let cutoffs = erplora_runtime::retention::Cutoffs::now();
                 let mut total = erplora_runtime::retention::PruneReport::default();
                 for _ in 0..erplora_runtime::retention::MAX_PASSES {
                     let runtime = st.runtime.lock().await;
                     let pass =
-                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoff).await;
+                        erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoffs)
+                            .await;
                     drop(runtime);
                     match pass {
                         Ok(p) if p.is_empty() => break,
@@ -886,7 +954,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         delivery_markers = total.delivery_markers,
                         runs = total.runs,
                         run_steps = total.run_steps,
+                        approvals = total.approvals,
+                        receipts = total.receipts,
                         retention_days = erplora_runtime::retention::RETENTION_DAYS,
+                        approval_audit_days = erplora_runtime::retention::APPROVAL_AUDIT_DAYS,
                         "retention: historial terminal podado"
                     );
                 }
@@ -1252,6 +1323,9 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
         .route("/api/system/metrics", get(system_metrics::system_metrics))
+        // Series de uso (CPU/RAM/conexiones) para /system: proxy con caché al endpoint device
+        // del SaaS (saas#1511) — el machine token vive en el runtime, nunca en el navegador.
+        .route("/api/system/usage-series", get(usage_series::usage_series))
         // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
         // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
         .route(
@@ -1440,6 +1514,31 @@ pub fn app(state: AppState) -> Router {
                 .delete(print::retire_host),
         )
         .route("/api/print/hosts/heartbeat", post(print::host_heartbeat))
+        // ── Estaciones de impresión, como FILAS (hub#457) ────────────────────────────────────
+        // «Qué impresora imprime esto» deja de ser una cadena comparada literalmente y pasa a ser
+        // una FILA con id: el mercado entero (Toast, Square, Lightspeed, Odoo, Simphony…) enlaza
+        // ítem→estación←impresora por referencia, nunca por un texto tecleado al imprimir. Leer
+        // basta sesión (el TPV ofrece los destinos); crear/renombrar/borrar es sesión **admin**,
+        // como `/api/keys`: define qué colas TIENE el negocio, no qué hace la caja de hoy.
+        .route(
+            "/api/print/stations",
+            get(print::list_stations).post(print::create_station),
+        )
+        .route(
+            "/api/print/stations/:id",
+            axum::routing::patch(print::rename_station).delete(print::delete_station),
+        )
+        // El mapa `documentType → estación` (hub#987): el módulo dice QUÉ imprime, el hub DÓNDE sale.
+        .route(
+            "/api/print/routes",
+            get(print::list_routes).put(print::set_route),
+        )
+        // Lo que NO se está drenando, para la campana. Sesión de usuario, no admin: quien está en
+        // el mostrador es quien puede encender la caja y quien se va a quedar sin darle el tique.
+        .route(
+            "/api/print/undrained",
+            get(print::undrained_stations),
+        )
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(
@@ -1539,8 +1638,17 @@ pub fn app(state: AppState) -> Router {
         // Reporte de errores del FRONTEND (same-origin, sin auth cloud): el web app postea sus
         // errores JS aquí y el runtime los funnelea al registro global → Cloud (el secreto de
         // máquina nunca toca el navegador). Ver `frontend_error_report`.
+        // hub#963 — the public door. `/p/:locator` is the only path in this router that answers
+        // somebody with NO session: the diner holding a ticket. Its authorisation is the locator
+        // itself (`public_door`), and the mint below is the session-gated side of the same pair.
+        .route(
+            "/p/:locator",
+            get(public_door::show).post(public_door::redeem),
+        )
+        .route("/api/hub/public-claims", post(public_door::mint_claim))
         .route("/api/error-report", post(frontend_error_report))
         .route("/api/auth/pin", post(auth_pin))
+        .route("/api/auth/badge", post(auth_badge))
         .route("/api/auth/set-pin", post(auth_set_pin))
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/courier", post(auth_courier))
@@ -1755,7 +1863,14 @@ async fn require_machine_registration(
     next: Next,
 ) -> Response {
     let path = request.uri().path();
-    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context") || st.is_dev_hub() || st.machine_registered() {
+    // `/p/...` (hub#963) is in the allow-list for the same reason the three above are: the person
+    // on the other side is a CUSTOMER holding a printed ticket. They cannot enrol a device, and a
+    // hub that already put a locator on paper has to honour it whatever state its enrolment is in.
+    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context")
+        || public_door::is_public_path(path)
+        || st.is_dev_hub()
+        || st.machine_registered()
+    {
         return next.run(request).await;
     }
     (
@@ -2778,22 +2893,52 @@ async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Re
     proxy_public_cloud_get(&st, &headers, cloud.app_release()).await
 }
 
-async fn proxy_marketplace_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    {
+async fn proxy_marketplace_catalog(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
+    // **The country the catalogue is asked about is read HERE, from this hub's own settings**
+    // (ADR-0062, hub#69) — never from the request. The page cannot widen what its till is offered,
+    // and it does not have to know the rule: what comes back is already filtered.
+    //
+    // **The language is the opposite case, and on purpose** (hub#1003, ADR-0364). The Cloud serves
+    // the catalogue per language now, but only to a caller that says which one — silence means
+    // English, which is the bug. Unlike the country, it comes from `?locale=` (ADR-0055, the same
+    // param `navigation` takes): the country is a fact about the *hub* and a page must not be able
+    // to widen it, whereas the language is a fact about the *person reading right now*, and only
+    // the page knows which one that is. Widening nothing is exactly what it can do with it.
+    //
+    // The hub's stored `language` is the fallback, not the source — that is what serves a caller
+    // that has not said (an old web build, a script), and it beats defaulting to English for a hub
+    // that has told us in its settings which language it reads in.
+    let catalog = {
         let rt = st.runtime.lock().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
-    }
+        let (country_code, region_code) = rt.country_and_region().await;
+        let requested = q.locale.unwrap_or_default();
+        let language = if requested.trim().is_empty() {
+            rt.language().await
+        } else {
+            requested
+        };
+        cloud_client::CatalogQuery::new(
+            cloud_client::CountryFilter::new(&country_code, &region_code),
+            &language,
+        )
+    };
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     if st.is_dev_hub() {
-        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules()).await;
+        return proxy_public_cloud_get(&st, &headers, cloud.public_marketplace_modules(&catalog))
+            .await;
     }
     let placeholder = cloud_client::Auth::HubToken {
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder)).await {
+    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &catalog)).await {
         Ok((status, body)) => {
             let rt = st.runtime.lock().await;
             if let Err(e) =
@@ -3217,6 +3362,9 @@ pub(crate) fn err_status_and_code(
         // own code, never the demo one — the demo lock has a way out (create your own hub) and this
         // one does not.
         E::BusinessTaxIdFrozen { .. } => (StatusCode::CONFLICT, "business_tax_id_frozen".into()),
+        // hub#69: same 409 as its sibling — the request is well formed, the STATE of the hub is
+        // what refuses it (ADR-0273: the country freezes at go-live).
+        E::HubCountryFrozen { .. } => (StatusCode::CONFLICT, "hub_country_frozen".into()),
         // hub#360 (paso 2b): a refusal a MANAGER could approve. `403` like `permission_denied` —
         // it IS a refusal and nothing ran — but with its own stable code, so the UI can tell
         // "ask the manager" (offer the PIN dialog, hub#363) from "this is not for you". Falling
@@ -3294,7 +3442,7 @@ fn entitlement_blocked(st: &AppState, module_id: Option<&str>) -> Option<Respons
 }
 
 /// `401` uniforme para fallos de autenticación (modo Jwt: token ausente/ inválido).
-fn unauthorized(e: auth::AuthError) -> Response {
+pub(crate) fn unauthorized(e: auth::AuthError) -> Response {
     (
         StatusCode::UNAUTHORIZED,
         Json(json!({ "ok": false, "error": e.message() })),
@@ -3687,20 +3835,81 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
         .as_deref()
         .map(str::trim)
         .filter(|id| !id.is_empty());
+    if let Some(refusal) = device_trust_gate(&st, &rt, device_id).await {
+        return refusal;
+    }
+    // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
+    // the right/wrong signal an attacker is fishing for.
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.name) {
+        return too_many_attempts(retry_after_secs);
+    }
+    match rt.verify_pin(&req.name, &req.pin).await {
+        Ok(Some(user)) => {
+            st.login_throttle.record_success(&req.name);
+            // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
+            // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
+            let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
+            mint_session(
+                &rt,
+                user,
+                device_id,
+                max_devices,
+                &erplora_runtime::identity::Credential::pin(),
+            )
+            .await
+        }
+        Ok(None) => {
+            st.login_throttle.record_failure(&req.name);
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+            )
+                .into_response()
+        }
+        Err(e) => err_response(e),
+    }
+}
+
+/// `429` de la guarda de fuerza bruta, idéntico en las dos puertas de login local.
+fn too_many_attempts(retry_after_secs: u64) -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "ok": false,
+            "error": "demasiados intentos fallidos: espera unos minutos",
+            "code": "too_many_attempts",
+            "retry_after_secs": retry_after_secs
+        })),
+    )
+        .into_response()
+}
+
+/// El gate de **device-trust** (§2.9, hub#330), compartido por las dos credenciales locales.
+///
+/// Vive en una función y no duplicado en cada puerta porque una placa que se saltase este gate
+/// sería, literalmente, la vuelta atrás de hub#330: el hub responde en la internet pública y una
+/// tarjeta se clona con un Flipper Zero. `None` = puede pasar.
+async fn device_trust_gate(
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+    device_id: Option<&str>,
+) -> Option<Response> {
     if st.config.device_trust_enforce {
         // No `device_id`, no bypass (hub#330): the check used to sit in an `if let Some(..)` with
         // no `else`, so leaving the field out walked past the gate entirely. The hub lives on the
         // public internet, so an unidentified device is the shape of the attack, not an oversight.
         let Some(device_id) = device_id else {
-            return (
-                StatusCode::FORBIDDEN,
-                Json(json!({
-                    "ok": false,
-                    "error": "this client did not identify its device",
-                    "code": "device_unidentified"
-                })),
-            )
-                .into_response();
+            return Some(
+                (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({
+                        "ok": false,
+                        "error": "this client did not identify its device",
+                        "code": "device_unidentified"
+                    })),
+                )
+                    .into_response(),
+            );
         };
         match rt.is_device_trusted(device_id).await {
             Ok(true) => {}
@@ -3720,56 +3929,95 @@ async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Respon
                 // The rule itself lives in `device_mode::demo_would_adopt`, SHARED with the read
                 // door that decides whether the pinpad is painted (hub#514): when the two drifted,
                 // this branch became unreachable — no pinpad, no PIN submit, no adoption.
-                let adopt = match device_mode::demo_would_adopt(st.config.demo, &rt, device_id).await
+                let adopt = match device_mode::demo_would_adopt(st.config.demo, rt, device_id).await
                 {
                     Ok(adopt) => adopt,
-                    Err(e) => return err_response(e),
+                    Err(e) => return Some(err_response(e)),
                 };
                 if !adopt {
-                    return (
-                        StatusCode::FORBIDDEN,
-                        Json(json!({
-                            "ok": false,
-                            "error": "this device has not signed in with an account yet",
-                            "code": "device_untrusted"
-                        })),
-                    )
-                        .into_response();
+                    return Some(
+                        (
+                            StatusCode::FORBIDDEN,
+                            Json(json!({
+                                "ok": false,
+                                "error": "this device has not signed in with an account yet",
+                                "code": "device_untrusted"
+                            })),
+                        )
+                            .into_response(),
+                    );
                 }
                 if let Err(e) = rt.trust_device(device_id, "Demo (first device)").await {
-                    return err_response(e);
+                    return Some(err_response(e));
                 }
             }
-            Err(e) => return err_response(e),
+            Err(e) => return Some(err_response(e)),
         }
     }
-    // Brute-force guard (hub#329): checked BEFORE verifying, so a locked identity stops leaking
-    // the right/wrong signal an attacker is fishing for.
-    if let Some(retry_after_secs) = st.login_throttle.locked_for(&req.name) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({
-                "ok": false,
-                "error": "demasiados intentos fallidos: espera unos minutos",
-                "code": "too_many_attempts",
-                "retry_after_secs": retry_after_secs
-            })),
-        )
-            .into_response();
+    None
+}
+
+#[derive(serde::Deserialize)]
+struct BadgeReq {
+    /// Lo que el lector escribió como ráfaga de teclado (o lo que se tecleó, para un iButton).
+    badge: String,
+    #[serde(default)]
+    device_id: Option<String>,
+}
+
+/// Login local por **PLACA** → abre sesión. Body `{badge, device_id?}` → `{ok, token, user}`
+/// (401 si falla). hub#658.
+///
+/// La placa resuelve la identidad ENTERA: sustituye al par (nombre, PIN) del pinpad, nunca al PIN
+/// solo. Por eso este cuerpo no lleva nombre — y por eso la respuesta no dice nunca si la tarjeta
+/// existe: un 401 igual para «esa placa no es de nadie» y «esa placa es de alguien dado de baja».
+///
+/// **Las tres barandillas del PIN se mantienen enteras**: el mismo gate de device-trust
+/// ([`device_trust_gate`]), la misma guarda de fuerza bruta y el mismo límite de dispositivos del
+/// plan. La guarda se cuenta contra el **índice** de la tarjeta y no contra un nombre —aquí no hay
+/// nombre que teclear— y eso además la hace más precisa: bloquea la tarjeta que se está probando,
+/// sin que nadie pueda dejar fuera a un compañero pasando cinco veces una tarjeta rota a su nombre.
+async fn auth_badge(State(st): State<AppState>, Json(req): Json<BadgeReq>) -> Response {
+    let rt = st.runtime.lock().await;
+    let device_id = req
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    if let Some(refusal) = device_trust_gate(&st, &rt, device_id).await {
+        return refusal;
     }
-    match rt.verify_pin(&req.name, &req.pin).await {
-        Ok(Some(user)) => {
-            st.login_throttle.record_success(&req.name);
-            // Límite de dispositivos del plan (ADR-0154): lo aporta el estado de entitlement del
-            // server (fail-open a 0 = ilimitado si el lock está envenenado o aún no hubo refresh).
+    // La clave del índice para poder acotar los intentos SIN guardar el número de la tarjeta en
+    // ninguna estructura del servidor: lo que entra en el contador es el índice, que ya es lo que
+    // la traza guarda.
+    let throttle_key = match rt.badge_index_key().await {
+        Ok(key) => format!(
+            "badge:{}",
+            erplora_runtime::identity::badge_index(&key, &req.badge)
+        ),
+        Err(e) => return err_response(e),
+    };
+    if let Some(retry_after_secs) = st.login_throttle.locked_for(&throttle_key) {
+        return too_many_attempts(retry_after_secs);
+    }
+    match rt.verify_badge(&req.badge).await {
+        Ok(Some(matched)) => {
+            st.login_throttle.record_success(&throttle_key);
             let max_devices = st.entitlement.read().map(|g| g.max_devices()).unwrap_or(0);
-            mint_session(&rt, user, device_id, max_devices).await
+            mint_session(
+                &rt,
+                matched.user,
+                device_id,
+                max_devices,
+                &erplora_runtime::identity::Credential::badge(&matched.badge_index),
+            )
+            .await
         }
         Ok(None) => {
-            st.login_throttle.record_failure(&req.name);
+            st.login_throttle.record_failure(&throttle_key);
             (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "ok": false, "error": "usuario o PIN incorrecto" })),
+                Json(json!({ "ok": false, "error": "placa no reconocida", "code": "badge_rejected" })),
             )
                 .into_response()
         }
@@ -3951,6 +4199,7 @@ async fn open_cloud_session(
                 user,
                 device_id.as_deref(),
                 max_devices,
+                &erplora_runtime::identity::Credential::cloud(),
                 cloud_tokens,
             )
             .await
@@ -4136,8 +4385,9 @@ async fn mint_session(
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
+    credential: &erplora_runtime::identity::Credential,
 ) -> Response {
-    mint_session_with_extra(rt, user, device_id, max_devices, None).await
+    mint_session_with_extra(rt, user, device_id, max_devices, credential, None).await
 }
 
 async fn mint_session_with_extra(
@@ -4145,6 +4395,10 @@ async fn mint_session_with_extra(
     user: erplora_runtime::identity::HubUser,
     device_id: Option<&str>,
     max_devices: u32,
+    // **Con qué se probó la identidad** (hub#658). Viaja hasta la fila de `hub_session` porque el
+    // login es la mitad de la traza que contesta «alguien usó mi tarjeta»; la otra mitad la escribe
+    // `_elevation_audit`.
+    credential: &erplora_runtime::identity::Credential,
     extra: Option<Value>,
 ) -> Response {
     if let Err(e) = rt.enforce_device_limit(max_devices, device_id).await {
@@ -4161,7 +4415,10 @@ async fn mint_session_with_extra(
         Ok(ttl) => ttl,
         Err(e) => return err_response(e),
     };
-    match rt.create_session(&user.id, ttl_secs, device_id).await {
+    match rt
+        .create_session_with_credential(&user.id, ttl_secs, device_id, credential)
+        .await
+    {
         Ok(token) => {
             let permissions = rt.session_permissions(&user.role);
             let mut payload = json!({

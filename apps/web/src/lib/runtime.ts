@@ -936,6 +936,24 @@ export const SECTION_DISCARD_CODES = [
   'system_table_not_portable',
   // hub#753 — la serie de facturación y el libro de números ya entregados son de UNA instalación.
   'numbering_not_portable',
+  // hub#380 — la sección es de un módulo que declara `installation_bound_data` en su module.json:
+  // sus registros son de la instalación que los emitió. Antes el motivo era prosa que nombraba
+  // VeriFactu; el código sirve igual para TicketBai o NF525, y aquí se traduce.
+  'installation_bound_data',
+  // hub#473 — los permisos módulo→host (`certificate`, `network`, `printer`, `notify`) que el dueño
+  // había concedido. De OTRO hub se descartan enteros; del backup PROPIO se reconceden los que el
+  // módulo instalado siga declarando, y los demás se cuentan.
+  'capability_grants_not_portable',
+  'capabilities_not_grantable',
+  // hub#986 — el kernel de automatización. El DOCUMENTO de un flujo es del negocio y aterriza; lo
+  // que se le permitía hacer es la aprobación de ESTE despliegue, así que de otro hub no se
+  // reconcede nada y el flujo llega en pausa (`flow_grants_not_portable`). En el backup PROPIO,
+  // un permiso que aquí ya no existe deja el flujo pausado (`flows_paused_without_grants`), y un
+  // documento que este hub rechazaría en la pantalla tampoco entra por el zip
+  // (`flows_not_restorable`).
+  'flow_grants_not_portable',
+  'flows_paused_without_grants',
+  'flows_not_restorable',
 ] as const;
 
 /** Código de descarte (ver [`SECTION_DISCARD_CODES`]). */

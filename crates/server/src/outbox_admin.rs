@@ -24,7 +24,9 @@
 //! API key ni el token de máquina. Reintentar re-ejecuta el command de otro con los permisos del
 //! emisor, y descartar cierra un registro fiscal para siempre; ninguna de las dos es una gestión
 //! que le toque a un token de integración — la key solo habla `/api/v1` (`auth::authenticate`).
-//! `discarded_by` sale SIEMPRE de la sesión resuelta, jamás del cuerpo de la petición.
+//! `discarded_by` sale SIEMPRE de la sesión resuelta, jamás del cuerpo de la petición. Lo único
+//! que sí viaja en el cuerpo es el **motivo** del descarte (hub#955): es lo único que no está ya
+//! dentro del hub, porque solo lo sabe quien decide cerrar la fila.
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -52,6 +54,35 @@ fn rejected(e: auth::AuthError) -> Response {
         .into_response()
 }
 
+/// **Las dos puertas de este fichero**, en el orden que importa (hub#953).
+///
+/// Primero la persona: `require_admin_session` intacto, así que un anónimo sigue recibiendo `401`
+/// y un cajero `403` — poner la capability delante contestaría `403` a quien nunca se identificó.
+/// Después el módulo: si la petición **nombra** uno, ese módulo necesita `manage_flows` declarado
+/// en su manifest y concedido por el dueño, exactamente como en `…/events/shape` (hub#715) y
+/// `…/events` (hub#823). Quien no nombra ninguno —el shell, `curl`, el agente de QA— pasa con la
+/// sesión sola: `require_flows_capability` devuelve `Ok` cuando no hay cabecera.
+///
+/// La segunda puerta llega aquí porque `@erplora/module-sdk` expone la cola a los módulos
+/// (flows#20): sin ella, «hay un admin conectado» significaría que **cualquier módulo instalado**
+/// lee los payloads íntegros de los eventos de todos los demás, y —peor— los reejecuta con la
+/// autoridad del módulo emisor (hub#686). De las tres lecturas del outbox esta es la más ancha y
+/// era la menos guardada.
+///
+/// Una sola implementación a propósito: dos copias de un *default-deny* es como una acaba siendo la
+/// permisiva.
+async fn require_admin_and_capability(
+    headers: &HeaderMap,
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+) -> Result<erplora_runtime::identity::HubUser, Response> {
+    let admin = auth::require_admin_session(headers, &st.config, rt)
+        .await
+        .map_err(rejected)?;
+    crate::flows_api::require_flows_capability(headers, rt).await?;
+    Ok(admin)
+}
+
 /// `404` cuando el id no es una dead-letter **de este hub**: no existe, ya se entregó, ya se
 /// descartó o es de otro tenant. Nunca un `200` silencioso que haga creer que se reintentó algo.
 fn not_a_dead_letter() -> Response {
@@ -73,8 +104,8 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
     }
     match rt.list_dead_events(DEAD_PAGE).await {
         Ok(events) => Json(json!({ "ok": true, "data": events })).into_response(),
@@ -91,8 +122,8 @@ pub async fn count_dead(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
     }
     match rt.count_dead_events().await {
         Ok(n) => Json(json!({ "ok": true, "data": { "count": n } })).into_response(),
@@ -121,8 +152,8 @@ pub async fn retry_dead(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
     }
     match rt.retry_dead_event(&id).await {
         Ok(RetryOutcome::Requeued) => {
@@ -157,8 +188,8 @@ pub async fn retry_all_dead(State(st): State<AppState>, headers: HeaderMap) -> R
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
     }
     match rt.retry_all_dead_events().await {
         Ok(moved) => Json(json!({ "ok": true, "data": { "retried": moved } })).into_response(),
@@ -166,30 +197,58 @@ pub async fn retry_all_dead(State(st): State<AppState>, headers: HeaderMap) -> R
     }
 }
 
-/// POST /api/hub/events/{id}/discard — cierra la dead-letter: estado `discarded` + `discarded_at`
-/// y `discarded_by`. **La fila se conserva** (auditable, nunca `DELETE`) y el relay no vuelve a
-/// cogerla (`claim_next_due` solo reclama `pending`). Auth = sesión admin.
+/// Cuerpo de `POST …/discard`: **un solo campo**, el motivo (hub#955).
+///
+/// Todo lo demás del sello sale de dentro —`discarded_at` del reloj, `discarded_by` de la sesión—,
+/// así que este cuerpo no tiene más superficie que la que el motivo necesita. Es opcional: el
+/// gesto existía antes que él y exigir una redacción para cerrar una fila es como una cola de
+/// recuperación deja de vaciarse.
+#[derive(serde::Deserialize, Default)]
+pub struct DiscardReq {
+    reason: Option<String>,
+}
+
+/// POST /api/hub/events/{id}/discard — cierra la dead-letter: estado `discarded` + `discarded_at`,
+/// `discarded_by` y **`discard_reason`** (hub#955). **La fila se conserva** (auditable, nunca
+/// `DELETE`) y el relay no vuelve a cogerla (`claim_next_due` solo reclama `pending`). Auth =
+/// sesión admin.
+///
+/// El motivo es lo único que sale del cuerpo, y lo único que solo sabe quien cierra la fila: sin
+/// él, seis meses después la única lectura posible de un descarte es «alguien lo descartó», que es
+/// justo la mitad que no hacía falta guardar. Lo consume la bandeja de `ERPlora/flows#20`.
 pub async fn discard_dead(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<DiscardReq>>,
 ) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+    let admin = match require_admin_and_capability(&headers, &st, &rt).await {
         Ok(user) => user,
-        Err(e) => return rejected(e),
+        Err(response) => return response,
     };
     // Auditoría: quién lo descartó sale de la SESIÓN resuelta, nunca del cuerpo (mismo criterio
-    // que el `created_by` de las API keys).
+    // que el `created_by` de las API keys). Un cuerpo que traiga `discarded_by` no cambia nada:
+    // `DiscardReq` no tiene ese campo y serde lo ignora.
     let discarded_by = format!("hub_user:{}", admin.id);
-    match rt.discard_dead_event(&id, &discarded_by).await {
+    // Se recorta AQUÍ con la misma función que aplica el runtime al escribir, para devolver
+    // exactamente lo que queda en la fila y no lo que llegó (una implementación, sin deriva).
+    let reason = erplora_runtime::outbox::clamp_discard_reason(
+        &body.map(|b| b.0).unwrap_or_default().reason.unwrap_or_default(),
+    );
+    match rt.discard_dead_event(&id, &discarded_by, &reason).await {
         Ok(true) => Json(json!({
             "ok": true,
-            "data": { "id": id, "status": erplora_runtime::outbox::STATUS_DISCARDED, "discarded_by": discarded_by }
+            "data": {
+                "id": id,
+                "status": erplora_runtime::outbox::STATUS_DISCARDED,
+                "discarded_by": discarded_by,
+                "discard_reason": reason
+            }
         }))
         .into_response(),
         Ok(false) => not_a_dead_letter(),
@@ -220,8 +279,8 @@ pub async fn trace_event(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
     }
     match rt.trace_event(&id).await {
         Ok(Some(trace)) => Json(json!({ "ok": true, "data": trace })).into_response(),
@@ -261,10 +320,7 @@ pub async fn list_events(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
-    }
-    if let Err(response) = crate::flows_api::require_flows_capability(&headers, &rt).await {
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
     match rt.event_catalog().await {
@@ -316,10 +372,7 @@ pub async fn event_shape(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-        return rejected(e);
-    }
-    if let Err(response) = crate::flows_api::require_flows_capability(&headers, &rt).await {
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
     let name = q.name.unwrap_or_default().trim().to_string();

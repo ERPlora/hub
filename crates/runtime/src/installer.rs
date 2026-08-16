@@ -219,9 +219,22 @@ async fn register_module(
     let seed_files = &manifest.seed.postgres;
     if !seed_files.is_empty() {
         let now = crate::registry::now_rfc3339();
+        let mut declared: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
+            std::collections::HashMap::new();
         for file in seed_files {
             let sql = loader::read_text(dir, file.file())?;
+            // hub#842: la guarda `WHERE NOT EXISTS` con la que el seed se hace idempotente ES la
+            // declaración de qué fila considera «la misma» el módulo, y el import la necesita —
+            // importar una plantilla instala el módulo (siembra) y DESPUÉS aplica los datos, así
+            // que sin esta clave las dos mitades se duplican. Se lee del MISMO texto que se va a
+            // ejecutar aquí abajo: no puede desincronizarse de lo que de verdad se siembra.
+            for (table, keys) in crate::seed::declared_natural_keys(&sql) {
+                declared.entry(table).or_default().extend(keys);
+            }
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
+        }
+        if !declared.is_empty() {
+            registry.seed_natural_keys.insert(manifest.id.clone(), declared);
         }
     }
 

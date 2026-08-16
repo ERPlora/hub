@@ -62,6 +62,7 @@ async fn a_staff_member_is_linked_to_a_hub_user() {
             email: "marta@example.com".into(),
             role: "employee".into(),
             pin: "4821".into(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -112,6 +113,7 @@ async fn the_link_can_be_set_and_cleared_later() {
             email: "luis@example.com".into(),
             role: "employee".into(),
             pin: String::new(),
+            badge: String::new(),
             local: false,
         })
         .await
@@ -189,6 +191,7 @@ async fn the_module_reaches_the_hub_users_through_the_dispatcher() {
         role: "manager".into(),
         pin: "4242".into(),
         // Personal de barra: nombre + PIN y nada en el SaaS (hub#355).
+        badge: String::new(),
         local: true,
         ..NewHubUser::default()
     })

@@ -150,13 +150,25 @@ pub async fn import_sections(
         // The role set of the vertical is NOT a section of data (hub#354): it travels as keys in
         // `manifest.active_roles` and is applied once, after this loop, through the role catalogue's
         // own write door. Skipped here so it does not also report a hollow `Skipped` row.
-        if section == crate::export::ROLES_SECTION {
+        // Same for the capability grants (hub#473): keys in `manifest.capability_grants`, applied
+        // after this loop through the granting door, never as rows.
+        // Same again for the flows (hub#986): documents in `manifest.flows`, saved after this loop
+        // through `flows::store::create`, never as rows.
+        if section == crate::export::ROLES_SECTION
+            || section == crate::export::CAPABILITY_GRANTS_SECTION
+            || section == crate::export::FLOWS_SECTION
+        {
             continue;
         }
+        // Asked BEFORE the match, not inside it: the answer comes from `rt.registry()` and the
+        // arms below hand `rt` out mutably, so the borrow must be over by then. The value is a
+        // plain `Option<String>`, so `.or()` is the same decision `.or_else()` would make.
+        let installation_bound =
+            installation_bound_not_portable(rt.registry(), manifest, section, target_hub_id);
         let (status, discarded_rows) = match system_table_not_portable(section)
             .or_else(|| ignored_by_purpose(manifest, section))
             .or_else(|| identity_not_portable(manifest, section, target_hub_id))
-            .or_else(|| chain_not_portable(manifest, section, target_hub_id))
+            .or(installation_bound)
         {
             // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a
             // status the user skims past into something they can act on (hub#331).
@@ -179,6 +191,34 @@ pub async fn import_sections(
         let (status, discarded_rows) = apply_role_activation(rt, manifest, target_hub_id).await;
         report.sections.push(SectionResult {
             section: crate::export::ROLES_SECTION.to_string(),
+            status,
+            discarded_rows,
+        });
+    }
+    // ── The capabilities each module had granted (hub#473) ───────────────────
+    // AFTER the sections, for the same reason as the roles: the modules whose `module.json`
+    // DECLARES these capabilities are installed by the server before the engine runs, and a
+    // capability nobody declares is refused. Driven by the DATA (`capability_grants`) and not by
+    // the presence of the section label, so a hand-made bundle that omits the label gets the very
+    // same guards.
+    if !manifest.capability_grants.is_empty() {
+        let (status, discarded_rows) =
+            apply_capability_grants(rt, manifest, target_hub_id, same_hub).await;
+        report.sections.push(SectionResult {
+            section: crate::export::CAPABILITY_GRANTS_SECTION.to_string(),
+            status,
+            discarded_rows,
+        });
+    }
+    // ── The automations the business had written (hub#986) ───────────────────
+    // LAST of the three declarative sections, and the order is load-bearing: a flow names commands
+    // and queries of modules the server installs before the engine runs, and its grants are judged
+    // against the registry as it stands. Driven by the DATA (`flows`) and not by the section label,
+    // so a hand-made bundle that omits the label gets the very same guards.
+    if !manifest.flows.is_empty() {
+        let (status, discarded_rows) = apply_flows(rt, manifest, target_hub_id, same_hub).await;
+        report.sections.push(SectionResult {
+            section: crate::export::FLOWS_SECTION.to_string(),
             status,
             discarded_rows,
         });
@@ -238,6 +278,239 @@ async fn apply_role_activation(
     }
 }
 
+/// Re-grants the capabilities the backup carried and turns the outcome into a row of the report.
+///
+/// **Whose hub this is decides first** — the same question, and the same `is_same_hub`, that the
+/// identities of ADR-0195 §3 are gated on. A capability grant is not vocabulary of a business (which
+/// is why the role set travels in both purposes, ADR-0242 §8): it is the approval THIS deployment's
+/// owner gave a module over the host's own primitives. A downloaded blueprint arriving with
+/// `certificate` pre-granted would be a file deciding that a module may use your signing key, and it
+/// would be the only grant in the system nobody ever clicked. So a bundle that is not this hub's own
+/// copy is discarded whole, counted, and reported with its stable code.
+///
+/// For the hub's own restore the policy lives in [`crate::capabilities::pre_grant`] — this only
+/// decides how to SAY it, with the three states the report already has, and counts the pairs left
+/// out. A database failure is `Failed`, never a discard.
+async fn apply_capability_grants(
+    rt: &Runtime,
+    manifest: &BlueprintManifest,
+    target_hub_id: &str,
+    same_hub: bool,
+) -> (SectionStatus, u32) {
+    let asked: u32 = manifest.capability_grants.values().map(|c| c.len() as u32).sum();
+    if !same_hub {
+        return (
+            SectionStatus::Ignored(ignore_reason::CAPABILITY_GRANTS_NOT_PORTABLE.into()),
+            asked,
+        );
+    }
+    match crate::capabilities::pre_grant(
+        rt.db(),
+        rt.registry(),
+        target_hub_id,
+        &manifest.capability_grants,
+        crate::roles::BLUEPRINT_ACTOR,
+    )
+    .await
+    {
+        Ok(outcome) => {
+            let discarded = outcome.refused.len() as u32;
+            let status = if outcome.refused.is_empty() {
+                SectionStatus::Applied
+            } else if outcome.granted.is_empty() {
+                SectionStatus::Ignored(ignore_reason::CAPABILITIES_NOT_GRANTABLE.into())
+            } else {
+                SectionStatus::PartiallyApplied(ignore_reason::CAPABILITIES_NOT_GRANTABLE.into())
+            };
+            (status, discarded)
+        }
+        Err(e) => (SectionStatus::Failed(e.to_string()), 0),
+    }
+}
+
+/// Restores the automations the backup carried and turns the outcome into a row of the report
+/// (hub#986 — ADR-0345 §2bis, the ⚠️ row of the table).
+///
+/// **The definition lands; the authority is what depends on whose bundle this is.** ADR-0345 draws
+/// the line by asking whether a datum is of the BUSINESS or of THIS DEPLOYMENT, and a flow falls on
+/// both sides at once: the document is what its owner wrote (so it travels in a backup, like the
+/// customers and the products already do), while its `_flow_grants` are the approval of one
+/// deployment's owner over what an automation may do with nobody watching (so they are only re-made
+/// for the hub restoring its own copy, `is_same_hub`, exactly like the capability grants of hub#473).
+///
+/// Four properties, each one deliberate:
+///
+/// - **The same door as `POST /flows`.** Every document goes through [`crate::flows::store::create`],
+///   so a bundle gets the guards the screen gets: a document that does not parse, an unresolvable
+///   `cron`, a `query` step naming a read nobody has — all refused here, counted, and the rest of
+///   the flows still land. An `INSERT` would have let a zip store what the hub can never execute.
+/// - **Created DISABLED, armed last.** The flow is written paused, its grants are re-made, and only
+///   then is it armed. The reverse order would leave a window in which the tick could fire a flow
+///   whose permissions had not arrived yet — and a flow that runs without its grants fails every
+///   step. If any grant did not come back, it simply stays paused, with its reason in the report.
+/// - **Additive, never mirroring.** A flow this hub wrote after the backup was taken is left alone;
+///   restoring an old copy must not delete an automation somebody created later (hub#473's lesson).
+/// - **Idempotent by name + document.** The same flow, by the same name, already live is already
+///   there: restoring twice does not hand the owner two copies of the same job, and two runs per
+///   event.
+///
+/// A database failure is `Failed`, never a discard: «I could not write» must not read as «this hub
+/// said no».
+async fn apply_flows(
+    rt: &Runtime,
+    manifest: &BlueprintManifest,
+    target_hub_id: &str,
+    same_hub: bool,
+) -> (SectionStatus, u32) {
+    use crate::flows::grants::GrantKind;
+
+    let db = rt.db();
+    let registry = rt.registry();
+    let mut live = match crate::flows::store::list(db, target_hub_id).await {
+        Ok(live) => live,
+        Err(e) => return (SectionStatus::Failed(e.to_string()), 0),
+    };
+
+    // Documents that landed (created here or already present), documents this hub will not save,
+    // and the ones that landed but stayed PAUSED because their authority did not come back.
+    let (mut landed, mut refused, mut paused) = (0u32, 0u32, 0u32);
+    // …and whether the reason for that is that this bundle is not this hub's own copy, which is a
+    // different sentence to the user than «that command no longer exists here».
+    let mut grants_not_portable = false;
+
+    for spec in &manifest.flows {
+        if live
+            .iter()
+            .any(|f| f.name == spec.name && f.definition == spec.definition)
+        {
+            landed += 1;
+            continue;
+        }
+        let new = crate::flows::NewFlow {
+            name: spec.name.clone(),
+            enabled: false, // armed at the end, once its authority is back
+            definition: spec.definition.clone(),
+        };
+        let flow = match crate::flows::store::create(
+            db,
+            target_hub_id,
+            registry,
+            &new,
+            crate::roles::BLUEPRINT_ACTOR,
+        )
+        .await
+        {
+            Ok(flow) => flow,
+            Err(e) if is_write_failure(&e) => return (SectionStatus::Failed(e.to_string()), refused),
+            Err(_) => {
+                refused += 1;
+                continue;
+            }
+        };
+        landed += 1;
+        live.push(flow.clone());
+
+        // The grants. Only this hub's own copy re-makes them; anybody else's bundle leaves the flow
+        // inert, which is what default-deny already means.
+        let mut authority_complete = true;
+        if !spec.grants.is_empty() && !same_hub {
+            grants_not_portable = true;
+            authority_complete = false;
+        } else {
+            for wanted in &spec.grants {
+                // One pair at a time, each time re-reading what is already live and offering it
+                // back plus the candidate. `grants::replace` is a REPLACE and it refuses a whole
+                // list if one pair names nothing — right for a screen somebody typed, wrong for a
+                // restore, which is best-effort like every other section here. Asking the REAL door
+                // once per pair keeps the judgement in the one place that enforces it; filtering
+                // the list first would be a SECOND door, judging by rules that could drift from the
+                // ones that matter.
+                let Some(kind) = GrantKind::parse(&wanted.kind) else {
+                    authority_complete = false;
+                    continue;
+                };
+                let mut candidate: Vec<(GrantKind, String)> = crate::flows::grants::list(
+                    db,
+                    target_hub_id,
+                    &flow.id,
+                )
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|g| GrantKind::parse(&g.kind).map(|k| (k, g.value)))
+                .collect();
+                candidate.push((kind, wanted.value.clone()));
+                match crate::flows::grants::replace(
+                    db,
+                    target_hub_id,
+                    &flow.id,
+                    registry,
+                    &candidate,
+                    crate::roles::BLUEPRINT_ACTOR,
+                )
+                .await
+                {
+                    Ok(()) => {}
+                    Err(e) if is_write_failure(&e) => {
+                        return (SectionStatus::Failed(e.to_string()), refused)
+                    }
+                    Err(_) => authority_complete = false,
+                }
+            }
+        }
+
+        if spec.enabled && authority_complete {
+            let armed = crate::flows::NewFlow { enabled: true, ..new };
+            match crate::flows::store::update(
+                db,
+                target_hub_id,
+                &flow.id,
+                registry,
+                &armed,
+                crate::roles::BLUEPRINT_ACTOR,
+            )
+            .await
+            {
+                Ok(_) => {}
+                Err(e) if is_write_failure(&e) => {
+                    return (SectionStatus::Failed(e.to_string()), refused)
+                }
+                Err(_) => paused += 1,
+            }
+        } else if spec.enabled {
+            paused += 1;
+        }
+    }
+
+    // One row, so the reasons are ordered by what the user has to act on first: a document that did
+    // not land at all, then permissions a foreign bundle may not make, then a flow waiting for the
+    // permission it lost. `discarded_rows` counts DOCUMENTS left out — a paused flow is in the hub,
+    // it is simply not running.
+    let status = if refused > 0 && landed == 0 {
+        SectionStatus::Ignored(ignore_reason::FLOWS_NOT_RESTORABLE.into())
+    } else if refused > 0 {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOWS_NOT_RESTORABLE.into())
+    } else if grants_not_portable {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOW_GRANTS_NOT_PORTABLE.into())
+    } else if paused > 0 {
+        SectionStatus::PartiallyApplied(ignore_reason::FLOWS_PAUSED_WITHOUT_GRANTS.into())
+    } else {
+        SectionStatus::Applied
+    };
+    (status, refused)
+}
+
+/// Is this error the database (or the disk) failing, rather than the hub REFUSING?
+///
+/// The distinction is the one every best-effort section here depends on: a policy refusal is
+/// reported and the import goes on, while «I could not write» has to surface as `Failed` instead of
+/// being dressed up as a decision. Everything the runtime raises on its own — an invalid document,
+/// a command that does not exist, an internal one — is a refusal; only the adapter's own errors and
+/// I/O are not.
+fn is_write_failure(e: &crate::RuntimeError) -> bool {
+    matches!(e, crate::RuntimeError::Db(_) | crate::RuntimeError::Io(_))
+}
+
 /// Stable reason codes carried by [`SectionStatus::Ignored`] — a CONTRACT with the shell, which
 /// turns each one into a translated sentence (same lesson as the domain-error channel, hub#139:
 /// a code that never changes, plus a message that can live in i18n, instead of prose that the UI
@@ -258,6 +531,15 @@ pub mod ignore_reason {
     /// One code for both, because the answer to the user is the same one: those roles are not part
     /// of this hub's catalogue, so nothing was switched on for them.
     pub const ROLES_NOT_ACTIVATABLE: &str = "roles_not_activatable";
+    /// The bundle carried the capability grants of ANOTHER hub (hub#473). `network`, `certificate`,
+    /// `printer` and `notify` are primitives of THIS deployment's host, and the grant over them is
+    /// the approval its owner gave (ADR-0079, default-deny). A downloaded file may not make one, so
+    /// the whole set is discarded — only the hub restoring its own copy gets its permissions back.
+    pub const CAPABILITY_GRANTS_NOT_PORTABLE: &str = "capability_grants_not_portable";
+    /// This hub's own backup asked to re-grant capabilities it cannot grant (hub#473): unknown
+    /// keys, and keys the module INSTALLED HERE does not declare — a module updated to stop asking
+    /// for the network, or one that failed to install. The rest were re-granted.
+    pub const CAPABILITIES_NOT_GRANTABLE: &str = "capabilities_not_grantable";
     /// The bundle brought a section over one of the hub's OWN system tables — its fiscal profile,
     /// its certificate store, its import batches (ADR-0273 D8 — hub#560). Those are the identity of
     /// THIS installation, not vocabulary of anybody's business, so no bundle writes them: not a
@@ -269,6 +551,27 @@ pub mod ignore_reason {
     /// that sequence with no gaps and no duplicates — per installation. The destination keeps its
     /// own series, its own `current_sequence` and its own ledger, untouched.
     pub const NUMBERING_NOT_PORTABLE: &str = "numbering_not_portable";
+    /// A bundle produced by ANOTHER hub carried the data section of a module that declares
+    /// `installation_bound_data` in its `module.json` (hub#380, generalising ADR-0202 §4.2): the
+    /// records it chains belong to the installation that emitted them, and this hub opens its own.
+    /// Named after the flag so the manifest field and the report row are one grep apart.
+    pub const INSTALLATION_BOUND_DATA: &str = "installation_bound_data";
+    /// The bundle carried the flow grants of ANOTHER hub (hub#986). What an automation may do —
+    /// which commands it runs, which URLs it dials, whose address it may read — is the approval of
+    /// THIS deployment's owner (ADR-0283 §2, default-deny), the same argument as
+    /// [`CAPABILITY_GRANTS_NOT_PORTABLE`]. The documents landed, so the owner can read them and
+    /// decide; they landed **paused**, because arming them was nobody's decision.
+    pub const FLOW_GRANTS_NOT_PORTABLE: &str = "flow_grants_not_portable";
+    /// This hub's own backup asked to re-grant permissions it cannot grant (hub#986): a command or
+    /// a read that is no longer here — a module that did not come back, or one whose new version
+    /// renamed it. Those flows are restored **disabled**, because an armed flow missing a permission
+    /// fails on every run, at whatever hour its trigger fires, with nobody watching.
+    pub const FLOWS_PAUSED_WITHOUT_GRANTS: &str = "flows_paused_without_grants";
+    /// The bundle carried flow documents this hub **would refuse at the screen** (hub#986): one that
+    /// does not parse, a `cron` the engine cannot resolve, a `query` step naming a read no installed
+    /// module has. The import saves through the same door as `POST /flows`, so what the owner could
+    /// not type in cannot arrive in a zip either. The rest of the flows still landed.
+    pub const FLOWS_NOT_RESTORABLE: &str = "flows_not_restorable";
 }
 
 /// Is this bundle a restore of the destination hub's OWN state?
@@ -395,29 +698,51 @@ fn ignored_by_purpose(manifest: &BlueprintManifest, section: &str) -> Option<Str
     ))
 }
 
-/// The fiscal chain never travels across installations (ADR-0202 §4.2 — hub#312).
+/// Data bound to the installation that produced it never travels (hub#380, generalising
+/// ADR-0202 §4.2 — hub#312).
 ///
-/// `NumeroInstalacion` = `hub_id`: the `verifactu` data section (chain records, contingency
-/// queue, events, AEAT log) is the fiscal history of ONE installation. Applied under another
-/// hub, its next record would chain on a `RegistroAnterior` the AEAT never received for that
-/// installation — and another hub's pending queue would get transmitted under the wrong
-/// `NumeroInstalacion`. A bundle proves its origin only through `manifest.hub.hub_id`
-/// (bundles older than that field read as unknown origin and import conservatively); the
-/// SAME hub restoring its own backup resumes its own chain (AEAT developer FAQ §4).
-fn chain_not_portable(
+/// The module says so itself, through `installation_bound_data` in its `module.json`. This used to
+/// ask whether the section was the literal `modules/verifactu`, which put one country's regime
+/// inside a generic engine: TicketBai chains its records the same way and NF525 carries the same
+/// integrity requirement, so every new regime would have been one more name in the core.
+///
+/// What the flag means, in the case that motivated it: `NumeroInstalacion` = `hub_id`, so the
+/// `verifactu` data section (chain records, contingency queue, events, AEAT log) is the fiscal
+/// history of ONE installation. Applied under another hub, its next record would chain on a
+/// `RegistroAnterior` the AEAT never received for that installation — and another hub's pending
+/// queue would get transmitted under the wrong `NumeroInstalacion`. A bundle proves its origin only
+/// through `manifest.hub.hub_id` (bundles older than that field read as unknown origin and import
+/// conservatively); the SAME hub restoring its own backup resumes its own chain (AEAT developer
+/// FAQ §4).
+fn installation_bound_not_portable(
+    registry: &crate::Registry,
     manifest: &BlueprintManifest,
     section: &str,
     target_hub_id: &str,
 ) -> Option<String> {
-    if section != "modules/verifactu" || is_same_hub(manifest, target_hub_id) {
+    let module_id = section.strip_prefix("modules/")?;
+    if !is_installation_bound(registry, module_id) || is_same_hub(manifest, target_hub_id) {
         return None;
     }
-    Some(
-        "la cadena VeriFactu pertenece a la instalación de origen (NumeroInstalacion = hub_id): \
-         los registros fiscales de otro hub no se aplican aquí — este hub abre su propia cadena \
-         con PrimerRegistro=S"
-            .into(),
-    )
+    Some(ignore_reason::INSTALLATION_BOUND_DATA.into())
+}
+
+/// Modules whose data is bound to their installation even though the manifest INSTALLED here does
+/// not say so — a bridge, not a rule (hub#380).
+///
+/// `verifactu` was published before the flag existed, so asking its manifest answers «portable»,
+/// and another installation's fiscal chain would land in this hub: precisely what ADR-0202 §4.2
+/// forbids and what the literal this function replaces was there to stop. The name keeps it bound
+/// until the module is republished declaring `installation_bound_data: true`, and it goes away with
+/// that republication. Nothing else may be added here: a second name would be the hard-coding
+/// coming back through the door it just left.
+const INSTALLATION_BOUND_BY_LEGACY_NAME: [&str; 1] = ["verifactu"];
+
+/// Is this module's data bound to the installation that produced it? Its manifest first, the
+/// legacy fallback second.
+fn is_installation_bound(registry: &crate::Registry, module_id: &str) -> bool {
+    registry.is_installation_bound(module_id)
+        || INSTALLATION_BOUND_BY_LEGACY_NAME.contains(&module_id)
 }
 
 /// Aplica una sección; cualquier fallo queda contenido en su `SectionStatus::Failed`. Devuelve
@@ -526,7 +851,16 @@ async fn apply_section(
     // cuyo literal apunte a un id reescrito). La guarda pasa a `hub_id = <dest> AND id = <nuevo>`,
     // que sigue siendo idempotente para una re-importación sobre el MISMO hub y deja de colisionar
     // con un hub hermano.
-    let keys = natural_keys_for_sql(rt.db(), &sql).await;
+    //
+    // hub#842: y a esas claves se suma la que declara el SEED del módulo, porque hay una que la BD
+    // no puede expresar como índice único. **Solo para un bundle AJENO.** Un hub que restaura su
+    // propia copia no tiene nada que deduplicar: sus filas sembradas no viajaron nunca
+    // (`export::is_module_seeded` las deja fuera), así que todo lo que trae el zip lo creó una
+    // persona — incluido un segundo método `card` («Amex») que la clave del seed, aplicada aquí,
+    // tiraría. Restaurar tu copia no puede perder nada; adoptar la plantilla de otro sí cede el
+    // hueco que el módulo ya te había sembrado.
+    let seed_declared = (!same_hub).then(|| rt.registry());
+    let keys = natural_keys_for_sql(rt.db(), seed_declared, &sql).await;
     let sql = remap_section_ids(&sql, target_hub_id, &keys);
     // Con lote abierto, el import REGISTRA qué filas inserta (ADR-0170): así esta importación
     // se puede deshacer después sin tocar lo que el usuario cree más tarde. Sin lote (llamadas
@@ -589,7 +923,9 @@ async fn apply_identity_extra(
     }
     let scope = crate::import_sql::scope_for_data_file(path)
         .ok_or_else(|| crate::RuntimeError::Other(format!("{path} no corresponde a ninguna sección conocida")))?;
-    let keys = natural_keys_for_sql(rt.db(), &sql).await;
+    // Sin claves de seed (hub#842): estas son tablas de IDENTIDAD del core, que ningún módulo
+    // siembra — y esta ruta solo corre para la copia del PROPIO hub (`identity_not_portable`).
+    let keys = natural_keys_for_sql(rt.db(), None, &sql).await;
     let sql = remap_section_ids(&sql, target_hub_id, &keys);
     match batch_id {
         Some(batch) => {
@@ -654,12 +990,13 @@ fn carries_a_foreign_numbering(sql: &str) -> bool {
 /// gate en el productor no protege al que importa.
 ///
 /// La pregunta no es «¿qué dice el bundle que es?» sino **«¿de quién es este hub?»** —igual que en
-/// [`identity_not_portable`] y [`chain_not_portable`]—, porque lo que hace peligrosas a estas filas
-/// no es la etiqueta del manifest: una serie define **cómo se numera cada documento que un negocio
-/// emite ante Hacienda** y `invoice_series_allocation` es el libro de números ya entregados que el
-/// RD 1007/2023 exige sin huecos ni duplicados. De OTRA instalación, aquí, son numeración ajena.
-/// El MISMO hub restaurando su copia sí las recupera: es su numeración volviendo a su sitio
-/// (ADR-0113 §1), que es justo lo que `chain_not_portable` hace con la cadena VeriFactu.
+/// [`identity_not_portable`] y [`installation_bound_not_portable`]—, porque lo que hace peligrosas
+/// a estas filas no es la etiqueta del manifest: una serie define **cómo se numera cada documento
+/// que un negocio emite ante Hacienda** y `invoice_series_allocation` es el libro de números ya
+/// entregados que el RD 1007/2023 exige sin huecos ni duplicados. De OTRA instalación, aquí, son
+/// numeración ajena. El MISMO hub restaurando su copia sí las recupera: es su numeración volviendo
+/// a su sitio (ADR-0113 §1), que es justo lo que `installation_bound_not_portable` hace con la
+/// cadena VeriFactu.
 ///
 /// Qué pasa con los números: **nada**. Las series del destino conservan su `id`, su `code`, su
 /// `current_sequence` y su libro; las del bundle no se aplican, no se fusionan y no renumeran nada.
@@ -1035,6 +1372,28 @@ fn natural_key_guards(
                 _ => usable = false,
             }
         }
+        // 🌱 hub#842: la clave que declara el SEED de un módulo no pregunta por cualquier fila
+        // equivalente — pregunta por **la que sembró el módulo**. `(hub_id, type)` identifica la
+        // forma de pago que el seed planta, pero no es única para el negocio: un salón cobra con
+        // `Visa` y con `Amex`, las dos `card`. Sin este `created_by = 'system'`, la fila del
+        // bundle cedería también ante el `Visa` del dueño, y adoptar una plantilla se comería una
+        // forma de pago que nadie pidió tirar.
+        //
+        // El marcador es el mismo que ya usa `export::is_module_seeded` y lo pone
+        // `seed::apply_module_seed` en TODA fila que siembra un módulo, así que no hay una segunda
+        // convención que mantener. Si la tabla no tiene esa columna, la clave se descarta: la
+        // guarda no puede nombrar una columna que no existe (es el error que tumbó la sección
+        // Usuarios entera en producción el 2026-08-03) y sin ella no sabríamos distinguir lo
+        // sembrado de lo del dueño, que es justo lo que esta clave necesita saber.
+        if key.seeded_only {
+            match value_of(SEEDED_ROW_MARKER_COLUMN) {
+                Some(_) => conds.push((
+                    SEEDED_ROW_MARKER_COLUMN.to_string(),
+                    Some(quote_string_literal(SEEDED_ROW_MARKER)),
+                )),
+                None => usable = false,
+            }
+        }
         if !usable || conds.is_empty() {
             continue;
         }
@@ -1051,23 +1410,39 @@ fn natural_key_guards(
     out
 }
 
+/// La columna y el valor con que `seed::apply_module_seed` firma TODA fila que siembra un módulo
+/// (`created_by = 'system'`, ver [`crate::export::is_module_seeded`]) — el marcador que separa lo
+/// que planta el módulo de lo que crea una persona (hub#842).
+const SEEDED_ROW_MARKER_COLUMN: &str = "created_by";
+const SEEDED_ROW_MARKER: &str = "system";
+
 /// Claves naturales de cada tabla que toca `sql`, leídas del catálogo del hub DESTINO.
 ///
 /// Se pregunta a la BD de destino, no al bundle: lo que decide si un INSERT choca es el índice que
 /// está creado AQUÍ. Una tabla que no se pueda leer devuelve la lista vacía y su fila conserva el
 /// comportamiento anterior (best-effort, como el resto del import).
+///
+/// A ellas se suman las que declara el SEED del módulo dueño de la tabla (`seed_declared`,
+/// hub#842) — `None` cuando el bundle es la copia de ESTE MISMO hub, que no tiene nada que
+/// deduplicar.
 async fn natural_keys_for_sql(
     db: &dyn erplora_db::DatabaseAdapter,
+    seed_declared: Option<&crate::Registry>,
     sql: &str,
 ) -> std::collections::HashMap<String, Vec<crate::export::NaturalKey>> {
-    let mut out = std::collections::HashMap::new();
+    let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
+        std::collections::HashMap::new();
     let Ok(stmts) = crate::import_sql::split_statements(sql) else { return out };
     for stmt in &stmts {
         let Some(parsed) = parse_insert(stmt) else { continue };
         if out.contains_key(parsed.table) {
             continue;
         }
-        out.insert(parsed.table.to_string(), crate::export::natural_keys(db, parsed.table).await);
+        let mut keys = crate::export::natural_keys(db, parsed.table).await;
+        if let Some(registry) = seed_declared {
+            keys.extend(registry.seed_natural_keys_for(parsed.table));
+        }
+        out.insert(parsed.table.to_string(), keys);
     }
     out
 }
@@ -1308,6 +1683,8 @@ mod tests {
             modules: Vec::new(),
             sections: vec!["hub_users".into()],
             active_roles: Vec::new(),
+            capability_grants: Default::default(),
+            flows: Vec::new(),
             sha256: BTreeMap::new(),
         }
     }
@@ -1346,6 +1723,96 @@ mod tests {
         assert_eq!(
             identity_not_portable(&manifest_from(""), "hub_users", "h2").as_deref(),
             Some(ignore_reason::IDENTITY_NOT_PORTABLE)
+        );
+    }
+
+    /// A destination registry where one module is installed, declaring (or not) that its data
+    /// belongs to the installation that produced it.
+    ///
+    /// The manifest is built through `serde` on purpose: what the engine asks about must be the
+    /// field a real `module.json` writes, not a struct literal a rename could leave behind.
+    fn registry_with(module_id: &str, bound: bool) -> crate::Registry {
+        let mut registry = crate::Registry::new();
+        registry.installed.push(
+            serde_json::from_str(&format!(
+                r#"{{ "id": "{module_id}", "name": "{module_id}", "version": "1.0.0",
+                      "installation_bound_data": {bound} }}"#
+            ))
+            .expect("manifest parses"),
+        );
+        registry
+    }
+
+    /// hub#380 — the engine asks the INSTALLED MANIFEST, and never names a module.
+    ///
+    /// The literal `modules/verifactu` made a Spanish regime part of a generic engine; TicketBai
+    /// chains its records the same way and NF525 has the same integrity requirement, so the next
+    /// two regimes would each have been one more `||` in the core. `ticketbai` is used here
+    /// precisely because nothing in the runtime has ever heard of it: what discards its section is
+    /// the flag, not the name.
+    #[test]
+    fn installation_bound_data_is_declared_by_the_module_not_named_by_the_core() {
+        let bound = registry_with("ticketbai", true);
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h2")
+                .as_deref(),
+            Some(ignore_reason::INSTALLATION_BOUND_DATA),
+            "another installation's bound records must not be applied here"
+        );
+        // The SAME installation restoring its own backup resumes its own chain (ADR-0113 §1).
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h1"),
+            None,
+            "a hub restoring its own backup gets its own records back"
+        );
+        // A module that declares nothing travels: the shape of every published manifest today.
+        let portable = registry_with("inventory", false);
+        assert_eq!(
+            installation_bound_not_portable(
+                &portable,
+                &manifest_from("h1"),
+                "modules/inventory",
+                "h2"
+            ),
+            None
+        );
+        // And this gate is about MODULE sections only; the others have their own.
+        assert_eq!(
+            installation_bound_not_portable(&bound, &manifest_from("h1"), "hub_settings", "h2"),
+            None
+        );
+    }
+
+    /// 🔴 Compatibility (hub#380): the PUBLISHED `verifactu` predates the flag, so asking its
+    /// manifest answers «portable» — and the fiscal chain of another installation would land here,
+    /// which is exactly what ADR-0202 §4.2 forbids. Until the module is republished declaring the
+    /// flag, the name keeps it bound.
+    ///
+    /// A fallback, not the rule: it only ADDS to what the manifest says and disappears with the
+    /// republication. Nothing else in the engine may grow a second name.
+    #[test]
+    fn verifactu_stays_bound_while_its_published_manifest_has_no_flag() {
+        let published = registry_with("verifactu", false);
+        assert_eq!(
+            installation_bound_not_portable(
+                &published,
+                &manifest_from("h1"),
+                "modules/verifactu",
+                "h2"
+            )
+            .as_deref(),
+            Some(ignore_reason::INSTALLATION_BOUND_DATA),
+            "the VeriFactu chain never travels across installations (ADR-0202 §4.2)"
+        );
+        assert_eq!(
+            installation_bound_not_portable(
+                &published,
+                &manifest_from("h1"),
+                "modules/verifactu",
+                "h1"
+            ),
+            None,
+            "the same hub restoring its own backup resumes its own chain"
         );
     }
 
@@ -1630,6 +2097,7 @@ mod tests {
                 cols: vec!["hub_id".into(), "code".into()],
                 predicate: vec![("is_deleted".into(), Some("0".into()))],
                 nulls_not_distinct: false,
+            seeded_only: false,
             }],
         );
         let out = remap_section_ids(sql, "h2", &keys);
@@ -1657,6 +2125,7 @@ mod tests {
             cols: c.into_iter().map(str::to_string).collect(),
             predicate: p.into_iter().map(|(a, b)| (a.to_string(), Some(b.to_string()))).collect(),
             nulls_not_distinct: false,
+            seeded_only: false,
         };
 
         for (caso, key) in [
@@ -1687,6 +2156,7 @@ mod tests {
                 .into_iter().map(str::to_string).collect(),
             predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
             nulls_not_distinct: true,
+            seeded_only: false,
         };
         let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
         assert_eq!(
@@ -1712,6 +2182,7 @@ mod tests {
                 .into_iter().map(str::to_string).collect(),
             predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
             nulls_not_distinct: true,
+            seeded_only: false,
         };
         let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
         assert!(out.is_empty(), "a component row cannot collide on the roots-only index: `{out}`");
@@ -1727,8 +2198,98 @@ mod tests {
             cols: vec!["hub_id".into(), "code".into()],
             predicate: vec![],
             nulls_not_distinct: false,
+            seeded_only: false,
         };
         let out = natural_key_guards("t", &cols, &vals, &[key]);
         assert!(out.is_empty(), "NULLS DISTINCT: a NULL value must keep discarding the key, got `{out}`");
+    }
+
+    // ── Claves declaradas por el SEED del módulo (hub#842) ──────────────────────────────────
+
+    /// Columnas y valores de una forma de pago del bundle `peluqueria` («Efectivo», `cash`).
+    fn fila_forma_de_pago(nombre: &str, kind: &str, autor: &str) -> (Vec<String>, Vec<String>) {
+        let cols = ["id", "hub_id", "name", "type", "is_deleted", "created_by"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let vals = vec![
+            "'pm-1'".to_string(),
+            "'h2'".to_string(),
+            format!("'{nombre}'"),
+            format!("'{kind}'"),
+            "0".to_string(),
+            format!("'{autor}'"),
+        ];
+        (cols, vals)
+    }
+
+    /// La clave del seed (`hub_id, type, is_deleted`) pregunta por la fila que **sembró el
+    /// módulo**, no por cualquier equivalente: sin `created_by = 'system'`, la «Tarjeta» del bundle
+    /// cedería también ante el «Visa» que creó el dueño.
+    #[test]
+    fn una_clave_de_seed_solo_pregunta_por_la_fila_que_sembro_el_modulo() {
+        let (cols, vals) = fila_forma_de_pago("Efectivo", "cash", "u-owner");
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into(), "is_deleted".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: true,
+        };
+        let out = natural_key_guards("sales_payment_method", &cols, &vals, &[key]);
+        assert_eq!(
+            out,
+            " AND NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE \"hub_id\" = 'h2' \
+             AND \"type\" = 'cash' AND \"is_deleted\" = 0 AND \"created_by\" = 'system')",
+            "la guarda del seed tiene que acotarse a lo sembrado por el módulo"
+        );
+        // …y encadenada a la guarda por `id`, como la emite `rewrite_insert`, sigue siendo SQL que
+        // el subconjunto del import admite (hub#239): una guarda que no se pudiera ejecutar
+        // tumbaría la sección entera.
+        let scope = crate::import_sql::scope_for_data_file("data/sales.sql").unwrap();
+        crate::import_sql::validate(
+            &format!(
+                "INSERT INTO sales_payment_method (\"id\") SELECT 'x' \
+                 WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE \"hub_id\" = 'h2' AND id = 'x'){out};"
+            ),
+            &scope,
+        )
+        .expect("la guarda del seed es SQL admitido por el subconjunto del import");
+    }
+
+    /// Una tabla sin `created_by` no puede distinguir lo sembrado de lo del dueño, y la guarda no
+    /// puede nombrar una columna que no existe: la clave se descarta y esa tabla se comporta como
+    /// antes de hub#842.
+    #[test]
+    fn una_clave_de_seed_se_descarta_si_la_tabla_no_marca_quien_creo_la_fila() {
+        let cols: Vec<String> = ["id", "hub_id", "type"].into_iter().map(str::to_string).collect();
+        let vals: Vec<String> = ["'x'", "'h2'", "'cash'"].into_iter().map(str::to_string).collect();
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: true,
+        };
+        assert!(
+            natural_key_guards("t", &cols, &vals, &[key]).is_empty(),
+            "sin `created_by` la clave del seed no se puede evaluar"
+        );
+    }
+
+    /// Una clave del CATÁLOGO (índice único) sigue preguntando por CUALQUIER fila equivalente: es
+    /// el índice quien rechazaría el INSERT, le dé igual quién creó la fila (hub#753, intacto).
+    #[test]
+    fn una_clave_del_catalogo_no_se_acota_a_lo_sembrado() {
+        let (cols, vals) = fila_forma_de_pago("Efectivo", "cash", "u-owner");
+        let key = crate::export::NaturalKey {
+            cols: vec!["hub_id".into(), "type".into()],
+            predicate: vec![],
+            nulls_not_distinct: false,
+            seeded_only: false,
+        };
+        let out = natural_key_guards("sales_payment_method", &cols, &vals, &[key]);
+        assert!(
+            !out.contains("created_by"),
+            "una clave de índice único no mira quién creó la fila: `{out}`"
+        );
     }
 }

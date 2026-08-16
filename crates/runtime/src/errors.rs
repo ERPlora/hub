@@ -168,6 +168,13 @@ pub enum RuntimeError {
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
     #[error("host.notify: {0}")]
     Notify(String),
+    /// Fallo de la capacidad de host `host.print` (hub#957): el gemelo de la de arriba para la cola
+    /// de impresión del hub (ADR-0196 §6). El relay del outbox lo trata como un listener fallido →
+    /// reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter. Su código propio existe por lo
+    /// mismo que el de `notify`: «no se encoló el papel» y «no salió el email» se arreglan en
+    /// pantallas distintas.
+    #[error("host.print: {0}")]
+    Print(String),
     /// Fallo al materializar o escribir la carpeta persistente declarada por un módulo.
     #[error("host.module_storage: {0}")]
     Storage(String),
@@ -235,6 +242,23 @@ pub enum RuntimeError {
     /// out — both travel so the screen can say what happened instead of "409".
     #[error("the business tax id is frozen to `{frozen_to}`: this hub emitted its first fiscal record on {since} and the chain is anchored to that identifier")]
     BusinessTaxIdFrozen { frozen_to: String, since: String },
+    /// **The country is frozen once the hub went live** (ADR-0273). `country_code` is not one
+    /// preference among others: it is the first input of the tax engine (ADR-0085 — a rule is
+    /// `(country_code, region_code, tax_category_key) → rate_pct`) and it decides WHICH fiscal
+    /// regime applies. Moving it on a hub that is already filing points a live chain at another
+    /// country's rules, with the records already emitted hanging off it.
+    ///
+    /// Sibling of [`Self::BusinessTaxIdFrozen`] and deliberately its own variant: the two freeze
+    /// different keys for different reasons, and a screen has to say which one refused.
+    ///
+    /// Re-sending the SAME country is not a change and is accepted — Ajustes posts the country
+    /// with the rest of the form. `region_code` is NOT frozen: it refines a country, it does not
+    /// replace the regime.
+    ///
+    /// `frozen_to` is the country the chain hangs from and `since` the go-live instant, so the
+    /// screen can say what happened instead of "409".
+    #[error("the country is frozen to `{frozen_to}`: this hub went live on {since} and its fiscal chain is anchored to that country's regime")]
+    HubCountryFrozen { frozen_to: String, since: String },
     /// This hub is an ephemeral DEMO (ADR-0197 §4) and the request would change something a demo
     /// hub does not own: its AEAT environment, its business certificate or its fiscal identity.
     /// The marker comes from the deployment (`HUB_DEMO`), never from the caller — see

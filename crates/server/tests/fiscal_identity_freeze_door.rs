@@ -211,3 +211,50 @@ async fn the_freeze_is_not_the_demo_lock() {
     assert_eq!(code, "business_tax_id_frozen");
     assert_ne!(code, "demo_fiscal_identity_locked");
 }
+
+// ── Y su HERMANA: el PAÍS se congela en el go-live (ADR-0273, hub#69) ─────────────────────────
+//
+// Misma puerta (`PUT /api/settings`), misma forma, hecho distinto. El país es la primera entrada
+// del motor de impuestos (ADR-0085: una regla es `(country_code, region_code, tax_category_key) →
+// rate_pct`) y decide QUÉ RÉGIMEN aplica; moverlo en un hub que ya declara apunta una cadena viva
+// a las normas de otro país. Lo que fija esto y el runtime no puede fijar es el par
+// `409` + `hub_country_frozen` que la UI necesita para explicarse — hay una cadena i18n colgando
+// de ese código exacto (`settings.saveRefused.hub_country_frozen`, en+es).
+
+/// 🔴 Con el perfil `ACTIVE`, un país **distinto** se rechaza con `409` y código PROPIO — no el de
+/// su hermana el NIF: son dos claves congeladas por dos hechos distintos y la pantalla tiene que
+/// poder decir cuál se negó.
+#[tokio::test]
+async fn a_hub_that_went_live_refuses_a_new_country_over_http() {
+    let (router, admin) = fixture("country-frozen", true).await;
+
+    let response = put(&router, &admin, json!({ "country_code": "FR" })).await;
+
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let body = body_json(response).await;
+    assert_eq!(
+        error_code(&body),
+        "hub_country_frozen",
+        "código propio, no `business_tax_id_frozen`: {body}"
+    );
+
+    let settings = get(&router, &admin).await;
+    assert_eq!(
+        settings["country_code"],
+        json!("ES"),
+        "el PUT entero se rechaza: el país no se movió: {settings}"
+    );
+}
+
+/// La otra mitad, la que no puede romperse: un hub que **aún no ha salido a producción** cambia su
+/// país como siempre. Es el caso ordinario —el dueño corrigiendo lo que adivinó `/start/`— y una
+/// guarda que lo atrapara rompería el alta de todos los hubs para proteger a los pocos que declaran.
+#[tokio::test]
+async fn a_hub_still_setting_itself_up_may_still_say_where_it_is() {
+    let (router, admin) = fixture("country-free", false).await;
+
+    let response = put(&router, &admin, json!({ "country_code": "FR" })).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(get(&router, &admin).await["country_code"], json!("FR"));
+}

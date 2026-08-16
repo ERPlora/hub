@@ -436,6 +436,23 @@ export async function runtimePinLogin(name: string, pin: string): Promise<HubSes
   );
 }
 
+/**
+ * Login por **placa** (hub#658): la tarjeta resuelve la identidad entera, así que no viaja nombre.
+ *
+ * Hermana de `runtimePinLogin` y no su sustituta: el PIN sigue siendo la vía de vuelta cuando la
+ * tarjeta se pierde. El runtime aplica exactamente las mismas barandillas que al PIN —device-trust,
+ * límite de intentos y límite de dispositivos del plan— y contesta 401 sin decir nunca si esa placa
+ * existe.
+ */
+export async function runtimeBadgeLogin(badge: string): Promise<HubSessionResult> {
+  const deviceId = await resolveDeviceId();
+  return runtimePost<HubSessionResult>(
+    '/api/auth/badge',
+    { badge, ...(deviceId ? { device_id: deviceId } : {}) },
+    {},
+  );
+}
+
 /** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */
 export async function runtimeSetPin(pin: string, sessionToken: string): Promise<void> {
   await runtimePost<{ ok: boolean }>('/api/auth/set-pin', { pin }, { 'X-Hub-Session': sessionToken });
@@ -751,7 +768,15 @@ function capabilityIds(raw: unknown): string[] {
 /** Catálogo real del Marketplace vía el runtime local. Un Hub real firma con su token de máquina;
  *  Demo usa el endpoint público de metadatos del SaaS. Nunca hay una lista local alternativa. */
 export async function cloudMarketplaceModules(): Promise<CloudMarketplaceModule[]> {
-  const data = await runtimeGet<unknown>('/api/marketplace/catalog');
+  // `?locale=` (ADR-0055, el mismo parámetro que `/api/navigation`): el Cloud sirve el catálogo
+  // por idioma (ADR-0364) pero solo a quien dice en cuál lo quiere — callarse significa inglés, y
+  // eso era «Añadir apps» en inglés dentro de una interfaz traducida entera (hub#1003).
+  //
+  // Va el idioma ACTIVO y no un ajuste guardado: es un hecho sobre quien está leyendo ahora, y eso
+  // solo lo sabe esta página. El `language` del hub es el respaldo, y lo pone el runtime.
+  const data = await runtimeGet<unknown>(
+    `/api/marketplace/catalog?locale=${encodeURIComponent(getLocale())}`,
+  );
   const items = Array.isArray(data)
     ? data
     : Array.isArray((data as { results?: unknown[] }).results)

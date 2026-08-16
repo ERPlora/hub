@@ -4,8 +4,10 @@
 //! flujo verificado contra el Cloud:
 //!
 //!   1. `GET versions/`          → lista de versiones; elige la pedida (o la última activa).
-//!   2. `GET download/?version=` → descarga el ZIP binario (async reqwest).
-//!   3. verify SHA256 + unzip    → reusa `erplora-source::ModuleStore` (anti zip-slip + cache).
+//!   2. `GET download/?version=` → descarga el ZIP **en streaming a un temp file** de la caché
+//!      de módulos, con el SHA256 calculado sobre la marcha (hub#981: el zip no vive en RAM).
+//!   3. verify SHA256 + unzip    → reusa `erplora-source::ModuleStore` (anti zip-slip + cache),
+//!      leyendo del fichero (`install_from_file`).
 //!   4. `Runtime::install_from_dir` → migra, registra capacidades, deja el módulo activo.
 //!   5. `POST mark_installed/`   → registra la instalación en el Cloud (best-effort).
 //!
@@ -79,9 +81,11 @@ impl InstallError {
     }
 }
 
-/// `Fetcher` de un solo uso: sirve unos bytes ya descargados (async, fuera de banda) a la
-/// lógica síncrona de `ModuleStore` (verify SHA256 + unzip seguro). Evita duplicar la
-/// verificación/descompresión que ya vive —y está testeada— en `erplora-source`.
+/// `Fetcher` de un solo uso: sirve unos bytes ya en memoria (hoy, la copia local de hub#571
+/// leída de la BD) a la lógica síncrona de `ModuleStore` (verify SHA256 + unzip seguro). El
+/// camino de DESCARGA ya no pasa por aquí: va en streaming a disco (hub#981) y entra por
+/// `ModuleStore::install_from_file`. Evita duplicar la verificación/descompresión que ya
+/// vive —y está testeada— en `erplora-source`.
 struct InMemoryFetcher {
     bytes: RefCell<Option<Vec<u8>>>,
 }
@@ -167,11 +171,20 @@ async fn send_text(
         .map_err(|e| InstallError::Cloud(e.to_string()))
 }
 
-/// Ejecuta una `PreparedRequest` GET y devuelve el cuerpo binario (descarga del ZIP).
-async fn send_bytes(
+/// Descarga el ZIP del módulo **en streaming a un temp file** en la caché de módulos (mismo
+/// volumen que la extracción final), calculando el SHA256 **sobre la marcha** mientras escribe
+/// (hub#981): el archivo nunca se bufferiza entero en RAM. Devuelve el temp file y el hex del
+/// SHA256 de lo realmente escrito. El `NamedTempFile` se borra solo al soltarse, así que TODOS
+/// los caminos de fallo (y el de éxito, tras usarlo) limpian la descarga.
+async fn download_to_temp_file(
     http: &reqwest::Client,
     req: &cloud_client::PreparedRequest,
-) -> Result<Vec<u8>, InstallError> {
+    cache_root: &std::path::Path,
+) -> Result<(tempfile::NamedTempFile, String), InstallError> {
+    use futures_util::StreamExt;
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+
     let mut r = http.request(method(req), &req.url);
     for (k, v) in &req.headers {
         r = r.header(*k, v);
@@ -183,11 +196,26 @@ async fn send_bytes(
     let resp = resp
         .error_for_status()
         .map_err(|e| InstallError::Cloud(e.to_string()))?;
-    Ok(resp
-        .bytes()
-        .await
-        .map_err(|e| InstallError::Cloud(e.to_string()))?
-        .to_vec())
+
+    std::fs::create_dir_all(cache_root).map_err(|e| InstallError::Source(e.into()))?;
+    let mut tmp =
+        tempfile::NamedTempFile::new_in(cache_root).map_err(|e| InstallError::Source(e.into()))?;
+    let mut hasher = Sha256::new();
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| InstallError::Cloud(e.to_string()))?;
+        hasher.update(&chunk);
+        tmp.write_all(&chunk)
+            .map_err(|e| InstallError::Source(e.into()))?;
+    }
+    tmp.flush().map_err(|e| InstallError::Source(e.into()))?;
+
+    let sha: String = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    Ok((tmp, sha))
 }
 
 fn method(req: &cloud_client::PreparedRequest) -> reqwest::Method {
@@ -222,6 +250,29 @@ fn acquire(
     };
     let dir = store.install(&fetcher, &grant, policy)?;
     Ok(dir)
+}
+
+/// Como [`acquire`], pero para un zip que ya está **en disco** (hub#981): la verificación
+/// (SHA256 + firma) y la descompresión leen del fichero, sin bufferizar el archivo en RAM.
+/// La usa el camino de descarga (streaming); [`acquire`] queda para la reposición local
+/// (hub#571), cuyos bytes salen de la base de datos.
+fn acquire_from_file(
+    store: &ModuleStore,
+    module_id: &str,
+    version: &ModuleVersion,
+    sha: &str,
+    signature: Option<cloud_client::ModuleSignature>,
+    zip_path: &std::path::Path,
+    policy: &cloud_client::SignaturePolicy,
+) -> Result<PathBuf, InstallError> {
+    let grant = InstallGrant {
+        module_id: module_id.to_string(),
+        version: version.version.clone(),
+        download_url: format!("file://{}", zip_path.display()),
+        sha256: sha.to_string(),
+        signature,
+    };
+    Ok(store.install_from_file(zip_path, &grant, policy)?)
 }
 
 /// Pipeline completo de instalación **con resolución de dependencias anidadas** (nested install).
@@ -497,6 +548,28 @@ async fn remember_package(
             error = %e,
             "no se pudo guardar la copia local del módulo (hub#571): este hub no sobrevive a un reinicio sin red"
         );
+    }
+}
+
+/// [`remember_package`] leyendo el zip **desde el temp file de la descarga** (hub#981): una
+/// asignación transitoria DESPUÉS de instalar, en vez de sostener el archivo en RAM durante
+/// todo el pipeline. Mismo contrato best-effort: si la lectura falla, queda el WARN y el módulo
+/// —ya instalado y sirviendo— no se toca.
+async fn remember_package_from_file(
+    runtime: &erplora_runtime::Runtime,
+    module_id: &str,
+    version: &str,
+    sha256: &str,
+    signature: Option<&cloud_client::ModuleSignature>,
+    zip_path: &std::path::Path,
+) {
+    match std::fs::read(zip_path) {
+        Ok(zip) => remember_package(runtime, module_id, version, sha256, signature, &zip).await,
+        Err(e) => tracing::warn!(
+            module_id = %module_id,
+            error = %e,
+            "no se pudo releer el zip verificado para la copia local (hub#571): este hub no sobrevive a un reinicio sin red"
+        ),
     }
 }
 
@@ -1005,9 +1078,13 @@ async fn execute_plan(
 
         on_progress(&node.module_id, "downloading");
         let dl_req = cloud.download(auth, &node.module_id, &node.version);
-        let zip_bytes = send_bytes(http, &dl_req).await?;
+        let (zip_file, downloaded_sha) = download_to_temp_file(http, &dl_req, cache_root).await?;
 
         on_progress(&node.module_id, "verifying");
+        // ADR-0015, mismo contrato que siempre: el SHA calculado sobre la marcha debe casar con
+        // el del plan ANTES de tocar nada. Un mismatch suelta `zip_file` → el temp se borra solo.
+        cloud_client::integrity::verify_sha256_hex(&downloaded_sha, sha)
+            .map_err(|e| InstallError::Source(e.into()))?;
         let store = ModuleStore::new(cache_root);
         let version = ModuleVersion {
             version: node.version.clone(),
@@ -1017,13 +1094,13 @@ async fn execute_plan(
             sha256: Some(sha.to_string()),
             signature: signature.clone(),
         };
-        let dir = acquire(
+        let dir = acquire_from_file(
             &store,
             &node.module_id,
             &version,
             sha,
             signature.clone(),
-            zip_bytes.clone(),
+            zip_file.path(),
             signature_policy,
         )?;
 
@@ -1048,13 +1125,13 @@ async fn execute_plan(
         let installed_id = register(runtime, &dir, &node.module_id, updating).await?;
 
         // hub#571: la copia propia del hub, para el arranque en el que el marketplace no conteste.
-        remember_package(
+        remember_package_from_file(
             runtime,
             &node.module_id,
             &node.version,
             sha,
             signature.as_ref(),
-            &zip_bytes,
+            zip_file.path(),
         )
         .await;
 
@@ -1142,22 +1219,26 @@ fn install_recursive<'a>(
             })?
             .to_string();
 
-        // (2) Descargar el ZIP binario.
+        // (2) Descargar el ZIP binario **en streaming a disco** (hub#981), con el SHA256
+        //     calculado sobre la marcha: el archivo no se bufferiza en RAM.
         on_progress(&module_id, "downloading");
         let dl_req = cloud.download(auth, &module_id, &version.version);
-        let zip_bytes = send_bytes(http, &dl_req).await?;
+        let (zip_file, downloaded_sha) = download_to_temp_file(http, &dl_req, cache_root).await?;
 
-        // (3) Verificar firma ed25519 (hub#239, DEFAULT deny según policy) + SHA256 + descomprimir
+        // (3) Verificar SHA256 (ADR-0015, ANTES de tocar nada; un fallo suelta el temp file, que
+        //     se borra solo) + firma ed25519 (hub#239, DEFAULT deny según policy) + descomprimir
         //     de forma segura + cachear.
         on_progress(&module_id, "verifying");
+        cloud_client::integrity::verify_sha256_hex(&downloaded_sha, &sha)
+            .map_err(|e| InstallError::Source(e.into()))?;
         let store = ModuleStore::new(cache_root);
-        let dir = acquire(
+        let dir = acquire_from_file(
             &store,
             &module_id,
             &version,
             &sha,
             version.signature.clone(),
-            zip_bytes.clone(),
+            zip_file.path(),
             signature_policy,
         )?;
 
@@ -1196,13 +1277,13 @@ fn install_recursive<'a>(
 
         // (5bis) hub#571: guardar la copia propia del hub, para el arranque en el que el
         //        marketplace no conteste. Después de instalar, nunca antes.
-        remember_package(
+        remember_package_from_file(
             runtime,
             &module_id,
             &version.version,
             &sha,
             version.signature.as_ref(),
-            &zip_bytes,
+            zip_file.path(),
         )
         .await;
 

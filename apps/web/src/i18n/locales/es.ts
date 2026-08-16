@@ -44,6 +44,11 @@ export default {
     noNotifications: 'Todo al día. Sin notificaciones.',
     deadLettersTitle: 'Eventos caídos',
     deadLettersBody: 'Hay {count} evento(s) que el relay no pudo entregar. Revísalos y reenvíalos.',
+    // Impresión sin drenar (hub#987). Nombra la estación: «la impresión está parada» manda al dueño
+    // a mirar cuatro impresoras; «la cocina está parada» lo manda a una.
+    printingStalledTitle: 'Nadie está imprimiendo «{station}»',
+    printingStalledBody:
+      'Hay {count} documento(s) esperando desde hace {minutes} min. Comprueba que la caja que imprime ahí está encendida.',
     // Nombre del menú en el que se pliega la barra en el móvil. Es solo-icono: esto es lo único con
     // lo que un lector de pantalla puede anunciarlo.
     more: 'Más opciones',
@@ -111,6 +116,14 @@ export default {
     reportConfirm: 'Denunciar',
     reportSent: 'Gracias, hemos recibido tu denuncia.',
     reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
+  },
+  // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
+  // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue
+  // funcionando igual que siempre, así que no hay nada que el usuario pueda hacer al respecto).
+  badge: {
+    nfcDisabled: 'El NFC está apagado en este aparato. Enciéndelo para leer las tarjetas acercándolas.',
+    nfcRandomUid:
+      'Esta tarjeta da un número distinto cada vez que se lee, así que no puede usarse como placa. Prueba con otra.',
   },
   // Lo que se le dice al usuario tras pulsar «descargar», lo pulse donde lo pulse (hub#480). Dentro
   // de la app instalada no hay barra de descargas ni aviso del sistema: si no lo decimos nosotros,
@@ -207,6 +220,18 @@ export default {
       blocked: 'Estas hay que añadirlas antes a tu plan: {apps}',
       failed: 'Hay algo más que no ha entrado. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
       failedApps: 'Estas no han entrado: {apps}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      // hub#899 — la otra mitad de la misma queja: cuando lo que falla es una SECCIÓN no hay app que
+      // nombrar y la tarjeta caía en «Hay algo más que no ha entrado». Dos «algos» en una tarjeta,
+      // justo en el minuto en que ella comprueba si su negocio está dentro.
+      failedParts: 'Esto no ha entrado: {parts}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      failedAppsAndParts:
+        'Estas no han entrado: {apps}. Tampoco {parts}. Puedes ver el detalle y reintentarlo en Ajustes › Datos.',
+      partSettings: 'los ajustes del negocio',
+      partTeam: 'las personas',
+      partRoles: 'los roles y lo que puede hacer cada uno',
+      partFiscal: 'los datos fiscales',
+      partMedia: 'las imágenes',
+      partAppData: 'los datos de {app}',
       notStartedTitle: 'No se ha podido abrir esa plantilla',
       notStartedBody: 'No ha cambiado nada en tu negocio. Inténtalo otra vez o cárgala desde Ajustes › Datos.',
       interruptedTitle: 'La configuración no ha terminado',
@@ -432,6 +457,8 @@ export default {
         'Una demo se queda siempre en el entorno de pruebas de la AEAT. Crea tu propio negocio en erplora.com para remitir de verdad.',
       business_tax_id_frozen:
         'El NIF ya no se puede cambiar: este negocio ya ha emitido con él.',
+      hub_country_frozen:
+        'El país ya no se puede cambiar: este negocio ya declara con sus normas fiscales. Escríbenos si el negocio se ha mudado de verdad.',
     },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',
@@ -684,6 +711,8 @@ export default {
     actionDeactivate: 'Dar de baja',
     access: {
       pin: 'PIN local',
+      pin_badge: 'PIN + placa',
+      badge: 'Placa',
       cloud: 'Cuenta online',
       // Existe como persona del negocio, pero no puede iniciar sesión en el Hub.
       none: 'Sin acceso',
@@ -828,6 +857,16 @@ export default {
     pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
+    badge: 'Placa',
+    badgeHelp:
+      'Pasa la tarjeta y se rellena sola: no hace falta hacer clic aquí antes. También puedes teclear el número, para un llavero o una etiqueta grabada.',
+    badgeSetHelp:
+      'Ya lleva una placa. Pasa una tarjeta nueva para sustituirla, o déjalo en blanco y se queda como está.',
+    badgeNfcHelp:
+      'Acerca la tarjeta a este aparato —o pásala por el lector— y se rellena sola. También puedes teclear el número, para un llavero o una etiqueta grabada.',
+    badgeNfcSetHelp:
+      'Ya lleva una placa. Acerca o pasa una tarjeta nueva para sustituirla, o déjalo en blanco y se queda como está.',
+    clearBadge: 'Retirar la placa',
     localUser: 'Usuario local',
     localUserHelp:
       'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
@@ -849,6 +888,9 @@ export default {
       local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
       local_has_email: 'Un usuario local no lleva email. Desmarca «Usuario local» para invitarlo como usuario de cuenta.',
       name_taken: 'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+      badge_shape: 'Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».',
+      badge_in_use: 'Esa placa ya la lleva otro usuario activo. La placa dice quién está en la caja, así que no la pueden compartir dos personas.',
+      badge_without_fallback: 'La placa no puede ser su única vía de entrada: si pierde la tarjeta se queda fuera. Consérvale el PIN, dale una cuenta, o retira también la placa.',
     },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
@@ -869,8 +911,6 @@ export default {
     database: 'Base de datos',
     memory: 'Memoria',
     connections: 'Conexiones',
-    connectionsOf: 'de {limit}',
-    connectionsActive: 'activas',
     // El titular de la tarjeta de la impresora, su palabra de estado y su frase vivían aquí, y
     // nombraban un proceso («Bridge») en vez de lo que hay sobre el mostrador. Ahora salen de
     // `system.health.*` (hub#375). Lo que queda abajo es el flujo de INSTALACIÓN, que sí va de un
@@ -934,6 +974,13 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    // Selector de rango de las series de uso (saas#1511). El contrato para en 3 días a propósito.
+    usageRange3h: '3 h',
+    usageRange24h: '24 h',
+    usageRange3d: '3 días',
+    usageRangeLabel3h: 'Últimas 3 horas',
+    usageRangeLabel24h: 'Últimas 24 horas',
+    usageRangeLabel3d: 'Últimos 3 días',
     databaseShared: 'Base de datos compartida',
     colTime: 'Hora',
     colLevel: 'Nivel',
@@ -1052,6 +1099,9 @@ export default {
     signInWithEmail: 'Iniciar sesión con email',
     changeUser: 'Cambiar usuario',
     pinIncorrect: 'PIN incorrecto',
+    orSwipeBadge: '…o pasa tu placa: no hace falta elegir tu nombre antes.',
+    badgeRejected: 'Esa placa no abre nada aquí. Entra con tu PIN o pídeselo a un administrador.',
+    badgeTooManyAttempts: 'Demasiados intentos fallidos con esta placa. Espera unos minutos o entra con tu PIN.',
     // hub#330. Sustituye a «PIN incorrecto» cuando lo que se rechazó fue el dispositivo, no los
     // dígitos. Decirle «PIN incorrecto» a quien lo ha escrito bien es la peor respuesta posible: lo
     // vuelve a teclear, y nada en pantalla nombra el gesto que lo arregla.
@@ -1099,6 +1149,7 @@ export default {
   elevation: {
     title: 'Hace falta una aprobación',
     lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
+    orSwipeBadge: '…o que pase su placa: no hace falta pulsar nada antes.',
     chooseApprover: '¿Quién lo aprueba?',
     approverName: 'Su nombre',
     approverNamePlaceholder: 'Escribe su nombre',
@@ -1115,6 +1166,29 @@ export default {
     notRequired: 'Esto ya no necesita aprobación. Cierra esta ventana y vuelve a intentarlo.',
     tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
     failed: 'No se pudo enviar la aprobación. Comprueba la conexión y vuelve a intentarlo.',
+  },
+  // hub#456 — el turno cambia en mitad de un ticket. Cada frase la lee alguien con una cola
+  // delante, y lo primero que tiene que decir el texto es que pulsar aquí NO pierde la venta: sin
+  // esa frase el cajero termina el ticket a nombre de otro, que es justo lo que esto viene a
+  // acabar.
+  userSwitch: {
+    menu: 'Cambiar de usuario',
+    title: 'Cambiar de usuario',
+    lead: 'La venta sigue abierta. A partir de ahora queda a nombre de quien entre aquí.',
+    chooseUser: '¿Quién se pone?',
+    userName: 'Su nombre',
+    userNamePlaceholder: 'Escribe su nombre',
+    continue: 'Continuar',
+    cancel: 'Cancelar',
+    someoneElse: 'Otra persona',
+    // La confirmación: la caja ya es de otra persona, y las siguientes líneas de esta venta van
+    // con su nombre.
+    nowServing: 'Ahora atiende {name}',
+    rejected: 'Esos datos no han funcionado. Revisa el nombre y el PIN, y vuelve a intentarlo.',
+    deviceNotEnrolled:
+      'Este dispositivo todavía no está dado de alta para el PIN. Entra una vez con una cuenta de ERPlora en él y el PIN funcionará a partir de entonces.',
+    deviceUnidentified: 'Este dispositivo no ha podido identificarse. Recarga la página y vuelve a intentarlo.',
+    tooManyAttempts: 'Demasiados intentos fallidos. Espera unos minutos y vuelve a intentarlo.',
   },
   activation: {
     title: 'Activación requerida',
@@ -1200,6 +1274,8 @@ export default {
     sectionFiscalDesc: 'Configuración VeriFactu y el certificado de empresa (.p12)',
     sectionMedia: 'Imágenes y media',
     sectionRoles: 'Roles',
+    sectionCapabilities: 'Permisos de las apps',
+    sectionFlows: 'Automatizaciones',
     sectionModule: 'App {id}',
     modulesTitle: 'Apps',
     withData: 'incluye datos',
@@ -1247,6 +1323,18 @@ export default {
       'Filas descartadas: {n}. El fichero intentaba escribir los registros propios de este negocio — su perfil fiscal y su certificado. Son de esta instalación y ningún fichero puede cambiarlos.',
     reasonNumberingNotPortable:
       'Numeración descartada: {n}. Las series de facturación y los números ya emitidos son del negocio que creó el fichero. Tu numeración se queda como está — si aún no tienes series, configúralas en Ajustes.',
+    reasonInstallationBoundData:
+      'Registros descartados: {n}. Esta app lleva un registro oficial encadenado a la caja que lo emitió, así que solo vuelve a esa misma caja. La tuya empieza el suyo — aquí no se ha cambiado nada.',
+    reasonCapabilityGrantsNotPortable:
+      'Permisos de apps descartados: {n}. El acceso a tu impresora, a tu certificado de firma y a internet se concede solo en este terminal. No se ha permitido nada \u2014 concede lo que necesites en Ajustes \u203a Permisos.',
+    reasonCapabilitiesNotGrantable:
+      'Permisos sin restaurar: {n}. Esas apps ya no los piden, o no est\u00e1n instaladas aqu\u00ed. Todo lo dem\u00e1s se ha devuelto.',
+    reasonFlowGrantsNotPortable:
+      'Automatizaciones restauradas, pero apagadas. Lo que cada una tiene permitido hacer se concede solo en este terminal \u2014 rev\u00edsalas en Automatizaciones y enciende las que quieras.',
+    reasonFlowsPausedWithoutGrants:
+      'Algunas automatizaciones han vuelto apagadas: un permiso que ten\u00edan ya no est\u00e1 disponible aqu\u00ed. Abre Automatizaciones para ver qu\u00e9 le falta a cada una.',
+    reasonFlowsNotRestorable:
+      'Automatizaciones descartadas: {n}. Sus instrucciones nombran algo que aqu\u00ed no existe, as\u00ed que no se han podido guardar. El resto ha vuelto.',
     done: 'Ir al inicio',
   },
   moduleView: {
