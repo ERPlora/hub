@@ -31,6 +31,52 @@ export interface ErploraTransport {
   query(name: string, params?: Record<string, unknown>): Promise<unknown>;
   command(name: string, payload?: Record<string, unknown>): Promise<unknown>;
   subscribe(event: string, cb: (payload: unknown) => void): () => void;
+  /**
+   * Descarga autenticada de un fichero de `media/`. Es opcional para que transportes sin HTTP
+   * (y shells anteriores) sigan siendo compatibles; el cliente degrada a `null`.
+   */
+  fetchMediaBlob?(ref: string, opts?: MediaFetchOptions): Promise<Blob | null>;
+}
+
+export interface MediaFetchOptions {
+  signal?: AbortSignal;
+}
+
+/**
+ * Convierte la referencia portable guardada en BD/blueprint en la única ruta REST que un módulo
+ * puede pedir. No es un proxy: rechaza orígenes, endpoints distintos, parámetros extra y
+ * traversal antes de que `fetch` vea la cadena.
+ */
+function mediaPath(ref: string): string | null {
+  if (typeof ref !== 'string' || !ref.trim()) return null;
+  let path = ref.trim();
+  if (path.startsWith('/')) {
+    let parsed: URL;
+    try {
+      parsed = new URL(path, 'http://erplora.invalid');
+    } catch {
+      return null;
+    }
+    const keys = [...parsed.searchParams.keys()];
+    if (
+      parsed.origin !== 'http://erplora.invalid'
+      || parsed.pathname !== '/api/media/raw'
+      || parsed.hash
+      || keys.length !== 1
+      || keys[0] !== 'path'
+    ) return null;
+    path = parsed.searchParams.get('path') ?? '';
+  }
+  if (
+    !path
+    || path.startsWith('/')
+    || path.includes('\\')
+    || path.includes('?')
+    || path.includes('#')
+    || /^[a-z][a-z0-9+.-]*:/i.test(path)
+    || path.split('/').some((part) => !part || part === '.' || part === '..')
+  ) return null;
+  return path;
 }
 
 export interface Notification {
@@ -639,6 +685,32 @@ export class HttpWsTransport implements ErploraTransport {
    */
   coreRequest(req: CoreRequest, extraHeaders: Record<string, string> = {}): Promise<unknown> {
     return this.send(req.method, req.path, req.body, extraHeaders);
+  }
+
+  /**
+   * Bytes de media para módulos, autenticados por el shell sin revelarles la sesión.
+   *
+   * A diferencia de `coreRequest`, esta puerta no acepta verbo ni URL arbitrarios: una referencia
+   * de blueprint sólo puede acabar en `GET /api/media/raw?path=…` del mismo Hub. El `Blob` permite
+   * que el consumidor cree un object URL local; ninguna credencial termina en el DOM.
+   */
+  async fetchMediaBlob(ref: string, opts: MediaFetchOptions = {}): Promise<Blob | null> {
+    const path = mediaPath(ref);
+    if (!path) return null;
+    try {
+      const res = await this.fetchImpl(
+        `${this.baseUrl}/api/media/raw?path=${encodeURIComponent(path)}`,
+        // Nunca seguir un 30x: `fetch` puede reenviar cabeceras a otro origen y la sesión del Hub
+        // no sale de este proceso ni aunque un proxy esté mal configurado.
+        { method: 'GET', headers: this.headers(), signal: opts.signal, redirect: 'error' },
+      );
+      if (!res.ok) return null;
+      const contentType = res.headers.get('content-type')?.toLowerCase() ?? '';
+      if (!contentType.startsWith('image/')) return null;
+      return await res.blob();
+    } catch {
+      return null;
+    }
   }
 
   private async send(
@@ -1595,6 +1667,17 @@ export class ErploraClient {
    */
   get peripherals(): BridgeTransport {
     return (this.bridge ??= new UnavailableBridgeTransport());
+  }
+
+  /**
+   * Descarga una referencia portable de `media/` sin exponer al módulo la sesión del Hub.
+   * `null` cubre referencia inválida, fichero ausente, aborto y shells/transportes anteriores.
+   */
+  fetchMediaBlob(ref: string, opts: MediaFetchOptions = {}): Promise<Blob | null> {
+    const fetcher = this.transport.fetchMediaBlob;
+    return typeof fetcher === 'function'
+      ? fetcher.call(this.transport, ref, opts)
+      : Promise.resolve(null);
   }
 
   /**
