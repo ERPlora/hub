@@ -911,8 +911,6 @@ export default {
     database: 'Base de datos',
     memory: 'Memoria',
     connections: 'Conexiones',
-    connectionsOf: 'de {limit}',
-    connectionsActive: 'activas',
     // El titular de la tarjeta de la impresora, su palabra de estado y su frase vivían aquí, y
     // nombraban un proceso («Bridge») en vez de lo que hay sobre el mostrador. Ahora salen de
     // `system.health.*` (hub#375). Lo que queda abajo es el flujo de INSTALACIÓN, que sí va de un
@@ -976,6 +974,13 @@ export default {
     resourcesCloud: 'Recursos en la nube',
     resourcesSystem: 'Recursos del sistema',
     sourceCloud: 'Nube',
+    // Selector de rango de las series de uso (saas#1511). El contrato para en 3 días a propósito.
+    usageRange3h: '3 h',
+    usageRange24h: '24 h',
+    usageRange3d: '3 días',
+    usageRangeLabel3h: 'Últimas 3 horas',
+    usageRangeLabel24h: 'Últimas 24 horas',
+    usageRangeLabel3d: 'Últimos 3 días',
     databaseShared: 'Base de datos compartida',
     colTime: 'Hora',
     colLevel: 'Nivel',
