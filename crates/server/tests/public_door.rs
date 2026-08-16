@@ -120,6 +120,41 @@ async fn mint(app: &axum::Router, subject: &str) -> String {
     json["locator"].as_str().unwrap().to_string()
 }
 
+/// Un locator del mismo largo y alfabeto que `real` pero **garantizado distinto** — la «errata al
+/// teclear» con la que se prueba que la puerta no es un oráculo.
+fn a_different_locator(real: &str) -> String {
+    // El último carácter se cambia por OTRO del alfabeto, elegido en función del que había: así la
+    // sonda difiere siempre, en vez de depender de que el locator no acabase ya en la letra fija.
+    // `X` e `Y` valen los dos como sustituto — están en Crockford y `normalize_locator` no los
+    // remapea (solo toca `O`→`0` e `I`/`L`→`1`), así que la puerta los ve tal cual se escriben.
+    let last = real.chars().last().expect("un locator nunca está vacío");
+    let other = if last == 'X' { 'Y' } else { 'X' };
+    format!("{}{}", &real[..real.len() - 1], other)
+}
+
+/// 🔴 La sonda tiene que diferir **por construcción, no por suerte**.
+///
+/// Escrita como `<15 primeros> + "X"` falla 1 de cada 32 ejecuciones: la `X` está en el alfabeto
+/// Crockford (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`, `public_claim.rs`), así que cuando el locator
+/// real ya termina en `X` la «errata» ES el locator real, la puerta responde 200 con toda la razón
+/// y el test cae. Enrojeció CI en hub#1008 sin tener nada que ver con aquel cambio, y el mensaje
+/// de fallo delató el caso: la sonda impresa era `SM5WF4VB0XG6CBNX`.
+#[test]
+fn la_sonda_nunca_coincide_con_el_locator_real() {
+    // El caso que enrojeció CI: un locator que ya acaba en `X`.
+    let acaba_en_x = "SM5WF4VB0XG6CBNX";
+    assert_ne!(
+        a_different_locator(acaba_en_x),
+        acaba_en_x,
+        "la errata no puede ser el locator real"
+    );
+    // Y el caso corriente sigue difiriendo.
+    let corriente = "SM5WF4VB0XG6CBNZ";
+    assert_ne!(a_different_locator(corriente), corriente);
+    // Conserva forma: mismo largo, para que la puerta lo trate como un locator y no como basura.
+    assert_eq!(a_different_locator(acaba_en_x).len(), acaba_en_x.len());
+}
+
 /// How many rows the fixture command has written, read straight from the database through the
 /// module's own query — the door is not asked to report on itself.
 async fn items(app: &axum::Router) -> Vec<Value> {
@@ -289,7 +324,7 @@ async fn a_declared_public_field_reaches_the_command_with_what_the_visitor_typed
 async fn an_unknown_locator_is_a_plain_404_with_nothing_to_learn_from() {
     let app = make_app().await;
     let real = mint(&app, "ticket-4").await;
-    for probe in ["ZZZZZZZZZZZZZZZZ", "short", &format!("{}X", &real[..15])] {
+    for probe in ["ZZZZZZZZZZZZZZZZ", "short", &a_different_locator(&real)] {
         let resp = app
             .clone()
             .oneshot(anonymous_get(&format!("/p/{probe}")))
