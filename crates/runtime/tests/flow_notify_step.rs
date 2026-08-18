@@ -563,3 +563,60 @@ async fn the_run_history_says_where_the_recipient_came_from_and_never_who_it_was
         "a customer's phone number is not part of a run's history: {history}"
     );
 }
+
+// ── quota exhausted is terminal NOW, and still an operator's to retry (hub#971) ──────────────
+
+/// The Cloud proxy answering «quota exceeded» is not a stumble: the eighth attempt, minutes later,
+/// meets the same wall as the first. So the row dies on the FIRST pass — but unlike a revoked
+/// release (hub#827) the cause CAN come back (a top-up, next month), so the row stays retryable by
+/// hand: `failure_kind` empty, recipient kept, and the reason readable in `last_error`.
+#[tokio::test]
+async fn quota_exceeded_dies_on_the_first_pass_but_stays_retryable_by_hand() {
+    let (mut rt, _recording) = runtime().await;
+    rt.set_notify_transport(std::sync::Arc::new(MockTransport::quota_exhausted()));
+    let flow_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+
+    rt.drain_outbox().await.unwrap();
+
+    let queued = rows(
+        &rt,
+        "SELECT status, attempts, failure_kind, last_error, payload FROM _event_outbox \
+         WHERE event_name LIKE '%.reminder.due'",
+    )
+    .await;
+    assert_eq!(queued.len(), 1);
+    assert_eq!(queued[0]["status"], json!("dead"), "no ladder: {:?}", queued[0]);
+    assert_eq!(queued[0]["failure_kind"], json!(""), "an operator may retry after a top-up");
+    assert!(
+        queued[0]["last_error"].as_str().unwrap_or_default().contains("quota"),
+        "the queue says why: {}",
+        queued[0]["last_error"]
+    );
+    assert!(
+        queued[0]["payload"].as_str().unwrap_or_default().contains(PHONE),
+        "the recipient is kept: a manual retry has to have someone to dial"
+    );
+}
+
+/// The control: a transport that merely fails keeps its backoff ladder — after one pass the row is
+/// still `pending`. Without this the test above would pass against a relay that kills everything.
+#[tokio::test]
+async fn a_transport_that_merely_fails_still_climbs_the_ladder() {
+    let (mut rt, _recording) = runtime().await;
+    rt.set_notify_transport(std::sync::Arc::new(MockTransport::failing()));
+    let flow_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+
+    rt.drain_outbox().await.unwrap();
+
+    let queued = rows(
+        &rt,
+        "SELECT status, attempts FROM _event_outbox WHERE event_name LIKE '%.reminder.due'",
+    )
+    .await;
+    assert_eq!(queued[0]["status"], json!("pending"), "{:?}", queued[0]);
+    assert_eq!(queued[0]["attempts"], json!(1));
+}

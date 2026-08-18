@@ -316,12 +316,18 @@ pub enum Routing {
     CloudProxy,
 }
 
-/// Resultado de un intento de envío. `Sent` = entregado al proveedor; `QuotaExceeded` = Cloud
-/// bloqueó por cuota agotada (no se reintenta: el relay lo manda a dead-letter como fallo
-/// terminal cuando el transporte lo marca así devolviendo `Err` con este detalle).
+/// Outcome of ONE send attempt (hub#971).
+///
+/// `Sent` = handed to the provider. `QuotaExceeded` = the Cloud proxy refused because the hub's
+/// quota is spent: not an `Err` — the transport did its job and got a definitive answer — and not
+/// a stumble either, so the relay must not climb the backoff ladder against it (the eighth attempt
+/// meets the same wall as the first). It dead-letters the row on the first pass, **keeping it
+/// retryable by hand**: unlike a revoked release, a quota comes back (top-up, next period).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendOutcome {
     Sent,
+    /// What the proxy said, trimmed — the reason has to reach whoever reads the dead-letter row.
+    QuotaExceeded { detail: String },
 }
 
 /// Transporte de notificación: el cliente real de un canal. **Trait inyectable** para no atar el
@@ -355,6 +361,8 @@ pub struct MockTransport {
     sent: Arc<Mutex<Vec<(NotifyIntent, Routing)>>>,
     /// Si `true`, `send` devuelve `Err` (para probar el camino de reintento/dead-letter del relay).
     fail: bool,
+    /// If `true`, `send` answers `Ok(SendOutcome::QuotaExceeded)` — the proxy's «no quota left».
+    quota_exhausted: bool,
 }
 
 impl MockTransport {
@@ -364,7 +372,12 @@ impl MockTransport {
 
     /// Variante que siempre falla (para tests del backoff/dead-letter del relay).
     pub fn failing() -> Self {
-        Self { sent: Arc::default(), fail: true }
+        Self { fail: true, ..Self::default() }
+    }
+
+    /// Variant whose every send is refused by quota (hub#971): terminal now, retryable by hand.
+    pub fn quota_exhausted() -> Self {
+        Self { quota_exhausted: true, ..Self::default() }
     }
 
     /// Envíos registrados (clon) — para aserciones en tests.
@@ -377,7 +390,10 @@ impl MockTransport {
 impl NotifyTransport for MockTransport {
     async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome> {
         if self.fail {
-            return Err(RuntimeError::Notify("transporte mock configurado para fallar".into()));
+            return Err(RuntimeError::Notify("mock transport configured to fail".into()));
+        }
+        if self.quota_exhausted {
+            return Ok(SendOutcome::QuotaExceeded { detail: "quota_exceeded".into() });
         }
         if let Ok(mut g) = self.sent.lock() {
             g.push((intent.clone(), routing));
