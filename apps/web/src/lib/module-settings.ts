@@ -42,3 +42,18 @@ export function settingValueForStorage(
   if (typeof value !== 'boolean') throw new TypeError('boolean setting must be boolean');
   return prop.type === 'integer' ? (value ? 1 : 0) : value;
 }
+
+/**
+ * Heading of the shell-owned tabs of a module (Plan, Settings) — hub#959.
+ *
+ * The nav entries carry `module_name` already localised by the runtime (ADR-0055); the manifest
+ * carries the raw source-language `name`. Prefer the localised one; fall back to the manifest for
+ * modules without nav entries; and to the id when even that is missing.
+ */
+export function shellTabHeading(
+  tabs: ReadonlyArray<{ moduleName: string }>,
+  manifest: { name?: string } | null | undefined,
+  moduleId: string,
+): string {
+  return tabs[0]?.moduleName || manifest?.name || moduleId;
+}

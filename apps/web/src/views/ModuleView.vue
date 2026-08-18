@@ -115,6 +115,7 @@ import AppPage from '../components/AppPage.vue';
 import ModulePlanPanel from '../components/ModulePlanPanel.vue';
 import ModuleSettingsForm from '../components/ModuleSettingsForm.vue';
 import { loadMenu, loadComponent, loadManifest, type MenuEntry } from '../lib/module-loader';
+import { shellTabHeading } from '../lib/module-settings';
 import { scrollActiveTabIntoView } from '@erplora/outfitkit/tabbar';
 import { clientInjectionKey, getClient } from '../lib/runtime';
 import { resolveProtectsGuard, type ActiveProtectsGuard } from '../lib/protects';
@@ -259,7 +260,7 @@ async function mount(): Promise<void> {
 
     // Pestaña "Plan": panel del shell, no un WC del módulo → no se monta nada en el outlet.
     if (navId === PLAN_TAB_ID && billing.value) {
-      moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
+      moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
       activeNavId.value = PLAN_TAB_ID;
       if (outlet.value) outlet.value.replaceChildren(); // el WC previo no debe quedar montado
       status.value = 'ready';
@@ -271,7 +272,7 @@ async function mount(): Promise<void> {
     // Con `component` (escape-hatch) → montamos ESE WC del módulo, cargando su bundle vía cualquier
     // entry de su nav. Se maneja ANTES del lookup de `entry` porque no hay entrada de nav para settings.
     if (navId === 'settings' && settings.value) {
-      moduleName.value = manifest?.name ?? tabs.value[0]?.moduleName ?? moduleId;
+      moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
       activeNavId.value = 'settings';
       if (settings.value.component) {
         if (tabs.value[0]) await loadComponent(tabs.value[0]); // registra el custom element del bundle
