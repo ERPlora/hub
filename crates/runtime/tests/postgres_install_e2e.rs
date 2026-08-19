@@ -117,14 +117,34 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
         .unwrap()
         .rows;
     let names: Vec<&str> = applied.iter().map(|r| r["filename"].as_str().unwrap()).collect();
+    // The expected list is READ from the module on disk, not written here: `invoice` publishes a
+    // migration every few days and a literal list turned this test red on every one of them
+    // (hub#959's gate broke on `005_substitution_unique.sql`). What the test measures is the
+    // union manifest ∪ package/migrations/postgres/*.sql, applied in filename order — so that
+    // union is what it computes.
+    let dir = module_dir("invoice");
+    let manifest = erplora_runtime::manifest::Manifest::load(&dir).expect("manifest de invoice");
+    let mut expected: Vec<String> = manifest
+        .migrations
+        .postgres
+        .iter()
+        .map(|e| e.file().to_string())
+        .collect();
+    for entry in std::fs::read_dir(dir.join("migrations/postgres")).expect("migrations/postgres") {
+        let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+        let rel = format!("migrations/postgres/{name}");
+        if name.ends_with(".sql") && !expected.contains(&rel) {
+            expected.push(rel);
+        }
+    }
+    expected.sort();
+    assert!(
+        expected.len() >= 4,
+        "the control: invoice ships at least the four migrations this test was born with: {expected:?}"
+    );
     assert_eq!(
         names,
-        [
-            "migrations/postgres/001_init.sql",
-            "migrations/postgres/002_tax_category_key.sql",
-            "migrations/postgres/003_substitution.sql",
-            "migrations/postgres/004_quantity_fixed_point.sql"
-        ],
+        expected,
         "unión manifest∪paquete: todas las migraciones Postgres del módulo, en orden"
     );
 

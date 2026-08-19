@@ -259,6 +259,14 @@ export function reloadForModuleUpdate(delayMs = MODULE_UPDATE_RELOAD_DELAY_MS): 
  */
 export interface ModuleLocaleFile {
   widgets?: Record<string, { title?: string; label?: string }>;
+  /** Nombre del módulo traducido (el runtime ya lo resuelve para la nav; aquí sirve al diálogo de
+   *  aprobación, que no pasa por `GET /api/navigation`). */
+  name?: string;
+  /** Cómo se llama cada command **en palabras del negocio** (hub#579), para que el encargado lea
+   *  qué está aprobando en vez de una clave nuestra. Misma forma que `widgets`: clave completa
+   *  (`sales.void`) → `{ label }`. Opcional: un módulo que no lo traiga hace que el diálogo caiga a
+   *  su nombre localizado, nunca al nombre del command. */
+  commands?: Record<string, { label?: string }>;
 }
 
 export interface InstalledManifest {

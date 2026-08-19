@@ -429,6 +429,9 @@ export default {
   // because the hub really does enforce them, and a promise it cannot keep would be worse than no
   // setting at all.
   pinPolicy: {
+    lengthTitle: 'PIN length',
+    lengthDigits: '{n} digits',
+    lengthConsequence: 'Everybody types the same number of digits, which is what lets the keypad sign you in on the last one instead of asking you to confirm. PINs already in use keep working until their owner changes them.',
     title: 'PIN pad',
     intro:
       'Whether the PIN pad is shown and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
@@ -1198,6 +1201,7 @@ export default {
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
     setupSaveError: 'The PIN could not be saved. Please try again.',
+    setupPinTooSimple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
     footerTrustedDevice: 'trusted device',
     footerSecureCloud: 'secure connection',
     errorSignIn: 'Could not sign in. Check your credentials or your connection.',
@@ -1225,6 +1229,9 @@ export default {
   // name / wrong PIN / deactivated user it was. The runtime answers those three identically on
   // purpose, so that a dialog anybody can open is not the way to learn who works here.
   elevation: {
+    what: 'To approve: {action}',
+    whatFromModule: 'To approve: an action in {app}',
+    whatUnknown: 'To approve: an action this app cannot name',
     title: 'Approval needed',
     lead: 'Ask a manager to enter their PIN to approve this.',
     // hub#658 — swiping the card IS the approval (Toast, Aloha, Square). Said up front, in both
@@ -1473,6 +1480,7 @@ export default {
     saved: 'Settings saved.',
     saveError: 'Could not save settings.',
     adminOnly: 'Only an administrator can change these settings.',
+    textPlaceholder: 'Type here…',
   },
   modulePlan: {
     tab: 'Plan',

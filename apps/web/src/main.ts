@@ -10,6 +10,7 @@ import {
   getClient,
   clientInjectionKey,
   bootHubContext,
+  ensureMediaCookie,
   RUNTIME_URL,
   runtimeHeaders,
   setOnRuntimeSessionExpired,
@@ -122,6 +123,14 @@ bootModuleNavLocale();
 
 // Registra el service worker y engancha el botón «Instalar app» (PWA, ver lib/pwa.ts).
 bootPwa();
+
+// Pide la cookie con la que el NAVEGADOR pide las fotos (hub#791). `setHubSession` ya la pide en
+// cada login, pero el caso más frecuente no es un login: es la caja que YA tiene sesión y se
+// recarga —el F5 al abrir, el webview reiniciado, la PWA que vuelve—. Ahí no empieza ninguna
+// sesión, así que sin esta llamada el TPV amanecería con las 50 baldosas en blanco hasta el
+// siguiente login. Sin sesión no llama a ninguna puerta, así que en la pantalla de login no cuesta
+// nada.
+void ensureMediaCookie();
 
 // Feedback global de acciones: toast en export/import CSV de cualquier ok-data-table (y base para
 // que el shell muestre éxito/fallo de otras acciones). Ver lib/toast.ts.

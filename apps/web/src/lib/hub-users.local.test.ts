@@ -5,6 +5,7 @@
 // (a) mandar el alta como local, (b) saber DECIR POR QUÉ cuando el runtime la rechaza, y
 // (c) adelantar los motivos que puede ver desde aquí, para no pedirle al administrador que pulse
 // «Crear» para enterarse de que `admin` no es un rol de un usuario local.
+import { hubSettings } from './hub-settings';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./runtime', () => ({
@@ -78,6 +79,8 @@ describe('alta de usuario local (hub#355)', () => {
   });
 
   it('adelanta en la UI los motivos que el runtime va a rechazar', () => {
+    // La longitud del PIN la fija el HUB (hub#974); estos casos van contra un hub de cuatro.
+    hubSettings.value = { pin_length: 4 } as never;
     const census = [cashier, dismissed];
     const ok = { name: 'Luis Prat', role: 'employee', pin: '5390' };
     expect(localUserIssue(ok, census)).toBe('');
@@ -88,7 +91,9 @@ describe('alta de usuario local (hub#355)', () => {
     for (const weak of ['0000', '1111', '1234', '4321']) {
       expect(localUserIssue({ ...ok, pin: weak }, census)).toBe('pin_too_simple');
     }
-    expect(localUserIssue({ ...ok, pin: '13579' }, census)).toBe('');
+    // Cinco dígitos ya no es «dentro del rango»: el hub pide exactamente cuatro.
+    expect(localUserIssue({ ...ok, pin: '13579' }, census)).toBe('pin_length');
+    expect(localUserIssue({ ...ok, pin: '1357' }, census)).toBe('');
     // Administrar el hub sale de una cuenta, nunca de cuatro dígitos.
     for (const role of ['admin', 'owner', 'ADMIN']) {
       expect(localUserIssue({ ...ok, role }, census)).toBe('local_cannot_administer');

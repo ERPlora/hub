@@ -120,6 +120,21 @@ export function setHubSession(token: string | null): void {
   } catch {
     /* noop */
   }
+  // Pide la cookie con la que el NAVEGADOR pide las fotos (hub#791). Va aquí, y no en cada pantalla
+  // de login, porque los cinco caminos que abren sesión —pinpad, login cloud, invitación, courier y
+  // cambio de usuario— ya pasan todos por aquí; cablearlo en cada uno significa que el sexto que se
+  // escriba entregue un TPV con las baldosas en blanco y nada que apunte al motivo.
+  //
+  // Suelto y tragándose el fallo, igual que los apagados de `shutDown`: entrar no puede fallar
+  // porque no se haya podido traer una credencial de fotos. Sin cookie se pierden las fotos —y la
+  // baldosa ya cae a sus iniciales (sales#104)—, no la sesión.
+  if (token) {
+    void import('./runtime')
+      .then((m) => m.ensureMediaCookie())
+      .catch(() => {
+        /* noop: ni el chunk que no llega ni la puerta que rechaza cancelan un login */
+      });
+  }
 }
 
 /**

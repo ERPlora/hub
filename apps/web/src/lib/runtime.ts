@@ -255,6 +255,35 @@ export async function fetchStreamTicket(): Promise<string | null> {
   }
 }
 
+/**
+ * **The credential a PHOTO can carry** (hub#791).
+ *
+ * Everything the app calls goes out with `X-Hub-Session` attached by hand. A photo is not one of
+ * those: `<img src="/api/media/raw?path=…">` is issued by the rendering engine, which attaches
+ * nothing — so the till's product pictures came back 401 and the grid came up blank. What the
+ * browser does attach by itself is a cookie, so the hub mints one: read-only, `HttpOnly`, and scoped
+ * by `Path` to the media read door alone (`crates/server/src/media.rs`).
+ *
+ * Called on boot and after every login, because the cookie carries the session token and therefore
+ * dies with the session. It is not called before there IS a session: that request could only be a
+ * 401, and a 401 is not free — it feeds the central dead-session reaction (hub#846).
+ *
+ * Returns `false` — never throws — on any refusal or network failure. This runs before the router
+ * mounts, so a throw here would trade "the photos are missing" for "the till does not open".
+ */
+export async function ensureMediaCookie(): Promise<boolean> {
+  if (!getHubSession()) return false;
+  try {
+    const res = await runtimeFetch(`${RUNTIME_URL}/api/media/session`, {
+      method: 'POST',
+      headers: runtimeHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Singleton del cliente SDK (HTTP RPC + WS eventos) apuntado al runtime local. */
 export function getClient(): ErploraClient {
   if (!_client) {
@@ -1354,6 +1383,8 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     api_docs_enabled: hubSettings.value?.api_docs_enabled ?? false,
     country_code: hubSettings.value?.country_code ?? 'ES',
     region_code: hubSettings.value?.region_code ?? null,
+    // hub#974: la longitud del PIN es del hub (4 o 6). Sin settings todavía, la de un hub nuevo.
+    pin_length: hubSettings.value?.pin_length ?? 4,
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',

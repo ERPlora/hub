@@ -223,7 +223,10 @@ async fn a_guessable_pin_is_rejected() {
     // hub ever sees the digits in clear (they are stored as a salted argon2id hash).
     let rt = runtime("hub-local").await;
 
-    for weak in ["0000", "1111", "9999", "1234", "4321", "345678"] {
+    // Los ejemplos van en la longitud que pide el hub (hub#974: es fija, y este pide cuatro): un
+    // `345678` se rechazaría por LARGO antes de llegar a la lista de adivinables, y el test estaría
+    // midiendo otra puerta.
+    for weak in ["0000", "1111", "9999", "1234", "4321", "6789"] {
         let err = rt
             .create_hub_user(&local("Marta Ruiz", weak, "employee"))
             .await
@@ -236,7 +239,7 @@ async fn a_guessable_pin_is_rejected() {
     }
     assert!(rt.list_hub_users().await.unwrap().is_empty());
 
-    for good in ["4821", "5390", "13579", "90210"] {
+    for good in ["4821", "5390", "1357", "9021"] {
         rt.create_hub_user(&local(&format!("User {good}"), good, "employee"))
             .await
             .unwrap_or_else(|e| panic!("`{good}` is a legitimate PIN: {e}"));

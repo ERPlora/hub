@@ -925,6 +925,45 @@ pub async fn limits(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalLimi
     Ok(limits)
 }
 
+/// **Escribe en el registro del core el techo que declara un módulo fiscal** (hub#1010).
+///
+/// La v51 sembró `ES/verifactu → 3.000,00 €` desde una migración de sistema, y eso deja al core
+/// sabiendo el número de un país concreto: la propiedad del dato al revés de lo que pedía
+/// [ADR-0357](../../../architecture/00-overview/decision-log.md) («el techo es DATO, no código»).
+/// Quien conoce el límite es el módulo que implementa el régimen — y se actualiza solo en cada
+/// arranque, así que la ley puede moverlo sin tocar el runtime ni migrar nada.
+///
+/// Lo que **no** cambia: la fila y la query siguen en el core, porque la respuesta no puede depender
+/// de que un módulo esté instalado, y la v51 sigue como **suelo transitorio** para el hub que aún no
+/// ha actualizado su proveedor.
+///
+/// `max_cents: None` = «este proveedor no mueve ese número», y deja la fila como estaba: callarse no
+/// es declarar cero. Un régimen que de verdad no capa nada se declara con `Some(0)`.
+pub async fn apply_regime_declaration(
+    db: &dyn DatabaseAdapter,
+    country_code: &str,
+    regime_key: &str,
+    max_cents: Option<i64>,
+) -> Result<()> {
+    let Some(cents) = max_cents else {
+        return Ok(());
+    };
+    let mut p = Params::new();
+    p.insert("country_code".into(), json!(country_code.to_uppercase()));
+    p.insert("regime_key".into(), json!(regime_key));
+    p.insert("max".into(), json!(cents.max(0)));
+    // Tolerante a que la tabla no exista, como el resto de este módulo: un runtime recién montado
+    // sobre una base vacía no tiene registro que actualizar, y eso es una respuesta, no un error.
+    let _ = db
+        .execute(
+            "UPDATE _hub_fiscal_regime_registry SET simplified_invoice_max_cents = :max \
+             WHERE country_code = :country_code AND regime_key = :regime_key",
+            &p,
+        )
+        .await;
+    Ok(())
+}
+
 /// The fiscal ceilings that apply to this hub — see [`limits`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
 pub struct FiscalLimits {

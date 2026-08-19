@@ -16,6 +16,7 @@
 //
 // Mismo transporte que el resto del shell (`runtime.ts`): mismo origen + `runtimeHeaders()`.
 
+import { hubPinLength } from './pin-length';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 
 /** Un usuario del hub tal y como lo lista el runtime. */
@@ -324,7 +325,7 @@ export function hubUserErrorKey(error: unknown): string | undefined {
  * seguida, arriba o abajo (`1234`, `4321`). **Espejo** de `is_guessable_pin` del runtime, que es
  * quien manda; aquí solo sirve para no hacer pulsar «Crear» para enterarse.
  */
-function isGuessablePin(pin: string): boolean {
+export function isGuessablePin(pin: string): boolean {
   const digits = [...pin].map(Number);
   if (digits.length < 2 || digits.some(Number.isNaN)) return true;
   const stepIs = (step: number) => digits.every((d, i) => i === 0 || d - digits[i - 1] === step);
@@ -345,7 +346,7 @@ export function localUserIssue(
 ): string {
   const pin = input.pin.trim();
   if (!pin) return 'local_needs_pin';
-  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (pin.length !== hubPinLength.value || !/^\d+$/.test(pin)) return 'pin_length';
   if (isGuessablePin(pin)) return 'pin_too_simple';
   if (ADMIN_ROLES.includes(input.role.trim().toLowerCase())) return 'local_cannot_administer';
   // Activos e inactivos: una persona = una fila, y un homónimo al lado de quien fue dado de baja
@@ -396,7 +397,7 @@ export function accountUserIssue(
   // misma credencial que la del usuario local y pasa por las mismas reglas.
   const pin = input.pin.trim();
   if (!pin) return '';
-  if (pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) return 'pin_length';
+  if (pin.length !== hubPinLength.value || !/^\d+$/.test(pin)) return 'pin_length';
   if (isGuessablePin(pin)) return 'pin_too_simple';
   return '';
 }

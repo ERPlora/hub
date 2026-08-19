@@ -368,6 +368,8 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // the ONLY failure it had — a sibling listener that merely stumbled still deserves its ladder.
     let mut failures = 0usize;
     let mut permanent: Option<&'static str> = None;
+    // …or one that will not resolve within the ladder's minutes, yet may later (hub#971).
+    let mut dead_now = false;
     for listener in &listeners {
         if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -413,6 +415,7 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         {
             failures += 1;
             permanent = f.permanent;
+            dead_now = f.dead_now;
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
@@ -491,6 +494,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         if let (1, Some(kind)) = (failures, permanent) {
             return kill_permanently(db, &id, &err, kind, &payload).await;
         }
+        // Same rule for a spent quota (hub#971), minus the stamp: `failure_kind` stays empty and
+        // the payload untouched, so `retry` still offers it once the quota is back.
+        if failures == 1 && dead_now {
+            return mark_dead(db, &id, &err).await;
+        }
         return defer_or_dead(db, &id, attempts, &err).await;
     }
 
@@ -510,6 +518,9 @@ struct NotifyFailure {
     /// The classification the row is stamped with when this is terminal ([`FAILURE_RELEASE_REVOKED`]).
     /// `None` = retryable.
     permanent: Option<&'static str>,
+    /// Terminal for the relay but not for an operator (hub#971): the row dies on this pass, unstamped
+    /// and with its payload, so a manual retry can pick it up once the cause (a quota) is gone.
+    dead_now: bool,
 }
 
 impl NotifyFailure {
@@ -518,6 +529,16 @@ impl NotifyFailure {
         Self {
             error,
             permanent: Some(kind),
+            dead_now: false,
+        }
+    }
+
+    /// A refusal the ladder cannot outwait, that a person can (hub#971).
+    fn dead_now(error: RuntimeError) -> Self {
+        Self {
+            error,
+            permanent: None,
+            dead_now: true,
         }
     }
 }
@@ -530,6 +551,7 @@ impl From<RuntimeError> for NotifyFailure {
         Self {
             error,
             permanent: None,
+            dead_now: false,
         }
     }
 }
@@ -631,7 +653,16 @@ async fn deliver_host_notify(
     // ¿WhatsApp premium de ERPlora? → proxy Cloud con cuota; si no, secreto local del tenant.
     let premium = !registry.premium_whatsapp_modules.is_empty();
     let routing = host_notify::route_channel(intent.channel, premium);
-    transport.send(&intent, routing).await?;
+    match transport.send(&intent, routing).await? {
+        host_notify::SendOutcome::Sent => {}
+        // A spent quota is not a stumble (hub#971): no ladder, dead now — but retryable by hand,
+        // because a quota, unlike a revoked release, comes back.
+        host_notify::SendOutcome::QuotaExceeded { detail } => {
+            return Err(NotifyFailure::dead_now(RuntimeError::Notify(format!(
+                "quota exceeded: {detail}"
+            ))));
+        }
+    }
     // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
     let (sql, p) = delivery_op(hub_id, event_id, HOST_NOTIFY_LISTENER);
     db.execute(&sql, &p).await?;

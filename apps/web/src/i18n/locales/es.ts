@@ -402,6 +402,9 @@ export default {
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
   pinPolicy: {
+    lengthTitle: 'Dígitos del PIN',
+    lengthDigits: '{n} dígitos',
+    lengthConsequence: 'Todo el mundo teclea el mismo número de dígitos, que es lo que permite que el teclado entre al último en vez de pedirte confirmar. Los PIN que ya se usan siguen funcionando hasta que su dueño los cambie.',
     title: 'Pinpad',
     intro:
       'Si se muestra el pinpad y se pregunta quién está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',
@@ -1119,6 +1122,7 @@ export default {
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
+    setupPinTooSimple: 'Ese PIN es demasiado fácil de adivinar: evita dígitos repetidos (1111) y secuencias (1234).',
     footerTrustedDevice: 'dispositivo de confianza',
     footerSecureCloud: 'conexión segura',
     errorSignIn: 'No se pudo iniciar sesión. Revisa tus credenciales o la conexión.',
@@ -1147,6 +1151,9 @@ export default {
   // a los tres igual a propósito, para que un diálogo que abre cualquiera no sirva para averiguar
   // quién trabaja aquí.
   elevation: {
+    what: 'Se aprueba: {action}',
+    whatFromModule: 'Se aprueba: una acción de {app}',
+    whatUnknown: 'Se aprueba: una acción que esta app no sabe nombrar',
     title: 'Hace falta una aprobación',
     lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
     orSwipeBadge: '…o que pase su placa: no hace falta pulsar nada antes.',
@@ -1355,6 +1362,7 @@ export default {
     saved: 'Ajustes guardados.',
     saveError: 'No se pudieron guardar los ajustes.',
     adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
+    textPlaceholder: 'Escribe aquí…',
   },
   modulePlan: {
     tab: 'Plan',

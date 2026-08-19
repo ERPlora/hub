@@ -1442,6 +1442,10 @@ pub fn app(state: AppState) -> Router {
             get(media::media_list).delete(media::media_delete),
         )
         .route("/api/media/raw", get(media::media_raw))
+        // Where the app asks for the credential the BROWSER can attach on its own (hub#791): an
+        // `<img src>` carries no header, so the read door above also takes a cookie. Read-only and
+        // scoped by `Path` to that door — the writing routes below stay header-only.
+        .route("/api/media/session", post(media::mint_media_session))
         .route("/api/media/upload", post(media::media_upload))
         .route("/api/media/folder", post(media::media_create_folder))
         .route("/api/media/rename", post(media::media_rename))

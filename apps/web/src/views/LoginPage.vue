@@ -280,7 +280,7 @@
                     <ok-pinpad
                       ref="mainPinpadRef"
                       dots
-                      :length="4"
+                      :length="hubPinLength"
                       :error="pinError"
                       :aria-busy="pinLoading"
                       secondary-icon="arrow-back-outline"
@@ -316,7 +316,7 @@
                   <ok-pinpad
                     ref="setupPinpadRef"
                     dots
-                    :length="4"
+                    :length="hubPinLength"
                     :error="setupError"
                     @ok-complete="onSetupPinComplete"
                   ></ok-pinpad>
@@ -343,6 +343,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { hubPinLength } from '../lib/pin-length';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -351,6 +352,7 @@ import {
   IonLabel, IonPopover, IonNote
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
+import { isGuessablePin } from '../lib/hub-users';
 import { setUser, setHubSession, getHubSession } from '../lib/session';
 import type { LoginResult } from '../lib/cloud';
 import {
@@ -940,6 +942,17 @@ async function onSetupComplete(pin: string): Promise<void> {
   }
   // Fase 2: confirmar contra el primero.
   if (pin === setupFirst.value) {
+    // Same rule as Personal (hub#974): the runtime refuses `0000`/`1234` at `set-pin`; mirror it
+    // here so the person is told WHY instead of «could not be saved» — the runtime stays the
+    // authority.
+    if (isGuessablePin(pin)) {
+      setupError.value = true;
+      setupErrorMessage.value = t('login.setupPinTooSimple');
+      setupFirst.value = '';
+      setupPhase.value = 'first';
+      clearSetupPinpad();
+      return;
+    }
     // Fija el PIN en el runtime para el usuario de la sesión actual (§2.9). Requiere la sesión
     // abierta en el login cloud previo (X-Hub-Session).
     const session = getHubSession();

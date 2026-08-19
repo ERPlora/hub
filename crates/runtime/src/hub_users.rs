@@ -299,15 +299,22 @@ fn clean_role(value: &str) -> Result<String> {
     Ok(role.to_string())
 }
 
-/// PIN: vacío (sin PIN) o entre 4 y 8 **dígitos** — lo que acepta el pinpad del login — y que no
-/// sea de los que se adivinan a la primera ([`is_guessable_pin`], hub#355).
-fn clean_pin(value: &str) -> Result<String> {
+/// PIN: vacío (sin PIN) o **exactamente** los dígitos que pide este hub (`length`, hub#974) — y que
+/// no sea de los que se adivinan a la primera ([`is_guessable_pin`], hub#355).
+///
+/// La longitud es del HUB, no de la persona: es lo que permite que el teclado envíe al último
+/// dígito en vez de pedir un «Aceptar» que el cajero pulsaría decenas de veces al día (decisión de
+/// mercado de hub#974; los productos con longitud variable llevan todos botón de confirmar).
+///
+/// `pub(crate)` porque hay DOS puertas por las que un PIN llega en claro: Personal (aquí) y la de
+/// auto-servicio tras el primer login de cuenta (`Runtime::set_pin`). Una sola regla.
+pub(crate) fn clean_pin(value: &str, length: i64) -> Result<String> {
     let pin = value.trim();
     if pin.is_empty() {
         return Ok(String::new());
     }
-    if !pin.chars().all(|c| c.is_ascii_digit()) || !PIN_LEN.contains(&pin.chars().count()) {
-        return Err(invalid("el PIN debe tener entre 4 y 8 dígitos"));
+    if !pin.chars().all(|c| c.is_ascii_digit()) || pin.chars().count() as i64 != length {
+        return Err(invalid(&format!("el PIN debe tener {length} dígitos")));
     }
     if is_guessable_pin(pin) {
         return Err(reject(
@@ -728,7 +735,7 @@ pub async fn create(
 ) -> Result<String> {
     let name = clean_name(&input.name)?;
     let role = clean_role(&input.role)?;
-    let pin = clean_pin(&input.pin)?;
+    let pin = clean_pin(&input.pin, crate::settings::pin_length_of(db, hub_id).await)?;
     let badge = clean_badge(&input.badge)?;
     let email = clean_email(&input.email)?;
     crate::roles::ensure_assignable(db, registry, hub_id, &role).await?;
@@ -792,7 +799,7 @@ pub async fn update(
         None => None,
     };
     let pin = match &input.pin {
-        Some(value) => Some(clean_pin(value)?),
+        Some(value) => Some(clean_pin(value, crate::settings::pin_length_of(db, hub_id).await)?),
         None => None,
     };
     let badge = match &input.badge {
@@ -1166,14 +1173,16 @@ mod tests {
         assert!(clean_name("  ").is_err());
         assert_eq!(clean_name("  Ana  ").unwrap(), "Ana");
         assert!(clean_role("").is_err());
-        assert_eq!(clean_pin("").unwrap(), "");
-        assert_eq!(clean_pin("4821").unwrap(), "4821");
-        assert!(clean_pin("12").is_err(), "menos de 4 dígitos");
-        assert!(clean_pin("123456789").is_err(), "más de 8 dígitos");
-        assert!(clean_pin("12ab").is_err(), "solo dígitos");
+        assert_eq!(clean_pin("", 4).unwrap(), "");
+        assert_eq!(clean_pin("4821", 4).unwrap(), "4821");
+        assert!(clean_pin("12", 4).is_err(), "menos dígitos de los que pide el hub");
+        assert!(clean_pin("48213", 4).is_err(), "más dígitos de los que pide el hub");
+        assert_eq!(clean_pin("482137", 6).unwrap(), "482137", "y en un hub de 6, seis");
+        assert!(clean_pin("4821", 6).is_err(), "en un hub de 6, cuatro no");
+        assert!(clean_pin("12ab", 4).is_err(), "solo dígitos");
         // hub#355: la forma ya no basta, el PIN tampoco puede ser de los que se adivinan a la
         // primera. `1234` era el ejemplo de este test justamente por ser el primero que se prueba.
-        assert!(clean_pin("1234").is_err(), "una cuesta arriba no es un PIN");
+        assert!(clean_pin("1234", 4).is_err(), "una cuesta arriba no es un PIN");
         assert_eq!(clean_email("").unwrap(), "");
         assert!(clean_email("ana@example.com").is_ok());
         assert!(clean_email("ana.example.com").is_err());

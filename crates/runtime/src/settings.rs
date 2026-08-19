@@ -162,6 +162,15 @@ const KNOWN: &[Setting] = &[
     // Solo tiene efecto con `pin_policy = always`; quien lo aplica es el CLIENTE (el hub no ve una
     // mano soltar la caja) y el TTL de servidor de `always` queda como red. La UI ofrece paradas
     // (1·5·10·15·30) pero aquí se valida un RANGO: las paradas son presentación.
+    // Cuántos DÍGITOS tiene el PIN de este hub (hub#974): 4 o 6, igual para todo el mundo. Fijo a
+    // propósito — es lo que permite que el teclado envíe al último dígito en vez de pedir un
+    // «Aceptar» que el cajero pulsaría decenas de veces al día.
+    Setting {
+        key: crate::pin_policy::PIN_LENGTH_SETTING,
+        default: || json!(crate::pin_policy::DEFAULT_PIN_LENGTH),
+        validate: validate_pin_length,
+        parse_stored: |s| s.parse::<i64>().map(|n| json!(n)).unwrap_or(Value::Null),
+    },
     Setting {
         key: crate::pin_policy::PIN_INACTIVITY_MINUTES_SETTING,
         default: || json!(crate::pin_policy::DEFAULT_PIN_INACTIVITY_MINUTES),
@@ -311,6 +320,31 @@ pub fn zone_for_country(country_code: &str, region_code: &str) -> chrono_tz::Tz 
     }
 }
 
+/// Cuántos dígitos pide el PIN de este hub (hub#974). Tolerante como el resto de este módulo: una
+/// fila corrupta o una tabla que aún no existe degradan al default, no revientan el login.
+pub async fn pin_length_of(db: &dyn DatabaseAdapter, hub_id: &str) -> i64 {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!(crate::pin_policy::PIN_LENGTH_SETTING));
+    let stored = match db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
+        .await
+    {
+        Ok(res) => res
+            .rows
+            .first()
+            .and_then(|r| r["value"].as_str())
+            .and_then(|s| s.parse::<i64>().ok()),
+        Err(_) => None,
+    };
+    stored
+        .filter(|n| crate::pin_policy::PIN_LENGTHS.contains(n))
+        .unwrap_or(crate::pin_policy::DEFAULT_PIN_LENGTH)
+}
+
 /// La zona horaria del negocio: la clave `timezone` si está declarada y vale, si no la deducida de
 /// `country_code`/`region_code` (hub#731). Tolerante como [`country_code_of`]: una fila corrupta o
 /// una tabla que aún no existe degradan a la deducción en vez de reventar a las 3 de la mañana.
@@ -449,6 +483,28 @@ fn validate_pin_policy(v: &Value) -> std::result::Result<String, String> {
 /// `pin_inactivity_minutes`: entero 1..=30. Un no-entero (`2.5`, `"five"`, `true`, `null`) no se
 /// interpreta: la clave decide cuánto tarda una caja en volver a pedir el PIN, y adivinar aquí es
 /// adivinar hacia el lado que deja la sesión abierta.
+/// `pin_length`: 4 o 6, y nada más ([`crate::pin_policy::PIN_LENGTHS`]). Un valor libre daría un
+/// teclado que no puede auto-enviar, que es justo lo que la decisión de mercado compra.
+fn validate_pin_length(v: &Value) -> std::result::Result<String, String> {
+    let n = v
+        .as_i64()
+        .filter(|_| v.as_f64().map(|f| f.fract() == 0.0).unwrap_or(false))
+        .ok_or_else(|| {
+            format!(
+                "`pin_length` es un entero de {:?} dígitos",
+                crate::pin_policy::PIN_LENGTHS
+            )
+        })?;
+    if !crate::pin_policy::PIN_LENGTHS.contains(&n) {
+        return Err(format!(
+            "`pin_length` admite {:?} y nada más: una longitud que ningún TPV ofrece dejaría el \
+             teclado sin poder enviar al último dígito",
+            crate::pin_policy::PIN_LENGTHS
+        ));
+    }
+    Ok(n.to_string())
+}
+
 fn validate_pin_inactivity_minutes(v: &Value) -> std::result::Result<String, String> {
     let n = v
         .as_i64()

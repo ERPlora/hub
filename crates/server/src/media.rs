@@ -480,15 +480,77 @@ pub struct PathQuery {
 }
 
 /// Sirve el contenido de un fichero de `media/` (inline), proxyando al Cloud.
+///
+/// **La única puerta del hub que acepta cookie** (hub#791, ADR-0366). Todo lo demás se autentica con
+/// la cabecera `X-Hub-Session` que el frontend pone a mano (ADR-0003), y eso cubre todo lo que la
+/// app *llama*. No cubre lo que el navegador *pide solo*: un `<img src>` lo emite el motor de render
+/// y no hay dónde ponerle una cabecera. Es el mismo problema que `EventSource` en el canal de
+/// eventos, que se resolvió con un ticket en la query (`event_stream`); aquí no vale, porque la URL
+/// que se pinta sale del dato (`product.image`) y el TPV pinta 50 fotos de golpe.
+///
+/// La cookie es de LECTURA: subir, borrar, renombrar y mover siguen exigiendo la cabecera. Por eso
+/// el CSRF no es un riesgo a mitigar sino uno que no existe — una petición forjada desde otro sitio
+/// no alcanza ninguna puerta que cambie algo. Ver [`mint_media_session`].
 pub async fn media_raw(
     State(st): State<AppState>,
     headers: HeaderMap,
     Query(q): Query<PathQuery>,
 ) -> Response {
-    if let Err(response) = require_user(&st, &headers).await {
+    if let Err(response) = require_user(&st, &with_cookie_session(headers)).await {
         return response;
     }
     cloud_raw(&st, &q.path).await
+}
+
+// ─────────────────────────── POST /api/media/session ───────────────────────────
+
+/// Nombre de la cookie de lectura de media.
+pub const MEDIA_COOKIE: &str = "erplora_media";
+
+/// Ruta a la que el navegador manda la cookie: **solo** la puerta de lectura.
+const MEDIA_COOKIE_PATH: &str = "/api/media/raw";
+
+/// Copia de las cabeceras con `X-Hub-Session` rellenado desde la cookie cuando la petición no la
+/// trae. Así la cookie entra por el MISMO camino de validación que la cabecera (`resolve_session`)
+/// en vez de abrir un segundo criterio de «quién eres» que pudiera divergir. Si vienen las dos,
+/// manda la cabecera: la pone la app, y la cookie es el apaño para quien no puede ponerla.
+fn with_cookie_session(mut headers: HeaderMap) -> HeaderMap {
+    if auth::session_token(&headers).is_some() {
+        return headers;
+    }
+    if let Some(token) = auth::cookie(&headers, MEDIA_COOKIE) {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&token) {
+            headers.insert("x-hub-session", value);
+        }
+    }
+    headers
+}
+
+/// `POST /api/media/session` — **la app pidiéndole al hub la credencial que el navegador sí sabe
+/// adjuntar.** Exige la sesión por cabecera (así que un anónimo no obtiene ninguna) y devuelve la
+/// cookie de lectura de media.
+///
+/// La cookie lleva **el propio token de sesión**, no una credencial nueva: caduca exactamente cuando
+/// caduca la sesión, y cerrar sesión la invalida sin que haya una segunda vida que revocar aparte.
+/// Los atributos son el mínimo que funciona: `Path` a la puerta de lectura y a nada más, `HttpOnly`
+/// (un XSS no la levanta), `Secure` y `SameSite=Strict`.
+pub async fn mint_media_session(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_user(&st, &headers).await {
+        return response;
+    }
+    // Sin token que meter en la cookie no hay nada que emitir: pasa en `AuthMode::Dev`, donde la
+    // puerta concede sin sesión y el frontend no necesita cookie porque tampoco la necesita nadie.
+    let Some(token) = auth::session_token(&headers) else {
+        return Json(json!({ "ok": true, "data": { "cookie": false } })).into_response();
+    };
+    let cookie = format!(
+        "{MEDIA_COOKIE}={token}; Path={MEDIA_COOKIE_PATH}; HttpOnly; Secure; SameSite=Strict"
+    );
+    (
+        [(header::SET_COOKIE, cookie)],
+        Json(json!({ "ok": true, "data": { "cookie": true } })),
+    )
+        .into_response()
 }
 
 // ─────────────────────────── POST /api/media/upload ───────────────────────────

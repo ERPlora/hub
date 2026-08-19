@@ -12,7 +12,10 @@
       reached through the ask the transport hands over, so no endpoint is spelt here);
     - it never says WHICH of «unknown name», «wrong PIN» or «deactivated user» it was, because the
       runtime answers all three identically so this dialog cannot become the staff directory;
-    - it never prints the permission or the command. Those are our vocabulary, not the counter's.
+    - it never prints the permission or the command. Those are our vocabulary, not the counter's —
+      which is WHY hub#579 says WHAT is being approved in the module's own words (`elevation-label`)
+      and, when it cannot, says that it cannot: falling back to `sales.void` would undo this rule at
+      exactly the moment the cashier and the customer are both looking at the screen.
 
   Mounted once, in `App.vue`. It is opened by the transport (`lib/elevation` → `askForApproval`),
   never by a module and never by a screen — which is the whole point: one dialog for all 24 apps,
@@ -27,6 +30,9 @@
   >
     <div class="elevation-body ion-padding">
       <h2>{{ t('elevation.title') }}</h2>
+      <!-- QUÉ se aprueba (hub#579). Sin esto el encargado teclea su PIN a ciegas y el recibo
+           (`approved_by`) es un sello de goma: nombra una decisión que nadie vio. -->
+      <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
       <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
       <!-- **Pasar la tarjeta ES la aprobación** (hub#658): es lo que hacen Toast, Aloha y Square, y
            obligar al encargado a teclear cuatro dígitos delante del cliente cuando lleva la tarjeta
@@ -93,7 +99,7 @@
             ref="pinpadRef"
             data-testid="elevation-pinpad"
             dots
-            :length="4"
+            :length="hubPinLength"
             :error="errorKey !== ''"
             :aria-busy="sending"
             secondary-icon="arrow-back-outline"
@@ -119,16 +125,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { hubPinLength } from '../lib/pin-length';
 import { useI18n } from 'vue-i18n';
 import { IonModal, IonButton, IonCard, IonCardContent, IonInput, IonNote } from '@ionic/vue';
 
 import { pendingElevation, resolveElevation, elevationRefusalKey } from '../lib/elevation';
+import {
+  describeElevation,
+  elevationCatalogue,
+  loadElevationCatalogue,
+} from '../lib/elevation-label';
 import { onBadgeScan } from '../lib/badge-scanner';
 import { pinUsers } from '../lib/runtime';
 import { toast } from '../lib/toast';
 
 const { t } = useI18n();
+
+// Cómo se llaman las acciones de cada app, en el idioma activo. Se pide UNA vez al montar (este
+// diálogo vive montado en `App.vue`): buscarlo cuando ya hay un encargado esperando delante del
+// cliente sería llegar tarde. Si falla, la escalera de `describeElevation` degrada sola.
+onMounted(() => void loadElevationCatalogue());
+
+/** Qué se está aprobando, en palabras del negocio — nunca el command ni el permiso (hub#363). */
+const whatIsBeingApproved = computed(() => {
+  const ask = pendingElevation.value;
+  if (!ask) return '';
+  const { action, moduleName } = describeElevation(ask, elevationCatalogue.value);
+  if (action) return t('elevation.what', { action });
+  if (moduleName) return t('elevation.whatFromModule', { app: moduleName });
+  return t('elevation.whatUnknown');
+});
 
 /** Everyone the hub says can sign in locally (`GET /api/hub/context` → `pin_users`).
  *

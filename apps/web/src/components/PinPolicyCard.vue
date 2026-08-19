@@ -75,6 +75,30 @@
           </ion-item>
         </template>
 
+        <!-- Cuántos dígitos pide el PIN (hub#974). Segmento y no un campo libre: las únicas
+             longitudes que ofrece el mercado son 4 y 6, y la uniformidad es lo que permite que el
+             teclado envíe al último dígito en vez de pedir un «Aceptar». -->
+        <template v-if="pinpadOn">
+          <ion-item lines="none">
+            <ion-label>
+              <h2>{{ t('pinPolicy.lengthTitle') }}</h2>
+            </ion-label>
+            <ion-segment
+              slot="end"
+              :value="String(hubPinLength)"
+              :disabled="!isAdmin || saving"
+              @ion-change="onLength($event)"
+            >
+              <ion-segment-button v-for="n in PIN_LENGTHS" :key="n" :value="String(n)">
+                <ion-label>{{ t('pinPolicy.lengthDigits', { n }) }}</ion-label>
+              </ion-segment-button>
+            </ion-segment>
+          </ion-item>
+          <ion-item lines="none">
+            <ion-note class="note">{{ t('pinPolicy.lengthConsequence') }}</ion-note>
+          </ion-item>
+        </template>
+
         <!-- Un control deshabilitado y mudo se lee como una avería; con el motivo es una regla. -->
         <ion-item v-if="!isAdmin" lines="none">
           <ion-note class="note">{{ t('pinPolicy.adminOnly') }}</ion-note>
@@ -104,6 +128,8 @@ import {
   IonList,
   IonNote,
   IonRange,
+  IonSegment,
+  IonSegmentButton,
   IonToggle,
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
@@ -118,6 +144,7 @@ import {
   wireFromToggle,
   type PinpadWire,
 } from '../lib/pinpad-dial';
+import { PIN_LENGTHS, hubPinLength } from '../lib/pin-length';
 import { isAdmin } from '../lib/session';
 
 const { t } = useI18n();
@@ -168,6 +195,22 @@ async function apply(wire: PinpadWire): Promise<void> {
 async function setPinpad(on: boolean): Promise<void> {
   if (on === pinpadOn.value) return;
   await apply(wireFromToggle(on));
+}
+
+/**
+ * La longitud del PIN. **No toca los PIN que ya existen**: los de la longitud anterior siguen
+ * entrando hasta que su dueño los cambie — subirla y dejar a los cajeros fuera en hora punta sería
+ * peor que no subirla. Y no se rellena con ceros como hace el «autofill» de Clover: eso es un PIN
+ * de seis dígitos con la entropía de cuatro.
+ */
+async function setLength(next: number): Promise<void> {
+  if (next === hubPinLength.value) return;
+  await apply({ pin_length: next } as unknown as PinpadWire);
+}
+
+function onLength(e: Event): void {
+  const value = Number((e as CustomEvent<{ value: string }>).detail.value);
+  if (PIN_LENGTHS.includes(value as (typeof PIN_LENGTHS)[number])) void setLength(value);
 }
 
 /** Una parada del range: minutos → `always` + minutos; la última → `per_shift`. */
