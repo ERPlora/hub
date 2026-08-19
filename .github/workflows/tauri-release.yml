@@ -543,7 +543,12 @@ jobs:
   # paquete que aún no existe en la consola.
   #
   # `PLAY_TRACK` decide la pista y su default es `internal` a propósito — la promoción a producción
-  # se hace a mano en la consola mientras no haya confianza.
+  # se hace a mano en la consola mientras no haya confianza. Y hay una razón dura además de esa:
+  # este paso sube con `status: completed`, o sea **rollout al 100% de golpe**. Poner
+  # `PLAY_TRACK=production` creyendo que se remata la automatización mandaría cada tag, sin probar,
+  # a TODAS las cajas a la vez — en un TPV eso no es un despliegue, es un incidente. Automatizar la
+  # promoción exige antes un rollout escalonado (`status: inProgress` + `userFraction`), y mientras
+  # ese cableado no exista la Variable se queda como está.
   #
   # 🔴 `changesNotSentForReview: false` desde el 2026-08-19, y esto es lo contrario de lo que decía
   # aquí antes. El argumento viejo era que mandar a revisión «decide por el humano»; lo que decide
