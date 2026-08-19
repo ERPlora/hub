@@ -197,3 +197,63 @@ async fn a_neighbouring_name_in_the_namespace_is_still_not_found() {
         "the error must name the query that does not exist: {err}"
     );
 }
+
+// ── Quién ESCRIBE el techo: el módulo fiscal del país, no una migración del core (hub#1010) ──
+//
+// La v51 sembró `ES/verifactu → 300000` desde una migración de sistema. Eso deja al core sabiendo
+// el número de un país concreto — justo lo que ADR-0357 quería evitar («el techo es DATO, no
+// código»): la propiedad del dato queda al revés. Quien conoce el límite de la factura
+// simplificada es el módulo que implementa el régimen, que además se actualiza solo en cada
+// arranque; la ley cambia el número sin tocar el runtime ni migrar nada.
+//
+// La query sigue en el core (ADR-0357: la respuesta no puede depender de que un módulo esté
+// instalado) y la v51 sigue como suelo transitorio para el hub que aún no ha actualizado su
+// `verifactu`. Lo único que cambia es quién escribe la fila.
+
+/// Instalar un proveedor que declara su techo lo escribe en el registro del core.
+#[tokio::test]
+async fn a_fiscal_module_declares_the_ceiling_and_the_core_stores_it() {
+    let rt = runtime("hub-es").await;
+    // El suelo transitorio de la v51: lo que hay antes de que ningún módulo hable.
+    let doc = limits(&rt, &ctx("hub-es", &[SESSION])).await;
+    assert_eq!(doc["simplified_invoice_max_cents"], 300_000);
+
+    rt.apply_fiscal_regime_declaration("ES", "verifactu", Some(250_000))
+        .await
+        .expect("un proveedor puede declarar el techo de su régimen");
+
+    let doc = limits(&rt, &ctx("hub-es", &[SESSION])).await;
+    assert_eq!(
+        doc["simplified_invoice_max_cents"], 250_000,
+        "manda lo que declara el módulo del país, no la migración del core"
+    );
+}
+
+/// Y un proveedor que NO declara techo no pisa el que ya había: callarse no es decir «cero».
+#[tokio::test]
+async fn a_provider_that_declares_no_ceiling_leaves_the_row_alone() {
+    let rt = runtime("hub-es").await;
+
+    rt.apply_fiscal_regime_declaration("ES", "verifactu", None)
+        .await
+        .expect("declarar el régimen sin techo es legítimo");
+
+    let doc = limits(&rt, &ctx("hub-es", &[SESSION])).await;
+    assert_eq!(
+        doc["simplified_invoice_max_cents"], 300_000,
+        "el silencio del módulo no borra el techo vigente"
+    );
+}
+
+/// El país es la clave: un proveedor francés no mueve el techo español.
+#[tokio::test]
+async fn a_provider_of_another_country_does_not_move_this_countrys_ceiling() {
+    let rt = runtime("hub-es").await;
+
+    rt.apply_fiscal_regime_declaration("FR", "facturx", Some(100_000))
+        .await
+        .expect("declarar el régimen de otro país es legítimo");
+
+    let doc = limits(&rt, &ctx("hub-es", &[SESSION])).await;
+    assert_eq!(doc["simplified_invoice_max_cents"], 300_000);
+}
