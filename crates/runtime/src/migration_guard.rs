@@ -361,18 +361,53 @@ fn tables_touched(statement: &str) -> Vec<String> {
     found
 }
 
-/// Parte por `;` respetando literales — el mismo criterio que ya usa `system_migrations`.
+/// Parte por `;` respetando literales **y comentarios** — el mismo criterio que ya usa
+/// `system_migrations`, más lo que le faltaba: un `;` (o un `'`) dentro de `-- …` o `/* … */` es
+/// prosa, no SQL. Sin esto, `printing/002_jobs.sql` («-- read); this table is …») se partía a
+/// mitad de comentario, el trozo perdía su `--`, y «table is» se leía como una tabla `is` que
+/// «no pertenece a printing» — un módulo publicado y correcto que no se instalaba.
+///
+/// El comentario se conserva en la sentencia (se copia tal cual): quitarlo es cosa de
+/// [`strip_comments`], en el momento de inspeccionar.
 fn split_statements(sql: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
     let mut in_string = false;
-    for ch in sql.chars() {
+    let mut chars = sql.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if in_string {
+            current.push(ch);
+            if ch == '\'' {
+                in_string = false;
+            }
+            continue;
+        }
         match ch {
             '\'' => {
-                in_string = !in_string;
+                in_string = true;
                 current.push(ch);
             }
-            ';' if !in_string => {
+            '-' if chars.peek() == Some(&'-') => {
+                current.push(ch);
+                for next in chars.by_ref() {
+                    current.push(next);
+                    if next == '\n' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&'*') => {
+                current.push(ch);
+                let mut prev = ' ';
+                for next in chars.by_ref() {
+                    current.push(next);
+                    if prev == '*' && next == '/' {
+                        break;
+                    }
+                    prev = next;
+                }
+            }
+            ';' => {
                 if !current.trim().is_empty() {
                     out.push(current.trim().to_string());
                 }
@@ -537,6 +572,17 @@ mod tests {
             "-- la fila que guarda el total for every sale\n             CREATE TABLE sales_total (id BIGINT);\n             /* DROP TABLE inventory_item -- esto es prosa, no SQL */",
         )
         .expect("los comentarios no cuentan");
+    }
+
+    /// The real `printing/002_jobs.sql` (v0.1.11): its header prose has TWO apostrophes
+    /// ("The module's … the runtime's") inside `--` comments. Read as string delimiters they
+    /// desynchronise the quote tracking, and prose words start looking like table names — the
+    /// install failed with «la migración toca `is`». A comment is opaque, apostrophes and all.
+    #[test]
+    fn apostrophes_inside_comments_do_not_open_a_string() {
+        let sql = include_str!("../tests/fixtures/migration_guard/printing_002_jobs.sql");
+        check("printing", "migrations/postgres/002_jobs.sql", sql, Kind::Expand)
+            .unwrap_or_else(|e| panic!("a published, well-formed migration must pass: {e}"));
     }
 
     // ── Lo ya publicado: la lista de abuelados ───────────────────────────────────────
