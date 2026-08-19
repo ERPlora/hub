@@ -457,3 +457,44 @@ async fn a_module_cannot_squat_the_core_namespace() {
     );
     std::fs::remove_dir_all(&dir).ok();
 }
+
+/// The self-service door (`POST /api/auth/set-pin` → `Runtime::set_pin`) is the OTHER place a PIN
+/// is chosen in clear — right after the first cloud login. It hashed whatever arrived: `0000`,
+/// `1234`, two digits, letters. Same digits, same rules as Personal (hub#974): length, digits only,
+/// and not one of the shapes anybody tries first (hub#355).
+#[tokio::test]
+async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
+    let rt = runtime("hub-staff").await;
+    let id = rt
+        .create_hub_user(&NewHubUser {
+            name: "Ana Soto".into(),
+            email: "ana@example.com".into(),
+            role: "employee".into(),
+            pin: String::new(),
+            badge: String::new(),
+            local: false,
+        })
+        .await
+        .unwrap();
+
+    for bad in ["1234", "0000", "12", "abcd", "123456789"] {
+        let err = rt
+            .set_pin(&id, bad)
+            .await
+            .expect_err(&format!("`{bad}` must be refused at the self-service door"));
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("PIN") || msg.contains("pin"),
+            "the refusal names the PIN: {msg}"
+        );
+        assert!(!row(&rt, &id).await.has_pin, "`{bad}` must not have been stored");
+    }
+
+    rt.set_pin(&id, "2580").await.unwrap();
+    assert!(row(&rt, &id).await.has_pin);
+    assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
+
+    // Empty still clears it (a user going back to account-only login).
+    rt.set_pin(&id, "").await.unwrap();
+    assert!(!row(&rt, &id).await.has_pin);
+}
