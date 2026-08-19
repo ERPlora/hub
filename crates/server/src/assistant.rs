@@ -36,6 +36,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     "query",
                     &q.module_id,
                     q.def.schema.as_deref(),
+                    ai.risk,
                 ));
             }
         }
@@ -58,6 +59,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     "command",
                     &c.module_id,
                     c.def.schema.as_deref(),
+                    ai.risk,
                 ));
             }
         }
@@ -138,7 +140,9 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         if permits(permission) {
             // module_id "hub" marca tool del CORE: `filter_tools_by_modules` la preserva
             // explícitamente (el core no es un módulo y su ref_id nunca está en el índice).
-            tools.push(tool_def(name, description, kind, "hub", *schema));
+            // Las tools de core no son destructivas por diseño (lo destructivo del host no se
+            // ofrece jamás, y hay un barrido que lo garantiza), así que `normal` explícito.
+            tools.push(tool_def(name, description, kind, "hub", *schema, None));
         }
     }
 
@@ -155,7 +159,14 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 /// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
 /// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
 /// necesita (ya recibe `kind` de la misma forma).
-fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: Option<&str>) -> Value {
+fn tool_def(
+    name: &str,
+    description: &str,
+    kind: &str,
+    module_id: &str,
+    schema: Option<&str>,
+    risk: Option<erplora_runtime::manifest::AiRisk>,
+) -> Value {
     // The operation's input schema (a JSON-Schema string) becomes the tool's
     // `parameters`, so the model calls with valid arguments. The Cloud reads it
     // as `fn.parameters` (orchestrator `_tools_from_hub`). Absent or unparseable
@@ -169,6 +180,9 @@ fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: 
         "kind": kind,
         "module_id": module_id,
         "parameters": parameters,
+        // Siempre presente, incluso sin declarar: el cliente aplica una política y no puede
+        // depender de si alguien se acordó de escribir el campo.
+        "risk": risk.unwrap_or(erplora_runtime::manifest::AiRisk::Normal).as_str(),
     })
 }
 
@@ -255,6 +269,55 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
                 s.push_str(&format!(
                     "    - {} → `/m/{}/{}`\n",
                     nav.label, m.id, nav.id
+                ));
+            }
+        }
+        s.push('\n');
+    }
+
+    // What this hub CORRECTS instead of editing (ADR-0331), straight from the manifests.
+    //
+    // Modules already declare it — `mutable: false` plus a CLOSED `reason` and the commands that
+    // correct the record — and the block's own documentation says the vocabulary is closed
+    // precisely «so the assistant can explain "an issued invoice is not edited: it is rectified
+    // with `invoice.rectify`"». It was wired into the dispatcher and never into the prompt, so
+    // the model never saw a single one of these rules. Asked what it could not do, it filled the
+    // gap with a policy of its own invention (hub#1042) — which is worse than having no rule,
+    // because the user believes it.
+    //
+    // Only the IMMUTABLE ones are listed: a mutable record needs no explanation, its update tool
+    // is already on the table, and a prompt that lists everything stops being read.
+    let mut immutable: Vec<(&str, &str, &erplora_runtime::manifest::RecordDef)> = Vec::new();
+    for m in registry.installed.iter().filter(|m| registry.is_active(&m.id)) {
+        for (record, def) in &m.records {
+            if !def.mutable {
+                immutable.push((m.id.as_str(), record.as_str(), def));
+            }
+        }
+    }
+    if !immutable.is_empty() {
+        // Deterministic order: a prompt that reshuffles between turns is a prompt whose cache
+        // never hits, and a diff nobody can read.
+        immutable.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        s.push_str(
+            "## What is corrected here, never edited
+
+These records cannot be edited after              they exist — the module says so itself. Do not offer an edit, do not look for a              tool that does it, and do not invent a reason: say what the record is, why it is              fixed, and name the command that CORRECTS it.
+
+",
+        );
+        for (module, record, def) in immutable {
+            let reason = def.reason.as_deref().unwrap_or("declared immutable");
+            if def.correct_with.is_empty() {
+                s.push_str(&format!("- `{module}` · **{record}** — {reason}. No correction tool.\n"));
+            } else {
+                s.push_str(&format!(
+                    "- `{module}` · **{record}** — {reason}. Correct it with: {}\n",
+                    def.correct_with
+                        .iter()
+                        .map(|c| format!("`{c}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ));
             }
         }
@@ -529,6 +592,13 @@ mod tests {
         serde_json::from_value(m).expect("fixture manifest must parse")
     }
 
+    /// Same, plus the `records` block a module uses to declare what is corrected and never
+    /// edited (ADR-0331). Deserialized like the rest, so it exercises the real parse.
+    fn manifest_with_records(id: &str, name: &str, records: Value) -> erplora_runtime::manifest::Manifest {
+        let m = json!({ "id": id, "name": name, "version": "1.0.0", "records": records });
+        serde_json::from_value(m).expect("fixture manifest must parse")
+    }
+
     /// A registry with `modules` installed; each entry is `(id, name, agent, active)`.
     fn registry_with(modules: &[(&str, &str, Option<&str>, bool)]) -> Registry {
         use erplora_runtime::registry::ModuleStatus;
@@ -545,6 +615,79 @@ mod tests {
             );
         }
         reg
+    }
+
+    /// ADR-0331 gave every module a way to say what of its data is CORRECTED and never edited,
+    /// with a CLOSED `reason` vocabulary. The block's own doc says why the vocabulary is closed:
+    /// «so the assistant can explain "an issued invoice is not edited: it is rectified with
+    /// `invoice.rectify`"». It was wired into the dispatcher and never into the assistant, so
+    /// the model never saw it — and when asked what it could not do, it INVENTED a policy
+    /// instead (hub#1042: «bulk_delete no existe, está deshabilitada intencionalmente», one turn
+    /// after listing it among its own tools).
+    ///
+    /// A model that is told the real rule does not have to make one up.
+    #[test]
+    fn instructions_carry_what_each_module_declares_immutable() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "invoice",
+            "Invoicing",
+            json!({ "invoice": { "mutable": false, "reason": "fiscal",
+                                 "correct_with": ["invoice.rectify"] } }),
+        ));
+        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        assert!(ins.contains("invoice.rectify"), "the correction door must be named: {ins}");
+        let lower = ins.to_lowercase();
+        assert!(lower.contains("fiscal"), "the closed reason must travel: {ins}");
+    }
+
+    /// A record the module declares MUTABLE says nothing worth a line in the prompt: the tools
+    /// already cover editing it. Only the refusals need explaining, and a prompt that lists
+    /// everything stops being read.
+    #[test]
+    fn a_mutable_record_does_not_crowd_the_prompt() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "sales",
+            "Sales",
+            json!({ "order": { "mutable": true, "update": "sales.order.update_line" } }),
+        ));
+        reg.status.insert("sales".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        // The SECTION itself must not appear: asserting on the update command's name would pass
+        // even while the record leaked in, because the rendering never prints that command. (It
+        // did exactly that until a deliberate sabotage — removing the `!def.mutable` filter —
+        // failed to turn this test red.)
+        assert!(
+            !ins.contains("corrected here, never edited"),
+            "with nothing immutable there is no section to write: {ins}"
+        );
+        assert!(
+            !ins.contains("**order**"),
+            "a mutable record needs no rule: the tool already covers it: {ins}"
+        );
+    }
+
+    /// An INACTIVE module's refusals are not this hub's refusals.
+    #[test]
+    fn an_inactive_module_declares_nothing_to_the_assistant() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "invoice",
+            "Invoicing",
+            json!({ "invoice": { "mutable": false, "reason": "fiscal",
+                                 "correct_with": ["invoice.rectify"] } }),
+        ));
+        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Inactive);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        assert!(!ins.contains("invoice.rectify"), "an inactive module says nothing: {ins}");
     }
 
     /// The keystone: the turn reaching the Cloud must carry a system prompt that says WHAT
@@ -727,6 +870,79 @@ mod tests {
         }
     }
 
+
+    /// The sweep above runs over `Registry::new()` — EMPTY — so it only ever constrained the
+    /// five core tools. Every destructive command of every MODULE walked straight past it: the
+    /// QA pass of 2026-08-19 counted 26 of them offered to the assistant, `bulk_delete` among
+    /// them (hub#1042, appointments#62). Nothing was deleted that day, but by the model's
+    /// judgement, not by a lock — and the same session had it claim, falsely, that a lock
+    /// existed.
+    ///
+    /// A test that cannot fail is not a guarantee. This one runs over a LOADED registry and pins
+    /// the channel that makes a lock possible at all: a module DECLARES how dangerous an
+    /// operation is (`ai.risk`), and the core carries that declaration to the client instead of
+    /// guessing from a name it does not parse.
+    ///
+    /// The core deliberately does NOT infer risk from the name. `delete` in a name means nothing
+    /// portable — `sales.void` is destructive and says neither — and a core that guessed would be
+    /// deciding for the module what its own data is worth. The module knows; it declares.
+    #[test]
+    fn a_destructive_module_tool_must_declare_its_risk() {
+        let mut reg = Registry::new();
+        let m: erplora_runtime::manifest::Manifest = serde_json::from_value(json!({
+            "id": "appointments", "name": "Appointments", "version": "1.0.0",
+            "commands": {
+                "appointments.appointments.create": {
+                    "permission": "appointments.add_appointment",
+                    "ai": { "description": "Books an appointment." }
+                },
+                "appointments.appointments.bulk_delete": {
+                    "permission": "appointments.delete_appointment",
+                    "ai": { "description": "Permanently deletes multiple appointments in bulk.",
+                            "risk": "bulk_destructive" }
+                }
+            }
+        }))
+        .expect("fixture manifest must parse");
+        reg.installed.push(m.clone());
+        for (name, def) in &m.commands {
+            reg.commands.insert(
+                name.clone(),
+                erplora_runtime::registry::RegisteredCommand {
+                    module_id: "appointments".to_string(),
+                    def: def.clone(),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+        }
+        reg.status
+            .insert("appointments".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&reg, &ctx);
+
+        let destructive = tools
+            .iter()
+            .find(|t| t["name"] == json!("appointments.appointments.bulk_delete"))
+            .expect("the tool is offered — that is the point");
+        assert_eq!(
+            destructive["risk"],
+            json!("bulk_destructive"),
+            "a destructive tool must carry its declared risk to the client: {destructive}"
+        );
+
+        let ordinary = tools
+            .iter()
+            .find(|t| t["name"] == json!("appointments.appointments.create"))
+            .expect("the create tool is offered");
+        assert_eq!(
+            ordinary["risk"],
+            json!("normal"),
+            "an ordinary tool is `normal`, stated rather than absent: {ordinary}"
+        );
+    }
 
     /// The policy line itself travels in the prompt: the model must know destructive actions are
     /// off the table BY DESIGN — so it explains honestly («eso lo haces tú desde la pantalla»)
@@ -1055,7 +1271,7 @@ mod tests {
         // The op's input schema becomes the tool's `parameters` so the model calls
         // with valid arguments (the Cloud reads `fn.parameters`).
         let schema = r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
-        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema));
+        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema), None);
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
     }
@@ -1082,6 +1298,7 @@ mod tests {
                 ai: Some(AiTool {
                     description: "Revierte el efecto en caja de una venta anulada".to_string(),
                     name: None,
+                    risk: None,
                 }),
                 expose_api: false,
                 internal,
@@ -1130,11 +1347,11 @@ mod tests {
 
     #[test]
     fn tool_def_defaults_params_when_no_schema() {
-        let t = tool_def("x.y", "d", "query", "x", None);
+        let t = tool_def("x.y", "d", "query", "x", None, None);
         assert_eq!(t["parameters"]["type"], "object");
         assert_eq!(t["parameters"]["properties"], json!({}));
         // An unparseable schema also degrades to the empty object (never panics).
-        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"));
+        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"), None);
         assert_eq!(bad["parameters"]["properties"], json!({}));
     }
 }
