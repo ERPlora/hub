@@ -1229,6 +1229,9 @@ export default {
   // name / wrong PIN / deactivated user it was. The runtime answers those three identically on
   // purpose, so that a dialog anybody can open is not the way to learn who works here.
   elevation: {
+    what: 'To approve: {action}',
+    whatFromModule: 'To approve: an action in {app}',
+    whatUnknown: 'To approve: an action this app cannot name',
     title: 'Approval needed',
     lead: 'Ask a manager to enter their PIN to approve this.',
     // hub#658 — swiping the card IS the approval (Toast, Aloha, Square). Said up front, in both
