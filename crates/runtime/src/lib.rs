@@ -1439,7 +1439,10 @@ impl Runtime {
 
     /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
     pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
-        identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, pin).await
+        // Same rules as Personal (hub#974): length, digits only, not guessable. This is the
+        // self-service door after the first account login and it used to hash whatever arrived.
+        let pin = hub_users::clean_pin(pin)?;
+        identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, &pin).await
     }
 
     /// Abre una sesión server-side para `user_id`; devuelve el token opaco. `device_id` = identidad

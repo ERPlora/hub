@@ -1119,6 +1119,7 @@ export default {
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
+    setupPinTooSimple: 'Ese PIN es demasiado fácil de adivinar: evita dígitos repetidos (1111) y secuencias (1234).',
     footerTrustedDevice: 'dispositivo de confianza',
     footerSecureCloud: 'conexión segura',
     errorSignIn: 'No se pudo iniciar sesión. Revisa tus credenciales o la conexión.',

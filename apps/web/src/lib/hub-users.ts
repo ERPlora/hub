@@ -324,7 +324,7 @@ export function hubUserErrorKey(error: unknown): string | undefined {
  * seguida, arriba o abajo (`1234`, `4321`). **Espejo** de `is_guessable_pin` del runtime, que es
  * quien manda; aquí solo sirve para no hacer pulsar «Crear» para enterarse.
  */
-function isGuessablePin(pin: string): boolean {
+export function isGuessablePin(pin: string): boolean {
   const digits = [...pin].map(Number);
   if (digits.length < 2 || digits.some(Number.isNaN)) return true;
   const stepIs = (step: number) => digits.every((d, i) => i === 0 || d - digits[i - 1] === step);

@@ -301,7 +301,10 @@ fn clean_role(value: &str) -> Result<String> {
 
 /// PIN: vacío (sin PIN) o entre 4 y 8 **dígitos** — lo que acepta el pinpad del login — y que no
 /// sea de los que se adivinan a la primera ([`is_guessable_pin`], hub#355).
-fn clean_pin(value: &str) -> Result<String> {
+///
+/// `pub(crate)` porque hay DOS puertas por las que un PIN llega en claro: Personal (aquí) y la de
+/// auto-servicio tras el primer login de cuenta (`Runtime::set_pin`, hub#974). Una sola regla.
+pub(crate) fn clean_pin(value: &str) -> Result<String> {
     let pin = value.trim();
     if pin.is_empty() {
         return Ok(String::new());
