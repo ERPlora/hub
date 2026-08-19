@@ -464,6 +464,14 @@ pub struct FiscalRegimeDef {
     pub country: String,
     /// Clave del régimen (`verifactu`, `facturx`…), la misma que el registro de regímenes del core.
     pub regime: String,
+    /// Techo de la factura simplificada de ESTE régimen, en céntimos (hub#1010). Opcional: el
+    /// proveedor que no lo declara no dice «cero», dice «yo no muevo ese número» — el que hubiera
+    /// se queda. Quien conoce el límite es el módulo del país, que además se actualiza en cada
+    /// arranque; la ley puede cambiarlo sin tocar el runtime ni migrar nada. La fila y la query
+    /// siguen siendo del core (ADR-0357): la respuesta no puede depender de que un módulo esté
+    /// instalado.
+    #[serde(default)]
+    pub simplified_invoice_max_cents: Option<i64>,
 }
 
 /// Acción que un **usuario** puede intentar sobre un fichero o carpeta desde la pantalla `/files`.

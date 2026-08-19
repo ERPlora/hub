@@ -77,6 +77,19 @@ pub async fn install(
     // ADR-0273 D7 (hub#559): and if what it declares is THIS hub's regime, it may not be sold.
     // Defensive: no published module is in that position today (see the function).
     validate_fiscal_provider_is_free(db, hub_id, &manifest).await?;
+    // hub#1010: y si además declara el TECHO de su régimen, el core lo guarda en su registro. La
+    // propiedad del dato es del módulo del país (que se actualiza solo); la fila y la query siguen
+    // siendo del core, porque la respuesta no puede depender de que un módulo esté instalado
+    // (ADR-0357). Un proveedor que no lo declara no pisa el valor vigente.
+    if let Some(fiscal) = manifest.fiscal_regime.as_ref() {
+        crate::fiscal_profile::apply_regime_declaration(
+            db,
+            fiscal.country.trim(),
+            fiscal.regime.trim(),
+            fiscal.simplified_invoice_max_cents,
+        )
+        .await?;
+    }
 
     // `hub` es el namespace RESERVADO del core (ADR-0192): el dispatcher resuelve `hub.*` antes de
     // mirar el registry, así que un módulo con ese id tendría capacidades inalcanzables y aparentaría

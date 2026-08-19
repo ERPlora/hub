@@ -1982,6 +1982,19 @@ impl Runtime {
         outbox::drain(self.db.as_ref(), &self.registry).await
     }
 
+    /// Escribe el techo de la simplificada que declara un módulo fiscal (hub#1010). Lo llama el
+    /// instalador con el bloque `fiscal_regime` del manifest; expuesto para poder probar la puerta
+    /// sin montar un zip.
+    pub async fn apply_fiscal_regime_declaration(
+        &self,
+        country_code: &str,
+        regime_key: &str,
+        max_cents: Option<i64>,
+    ) -> Result<()> {
+        fiscal_profile::apply_regime_declaration(self.db.as_ref(), country_code, regime_key, max_cents)
+            .await
+    }
+
     /// Dead-letters of this hub, newest first (hub#660). What the relay gave up on, with the
     /// payload it was carrying — the queue an admin operates from `/api/hub/events/dead`.
     pub async fn list_dead_events(&self, limit: i64) -> Result<Vec<outbox::DeadEvent>> {
