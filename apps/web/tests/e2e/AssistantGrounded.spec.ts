@@ -154,6 +154,13 @@ test('la pregunta de configuración viaja ANCLADA: identidad, fecha y hub.setup.
   expect(instructions.toLowerCase()).toContain('no business modules');
   // Céntimos (ADR-0123): la regla con su ejemplo — 12,50 € = 1250.
   expect(instructions).toContain('1250');
+  // La versión de ESTA instalación (hub#1044). Sin ella el modelo negaba que ERPlora tuviera
+  // versión mientras el número estaba impreso en la barra lateral de la misma pantalla. Se
+  // compara contra la que el propio runtime reporta en `/readyz`, no contra una cadena clavada
+  // que habría que editar en cada release.
+  const sys = await (await pwRequest.newContext()).get(`${RUNTIME}/readyz`);
+  const runningVersion = String((await sys.json()).version);
+  expect(instructions).toContain(runningVersion);
 
   // La tool que convierte «¿qué falta?» en una LECTURA del hub en vez de consejo genérico.
   const tools = body.tools as Array<{ name: string; kind: string }>;
