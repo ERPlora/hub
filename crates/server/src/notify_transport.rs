@@ -155,8 +155,7 @@ impl CloudNotifyTransport {
 
         // The reason has to reach whoever reads the dead-letter row: `quota_exceeded`,
         // `no_whatsapp_number` and `invalid_recipients` each need a different human action, and a
-        // bare status code names none of them. Even a terminal reason travels as `Err`: the trait
-        // has no terminal variant, so it retries with backoff and then dead-letters (`outbox.rs`).
+        // bare status code names none of them.
         let detail: String = response
             .text()
             .await
@@ -165,6 +164,14 @@ impl CloudNotifyTransport {
             .chars()
             .take(MAX_DETAIL)
             .collect();
+        // A spent quota is an ANSWER, not a stumble (hub#971): the proxy says so with 429 or 402,
+        // and the relay must not spend eight rungs of backoff against it. Everything else stays an
+        // `Err` and keeps its ladder.
+        if status == reqwest::StatusCode::TOO_MANY_REQUESTS
+            || status == reqwest::StatusCode::PAYMENT_REQUIRED
+        {
+            return Ok(SendOutcome::QuotaExceeded { detail });
+        }
         Err(RuntimeError::Notify(format!(
             "notify proxy answered {status}: {detail}"
         )))
@@ -592,14 +599,34 @@ mod tests {
         assert_eq!(cloud.calls().len(), 1, "it did try");
     }
 
-    /// Quota exhausted is still an error, never a silent success — the message did not go out.
+    /// Quota exhausted is not a delivery — and not a stumble either (hub#971): it comes back as
+    /// the outcome the relay dead-letters at once, with the proxy's reason on it, instead of an
+    /// `Err` that would climb eight rungs of backoff against the same wall.
     #[tokio::test]
     async fn quota_exceeded_is_not_a_delivery() {
-        let cloud = fake_cloud(
-            StatusCode::TOO_MANY_REQUESTS,
-            json!({"error": "quota_exceeded"}),
-        )
-        .await;
+        for status in [StatusCode::TOO_MANY_REQUESTS, StatusCode::PAYMENT_REQUIRED] {
+            let cloud = fake_cloud(status, json!({"error": "quota_exceeded"})).await;
+            let outcome = transport(&cloud.base_url, Some("machine-tok"))
+                .send(
+                    &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
+                    Routing::CloudProxy,
+                )
+                .await
+                .unwrap_or_else(|e| panic!("{status} is an answer, not a transport error: {e}"));
+            match outcome {
+                SendOutcome::QuotaExceeded { detail } => assert!(
+                    detail.contains("quota_exceeded"),
+                    "the reason has to reach the dead-letter screen: {detail}"
+                ),
+                other => panic!("{status} must be QuotaExceeded, got {other:?}"),
+            }
+        }
+    }
+
+    /// The control: any other non-2xx stays an `Err` and keeps its ladder (a 502 is a stumble).
+    #[tokio::test]
+    async fn other_refusals_stay_errors_and_keep_the_ladder() {
+        let cloud = fake_cloud(StatusCode::BAD_GATEWAY, json!({"error": "upstream"})).await;
         let err = transport(&cloud.base_url, Some("machine-tok"))
             .send(
                 &intent(Channel::Whatsapp, "+34600999888", "reminder", json!({})),
@@ -607,10 +634,7 @@ mod tests {
             )
             .await
             .unwrap_err();
-        assert!(
-            format!("{err}").contains("quota_exceeded"),
-            "the reason has to reach the dead-letter screen: {err}"
-        );
+        assert!(format!("{err}").contains("502"), "{err}");
     }
 
     /// An un-enrolled hub has no machine credential, so there is nothing to sign the call with.
