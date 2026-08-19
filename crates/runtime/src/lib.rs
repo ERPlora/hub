@@ -1338,6 +1338,21 @@ impl Runtime {
         hub_users::create(self.db.as_ref(), &self.registry, &self.hub_id, input).await
     }
 
+    /// Cuántos dígitos pide el PIN de este hub (hub#974): 4 o 6, igual para todo el mundo.
+    pub async fn pin_length(&self) -> Result<i64> {
+        Ok(settings::pin_length_of(self.db.as_ref(), &self.hub_id).await)
+    }
+
+    /// Fija la longitud del PIN del hub. Puerta de admin (`PUT /api/settings` la revalida).
+    pub async fn set_pin_length(&self, length: i64) -> Result<()> {
+        let mut updates = serde_json::Map::new();
+        updates.insert(
+            pin_policy::PIN_LENGTH_SETTING.to_string(),
+            serde_json::json!(length),
+        );
+        self.set_settings(&updates, "system").await.map(|_| ())
+    }
+
     /// Edición parcial de un usuario del hub; `is_active: Some(false)` es la baja.
     pub async fn update_hub_user(
         &self,
@@ -1441,7 +1456,7 @@ impl Runtime {
     pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
         // Same rules as Personal (hub#974): length, digits only, not guessable. This is the
         // self-service door after the first account login and it used to hash whatever arrived.
-        let pin = hub_users::clean_pin(pin)?;
+        let pin = hub_users::clean_pin(pin, self.pin_length().await?)?;
         identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, &pin).await
     }
 

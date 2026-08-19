@@ -97,6 +97,31 @@ pub const PIN_INACTIVITY_MINUTES_SETTING: &str = "pin_inactivity_minutes";
 /// long enough not to punish reading a long menu out loud.
 pub const DEFAULT_PIN_INACTIVITY_MINUTES: i64 = 5;
 
+/// Cuántos dígitos tiene el PIN de ESTE hub (hub#974). Fijo para todo el hub, no por persona.
+pub const PIN_LENGTH_SETTING: &str = "pin_length";
+
+/// Las dos longitudes que ofrece el mercado, y las únicas que se admiten.
+///
+/// Decisión de mercado (9 referencias + foros, hub#974): gana el modelo de Clover — longitud **fija
+/// por cuenta**, 4 o 6. La uniformidad no es capricho: es lo que permite que el teclado **envíe solo
+/// al último dígito**. Los productos que admiten longitud variable (Toast 3-8, Lightspeed K 4-6,
+/// Shopify 4-6) están obligados a poner un botón de confirmar, y un cajero que ficha decenas de
+/// veces al día paga ese toque extra decenas de veces al día. Cinco o siete dígitos no los ofrece
+/// nadie, así que admitirlos solo compraría un teclado que no puede auto-enviar.
+pub const PIN_LENGTHS: [i64; 2] = [4, 6];
+
+/// Lo que pide un hub que **no ha dicho nada**: 4, la longitud con la que se tecleaban todos los
+/// PIN que hoy funcionan (el pinpad estuvo clavado a 4). Es compatibilidad, no la recomendación.
+///
+/// **Los hubs NUEVOS estrenan 6** —Clover lo exige a los comercios nuevos desde abril de 2026 y la
+/// doc de login de Toast ya habla de 6-8—, pero ese 6 lo escribe **quien crea el hub** (el
+/// aprovisionamiento del SaaS), que es el único que sabe que es nuevo: aquí, dentro del runtime, un
+/// hub recién migrado y uno de hace un año son la misma base de datos. Subirlo desde este default
+/// dejaría a cajeros fuera en hora punta al actualizar la imagen, y rellenar con `00` los PIN de 4
+/// —el «autofill» de Clover— es un PIN de 6 con la entropía de 4 y un sufijo que conoce todo el
+/// mundo.
+pub const DEFAULT_PIN_LENGTH: i64 = 4;
+
 /// Ceiling of the idle window. Above this the "lock" would outlive the longest coffee break and
 /// the position stops being distinguishable from "until you sign out".
 pub const MAX_PIN_INACTIVITY_MINUTES: i64 = 30;

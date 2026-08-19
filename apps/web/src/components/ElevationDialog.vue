@@ -93,7 +93,7 @@
             ref="pinpadRef"
             data-testid="elevation-pinpad"
             dots
-            :length="4"
+            :length="hubPinLength"
             :error="errorKey !== ''"
             :aria-busy="sending"
             secondary-icon="arrow-back-outline"
@@ -120,6 +120,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { hubPinLength } from '../lib/pin-length';
 import { useI18n } from 'vue-i18n';
 import { IonModal, IonButton, IonCard, IonCardContent, IonInput, IonNote } from '@ionic/vue';
 

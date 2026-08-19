@@ -498,3 +498,97 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
     rt.set_pin(&id, "").await.unwrap();
     assert!(!row(&rt, &id).await.has_pin);
 }
+
+// ── La LONGITUD del PIN la fija el HUB, y es fija para todo el mundo (hub#974) ──────────────
+//
+// Decisión de mercado (9 referencias + foros, tabla en la issue): gana el modelo de Clover —
+// longitud FIJA por cuenta, 4 o 6. La uniformidad es lo que permite que el teclado envíe solo al
+// último dígito: los productos que admiten longitud variable (Toast 3-8, Lightspeed K 4-6,
+// Shopify 4-6) están OBLIGADOS a poner un botón de confirmar, y un cajero que ficha decenas de
+// veces al día paga ese toque extra decenas de veces al día.
+//
+// **Un hub nuevo se crea con 6**, pero ese 6 lo escribe quien lo crea: aquí dentro, un hub recién
+// migrado y uno de hace un año son la misma base de datos, así que el default es 4 — la longitud
+// con la que se tecleaban todos los PIN que hoy funcionan. Y lo que NO se copia de Clover es su
+// «autofill», que rellena con `00` los PIN de 4 al pasar a 6: un PIN de seis dígitos con la
+// entropía de cuatro y un sufijo que conoce todo el mundo.
+
+#[tokio::test]
+async fn the_length_is_the_hubs_and_a_pin_of_another_length_is_refused() {
+    let rt = runtime("hub-largo").await;
+    rt.set_pin_length(6).await.unwrap();
+
+    let err = rt
+        .create_hub_user(&NewHubUser {
+            name: "Ana Soto".into(),
+            email: String::new(),
+            role: "employee".into(),
+            pin: "2580".into(), // cuatro, en un hub que pide seis
+            badge: String::new(),
+            local: true,
+        })
+        .await
+        .expect_err("la longitud es fija: cuatro no cuela en un hub de seis");
+    assert!(format!("{err}").contains('6'), "el mensaje dice cuántos dígitos: {err}");
+
+    rt.create_hub_user(&NewHubUser {
+        name: "Ana Soto".into(),
+        email: String::new(),
+        role: "employee".into(),
+        pin: "258013".into(),
+        badge: String::new(),
+        local: true,
+    })
+    .await
+    .expect("seis dígitos sí");
+}
+
+#[tokio::test]
+async fn a_hub_that_says_nothing_keeps_the_length_its_pins_were_typed_with() {
+    let rt = runtime("hub-viejo").await;
+    // Sin decir nada: 4, que es lo que el pinpad aceptó siempre. Actualizar la imagen no puede
+    // dejar a los cajeros fuera en hora punta.
+    assert_eq!(rt.pin_length().await.unwrap(), 4);
+
+    let id = rt
+        .create_hub_user(&NewHubUser {
+            name: "Ana Soto".into(),
+            email: String::new(),
+            role: "employee".into(),
+            pin: "2580".into(),
+            badge: String::new(),
+            local: true,
+        })
+        .await
+        .expect("cuatro dígitos siguen valiendo");
+    assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
+
+    // Y subir el listón NO invalida el PIN que ya funcionaba: sigue entrando hasta que su dueño lo
+    // cambie. Lo que cambia es lo que se admite al ponerlo NUEVO.
+    rt.set_pin_length(6).await.unwrap();
+    assert!(
+        rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some(),
+        "un PIN vigente no se rompe porque el hub suba la longitud"
+    );
+    let err = rt
+        .update_hub_user(
+            &id,
+            &UpdateHubUser { pin: Some("2580".into()), ..UpdateHubUser::default() },
+        )
+        .await
+        .expect_err("pero uno nuevo ya tiene que ser de seis");
+    assert!(format!("{err}").contains('6'), "{err}");
+}
+
+#[tokio::test]
+async fn the_hub_only_admits_the_two_lengths_the_market_uses() {
+    let rt = runtime("hub-raro").await;
+    for absurda in [1, 3, 5, 7, 8, 12] {
+        assert!(
+            rt.set_pin_length(absurda).await.is_err(),
+            "`{absurda}` no es una longitud que ningún TPV ofrezca"
+        );
+    }
+    rt.set_pin_length(4).await.unwrap();
+    rt.set_pin_length(6).await.unwrap();
+}

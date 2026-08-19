@@ -58,6 +58,10 @@ export interface HubSettings {
    *  Solo tiene efecto con `pin_policy = always` y en dispositivos `shared`; quien lo aplica es
    *  el detector del shell (lib/idle-logout), el TTL de servidor queda como red. */
   pin_inactivity_minutes: number;
+  /** Cuántos DÍGITOS tiene el PIN de este hub (hub#974): 4 o 6, igual para todo el mundo. Fija a
+   *  propósito — es lo que permite que el teclado envíe al último dígito en vez de pedir un
+   *  «Aceptar» que el cajero pulsaría decenas de veces al día. Lo normaliza `lib/pin-length`. */
+  pin_length: number;
 }
 
 /**
@@ -101,6 +105,9 @@ function setHubSettings(raw: unknown): HubSettings {
       (r.pin_inactivity_minutes as number) <= 30
         ? (r.pin_inactivity_minutes as number)
         : 5,
+    // Longitud del PIN (hub#974). Un valor que no sea 4 ni 6 degrada al default (6): pintar un
+    // teclado con una longitud que el runtime va a rechazar sería fallar en caja, con cola.
+    pin_length: r.pin_length === 4 || r.pin_length === 6 ? r.pin_length : 4,
   };
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).

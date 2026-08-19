@@ -280,7 +280,7 @@
                     <ok-pinpad
                       ref="mainPinpadRef"
                       dots
-                      :length="4"
+                      :length="hubPinLength"
                       :error="pinError"
                       :aria-busy="pinLoading"
                       secondary-icon="arrow-back-outline"
@@ -316,7 +316,7 @@
                   <ok-pinpad
                     ref="setupPinpadRef"
                     dots
-                    :length="4"
+                    :length="hubPinLength"
                     :error="setupError"
                     @ok-complete="onSetupPinComplete"
                   ></ok-pinpad>
@@ -343,6 +343,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { hubPinLength } from '../lib/pin-length';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {

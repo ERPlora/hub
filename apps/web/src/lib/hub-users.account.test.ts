@@ -5,6 +5,7 @@
 // la UI tiene que (a) mandar el email —que sin la casilla es obligatorio—, (b) saber DECIR POR QUÉ
 // cuando el runtime rechaza, y (c) adelantar lo que puede ver, para no pedirle al administrador que
 // pulse «Crear» y espere a la red para enterarse de que `kitchen` no es un rol que el SaaS conceda.
+import { hubSettings } from './hub-settings';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./runtime', () => ({
@@ -84,6 +85,8 @@ describe('alta de usuario de cuenta (hub#356)', () => {
   });
 
   it('adelanta en la UI los motivos que el runtime va a rechazar', () => {
+    // La longitud del PIN la fija el HUB (hub#974); estos casos van contra un hub de cuatro.
+    hubSettings.value = { pin_length: 4 } as never;
     const census = [manager, revoked];
     const ok = { name: 'Marta Ruiz', email: 'marta@example.com', role: 'employee', pin: '' };
     expect(accountUserIssue(ok, census)).toBe('');

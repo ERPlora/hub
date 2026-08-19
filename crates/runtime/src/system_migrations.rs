@@ -1722,6 +1722,7 @@ CREATE INDEX IF NOT EXISTS ix_flow_wait_event \
   WHERE status = 'armed' AND deleted_at IS NULL;\
 CREATE INDEX IF NOT EXISTS ix_flow_wait_run ON _flow_run_waits (hub_id, run_id);",
     },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
