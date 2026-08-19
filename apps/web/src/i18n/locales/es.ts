@@ -402,6 +402,9 @@ export default {
     revokeError: 'No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.',
   },
   pinPolicy: {
+    lengthTitle: 'Dígitos del PIN',
+    lengthDigits: '{n} dígitos',
+    lengthConsequence: 'Todo el mundo teclea el mismo número de dígitos, que es lo que permite que el teclado entre al último en vez de pedirte confirmar. Los PIN que ya se usan siguen funcionando hasta que su dueño los cambie.',
     title: 'Pinpad',
     intro:
       'Si se muestra el pinpad y se pregunta quién está en la caja. Vale para todo el negocio: además, cada dispositivo decide por su cuenta, arriba.',

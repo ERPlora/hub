@@ -429,6 +429,9 @@ export default {
   // because the hub really does enforce them, and a promise it cannot keep would be worse than no
   // setting at all.
   pinPolicy: {
+    lengthTitle: 'PIN length',
+    lengthDigits: '{n} digits',
+    lengthConsequence: 'Everybody types the same number of digits, which is what lets the keypad sign you in on the last one instead of asking you to confirm. PINs already in use keep working until their owner changes them.',
     title: 'PIN pad',
     intro:
       'Whether the PIN pad is shown and asks who is at the till. It applies to the whole business — each device also decides for itself, above.',
