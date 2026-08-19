@@ -7,16 +7,22 @@ la **MISMA app Tauri** de este repo, bajo la identidad única **`com.erplora.app
 job **`build-android`**. ADR-0196 remata la dirección: **la app Kotlin de
 `ERPlora-Bridge-android` muere**, y con ella el bridge como proceso aparte.
 
-> ⚠️ **Hueco de cableado abierto:** este workflow **construye** el AAB (`erplora-app.aab`) y
-> lo sube a Object Storage, pero **no lo publica** en Play — aquí no hay job `publish-play`.
-> El único `publish-play` que existe vive en `ERPlora-Bridge-android/.github/workflows/build.yml`
-> y publica el AAB **Kotlin**, que es justo el que ADR-0196 retira. Nadie publica
-> `erplora-app.aab`. Seguimiento: hub#308.
+> ✅ **El hueco de cableado se cerró.** Este workflow ya tiene su job **`publish-play`**, que
+> consume el AAB de `build-android` y lo sube a la pista. (El aviso anterior decía que no
+> existía y apuntaba al `publish-play` de `ERPlora-Bridge-android`, que publicaba el AAB
+> **Kotlin** retirado por ADR-0196.) Lo que queda para que publique de verdad son **credenciales
+> y Variables, no código** — ver «Pasos manuales» abajo. Seguimiento: hub#984.
 
 Sigue vigente la decisión de canal (2026-07-16): Android de cara al cliente se distribuye
 **SOLO por Google Play** (UE; confianza; todos los terminales objetivo tienen Play). La
 landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a Play
 (saas#707).
+
+> 🔒 **Y ese 302 ya no depende de configuración** (hub#984). Estaba gateado por el setting
+> `GOOGLE_PLAY_APP_ID` y, vacío, `/app/download/android/` caía al **APK presignado** de Object
+> Storage — que es lo que hacía producción hasta el 19/08. El `applicationId` va horneado en el
+> AAB, así que el SaaS lo sabe en tiempo de código (`downloads.ANDROID_PLAY_PACKAGE`) y el
+> setting quedó solo como anulación. **Android no tiene fallback a APK: o Play, o 404.**
 
 ## Requisitos
 
@@ -42,8 +48,8 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
 | --- | --- |
 | Build del AAB | este repo, [`tauri-release.yml`](../../.github/workflows/tauri-release.yml) job `build-android` |
 | Subida a Object Storage | ídem, job `upload-s3` |
-| Publicación en Play | **no cableada** (ver aviso de arriba) |
-| Redirect 302 a Play | SaaS `apps/public/downloads.py::store_url_for` + setting `GOOGLE_PLAY_APP_ID` |
+| Publicación en Play | ídem, job `publish-play` — gateado por la Variable `PLAY_PACKAGE_NAME` |
+| Redirect 302 a Play | SaaS `apps/public/downloads.py::store_url_for` (constante `ANDROID_PLAY_PACKAGE`; el setting `GOOGLE_PLAY_APP_ID` solo lo anula) |
 
 ## Pasos manuales (Ioan) — en orden
 
@@ -52,15 +58,27 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
    registra la upload key (keystore ADR-0053) y activa Play App Signing. Formularios: Data
    safety · content rating IARC · privacy policy URL · screenshots (mín. 2) + feature graphic
    1024×500 + icono 512×512.
-3. Cablear la publicación automática en **este** repo (hub#308): poner la Variable
-   `PLAY_PACKAGE_NAME` (+ el secret `PLAY_SERVICE_ACCOUNT_JSON`) y **quitar `play` de
-   `RELEASE_CHANNELS_PENDING`** (hub#895). Mientras `play` siga en esa lista, el job
-   `release-gate` deja pasar el tag en verde avisando de que Play no publicó; en cuanto se
-   quita, un tag que no llegue a Play sale **rojo**.
-4. Promoción `internal` → `production` manual en consola (cuenta org = sin closed testing
-   obligatorio).
-5. Con la ficha LIVE: setting `GOOGLE_PLAY_APP_ID=com.erplora.app` en Dokploy (saas-web) → la
-   landing y el Hub redirigen solos a Play.
+3. **Crear la service account y darle permiso** — el único paso que sigue pidiendo un humano
+   (hub#984): en Google Cloud, service account sin roles IAM; en **Play Console → Users and
+   permissions**, invitarla sobre ESTA app con «Release to testing tracks» y nada más. Su JSON
+   va al secret `PLAY_SERVICE_ACCOUNT_JSON` del repo `ERPlora/hub`.
+4. **Enchufar el canal, los tres a la vez** (el orden importa, ver el comentario del
+   `release-gate` en el workflow): con el secret ya puesto → Variable `PLAY_PACKAGE_NAME`
+   (`com.erplora.app`) → y **quitar `play` de `RELEASE_CHANNELS_PENDING`** (hub#895), que pasa
+   a valer `store`. Mientras `play` siga en esa lista, el gate deja pasar el tag en **verde**
+   aunque Play no publique; en cuanto se quita, un tag que no llegue a Play sale **rojo**.
+   ⚠️ Ponerlas en otro orden deja el gate rojo: sin `PLAY_PACKAGE_NAME` el job se salta, y con
+   la Variable pero sin el secret el job falla.
+   ⚠️ Las Variables van en el repo `ERPlora/hub`, **no** en la organización: con el plan Free
+   las Variables de org NO llegan a un repo privado aunque digan «all repositories».
+   Comprobar con `gh variable list --repo ERPlora/hub`, no dar por hecho que se heredan.
+5. Promoción `internal` → `production` manual en consola (cuenta org = sin closed testing
+   obligatorio). Automatizarla por tag pide antes un rollout escalonado: hoy `publish-play`
+   sube con `status: completed`, o sea 100% de golpe.
+
+> El paso que había aquí —«setting `GOOGLE_PLAY_APP_ID=com.erplora.app` en Dokploy»— **ya no
+> hace falta**: hub#984 quitó esa dependencia del SaaS. Ponerlo es inocuo, pero no es lo que
+> enciende el 302.
 
 ## Verificación
 

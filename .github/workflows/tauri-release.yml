@@ -543,9 +543,20 @@ jobs:
   # paquete que aún no existe en la consola.
   #
   # `PLAY_TRACK` decide la pista y su default es `internal` a propósito — la promoción a producción
-  # se hace a mano en la consola mientras no haya confianza. `changesNotSentForReview: true` porque
-  # una release en pista interna se revisa sola; mandarla a revisión desde aquí sería decidir por el
-  # humano algo que el runbook deja en su mano.
+  # se hace a mano en la consola. Y sigue siendo lo correcto por una razón que no es la prudencia:
+  # este paso sube con `status: completed`, o sea rollout al 100% de golpe. En un TPV eso es mandar
+  # una versión sin probar a todas las cajas a la vez; producción por tag pide antes un rollout
+  # escalonado (`status: inProgress` + `userFraction`), que hoy no está cableado.
+  #
+  # ⚠️ `changesNotSentForReview: false` (hub#984). Estuvo en `true`, y ese era el fallo: subía el
+  # AAB y lo dejaba PARADO en la consola esperando un clic de «Submit for review» — la release
+  # existía y no llegaba a nadie, con el job en verde. Se puso así cuando la ficha aún no había
+  # pasado su PRIMERA revisión, porque hasta entonces Play rechaza el envío automático; superada
+  # esa revisión, la razón caducó y lo que quedaba era un canal mudo.
+  #
+  # Lo que trae el `false`: manda a revisión TODO lo que la ficha tenga pendiente, no solo el AAB.
+  # Es lo que se quiere aquí (los 14 cambios de la ficha se enviaron el 19/08), pero conviene
+  # saberlo: si alguien deja a medias un formulario en la consola, el tag lo envía con la release.
   #
   # La service account NO necesita roles IAM en GCP: los permisos se conceden invitándola en Play
   # Console sobre esta app, con «Release to testing tracks» y nada más.
@@ -584,7 +595,7 @@ jobs:
           releaseFiles: artifacts/erplora-app.aab
           track: ${{ vars.PLAY_TRACK || 'internal' }}
           status: completed
-          changesNotSentForReview: true
+          changesNotSentForReview: false
 
   upload-s3:
     name: Upload to Object Storage
@@ -699,10 +710,19 @@ jobs:
   # Declarar un canal = Variable `RELEASE_CHANNELS_PENDING` (lista separada por comas:
   # `store`, `play`). Es la diferencia entre «sabemos que Play aún no está enchufado» y
   # «nadie se dio cuenta». Hoy: MICROSOFT_STORE_PRODUCT_ID se retiró a propósito y la
-  # decisión de restaurarla es de Ioan (hub#392); PLAY_PACKAGE_NAME espera la primera
-  # subida manual que exige Google (hub#308). Mientras esas dos sigan así, la Variable
+  # decisión de restaurarla es de Ioan (hub#392); PLAY_PACKAGE_NAME espera el secret
+  # `PLAY_SERVICE_ACCOUNT_JSON` (hub#984). Mientras esas dos sigan así, la Variable
   # debe valer `store,play` — y el run lo dirá en cada tag con un warning, que es
   # exactamente lo que se pedía: hacer VISIBLE el estado, no ocultarlo.
+  #
+  # ⚠️ **`play` sale de esa lista en cuanto Play publique, y no antes** (hub#984). Declararlo
+  # pendiente es lo que ha dejado pasar en VERDE, tag tras tag, releases que no llegaron a
+  # ninguna tienda — el estado se hizo visible y luego nadie lo miró. Pero quitarlo antes de
+  # tiempo tampoco vale: sin `PLAY_PACKAGE_NAME` el job se salta y el gate sale ROJO, y con la
+  # Variable puesta pero sin el secret el job FALLA y sale rojo igual. El orden es uno solo:
+  #   1) secret `PLAY_SERVICE_ACCOUNT_JSON` (service account invitada en Play Console),
+  #   2) Variables `PLAY_PACKAGE_NAME` (+ `PLAY_TRACK` si no vale `internal`),
+  #   3) quitar `play` de `RELEASE_CHANNELS_PENDING` — los tres juntos, no sueltos.
   #
   # `upload-s3` NO lleva Variable: es obligatorio. Es quien escribe `latest.json`, lo
   # único contra lo que la app instalada compara su versión (hub#400); sin él la flota
