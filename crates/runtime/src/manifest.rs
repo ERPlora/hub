@@ -1267,8 +1267,11 @@ pub struct AiTool {
     /// significa nada portable —`sales.void` es destructivo y no lo dice— y un core que lo
     /// adivinara estaría decidiendo por el módulo cuánto vale su propio dato. El módulo lo sabe.
     ///
-    /// Ausente = `normal`: el bloque es opcional y ningún manifest publicado lo declara todavía.
-    #[serde(default)]
+    /// Ausente = `normal`: el bloque es opcional.
+    ///
+    /// Se lee con [`deserialize_risk`] y no con el `Deserialize` derivado, para que un valor
+    /// fuera del vocabulario NO impida instalar el módulo.
+    #[serde(default, deserialize_with = "deserialize_risk")]
     pub risk: Option<AiRisk>,
 }
 
@@ -1283,6 +1286,37 @@ pub enum AiRisk {
     Destructive,
     /// Alcanza a un CONJUNTO cuyo tamaño el usuario no ve al confirmar.
     BulkDestructive,
+    /// Un valor que este core no conoce — **nunca lo escribe un manifest**: lo produce la
+    /// degradación de [`deserialize_risk`] cuando llega algo fuera del vocabulario.
+    ///
+    /// Se comporta como `destructive` en toda política: un riesgo que no entendemos no se trata
+    /// como inofensivo.
+    #[serde(skip)]
+    Unknown,
+}
+
+/// Lee `ai.risk` SIN poder tumbar la instalación del módulo (hub#1042).
+///
+/// `erplora validate` comprueba las CLAVES del manifest, no los valores de un enum: un módulo con
+/// `risk: "catastrophic"` pasa la puerta del autor y se publica. Si aquí se usara el
+/// `Deserialize` derivado, ese valor haría fallar el parseo del manifest ENTERO y el módulo
+/// dejaría de instalarse — con el fallo apareciendo en el hub de un cliente, no en el CI de quien
+/// lo escribió. Es el modo de fallo que `module-toolkit/src/manifest-schema.mjs` documenta como
+/// el peor de los dos.
+///
+/// Así que se degrada, y hacia el lado SEGURO: lo que no se entiende se trata como destructivo.
+fn deserialize_risk<'de, D>(d: D) -> std::result::Result<Option<AiRisk>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let raw = <Option<String> as serde::Deserialize>::deserialize(d)?;
+    Ok(raw.map(|value| match value.as_str() {
+        "normal" => AiRisk::Normal,
+        "destructive" => AiRisk::Destructive,
+        "bulk_destructive" => AiRisk::BulkDestructive,
+        _ => AiRisk::Unknown,
+    }))
 }
 
 impl AiRisk {
@@ -1294,6 +1328,9 @@ impl AiRisk {
             AiRisk::Normal => "normal",
             AiRisk::Destructive => "destructive",
             AiRisk::BulkDestructive => "bulk_destructive",
+            // Hacia fuera se presenta como destructivo: el cliente aplica la política estricta
+            // sin tener que conocer una cuarta palabra.
+            AiRisk::Unknown => "destructive",
         }
     }
 }
@@ -1974,6 +2011,59 @@ pub struct NavLocale {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// Un `risk` fuera del vocabulario NO puede impedir que el módulo se instale (hub#1042).
+    ///
+    /// `erplora validate` comprueba las CLAVES del manifest, no los valores del enum: un módulo
+    /// con `risk: "catastrophic"` pasa la puerta del autor y se publica. Si el runtime se negara a
+    /// parsearlo, el módulo entero dejaría de instalarse —y el fallo aparecería en el hub de un
+    /// cliente, no en el CI de quien lo escribió. Es exactamente el modo de fallo que el toolkit
+    /// documenta como el peor de los dos.
+    ///
+    /// Así que se degrada, y se degrada HACIA EL LADO SEGURO: un riesgo que no entendemos se
+    /// trata como destructivo, no como normal. Y se deja dicho en `warnings`, que es el canal que
+    /// el manifest ya tiene para «esto no lo entendí y seguí».
+    #[test]
+    fn an_unknown_risk_degrades_to_destructive_instead_of_bricking_the_install() {
+        let raw = r#"{"id":"x","name":"X","version":"1.0.0",
+          "commands":{"x.wipe":{"permission":"x.d","ai":{"description":"d","risk":"catastrophic"}}}}"#;
+
+        let manifest: Manifest = serde_json::from_str(raw).expect("el módulo TIENE que instalarse");
+
+        let ai = manifest.commands["x.wipe"].ai.as_ref().expect("bloque ai");
+        assert_eq!(
+            ai.risk.map(AiRisk::as_str),
+            Some("destructive"),
+            "un riesgo desconocido se trata como destructivo: fallar hacia el lado seguro"
+        );
+    }
+
+    /// El vocabulario conocido sigue leyéndose tal cual.
+    #[test]
+    fn the_declared_vocabulary_is_read_as_declared() {
+        for (raw, expected) in [
+            ("normal", AiRisk::Normal),
+            ("destructive", AiRisk::Destructive),
+            ("bulk_destructive", AiRisk::BulkDestructive),
+        ] {
+            let json = format!(
+                r#"{{"id":"x","name":"X","version":"1.0.0",
+                   "commands":{{"x.op":{{"permission":"p","ai":{{"description":"d","risk":"{raw}"}}}}}}}}"#
+            );
+            let m: Manifest = serde_json::from_str(&json).expect("parsea");
+            assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, Some(expected), "{raw}");
+        }
+    }
+
+    /// Sin declarar sigue siendo «sin declarar», que el ensamblado traduce a `normal`.
+    #[test]
+    fn an_undeclared_risk_stays_undeclared() {
+        let raw = r#"{"id":"x","name":"X","version":"1.0.0",
+          "commands":{"x.op":{"permission":"p","ai":{"description":"d"}}}}"#;
+        let m: Manifest = serde_json::from_str(raw).expect("parsea");
+        assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, None);
+    }
     use super::*;
 
     /// hub#380 — «my data belongs to the installation that produced it» is something the MODULE
