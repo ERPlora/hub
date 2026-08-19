@@ -66,13 +66,31 @@
               <span v-if="messageText(m.content)">{{ messageText(m.content) }}</span>
               <ion-spinner v-else-if="m.role === 'assistant'" name="dots" class="chat-typing" />
             </div>
+            <!-- The grounding notice (hub#1038, #1039, #1048). Written by the RUNTIME from the
+                 turn's receipts, never by the model: the answer claimed a change no tool made,
+                 printed an id no tool returned, or pointed at a screen this hub does not serve.
+                 It sits OUTSIDE the bubble on purpose — it is chrome, not part of the reply. -->
+            <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
+              <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.claimedWithoutEffect') }}
+              </p>
+              <p v-if="m.grounding.unsourcedIds.length" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.unsourcedId') }}
+              </p>
+              <p v-if="m.grounding.unknownRoutes.length" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.unknownRoute') }}
+              </p>
+            </div>
             <!-- Botones de navegación: si la respuesta del asistente menciona rutas internas del
                  shell (/m/…, /settings#…, /apps#…, …), se extraen y se ofrecen como CTAs clicables
                  que navegan vía router.push. Así el asistente puede llevar al usuario a la pantalla
                  exacta sin depender de markdown/links embebidos (las burbujas son texto plano). -->
             <div v-if="m.role === 'assistant' && messageText(m.content)" class="chat-actions">
               <ion-button
-                v-for="r in extractRoutes(messageText(m.content))"
+                v-for="r in extractRoutes(messageText(m.content), m.grounding)"
                 :key="r.url"
                 size="small"
                 fill="outline"
@@ -202,6 +220,8 @@ import { reportAssistantMessage } from '../lib/assistant-report';
 import { toastSuccess, toastError } from '../lib/toast';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
+import { moduleNav } from '../lib/nav';
+import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
 
@@ -215,14 +235,19 @@ const router = useRouter();
  */
 const ROUTE_RE = /(\/(?:m\/[\w-]+(?:\/[\w-]+)?|settings|apps|dashboard|system|billing|employees)(?:#[\w-]+)?)/g;
 interface ExtractedRoute { url: string; label: string }
-function extractRoutes(text: string): ExtractedRoute[] {
+function extractRoutes(text: string, grounding?: TurnAudit): ExtractedRoute[] {
   const matches = text.match(ROUTE_RE);
   if (!matches) return [];
+  // A route the audit could not find in this hub never becomes a button (hub#1048): offering
+  // «Go to» for an invented screen sends the user to /dashboard via the catch-all and leaves
+  // them sure their hub is broken.
+  const unknown = new Set((grounding?.unknownRoutes ?? []).map((r) => r.toLowerCase()));
   const seen = new Set<string>();
   const out: ExtractedRoute[] = [];
   for (const url of matches) {
     if (seen.has(url)) continue;
     seen.add(url);
+    if (unknown.has(url.toLowerCase().replace(/\/+$/, ''))) continue;
     // Etiqueta legible: "VeriFactu › Ajustes" para /m/verifactu/settings; el nombre del tab para los #hash.
     let label = url;
     const m = url.match(/^\/m\/([\w-]+)(?:\/([\w-]+))?/);
@@ -237,6 +262,22 @@ function extractRoutes(text: string): ExtractedRoute[] {
     out.push({ url, label });
   }
   return out.slice(0, 4); // máximo 4 CTAs por mensaje
+}
+
+/**
+ * The hub's REAL navigation map, for the grounding audit (hub#1047, hub#1048). Two authorities,
+ * no third list: the router for the shell's own screens, and `/api/navigation` (via `moduleNav`)
+ * for the modules actually installed. A route the model invents — `/settings/developers` was the
+ * one the QA pass caught — matches neither, and the router's catch-all would have redirected it
+ * to /dashboard in silence.
+ */
+function knownRoutes(): string[] {
+  const shell = router
+    .getRoutes()
+    .map((r) => r.path)
+    .filter((path) => !path.includes(':') && path !== '/');
+  const modules = moduleNav.value.map((m) => m.path);
+  return [...shell, ...modules];
 }
 
 /** Navega a una ruta interna del shell (router.push) y cierra el drawer para que vea la pantalla. */
@@ -423,6 +464,18 @@ async function send(): Promise<void> {
   }
 
   abort = streamAssistant(history, {
+    // The map the audit checks a named screen against (hub#1047, hub#1048).
+    knownRoutes: knownRoutes(),
+    /**
+     * The turn's grounding verdict (hub#1038, hub#1039). It is stamped on the MESSAGE, so the
+     * notice renders as chrome the runtime wrote — never as a sentence the model could have
+     * phrased away. A clean verdict leaves the bubble exactly as it was.
+     */
+    onAudit: (audit: TurnAudit) => {
+      const flagged =
+        audit.claimedWithoutEffect || audit.unsourcedIds.length > 0 || audit.unknownRoutes.length > 0;
+      if (flagged) assistantMsg.value.grounding = audit;
+    },
     // Confirm-card de ESCRITURAS (§9.2): sin este handler, streamAssistant cancela toda
     // mutación por default-deny — correcto como seguro, pero dejaba al asistente sin manos
     // (ni instalar un módulo ni ningún command de módulo). Un ion-alert nativo: el usuario ve
@@ -711,6 +764,22 @@ onBeforeUnmount(() => {
 }
 .chat-report-btn:hover {
   --color: var(--ion-color-danger, #c00);
+}
+.chat-grounding {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-inline-start: 3px solid var(--ion-color-warning, #ffc409);
+  background: var(--ok-surface-2, rgba(255, 196, 9, 0.08));
+  border-radius: 6px;
+}
+.chat-grounding-line {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--ion-color-warning-shade, #b88a00);
 }
 .chat-bubble {
   padding: 0.6rem 0.85rem;
