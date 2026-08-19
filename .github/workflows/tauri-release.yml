@@ -543,9 +543,16 @@ jobs:
   # paquete que aún no existe en la consola.
   #
   # `PLAY_TRACK` decide la pista y su default es `internal` a propósito — la promoción a producción
-  # se hace a mano en la consola mientras no haya confianza. `changesNotSentForReview: true` porque
-  # una release en pista interna se revisa sola; mandarla a revisión desde aquí sería decidir por el
-  # humano algo que el runbook deja en su mano.
+  # se hace a mano en la consola mientras no haya confianza.
+  #
+  # 🔴 `changesNotSentForReview: false` desde el 2026-08-19, y esto es lo contrario de lo que decía
+  # aquí antes. El argumento viejo era que mandar a revisión «decide por el humano»; lo que decide
+  # de verdad `true` es NO mandar: el AAB se sube y el cambio se queda en «Changes not yet
+  # submitted for review» esperando un clic que nadie sabe que tiene pendiente. Pasó con la primera
+  # ficha: 14 cambios guardados el 14/08 seguían sin enviarse el 19/08, `Submission activity` vacío
+  # y la app en `Draft` como `com.erplora.app (unreviewed)`, mientras cada tag salía verde. Un
+  # canal cuyo último paso es humano no está automatizado; y el peor de los dos fallos es el que
+  # PARECE que publicó. Guardado por `release_gate.rs`.
   #
   # La service account NO necesita roles IAM en GCP: los permisos se conceden invitándola en Play
   # Console sobre esta app, con «Release to testing tracks» y nada más.
@@ -584,7 +591,7 @@ jobs:
           releaseFiles: artifacts/erplora-app.aab
           track: ${{ vars.PLAY_TRACK || 'internal' }}
           status: completed
-          changesNotSentForReview: true
+          changesNotSentForReview: false
 
   upload-s3:
     name: Upload to Object Storage
