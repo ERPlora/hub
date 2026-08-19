@@ -198,6 +198,23 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          hub unless the user plainly says otherwise.\n\n",
     );
 
+    // The two facts a model can NEVER supply itself, injected per request.
+    //
+    // The version was the one the QA pass of 2026-08-19 caught worst (hub#1044): asked «what
+    // version of ERPlora do I have?», with `v1.1.7` printed in the sidebar of the same screen,
+    // it answered that ERPlora HAS no single version and invented a per-module versioning
+    // architecture to justify it. There was no path to the answer — no block carried the number
+    // and no core tool reads it — and a model with no datum and no permission to say "I don't
+    // know" improvises. It comes from the one place that owns it (hub#515), the same number
+    // `/readyz` and the sidebar report, so the three cannot drift.
+    s.push_str(&format!(
+        "## This installation\n\nERPlora version running here: **v{}**. This is THE version of \
+         this installation — one number for the whole product, not one per module (installed \
+         modules have their own versions on top of it). If asked which version this is, answer \
+         with this number.\n\n",
+        crate::version::HUB_VERSION
+    ));
+
     // "Today" is the one fact a model can never supply itself — its clock froze at training
     // time — and in an ERP the date is load-bearing: today's sales, this quarter, due dates.
     // Injected per request; UTC so it is unambiguous, and the model converts for the user.
@@ -729,6 +746,35 @@ mod tests {
     /// user writes the price however they speak it ("12,50", "12.50", "12 euros 50"); converting
     /// that to cents is the assistant's job, and it has to be told so.
     #[test]
+    /// «What version of ERPlora do I have?» is one of the most basic identity questions an ERP
+    /// gets, and the assistant had NO path to it: no block of the prompt carried the number and
+    /// none of the five core tools reads it. So the model improvised — and improvised an
+    /// ARCHITECTURE: «ERPlora has no single global version», while `v1.1.7` was printed in the
+    /// sidebar of the very same screen (hub#1044).
+    ///
+    /// The number is not a fact a model can hold: it changes with every release. It is injected,
+    /// like the date, from the one place that owns it (`crate::version::HUB_VERSION`, hub#515).
+    #[test]
+    fn instructions_state_the_version_this_hub_is_running() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        assert!(
+            ins.contains(crate::version::HUB_VERSION),
+            "the running version must be in the prompt, from the single source (hub#515): {ins}"
+        );
+    }
+
+    /// Knowing the number is half of it. The model also has to be told the number is THE hub's,
+    /// so it stops answering the question with a lecture about per-module versioning.
+    #[test]
+    fn the_version_is_presented_as_this_hub_s_own() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("version"),
+            "the version has to be named as such, not left as a bare number: {ins}"
+        );
+    }
+
     fn instructions_state_the_money_contract_in_cents() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
