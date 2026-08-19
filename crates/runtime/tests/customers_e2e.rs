@@ -85,8 +85,17 @@ async fn record_purchase_transitions_lifecycle() {
     let ctx = admin();
     let id = new_customer(&rt, &ctx, "Lead X", "lead").await;
 
+    // `customers.record_purchase` es INTERNO desde customers#8 (`"internal": true`): es el
+    // listener de `sale.completed`, no una puerta pública — que un cliente pudiera llamarlo
+    // movería los totales de un cliente sin que hubiera habido venta. La decisión del módulo es
+    // la correcta; lo que estaba desfasado es este test, que lo llamaba por la puerta pública.
+    //
+    // Aquí el test actúa como HOST EMBEBEDOR y siembra la intención exacta que emitiría el
+    // listener — el mismo patrón que `appointments_availability_e2e` usa con sus sub-commands.
+    // Lo que se ejerce es la máquina de estados del ciclo de vida, no la puerta.
+    //
     // primera compra: lead → first_purchase. total en CÉNTIMOS (ADR-0007): 5000 = 50€.
-    rt.execute_command("customers.record_purchase",
+    rt.execute_command_internal("customers.record_purchase",
         &params(json!({ "customer_id": id, "total": 5000 })), &ctx).await.unwrap();
     let c = rt.execute_query("customers.get", &params(json!({"customer_id": id})), &ctx).await.unwrap();
     assert_eq!(c[0]["lifecycle_stage"], json!("first_purchase"));
@@ -94,7 +103,7 @@ async fn record_purchase_transitions_lifecycle() {
     assert_eq!(c[0]["total_spent"].as_i64().unwrap(), 5000);
 
     // segunda compra: first_purchase → active. 3000 = 30€.
-    rt.execute_command("customers.record_purchase",
+    rt.execute_command_internal("customers.record_purchase",
         &params(json!({ "customer_id": id, "total": 3000 })), &ctx).await.unwrap();
     let c2 = rt.execute_query("customers.get", &params(json!({"customer_id": id})), &ctx).await.unwrap();
     assert_eq!(c2[0]["lifecycle_stage"], json!("active"));

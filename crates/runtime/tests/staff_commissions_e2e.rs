@@ -33,6 +33,28 @@ async fn create_member(rt: &Runtime, ctx: &RequestContext, first: &str, rate: f6
     })), ctx).await.unwrap();
 }
 
+/// Da de baja a un miembro por la puerta que lo hace de verdad (`staff.members.delete`:
+/// fecha, motivo, soft-delete y evento). El alta no admite `terminated` desde staff 36c0bd2.
+async fn terminate_member(rt: &Runtime, ctx: &RequestContext, first: &str) {
+    let id = rt
+        .execute_query("staff.members.list", &Params::new(), ctx)
+        .await
+        .unwrap()
+        .iter()
+        .find(|r| r["first_name"].as_str() == Some(first))
+        .unwrap_or_else(|| panic!("{first} debe estar en la lista"))["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    rt.execute_command(
+        "staff.members.delete",
+        &params(json!({ "staff_id": id, "termination_date": "2026-08-19", "reason": "e2e" })),
+        ctx,
+    )
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn install_registers_commissions_query() {
     if !erplora_runtime::require_modules_workspace() { return; }
@@ -50,7 +72,10 @@ async fn commissions_summary_returns_rate_per_active_member() {
     let ctx = admin();
     create_member(&rt, &ctx, "Ana", 15.0, "active").await;
     create_member(&rt, &ctx, "Beto", 10.0, "active").await;
-    create_member(&rt, &ctx, "Caro", 20.0, "terminated").await; // excluido
+    // Caro nace activa y se DA DE BAJA: el alta ya no puede nacer `terminated` (staff 36c0bd2),
+    // la baja es su propia puerta con fecha y motivo. Así el test ejerce el camino real.
+    create_member(&rt, &ctx, "Caro", 20.0, "active").await;
+    terminate_member(&rt, &ctx, "Caro").await;                  // excluido
     create_member(&rt, &ctx, "Dani", 0.0, "inactive").await;    // excluido
 
     let rows = rt.execute_query("staff.commissions.summary", &Params::new(), &ctx).await.unwrap();

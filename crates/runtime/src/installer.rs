@@ -1814,6 +1814,7 @@ mod tests {
         }
         let root = crate::e2e_support::modules_root();
         let mut parsed = 0;
+        let mut without_roles = 0;
         for entry in std::fs::read_dir(&root)
             .expect("modules root is readable")
             .flatten()
@@ -1829,11 +1830,15 @@ mod tests {
                 .to_string();
             match crate::manifest::Manifest::load(&dir) {
                 Ok(manifest) => {
-                    assert!(
-                        manifest.roles.is_empty(),
-                        "`{module}` already declares roles: this test asserts the OPTIONALITY of \
-                         the block against the catalogue as published"
-                    );
+                    // This used to assert `roles.is_empty()` for EVERY module, to show the block
+                    // was optional. That premise expired the day a module started using it
+                    // (`sales` declares `cashier`), and the assertion then failed for the one
+                    // reason it should have celebrated. Optionality is still checked below, on
+                    // the modules that do not declare the block — a fact about the catalogue as
+                    // it is, not as it was.
+                    if manifest.roles.is_empty() {
+                        without_roles += 1;
+                    }
                     super::validate_role_declarations(&manifest)
                         .unwrap_or_else(|e| panic!("`{module}` must keep validating: {e}"));
                     parsed += 1;
@@ -1854,6 +1859,14 @@ mod tests {
             parsed >= 20,
             "expected the published catalogue (~24 modules), only {parsed} parsed in {}",
             root.display()
+        );
+        // The block is OPTIONAL, and that is only proven while real published modules go without
+        // it. If this ever hits zero the guarantee has quietly become "roles are mandatory", and
+        // somebody should find out on purpose rather than when an install starts failing.
+        assert!(
+            without_roles > 0,
+            "every published module now declares `roles`: the block's optionality is no longer \
+             exercised by the catalogue"
         );
     }
 }

@@ -76,8 +76,12 @@ async fn enable_cash_register(rt: &Runtime, ctx: &erplora_runtime::RequestContex
             "require_opening_balance": false,
             "require_closing_balance": false,
             "allow_negative_balance": false,
-            "auto_open_session_on_login": false,
-            "auto_close_session_on_logout": false,
+            // `auto_open_session_on_login` / `auto_close_session_on_logout` se RETIRARON del
+            // módulo; los tres de abajo pasaron a ser obligatorios. El schema no los rellena por
+            // defecto, así que el objeto viaja completo (hub#1028).
+            "require_blind_count": false,
+            "auto_close_enabled": false,
+            "auto_close_time": "23:00",
             "protected_pos_url": "/m/sales"
         })),
         ctx,
