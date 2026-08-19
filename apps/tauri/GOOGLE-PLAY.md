@@ -65,25 +65,26 @@ landing no ofrece APK: el endpoint de descarga del SaaS hace **redirect 302** a 
 | --- | --- |
 | Build del AAB | este repo, [`tauri-release.yml`](../../.github/workflows/tauri-release.yml) job `build-android` |
 | Subida a Object Storage | ídem, job `upload-s3` |
-| Publicación en Play | **no cableada** (ver aviso de arriba) |
+| Publicación en Play | ídem, job **`publish-play`** — gateado por la Variable `PLAY_PACKAGE_NAME` (vacía = saltado) |
 | Redirect 302 a Play | SaaS `apps/public/downloads.py::store_url_for` + setting `GOOGLE_PLAY_APP_ID` |
 
-## Pasos manuales (Ioan) — en orden
+## Lo que YA está hecho
 
-1. **Play Console**: crear la ficha única **`com.erplora.app`**.
-2. Subir **a mano** el primer AAB (artifact de `build-android`) al track `internal` — esto
-   registra la upload key (keystore ADR-0053) y activa Play App Signing. Formularios: Data
-   safety · content rating IARC · privacy policy URL · screenshots (mín. 2) + feature graphic
-   1024×500 + icono 512×512.
-3. Cablear la publicación automática en **este** repo (hub#308): poner la Variable
-   `PLAY_PACKAGE_NAME` (+ el secret `PLAY_SERVICE_ACCOUNT_JSON`) y **quitar `play` de
-   `RELEASE_CHANNELS_PENDING`** (hub#895). Mientras `play` siga en esa lista, el job
-   `release-gate` deja pasar el tag en verde avisando de que Play no publicó; en cuanto se
-   quita, un tag que no llegue a Play sale **rojo**.
-4. Promoción `internal` → `production` manual en consola (cuenta org = sin closed testing
-   obligatorio).
-5. Con la ficha LIVE: setting `GOOGLE_PLAY_APP_ID=com.erplora.app` en Dokploy (saas-web) → la
-   landing y el Hub redirigen solos a Play.
+No se repite en «Orden que queda» porque no queda: se deja escrito para que nadie lo rehaga.
+
+1. **Ficha única `com.erplora.app`** creada en Play Console.
+2. **Primera subida manual** del AAB al track `internal` — es la que registra la upload key
+   (keystore ADR-0053) y activa Play App Signing. Con ella se quemó el `versionCode` `1000000`.
+3. **Formularios**: Data safety · content rating IARC · privacy policy · target audience · ads ·
+   screenshots + feature graphic 1024×500 + icono 512×512. Los 10, completos.
+4. **Job `publish-play`** cableado en este repo, con el AAB firmado y verificado (`jarsigner`) y
+   `changesNotSentForReview: false` (hub#984) para que el tag envíe a revisión de verdad.
+
+⚠️ **La promoción `internal` → `production` sigue siendo MANUAL, y automatizarla no es solo
+cuestión de confianza.** `publish-play` sube con `status: completed`, o sea **rollout al 100% de
+golpe**: poner `PLAY_TRACK=production` creyendo que se remata la automatización mandaría cada tag,
+sin probar, a **todas las cajas a la vez**. Para automatizarla hace falta antes un rollout
+escalonado (`status: inProgress` + `userFraction`), que hoy no está cableado.
 
 ## Verificación
 
