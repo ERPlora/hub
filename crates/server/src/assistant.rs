@@ -525,7 +525,10 @@ pub fn last_user_message(frontend: &Value) -> String {
 /// Devuelve `Some(frame)` con la línea SSE ya formateada (incluye `\n\n`), o `None` si la línea
 /// no aporta contenido (comentarios, keep-alives). El terminador `[DONE]` del Cloud se traduce a
 /// `{"type":"done"}`.
-pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn translate_sse_line(
+    line: &str,
+    notes: &std::collections::HashMap<String, Value>,
+) -> Option<String> {
     let payload = line.strip_prefix("data:")?.trim();
     if payload.is_empty() {
         return None;
@@ -560,15 +563,70 @@ pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, 
         Some("function_call") => {
             let mut out = ev;
             let name = out.get("name").and_then(Value::as_str).map(str::to_string);
-            if let Some(kind) = name.and_then(|n| kinds.get(&n)) {
+            // Todo lo que el catálogo resolvió sobre esta tool viaja CON la llamada: su `kind`
+            // (leer sola vs confirmar), su `risk` (hub#1042) y qué argumentos son dinero
+            // (hub#1040). El drawer no tiene catálogo propio donde consultarlo, y son hechos del
+            // manifest — no cosas que el modelo pueda decir de sí mismo.
+            if let Some(note) = name.and_then(|n| notes.get(&n)).and_then(Value::as_object) {
                 if let Some(obj) = out.as_object_mut() {
-                    obj.insert("kind".to_string(), json!(kind));
+                    for (k, v) in note {
+                        obj.insert(k.clone(), v.clone());
+                    }
                 }
             }
             Some(sse(&out))
         }
         _ => None,
     }
+}
+
+/// Qué argumentos de un command son DINERO, leído de su JSON Schema (hub#1040).
+///
+/// La tarjeta de confirmación es el último sitio donde un humano puede cazar un error de ×100, y
+/// era el único del producto donde el importe no salía en euros. Para pintarlo bien hay que saber
+/// QUÉ campo es dinero — y eso no se adivina por el nombre: el día que un porcentaje se pinte como
+/// importe, la tarjeta pasa de ilegible a mentirosa.
+///
+/// Quien lo sabe es el schema del propio command, que enuncia el contrato del dinero en la
+/// descripción del campo (ADR-0123: «Minor units of the hub currency», «Céntimos por hora»). El
+/// runtime lo resuelve una vez y manda la respuesta con la tool call.
+///
+/// **Conservador a propósito**: exige TIPO entero **y** marca explícita. No detectar un campo de
+/// dinero deja un entero crudo —lo que ya pasa hoy, solo poco útil—; detectar uno de más se
+/// inventa un importe.
+pub(crate) fn money_fields(schema: &str) -> Vec<String> {
+    /// Las formas en que un schema publicado dice «esto es dinero». Ambos idiomas: los manifests
+    /// se escriben en inglés, pero las descripciones viejas siguen en castellano.
+    const MARKERS: &[&str] = &["minor unit", "céntimo", "centimo", "adr-0123"];
+
+    let Ok(parsed) = serde_json::from_str::<Value>(schema) else {
+        return Vec::new();
+    };
+    let Some(props) = parsed.get("properties").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+
+    props
+        .iter()
+        .filter(|(_, def)| {
+            // El tipo puede ser `"integer"` o `["integer","null"]` (opcional en el manifest).
+            let is_integer = match def.get("type") {
+                Some(Value::String(t)) => t == "integer",
+                Some(Value::Array(ts)) => ts.iter().any(|t| t.as_str() == Some("integer")),
+                _ => false,
+            };
+            if !is_integer {
+                return false;
+            }
+            let desc = def
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_lowercase();
+            MARKERS.iter().any(|m| desc.contains(m))
+        })
+        .map(|(name, _)| name.clone())
+        .collect()
 }
 
 /// Formatea un valor JSON como un evento SSE `data: …\n\n`.
@@ -688,6 +746,54 @@ mod tests {
         let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
 
         assert!(!ins.contains("invoice.rectify"), "an inactive module says nothing: {ins}");
+    }
+
+    /// Which arguments of a command are MONEY (hub#1040).
+    ///
+    /// The confirm card showed `{"price_cents": 1500}` and the owner approved it without ever
+    /// reading «15,00 €» — in the one place a human could have caught a ×100, and the only place
+    /// in the product where an amount was not shown in euros.
+    ///
+    /// The client must NOT guess this from field names: the day a percentage gets painted as an
+    /// amount, the card starts lying instead of just being unreadable. Who knows is the command's
+    /// JSON Schema, which states the money contract in the field's own description (ADR-0123:
+    /// «Minor units of the hub currency», «Céntimos por hora»). The runtime resolves it once and
+    /// sends the answer.
+    ///
+    /// Conservative on purpose: missing a money field shows a raw integer (what happens today,
+    /// merely unhelpful); a false positive invents an amount. So it demands BOTH an integer type
+    /// and an explicit marker.
+    #[test]
+    fn money_fields_are_read_from_the_schema_never_guessed_from_the_name() {
+        let schema = r#"{
+            "type": "object",
+            "properties": {
+                "price": { "type": ["integer","null"],
+                           "description": "Minor units of the hub currency (ADR-0007/0123): 1500 = 15,00 €" },
+                "hourly_rate": { "type": "integer", "description": "Céntimos por hora (dinero, ADR-0123)" },
+                "duration_minutes": { "type": "integer",
+                                      "description": "A service takes time: 0 or negative is not a duration." },
+                "commission_rate": { "type": "number", "description": "Porcentaje de comisión (ADR-0123 no aplica)" },
+                "name": { "type": "string" }
+            }
+        }"#;
+
+        let mut fields = money_fields(schema);
+        fields.sort();
+
+        assert_eq!(
+            fields,
+            vec!["hourly_rate".to_string(), "price".to_string()],
+            "solo los enteros que el schema MARCA como dinero"
+        );
+    }
+
+    /// A schema that is absent, empty or unparseable marks nothing. Falling back to «no money»
+    /// is the safe direction: the card shows raw integers, exactly as it does today.
+    #[test]
+    fn an_unreadable_schema_marks_nothing_as_money() {
+        assert!(money_fields("{not json").is_empty());
+        assert!(money_fields("{}").is_empty());
     }
 
     /// The keystone: the turn reaching the Cloud must carry a system prompt that says WHAT
@@ -1256,7 +1362,7 @@ mod tests {
         // The web app auto-runs reads (query) but must CONFIRM writes (command); the
         // runtime tags each function_call with its kind from the assembled catalog.
         let mut kinds = std::collections::HashMap::new();
-        kinds.insert("pos.sale.create".to_string(), "command".to_string());
+        kinds.insert("pos.sale.create".to_string(), json!({ "kind": "command" }));
         let line = r#"data: {"type":"function_call","name":"pos.sale.create","call_id":"c9","arguments":"{}"}"#;
         let out = translate_sse_line(line, &kinds).expect("forwarded");
         assert!(out.contains("\"kind\":\"command\""));
@@ -1264,6 +1370,26 @@ mod tests {
         let line2 = r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
         let out2 = translate_sse_line(line2, &kinds).expect("forwarded");
         assert!(!out2.contains("\"kind\""));
+    }
+
+    /// The confirm card needs two things the model cannot be trusted to supply: how DANGEROUS the
+    /// operation is (hub#1042) and which of its arguments are MONEY (hub#1040). Both are facts of
+    /// the manifest, resolved once when the catalogue is assembled, and they have to travel WITH
+    /// the tool call — the drawer has no catalogue of its own to look them up in.
+    #[test]
+    fn translate_annotates_risk_and_money_fields() {
+        let mut notes = std::collections::HashMap::new();
+        notes.insert(
+            "services.services.create".to_string(),
+            json!({ "kind": "command", "risk": "normal", "money_fields": ["price_cents"] }),
+        );
+        let line = r#"data: {"type":"function_call","name":"services.services.create","call_id":"c1","arguments":"{}"}"#;
+
+        let out = translate_sse_line(line, &notes).expect("forwarded");
+
+        assert!(out.contains("\"kind\":\"command\""), "{out}");
+        assert!(out.contains("\"risk\":\"normal\""), "{out}");
+        assert!(out.contains("price_cents"), "the money marking must reach the card: {out}");
     }
 
     #[test]

@@ -116,7 +116,13 @@ export interface StreamCallbacks {
    * ejecutar, `false` para cancelar. Si no se provee, las escrituras se **cancelan** (seguro
    * por defecto: nunca se muta sin confirmación). Las LECTURAS (`query`) no la usan.
    */
-  onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>;
+  onConfirm?: (call: {
+    name: string;
+    arguments: string;
+    kind: string;
+    risk?: string;
+    moneyFields?: string[];
+  }) => Promise<boolean>;
   /**
    * The turn's grounding verdict, emitted once the answer is complete (hub#1038, #1039).
    * The runtime holds the receipts — which tools ran and how they ended — so it, not the
@@ -134,6 +140,11 @@ interface FunctionCall {
   call_id: string;
   arguments: string; // JSON string of the arguments
   kind?: string; // 'query' (read, auto) | 'command' (write, needs confirm), tagged by the runtime
+  /** How dangerous the module says this operation is (hub#1042). */
+  risk?: string;
+  /** Which arguments are money, resolved by the runtime from the command's schema (hub#1040).
+   *  The card formats ONLY these: guessing from a field name would invent an amount. */
+  money_fields?: string[];
 }
 
 /** OpenAI-style tool_call, as the Cloud expects it back on the assistant message. */
@@ -347,7 +358,13 @@ async function runToolCall(
 
   if (fc.kind === 'command') {
     const approved = cb.onConfirm
-      ? await cb.onConfirm({ name: fc.name, arguments: fc.arguments, kind: 'command' })
+      ? await cb.onConfirm({
+          name: fc.name,
+          arguments: fc.arguments,
+          kind: 'command',
+          risk: fc.risk,
+          moneyFields: fc.money_fields,
+        })
       : false;
     if (!approved) {
       return done('cancelled', { status: 'cancelled', message: 'Action was not confirmed.' });

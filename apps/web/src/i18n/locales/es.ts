@@ -123,6 +123,9 @@ export default {
     unsourcedId:
       'Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.',
     unknownRoute: 'Esta respuesta señala una pantalla que no existe aquí.',
+    // hub#1040 — cuando la app no sabe nombrar su propia acción se dice, en vez de rellenar el
+    // hueco con el nombre interno del command (hub#363: ese vocabulario es nuestro, no del mostrador).
+    confirmUnnamedAction: 'Una acción que esta app no sabe nombrar',
   },
   // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
   // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue

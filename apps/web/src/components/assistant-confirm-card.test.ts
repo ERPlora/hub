@@ -18,3 +18,26 @@ describe('assistant confirm card', () => {
     }
   });
 });
+
+// hub#1040 — la tarjeta deja de hablar en lenguaje de máquina.
+//
+// Enseñaba `subHeader: name` (el nombre crudo de la tool, sin traducir) y `message` = el
+// `JSON.stringify` de los argumentos. El dueño aprobaba `{"price_cents": 1500}` sin leer nunca
+// «15,00 €» — en el último punto donde un humano puede cazar un ×100.
+describe('la tarjeta se lee en palabras del negocio (hub#1040)', () => {
+  it('ya no imprime el nombre crudo de la tool como subtítulo', () => {
+    expect(drawer).not.toContain('subHeader: name');
+  });
+
+  it('ya no vuelca el JSON de los argumentos', () => {
+    expect(drawer).not.toMatch(/message:\s*pretty/);
+  });
+
+  it('describe la llamada con el helper que formatea el dinero', () => {
+    expect(drawer).toContain('describeToolCall');
+  });
+
+  it('le pasa las marcas de dinero que mandó el runtime', () => {
+    expect(drawer).toContain('moneyFields');
+  });
+});
