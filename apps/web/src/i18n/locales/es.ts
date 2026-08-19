@@ -116,6 +116,13 @@ export default {
     reportConfirm: 'Denunciar',
     reportSent: 'Gracias, hemos recibido tu denuncia.',
     reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
+    // hub#1038/#1039/#1048 — lo dice el RUNTIME, nunca el modelo: los recibos del turno no
+    // respaldan lo que afirmó la respuesta. Se muestra como aviso sobre el propio mensaje.
+    claimedWithoutEffect:
+      'El asistente ha dicho que hizo un cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.',
+    unsourcedId:
+      'Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.',
+    unknownRoute: 'Esta respuesta señala una pantalla que no existe aquí.',
   },
   // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
   // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue

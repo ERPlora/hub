@@ -6,6 +6,7 @@
 //   POST /api/assistant/chat/stream  {messages:[{role,content}]}
 //   -> SSE: líneas `data: {"type":"token","text":"…"}` … `data: {"type":"done"}`
 import { RUNTIME_URL, getClient, runtimeHeaders } from './runtime';
+import { auditTurn, type ExecutedTool, type TurnAudit } from './assistant-grounding';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -37,6 +38,9 @@ export interface ChatMessage {
   /** Stable client-generated id (crypto.randomUUID), used to reference the message when
    *  reporting it (hub#946). Optional: history persisted before ids existed has none. */
   id?: string;
+  /** The runtime's grounding verdict on this answer (hub#1038, #1039). Present only when the
+   *  turn's receipts did NOT back what it claimed; the drawer renders it as a system notice. */
+  grounding?: TurnAudit;
 }
 
 /** Keep well under the Cloud's per-attachment cap (base64 grows ~1.33×). */
@@ -113,6 +117,15 @@ export interface StreamCallbacks {
    * por defecto: nunca se muta sin confirmación). Las LECTURAS (`query`) no la usan.
    */
   onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>;
+  /**
+   * The turn's grounding verdict, emitted once the answer is complete (hub#1038, #1039).
+   * The runtime holds the receipts — which tools ran and how they ended — so it, not the
+   * model, decides whether the answer is allowed to say a change happened. The drawer turns
+   * a flagged verdict into a SYSTEM notice; it is never text the model wrote.
+   */
+  onAudit?: (audit: TurnAudit) => void;
+  /** The hub's real navigation map, so a named screen can be checked (hub#1047, #1048). */
+  knownRoutes?: string[];
 }
 
 /** A tool call the model asked for (forwarded by the runtime from the Cloud). */
@@ -162,10 +175,24 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
     try {
       let convo: WireMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
+      // The receipts of THIS turn: what actually ran and how it ended. The audit at the end
+      // is built from these, never from what the answer says about itself (hub#1038).
+      const executed: ExecutedTool[] = [];
+      let spokenText = '';
+      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+      const userText = typeof lastUser?.content === 'string' ? lastUser.content : undefined;
+      const audit = (): void => {
+        cb.onAudit?.(
+          auditTurn({ text: spokenText, executed, userText, knownRoutes: cb.knownRoutes }),
+        );
+      };
+
       for (let iter = 0; ; iter++) {
         const round = await streamRound(convo, cb, ctrl.signal);
+        spokenText += round.text;
         if (round.errored) return; // streamRound ya llamó a onError
         if (round.functionCalls.length === 0) {
+          audit();
           cb.onDone?.();
           return;
         }
@@ -177,7 +204,9 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
         // con la sesión del usuario y añade su resultado — el Cloud continúa el turno.
         // (El Cloud emite una tool call por ronda — parallel_tool_calls=False — así que no
         // hay confirmaciones concurrentes.)
-        const results = await Promise.all(round.functionCalls.map((fc) => runToolCall(fc, cb)));
+        const ran = await Promise.all(round.functionCalls.map((fc) => runToolCall(fc, cb)));
+        for (const r of ran) executed.push(r.executed);
+        const results = ran.map((r) => r.message);
         convo = [
           ...convo,
           {
@@ -297,34 +326,50 @@ async function streamRound(
  *    una nota `cancelled` para que el modelo se lo diga al usuario (seguro por defecto).
  *
  *  Cualquier fallo degrada a una nota de error (nunca lanza): el turno sigue. */
-async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireMessage> {
+async function runToolCall(
+  fc: FunctionCall,
+  cb: StreamCallbacks,
+): Promise<{ message: WireMessage; executed: ExecutedTool }> {
   const params = safeParseArgs(fc.arguments);
+  const kind: ExecutedTool['kind'] = fc.kind === 'command' ? 'command' : 'query';
+  // The receipt the audit reads: a write only counts as done when the dispatcher answered
+  // without error AND the user approved the card. Cancelled and failed are both "no effect".
+  const receipt = (status: ExecutedTool['status'], result: unknown): ExecutedTool => ({
+    name: fc.name,
+    kind,
+    status,
+    result,
+  });
+  const done = (status: ExecutedTool['status'], payload: unknown) => ({
+    message: toolMessage(fc.call_id, payload),
+    executed: receipt(status, payload),
+  });
 
   if (fc.kind === 'command') {
     const approved = cb.onConfirm
       ? await cb.onConfirm({ name: fc.name, arguments: fc.arguments, kind: 'command' })
       : false;
     if (!approved) {
-      return toolMessage(fc.call_id, { status: 'cancelled', message: 'Action was not confirmed.' });
+      return done('cancelled', { status: 'cancelled', message: 'Action was not confirmed.' });
     }
     try {
       // Host tool mutante (hub#631): instalar va por el MISMO endpoint que el botón de Apps
       // (`request-install`), que revalida admin server-side. Pasa por el confirm de arriba
       // como cualquier command — el modelo nunca instala sin el clic del usuario.
       if (fc.name === 'hub.modules.install') {
-        return toolMessage(fc.call_id, await hostInstall(params));
+        return done('ok', await hostInstall(params));
       }
       // Host tool mutante (hub#631, pasos 2-3): aplicar un blueprint va por el MISMO pipeline que
       // la hero card del dashboard. Semántica verificada ANTES de exponerla: el import es ADITIVO
       // (import_sql.rs solo admite INSERT con guardas NOT EXISTS; ADR-0304 añade las claves
       // naturales del destino — una fila existente se SALTA, nunca se funde ni se pisa).
       if (fc.name === 'hub.blueprints.apply') {
-        return toolMessage(fc.call_id, await hostBlueprintApply(params));
+        return done('ok', await hostBlueprintApply(params));
       }
       const data = await getClient().command(fc.name, params);
-      return toolMessage(fc.call_id, data ?? null);
+      return done('ok', data ?? null);
     } catch (err) {
-      return toolMessage(fc.call_id, { error: errMessage(err) });
+      return done('error', { error: errMessage(err) });
     }
   }
 
@@ -333,16 +378,16 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
     // se sirve por su endpoint real y se recorta a lo que el modelo necesita (id, nombre,
     // descripción, versión, precio, instalado) para no quemar contexto.
     if (fc.name === 'hub.marketplace.search') {
-      return toolMessage(fc.call_id, await hostMarketplaceSearch(params));
+      return done('ok', await hostMarketplaceSearch(params));
     }
     // Host tool de lectura (hub#631): el catálogo de blueprints del SaaS, recortado a la ficha.
     if (fc.name === 'hub.blueprints.list') {
-      return toolMessage(fc.call_id, await hostBlueprintsList());
+      return done('ok', await hostBlueprintsList());
     }
     const data = await getClient().query(fc.name, params);
-    return toolMessage(fc.call_id, data ?? null);
+    return done('ok', data ?? null);
   } catch (err) {
-    return toolMessage(fc.call_id, { error: errMessage(err) });
+    return done('error', { error: errMessage(err) });
   }
 }
 

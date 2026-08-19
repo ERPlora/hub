@@ -118,6 +118,13 @@ export default {
     reportConfirm: 'Report',
     reportSent: 'Thank you, we received your report.',
     reportError: 'The report could not be sent. Please try again.',
+    // hub#1038/#1039/#1048 — said by the RUNTIME, never by the model: the turn's receipts did
+    // not back what the answer claimed. Shown as a notice on the message itself.
+    claimedWithoutEffect:
+      'The assistant said it made a change, but no action was carried out. Nothing has been modified.',
+    unsourcedId:
+      'This answer shows an identifier the assistant did not actually read. Do not rely on it.',
+    unknownRoute: 'This answer points at a screen that does not exist here.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
