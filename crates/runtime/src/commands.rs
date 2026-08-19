@@ -1053,7 +1053,7 @@ async fn persist_handler_output(
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
     for op in &output.operations {
-        let sqls = validate_operation(registry, &cmd.module_id, op)?;
+        let sqls = validate_operation(registry, ctx, &cmd.module_id, op)?;
         let bound = crate::system_params(&op.params, ctx);
         for sql in sqls {
             tx_ops.push((sql, bound.clone()));
@@ -1366,9 +1366,23 @@ fn spend_approval(
 ///
 /// Reglas (ARQUITECTURA.md §5.3): el `command` referenciado debe (1) ser de tipo
 /// `"sql"`, (2) existir en el registry, (3) pertenecer al **mismo módulo** que el
-/// handler (`handler_module_id`). En otro caso se rechaza y la transacción no se aplica.
+/// handler (`handler_module_id`) y (4) **no exigir más permiso del que tiene quien llama**
+/// (hub#459). En otro caso se rechaza y la transacción no se aplica.
+///
+/// 🔑 **La cuarta es el TECHO.** Las tres primeras dicen qué SQL puede alcanzar un handler, no con
+/// qué permiso: sin la cuarta, un command que un empleado puede llamar (`add_appointment`) alcanza
+/// SQL declarado `change_appointment`, y con la elevación viva eso es el nivel encargado por la
+/// puerta de atrás — sin PIN, sin aprobación y sin recibo.
+///
+/// Se comprueba con el MISMO [`permissions::check_command`] de la puerta principal, con una
+/// diferencia deliberada: **aquí no se ofrece elevación**. Estamos a mitad de una transacción, con
+/// el handler ya ejecutado y sin nadie a quien preguntar; un `RequiresElevation` que nadie puede
+/// atender sería una denegación disfrazada de diálogo. Si un módulo necesita de verdad que su
+/// handler escriba por encima de su command, lo que cambia es el permiso declarado de la op —
+/// visible en el manifest y revisable— no este gate.
 pub(crate) fn validate_operation(
     registry: &Registry,
+    ctx: &RequestContext,
     handler_module_id: &str,
     op: &Operation,
 ) -> Result<Vec<String>> {
@@ -1402,6 +1416,23 @@ pub(crate) fn validate_operation(
              solo puede referenciar comandos SQL del propio módulo (§5.3)",
             op.command
         )));
+    }
+
+    // (4) El techo: quien llama tiene que poder ejecutar también la op, no solo el command que la
+    // empujó. `check_command` responde `Ok` a un contexto `*` (el relay y el scheduler, que
+    // corren como el propio runtime) sin ningún caso especial que mantener aquí.
+    match permissions::check_command(registry, ctx, &target.def.permission) {
+        Ok(()) => {}
+        // Sin persona a la que pedir el PIN, «hace falta elevación» y «denegado» son lo mismo para
+        // esta transacción — pero se dice cuál era el permiso, que es lo que arregla el manifest.
+        Err(RuntimeError::RequiresElevation { permission }) | Err(RuntimeError::PermissionDenied(permission)) => {
+            return Err(RuntimeError::PermissionDenied(format!(
+                "la operación `{}` exige `{permission}`, que quien invocó `{}` no tiene: un handler \
+                 no puede alcanzar SQL por encima del permiso de su propio command (§5.3, hub#459)",
+                op.command, handler_module_id
+            )));
+        }
+        Err(e) => return Err(e),
     }
 
     Ok(target.sql.clone())
@@ -1708,6 +1739,11 @@ mod tests {
         reg
     }
 
+    /// A `*` context: what the relay and the scheduler run with.
+    fn sys_ctx() -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()])
+    }
+
     fn op(command: &str) -> Operation {
         Operation {
             kind: "sql".to_string(),
@@ -1719,14 +1755,14 @@ mod tests {
     #[test]
     fn validate_operation_resolves_same_module_command_to_sql() {
         let reg = registry_with_command("notes", "notes.create");
-        let sql = validate_operation(&reg, "notes", &op("notes.create")).unwrap();
+        let sql = validate_operation(&reg, &sys_ctx(), "notes", &op("notes.create")).unwrap();
         assert_eq!(sql, vec!["INSERT INTO x VALUES (1);".to_string()]);
     }
 
     #[test]
     fn validate_operation_rejects_other_module_command() {
         let reg = registry_with_command("inventory", "inventory.products.create");
-        let err = validate_operation(&reg, "notes", &op("inventory.products.create")).unwrap_err();
+        let err = validate_operation(&reg, &sys_ctx(), "notes", &op("inventory.products.create")).unwrap_err();
         assert!(
             matches!(err, RuntimeError::PermissionDenied(_)),
             "got {err:?}"
@@ -1736,7 +1772,7 @@ mod tests {
     #[test]
     fn validate_operation_rejects_unknown_command() {
         let reg = registry_with_command("notes", "notes.create");
-        let err = validate_operation(&reg, "notes", &op("notes.nope")).unwrap_err();
+        let err = validate_operation(&reg, &sys_ctx(), "notes", &op("notes.nope")).unwrap_err();
         assert!(
             matches!(err, RuntimeError::CommandNotFound(_)),
             "got {err:?}"
@@ -1748,8 +1784,83 @@ mod tests {
         let reg = registry_with_command("notes", "notes.create");
         let mut o = op("notes.create");
         o.kind = "http".to_string();
-        let err = validate_operation(&reg, "notes", &o).unwrap_err();
+        let err = validate_operation(&reg, &sys_ctx(), "notes", &o).unwrap_err();
         assert!(matches!(err, RuntimeError::Wasm(_)), "got {err:?}");
+    }
+
+    // ── El TECHO de permisos de un handler Tier 2 (hub#459) ──────────────────────────────
+    //
+    // Las tres reglas de arriba —es sql, existe, mismo módulo— dicen QUÉ SQL puede alcanzar un
+    // handler, no CON QUÉ PERMISO. Así, un command que un empleado puede llamar
+    // (`appointments.appointments.create`, `add_appointment`) empujaba una op declarada
+    // `change_appointment`: el nivel encargado por la puerta de atrás, sin PIN y sin recibo.
+    //
+    // La op se comprueba contra el MISMO `check_command` de la puerta principal, con una
+    // diferencia deliberada: aquí no se ofrece elevación. Estamos a mitad de una transacción,
+    // sin nadie a quien preguntar, y un `RequiresElevation` que nadie puede atender es una
+    // denegación disfrazada de diálogo.
+    fn registry_with_two(module_id: &str, public: (&str, &str), internal: (&str, &str)) -> Registry {
+        let mut reg = registry_with_command(module_id, public.0);
+        for (name, permission) in [public, internal] {
+            let mut def = cmd_def();
+            def.permission = permission.to_string();
+            reg.commands.insert(
+                name.to_string(),
+                RegisteredCommand {
+                    module_id: module_id.to_string(),
+                    def,
+                    sql: vec!["INSERT INTO x VALUES (1);".to_string()],
+                    wasm: None,
+                    schema: None,
+                },
+            );
+        }
+        reg
+    }
+
+    #[test]
+    fn an_operation_may_not_demand_a_permission_the_caller_lacks() {
+        let reg = registry_with_two(
+            "appointments",
+            ("appointments.appointments.create", "appointments.add_appointment"),
+            ("appointments._insert_history", "appointments.change_appointment"),
+        );
+        let cashier = RequestContext::new("h1", "u1", ["appointments.add_appointment".to_string()]);
+        let err = validate_operation(&reg, &cashier, "appointments", &op("appointments._insert_history"))
+            .unwrap_err();
+        match err {
+            RuntimeError::PermissionDenied(p) => {
+                assert!(p.contains("change_appointment"), "names the missing permission: {p}")
+            }
+            other => panic!("a ceiling leak is a denial, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_operation_the_caller_is_entitled_to_still_resolves() {
+        let reg = registry_with_two(
+            "appointments",
+            ("appointments.appointments.create", "appointments.add_appointment"),
+            ("appointments._insert_history", "appointments.add_appointment"),
+        );
+        let cashier = RequestContext::new("h1", "u1", ["appointments.add_appointment".to_string()]);
+        let sql = validate_operation(&reg, &cashier, "appointments", &op("appointments._insert_history"))
+            .expect("same permission as the command that pushes it");
+        assert_eq!(sql.len(), 1);
+    }
+
+    #[test]
+    fn the_relay_and_the_scheduler_are_not_caught_by_the_ceiling() {
+        // Origin::Internal runs with a `*` context: the runtime delivering to itself has no role
+        // to check, and a ceiling that stopped the outbox would break every listener.
+        let reg = registry_with_two(
+            "appointments",
+            ("appointments.appointments.create", "appointments.add_appointment"),
+            ("appointments._insert_history", "appointments.change_appointment"),
+        );
+        let system = RequestContext::new("h1", "u1", ["*".to_string()]);
+        validate_operation(&reg, &system, "appointments", &op("appointments._insert_history"))
+            .expect("the system context resolves every op of the module");
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -2630,7 +2741,7 @@ mod tests {
             },
         );
         let err =
-            validate_operation(&reg, "inventory", &op("inventory.stock.decrease")).unwrap_err();
+            validate_operation(&reg, &sys_ctx(), "inventory", &op("inventory.stock.decrease")).unwrap_err();
         assert!(
             matches!(err, RuntimeError::Wasm(_)),
             "debe rechazar, no aplicar 0 sentencias: {err:?}"
