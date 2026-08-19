@@ -14,13 +14,12 @@ import { hubSettings } from './hub-settings';
 export const PIN_LENGTHS = [4, 6] as const;
 
 /**
- * Lo que pide un hub nuevo, y también lo que se supone mientras los settings no han llegado.
- *
- * **No cuatro**: un teclado que pinta cuatro casillas y luego rechaza el PIN es peor que uno que
- * espera, porque el error aparece en caja y con cola. Seis es lo que estrena un hub nuevo (Clover lo
- * exige a los comercios nuevos desde abril de 2026), así que es también la suposición honesta.
+ * Lo que se supone mientras el hub no ha dicho nada: 4, espejo del default del runtime
+ * (`pin_policy::DEFAULT_PIN_LENGTH`). Es compatibilidad — la longitud con la que se tecleaban todos
+ * los PIN que hoy funcionan—, no la recomendación: **un hub nuevo se crea con 6**, y ese 6 lo
+ * escribe el aprovisionamiento, que es el único que sabe que el hub es nuevo.
  */
-export const DEFAULT_PIN_LENGTH = 6;
+export const DEFAULT_PIN_LENGTH = 4;
 
 /** La longitud vigente: la del hub si es una de las dos, el default si no hay o no se entiende. */
 export const hubPinLength = computed<number>(() => {

@@ -107,7 +107,7 @@ function setHubSettings(raw: unknown): HubSettings {
         : 5,
     // Longitud del PIN (hub#974). Un valor que no sea 4 ni 6 degrada al default (6): pintar un
     // teclado con una longitud que el runtime va a rechazar sería fallar en caja, con cola.
-    pin_length: r.pin_length === 4 || r.pin_length === 6 ? r.pin_length : 6,
+    pin_length: r.pin_length === 4 || r.pin_length === 6 ? r.pin_length : 4,
   };
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).

@@ -1384,7 +1384,7 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
     country_code: hubSettings.value?.country_code ?? 'ES',
     region_code: hubSettings.value?.region_code ?? null,
     // hub#974: la longitud del PIN es del hub (4 o 6). Sin settings todavía, la de un hub nuevo.
-    pin_length: hubSettings.value?.pin_length ?? 6,
+    pin_length: hubSettings.value?.pin_length ?? 4,
     // El contexto del hub solo trae moneda/idioma; la identidad de negocio la rellena el GET completo
     // de /api/settings (getHubSettings). Preservamos lo ya cacheado para no pisarlo con vacío.
     business_tax_id: hubSettings.value?.business_tax_id ?? '',

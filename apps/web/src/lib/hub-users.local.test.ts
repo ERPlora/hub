@@ -79,8 +79,7 @@ describe('alta de usuario local (hub#355)', () => {
   });
 
   it('adelanta en la UI los motivos que el runtime va a rechazar', () => {
-    // La longitud del PIN la fija el HUB (hub#974): sin decirlo, estos casos se leerían contra el
-    // default de un hub nuevo (6) y `5390` sería «corto», que no es lo que este test mide.
+    // La longitud del PIN la fija el HUB (hub#974); estos casos van contra un hub de cuatro.
     hubSettings.value = { pin_length: 4 } as never;
     const census = [cashier, dismissed];
     const ok = { name: 'Luis Prat', role: 'employee', pin: '5390' };

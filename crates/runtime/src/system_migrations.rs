@@ -1722,38 +1722,7 @@ CREATE INDEX IF NOT EXISTS ix_flow_wait_event \
   WHERE status = 'armed' AND deleted_at IS NULL;\
 CREATE INDEX IF NOT EXISTS ix_flow_wait_run ON _flow_run_waits (hub_id, run_id);",
     },
-    // ── v54 — hub#974: la LONGITUD del PIN es del hub (4 o 6), y los nuevos estrenan 6 ──────────
-    //
-    // Decisión de mercado (9 referencias + foros): gana el modelo de Clover — longitud FIJA por
-    // cuenta. La uniformidad es lo que permite que el teclado envíe al último dígito; los productos
-    // que admiten longitud variable (Toast 3-8, Lightspeed K 4-6, Shopify 4-6) llevan todos un botón
-    // de confirmar que el cajero pulsa decenas de veces al día.
-    //
-    // Un hub que YA tiene PINs se queda en **4**, y no porque lo diga una preferencia: hasta ahora
-    // el pinpad del login estaba clavado a 4, así que todo PIN que HOY funciona tiene cuatro
-    // dígitos. El hash argon2 no dice la longitud del secreto — por eso no se «detecta»: se deduce
-    // de la única puerta por la que se pudo teclear. Despertar pidiendo dos dígitos más dejaría a
-    // esos cajeros fuera en hora punta, así que subir a 6 queda como decisión del dueño.
-    //
-    // Lo que NO se copia de Clover es su «autofill», que al pasar de 4 a 6 rellena cada PIN con
-    // `00`: eso es un PIN de seis dígitos con la entropía de cuatro y un sufijo que conoce todo el
-    // mundo — peor que no migrar, porque parece que has subido el listón.
-    //
-    // Un hub NUEVO no escribe fila y hereda el default (6). Idempotente: el `NOT EXISTS` respeta
-    // una elección ya hecha, así que reaplicarla nunca pisa al dueño.
-    SystemMigration {
-        version: 54,
-        name: "pin_length_keeps_four_where_pins_already_exist",
-        kind: Kind::Backfill,
-        postgres: "\
-INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
-SELECT DISTINCT u.hub_id, 'pin_length', '4', \
-       TO_CHAR(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SSZ'), 'system' \
-  FROM hub_user u \
- WHERE COALESCE(u.pin_hash, '') <> '' \
-   AND NOT EXISTS (SELECT 1 FROM hub_settings s \
-                    WHERE s.hub_id = u.hub_id AND s.key = 'pin_length');",
-    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3612,12 +3581,6 @@ mod kind_contract_tests {
         // v53 cuando hub#1000 se llevó la v51 y hub#1001 la v52), que es justo por qué se
         // recomprueba en el rebase y no al escribir. El hueco de la v52 es de hub#1001 y tiene que
         // entrar ANTES: rellenar un hueco por DEBAJO del máximo ya aplicado aborta el arranque.
-        // + `pin_length_keeps_four_where_pins_already_exist` (v54, hub#974): la longitud del PIN
-        // pasa a ser del hub (4 o 6) y los nuevos estrenan 6, así que a los hubs que YA tienen PINs
-        // se les escribe el 4 con el que se tecleaban — el pinpad del login estuvo clavado a 4
-        // hasta ahora, y el hash argon2 no dice la longitud del secreto: se deduce de la única
-        // puerta por la que se pudo escribir. Backfill idempotente (`NOT EXISTS`), para no pisar a
-        // un dueño que ya haya elegido. Al escribirla el máximo era la v53 en `origin/develop`.
-        assert_eq!(MIGRATIONS.len(), 51, "el catálogo cambió de tamaño");
+        assert_eq!(MIGRATIONS.len(), 50, "el catálogo cambió de tamaño");
     }
 }

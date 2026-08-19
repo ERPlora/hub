@@ -25,11 +25,11 @@ describe('the length the keypad asks for', () => {
     expect(hubPinLength.value).toBe(6);
   });
 
-  it('defaults to six before the settings land, and refuses a length no POS offers', () => {
-    // Not four: a keypad that paints four boxes and then refuses the PIN is worse than one that
-    // waits. Six is what a new hub gets, so it is also the honest guess while nothing is known.
+  it('falls back to the runtime default, and refuses a length no POS offers', () => {
+    // Four, mirroring `pin_policy::DEFAULT_PIN_LENGTH`: it is the length every PIN in use today was
+    // typed with. A new hub is created with six, but that six is written by whoever creates it.
     expect(hubPinLength.value).toBe(DEFAULT_PIN_LENGTH);
-    expect(DEFAULT_PIN_LENGTH).toBe(6);
+    expect(DEFAULT_PIN_LENGTH).toBe(4);
     for (const absurd of [1, 3, 5, 7, 8, 12, 0, -4, 4.5]) {
       hubSettings.value = { pin_length: absurd } as never;
       expect(hubPinLength.value, `${absurd} is not a length any POS offers`).toBe(

@@ -35,7 +35,7 @@ async fn lists_every_user_of_the_hub_including_the_cloud_owner_without_pin() {
         .unwrap();
     // Cajera: solo-local, con PIN.
     let cashier = rt
-        .create_user("Marta Ruiz", "271905", "cashier", None)
+        .create_user("Marta Ruiz", "1234", "cashier", None)
         .await
         .unwrap();
 
@@ -69,7 +69,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
             // membresía (hub#356); `cashier` es de los que declara un módulo, y esos son del
             // personal LOCAL.
             role: "employee".into(),
-            pin: "482137".into(),
+            pin: "4821".into(),
             badge: String::new(),
             local: false,
         })
@@ -82,7 +82,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
     assert_eq!(created.role, "employee");
     assert!(created.has_pin);
     assert!(
-        rt.verify_pin("Marta Ruiz", "482137").await.unwrap().is_some(),
+        rt.verify_pin("Marta Ruiz", "4821").await.unwrap().is_some(),
         "el PIN del alta sirve para entrar"
     );
 
@@ -118,7 +118,7 @@ async fn creates_updates_and_deactivates_users_with_their_email() {
     let inactive = row(&rt, &id).await;
     assert!(!inactive.is_active, "el inactivo sigue listado, marcado");
     assert!(
-        rt.verify_pin("Marta Ruiz Gil", "482137")
+        rt.verify_pin("Marta Ruiz Gil", "4821")
             .await
             .unwrap()
             .is_none(),
@@ -148,14 +148,14 @@ async fn resets_the_pin_and_clears_it_when_empty() {
     rt.update_hub_user(
         &id,
         &UpdateHubUser {
-            pin: Some("424209".into()),
+            pin: Some("4242".into()),
             ..UpdateHubUser::default()
         },
     )
     .await
     .unwrap();
     assert!(row(&rt, &id).await.has_pin);
-    assert!(rt.verify_pin("Ana Soto", "424209").await.unwrap().is_some());
+    assert!(rt.verify_pin("Ana Soto", "4242").await.unwrap().is_some());
 
     rt.update_hub_user(
         &id,
@@ -232,10 +232,10 @@ async fn roles_are_core_and_count_their_members() {
     rt.get_or_link_cloud_user("cloud-1", "Ioan", "admin", None, None)
         .await
         .unwrap();
-    rt.create_user("Marta", "111102", "cashier", None)
+    rt.create_user("Marta", "1111", "cashier", None)
         .await
         .unwrap();
-    rt.create_user("Luis", "222208", "cashier", None)
+    rt.create_user("Luis", "2222", "cashier", None)
         .await
         .unwrap();
 
@@ -308,7 +308,7 @@ async fn a_row_that_still_carries_owner_keeps_every_administrative_power() {
     );
 
     let rt = runtime("hub-roles-legacy").await;
-    let legacy = rt.create_user("Boss", "987603", "owner", None).await.unwrap();
+    let legacy = rt.create_user("Boss", "9876", "owner", None).await.unwrap();
     assert_eq!(row(&rt, &legacy).await.role, "owner");
 
     let roles = rt.list_hub_roles().await.unwrap();
@@ -336,7 +336,7 @@ async fn a_module_reads_the_hub_users_through_the_dispatcher() {
     rt.create_hub_user(&NewHubUser {
         name: "Marta Ruiz".into(),
         role: "cashier".into(),
-        pin: "482137".into(),
+        pin: "4821".into(),
         badge: String::new(),
         local: true,
         ..NewHubUser::default()
@@ -477,8 +477,7 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
         .await
         .unwrap();
 
-    // Un hub nuevo pide 6 (hub#974), así que los malos son: adivinables, cortos, largos y no-dígitos.
-    for bad in ["123456", "000000", "1234", "abcdef", "123456789"] {
+    for bad in ["1234", "0000", "12", "abcd", "123456789"] {
         let err = rt
             .set_pin(&id, bad)
             .await
@@ -491,43 +490,45 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
         assert!(!row(&rt, &id).await.has_pin, "`{bad}` must not have been stored");
     }
 
-    rt.set_pin(&id, "258013").await.unwrap();
+    rt.set_pin(&id, "2580").await.unwrap();
     assert!(row(&rt, &id).await.has_pin);
-    assert!(rt.verify_pin("Ana Soto", "258013").await.unwrap().is_some());
+    assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
 
     // Empty still clears it (a user going back to account-only login).
     rt.set_pin(&id, "").await.unwrap();
     assert!(!row(&rt, &id).await.has_pin);
 }
 
-// ── La LONGITUD del PIN la fija el hub, y los hubs nuevos estrenan 6 (hub#974) ───────────────
+// ── La LONGITUD del PIN la fija el HUB, y es fija para todo el mundo (hub#974) ──────────────
 //
 // Decisión de mercado (9 referencias + foros, tabla en la issue): gana el modelo de Clover —
-// longitud FIJA por cuenta, 4 o 6, con 6 en las altas nuevas. La uniformidad es lo que permite que
-// el teclado envíe solo al último dígito: los productos que admiten longitud variable (Toast 3-8,
-// Lightspeed K 4-6, Shopify 4-6) están OBLIGADOS a poner un botón de confirmar, y un cajero que
-// ficha decenas de veces al día paga ese toque extra decenas de veces al día.
+// longitud FIJA por cuenta, 4 o 6. La uniformidad es lo que permite que el teclado envíe solo al
+// último dígito: los productos que admiten longitud variable (Toast 3-8, Lightspeed K 4-6,
+// Shopify 4-6) están OBLIGADOS a poner un botón de confirmar, y un cajero que ficha decenas de
+// veces al día paga ese toque extra decenas de veces al día.
 //
-// Lo que NO se copia de Clover: su «autofill» que rellena con `00` los PIN de 4 al pasar a 6 — eso
-// es un PIN de 6 con la entropía de 4 y un sufijo público. Un hub que YA tiene PINs se queda en su
-// longitud; el salto a 6 es una decisión del dueño, no una migración silenciosa.
+// **Un hub nuevo se crea con 6**, pero ese 6 lo escribe quien lo crea: aquí dentro, un hub recién
+// migrado y uno de hace un año son la misma base de datos, así que el default es 4 — la longitud
+// con la que se tecleaban todos los PIN que hoy funcionan. Y lo que NO se copia de Clover es su
+// «autofill», que rellena con `00` los PIN de 4 al pasar a 6: un PIN de seis dígitos con la
+// entropía de cuatro y un sufijo que conoce todo el mundo.
 
 #[tokio::test]
-async fn a_brand_new_hub_asks_for_six_digits() {
-    let rt = runtime("hub-nuevo").await;
-    assert_eq!(rt.pin_length().await.unwrap(), 6);
+async fn the_length_is_the_hubs_and_a_pin_of_another_length_is_refused() {
+    let rt = runtime("hub-largo").await;
+    rt.set_pin_length(6).await.unwrap();
 
     let err = rt
         .create_hub_user(&NewHubUser {
             name: "Ana Soto".into(),
             email: String::new(),
             role: "employee".into(),
-            pin: "2580".into(), // 4 dígitos: la longitud de ayer
+            pin: "2580".into(), // cuatro, en un hub que pide seis
             badge: String::new(),
             local: true,
         })
         .await
-        .expect_err("un hub nuevo no acepta un PIN de 4");
+        .expect_err("la longitud es fija: cuatro no cuela en un hub de seis");
     assert!(format!("{err}").contains('6'), "el mensaje dice cuántos dígitos: {err}");
 
     rt.create_hub_user(&NewHubUser {
@@ -543,10 +544,11 @@ async fn a_brand_new_hub_asks_for_six_digits() {
 }
 
 #[tokio::test]
-async fn a_hub_that_already_has_pins_keeps_its_length() {
+async fn a_hub_that_says_nothing_keeps_the_length_its_pins_were_typed_with() {
     let rt = runtime("hub-viejo").await;
-    // Un hub de antes de esta decisión: alguien ya tiene un PIN de 4 dígitos.
-    rt.set_pin_length(4).await.unwrap();
+    // Sin decir nada: 4, que es lo que el pinpad aceptó siempre. Actualizar la imagen no puede
+    // dejar a los cajeros fuera en hora punta.
+    assert_eq!(rt.pin_length().await.unwrap(), 4);
 
     let id = rt
         .create_hub_user(&NewHubUser {
@@ -558,18 +560,24 @@ async fn a_hub_that_already_has_pins_keeps_its_length() {
             local: true,
         })
         .await
-        .expect("con el hub en 4, cuatro dígitos siguen valiendo");
+        .expect("cuatro dígitos siguen valiendo");
     assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
 
-    // Y ahora seis NO cuela: la longitud es fija, que es lo que permite el auto-envío del teclado.
+    // Y subir el listón NO invalida el PIN que ya funcionaba: sigue entrando hasta que su dueño lo
+    // cambie. Lo que cambia es lo que se admite al ponerlo NUEVO.
+    rt.set_pin_length(6).await.unwrap();
+    assert!(
+        rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some(),
+        "un PIN vigente no se rompe porque el hub suba la longitud"
+    );
     let err = rt
         .update_hub_user(
             &id,
-            &UpdateHubUser { pin: Some("258013".into()), ..UpdateHubUser::default() },
+            &UpdateHubUser { pin: Some("2580".into()), ..UpdateHubUser::default() },
         )
         .await
-        .expect_err("longitud fija: en un hub de 4, seis dígitos no");
-    assert!(format!("{err}").contains('4'), "{err}");
+        .expect_err("pero uno nuevo ya tiene que ser de seis");
+    assert!(format!("{err}").contains('6'), "{err}");
 }
 
 #[tokio::test]
@@ -583,46 +591,4 @@ async fn the_hub_only_admits_the_two_lengths_the_market_uses() {
     }
     rt.set_pin_length(4).await.unwrap();
     rt.set_pin_length(6).await.unwrap();
-}
-
-/// La migración v54 sobre un hub que YA existía: sus PIN de 4 siguen entrando y el hub se queda en
-/// 4 — el pinpad estuvo clavado a 4 hasta ahora, así que ese es el único largo que pudo escribirse.
-/// Sin esto, actualizar la imagen dejaría a los cajeros fuera en hora punta sin saber por qué.
-#[tokio::test]
-async fn upgrading_a_hub_that_already_had_pins_does_not_lock_its_cashiers_out() {
-    let rt = runtime("hub-en-marcha").await;
-    // El hub de ayer: longitud 4 y alguien con su PIN puesto.
-    rt.set_pin_length(4).await.unwrap();
-    rt.create_hub_user(&NewHubUser {
-        name: "Marta Ruiz".into(),
-        email: String::new(),
-        role: "cashier".into(),
-        pin: "2719".into(),
-        badge: String::new(),
-        local: true,
-    })
-    .await
-    .unwrap();
-    // Y se le quita todo rastro de esta versión: ni la preferencia, ni la marca de que la
-    // migración corrió. Así queda como el hub REAL que actualiza — uno que ya tenía cajeros
-    // trabajando cuando la v54 llega por primera vez, no uno recién creado.
-    for sql in [
-        "DELETE FROM hub_settings WHERE key = 'pin_length'",
-        "DELETE FROM _hub_system_migrations WHERE version = 54",
-    ] {
-        rt.db_for_test().execute(sql, &Params::new()).await.unwrap();
-    }
-
-    // Actualizar la imagen = volver a aplicar las migraciones de sistema.
-    rt.ensure_system_tables().await.unwrap();
-
-    assert_eq!(
-        rt.pin_length().await.unwrap(),
-        4,
-        "un hub con PINs conserva su longitud; subir a 6 lo decide el dueño"
-    );
-    assert!(
-        rt.verify_pin("Marta Ruiz", "2719").await.unwrap().is_some(),
-        "y el PIN que ya funcionaba sigue entrando"
-    );
 }
