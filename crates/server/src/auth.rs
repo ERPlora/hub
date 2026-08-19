@@ -52,6 +52,24 @@ pub fn session_token(headers: &HeaderMap) -> Option<String> {
     header(headers, "x-hub-session")
 }
 
+/// Value of `name` in the request's `Cookie` header, if present.
+///
+/// The hub authenticates by header everywhere (ADR-0003), and this is not a second way in: the only
+/// caller is the media READ door, because the only requests the app cannot put a header on are the
+/// ones the browser issues by itself — `<img src>` and `background-image` (hub#791, ADR-0366). See
+/// [`crate::media`] for why that door, and only that one, reads a cookie.
+pub fn cookie(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|line| line.split(';'))
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(k, _)| k.trim() == name)
+        .map(|(_, v)| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 /// Step-up approval token of `X-Elevation-Token` (hub#361), if the caller presents one.
 ///
 /// A **header**, not a payload field: the body of a command has to stay pure data, so that the
