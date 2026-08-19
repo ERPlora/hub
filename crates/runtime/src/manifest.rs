@@ -1261,6 +1261,41 @@ pub struct AiTool {
     /// Nombre opcional que ve el LLM (por defecto, el nombre de la operación).
     #[serde(default)]
     pub name: Option<String>,
+    /// **Cuánto daño hace esta operación** si el asistente la ejecuta (hub#1042).
+    ///
+    /// Lo DECLARA el módulo, y no se infiere del nombre a propósito: `delete` en un nombre no
+    /// significa nada portable —`sales.void` es destructivo y no lo dice— y un core que lo
+    /// adivinara estaría decidiendo por el módulo cuánto vale su propio dato. El módulo lo sabe.
+    ///
+    /// Ausente = `normal`: el bloque es opcional y ningún manifest publicado lo declara todavía.
+    #[serde(default)]
+    pub risk: Option<AiRisk>,
+}
+
+/// Vocabulario CERRADO de peligrosidad (hub#1042), como el `reason` de ADR-0331: cerrado para
+/// que el core pueda aplicar una política sin conocer el dominio, y para que sea traducible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiRisk {
+    /// Lo corriente: la tarjeta de confirmación de siempre.
+    Normal,
+    /// Borra o anula UN registro de forma que el usuario no puede deshacer solo.
+    Destructive,
+    /// Alcanza a un CONJUNTO cuyo tamaño el usuario no ve al confirmar.
+    BulkDestructive,
+}
+
+impl AiRisk {
+    /// El nombre que viaja al cliente. `Normal` se envía explícito, no ausente: «no lo declaró»
+    /// y «lo declaró normal» tienen que verse igual desde fuera, o la política se vuelve
+    /// dependiente de si alguien se acordó de escribirlo.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiRisk::Normal => "normal",
+            AiRisk::Destructive => "destructive",
+            AiRisk::BulkDestructive => "bulk_destructive",
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

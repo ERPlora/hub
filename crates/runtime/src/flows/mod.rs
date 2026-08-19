@@ -123,6 +123,7 @@ pub(crate) mod test_support {
                 ai: Some(AiTool {
                     description: "a read the assistant may perform".to_string(),
                     name: None,
+                    risk: None,
                 }),
                 expose_api: false,
             },
