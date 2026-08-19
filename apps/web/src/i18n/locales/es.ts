@@ -1151,6 +1151,9 @@ export default {
   // a los tres igual a propósito, para que un diálogo que abre cualquiera no sirva para averiguar
   // quién trabaja aquí.
   elevation: {
+    what: 'Se aprueba: {action}',
+    whatFromModule: 'Se aprueba: una acción de {app}',
+    whatUnknown: 'Se aprueba: una acción que esta app no sabe nombrar',
     title: 'Hace falta una aprobación',
     lead: 'Pide a un encargado que introduzca su PIN para aprobarlo.',
     orSwipeBadge: '…o que pase su placa: no hace falta pulsar nada antes.',
