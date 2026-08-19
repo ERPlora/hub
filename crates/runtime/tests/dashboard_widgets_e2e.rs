@@ -164,9 +164,30 @@ async fn staff_headcount_kpi_counts_active_members() {
         }))
     };
     // 2 activos + 1 terminado (excluido del headcount).
+    //
+    // El alta ya NO puede nacer `terminated` (staff 36c0bd2): el enum de `member_create` es
+    // `active|inactive|on_leave` y la baja es una PUERTA propia — `staff.members.delete`, con su
+    // fecha y su motivo. Se termina por ahí, que además es lo que ejerce el camino real.
     rt.execute_command("staff.members.create", &create("Ana", "active"), &ctx).await.unwrap();
     rt.execute_command("staff.members.create", &create("Beto", "active"), &ctx).await.unwrap();
-    rt.execute_command("staff.members.create", &create("Caro", "terminated"), &ctx).await.unwrap();
+    rt.execute_command("staff.members.create", &create("Caro", "active"), &ctx).await.unwrap();
+    let caro = rt
+        .execute_query("staff.members.list", &Params::new(), &ctx)
+        .await
+        .unwrap()
+        .iter()
+        .find(|r| r["first_name"].as_str() == Some("Caro"))
+        .expect("Caro debe estar en la lista")["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    rt.execute_command(
+        "staff.members.delete",
+        &params(json!({ "staff_id": caro, "termination_date": "2026-08-19", "reason": "e2e" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
 
     let stats = kpi_row(&rt, "staff.members.stats", &ctx).await;
     assert_eq!(i64_of(&stats["active_members"]), 2, "el KPI cuenta SOLO los activos reales");
