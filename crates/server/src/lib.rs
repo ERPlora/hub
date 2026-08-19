@@ -3209,15 +3209,37 @@ async fn assistant_chat_stream(
         None => all_tools,
     };
 
-    // Mapa name→kind (query/command) del catálogo ofrecido, para anotar los eventos
-    // `function_call` que reenviamos: el web app auto-ejecuta las LECTURAS (query) y pide
-    // confirmación antes de una ESCRITURA (command). §9.2.
-    let tool_kinds: std::collections::HashMap<String, String> = tools
+    // Lo que el catálogo YA resolvió sobre cada tool, para anotar los eventos `function_call`
+    // que reenviamos. El drawer no tiene catálogo propio donde consultarlo, y ninguna de estas
+    // tres cosas puede venir del modelo — son hechos del manifest:
+    //
+    //   · `kind`         — el web app auto-ejecuta las LECTURAS y confirma las ESCRITURAS (§9.2).
+    //   · `risk`         — cuánto daño hace la operación (hub#1042).
+    //   · `money_fields` — qué argumentos son dinero, para que la tarjeta enseñe «15,00 €» y no
+    //                      `price_cents: 1500` (hub#1040): el único punto donde un humano puede
+    //                      cazar un ×100, y el único del producto donde no salía en euros.
+    let tool_notes: std::collections::HashMap<String, serde_json::Value> = tools
         .iter()
         .filter_map(|t| {
             let name = t.get("name").and_then(|v| v.as_str())?;
-            let kind = t.get("kind").and_then(|v| v.as_str())?;
-            Some((name.to_string(), kind.to_string()))
+            let mut note = serde_json::Map::new();
+            if let Some(kind) = t.get("kind").and_then(|v| v.as_str()) {
+                note.insert("kind".to_string(), serde_json::json!(kind));
+            }
+            if let Some(risk) = t.get("risk").and_then(|v| v.as_str()) {
+                note.insert("risk".to_string(), serde_json::json!(risk));
+            }
+            let money = t
+                .get("parameters")
+                .map(|p| assistant::money_fields(&p.to_string()))
+                .unwrap_or_default();
+            if !money.is_empty() {
+                note.insert("money_fields".to_string(), serde_json::json!(money));
+            }
+            if note.is_empty() {
+                return None;
+            }
+            Some((name.to_string(), serde_json::Value::Object(note)))
         })
         .collect();
 
@@ -3252,7 +3274,7 @@ async fn assistant_chat_stream(
             if let Some(idx) = buf.find('\n') {
                 let line: String = buf.drain(..=idx).collect();
                 let line = line.trim_end_matches(['\r', '\n']);
-                if let Some(frame) = assistant::translate_sse_line(line, &tool_kinds) {
+                if let Some(frame) = assistant::translate_sse_line(line, &tool_notes) {
                     return Poll::Ready(Some(Ok::<_, std::io::Error>(bytes_from(frame))));
                 }
                 continue;
@@ -3270,7 +3292,7 @@ async fn assistant_chat_stream(
                     // Fin del stream del Cloud: procesa cualquier resto + cierra.
                     if !buf.is_empty() {
                         let rest = std::mem::take(&mut buf);
-                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_kinds) {
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_notes) {
                             return Poll::Ready(Some(Ok(bytes_from(frame))));
                         }
                     }

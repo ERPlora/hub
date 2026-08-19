@@ -221,6 +221,8 @@ import { toastSuccess, toastError } from '../lib/toast';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
 import { moduleNav } from '../lib/nav';
+import { describeToolCall } from '../lib/assistant-confirm';
+import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
@@ -481,13 +483,28 @@ async function send(): Promise<void> {
     // (ni instalar un módulo ni ningún command de módulo). Un ion-alert nativo: el usuario ve
     // QUÉ tool y con QUÉ argumentos, y decide. Lo DESTRUCTIVO ni llega aquí: no se ofrece
     // como tool (regla de Ioan, test en assemble_tools).
-    onConfirm: async ({ name, arguments: args }) => {
-      let pretty = args;
-      try { pretty = JSON.stringify(JSON.parse(args || '{}'), null, 1); } catch { /* raw */ }
+    onConfirm: async ({ name, arguments: args, moneyFields }) => {
+      // La tarjeta se lee en palabras del negocio (hub#1040). Antes enseñaba el nombre crudo de
+      // la tool y el `JSON.stringify` de los argumentos: el dueño aprobaba `price_cents: 1500`
+      // sin leer nunca «15,00 €», en el ÚNICO punto donde un humano puede cazar un ×100.
+      //
+      // El dinero lo marca el runtime desde el schema del command; aquí no se adivina por el
+      // nombre del campo, porque un porcentaje pintado como importe sería una mentira nueva.
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(args || '{}') as Record<string, unknown>; } catch { /* sin args */ }
+      const described = describeToolCall({
+        command: name,
+        args: parsed,
+        moneyFields,
+        catalogue: elevationCatalogue.value,
+      });
+      const lines = described.fields.map((f) => `${f.key}: ${f.value}`).join('\n');
       const alert = await alertController.create({
         header: t('assistant.confirmTitle'),
-        subHeader: name,
-        message: pretty,
+        // La acción como la nombra el MÓDULO; si no sabe nombrarla se dice, nunca se rellena
+        // con el identificador interno (hub#363).
+        subHeader: described.action || t('assistant.confirmUnnamedAction'),
+        message: lines,
         buttons: [
           { text: t('assistant.confirmCancel'), role: 'cancel' },
           { text: t('assistant.confirmRun'), role: 'confirm' },
