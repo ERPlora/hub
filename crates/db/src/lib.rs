@@ -558,6 +558,30 @@ fn shim_functions(sql: &str) -> String {
             i += 1;
             continue;
         }
+        // Comentarios `-- …` (línea) y `/* … */` (bloque), fuera de string: se emiten VERBATIM y
+        // NO tocan el estado de cadena — igual que hace `translate` con sus `:name` (hub#1026).
+        // Sin esto, un apóstrofo en prosa (`-- the slot's capacity`) abría un literal fantasma y
+        // dejaba TODAS las funciones-puente posteriores sin reescribir → Postgres `function
+        // erp_datediff_days(text, text) does not exist`. Se copia por slice para preservar el
+        // UTF-8 del comentario.
+        if c == b'-' && bytes.get(i + 1) == Some(&b'-') {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            out.extend_from_slice(&bytes[start..i]);
+            continue;
+        }
+        if c == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len()); // consume el `*/` de cierre
+            out.extend_from_slice(&bytes[start..i]);
+            continue;
+        }
         // Sólo arranca un nombre del set si el carácter previo NO es parte de un identificador
         // (descarta `xerp_pad`).
         let prev_is_ident = i > 0 && (bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_');
@@ -786,6 +810,28 @@ pub fn shim_ddl_types(sql: &str) -> String {
             in_string = true;
             out.push(b'\'');
             i += 1;
+            continue;
+        }
+        // Comentarios verbatim, sin tocar el estado de cadena — misma regla que `translate` y que
+        // `shim_functions` (hub#1026). Aquí el precio de no hacerlo es más caro: un apóstrofo en
+        // prosa dejaba los tipos portables posteriores SIN normalizar, y `BLOB` no existe en
+        // Postgres (la migración revienta) mientras `INTEGER` no es `BIGINT` (queda de 4 bytes).
+        if c == b'-' && bytes.get(i + 1) == Some(&b'-') {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            out.extend_from_slice(&bytes[start..i]);
+            continue;
+        }
+        if c == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+            out.extend_from_slice(&bytes[start..i]);
             continue;
         }
         // Sólo reescribe tipos como palabra completa.
@@ -1312,6 +1358,42 @@ mod tests {
         // `xerp_pad` no es la función-puente: se deja intacto.
         let (sql, _) = translate("SELECT xerp_pad");
         assert_eq!(sql, "SELECT xerp_pad");
+    }
+
+    #[test]
+    fn shim_skips_line_comments_so_an_apostrophe_does_not_swallow_the_rest() {
+        // hub#1026: an apostrophe inside a `--` comment used to open a phantom string literal,
+        // leaving EVERY bridge function after it unrewritten — Postgres then failed with
+        // `function erp_now() does not exist`. The comment is copied verbatim and never touches
+        // the string state, exactly like `translate` already does for its `:name` binds.
+        let (sql, _) = translate("-- the slot's capacity\nSELECT erp_now()");
+        assert_eq!(sql, "-- the slot's capacity\nSELECT now()");
+    }
+
+    #[test]
+    fn shim_skips_block_comments_so_an_apostrophe_does_not_swallow_the_rest() {
+        let (sql, _) = translate("/* it's here */ SELECT erp_now()");
+        assert_eq!(sql, "/* it's here */ SELECT now()");
+    }
+
+    #[test]
+    fn shim_leaves_a_bridge_call_inside_a_comment_verbatim() {
+        // A call documented in a comment is prose, not code: it must not be rewritten.
+        let (sql, _) = translate("-- use erp_now() here\nSELECT 1");
+        assert_eq!(sql, "-- use erp_now() here\nSELECT 1");
+    }
+
+    #[test]
+    fn ddl_shim_skips_comments_so_an_apostrophe_does_not_swallow_the_types() {
+        // hub#1026, same root cause one function over: a `'` in a `--` comment left the rest of a
+        // MIGRATION "inside a string", so the portable types after it were never normalised —
+        // `BLOB` does not exist in Postgres and `INTEGER` is not `BIGINT`. Worse than the bridge
+        // case: it lands in the schema.
+        let out = shim_ddl_types("-- the slot's capacity\nCREATE TABLE t (n INTEGER, b BLOB);");
+        assert_eq!(
+            out,
+            "-- the slot's capacity\nCREATE TABLE t (n BIGINT, b BYTEA);"
+        );
     }
 
     #[test]
