@@ -1473,6 +1473,7 @@ export default {
     saved: 'Settings saved.',
     saveError: 'Could not save settings.',
     adminOnly: 'Only an administrator can change these settings.',
+    textPlaceholder: 'Type here…',
   },
   modulePlan: {
     tab: 'Plan',

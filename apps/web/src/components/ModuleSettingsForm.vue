@@ -21,6 +21,7 @@
             <ion-toggle
               v-if="field.control === 'toggle'"
               slot="end"
+              :aria-label="field.label"
               :checked="model[field.key] === true"
               :disabled="!canEdit"
               @ion-change="onToggle(field.key, $event)"
@@ -53,11 +54,13 @@
               @ion-input="model[field.key] = toNumber($event.detail.value)"
             />
 
-            <!-- string → ion-input -->
+            <!-- string → ion-input. The placeholder is what makes an EMPTY field visible: without
+                 it a bare `slot="end"` input paints nothing (hub#959 — "the fields do not exist"). -->
             <ion-input
               v-else
               slot="end"
               :aria-label="field.label"
+              :placeholder="t('moduleSettings.textPlaceholder')"
               :readonly="!canEdit"
               :maxlength="field.maxLength"
               :value="(model[field.key] as string | null) ?? ''"

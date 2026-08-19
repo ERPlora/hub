@@ -1355,6 +1355,7 @@ export default {
     saved: 'Ajustes guardados.',
     saveError: 'No se pudieron guardar los ajustes.',
     adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
+    textPlaceholder: 'Escribe aquí…',
   },
   modulePlan: {
     tab: 'Plan',
