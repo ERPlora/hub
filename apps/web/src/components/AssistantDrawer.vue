@@ -261,6 +261,7 @@ import { assistantMessages, saveAssistantHistory } from '../lib/assistant-histor
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
 import { moduleNav } from '../lib/nav';
 import { describeToolCall } from '../lib/assistant-confirm';
+import { confirmationFor } from '../lib/assistant-danger';
 import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
 import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
@@ -528,7 +529,7 @@ async function send(): Promise<void> {
     // (ni instalar un módulo ni ningún command de módulo). Un ion-alert nativo: el usuario ve
     // QUÉ tool y con QUÉ argumentos, y decide. Lo DESTRUCTIVO ni llega aquí: no se ofrece
     // como tool (regla de Ioan, test en assemble_tools).
-    onConfirm: async ({ name, arguments: args, moneyFields }) => {
+    onConfirm: async ({ name, arguments: args, moneyFields, risk }) => {
       // La tarjeta se lee en palabras del negocio (hub#1040). Antes enseñaba el nombre crudo de
       // la tool y el `JSON.stringify` de los argumentos: el dueño aprobaba `price_cents: 1500`
       // sin leer nunca «15,00 €», en el ÚNICO punto donde un humano puede cazar un ×100.
@@ -544,6 +545,44 @@ async function send(): Promise<void> {
         catalogue: elevationCatalogue.value,
       });
       const lines = described.fields.map((f) => `${f.key}: ${f.value}`).join('\n');
+
+      // Lo destructivo pide MÁS que un clic (hub#1042). El módulo declara cuánto daño hace
+      // (`ai.risk`); el core decide cuánta fricción pone, sin saber qué es una cita.
+      const gate = confirmationFor({ risk, args: parsed });
+      if (gate.kind === 'refuse') {
+        // Un masivo que no sabe cuántos caen no se ejecuta desde el chat: una tarjeta que no
+        // dice el número es la que se aprueba sin saber qué se aprueba.
+        const refusal = await alertController.create({
+          header: t('assistant.confirmTitle'),
+          subHeader: described.action || t('assistant.confirmUnnamedAction'),
+          message: t('assistant.confirmBulkUnknown'),
+          buttons: [{ text: t('assistant.confirmCancel'), role: 'cancel' }],
+        });
+        await refusal.present();
+        await refusal.onDidDismiss();
+        return false;
+      }
+      if (gate.kind === 'typed') {
+        const expected = gate.expected ?? t('assistant.confirmDestructiveWord');
+        const detail = gate.affected
+          ? `${t('assistant.confirmBulkAffected', { count: gate.affected })} ${t('assistant.confirmDestructive', { expected })}`
+          : t('assistant.confirmDestructive', { expected });
+        const typed = await alertController.create({
+          header: t('assistant.confirmTitle'),
+          subHeader: described.action || t('assistant.confirmUnnamedAction'),
+          message: `${lines}\n\n${detail}`,
+          inputs: [{ name: 'confirmation', type: 'text', placeholder: expected }],
+          buttons: [
+            { text: t('assistant.confirmCancel'), role: 'cancel' },
+            { text: t('assistant.confirmRun'), role: 'confirm' },
+          ],
+        });
+        await typed.present();
+        const { role, data } = await typed.onDidDismiss();
+        // Comparación exacta salvo espacios: si «4 » valiera, valdría cualquier cosa parecida.
+        return role === 'confirm' && String(data?.values?.confirmation ?? '').trim() === expected;
+      }
+
       const alert = await alertController.create({
         header: t('assistant.confirmTitle'),
         // La acción como la nombra el MÓDULO; si no sabe nombrarla se dice, nunca se rellena

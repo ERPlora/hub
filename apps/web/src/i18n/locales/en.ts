@@ -128,6 +128,13 @@ export default {
     // hub#1040 — when the app cannot name its own action we say so, rather than filling the
     // gap with the internal command name (hub#363: that is our vocabulary, not the counter's).
     confirmUnnamedAction: 'An action this app cannot name',
+    // hub#1042 — destructive actions ask for more than a click. Typing the COUNT is what
+    // forces reading the sentence that says how many are about to go.
+    confirmDestructive: 'This cannot be undone from the screen. Type {expected} to confirm.',
+    confirmDestructiveWord: 'DELETE',
+    confirmBulkAffected: 'You are about to delete {count} records.',
+    confirmBulkUnknown:
+      'I cannot tell how many records this would delete, so I will not do it from here. Open the screen, where you can see them.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is

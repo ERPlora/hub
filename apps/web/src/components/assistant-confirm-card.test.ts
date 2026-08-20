@@ -41,3 +41,32 @@ describe('la tarjeta se lee en palabras del negocio (hub#1040)', () => {
     expect(drawer).toContain('moneyFields');
   });
 });
+
+// hub#1042 — la tarjeta APLICA la marca de peligrosidad, no solo la recibe.
+//
+// El barrido del core ya garantizaba que lo destructivo del HOST no se ofrece jamás; lo de módulo
+// no pasaba por ningún filtro, y la única protección era el criterio del modelo — que en la misma
+// sesión se inventó una política de seguridad que no existe.
+describe('lo destructivo pide más que un clic (hub#1042)', () => {
+  it('la tarjeta consulta la política antes de ejecutar', () => {
+    expect(drawer).toContain('confirmationFor');
+  });
+
+  it('un masivo que no sabe cuántos caen NO se ejecuta desde el chat', () => {
+    // La RAMA, no solo el texto: comprobar que la cadena existe dejaba pasar un `if (false)`.
+    // Lo destapó el sabotaje, no la lectura.
+    expect(drawer).toContain("gate.kind === 'refuse'");
+    expect(drawer).toContain('confirmBulkUnknown');
+    // Sin botón de ejecutar: la única salida es cancelar.
+    expect(drawer).toMatch(/confirmBulkUnknown[\s\S]{0,400}confirmCancel/);
+  });
+
+  it('y la rama de escritura se toma por la política, no por el nombre de la tool', () => {
+    expect(drawer).toContain("gate.kind === 'typed'");
+  });
+
+  it('la confirmación escrita se compara de verdad, no basta con pulsar', () => {
+    expect(drawer).toContain('inputs:');
+    expect(drawer).toMatch(/values\?\.confirmation/);
+  });
+});
