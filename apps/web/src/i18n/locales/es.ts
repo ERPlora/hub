@@ -131,6 +131,13 @@ export default {
     // hub#1040 — cuando la app no sabe nombrar su propia acción se dice, en vez de rellenar el
     // hueco con el nombre interno del command (hub#363: ese vocabulario es nuestro, no del mostrador).
     confirmUnnamedAction: 'Una acción que esta app no sabe nombrar',
+    // hub#1042 — lo destructivo pide más que un clic. Escribir el NÚMERO es lo que obliga a
+    // leer la frase que dice cuántos van a caer.
+    confirmDestructive: 'Esto no se puede deshacer desde la pantalla. Escribe {expected} para confirmar.',
+    confirmDestructiveWord: 'BORRAR',
+    confirmBulkAffected: 'Vas a borrar {count} registros.',
+    confirmBulkUnknown:
+      'No puedo saber cuántos registros borraría esto, así que no lo hago desde aquí. Abre la pantalla, donde puedes verlos.',
   },
   // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
   // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue
