@@ -118,7 +118,11 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
              verified so: it only inserts rows that do not exist yet — it never overwrites or \
              deletes what the hub already has (existing records are kept and the template's \
              duplicates are skipped), and it never imports people, fiscal identity or another \
-             business's invoice numbering. Mutating: the user confirms a card before it runs — \
+             business's invoice numbering. A template does NOT set up the fiscal side: the \
+             result carries `still_blocking` — what this hub STILL cannot do until somebody \
+             configures it. Relay those items as PENDING; never describe a template's contents \
+             as if they were done, and never say invoicing is ready while `still_blocking` names \
+             it. Mutating: the user confirms a card before it runs — \
              never claim it is applied until the result comes back. Use the slug exactly as \
              hub.blueprints.list returned it.",
             "command",
@@ -810,6 +814,40 @@ mod tests {
         assert!(
             lower.contains("never «centavos»") || lower.contains("not «centavos»"),
             "y hay que decir explícitamente cuál NO es, o el modelo vuelve a derivar: {ins}"
+        );
+    }
+
+    /// Aplicar una plantilla NO configura lo fiscal, y decirlo por escrito importa porque el
+    /// modelo lo afirmó con el banner rojo «Todavía no puedes facturar» visible en la misma
+    /// pantalla (hub#1041). El resultado de la tool ya trae lo que sigue bloqueando; esto es la
+    /// otra mitad: que sepa qué hacer con ese campo en vez de adornarlo.
+    #[test]
+    fn the_blueprint_tool_says_it_does_not_configure_the_fiscal_side() {
+        // Va en la DESCRIPCIÓN de la tool, no en el prompt general: es donde el modelo la lee
+        // justo antes de usarla, y donde ya vive el resto del contrato de esta acción.
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let apply = tools
+            .iter()
+            .find(|t| t["name"] == json!("hub.blueprints.apply"))
+            .expect("la tool de blueprints se ofrece");
+        let desc = apply["description"].as_str().unwrap_or("").to_lowercase();
+
+        assert!(
+            desc.contains("still_blocking"),
+            "el campo que trae la verdad tiene que nombrarse: {desc}"
+        );
+        // Nombrar el campo no basta: hay que decir QUÉ hacer con él. Sin estas dos, la
+        // descripción podía perder la regla entera y el test seguía en verde — comprobado
+        // saboteándolo (`fiscal` ya aparecía antes en «fiscal identity», así que era vacuo).
+        assert!(
+            desc.contains("does not set up the fiscal side"),
+            "tiene que decir que la plantilla NO deja lo fiscal hecho: {desc}"
+        );
+        assert!(
+            desc.contains("as pending") && desc.contains("never say invoicing is ready"),
+            "y que esos ítems se transmiten como PENDIENTES, sin declarar que ya se puede \
+             facturar: {desc}"
         );
     }
 
