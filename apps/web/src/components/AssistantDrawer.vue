@@ -63,7 +63,46 @@
                   {{ a.name }}
                 </span>
               </div>
-              <span v-if="messageText(m.content)">{{ messageText(m.content) }}</span>
+              <!-- El markdown se PINTA, no se enseña (hub#1043). Se parsea a estructura y lo
+                   renderiza Vue: sin `v-html`, así que el texto se escapa por definición y no hay
+                   nada que sanear. Las respuestas del asistente las escribe un LLM — no es el
+                   sitio para estrenar el primer `v-html` del web app.
+                   El mensaje del USUARIO va tal cual: lo que escribió es lo que ve. -->
+              <span v-if="m.role === 'user' && messageText(m.content)">{{ messageText(m.content) }}</span>
+              <div v-else-if="messageText(m.content)" class="chat-md">
+                <template v-for="(b, bi) in parseMarkdown(messageText(m.content))" :key="bi">
+                  <component :is="`h${Math.min(b.level + 2, 6)}`" v-if="b.type === 'heading'" class="md-h">
+                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                  </component>
+                  <component :is="b.ordered ? 'ol' : 'ul'" v-else-if="b.type === 'list'" class="md-list">
+                    <li v-for="(item, ii) in b.items" :key="ii">
+                      <span v-for="(s, si) in item" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                    </li>
+                  </component>
+                  <!-- La tabla scrollea DENTRO de su envoltorio: a 390 px el drawer no se mueve. -->
+                  <div v-else-if="b.type === 'table'" class="md-table-wrap">
+                    <table class="md-table">
+                      <thead>
+                        <tr>
+                          <th v-for="(cell, ci) in b.head" :key="ci">
+                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, ri) in b.rows" :key="ri">
+                          <td v-for="(cell, ci) in row" :key="ci">
+                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p v-else class="md-p">
+                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                  </p>
+                </template>
+              </div>
               <ion-spinner v-else-if="m.role === 'assistant'" name="dots" class="chat-typing" />
             </div>
             <!-- The grounding notice (hub#1038, #1039, #1048). Written by the RUNTIME from the
@@ -222,6 +261,7 @@ import { assistantMessages, saveAssistantHistory } from '../lib/assistant-histor
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
 import { moduleNav } from '../lib/nav';
 import { describeToolCall } from '../lib/assistant-confirm';
+import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
 import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
@@ -280,6 +320,11 @@ function knownRoutes(): string[] {
     .filter((path) => !path.includes(':') && path !== '/');
   const modules = moduleNav.value.map((m) => m.path);
   return [...shell, ...modules];
+}
+
+/** La clase de un span en línea. `text` no lleva ninguna: es lo corriente. */
+function spanClass(span: Inline): string {
+  return span.kind === 'text' ? '' : `md-${span.kind}`;
 }
 
 /** Navega a una ruta interna del shell (router.push) y cierra el drawer para que vea la pantalla. */
@@ -782,6 +827,31 @@ onBeforeUnmount(() => {
 .chat-report-btn:hover {
   --color: var(--ion-color-danger, #c00);
 }
+.chat-md :where(p, ul, ol, h3, h4, h5, h6) { margin: 0 0 6px; }
+.chat-md :where(p, ul, ol, h3, h4, h5, h6):last-child { margin-bottom: 0; }
+.md-bold { font-weight: 600; }
+.md-italic { font-style: italic; }
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--ok-surface-2, rgba(0, 0, 0, 0.06));
+}
+.md-list { padding-inline-start: 1.15em; }
+.md-h { font-size: 1em; font-weight: 600; }
+/* La tabla scrollea DENTRO de su envoltorio — a 390 px el drawer NO se mueve en horizontal.
+   Es el mismo patrón que ya usa ok-data-table. */
+.md-table-wrap { overflow-x: auto; max-width: 100%; }
+.md-table { border-collapse: collapse; font-size: 0.9em; }
+.md-table :where(th, td) {
+  border: 1px solid var(--ok-border, rgba(0, 0, 0, 0.12));
+  padding: 3px 6px;
+  text-align: start;
+  white-space: nowrap;
+}
+.md-table th { font-weight: 600; }
+
 .chat-grounding {
   margin-top: 4px;
   padding: 6px 10px;
