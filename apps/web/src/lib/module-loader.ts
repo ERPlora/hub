@@ -10,6 +10,7 @@
 // Los assets (module.json + dist/<id>.esm.js + icons.json) se sirven desde `/modules/**`:
 //   - dev: copiados a public/ por sync-modules.mjs (puente del shell de desarrollo),
 //   - prod: el runtime (crates/server, ServeDir) los sirve desde el web dir.
+import { warnOnOutfitkitSkew } from './outfitkit-skew';
 import type { ModuleManifest, NavigationItem } from '@erplora/module-types';
 import { addIcons } from 'ionicons';
 
@@ -101,6 +102,21 @@ async function fetchNavigation(): Promise<Navigation> {
  * iconos de cada módulo —menos aún de uno de terceros—, así que el módulo los trae en su zip y
  * aquí se registran al cargarlo.
  */
+async function loadOutfitkitStamp(base: string, entry: string, moduleId: string): Promise<void> {
+  // `dist/outfitkit.json` lo escribe `erplora build` (module-toolkit) con la versión que horneó.
+  // Vive junto al bundle, como `icons.json`. Su ausencia NO es un defecto: es lo que traen los
+  // módulos publicados antes del sello, y `warnOnOutfitkitSkew` se calla en ese caso.
+  const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
+  try {
+    const res = await fetch(`${base}/${distDir ? `${distDir}/` : ''}outfitkit.json`);
+    if (!res.ok) return;
+    const stamp = (await res.json()) as { outfitkit?: string };
+    warnOnOutfitkitSkew(moduleId, stamp.outfitkit, __OUTFITKIT_VERSION__);
+  } catch {
+    // Sin sello legible no hay nada que comparar. Silencio: el módulo carga igual.
+  }
+}
+
 async function loadIconMap(base: string, entry: string): Promise<Record<string, string>> {
   // icons.json vive junto al bundle del WC (dist/), lo genera `module-toolkit build`.
   const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
@@ -336,6 +352,7 @@ export async function loadInstalledManifests(): Promise<InstalledManifest[]> {
     // usa `loadInstalledManifests` (no la navegación), así que sin esto los iconos de cabecera de
     // widget que SÍ están horneados salían vacíos si su módulo no tenía entrada de navegación (P2).
     await loadIconMap(base, manifest.ui.entry);
+    void loadOutfitkitStamp(base, manifest.ui.entry, moduleId);
     const locale = lang === 'en' ? undefined : await loadModuleLocale(base, lang);
     out.push({
       moduleId,
