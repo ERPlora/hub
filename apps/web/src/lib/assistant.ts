@@ -100,7 +100,7 @@ export function messageAttachments(content: ChatContent): { kind: 'image' | 'fil
 export type AssistantEvent =
   | { type: 'token'; text: string }
   | { type: 'done' }
-  | { type: 'error'; message?: string }
+  | { type: 'error'; message?: string; error?: string; limit?: number; used?: number; tier?: string; kind?: string; upgrade_required?: boolean }
   | { type: string; [k: string]: unknown };
 
 export interface StreamCallbacks {
@@ -132,6 +132,22 @@ export interface StreamCallbacks {
   onAudit?: (audit: TurnAudit) => void;
   /** The hub's real navigation map, so a named screen can be checked (hub#1047, #1048). */
   knownRoutes?: string[];
+}
+
+/**
+ * Por qué falló el turno, con lo que el SaaS ya sabía (saas#1540).
+ *
+ * La cuota agotada NO es una avería, y presentarla como tal convierte el único momento de
+ * conversión del tier gratuito en un fallo del producto: el dueño leía «No se pudo contactar con
+ * el asistente» y creía que estaba roto. El SaaS manda `{error, limit, used, tier, kind,
+ * upgrade_required}`; aquí se perdía entero — y hasta el texto, porque se leía `message` cuando la
+ * clave que viaja es `error`.
+ */
+export interface AssistantFailure {
+  message: string;
+  /** Presente SOLO si el turno murió por cuota. Un error de transporte no la lleva: pintar un
+   *  botón de pagar sobre una caída de red no arregla nada y encima cobra. */
+  quota?: { limit?: number; used?: number; tier?: string; kind?: string; upgradeRequired: boolean };
 }
 
 /** A tool call the model asked for (forwarded by the runtime from the Cloud). */
@@ -319,7 +335,28 @@ async function streamRound(
       } else if (evt.type === 'done') {
         return { functionCalls, text, errored: false };
       } else if (evt.type === 'error') {
-        cb.onError?.(new Error((evt as { message?: string }).message ?? 'assistant error'));
+        // La clave del texto es `error`, no `message`: leyendo la equivocada se perdía hasta la
+        // frase que el SaaS había escrito. `message` se sigue aceptando por si algún emisor la usa.
+        const e = evt as {
+          message?: string;
+          error?: string;
+          limit?: number;
+          used?: number;
+          tier?: string;
+          kind?: string;
+          upgrade_required?: boolean;
+        };
+        const failure: AssistantFailure = { message: e.error ?? e.message ?? 'assistant error' };
+        if (e.upgrade_required) {
+          failure.quota = {
+            limit: e.limit,
+            used: e.used,
+            tier: e.tier,
+            kind: e.kind,
+            upgradeRequired: true,
+          };
+        }
+        cb.onError?.(failure);
         return { functionCalls, text, errored: true };
       }
     }
