@@ -7,6 +7,7 @@
 //   -> SSE: líneas `data: {"type":"token","text":"…"}` … `data: {"type":"done"}`
 import { RUNTIME_URL, getClient, runtimeHeaders } from './runtime';
 import { auditTurn, type ExecutedTool, type TurnAudit } from './assistant-grounding';
+import { SETUP_STATUS_QUERY } from './setup-status';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -475,10 +476,40 @@ async function hostBlueprintApply(params: Record<string, unknown>): Promise<unkn
   const blob = await downloadBlueprint(slug);
   const inspection = await inspectBlueprint(blob);
   const report = await importBlueprint(inspection.upload_id, heroSelection(inspection.manifest));
-  return {
+
+  // Lo que la plantilla NO deja hecho, leído del hub (hub#1041).
+  //
+  // Aplicarla instala módulos y siembra catálogo, pero no toca la identidad fiscal ni la
+  // numeración — la descripción de esta misma tool ya lo dice: «it never imports people, fiscal
+  // identity or another business's invoice numbering». Aun así el asistente contestó «Serie F1
+  // activa · VeriFactu configurado · ya puedes emitir facturas», con 0 series y el runtime
+  // bloqueando, porque describió el resultado desde el folleto de la plantilla en vez de leer el
+  // hub. No había nada que leer: el resultado solo traía los módulos instalados.
+  //
+  // Ahora trae también lo que SIGUE bloqueando, así que no queda hueco que rellenar. Solo lo
+  // bloqueante y solo lo pendiente: una lista de todo se vuelve ruido y deja de leerse.
+  const result: Record<string, unknown> = {
     outcome: importOutcome(report),
     installed_modules: (report.installed_modules ?? []).map((m) => ({ id: m.id, status: m.status })),
   };
+  try {
+    const rows = await getClient().query(SETUP_STATUS_QUERY, {});
+    const items = (rows?.[0]?.items ?? []) as {
+      key: string;
+      state: string;
+      level: string;
+      title: string;
+      route: string;
+    }[];
+    result.still_blocking = items
+      .filter((i) => i.state === 'pending' && (i.level === 'legal' || i.level === 'functional'))
+      .map((i) => ({ key: i.key, level: i.level, title: i.title, route: i.route }));
+  } catch {
+    // Callar sería PEOR que fallar: sin el campo, el modelo lee «no hay nada bloqueando» y vuelve
+    // a decir que ya se puede facturar. Se dice que no se sabe.
+    result.setup_status_unavailable = true;
+  }
+  return result;
 }
 
 // ── Voice input (hub#629): microphone → MediaRecorder → SaaS speech proxy → text ────────────────
