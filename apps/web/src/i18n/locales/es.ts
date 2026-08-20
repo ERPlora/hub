@@ -99,6 +99,11 @@ export default {
     close: 'Cerrar',
     noReply: '(sin respuesta)',
     error: 'No se pudo contactar con el asistente.',
+    // saas#1540 — quedarse sin mensajes es un estado del PLAN, no una avería. Decir «no se
+    // pudo contactar» convierte el único momento de conversión del tier gratuito en un fallo.
+    quotaTitle: 'Has usado todos tus mensajes del asistente',
+    quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
+    quotaCta: 'Ver planes',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',

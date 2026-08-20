@@ -101,6 +101,11 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
+    // saas#1540 — running out of messages is a PLAN state, not an outage. Saying «could not
+    // reach» turns the one conversion moment of the free tier into a product failure.
+    quotaTitle: 'You have used all your assistant messages',
+    quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
+    quotaCta: 'See plans',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',

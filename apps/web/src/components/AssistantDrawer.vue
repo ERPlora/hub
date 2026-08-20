@@ -359,6 +359,8 @@ function translatedItem(item: SetupItem, field: 'title' | 'description'): string
 // Hilo con alcance de SESIÓN (ADR-0149): vive en lib/assistant-history (sessionStorage),
 // sobrevive un reload y lo vacía logout(). El Cloud no guarda copia.
 const messages = assistantMessages;
+/** El plan y el consumo cuando el turno murió por cuota (saas#1540). */
+const assistantQuota = ref<{ tier?: string; used?: number; limit?: number } | null>(null);
 const draft = ref('');
 const streaming = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
@@ -571,10 +573,24 @@ async function send(): Promise<void> {
       if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.noReply');
       saveAssistantHistory();
     },
-    onError: () => {
+    onError: (failure: unknown) => {
       streaming.value = false;
       abort = null;
-      if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.error');
+      // Quedarse sin mensajes NO es una avería (saas#1540): se dice el plan, el consumo y por
+      // dónde se amplía. «No se pudo contactar» ahí es una mentira que además pierde la venta.
+      const quota = (failure as { quota?: { tier?: string; used?: number; limit?: number } })?.quota;
+      if (quota) {
+        assistantQuota.value = quota;
+        if (!messageText(assistantMsg.value.content)) {
+          assistantMsg.value.content = `${t('assistant.quotaTitle')} ${t('assistant.quotaUsed', {
+            tier: quota.tier ?? '—',
+            used: quota.used ?? '—',
+            limit: quota.limit ?? '—',
+          })}`;
+        }
+      } else if (!messageText(assistantMsg.value.content)) {
+        assistantMsg.value.content = t('assistant.error');
+      }
       saveAssistantHistory();
     },
   });
