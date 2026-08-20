@@ -109,6 +109,15 @@
                  turn's receipts, never by the model: the answer claimed a change no tool made,
                  printed an id no tool returned, or pointed at a screen this hub does not serve.
                  It sits OUTSIDE the bubble on purpose — it is chrome, not part of the reply. -->
+            <!-- El «ver planes» que la issue pedía y no existía (saas#1540): sin una salida, la
+                 frase de cuota agotada es un callejón, y el único momento de conversión del tier
+                 gratuito muere ahí. Solo en el mensaje que TRAE la cuota, no en todos. -->
+            <div v-if="assistantQuota && i === messages.length - 1" class="chat-quota-cta">
+              <ion-button size="small" :disabled="checkoutPending" @click="openPlans()">
+                <HubIcon slot="start" name="arrow-up-circle-outline" />
+                {{ t('assistant.quotaCta') }}
+              </ion-button>
+            </div>
             <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
               <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
                 <HubIcon name="alert-circle-outline" />
@@ -262,6 +271,7 @@ import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-st
 import { moduleNav } from '../lib/nav';
 import { describeToolCall } from '../lib/assistant-confirm';
 import { confirmationFor } from '../lib/assistant-danger';
+import { startAssistantCheckout } from '../lib/assistant-plan';
 import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
 import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
@@ -362,6 +372,23 @@ function translatedItem(item: SetupItem, field: 'title' | 'description'): string
 const messages = assistantMessages;
 /** El plan y el consumo cuando el turno murió por cuota (saas#1540). */
 const assistantQuota = ref<{ tier?: string; used?: number; limit?: number } | null>(null);
+/** Evita abrir dos checkouts con un doble clic — el sitio del producto donde una segunda compra
+ *  accidental es más probable (saas#1541). */
+const checkoutPending = ref(false);
+
+/** Abre el checkout del plan. Si no llega url NO se navega: mejor no moverse que llevar a una
+ *  página vacía justo cuando el dueño está intentando pagar. */
+async function openPlans(): Promise<void> {
+  if (checkoutPending.value) return;
+  checkoutPending.value = true;
+  try {
+    const url = await startAssistantCheckout('basic');
+    if (url) window.location.assign(url);
+    else toastError(t('assistant.error'));
+  } finally {
+    checkoutPending.value = false;
+  }
+}
 const draft = ref('');
 const streaming = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
@@ -907,6 +934,7 @@ onBeforeUnmount(() => {
 }
 .md-table th { font-weight: 600; }
 
+.chat-quota-cta { margin-top: 6px; }
 .chat-grounding {
   margin-top: 4px;
   padding: 6px 10px;
