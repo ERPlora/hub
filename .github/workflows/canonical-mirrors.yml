@@ -1,0 +1,91 @@
+# ==============================================================================
+# Los ESPEJOS canónicos del toolkit — la alarma, en el lado que la puede oír
+# (ERPlora/module-toolkit#61)
+# ==============================================================================
+#
+# `ERPlora/module-toolkit` copia A MANO seis cosas cuya autoridad vive en este repo:
+#
+#   1. `schemas/module.schema.json` — vendorizado byte a byte (el gate de los 25 repos
+#      de módulo corre sin checkout del hub, así que el validador no puede ir a buscarlo);
+#   2. `crates/db/src/lib.rs::BRIDGE_FUNCTIONS` — las `erp_*` que el shim reescribe;
+#   3. `crates/runtime/src/manifest.rs` — `refuses_unknown_fields` + `RETIRED_FIELDS`
+#      (la puerta del autor y la de instalación tienen que decir lo mismo);
+#   4. `crates/runtime/src/hub_users.rs::CORE_QUERIES` — las capacidades del namespace `hub.`;
+#   5. `crates/runtime/src/migration_guard.rs::GRANDFATHERED`;
+#   6. `apps/web/src/main.ts` — el pin de Ionic a `ios`, que es la PREMISA del guard de `fill`.
+#
+# EL AGUJERO QUE CIERRA. El toolkit ya tenía el test que compara los seis
+# (`test/canonical-mirrors.test.mjs`), pero cada uno abría con
+# `if (!existsSync(canonical)) return t.skip(…)` y buscaba el hub como HERMANO DE DISCO. En el CI
+# del toolkit no hay hub —ni lo puede haber: la org está en plan free, donde «organization-level
+# secrets and variables are not accessible by private repositories», así que no existe credencial
+# para hacer checkout de este repo privado—, de modo que los siete se saltaban y el run salía
+# VERDE. Medido el 2026-08-20: `tests 7 · pass 0 · fail 0 · skipped 7`.
+#
+# Un guard que se salta no deniega: queda ABIERTO. Y un skip silencioso es indistinguible de un
+# PASS en el resumen de un run.
+#
+# POR QUÉ AQUÍ. La divergencia solo se puede introducir editando ESTE repo, y este repo sí está
+# checkouteado en su propio CI. Lo único que le faltaba era la copia vendorizada del toolkit — y
+# una composite action es justo la forma que GitHub resuelve SIN credencial cuando el repo de la
+# action comparte sus Actions con la organización (module-toolkit ya lo hace: es como los 24 repos
+# de módulo corren `validate-module`). El runner se trae el toolkit entero para ejecutar la action,
+# y eso es lo que pone la copia en disco.
+#
+# COSTE. Diez segundos, y SOLO en las PR que tocan uno de los seis ficheros de arriba (el filtro de
+# `paths`). Lo que sustituye no costaba nada tampoco: no existía.
+# ==============================================================================
+
+name: Canonical mirrors (module-toolkit)
+
+on:
+  pull_request:
+    paths:
+      - 'schemas/module.schema.json'
+      - 'crates/db/src/lib.rs'
+      - 'crates/runtime/src/manifest.rs'
+      - 'crates/runtime/src/hub_users.rs'
+      - 'crates/runtime/src/migration_guard.rs'
+      - 'apps/web/src/main.ts'
+      # El control positivo del escáner de `fill` recorre TODAS las vistas del shell: si una
+      # `.vue` nueva le hiciera decir algo distinto que el guard propio del hub, las dos puertas
+      # estarían diciendo cosas distintas del mismo markup y lo pagarían los autores de módulos.
+      - 'apps/web/src/**/*.vue'
+      - '.github/workflows/canonical-mirrors.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'schemas/module.schema.json'
+      - 'crates/db/src/lib.rs'
+      - 'crates/runtime/src/manifest.rs'
+      - 'crates/runtime/src/hub_users.rs'
+      - 'crates/runtime/src/migration_guard.rs'
+      - 'apps/web/src/main.ts'
+      - 'apps/web/src/**/*.vue'
+      - '.github/workflows/canonical-mirrors.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: canonical-mirrors-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mirrors:
+    name: la copia del toolkit sigue al día
+    # El runner propio de la org cuando `CI_RUNNER_LABEL` está puesta, la imagen hospedada cuando
+    # no. El fallback es el punto: si la variable desaparece, esto sigue corriendo en vez de
+    # encolarse para siempre contra una etiqueta que nadie atiende.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sin `with: token`: la action se resuelve por el Actions-sharing de module-toolkit, no por
+      # una credencial. Si un día ese repo dejara de compartir sus Actions, este paso falla en
+      # ROJO diciendo que no la encuentra — nunca se degrada a verde.
+      - uses: ERPlora/module-toolkit/.github/actions/check-canonical-mirrors@main
+        with:
+          hub-dir: ${{ github.workspace }}
