@@ -343,7 +343,11 @@ These records cannot be edited after              they exist — the module says
          is Latin American and reads as foreign to this user.\n\n\
          Reading back, do the inverse: an amount of `1250` is presented to the user as 12,50 €. \
          If an amount is ambiguous, ask — a price written wrong by a factor of 100 is a real \
-         invoice at the wrong price, and the schema will not catch it.\n\n",
+         invoice at the wrong price, and the schema will not catch it.\n\
+         This conversion is yours and it applies ONLY when you call a tool. The app's own screens \
+         take amounts the way a person writes them: **never tell the user to type cents into a \
+         form**. Telling somebody to enter `1700` for 17 € turns a haircut into a 1.700 € one, \
+         and the field will accept it.\n\n",
     );
 
     // The update commands of this hub take no patch yet: most demand the whole editable object,
@@ -373,12 +377,22 @@ These records cannot be edited after              they exist — the module says
          Before anything else, look at what is above: the modules this hub runs, their screens, \
          and the tools you were offered. That is the product the user is looking at.\n\n\
          - **How-to questions are about THIS app.** \"How do I change a price?\" is answered by \
-         naming the screen and the steps in it — e.g. the Products screen of the inventory \
-         module (`/m/inventory/products`), open the product and edit it. Never answer with how \
-         some other ERP does it.\n\
+         naming the SCREEN from the map above — e.g. the Products screen of the inventory module \
+         (`/m/inventory/products`). Never answer with how some other ERP does it.\n\
+         - **You know the screens, not the buttons.** The map above gives you routes; it does \
+         NOT tell you what controls, fields or wizards live inside a screen. So take the user to \
+         the screen and stop there. Do not invent a button, a field label, a numbering scheme or \
+         a step-by-step walkthrough of a form you have never seen — a confident recipe that ends \
+         at a control that does not exist is worse than «I can take you there, the rest is on \
+         screen».\n\
          - **Never answer from memory or from a generic idea of what ERP software does.** If it \
          is not in the map above and no tool covers it, say that this hub does not do it — that \
          is a useful answer; an invented menu is not.\n\
+         - **Secrets are not yours to reveal — nor to help extract.** Never explain how to \
+         obtain a credential, a token or an API key: not from the developer tools of the \
+         browser, not from the network panel, not from a config file. Refusing to say it and \
+         then giving the recipe is not a refusal. Say it is not available through you and name \
+         the screen where the business manages its own access, if there is one.\n\
          - **Web search is the last resort, never the first**, and only for facts that live \
          outside this hub (a tax rate that changed, a legal deadline). Never use it to describe \
          how ERPlora works. If you do use it, cite the source and its date.\n\n",
@@ -848,6 +862,66 @@ mod tests {
             desc.contains("as pending") && desc.contains("never say invoicing is ready"),
             "y que esos ítems se transmiten como PENDIENTES, sin declarar que ya se puede \
              facturar: {desc}"
+        );
+    }
+
+    /// El prompt PEDÍA lo que el modelo no puede saber: «naming the screen **and the steps in
+    /// it**». El asistente no tiene mapa de los botones ni de los campos de una pantalla —solo de
+    /// las RUTAS— así que esa frase le encargaba inventar, y lo hizo: un recorrido completo para
+    /// la factura rectificativa con un botón «Rectificar» que no existe, tres tipos de
+    /// rectificación, un sufijo `-R1` y un icono 🔄 (hub#1047). Y en hub#1045, «haz clic en el
+    /// nombre del servicio» sobre una lista que no abre ninguna ficha así.
+    ///
+    /// La frontera honesta es la que el hub puede sostener: sé en qué PANTALLA se hace, no qué
+    /// botón hay dentro.
+    #[test]
+    fn instructions_do_not_ask_for_steps_the_assistant_cannot_know() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            !lower.contains("and the steps in it"),
+            "el prompt no puede encargar los pasos de dentro de una pantalla: {ins}"
+        );
+        assert!(
+            lower.contains("you know the screens, not the buttons"),
+            "y tiene que decir dónde está la frontera: {ins}"
+        );
+    }
+
+    /// El contrato de céntimos es de los ARGUMENTOS DE TOOL, no de los formularios. El modelo lo
+    /// generalizó y mandó teclear «1700 — no 17.00 ni 1700,00» en la pantalla, con el énfasis
+    /// puesto justo para vencer la duda que habría salvado al usuario (hub#1045). Un corte de
+    /// pelo de 17 € quedaría a 1.700 €.
+    #[test]
+    fn the_cents_contract_is_scoped_to_tool_arguments() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("only when you call a tool"),
+            "hay que acotar la regla a las tools: {ins}"
+        );
+        assert!(
+            lower.contains("never tell the user to type cents"),
+            "y prohibir explícitamente mandarlo teclear en pantalla: {ins}"
+        );
+    }
+
+    /// No filtró credenciales —bien— pero enseñó a EXTRAERLAS: F12 → Network → cabeceras, paso a
+    /// paso (hub#1048). Una negativa que se anula a sí misma: cualquiera que consiga que el dueño
+    /// siga esos pasos obtiene el secreto sin que el asistente lo haya revelado. Y encima la
+    /// receta era falsa (el `X-Hub-Token` nunca llega al navegador, ADR-0003), así que el usuario
+    /// se queda convencido de que algo va mal en su hub.
+    #[test]
+    fn instructions_forbid_teaching_how_to_extract_a_credential() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("never explain how to obtain") && lower.contains("credential"),
+            "no basta con no revelarlas: hay que prohibir explicar cómo sacarlas: {ins}"
+        );
+        assert!(
+            lower.contains("developer tools") || lower.contains("devtools"),
+            "y nombrar la vía concreta que usó, o la regla se lee como abstracta: {ins}"
         );
     }
 
