@@ -61,7 +61,7 @@ export interface HubContext {
   /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
   pin_users?: PinUser[];
   /**
-   * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`general`). Lo usa
+   * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`). Lo usa
    * el dashboard para derivar el preset "Recomendado" de widgets (ADR-0054). Opcional: el runtime
    * lo expondrá cuando se cablee el setting del hub; hasta entonces llega ausente y el preset
    * queda vacío (el board sigue funcionando). Acepta `sector` o `business_type` (alias).
