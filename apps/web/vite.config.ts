@@ -6,6 +6,7 @@ import Icons from 'unplugin-icons/vite';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 import { stripModuleVersion } from './src/lib/module-url';
@@ -13,6 +14,30 @@ import { stripModuleVersion } from './src/lib/module-url';
 // Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
 // Orden de prioridad: env APP_VERSION (CI) > git tag más reciente > package.json.
 // package.json es "0.0.0" a propósito (monorepo); la versión real viene de los tags git.
+/** Versión de OutfitKit REALMENTE instalada (hub#1024). Vacío si no se puede resolver. */
+const OUTFITKIT_VERSION = (() => {
+  try {
+    return JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('./node_modules/@erplora/outfitkit/package.json', import.meta.url)),
+        'utf8',
+      ),
+    ).version as string;
+  } catch {
+    // pnpm deja el paquete en la raíz del workspace: segundo intento antes de rendirse.
+    try {
+      return JSON.parse(
+        readFileSync(
+          fileURLToPath(new URL('../../node_modules/@erplora/outfitkit/package.json', import.meta.url)),
+          'utf8',
+        ),
+      ).version as string;
+    } catch {
+      return '';
+    }
+  }
+})();
+
 const APP_VERSION = (() => {
   // 1. Env var inyectada por CI (build-hub.yml en tags v*).
   if (process.env.APP_VERSION) return process.env.APP_VERSION;
@@ -110,6 +135,10 @@ export default defineConfig({
   ],
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
+    // hub#1024 — la OutfitKit que ESTA imagen lleva de verdad, leída del paquete resuelto (no del
+    // rango de `package.json`: el Dockerfile hace `add @erplora/outfitkit@latest` en cada build, así
+    // que el rango miente). Con ella el shell puede avisar cuando un módulo trae otra horneada.
+    __OUTFITKIT_VERSION__: JSON.stringify(OUTFITKIT_VERSION),
   },
   build: {
     target: 'es2022',
