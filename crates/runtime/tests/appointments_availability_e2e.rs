@@ -481,11 +481,19 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
         )
         .await
         .expect_err("2ª cita solapada del mismo staff debe rechazarse (hub#110)");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("overlap"),
-        "el rechazo debe ser por solape, no otro error. llegó: {msg}"
-    );
+    // El rechazo se identifica por su CÓDIGO estable, no por el texto. `appointments` dejó de
+    // devolver `Err("overlap: …")` y pasó a un `DomainError` con código
+    // (`appointments.overlapping_appointment`, appointments#70/#71) precisamente para que nadie
+    // tenga que olfatear un prefijo — y este e2e seguía olfateándolo, así que se rompía en cuanto
+    // el módulo escribió el mensaje en lenguaje de negocio. El mensaje es texto humano y además
+    // traducible (ADR-0055): afirmar sobre él es afirmar sobre la traducción.
+    match &err {
+        erplora_runtime::RuntimeError::Domain { code, .. } => assert_eq!(
+            code, "appointments.overlapping_appointment",
+            "el rechazo debe ser por solape, no otro error"
+        ),
+        other => panic!("se esperaba un rechazo de negocio por solape, llegó: {other:?}"),
+    }
 
     // El listado sigue intacto (la cita rechazada no se materializó).
     let rows_after = rt

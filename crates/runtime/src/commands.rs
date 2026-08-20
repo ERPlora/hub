@@ -1,7 +1,7 @@
 //! Ejecución de commands declarativos (mutaciones) + emisión de eventos. ARQUITECTURA.md §4.
 //! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
 //! y plugins **nativos first-party** (ADR-0009, `native.rs`).
-use erplora_db::{DatabaseAdapter, Params, TxGatedOutcome};
+use erplora_db::{DatabaseAdapter, Params, RowGate, TxGatedOutcome};
 use erplora_wasm_host::{Operation, Output};
 use serde_json::{json, Value as Json};
 
@@ -461,8 +461,19 @@ pub(crate) async fn execute_at(
     // guaranteed the two fields do not coexist and that the code lives in the module namespace.
     let expected = cmd.def.expect_rows.as_ref();
     let min = expected.map(|expect| expect.n).or(cmd.def.min_affected_rows);
-    match db.execute_tx_gated(&ops, sql_op_count, min).await? {
-        TxGatedOutcome::RolledBack { sql_counts } => {
+    // Un command declarativo ES un solo grupo: sus sentencias de mutación, sin el outbox. La forma
+    // de lista la trajo hub#1025 para el camino del handler, que emite varios sub-commands.
+    let gates: Vec<RowGate> = min
+        .map(|min| {
+            vec![RowGate {
+                first: 0,
+                count: sql_op_count,
+                min,
+            }]
+        })
+        .unwrap_or_default();
+    match db.execute_tx_gated(&ops, &gates).await? {
+        TxGatedOutcome::RolledBack { sql_counts, .. } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
             if let Some(expect) = expected {
@@ -1051,12 +1062,38 @@ async fn persist_handler_output(
     }
 
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
+    //
+    // hub#1025: y cada operación se lleva SU PROPIA gate de filas. `expect_rows` solo se evaluaba
+    // en el camino declarativo, así que el mismo sub-command alcanzado por un handler se saltaba su
+    // contrato: en `customers.set_groups` un `group_id` de otro hub hace que el `INSERT … SELECT`
+    // no case ninguna fila, y el command entero respondía `{ok: true, operations: N}` — el usuario
+    // cree que asignó el grupo. Un mínimo GLOBAL no vale: el `_clear` de al lado afecta 1 fila y
+    // taparía al `_add` que afecta 0, que es justo el caso que hay que cazar.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
+    let mut gates: Vec<RowGate> = Vec::new();
+    // Alineado con `gates` — NO con `operations`, porque solo algunas llevan gate: de quién es
+    // cada una, para poder acuñar SU error y nombrar SU command, no uno genérico del raíz.
+    let mut gated_commands: Vec<(&str, &RegisteredCommand)> = Vec::new();
     for op in &output.operations {
         let sqls = validate_operation(registry, ctx, &cmd.module_id, op)?;
         let bound = crate::system_params(&op.params, ctx);
+        let first = tx_ops.len();
+        let count = sqls.len();
         for sql in sqls {
             tx_ops.push((sql, bound.clone()));
+        }
+        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
+        if let Some(target) = registry.commands.get(&op.command) {
+            let min = target
+                .def
+                .expect_rows
+                .as_ref()
+                .map(|expect| expect.n)
+                .or(target.def.min_affected_rows);
+            if let Some(min) = min {
+                gates.push(RowGate { first, count, min });
+                gated_commands.push((op.command.as_str(), target));
+            }
         }
     }
 
@@ -1124,7 +1161,31 @@ async fn persist_handler_output(
         ));
     }
     tx_ops.extend_from_slice(extra_ops);
-    db.execute_tx(&tx_ops).await?;
+    // Misma semántica de rollback que el camino declarativo (hub#139/#140): si una operación no
+    // alcanza su mínimo, revierte la transacción ENTERA — ni las otras operaciones ni el outbox —
+    // y el error que sale es el del sub-command que rompió su contrato, no uno del command raíz.
+    match db.execute_tx_gated(&tx_ops, &gates).await? {
+        TxGatedOutcome::RolledBack { gate, sql_counts } => {
+            let (command, target) = gated_commands[gate];
+            if let Some(expect) = &target.def.expect_rows {
+                return Err(RuntimeError::Domain {
+                    code: expect.error.clone(),
+                    message: expect.message.clone().unwrap_or_else(|| {
+                        "the operation could not be applied in the current state".to_string()
+                    }),
+                });
+            }
+            let required = target.def.min_affected_rows.unwrap_or_default();
+            let affected: u64 = sql_counts.iter().sum();
+            return Err(RuntimeError::MinAffectedRows {
+                command: command.to_string(),
+                required,
+                affected,
+                kind: crate::errors::affected_kind(affected, required),
+            });
+        }
+        TxGatedOutcome::Committed { .. } => {}
+    }
 
     // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay. Los
     // eventos del handler salen con el módulo del command (hub#529) — que es también el único
@@ -2806,8 +2867,7 @@ mod tests {
         async fn execute_tx_gated(
             &self,
             _ops: &[(String, Params)],
-            _sql_op_count: usize,
-            _min_affected_rows: Option<u64>,
+            _gates: &[erplora_db::RowGate],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             panic!("DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes");
         }
@@ -2846,22 +2906,27 @@ mod tests {
         async fn execute_tx_gated(
             &self,
             ops: &[(String, Params)],
-            sql_op_count: usize,
-            min_affected_rows: Option<u64>,
+            gates: &[erplora_db::RowGate],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-            // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si el caller
-            // exige un mínimo y la suma de las `sql_op_count` primeras lo cubre, commitea; si no,
-            // revierte. Los tests de hub#140 construyen su propio doble cuando necesitan 0 filas.
+            // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si algún gate
+            // exige más de lo que su grupo afecta, revierte. Los tests de hub#140 construyen su
+            // propio doble cuando necesitan 0 filas.
             let counts = vec![1u64; ops.len()];
-            let n = sql_op_count.min(counts.len());
-            let sql_counts: Vec<u64> = counts[..n].to_vec();
-            let affected: u64 = sql_counts.iter().sum();
-            let ok = min_affected_rows.map_or(true, |min| affected >= min);
-            if ok {
-                Ok(erplora_db::TxGatedOutcome::Committed { per_op: counts })
-            } else {
-                Ok(erplora_db::TxGatedOutcome::RolledBack { sql_counts })
+            let failed = gates.iter().position(|g| {
+                let end = g.first.saturating_add(g.count).min(counts.len());
+                let affected: u64 = counts[g.first.min(counts.len())..end].iter().sum();
+                affected < g.min
+            });
+            if let Some(i) = failed {
+                let g = gates[i];
+                let end = g.first.saturating_add(g.count).min(counts.len());
+                let sql_counts = counts[g.first.min(counts.len())..end].to_vec();
+                return Ok(erplora_db::TxGatedOutcome::RolledBack {
+                    gate: i,
+                    sql_counts,
+                });
             }
+            Ok(erplora_db::TxGatedOutcome::Committed { per_op: counts })
         }
         async fn query(
             &self,
@@ -3517,6 +3582,224 @@ mod tests {
                 }
             ),
             "got {err:?}"
+        );
+    }
+
+    // ── hub#1025: the row gate also covers the operations a handler resolves ────────────────
+
+    /// A `DatabaseAdapter` that answers with the affected counts the caller declares, so a test
+    /// can say "this statement matches nothing" without a Postgres. It also records whether the
+    /// transaction was ever handed over — the gate has to reject BEFORE anything is persisted, and
+    /// "returned the right error" is a weaker claim than "wrote nothing".
+    struct CountingDb {
+        /// Affected rows per SQL statement, keyed by the statement text.
+        counts: std::collections::HashMap<String, u64>,
+        committed: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl CountingDb {
+        fn new(counts: &[(&str, u64)]) -> Self {
+            Self {
+                counts: counts.iter().map(|(s, n)| ((*s).to_string(), *n)).collect(),
+                committed: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+        fn affected(&self, sql: &str) -> u64 {
+            // Default 1: an unlisted statement is an ordinary INSERT that matched.
+            self.counts.get(sql).copied().unwrap_or(1)
+        }
+        fn what_committed(&self) -> Vec<String> {
+            self.committed.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl DatabaseAdapter for CountingDb {
+        async fn execute(
+            &self,
+            sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            Ok(erplora_db::CommandResult::affected(self.affected(sql)))
+        }
+        async fn execute_tx(
+            &self,
+            ops: &[(String, Params)],
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            let mut log = self.committed.lock().unwrap();
+            log.extend(ops.iter().map(|(sql, _)| sql.clone()));
+            Ok(erplora_db::CommandResult::affected(ops.len() as u64))
+        }
+        async fn execute_tx_gated(
+            &self,
+            ops: &[(String, Params)],
+            gates: &[erplora_db::RowGate],
+        ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
+            let per_op: Vec<u64> = ops.iter().map(|(sql, _)| self.affected(sql)).collect();
+            for (i, g) in gates.iter().enumerate() {
+                let end = g.first.saturating_add(g.count).min(per_op.len());
+                let slice = &per_op[g.first.min(per_op.len())..end];
+                if slice.iter().sum::<u64>() < g.min {
+                    return Ok(erplora_db::TxGatedOutcome::RolledBack {
+                        gate: i,
+                        sql_counts: slice.to_vec(),
+                    });
+                }
+            }
+            let mut log = self.committed.lock().unwrap();
+            log.extend(ops.iter().map(|(sql, _)| sql.clone()));
+            Ok(erplora_db::TxGatedOutcome::Committed { per_op })
+        }
+        async fn query(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::QueryResult, erplora_db::DbError> {
+            Ok(erplora_db::QueryResult::new(Vec::new()))
+        }
+        async fn execute_batch(&self, _sql: &str) -> std::result::Result<(), erplora_db::DbError> {
+            Ok(())
+        }
+    }
+
+    const CLEAR_SQL: &str = "DELETE FROM customer_group_member WHERE customer_id = :id;";
+    const ADD_SQL: &str = "INSERT INTO customer_group_member (customer_id, group_id) \
+                           SELECT :id, id FROM customer_group WHERE id = :group_id AND hub_id = :hub_id;";
+
+    /// The shape every module follows for hub-scoping (services#7 / pm#146): the sub-command
+    /// inserts `SELECT`ing from its own hub's parents, and `expect_rows` is what turns a foreign
+    /// id into a REJECTION instead of a silent no-op.
+    fn registry_with_gated_subcommand() -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("customers".to_string(), ModuleStatus::Active);
+
+        let mut clear = cmd_def();
+        clear.sql = vec![CLEAR_SQL.to_string()];
+        reg.commands.insert(
+            "customers._group_clear".to_string(),
+            RegisteredCommand {
+                module_id: "customers".to_string(),
+                def: clear,
+                sql: vec![CLEAR_SQL.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+
+        let mut add = cmd_def();
+        add.sql = vec![ADD_SQL.to_string()];
+        add.expect_rows = Some(crate::manifest::ExpectRows {
+            op: crate::manifest::ExpectRowsOp::Min,
+            n: 1,
+            error: "customers.group_not_found".to_string(),
+            message: None,
+        });
+        reg.commands.insert(
+            "customers._group_add".to_string(),
+            RegisteredCommand {
+                module_id: "customers".to_string(),
+                def: add,
+                sql: vec![ADD_SQL.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    fn root_wasm_command() -> RegisteredCommand {
+        let mut def = cmd_def();
+        def.sql = Vec::new();
+        def.emit = vec!["customers.groups.changed".to_string()];
+        RegisteredCommand {
+            module_id: "customers".to_string(),
+            def,
+            sql: Vec::new(),
+            wasm: None,
+            schema: None,
+        }
+    }
+
+    /// hub#1025 — `expect_rows` was only evaluated on the DECLARATIVE path. The same sub-command
+    /// reached through a handler skipped its own gate, so a foreign `group_id` wrote nothing and
+    /// the command still answered `{ok: true}`: the user believes the group was assigned.
+    ///
+    /// The gate must reject and the transaction must leave NOTHING behind — not the sibling
+    /// operation that did match, and not the outbox event.
+    #[tokio::test]
+    async fn a_handler_operation_below_its_gate_rejects_and_persists_nothing() {
+        let reg = registry_with_gated_subcommand();
+        let root = root_wasm_command();
+        // The `add` matches no row: the `group_id` belongs to another hub.
+        let db = CountingDb::new(&[(ADD_SQL, 0)]);
+        let output = Output {
+            operations: vec![op("customers._group_clear"), op("customers._group_add")],
+            events: Vec::new(),
+            error: None,
+            result: None,
+        };
+
+        let err = persist_handler_output(
+            &db,
+            &reg,
+            &root,
+            &Params::new(),
+            &sys_ctx(),
+            0,
+            &[],
+            &output,
+            &[],
+        )
+        .await
+        .unwrap_err();
+
+        match err {
+            RuntimeError::Domain { code, .. } => assert_eq!(code, "customers.group_not_found"),
+            other => panic!("expected the sub-command's own Domain code, got {other:?}"),
+        }
+        assert!(
+            db.what_committed().is_empty(),
+            "nothing may be persisted — not the sibling operation, not the outbox: {:?}",
+            db.what_committed()
+        );
+    }
+
+    /// The other half of the same contract: when every gated operation DOES match, the command
+    /// commits exactly as before. A gate that also rejects the happy path is not a gate.
+    #[tokio::test]
+    async fn a_handler_operation_that_matches_its_gate_still_commits() {
+        let reg = registry_with_gated_subcommand();
+        let root = root_wasm_command();
+        let db = CountingDb::new(&[(ADD_SQL, 1)]);
+        let output = Output {
+            operations: vec![op("customers._group_clear"), op("customers._group_add")],
+            events: Vec::new(),
+            error: None,
+            result: None,
+        };
+
+        persist_handler_output(
+            &db,
+            &reg,
+            &root,
+            &Params::new(),
+            &sys_ctx(),
+            0,
+            &[],
+            &output,
+            &[],
+        )
+        .await
+        .expect("the happy path must be untouched");
+
+        let committed = db.what_committed();
+        assert!(
+            committed.iter().any(|s| s == ADD_SQL),
+            "the mutation must land: {committed:?}"
+        );
+        assert!(
+            committed.iter().any(|s| s.contains("_event_outbox")),
+            "and so must the declared event: {committed:?}"
         );
     }
 
