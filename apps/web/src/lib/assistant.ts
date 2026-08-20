@@ -493,14 +493,13 @@ async function hostBlueprintApply(params: Record<string, unknown>): Promise<unkn
     installed_modules: (report.installed_modules ?? []).map((m) => ({ id: m.id, status: m.status })),
   };
   try {
-    const rows = await getClient().query(SETUP_STATUS_QUERY, {});
-    const items = (rows?.[0]?.items ?? []) as {
-      key: string;
-      state: string;
-      level: string;
-      title: string;
-      route: string;
-    }[];
+    // La query devuelve UNA fila con el documento entero (`architecture/hub/setup-status.md`),
+    // así que se tipa aquí en vez de confiar en el genérico del cliente.
+    type SetupRow = {
+      items?: { key: string; state: string; level: string; title: string; route: string }[];
+    };
+    const rows = (await getClient().query(SETUP_STATUS_QUERY, {})) as SetupRow[] | null;
+    const items = rows?.[0]?.items ?? [];
     result.still_blocking = items
       .filter((i) => i.state === 'pending' && (i.level === 'legal' || i.level === 'functional'))
       .map((i) => ({ key: i.key, level: i.level, title: i.title, route: i.route }));
