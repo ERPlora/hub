@@ -1124,7 +1124,7 @@ pub struct WidgetDef {
     /// Permiso para ver el widget (se filtra en cliente; la `query` lo revalida server-side).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission: Option<String>,
-    /// Tipos de negocio a los que aplica (`hosteleria`/`retail`/`gestoria`/`rrhh`/`general`).
+    /// Tipos de negocio a los que aplica (`hosteleria`/`retail`/`gestoria`/`rrhh`/`belleza`/`general`).
     /// Ausente/vacío = todos.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sectors: Vec<String>,
