@@ -213,7 +213,11 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          working inside their own Hub — their business's instance — which loads business modules \
          on demand from the ERPlora marketplace.\n\n\
          You are not a general-purpose chatbot. Every question is about THIS business and THIS \
-         hub unless the user plainly says otherwise.\n\n",
+         hub. If someone asks about something else — the weather, a film, general trivia — say in \
+         ONE SHORT SENTENCE that you only cover their business, and offer something you can \
+         actually do here. Do not lecture, do not apologise at length, and do not answer the \
+         question anyway: this assistant is metered, and a turn spent on trivia is one the owner \
+         paid for and cannot spend on their business.\n\n",
     );
 
     // The two facts a model can NEVER supply itself, injected per request.
@@ -922,6 +926,49 @@ mod tests {
         assert!(
             lower.contains("developer tools") || lower.contains("devtools"),
             "y nombrar la vía concreta que usó, o la regla se lee como abstracta: {ins}"
+        );
+    }
+
+    /// El alcance lo decidió el MERCADO (skill `market-decision`, 8 referencias en hub#1046), y
+    /// coincide sin fisuras: BC lo dice verbatim —«Chat is designed for enterprise use and
+    /// answering questions that relate to Business Central and the business data it contains»—,
+    /// Odoo «operates exclusively within business data context», Sidekick vive dentro del admin
+    /// de Shopify, y Fin trata la AUSENCIA de guardarraíles de alcance como su modo de fallo
+    /// conocido.
+    ///
+    /// Aquí la puerta la abría la propia coletilla del prompt: «unless the user plainly says
+    /// otherwise». Pedir una película *es* decir otra cosa, así que no había barrera ninguna — y
+    /// una respuesta así gasta uno de los 30 mensajes/mes del plan gratuito (~23k tokens) del
+    /// cliente, en conocimiento del modelo que nadie ha verificado.
+    #[test]
+    fn the_scope_is_the_business_and_the_loophole_is_closed() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+
+        assert!(
+            !lower.contains("unless the user plainly says otherwise"),
+            "esa coletilla es la puerta por la que se cuela todo: {ins}"
+        );
+        assert!(
+            lower.contains("not a general-purpose"),
+            "el alcance tiene que seguir enunciado: {ins}"
+        );
+    }
+
+    /// Y cómo se dice importa tanto como el límite. El mercado no cierra en seco: Fin ESCALA en
+    /// vez de dejar que el bot «intente y rechace», y Copilot Studio tiene un `fallback topic`
+    /// para lo de fuera. Una negativa seca en un producto que el cliente paga se lee como avería.
+    #[test]
+    fn out_of_scope_is_redirected_briefly_not_lectured() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("one short sentence"),
+            "hay que acotar la longitud, o el redirect se vuelve un sermón: {ins}"
+        );
+        assert!(
+            lower.contains("do not lecture") || lower.contains("without lecturing"),
+            "y decir explícitamente que no se sermonea: {ins}"
         );
     }
 
