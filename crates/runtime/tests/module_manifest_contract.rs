@@ -201,8 +201,11 @@ async fn install_warns_about_an_unknown_field_in_a_navigation_entry() {
     let db = fresh_db().await;
     let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
     runtime.ensure_system_tables().await.unwrap();
-    // `invoice` ships exactly this today: a `permission` on its settings tab that the schema does
-    // not know and the runtime drops. The tab renders for everyone and nobody is told.
+    // The example used to be `permission`, because `invoice` shipped exactly that and the core
+    // dropped it — the tab rendered for everyone and nobody was told. hub#1052 made `permission`
+    // a REAL field, so it is no longer unknown; the contract this test guards is not about that
+    // one field but about the PATH of the warning, so the example moves to another unknown key.
+    // Keeping `permission` here would have quietly turned this into a test of nothing.
     let dir = fixture(
         r#"{
           "id":"invoice",
@@ -211,7 +214,7 @@ async fn install_warns_about_an_unknown_field_in_a_navigation_entry() {
           "navigation":[
             {"id":"invoice","label":"Invoices","component":"erp-invoice-list"},
             {"id":"settings","label":"Settings","component":"erp-invoice-settings",
-             "permission":"invoice.view_invoice"}
+             "badge":"new"}
           ]
         }"#,
     );
@@ -230,7 +233,7 @@ async fn install_warns_about_an_unknown_field_in_a_navigation_entry() {
         module
             .manifest_warnings
             .iter()
-            .any(|w| w.path == "navigation[1].permission"),
+            .any(|w| w.path == "navigation[1].badge"),
         "the warning must point at the entry, not just at `navigation`: {:?}",
         module.manifest_warnings
     );

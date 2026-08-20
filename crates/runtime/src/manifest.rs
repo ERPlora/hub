@@ -1073,6 +1073,14 @@ pub struct Nav {
     /// el comportamiento vive en el componente del módulo.
     #[serde(default)]
     pub actions: Vec<NavAction>,
+    /// Permiso que ABRE esta pestaña. Sin él, `/api/navigation` no la sirve (hub#1052).
+    ///
+    /// Mismo contrato que [`NavAction::permission`] un escalón más arriba: el manifest declara a
+    /// quién le sirve la pestaña, y el runtime revalida siempre la query/command real detrás — esto
+    /// no es la puerta, es no enseñar una puerta cerrada. `None` = visible para todos, que es como
+    /// se comportan los manifests publicados hasta hoy.
+    #[serde(default)]
+    pub permission: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1574,7 +1582,15 @@ const CAPABILITY_FIELDS: &[&str] = &[
 const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];
-const NAV_FIELDS: &[&str] = &["id", "label", "icon", "component", "chrome", "actions"];
+const NAV_FIELDS: &[&str] = &[
+    "id",
+    "label",
+    "icon",
+    "component",
+    "chrome",
+    "actions",
+    "permission",
+];
 const PROTECTS_FIELDS: &[&str] = &[
     "settings_query",
     "enabled_setting",

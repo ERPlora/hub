@@ -3489,13 +3489,28 @@ async fn navigation(
 ) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
-    }
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => return unauthorized(e),
+    };
     let reg = rt.registry();
     let items: Vec<Value> = rt
         .navigation()
         .iter()
+        // hub#1052: una pestaña con `permission` solo se sirve a quien la tiene. Antes no había
+        // dónde declararlo, así que el módulo la pintaba para todos y el usuario descubría el
+        // límite estrellándose contra un 403 — `flows` lo dice en su propio código: mandar al
+        // cajero a revisar sus permisos «lo mandaría a un sitio al que no puede ir».
+        //
+        // El predicado es el MISMO que el de la puerta real (`permissions::has`), así que el menú
+        // y el command no pueden discrepar sobre qué significa un permiso. Sin `permission` la
+        // entrada es visible, como en todos los manifests publicados hasta hoy.
+        .filter(|n| {
+            n.nav
+                .permission
+                .as_deref()
+                .is_none_or(|p| erplora_runtime::permissions::has(&ctx, p))
+        })
         .map(|n| {
             let entry = reg.installed.iter().find(|m| m.id == n.module_id);
             let mod_fallback = entry
