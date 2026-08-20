@@ -96,7 +96,19 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  runtime?.kill();
+  // SIGKILL y ESPERAR a que muera, no `kill()` a secas.
+  //
+  // El SIGTERM por defecto no bajaba este runtime: se quedaba vivo reteniendo el :8791, y la
+  // siguiente ejecución fallaba con `AddrInUse` — pero no de forma visible. Su runtime moría, los
+  // tests hablaban con el ANTERIOR, cuyo fixture-cloud ya estaba cerrado, y el síntoma era
+  // «No se pudo contactar con el asistente»: un error de red que manda a investigar el asistente
+  // cuando lo que sobra es un proceso. Se ejecutaba dos veces seguidas y fallaba la segunda.
+  const dead = new Promise<void>((done) => {
+    if (!runtime || runtime.exitCode !== null) return done();
+    runtime.once('exit', () => done());
+  });
+  runtime?.kill('SIGKILL');
+  await dead;
   cloud?.close();
 });
 
@@ -221,4 +233,62 @@ test('un turno que dice haber creado algo SIN ejecutar nada sale marcado (hub#10
   await expect(drawer.locator('.chat-grounding')).toBeVisible({ timeout: 10_000 });
   await expect(drawer).toContainText('no se ejecutó ninguna acción');
   await expect(drawer).toContainText('identificador');
+});
+
+/**
+ * hub#1043 — la tabla, que era lo ilegible.
+ *
+ * El drawer pintaba el markdown CRUDO: el usuario leía `**negrita**` y las tablas salían como una
+ * sopa de barras verticales, partidas en tres líneas a 390 px. Aquí el fixture devuelve la misma
+ * forma de respuesta que da el modelo de verdad —tabla de módulos con código en línea— y se
+ * comprueba en el NAVEGADOR que llega pintada: una `<table>` real, sin barras a la vista y sin
+ * asteriscos.
+ */
+test('una respuesta con tabla y negrita llega PINTADA, no en crudo (hub#1043)', async ({ page }) => {
+  test.setTimeout(90_000);
+  cannedTokens = [
+    'Tienes estos **módulos** instalados:\n\n',
+    '| Módulo | Para qué | Ruta |\n',
+    '|---|---|---|\n',
+    '| `staff` | Personal | /m/staff/staff |\n',
+    '| `taxes` | Impuestos | /m/taxes/categories |\n',
+  ];
+
+  const api = await pwRequest.newContext();
+  const login = await api.post(`${RUNTIME}/api/auth/pin`, {
+    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+  });
+  expect(login.ok(), `login PIN falló: ${login.status()} ${await login.text()}`).toBeTruthy();
+  const session = await login.json();
+  await api.dispose();
+
+  await page.addInitScript(
+    ([token, user]) => {
+      localStorage.setItem('erplora.hub_session', token as string);
+      localStorage.setItem('erplora.session', JSON.stringify(user));
+    },
+    [session.token, session.user],
+  );
+  await page.goto(RUNTIME);
+
+  const sparkles = page.locator('ion-button[title*="sistant" i], ion-button[title*="sistente" i]').first();
+  await sparkles.waitFor({ timeout: 15_000 });
+  await sparkles.dispatchEvent('click');
+  const input = page.locator('ion-textarea textarea').last();
+  await input.waitFor({ timeout: 10_000 });
+  await input.fill('¿Qué módulos tengo instalados?');
+  await input.press('Enter');
+
+  const drawer = page.locator('.assistant-drawer');
+  // Una tabla DE VERDAD, con sus filas.
+  const table = drawer.locator('table.md-table');
+  await expect(table).toBeVisible({ timeout: 15_000 });
+  await expect(table.locator('tbody tr')).toHaveCount(2);
+  await expect(table.locator('thead th').first()).toHaveText('Módulo');
+
+  // Y nada de sintaxis a la vista: ni asteriscos de negrita ni barras de tabla.
+  const painted = (await drawer.innerText()).replace('¿Qué módulos tengo instalados?', '');
+  expect(painted).not.toContain('**');
+  expect(painted).not.toContain('|---|');
+  expect(painted).toContain('módulos');
 });

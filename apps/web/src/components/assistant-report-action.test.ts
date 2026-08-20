@@ -17,10 +17,12 @@ describe('the drawer offers "report an issue" on assistant answers', () => {
     expect(drawer).toContain('data-testid="assistant-report"');
     // The action lives inside the per-assistant-message action block: that block is gated on
     // the assistant role, so the report button never shows up on the user's own bubbles.
-    const actionsBlock = drawer.slice(
-      drawer.indexOf("m.role === 'assistant'"),
-      drawer.indexOf('</template>'),
-    );
+    // El cierre se busca A PARTIR del inicio, no desde el principio del fichero: desde que la
+    // burbuja pinta markdown (hub#1043) hay un `<template v-for>` anidado —Vue idiomático— cuyo
+    // `</template>` aparece ANTES, y con `indexOf` a secas el corte salía vacío y el test pasaba
+    // a afirmar sobre la nada.
+    const start = drawer.indexOf("m.role === 'assistant'");
+    const actionsBlock = drawer.slice(start, drawer.indexOf('</template>', start));
     expect(actionsBlock).toContain('data-testid="assistant-report"');
   });
 

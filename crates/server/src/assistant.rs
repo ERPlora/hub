@@ -334,7 +334,9 @@ These records cannot be edited after              they exist — the module says
          **integer number of cents**. Never send a decimal.\n\n\
          Whatever way the user writes or says it, convert before calling a tool:\n\
          `12.50` · `12,50` · `12,50 €` · `12 euros 50` · `12 euros con 50 céntimos` → **1250**.\n\
-         `8` · `8 €` · `8 euros` → **800**. `0,05` · `5 céntimos` → **5**.\n\n\
+         `8` · `8 €` · `8 euros` → **800**. `0,05` · `5 céntimos` → **5**.\n\
+         In Spanish (Spain) the currency subunit is «céntimos», never «centavos» — that spelling \
+         is Latin American and reads as foreign to this user.\n\n\
          Reading back, do the inverse: an amount of `1250` is presented to the user as 12,50 €. \
          If an amount is ambiguous, ask — a price written wrong by a factor of 100 is a real \
          invoice at the wrong price, and the schema will not catch it.\n\n",
@@ -794,6 +796,21 @@ mod tests {
     fn an_unreadable_schema_marks_nothing_as_money() {
         assert!(money_fields("{not json").is_empty());
         assert!(money_fields("{}").is_empty());
+    }
+
+    /// En España la subunidad son **céntimos**; «centavos» es LatAm. El prompt ya usa la palabra
+    /// correcta en sus ejemplos, pero el modelo derivó a «centavos enteros» en una respuesta real
+    /// (hub#1043). Basta con decirlo, porque es una preferencia de vocabulario y no un contrato —
+    /// pero hay que decirlo, o se vuelve a derivar.
+    #[test]
+    fn instructions_name_the_currency_subunit_as_spain_says_it() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(lower.contains("céntimo"), "la palabra correcta tiene que estar: {ins}");
+        assert!(
+            lower.contains("never «centavos»") || lower.contains("not «centavos»"),
+            "y hay que decir explícitamente cuál NO es, o el modelo vuelve a derivar: {ins}"
+        );
     }
 
     /// The keystone: the turn reaching the Cloud must carry a system prompt that says WHAT
