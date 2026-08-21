@@ -1673,6 +1673,11 @@ pub fn app(state: AppState) -> Router {
         // Report of inappropriate AI-generated content (Microsoft Store policy 11.16, hub#946):
         // any signed-in hub user; funneled into the global error registry (ADR-0052) → Cloud.
         .route("/api/assistant/report", post(assistant_report::report))
+        // El plan del asistente y su checkout, por el runtime (saas#1540). Van AQUÍ y no desde el
+        // navegador porque la credencial hub-scoped es secreto del runtime (ADR-0003): el web app
+        // no tiene —ni debe tener— con qué firmar estas llamadas.
+        .route("/api/assistant/config", get(assistant_config))
+        .route("/api/assistant/checkout", post(assistant_checkout))
         // The EVENT channel (hub#504): needs an API key of this hub that may read. See
         // `event_stream` — the credential travels in the header, in the first frame (`/ws`) or as
         // a single-use ticket (`/api/events`), never as a long-lived secret in the URL.
@@ -3147,6 +3152,61 @@ fn bad_gateway(reason: String) -> Response {
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
 /// Reenvía el `Authorization: Bearer` + `X-Hub-Id` entrantes; ensambla las tools permitidas
 /// (§9.2) y traduce el stream del Cloud al contrato del frontend (`token`/`done`).
+/// **Qué plan tiene este hub** (saas#1540): tier, consumo del mes y planes contratables.
+///
+/// El hub solo descubría su plan cuando ya lo había AGOTADO, así que quedarse sin mensajes solo
+/// podía presentarse como una avería. Va por el runtime y no desde el navegador porque la
+/// credencial hub-scoped es **secreto del runtime** (ADR-0003): el web app no tiene —ni debe
+/// tener— con qué firmar esta llamada.
+///
+/// Reutiliza `proxy_cloud_get`, que ya devuelve el JSON del Cloud sin reinterpretar: un 402/429
+/// del SaaS es información que el llamador necesita, y traducirlo a un genérico es exactamente el
+/// fallo que esta issue documenta.
+async fn assistant_config(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: String::new(),
+        token: String::new(),
+    };
+    proxy_cloud_get(&st, &headers, cloud.assistant_config(&placeholder)).await
+}
+
+/// **Abrir el checkout del plan del asistente** (saas#1540, ADR-0033) → `{"checkout_url": …}`.
+///
+/// Sin este camino, un «ver planes» no lleva a ninguna parte: el único momento de conversión del
+/// tier gratuito moría en una frase.
+async fn assistant_checkout(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial" })),
+        )
+            .into_response();
+    };
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let req = cloud.assistant_checkout(&auth);
+    let mut r = st.http.post(&req.url);
+    for (k, v) in auth.headers() {
+        r = r.header(k, v);
+    }
+    match r.json(&body).send().await {
+        Ok(resp) => {
+            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let bytes = resp.bytes().await.unwrap_or_default();
+            cloud_json_passthrough(status, bytes)
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
 async fn assistant_chat_stream(
     State(st): State<AppState>,
     headers: HeaderMap,
