@@ -1,0 +1,21 @@
+{
+  "id": "gate_broken",
+  "name": "Broken Anchor",
+  "version": "1.0.0",
+  "permissions": ["gate_broken.write"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "gate_broken.bump": {
+      "permission": "gate_broken.write",
+      "transaction": true,
+      "sql": ["commands/bump.sql"],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "gate_broken.never",
+        "statement": "commands/no_such_statement.sql"
+      },
+      "emit": []
+    }
+  }
+}

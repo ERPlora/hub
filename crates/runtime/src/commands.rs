@@ -464,19 +464,29 @@ pub(crate) async fn execute_at(
     // semantics, but the failure surfaces as `RuntimeError::Domain` with the module-declared
     // namespaced code instead of the generic `MinAffectedRows` variant. The installer already
     // guaranteed the two fields do not coexist and that the code lives in the module namespace.
+    //
+    // hub#1091: `expect_rows.statement` optionally ANCHORS the gate to ONE statement of the
+    // command. Without it the batch SUM is the contract (documented semantics, kept: legitimate
+    // multi-statement gates like `customers.consent.grant` sum 3 rows from 3 statements, and
+    // `customers.anonymize` has steps that may rightly affect 0). With it, only the anchored
+    // statement counts — an unconditional sibling (a counter UPSERT, an audit INSERT) can no
+    // longer satisfy a guard the guarded statement failed, which answered `200 ok` with an
+    // event for something that never happened (online_booking#25).
     let expected = cmd.def.expect_rows.as_ref();
     let min = expected.map(|expect| expect.n).or(cmd.def.min_affected_rows);
-    // Un command declarativo ES un solo grupo: sus sentencias de mutación, sin el outbox. La forma
-    // de lista la trajo hub#1025 para el camino del handler, que emite varios sub-commands.
-    let gates: Vec<RowGate> = min
-        .map(|min| {
-            vec![RowGate {
-                first: 0,
-                count: sql_op_count,
-                min,
-            }]
-        })
-        .unwrap_or_default();
+    let gates: Vec<RowGate> = match (min, expected.and_then(|e| e.statement.as_deref())) {
+        (Some(min), Some(anchor)) => vec![RowGate {
+            first: anchored_statement_index(cmd, name, anchor)?,
+            count: 1,
+            min,
+        }],
+        (Some(min), None) => {
+            // Un command declarativo ES un solo grupo: sus sentencias de mutación, sin el
+            // outbox. La forma de lista la trajo hub#1025 para el camino del handler.
+            vec![RowGate { first: 0, count: sql_op_count, min }]
+        }
+        (None, _) => Vec::new(),
+    };
     match db.execute_tx_gated(&ops, &gates).await? {
         TxGatedOutcome::RolledBack { sql_counts, .. } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
@@ -1098,15 +1108,22 @@ async fn persist_handler_output(
         for sql in sqls {
             tx_ops.push((sql, bound.clone()));
         }
+        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
         if let Some(target) = target {
-            let min = target
-                .def
-                .expect_rows
-                .as_ref()
-                .map(|expect| expect.n)
-                .or(target.def.min_affected_rows);
+            let expected = target.def.expect_rows.as_ref();
+            let min = expected.map(|expect| expect.n).or(target.def.min_affected_rows);
             if let Some(min) = min {
-                gates.push(RowGate { first, count, min });
+                // hub#1091: an anchored gate counts ONLY the anchored statement of this op —
+                // same rule as the declarative path, so a handler cannot reach a sub-command
+                // whose contract reads differently depending on who called it.
+                let gate = match expected.and_then(|e| e.statement.as_deref()) {
+                    Some(anchor) => {
+                        let idx = anchored_statement_index(target, &op.command, anchor)?;
+                        RowGate { first: first + idx, count: 1, min }
+                    }
+                    None => RowGate { first, count, min },
+                };
+                gates.push(gate);
                 gated_commands.push((op.command.as_str(), target));
             }
         }
@@ -1456,6 +1473,26 @@ fn spend_approval(
 /// atender sería una denegación disfrazada de diálogo. Si un módulo necesita de verdad que su
 /// handler escriba por encima de su command, lo que cambia es el permiso declarado de la op —
 /// visible en el manifest y revisable— no este gate.
+/// Index (into the command's statements) of the statement `expect_rows.statement` anchors to
+/// (hub#1091). The anchor is declared as a `sql` PATH (what the manifest writes); the registry
+/// resolves those same paths, in the same order, into [`RegisteredCommand::sql`] — so the index
+/// found among the paths is the index of the statement that will run. The installer already
+/// refuses an anchor naming no statement of its command; this is the runtime's own defense in
+/// depth — silently degrading to the batch-sum gate would re-create exactly the "guard its
+/// author believes armed" hole this anchor exists to close.
+fn anchored_statement_index(
+    cmd: &RegisteredCommand,
+    name: &str,
+    anchor: &str,
+) -> Result<usize> {
+    cmd.def.sql.iter().position(|path| path == anchor).ok_or_else(|| {
+        RuntimeError::Other(format!(
+            "command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
+             which is not one of its sql statements"
+        ))
+    })
+}
+
 pub(crate) fn validate_operation(
     registry: &Registry,
     ctx: &RequestContext,
@@ -3708,6 +3745,7 @@ mod tests {
             n: 1,
             error: "customers.group_not_found".to_string(),
             message: None,
+            statement: None,
         });
         reg.commands.insert(
             "customers._group_add".to_string(),
