@@ -1095,7 +1095,7 @@ async fn list_approvals(
     // can override the tenant.
     let mut bound = params.clone();
     bound.insert("hub_id".into(), json!(hub_id));
-    crate::queries::run_list(db, BASE_SQL, &spec, &bound).await
+    crate::queries::run_list(db, "hub.approvals.list", BASE_SQL, &spec, &bound).await
 }
 
 #[cfg(test)]

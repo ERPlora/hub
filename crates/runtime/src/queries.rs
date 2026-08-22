@@ -181,7 +181,7 @@ pub async fn execute_page(
             Ok(QueryPage { rows, total, limit: total, offset: 0 })
         }
         // Query de lista: compone el SQL paginado de forma genérica.
-        Some(spec) => run_list(db, &q.sql, spec, &bound).await,
+        Some(spec) => run_list(db, name, &q.sql, spec, &bound).await,
     }
 }
 
@@ -190,10 +190,29 @@ pub async fn execute_page(
 /// contrato, sin un segundo paginador.
 pub(crate) async fn run_list(
     db: &dyn DatabaseAdapter,
+    query: &str,
     base_sql: &str,
     spec: &ListSpec,
     bound: &Params,
 ) -> Result<QueryPage> {
+    // ── binds obligatorios (hub#1086) ─────────────────────────────────────────────────────
+    // Un bind que el SQL base referencia FUERA de un `COALESCE(:p, …)` no puede ser opcional:
+    // ligarlo como NULL convierte `col = :param` en un filtro que no casa nada y la página
+    // responde total: 0 CON CREDIBILIDAD — el caso real fue un arqueo de caja asegurando que no
+    // había movimientos con los movimientos escritos (`cart_checkout.items.list`,
+    // `cash_register.movements.list`, QA 21/08/2026). La distinción está en el propio SQL:
+    // lo que el módulo envolvió en COALESCE es un default DECLARADO (el idioma
+    // `include_archived` de `services.services.list`, services#44) y sigue siendo opcional;
+    // lo demás se exige presente y no-null, con un error que nombra el parámetro.
+    for name in required_binds(base_sql) {
+        if !bound.get(&name).is_some_and(|v| !v.is_null()) {
+            return Err(RuntimeError::MissingRequiredParam {
+                query: query.to_string(),
+                param: name,
+            });
+        }
+    }
+
     let mut p = bound.clone();
 
     // ── orden (whitelist + anti-inyección) ────────────────────────────────────────────────
@@ -314,6 +333,191 @@ pub(crate) async fn run_list(
     Ok(QueryPage { rows, total, limit, offset })
 }
 
+
+// ── binds obligatorios de un SQL de lista (hub#1086) ─────────────────────────────────────
+
+/// Vocabulario del PROPIO motor de listas: `limit`/`offset` (paginación), `search` (buscador
+/// global), `sort`/`dir` (orden) y `f_*` (filtros por columna del bloque `list`). Un filtro
+/// ausente significa «sin condición» — es opcional POR DISEÑO, nunca un bind obligatorio.
+fn is_engine_bind(name: &str) -> bool {
+    name.starts_with("f_") || matches!(name, "limit" | "offset" | "search" | "sort" | "dir")
+}
+
+/// Binds que el SQL base referencia de forma NO tolerante a NULL (hub#1086).
+///
+/// «No tolerante» = el bind aparece AL MENOS UNA VEZ fuera del primer argumento de un
+/// `COALESCE(<…bind…>, default)`. La regla es textual a propósito: es el módulo quien ESCRIBIÓ
+/// su manejo del NULL en el SQL, y ese es hoy el único idioma de bind opcional que existe en
+/// los manifests publicados (verificado contra los 25 módulos, 22/08/2026: el único bind
+/// opcional en un SQL de lista es el `include_archived` de `services.services.list`, envuelto
+/// en COALESCE). Un bind COALESCE-guardado ausente llega como NULL a propósito — default
+/// declarado, no accidente.
+///
+/// El escaneo replica las reglas de `translate` (nombres `:name`, `::` cast nunca es bind,
+/// strings `'…'` y comentarios `--`/`/* */` verbatim), porque la guarda tiene que ver EXACTAMENTE
+/// los nombres que el traductor bajará a `$n`.
+pub(crate) fn required_binds(sql: &str) -> Vec<String> {
+    let bytes = sql.as_bytes();
+    let code = code_spans(bytes);
+    let coalesced = coalesce_first_arg_spans(bytes, &code);
+
+    let mut required: Vec<String> = Vec::new();
+    for (start, end) in &code {
+        let seg = &sql[*start..*end];
+        let mut i = 0usize;
+        while i < seg.len() {
+            // `::` es el cast de Postgres, no un parámetro.
+            if seg.as_bytes()[i] == b':' {
+                if seg.as_bytes().get(i + 1) == Some(&b':') {
+                    i += 2;
+                    continue;
+                }
+                let mut j = i + 1;
+                while j < seg.len()
+                    && (seg.as_bytes()[j].is_ascii_alphanumeric() || seg.as_bytes()[j] == b'_')
+                {
+                    j += 1;
+                }
+                if j > i + 1 {
+                    let name = &seg[i + 1..j];
+                    let abs = start + i + 1; // posición del nombre (byte absoluto)
+                    let in_coalesce = coalesced.iter().any(|(s, e)| abs >= *s && abs < *e);
+                    if !in_coalesce && !required.iter().any(|n| n == name) {
+                        required.push(name.to_string());
+                    }
+                    i = j;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+    }
+    // Un bind entra en `required` por su PRIMERA aparición fuera de COALESCE, y ya no sale:
+    // si aparece además dentro de un COALESCE, su aparición desprotegida manda (ligarla como
+    // NULL mintió igual). El bind cuyas apariciones están TODAS protegidas nunca entró.
+    required.retain(|name| !is_engine_bind(name));
+    required
+}
+
+/// Tramos de `bytes` que son CÓDIGO: fuera de literales `'…'` y de comentarios `-- …` / `/* … */`.
+/// Mismas reglas que `translate`/`shim_functions` en erplora-db (hub#1026): un apóstrofe en
+/// prosa no abre un literal fantasma.
+fn code_spans(bytes: &[u8]) -> Vec<(usize, usize)> {
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+    let mut i = 0usize;
+    let mut start = 0usize;
+    let mut in_string = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            if c == b'\'' {
+                in_string = false;
+                i += 1;
+                start = i; // el tramo de código siguiente empieza TRAS el literal
+            } else {
+                i += 1;
+            }
+            continue;
+        }
+        match c {
+            b'\'' => {
+                spans.push((start, i));
+                in_string = true;
+                i += 1;
+            }
+            b'-' if bytes.get(i + 1) == Some(&b'-') => {
+                spans.push((start, i));
+                let mut j = i;
+                while j < bytes.len() && bytes[j] != b'\n' {
+                    j += 1;
+                }
+                i = j;
+                start = j; // el salto de línea es código (blanco)
+            }
+            b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                spans.push((start, i));
+                let mut j = i + 2;
+                while j < bytes.len() && !(bytes[j] == b'*' && bytes.get(j + 1) == Some(&b'/')) {
+                    j += 1;
+                }
+                i = (j + 2).min(bytes.len());
+                start = i;
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    spans.push((start, bytes.len()));
+    spans.retain(|(a, b)| a < b);
+    spans
+}
+
+/// Tramos (en bytes absolutos) del PRIMER argumento de cada llamada `COALESCE(…)`: desde tras
+/// el `(` hasta la coma a profundidad 1 o el `)` de cierre, contando strings para que una coma
+/// dentro de un literal no corte el argumento. Case-insensitive y con frontera de palabra.
+fn coalesce_first_arg_spans(bytes: &[u8], code: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    let needle = b"COALESCE";
+    let mut spans = Vec::new();
+    for (start, end) in code {
+        let seg = &bytes[*start..*end];
+        let mut i = 0usize;
+        while i < seg.len() {
+            if seg[i..].len() >= needle.len()
+                && seg[i..i + needle.len()].eq_ignore_ascii_case(needle)
+            {
+                let prev_ident = i > 0
+                    && (seg[i - 1].is_ascii_alphanumeric() || seg[i - 1] == b'_');
+                let after = i + needle.len();
+                let next_ident = seg
+                    .get(after)
+                    .is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_');
+                if !prev_ident && !next_ident {
+                    // saltar espacios hasta el `(` ; si no viene, no es una llamada.
+                    let mut j = after;
+                    while j < seg.len() && (seg[j] as char).is_whitespace() {
+                        j += 1;
+                    }
+                    if seg.get(j) == Some(&b'(') {
+                        let open = j;
+                        let mut depth = 0usize;
+                        let mut k = open;
+                        let mut in_str = false;
+                        while k < seg.len() {
+                            let c = seg[k];
+                            if in_str {
+                                if c == b'\'' {
+                                    in_str = false;
+                                }
+                                k += 1;
+                                continue;
+                            }
+                            match c {
+                                b'\'' => in_str = true,
+                                b'(' => depth += 1,
+                                b')' => {
+                                    depth -= 1;
+                                    if depth == 0 {
+                                        break;
+                                    }
+                                }
+                                b',' if depth == 1 => break,
+                                _ => {}
+                            }
+                            k += 1;
+                        }
+                        let end_rel = (k + 1).min(seg.len()); // incluye la coma/paréntesis de corte
+                        spans.push((start + open + 1, start + end_rel));
+                        i = end_rel;
+                        continue;
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+    spans
+}
 /// ¿Es un identificador SQL seguro (`[A-Za-z_][A-Za-z0-9_]*`)? Solo estos se interpolan en el
 /// SQL (columnas de `sort`/`filters` vienen del manifest de confianza; esto es defensa en
 /// profundidad frente a un manifest malformado).
@@ -321,4 +525,67 @@ fn is_ident(s: &str) -> bool {
     let mut chars = s.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{code_spans, coalesce_first_arg_spans, required_binds};
+
+    // ── hub#1086: el escáner de binds obligatorios ───────────────────────────────────────────
+    // La regla: un bind es obligatorio iff aparece AL MENOS UNA VEZ fuera del primer argumento
+    // de un COALESCE. Es la distinción que el issue pide: filtro ausente = no filtrar (legítimo,
+    // vocabulario del motor) VERSUS contexto ausente = página que miente (requerido).
+
+    #[test]
+    fn bare_bind_is_required() {
+        let sql = "SELECT * FROM t WHERE hub_id = :hub_id AND cart_id = :cart_id";
+        // `hub_id` también sale: el escáner refleja lo que el SQL EXIGE; que el runtime lo
+        // inyecte siempre es cosa de la guarda (lo verá presente y pasará).
+        assert_eq!(required_binds(sql), vec!["hub_id", "cart_id"]);
+    }
+
+    #[test]
+    fn coalesce_wrapped_bind_is_optional() {
+        // El idioma de services.services.list (services#44): ausente = NULL = alcance default.
+        let sql = "SELECT * FROM c WHERE hub_id = :hub_id \
+                   AND (COALESCE(CAST(:include_archived AS TEXT), '0') IN ('1', 'true') \
+                        OR c.archived = 0)";
+        assert_eq!(
+            required_binds(sql),
+            vec!["hub_id"],
+            "include_archived queda OPCIONAL por el COALESCE; hub_id es del sistema"
+        );
+    }
+
+    #[test]
+    fn bind_in_both_places_is_required() {
+        // El idioma de appointments.list (simple, no list): el sentinel `(COALESCE(:p,'')='' OR
+        // col = :p)`. La SEGUNDA aparición no está protegida — para el motor de listas manda
+        // como requerido: es la lectura conservadora de un bind medio protegido.
+        let sql = "SELECT * FROM t WHERE (COALESCE(CAST(:status AS text), '') = '' OR status = :status)";
+        assert_eq!(required_binds(sql), vec!["status"]);
+    }
+
+    #[test]
+    fn engine_vocabulary_is_never_required() {
+        let sql = "SELECT * FROM t WHERE name LIKE '%' || :search || '%' \
+                   ORDER BY :sort LIMIT :limit OFFSET :offset AND name = :f_name";
+        assert!(
+            required_binds(sql).is_empty(),
+            "limit/offset/search/sort/f_* son vocabulario del motor: opcionales por diseño"
+        );
+    }
+
+    #[test]
+    fn strings_comments_and_casts_are_not_binds() {
+        let sql = "-- el :cart_id de la prosa no cuenta\n\
+                   SELECT ':cart_id' AS lit, t.id::int FROM t /* :ghost */ WHERE 1 = 1";
+        assert!(required_binds(sql).is_empty());
+    }
+
+    #[test]
+    fn repeated_bind_is_listed_once() {
+        let sql = "SELECT * FROM t WHERE a = :x OR b = :x";
+        assert_eq!(required_binds(sql), vec!["x"]);
+    }
 }

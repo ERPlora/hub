@@ -163,6 +163,15 @@ pub enum RuntimeError {
     /// El JSON Schema declarado por una query/command no compila (se detecta al instalar).
     #[error("schema inválido en `{name}`: {detail}")]
     Schema { name: String, detail: String },
+    /// Un bind que el SQL base de una query de LISTA referencia quedó AUSENTE (o a null) en los
+    /// params (hub#1086). Ligarlo como NULL convierte `col = :param` en un filtro que no casa
+    /// NADA, y la página responde `total: 0` con credibility plena: el listado miente sin
+    /// levantar sospechas (el movimiento de caja ESTABA escrito; la query decía que no había
+    /// nada). Es la mitad ruidosa del contrato: lo que el SQL referencia FUERA de un
+    /// `COALESCE(:p, …)` no puede ser opcional — un bind COALESCE-guardado es un default
+    /// declarado por el propio módulo y sigue llegando como NULL a propósito.
+    #[error("la query `{query}` requiere el parámetro `:{param}` (su SQL lo referencia) y llegó ausente o null: se rehúsa a ligarlo como NULL porque respondería una página vacía como si no existiera nada")]
+    MissingRequiredParam { query: String, param: String },
     /// Fallo de la capacidad de host `host.notify` (ADR-0012): el transporte de un canal
     /// (email/sms/whatsapp) no pudo entregar. El relay del outbox lo trata como un listener
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
