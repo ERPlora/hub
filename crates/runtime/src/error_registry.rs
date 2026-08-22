@@ -237,6 +237,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
     use RuntimeError as E;
     match err {
         E::InvalidPayload { .. }
+        // hub#1086: a payload missing a bind the query's SQL references is the caller's
+        // mistake, same family as an invalid payload — never a Hub bug.
+        | E::MissingRequiredParam { .. }
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
@@ -315,6 +318,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Wasm(_) => "wasm",
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
+        // hub#1086: its own stable code, so a caller can tell "you did not send what the
+        // query needs" from "what you sent does not validate".
+        E::MissingRequiredParam { .. } => "missing_required_param",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero

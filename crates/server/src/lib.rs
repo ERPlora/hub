@@ -3424,6 +3424,13 @@ pub(crate) fn err_status_and_code(
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        // hub#1086: the payload does not carry a bind the query's own SQL references. `422`
+        // like `invalid_payload` (it IS a payload-contract refusal, caught before any read),
+        // with its own stable code so the caller can tell "you did not send what the query
+        // needs" from "what you sent does not validate".
+        E::MissingRequiredParam { .. } => {
+            (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
+        }
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
