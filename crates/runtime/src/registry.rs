@@ -79,6 +79,71 @@ impl CompiledSchema {
         }
     }
 
+    /// Reescribe los números de `params` a la FORMA que su propiedad declara (hub#1092):
+    /// `"type": "number"` → siempre flotante; `"type": "integer"` → siempre entero.
+    ///
+    /// # Por qué existe
+    ///
+    /// El binder de `erplora-db` tipa cada bind **por el valor**: un JSON `10` sale como `int8` y
+    /// un `10.5` como `float8`. Para un campo declarado `"number"` esas son la MISMA ranura de la
+    /// MISMA sentencia con dos tipos de cable distintos — y la caché de sentencias preparadas de
+    /// sqlx (indexada por texto, sin re-Parse) congela el primero que la calentó. Como `int8` y
+    /// `float8` miden los dos 8 bytes, el servidor no puede detectar el cambiazo: lee los bytes
+    /// como el tipo que tenía guardado. Medido (services#55): `int8` con un `10.5` encima guarda
+    /// `4.6e18`; `float8` con un `10` encima guarda un denormal `5e-323` — o revienta con `22003`
+    /// en una columna `real` estrecha. Ruidoso **a veces**, corrupto **siempre**.
+    ///
+    /// La corrección no puede vivir en el binder (no conoce el schema): vive aquí, donde el
+    /// runtime SABE lo que el módulo declaró. Se llama tras [`Self::validate`] (y tras
+    /// [`Self::apply_defaults`], cuyos `default` llegan con la forma del JSON del módulo), antes
+    /// de bajar a SQL.
+    ///
+    /// # Reglas
+    ///
+    /// - Solo propiedades de PRIMER nivel con `"type"` `"number"`/`"integer"` (también como
+    ///   lista, p. ej. `["number", "null"]`): los payloads del motor son planos y bindean por
+    ///   nombre; lo demás queda como está.
+    /// - `number`: un entero en JSON (`10`) ES un number válido (el validador lo acepta) → se
+    ///   reescribe como `10.0`. Un entero > 2^53 pierde precisión al bajar a `f64`: es lo que el
+    ///   schema declaró (semántica JS de `number`), y hoy ninguna tasa ni precio la alcanza.
+    /// - `integer`: un flotante de valor integral (`4.0` ES un integer válido para JSON Schema)
+    ///   se reescribe como `4`. Un flotante NO integral no se toca: el validador ya lo rechazó en
+    ///   el camino declarativo, y en el camino de handler (sin validación de payload) tocarlo
+    ///   cambiaría el valor, no la forma.
+    /// - Strings, bools, `null` y ausentes: nunca se tocan.
+    pub fn coerce_declared_number_shapes(&self, params: &mut crate::Params) {
+        let Some(props) = self.raw.get("properties").and_then(|p| p.as_object()) else {
+            return;
+        };
+        for (key, prop) in props {
+            let declared = match declared_number_type(prop) {
+                Some(t) => t,
+                None => continue, // sin declaración de tipo numérico → el valor manda, como siempre
+            };
+            let Some(value) = params.get_mut(key) else { continue };
+            let serde_json::Value::Number(n) = value else { continue };
+            match declared {
+                DeclaredNumberType::Number => {
+                    if !n.is_f64() {
+                        if let Some(f) =
+                            serde_json::Number::from_f64(n.as_f64().unwrap_or(f64::NAN))
+                        {
+                            *value = serde_json::Value::Number(f);
+                        }
+                    }
+                }
+                DeclaredNumberType::Integer => {
+                    if let Some(f) = n.as_f64() {
+                        if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                            *value =
+                                serde_json::Value::Number(serde_json::Number::from(f as i64));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Valida `instance`; `Err` lleva el detalle legible de las violaciones (máx. 5).
     pub fn validate(&self, instance: &serde_json::Value) -> Result<(), String> {
         let errors: Vec<String> = self
@@ -99,6 +164,32 @@ impl CompiledSchema {
         } else {
             Err(errors.join("; "))
         }
+    }
+}
+
+/// El tipo numérico que una propiedad de schema declara (hub#1092). `None` = no declara
+/// `number`/`integer` (o declara otra cosa): el bind sigue tipado por el valor, como siempre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeclaredNumberType {
+    Number,
+    Integer,
+}
+
+/// Lee el `"type"` de una propiedad como tipo numérico declarado. Acepta la forma string
+/// (`"number"`) y la forma lista (`["number", "null"]`, el idioma de «opcional/nullable»);
+/// en la lista manda el primer tipo numérico que aparezca.
+fn declared_number_type(prop: &serde_json::Value) -> Option<DeclaredNumberType> {
+    let pick = |s: &str| match s {
+        "number" => Some(DeclaredNumberType::Number),
+        "integer" => Some(DeclaredNumberType::Integer),
+        _ => None,
+    };
+    match prop.get("type")? {
+        serde_json::Value::String(s) => pick(s.as_str()),
+        serde_json::Value::Array(types) => {
+            types.iter().find_map(|t| t.as_str().and_then(pick))
+        }
+        _ => None,
     }
 }
 
@@ -972,6 +1063,99 @@ pub(crate) fn new_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#1092: coerce_declared_number_shapes ─────────────────────────────────────────────
+
+    fn compiled(schema: serde_json::Value) -> CompiledSchema {
+        CompiledSchema::compile(&schema).expect("schema compila")
+    }
+
+    fn shape_of(v: &serde_json::Value) -> &'static str {
+        // The WIRE form of a JSON number, which is what the binder keys on: serde_json keeps
+        // integers and floats in separate variants even when they are equal as reals.
+        let n = v.as_number().expect("es un número");
+        if n.is_u64() || n.is_i64() {
+            "int"
+        } else if n.is_f64() {
+            "float"
+        } else {
+            "???"
+        }
+    }
+
+    /// `"number"` declara FLOTANTE: un `10` en JSON (entero para serde_json) se reescribe como
+    /// `10.0` para que el bind salga siempre `float8`. Es la mitad que congela la sentencia.
+    #[test]
+    fn number_field_rewrites_integer_shaped_values_to_float() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "rate": { "type": "number" } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::json!(10));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["rate"]), "float", "10 debe salir como 10.0");
+        assert_eq!(p["rate"].as_f64(), Some(10.0), "mismo valor, otra forma");
+    }
+
+    /// `"integer"` declara ENTERO: un `4.0` (float que ES un integer válido para JSON Schema,
+    /// el validador lo acepta) se reescribe como `4` para que el bind salga siempre `int8`.
+    /// Un `4.5` no se toca: cambiarlo sería cambiar el VALOR, no la forma.
+    #[test]
+    fn integer_field_rewrites_integral_floats_and_leaves_fractions() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "qty": { "type": "integer" } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("qty".into(), serde_json::json!(4.0));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["qty"]), "int", "4.0 debe salir como 4");
+
+        let mut p = crate::Params::new();
+        p.insert("qty".into(), serde_json::json!(4.5));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["qty"]), "float", "4.5 no es integral: se queda como está");
+    }
+
+    /// La forma nullable (`["number", "null"]`) es la misma declaración; strings, bools, `null`
+    /// y claves sin declaración numérica nunca se tocan.
+    #[test]
+    fn nullable_number_form_coerces_but_non_numbers_are_untouched() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "rate": { "type": ["number", "null"] },
+                "note": { "type": "string" },
+                "qty": { "type": ["integer", "null"] },
+                "free": { "type": ["string", "null"] }
+            }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::json!(21));
+        p.insert("note".into(), serde_json::json!("21"));
+        p.insert("qty".into(), serde_json::json!(3.0));
+        p.insert("free".into(), serde_json::json!(7));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["rate"]), "float", "['number','null'] declara number");
+        assert_eq!(p["note"], serde_json::json!("21"), "un string no se toca");
+        assert_eq!(shape_of(&p["qty"]), "int", "['integer','null'] declara integer");
+        assert_eq!(p["free"], serde_json::json!(7), "sin tipo numérico declarado, el valor manda");
+    }
+
+    /// Un `null` explícito sobre un campo `number` nullable sigue siendo `null`: se bindea como
+    /// `DynNull` (inferido por contexto), que es correcto y no congela ningún tipo.
+    #[test]
+    fn explicit_null_stays_null() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "rate": { "type": ["number", "null"] } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::Value::Null);
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(p["rate"], serde_json::Value::Null);
+    }
 
     fn cmd_def(expose_api: bool, internal: bool) -> CommandDef {
         CommandDef {
