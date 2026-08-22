@@ -126,11 +126,21 @@ pub async fn execute_page(
 
     // Validación del payload contra el JSON Schema declarado (compilado al instalar y
     // cacheado en el Registry): rechaza ANTES de tocar la BD (hub#27).
-    if let Some(schema) = &q.schema {
+    let coerced;
+    let params = if let Some(schema) = &q.schema {
         schema
             .validate(&Json::Object(params.clone()))
             .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
-    }
+        // hub#1092: los números se bindean con la FORMA que el schema declara (`number`→f64,
+        // `integer`→i64), no con la del valor accidental — un filtro numérico enviado como `3`
+        // y luego como `3.5` no debe re-preparar (ni corromper) la misma sentencia.
+        let mut p = params.clone();
+        schema.coerce_declared_number_shapes(&mut p);
+        coerced = p;
+        &coerced
+    } else {
+        params
+    };
 
     // Identidad de NEGOCIO GLOBAL del hub (fuente única país-agnóstica, `hub_settings` — ADR-0061) →
     // contexto, igual que en `commands::execute` (depth 0). El path de queries NO la cargaba, así que

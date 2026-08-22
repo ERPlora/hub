@@ -377,6 +377,11 @@ pub(crate) async fn execute_at(
         validate_against(cmd, name, payload)?;
         let mut p = payload.clone();
         schema.apply_defaults(&mut p);
+        // hub#1092: el bind se tipa por lo que el schema DECLARA, no por el valor accidental —
+        // un `10` y un `10.5` de un mismo campo `number` deben llegar a la MISMA sentencia con
+        // el mismo tipo de cable, o la caché de sentencias preparadas congela el primero y
+        // corrompe el segundo (int8/float8 miden lo mismo: el servidor no ve el cambiazo).
+        schema.coerce_declared_number_shapes(&mut p);
         defaulted = p;
         &defaulted
     } else {
@@ -1076,14 +1081,24 @@ async fn persist_handler_output(
     let mut gated_commands: Vec<(&str, &RegisteredCommand)> = Vec::new();
     for op in &output.operations {
         let sqls = validate_operation(registry, ctx, &cmd.module_id, op)?;
-        let bound = crate::system_params(&op.params, ctx);
+        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
+        let target = registry.commands.get(&op.command);
+        let mut op_params = op.params.clone();
+        // hub#1092, misma regla que el camino declarativo: si el command destino DECLARA su
+        // contrato en un schema, sus números se bindean con la forma declarada. El handler hoy
+        // entrega siempre `f64` (por eso este camino no estaba armado), pero la regla es una
+        // sola: si hay declaración, manda la declaración — un guest que devuelva `4` para un
+        // campo `number` no debe poder re-armar la caché que el declarativo acaba de desactivar.
+        if let Some(schema) = target.and_then(|t| t.schema.as_ref()) {
+            schema.coerce_declared_number_shapes(&mut op_params);
+        }
+        let bound = crate::system_params(&op_params, ctx);
         let first = tx_ops.len();
         let count = sqls.len();
         for sql in sqls {
             tx_ops.push((sql, bound.clone()));
         }
-        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
-        if let Some(target) = registry.commands.get(&op.command) {
+        if let Some(target) = target {
             let min = target
                 .def
                 .expect_rows

@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  },
+  "required": ["rate"],
+  "additionalProperties": false
+}
