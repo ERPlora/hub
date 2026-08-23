@@ -39,8 +39,42 @@ async fn fresh() -> Runtime {
     rt
 }
 
+/// Un servicio REAL del catálogo de ESTE hub, para la línea del bono. `services.packages.create`
+/// declara `reads` (ADR-0069, services v1.5.20): contrasta cada línea contra
+/// `services.services.list` y RECHAZA el command si nombra algo que no está — un id inventado no
+/// vale (hub#1036, services#42). Find-or-create para que el helper sea idempotente por runtime.
+async fn bono_service(rt: &Runtime, ctx: &RequestContext) -> String {
+    let list = rt.execute_query("services.services.list", &Params::new(), ctx).await.unwrap();
+    if let Some(found) = list.iter().find(|s| s["name"] == json!("Corte")) {
+        return found["id"].as_str().unwrap().to_string();
+    }
+    rt.execute_command(
+        "services.services.create",
+        &params(json!({
+            "name": "Corte",
+            "tax_category_key": "service.generic",
+            "price": 1000
+        })),
+        ctx,
+    )
+    .await
+    .expect("crear el servicio de la línea del bono");
+    let list = rt.execute_query("services.services.list", &Params::new(), ctx).await.unwrap();
+    list.iter()
+        .find(|s| s["name"] == json!("Corte"))
+        .unwrap_or_else(|| panic!("servicio Corte no encontrado tras crearlo"))["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
 /// Crea un paquete vía el handler WASM `create_package` y devuelve su id (resuelto por
 /// `services.packages.list`). Requiere `dist/handler.wasm`.
+///
+/// El bono lleva al menos UNA línea real (hub#1036): `services#42` va a exigir `minItems: 1`
+/// en `schemas/package_create.json` — un bono sin líneas no es un producto vendible — y este
+/// helper era el único llamante que creaba paquetes vacíos. La línea nombra un servicio del
+/// catálogo (ver [`bono_service`]) porque el command lo contrasta antes de escribir.
 async fn create_package(
     rt: &Runtime,
     ctx: &RequestContext,
@@ -48,6 +82,7 @@ async fn create_package(
     max_uses: Option<i64>,
     validity_days: Option<i64>,
 ) -> String {
+    let svc = bono_service(rt, ctx).await;
     rt.execute_command(
         "services.packages.create",
         &params(json!({
@@ -56,7 +91,7 @@ async fn create_package(
             "discount_value": 10.0,
             "max_uses": max_uses,
             "validity_days": validity_days,
-            "items": []
+            "items": [{ "service_id": svc, "quantity": 1_000_000 }]
         })),
         ctx,
     )
@@ -64,12 +99,31 @@ async fn create_package(
     .expect("crear paquete");
 
     let pkgs = rt.execute_query("services.packages.list", &Params::new(), ctx).await.unwrap();
-    pkgs.iter()
+    let pkg_id = pkgs
+        .iter()
         .find(|p| p["name"] == json!(name))
         .unwrap_or_else(|| panic!("paquete {name} no encontrado"))["id"]
         .as_str()
         .unwrap()
-        .to_string()
+        .to_string();
+
+    // El bono creado lleva su línea: la fixture no vuelve a fabricar el paquete vacío que
+    // services#42 va a volver ilegal. Si el handler perdiera la línea en silencio, el redeem
+    // seguiría pasando (cuenta usos, no líneas) — este assert es lo que lo haría visible.
+    let lines = rt
+        .execute_query(
+            "services.package_items.list",
+            &params(json!({ "package_id": pkg_id })),
+            ctx,
+        )
+        .await
+        .unwrap_or_else(|e| panic!("package_items.list del bono {name}: {e:?}"));
+    assert!(
+        lines.iter().any(|l| l["service_name"] == json!("Corte")),
+        "el bono {name} debe llevar al menos la línea de «Corte»; líneas: {lines:?}"
+    );
+
+    pkg_id
 }
 
 #[tokio::test]
