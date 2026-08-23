@@ -1,0 +1,8 @@
+{
+  "id": "dmid",
+  "name": "Dependency Middle",
+  "version": "1.0.0",
+  "permissions": [],
+  "depends_on": ["dbase"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] }
+}

@@ -766,6 +766,10 @@ export default {
     toggleError: 'Could not change the status of {name}.',
     uninstalled: '{name} uninstalled.',
     uninstallError: 'Could not uninstall {name}.',
+    // hub#1101: the runtime refused because other installed apps declare this one. Only reachable
+    // when the list the dialog was drawn with had gone stale (another tab, another admin), so it
+    // names the apps the RUNTIME sent, not the ones we happened to have loaded.
+    uninstallBlocked: '{name} was not uninstalled: these apps need it — {apps}. Uninstall them first.',
     moduleInstalledNamed: '{name} installed.',
     moduleInstalled: 'App installed.',
     consentTitle: 'Requested permissions',

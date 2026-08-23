@@ -1,0 +1,8 @@
+{
+  "id": "dtop",
+  "name": "Dependency Top",
+  "version": "1.0.0",
+  "permissions": [],
+  "depends_on": ["dmid"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] }
+}

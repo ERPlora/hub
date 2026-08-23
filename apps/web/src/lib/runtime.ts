@@ -518,27 +518,53 @@ export async function listInstalledModules(): Promise<InstalledModule[]> {
 export class ModuleActionError extends Error {
   readonly code?: string;
 
-  constructor(message: string, code?: string) {
+  /**
+   * Las apps que dejarían de funcionar, cuando el rechazo es `has_dependents` (hub#1101).
+   *
+   * Viaja como CAMPO, igual que el `permission` de `requires_elevation`: la pantalla la ENUMERA,
+   * y sacarla a fuerza de parsear una frase es exactamente lo que hace que un día deje de
+   * funcionar en silencio.
+   */
+  readonly dependents?: readonly string[];
+
+  constructor(message: string, code?: string, dependents?: readonly string[]) {
     super(message);
     this.name = 'ModuleActionError';
     this.code = code;
+    this.dependents = dependents;
   }
 }
 
-/** Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla. */
-async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uninstall'): Promise<void> {
+/**
+ * Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla.
+ *
+ * `force` (solo en `uninstall`, hub#1101) es la respuesta del dueño a «otras apps necesitan esta,
+ * ¿la quito igualmente?», después de que la pantalla se las haya nombrado. Sin él el runtime
+ * rechaza con `409 has_dependents`, que es lo que tiene que pasarle a quien nunca vio esa lista:
+ * un script, el asistente, un flujo o un `curl`. Por eso el cuerpo **no se manda** cuando no hay
+ * nada que confirmar — «sin cuerpo» tiene que seguir significando la respuesta segura.
+ */
+async function moduleAction(
+  id: string,
+  action: 'activate' | 'deactivate' | 'uninstall',
+  opts: { force?: boolean } = {},
+): Promise<void> {
   const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
     method: 'POST',
-    headers: runtimeHeaders(),
+    headers: opts.force
+      ? { ...runtimeHeaders(), 'Content-Type': 'application/json' }
+      : runtimeHeaders(),
+    ...(opts.force ? { body: JSON.stringify({ force: true }) } : {}),
   });
   const env = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; dependents?: string[] };
   };
   if (!res.ok || env.ok === false) {
     throw new ModuleActionError(
       env.error?.message ?? `${action} ${id} → ${res.status}`,
       env.error?.code,
+      env.error?.dependents,
     );
   }
 }
@@ -641,7 +667,8 @@ export async function listModuleVersions(moduleId: string): Promise<ModuleVersio
 
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');
 export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 'deactivate');
-export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
+export const uninstallModule = (id: string, opts: { force?: boolean } = {}): Promise<void> =>
+  moduleAction(id, 'uninstall', opts);
 
 /**
  * Una capability (permiso) que declara un módulo. El runtime es la autoridad (default-deny):
