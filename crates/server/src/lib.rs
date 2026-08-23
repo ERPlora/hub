@@ -3481,6 +3481,13 @@ pub(crate) fn err_status_and_code(
         // precondition and the demo locks. Its own code, never `permission_denied`: the action
         // that resolves it is "open the drawer", not "ask the manager".
         E::ProtectsGuard { .. } => (StatusCode::CONFLICT, "protects_guard".into()),
+        // hub#1101: other installed modules declare this one in `depends_on`. `409` for the same
+        // reason as its neighbours above — the request is well-formed and the caller is allowed,
+        // it conflicts with the SHAPE of what this hub has installed. Its own stable code, never
+        // the generic `400 {code:"error"}` bucket: the screen does not merely report this one, it
+        // ACTS on it (lists the dependants and offers «remove it anyway»), and it cannot do that
+        // against an error it cannot tell apart.
+        E::HasDependents { .. } => (StatusCode::CONFLICT, "has_dependents".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
     }
@@ -3495,6 +3502,11 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     // refusal must not look like an offer to elevate.
     if let E::RequiresElevation { permission } = &e {
         error["permission"] = json!(permission);
+    }
+    // hub#1101: same rule — the apps that would break travel as a FIELD, never parsed out of the
+    // sentence, because that list is what the confirmation dialog enumerates.
+    if let E::HasDependents { dependents, .. } = &e {
+        error["dependents"] = json!(dependents);
     }
     (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }
@@ -3750,16 +3762,35 @@ async fn deactivate_module(
     }
 }
 
+/// Body of `POST /api/modules/:id/uninstall` (hub#1101). Optional in full: the historical call
+/// sends nothing at all, and «nothing» has to keep meaning the SAFE answer.
+#[derive(serde::Deserialize, Default)]
+struct UninstallReq {
+    /// «Other apps need this one — remove it anyway». Only the caller that was shown the list
+    /// (the confirmation dialog of hub#773, or support driving the API on purpose) sends it.
+    /// It opens the dependants gate and NOTHING else: the fiscal locks are not the owner's
+    /// question and stay shut (ADR-0202 R2, ADR-0273 D5).
+    #[serde(default)]
+    force: bool,
+}
+
 async fn uninstall_module(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<UninstallReq>>,
 ) -> Response {
+    let force = body.map(|Json(b)| b.force).unwrap_or_default();
     let mut rt = st.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
-    match rt.uninstall(&id).await {
+    let outcome = if force {
+        rt.uninstall_forced(&id).await
+    } else {
+        rt.uninstall(&id).await
+    };
+    match outcome {
         Ok(()) => {
             drop(rt);
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.

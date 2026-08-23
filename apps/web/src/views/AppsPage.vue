@@ -158,7 +158,7 @@ import { config } from '../lib/config';
 import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
-  getModuleCapabilities, putModuleCapabilities, InstallBlockedError,
+  getModuleCapabilities, putModuleCapabilities, InstallBlockedError, ModuleActionError,
   updateModule, listModuleUpdates, listModuleVersions,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
@@ -949,11 +949,25 @@ async function removeModule(m: InstalledModule): Promise<void> {
   const result = await alert.onDidDismiss();
   if (result.role !== 'confirm') return;
   try {
-    await uninstallModule(m.id);
+    // hub#1101: el runtime rechaza por su cuenta si algo depende de esta app, y hace bien — esa
+    // guarda existe para el que NUNCA vio esta lista (un script, el asistente, un flujo, un
+    // `curl`). Aquí sí se vio y sí se confirmó, así que la pantalla contesta esa pregunta. Sin
+    // dependientes no se manda nada: si la lista se hubiera quedado vieja, el rechazo tiene que
+    // llegar en lugar de colarse.
+    await uninstallModule(m.id, { force: breaks.length > 0 });
     notify(t('apps.uninstalled', { name: m.name }), 'primary');
     await Promise.all([loadInstalled(), loadCatalog()]);
     void refreshModuleNav();
   } catch (e) {
+    // Ese caso — la lista con la que se pintó el diálogo era vieja — llega con su código estable y
+    // sus dependientes. La frase del runtime va en inglés (es código), así que se traduce y se
+    // nombran las apps QUE MANDÓ ÉL, que son las de verdad.
+    if (e instanceof ModuleActionError && e.code === 'has_dependents') {
+      const names = (e.dependents ?? []).join(', ');
+      notify(t('apps.uninstallBlocked', { name: m.name, apps: names }), 'danger');
+      await loadInstalled();
+      return;
+    }
     notify(moduleFailureMessage(e, t('apps.uninstallError', { name: m.name })), 'danger');
   }
 }

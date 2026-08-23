@@ -583,12 +583,35 @@ impl Runtime {
     ///
     /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
     /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
+    ///
+    /// hub#1101: y se rechaza si otros módulos instalados lo declaran en `depends_on`, nombrándolos
+    /// ([`Self::dependents_of`]). Para saltárselo hace falta [`Self::uninstall_forced`].
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        self.uninstall_with(module_id, false).await
+    }
+
+    /// [`Self::uninstall`] **saltándose el gate de dependientes** (hub#1101) — y solo ese.
+    ///
+    /// Es la respuesta a UNA pregunta: «otras apps necesitan esta, ¿la quito igualmente?». La
+    /// contesta el dueño, al que la pantalla le ha nombrado antes lo que se rompe (hub#773), o
+    /// soporte por API. Lo que NO abre es el lado fiscal: si el motor aún debe registros a una
+    /// autoridad, o si el módulo es el último proveedor fiscal del hub, esto sigue rechazando —
+    /// esas dos no son preguntas del dueño (ADR-0202 R2, ADR-0273 D5).
+    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<()> {
+        self.uninstall_with(module_id, true).await
+    }
+
+    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<()> {
         // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
         // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
         self.ensure_fiscal_provider_remains(&[module_id.to_string()])
             .await?;
         self.ensure_module_can_go(module_id).await?;
+        // El último, y a propósito: es el ÚNICO forzable, así que va detrás de los candados que no
+        // lo son. Ponerlo delante haría que un `force` los saltara por el orden de las guardas.
+        if !force {
+            self.ensure_nobody_depends_on(module_id)?;
+        }
         installer::uninstall(
             self.db.as_ref(),
             &mut self.registry,
@@ -596,6 +619,56 @@ impl Runtime {
             module_id,
         )
         .await
+    }
+
+    /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).
+    ///
+    /// Un módulo que no está instalado no tiene nada que proteger: quien llama debe seguir viendo
+    /// su «módulo no instalado» de siempre, no un rechazo de dependencias.
+    fn ensure_nobody_depends_on(&self, module_id: &str) -> Result<()> {
+        if !self.registry.is_installed(module_id) {
+            return Ok(());
+        }
+        let dependents = self.dependents_of(module_id);
+        if dependents.is_empty() {
+            return Ok(());
+        }
+        Err(RuntimeError::HasDependents {
+            module: module_id.to_string(),
+            dependents,
+        })
+    }
+
+    /// Los módulos instalados que dejarían de funcionar si `module_id` se fuera — **transitivos y
+    /// sea cual sea su estado** (hub#1101).
+    ///
+    /// A propósito NO es el mismo conjunto que la cascada de desactivación
+    /// ([`Self::deactivation_cascade`]), que solo mira a los ACTIVOS porque apagar lo que ya está
+    /// apagado no cambia nada. Desinstalar se lleva el paquete: un dependiente apagado ya no se
+    /// podrá volver a encender nunca, así que cuenta igual. Es la misma regla que la pantalla ya
+    /// aplica al pintar el aviso (hub#773, `dependentsOf`).
+    ///
+    /// Recorrido en oleadas sobre lo ya caído, así que un manifest con un ciclo termina en vez de
+    /// colgar al que pregunta.
+    pub fn dependents_of(&self, module_id: &str) -> Vec<String> {
+        let mut fallen = vec![module_id.to_string()];
+        let mut out: Vec<String> = Vec::new();
+        loop {
+            let wave: Vec<String> = self
+                .registry
+                .installed
+                .iter()
+                .filter(|m| {
+                    !fallen.contains(&m.id) && m.depends_on.iter().any(|d| fallen.contains(&d.id))
+                })
+                .map(|m| m.id.clone())
+                .collect();
+            if wave.is_empty() {
+                return out;
+            }
+            fallen.extend(wave.iter().cloned());
+            out.extend(wave);
+        }
     }
 
     /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).

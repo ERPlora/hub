@@ -204,4 +204,30 @@ describe('Apps · what an installed app card offers', () => {
     expect(fn.indexOf('dependentsOf(')).toBeLessThan(fn.indexOf('uninstallModule('));
     expect(source).toContain('apps.uninstallBreaks');
   });
+
+  // hub#1101: el runtime ya rechaza por su cuenta (409 `has_dependents`) — la pantalla es la que
+  // acaba de nombrar las apps y de recoger el «sí», así que es la única que puede contestar esa
+  // pregunta. Y solo la contesta cuando de verdad la ha hecho.
+  it('only forces the uninstall when it actually showed the list and got a yes', () => {
+    const fn = source.slice(
+      source.indexOf('async function removeModule'),
+      source.indexOf('function toViewModule'),
+    );
+    expect(fn).toContain('uninstallModule(m.id, { force: breaks.length > 0 })');
+    // El `force` va DESPUÉS de la confirmación, nunca antes: mandarlo al construir el diálogo
+    // sería saltarse el gate sin haber preguntado.
+    expect(fn.indexOf("result.role !== 'confirm'")).toBeLessThan(fn.indexOf('uninstallModule('));
+  });
+
+  it('translates the dependents refusal instead of showing the runtime sentence raw', () => {
+    const fn = source.slice(
+      source.indexOf('async function removeModule'),
+      source.indexOf('function toViewModule'),
+    );
+    // Si la lista con la que se pintó el diálogo se quedó vieja (otra pestaña instaló una
+    // dependiente), el rechazo llega igual. Enseñarle al dueño la frase EN INGLÉS del runtime es
+    // peor que no decir nada: se traduce y se nombran las apps que el runtime mandó.
+    expect(fn).toContain("'has_dependents'");
+    expect(fn).toContain('apps.uninstallBlocked');
+  });
 });

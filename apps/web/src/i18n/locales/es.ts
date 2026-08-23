@@ -698,6 +698,7 @@ export default {
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
     uninstallError: 'No se pudo desinstalar {name}.',
+    uninstallBlocked: '{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.',
     moduleInstalledNamed: '{name} instalado.',
     moduleInstalled: 'App instalada.',
     consentTitle: 'Permisos solicitados',

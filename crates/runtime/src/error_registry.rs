@@ -275,6 +275,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // doing its job — the state of the hub (no open session), not a bug of the Hub. Same
         // severity as the other business-state refusals above.
         | E::ProtectsGuard { .. }
+        // hub#1101: the dependents gate refusing an uninstall is the gate doing its job — the
+        // shape of what the owner installed, not a bug of the Hub.
+        | E::HasDependents { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -354,6 +357,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // different door from RBAC (it is a module's precondition over another module's surface),
         // and the screen that explains it has to say "open the drawer", not "ask the manager".
         E::ProtectsGuard { .. } => "protects_guard",
+        // hub#1101: the inverse of `missing_dependency`, and its own code. The screen does not just
+        // report it, it ACTS on it — it lists `dependents` and offers «remove it anyway» — so it
+        // must be distinguishable from every other refusal of an uninstall.
+        E::HasDependents { .. } => "has_dependents",
         E::Other(_) => "other",
     })
 }

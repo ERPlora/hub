@@ -116,6 +116,29 @@ pub enum RuntimeError {
     CapabilityDenied { module: String, capability: String },
     #[error("dependencia no satisfecha: el módulo `{module}` requiere `{dep}`")]
     MissingDependency { module: String, dep: String },
+    /// The inverse of [`RuntimeError::MissingDependency`] (hub#1101): the module is on its way OUT
+    /// and other INSTALLED modules declare it in `depends_on`.
+    ///
+    /// Installing resolves dependencies forward (ADR-0060) and uninstalling resolved nothing at
+    /// all: removing `taxes` answered `ok: true`, the till kept its «Charge» button enabled, and
+    /// the cashier discovered it when `sales.complete_sale` aborted mid-charge on a read whose
+    /// owner had gone. The refusal has to happen at the door and has to NAME who needs it —
+    /// «this cannot be removed» is not something an owner can act on.
+    ///
+    /// `dependents` is the TRANSITIVE closure and ignores status: uninstalling takes the package
+    /// away, so a dependant that is merely switched off can never be switched back on either. It
+    /// travels as a **field**, never parsed out of the sentence, because it is what the dialog
+    /// lists.
+    #[error(
+        "`{module}` cannot be uninstalled: {} installed app(s) need it — {}. Uninstall those first, \
+         or confirm you want to remove it anyway",
+        dependents.len(),
+        dependents.join(", ")
+    )]
+    HasDependents {
+        module: String,
+        dependents: Vec<String>,
+    },
     /// The dependency is installed but OLDER than the declared floor (hub#681): each module is
     /// correct in isolation and the combination does not work, so the refusal names all four
     /// facts the operator needs.
