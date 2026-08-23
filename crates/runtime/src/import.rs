@@ -1000,9 +1000,9 @@ fn carries_a_foreign_numbering(sql: &str) -> bool {
 ///
 /// Qué pasa con los números: **nada**. Las series del destino conservan su `id`, su `code`, su
 /// `current_sequence` y su libro; las del bundle no se aplican, no se fusionan y no renumeran nada.
-/// Un hub que aún no tenga series las crea por su propia puerta (ítem obligatorio
-/// `invoice_series.setup` de la checklist, ADR-0222) — una tarea visible es infinitamente mejor que
-/// un falso «hecho» heredado de otro negocio.
+/// Un hub que aún no tenga series las crea por su propia puerta (ítem obligatorio de numeración de
+/// la checklist — `invoice.setup` desde invoice#41, `invoice_series.setup` en su día —, ADR-0222)
+/// — una tarea visible es infinitamente mejor que un falso «hecho» heredado de otro negocio.
 ///
 /// Se valida ANTES y se filtra después, por el mismo motivo que en `keep_portable_settings`: una
 /// sección inválida tiene que seguir fallando ENTERA y sin tocar la BD (hub#239).

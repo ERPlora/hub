@@ -833,6 +833,96 @@ async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
     );
 }
 
+/// 🔴 [hub#1033, ADR-0369] La numeración que `invoice` SÍ usa tampoco viaja en una plantilla.
+///
+/// `invoice_series` (el módulo que se retira) sembraba `invoice_series_series` /
+/// `invoice_series_allocation`, excluidas desde hub#533. Pero desde ADR-0369 la numeración que
+/// de verdad corre vive en `invoice`: `invoice_invoiceseries` (prefijo, formato y serie por
+/// defecto — cómo se numera cada documento que el negocio emite ante Hacienda) y
+/// `invoice_number_allocation` (el libro append-only de números entregados, RD 1007/2023). Sin
+/// este test, la exclusión solo cubría la numeración de un módulo que ya no numera nada.
+///
+/// Hoy no se nota porque la fila de serie nace sola en la primera emisión (`_ensure_series`):
+/// en cuanto un hub plantilla EMITA algo antes de exportarse, la plantilla llevaría la serie y
+/// el contador de OTRA instalación — y con el ítem `invoice.setup` (invoice#41) de la checklist
+/// marcado «hecho» por la fila ajena, el falso «hecho» de hub#426 otra vez. Un **backup** se las
+/// lleva todas: es la numeración de su dueño volviendo a su sitio (ADR-0113 §1).
+#[tokio::test]
+async fn una_plantilla_no_lleva_la_numeracion_de_invoice() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    let db = fresh_db().await;
+    let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
+    // `invoice` depende de `sales` (que trae `inventory` y `taxes` detrás): mismo orden que el
+    // installer resolvería. La selección de export nombra SOLO `invoice` — las tablas de
+    // numeración viven en su módulo, que la exclusión protege le pida quien le pida el dato.
+    for dep in ["taxes", "inventory", "sales", "invoice"] {
+        rt.install_from_dir(&modules_root().join(dep))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {dep}: {e}"));
+    }
+
+    // Serie y número entregado creados por una PERSONA (`created_by` = su id): no las excluye
+    // `is_module_seeded`, así que sin la regla de este test viajarían en la plantilla.
+    let mut p = Params::new();
+    p.insert("hub".into(), json!("h1"));
+    rt.db()
+        .execute(
+            "INSERT INTO invoice_invoiceseries (id, hub_id, code, name, invoice_type, year, \
+             current_number, prefix, is_active, is_default, is_deleted, created_by, created_at) \
+             VALUES ('s1', :hub, 'FACT', 'Facturas', 'F1', 2026, 42, 'FACT-', 1, 1, 0, 'u1', \
+             '2026-07-13T00:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("sembrar serie de invoice");
+    rt.db()
+        .execute(
+            "INSERT INTO invoice_number_allocation (id, hub_id, series_id, code, year, sequence, \
+             document_number, invoice_id, allocated_at, is_deleted, created_by, created_at) \
+             VALUES ('a1', :hub, 's1', 'FACT', 2026, 43, 'FACT-2026-000043', NULL, \
+             '2026-07-13T00:00:00Z', 0, 'u1', '2026-07-13T00:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("sembrar número entregado de invoice");
+
+    let seleccion = |purpose: BundlePurpose| ExportSelection {
+        users: false,
+        settings: false,
+        settings_items: None,
+        fiscal: false,
+        media: false,
+        modules: vec![ModuleDataSelection { module_id: "invoice".into(), with_data: true, tables: None }],
+        purpose,
+    };
+
+    let plantilla = export_hub(&rt, "h1", &seleccion(BundlePurpose::Template), "t", "es", CREATED_AT)
+        .await
+        .expect("export plantilla");
+    let sql_plantilla = String::from_utf8(plantilla.files["data/invoice.sql"].clone()).unwrap();
+    assert!(
+        !sql_plantilla.contains("INSERT INTO invoice_invoiceseries"),
+        "una plantilla NO puede crear la serie de facturación de `invoice` del negocio que la importa:\n{sql_plantilla}"
+    );
+    assert!(
+        !sql_plantilla.contains("INSERT INTO invoice_number_allocation"),
+        "el libro de números entregados de `invoice` (RD 1007/2023) es de UNA instalación:\n{sql_plantilla}"
+    );
+
+    let backup = export_hub(&rt, "h1", &seleccion(BundlePurpose::Backup), "t", "es", CREATED_AT)
+        .await
+        .expect("export backup");
+    let sql_backup = String::from_utf8(backup.files["data/invoice.sql"].clone()).unwrap();
+    assert!(
+        sql_backup.contains("INSERT INTO invoice_invoiceseries"),
+        "un BACKUP sí se lleva la numeración de invoice: es la de su dueño volviendo a su sitio:\n{sql_backup}"
+    );
+    assert!(
+        sql_backup.contains("INSERT INTO invoice_number_allocation"),
+        "un BACKUP sí se lleva el libro de números entregados de invoice:\n{sql_backup}"
+    );
+}
+
 // ── Casillas por TABLA: quien monta la plantilla elige qué entra ──────────────────────────────
 
 /// 🔴 [hub#534] El formulario de export puede acotar **tabla a tabla**, no solo módulo a módulo.
