@@ -29,7 +29,7 @@ vi.mock('ionicons', () => ({ addIcons: () => {} }));
 vi.mock('../i18n', () => ({ getLocale: () => 'en' }));
 vi.mock('./entitlement', () => ({ isModuleEntitled: () => true }));
 
-import { loadInstalledManifests, loadMenu } from './module-loader';
+import { invalidateManifestCache, loadInstalledManifests, loadMenu } from './module-loader';
 
 /** Un item de `/api/navigation`. `version` ausente = un runtime anterior a hub#935. */
 function navItem(moduleId: string, version?: string) {
@@ -74,6 +74,9 @@ const manifestAt = (version: string) => ({
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  // La caché de manifests es estado de SESIÓN (hub#1099): sin vaciarla, un caso heredaría el
+  // `module.json` que leyó el anterior y estaría midiendo otra cosa.
+  invalidateManifestCache();
 });
 
 describe('the bundle the browser imports is addressed BY VERSION', () => {
