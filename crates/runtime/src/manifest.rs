@@ -1015,6 +1015,31 @@ pub struct ExpectRows {
     /// Optional human fallback. When omitted, the runtime generates one without internal data.
     #[serde(default)]
     pub message: Option<String>,
+    /// **Ancla la guarda a UNA sentencia** del command (hub#1091): la ruta del fichero SQL, tal
+    /// cual aparece en `commands.<name>.sql`. Ausente = el comportamiento de siempre: la suma
+    /// del lote entero.
+    ///
+    /// # Por qué existe
+    ///
+    /// La suma del lote es la semántica DOCUMENTADA de `expect_rows`/`min_affected_rows`, pero un
+    /// command con una sentencia incondicional al lado de la que lleva la guarda queda
+    /// NEUTRALIZADO sin señal alguna: en `online_booking.bookings.create` (online_booking#25)
+    /// el INSERT de la reserva no casa (fuera de ventana), el UPSERT del contador afecta 1, el
+    /// `min: 1` se cumple con la fila que NO era la vigilada — `200 ok`, reserva sin guardar y
+    /// evento de una reserva inexistente. Mismo patrón en `appointments.*` (historia) y
+    /// `tables.tables.hold` (upsert idempotente).
+    ///
+    /// No se cambia el DEFAULT a propósito: hay commands legítimos de varias sentencias cuya
+    /// suma ES el contrato (`customers.consent.grant` exige 3 filas de 3 sentencias que afectan
+    /// 1 cada una) y otros con pasos que legítimamente afectan 0 (`customers.anonymize`:
+    /// «sin notas que borrar» no es un fallo). Sólo el módulo sabe cuál sentencia porta la
+    /// guarda — y esta campo es cómo lo declara.
+    ///
+    /// El installer rechaza una ruta que no esté en la lista `sql` del command (un ancla que no
+    /// apunta a nada se leería como protegido y no lo estaría, que es justo el fallo que
+    /// hub#1091 cierra).
+    #[serde(default)]
+    pub statement: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]

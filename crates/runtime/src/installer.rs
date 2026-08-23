@@ -613,6 +613,19 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                     manifest.id
                 )));
             }
+            // hub#1091: the per-statement anchor must name one of the command's own SQL files.
+            // An anchor that resolves to nothing would read as "protected" while running with
+            // the batch-sum default — a guard its author believes armed and is not, which is
+            // the exact failure mode this field exists to close.
+            if let Some(anchor) = &expect.statement {
+                if !command.sql.iter().any(|sql| sql == anchor) {
+                    return Err(RuntimeError::Other(format!(
+                        "manifest `{}`: command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
+                         which is not one of its `sql` entries {:?}",
+                        manifest.id, command.sql
+                    )));
+                }
+            }
         }
     }
     Ok(())
