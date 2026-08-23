@@ -2874,6 +2874,24 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         "has_certificate".into(),
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
     );
+    // LA ZONA HORARIA DEL NEGOCIO (hub#731, hub#1022), como nombre IANA ya RESUELTO
+    // (`settings::timezone_of`: la declarada o la deducida del país/región). Disponible como
+    // `:timezone` en TODO el SQL de queries y comandos — «mañana a las 09:00» son las 09:00 de la
+    // TIENDA. Degrada a `UTC` si el dispatcher no la llegó a resolver (mismo fallback que el boot
+    // del server), nunca a una cadena vacía que nadie podría interpretar.
+    p.insert(
+        "timezone".into(),
+        Json::String(ctx.timezone_name().to_string()),
+    );
+    // EL IDIOMA EFECTIVO DE QUIEN LLAMA (hub#1098), con la precedencia del shell
+    // (`bootHubLanguage`): override personal (`hub_user_pref.language`) → setting del hub
+    // (`hub_settings.language`) → default del core (`es`). Hasta aquí cada módulo que proyectaba
+    // texto traducido reimplementaba esto en SQL leyendo tablas del CORE (taxes#38) — y adivinaba
+    // el default, mal (taxes#40). Degrada a `es`, el default del core, nunca a vacío.
+    p.insert(
+        "caller_lang".into(),
+        Json::String(ctx.caller_lang().to_string()),
+    );
     // Who APPROVED this command, when it only ran because a manager stepped up (hub#361). Empty
     // for everything else, which is almost everything. It sits next to `:current_user_id` on
     // purpose: together they are the double attribution rule 3 asks for — `created_by` is the
@@ -2886,6 +2904,51 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         Json::String(ctx.approved_by.clone().unwrap_or_default()),
     );
     p
+}
+
+/// El idioma EFECTIVO de quien llama (hub#1098), con la MISMA precedencia que el shell
+/// (`apps/web/src/i18n → bootHubLanguage`) y que taxes#38 reimplementaba a mano en el SQL de cada
+/// módulo:
+///
+/// 1. el override personal (`hub_user_pref.language`, si no está vacío);
+/// 2. el setting del hub (`hub_settings.language`, cuyo default `es` YA aplica la capa de
+///    settings — `settings::get_all` lo mezcla);
+/// 3. `es`, el default del CORE (taxes#40: no `en`; ADR-0055 sigue mandando para la fuente y el
+///    fallback de una TRADUCCIÓN faltante, que es cosa del módulo, no de esta función).
+///
+/// Tolerante a propósito: sin fila de preferencia, sin tabla o sin settings legibles no hay error
+/// que el caller pueda arreglar — es el caso normal (casi nadie elige idioma) y se degrada al
+/// setting/default. `settings` es el mapa de [`settings::get_all`], que el dispatcher YA leyó para
+/// la identidad de negocio: no se vuelve a pagar ese viaje.
+pub(crate) async fn effective_caller_lang(
+    db: &dyn DatabaseAdapter,
+    settings: &Json,
+    hub_id: &str,
+    user_id: &str,
+) -> String {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("user_id".into(), json!(user_id));
+    if let Ok(rows) = db
+        .query(
+            "SELECT TRIM(language) AS language FROM hub_user_pref \
+             WHERE hub_id = :hub_id AND user_id = :user_id",
+            &p,
+        )
+        .await
+    {
+        if let Some(lang) = rows.rows.first().and_then(|r| r["language"].as_str()) {
+            if !lang.is_empty() {
+                return lang.to_string();
+            }
+        }
+    }
+    settings
+        .get("language")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("es")
+        .to_string()
 }
 
 #[cfg(test)]
@@ -2915,6 +2978,23 @@ mod tests {
             wasm: None,
             schema: None,
         }
+    }
+
+    /// hub#1022/hub#1098: `:timezone`/`:caller_lang` llegan SIEMPRE con un valor bindeable — el
+    /// resuelto por el dispatcher si pasó por ahí, y si no, los fallbacks DOCUMENTADOS (`UTC`, el
+    /// reloj que correrá de todos modos; `es`, el default del core que taxes#40 fijó como tal).
+    /// Una cadena vacía sería «no lo sé», y un bind vacío en SQL es un bug a las 3 de la mañana.
+    #[test]
+    fn system_params_timezone_and_caller_lang_never_arrive_empty() {
+        let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["timezone"], json!("UTC"));
+        assert_eq!(p["caller_lang"], json!("es"));
+
+        let ctx = ctx.with_timezone("Atlantic/Canary").with_caller_lang("en");
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["timezone"], json!("Atlantic/Canary"));
+        assert_eq!(p["caller_lang"], json!("en"));
     }
 
     /// hub#131/#145: [`Runtime::execute_command`] (la puerta PÚBLICA del embedder, la única que

@@ -1649,6 +1649,16 @@ export class ErploraClient {
       /** Los DECIMALES de la moneda del hub (ADR-0123 §7): EUR 2, JPY 0, KWD 3. Lo inyecta el shell
        *  desde `/api/hub/context` (`currency_decimals`). Sin esto, se resuelven del código ISO. */
       currencyDecimals?: () => number;
+      /**
+       * La zona horaria IANA del NEGOCIO, ya RESUELTA (hub#731, hub#1022): la declarada en settings
+       * o la deducida del país del hub. La inyecta el shell desde `/api/hub/context` (misma fuente
+       * que `currency`). Si no se inyecta, lee la que el shell publica en
+       * `globalThis.__erploraTimezone` (mirror de `__erploraCurrency`) y, en último término,
+       * degrada a `'UTC'`. La leen los módulos que agendan — «mañana a las 09:00» son las 09:00 de
+       * la TIENDA: igual que el runtime entrega `context.timezone` a los handlers, el shell entrega
+       * esto al Web Component. Inyectable para tests.
+       */
+      timezone?: () => string;
     } = {},
     bridge?: BridgeTransport,
   ) {
@@ -1903,6 +1913,27 @@ export class ErploraClient {
       /* noop — degradación elegante */
     }
     return 'EUR';
+  }
+
+  /**
+   * La zona horaria IANA del NEGOCIO, ya resuelta (hub#731, hub#1022): `Europe/Madrid`,
+   * `Atlantic/Canary`… La inyecta el shell vía `opts.timezone` (fuente: `/api/hub/context`, que el
+   * runtime resuelve con `settings::timezone_of`); sin inyección, la que el shell publicó en
+   * `globalThis.__erploraTimezone`; en último término, `'UTC'`. Un módulo que agenda NUNCA
+   * hardcodea el huso ni lo deduce del navegador: el negocio está donde está, aunque el cliente
+   * viaje. NO se normaliza a mayúsculas (`currency` sí): los nombres IANA son case-sensitive ante
+   * la tzdb y `EUROPE/MADRID` no existe.
+   */
+  get timezone(): string {
+    try {
+      const injected = this.opts.timezone?.();
+      if (injected && injected.trim()) return injected.trim();
+      const published = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+      if (typeof published === 'string' && published.trim()) return published.trim();
+    } catch {
+      /* noop — degradación elegante */
+    }
+    return 'UTC';
   }
 
   /** `Intl.NumberFormat` de moneda con la moneda del hub (o `opts.currency`) y el locale activo. */

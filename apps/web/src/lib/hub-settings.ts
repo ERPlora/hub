@@ -71,6 +71,38 @@ export interface HubSettings {
  */
 export const hubSettings = ref<HubSettings | null>(null);
 
+/**
+ * La zona horaria IANA del NEGOCIO, ya RESUELTA (hub#731, hub#1022) — NO la clave cruda de
+ * `HubSettings.timezone` (que es `null` mientras se deduce del país y tiene que poder volver por
+ * un `PUT`): esta es la que el runtime entrega en `/api/hub/context` (`timezone_name()`), siempre
+ * un nombre válido. La siembra `bootHubContext` vía `publishHubTimezone`; se refresca en el
+ * siguiente boot (cambiar país/zona en Ajustes no la re-resuelve en caliente — igual que la
+ * deducción, es una decisión de dueño que vive con la sesión).
+ *
+ * Es el espejo de `lib/money.ts → hubCurrency()`: una fuente, publicada como dato global para que
+ * el `@erplora/module-sdk` (`erplora.timezone`) y el shell lean el MISMO reloj que el runtime le
+ * entrega a los handlers como `context.timezone` / `:timezone`.
+ */
+export function hubTimezone(): string {
+  const published = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  return typeof published === 'string' && published.trim() ? published.trim() : 'UTC';
+}
+
+/**
+ * Publica la zona horaria RESUELTA del negocio en `globalThis.__erploraTimezone` (hub#1022), de
+ * donde la leen `hubTimezone()` y el SDK de los módulos. Mirror de `publishHubCurrency`: la zona
+ * del negocio es global (no hay override por usuario). Recibe el valor RESUELTO — si un caller le
+ * pasa el setting crudo `null`, degrada a `UTC` en vez de publicar «no lo sé».
+ */
+export function publishHubTimezone(timezone: string | null | undefined): void {
+  try {
+    (globalThis as { __erploraTimezone?: string }).__erploraTimezone =
+      typeof timezone === 'string' && timezone.trim() ? timezone.trim() : 'UTC';
+  } catch {
+    /* noop — degradación elegante */
+  }
+}
+
 /** Aplica una respuesta del runtime a la cache reactiva, normalizando tipos defensivamente. */
 function setHubSettings(raw: unknown): HubSettings {
   const r = (raw ?? {}) as Partial<HubSettings>;

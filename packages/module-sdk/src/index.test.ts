@@ -518,6 +518,36 @@ test('currency lee globalThis.__erploraCurrency cuando no hay getter (fallback d
   }
 });
 
+// ── ErploraClient: zona horaria del negocio (hub#731, hub#1022) ─────────────
+
+test('timezone usa el getter inyectado por el shell (SIN normalizar: IANA es case-sensitive)', () => {
+  const c = new ErploraClient({} as never, { timezone: () => 'Atlantic/Canary' });
+  assert.equal(c.timezone, 'Atlantic/Canary');
+});
+
+test('timezone degrada a UTC sin getter ni publicación global', () => {
+  const prev = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  delete (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.timezone, 'UTC');
+  } finally {
+    if (prev !== undefined) (globalThis as { __erploraTimezone?: string }).__erploraTimezone = prev;
+  }
+});
+
+test('timezone lee globalThis.__erploraTimezone cuando no hay getter (fallback del shell)', () => {
+  const prev = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  (globalThis as { __erploraTimezone?: string }).__erploraTimezone = 'Europe/Lisbon';
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.timezone, 'Europe/Lisbon');
+  } finally {
+    if (prev === undefined) delete (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+    else (globalThis as { __erploraTimezone?: string }).__erploraTimezone = prev;
+  }
+});
+
 test('formatMoney convierte céntimos→unidades con la moneda del hub', () => {
   // Locale fijo para que el separador/símbolo sea determinista entre entornos.
   const c = new ErploraClient({} as never, { currency: () => 'USD' });
