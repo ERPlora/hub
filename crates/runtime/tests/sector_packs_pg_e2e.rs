@@ -9,10 +9,11 @@
 //! No paniquea al primer fallo: acumula TODOS los reds (módulo + fase + error) y falla al final
 //! con el informe completo, para arreglar/mergear el lote de una pasada.
 //!
-//! Requiere un Postgres real (ignorado por defecto):
+//! Requiere un Postgres real (sin `--ignored`: el guard de `run_sector` ya salta solo si faltan
+//! los fixtures de módulos; con `--ignored` estos tests se FILTRAN y corren 0):
 //! ```sh
-//! DATABASE_URL=postgres://erplora:PASS@localhost:5433/erplora_hubtest \
-//!   cargo test -p erplora-runtime --test sector_packs_pg_e2e -- --ignored --test-threads=1 --nocapture
+//! DATABASE_URL=postgres://postgres:test@localhost:5433/hub_test \
+//!   cargo test -p erplora-runtime --test sector_packs_pg_e2e -- --test-threads=1 --nocapture
 //! ```
 use std::path::PathBuf;
 
@@ -65,9 +66,37 @@ async fn install_pack(rt: &mut Runtime, failures: &mut Vec<String>) {
     }
 }
 
-/// Ejercita cada query `*.list` declarada por los módulos instalados con params vacíos
-/// (el motor de listado funciona sin filtros — es la ruta que carga la UI al abrir cada módulo).
-/// Un red aquí = tabla no creada (migración no aplicada) o SQL que Postgres rechaza.
+/// Listas de DETALLE cuyo SQL referencia un bind fuera de todo `COALESCE(:p, …)`: desde hub#1086
+/// (PR #1112) el motor de listas las EXIGE y responde `missing_required_param` si faltan — ligarlas
+/// como NULL era el bug original (`cash_register.movements.list` respondiendo una página vacía
+/// «sin movimientos» con los movimientos escritos, QA 21/08). La UI jamás abre estas listas sin
+/// su contexto (la sesión de caja, el pack, la fecha visible del calendario), así que el smoke
+/// tampoco: les pasa el bind que su SQL declara requerido.
+///
+/// PINNADO A PROPÓSITO: todo lo que NO está aquí se sigue ejerciendo con params vacíos. Si un
+/// módulo publica un bind requerido NUEVO en un `*.list` y nadie lo declara en este mapa, el test
+/// vuelve a rojo con `missing_required_param` — la lista de qué queries exigen contexto queda
+/// ESCRITA y consciente, no silenciada. Y al revés: los opcionales reales del pack (el
+/// `include_archived` de `services.services.list`, envuelto en COALESCE) corren sin params y en
+/// verde, que es la prueba sobre PG de que el escáner no da falsos requeridos con su idioma.
+const REQUIRED_LIST_BINDS: &[(&str, &[(&str, &str)])] = &[
+    // Arqueos y movimientos de UNA sesión de caja — el caso real de hub#1086.
+    ("cash_register.counts.list", &[("session_id", "session-smoke")]),
+    ("cash_register.movements.list", &[("session_id", "session-smoke")]),
+    // Líneas de servicios de UN pack.
+    ("services.package_items.list", &[("package_id", "package-smoke")]),
+    // Bloqueos a partir de la fecha visible del calendario (ISO 8601; la columna es TEXT).
+    (
+        "appointments.blocked_times.list",
+        &[("from_datetime", "2026-01-01T00:00:00")],
+    ),
+];
+
+/// Ejercita cada query `*.list` declarada por los módulos instalados: las de contexto con el bind
+/// que su SQL exige (ver [`REQUIRED_LIST_BINDS`]), el resto con params vacíos (el motor de listado
+/// funciona sin filtros — es la ruta que carga la UI al abrir cada módulo).
+/// Un red aquí = tabla no creada (migración no aplicada), SQL que Postgres rechaza, o un bind
+/// requerido nuevo que nadie declaró en [`REQUIRED_LIST_BINDS`].
 async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mut Vec<String>) {
     for id in POS_MODULES_ORDERED {
         let mj = module_dir(id).join("module.json");
@@ -75,7 +104,15 @@ async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mu
         let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
         let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else { continue };
         for name in queries.keys().filter(|n| n.ends_with(".list")) {
-            if let Err(e) = rt.execute_query(name, &Params::new(), ctx).await {
+            let mut params = Params::new();
+            for (query, binds) in REQUIRED_LIST_BINDS {
+                if query == name {
+                    for (k, v) in *binds {
+                        params.insert((*k).to_string(), serde_json::json!(v));
+                    }
+                }
+            }
+            if let Err(e) = rt.execute_query(name, &params, ctx).await {
                 failures.push(format!("QUERY {name}: {e}"));
             }
         }
