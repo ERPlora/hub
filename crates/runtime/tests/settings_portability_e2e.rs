@@ -30,7 +30,7 @@ use erplora_runtime::Runtime;
 use serde_json::json;
 
 /// The origin business, as a real hub has it: configuration AND fiscal identity in the same table.
-const ORIGIN_TAX_ID: &str = "B12345678";
+const ORIGIN_TAX_ID: &str = "B12345674";
 const ORIGIN_LEGAL_NAME: &str = "Bar Pepe SL";
 const ORIGIN_ADDRESS: &str = "Calle Mayor 1, Madrid";
 const ORIGIN_RECIPIENT: &str = "jefe@barpepe.es";

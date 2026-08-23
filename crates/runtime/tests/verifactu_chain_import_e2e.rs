@@ -43,7 +43,7 @@ async fn insert_chain_record(rt: &Runtime, hub: &str) {
             "INSERT INTO verifactu_record (id, hub_id, record_type, sequence_number, issuer_nif, \
              issuer_name, invoice_number, invoice_date, invoice_type, generation_timestamp, \
              status, aeat_csv, created_at) \
-             VALUES ('vr-origin-1', :hub_id, 'alta', 1, 'B12345678', 'Origin SL', 'F-0001', \
+             VALUES ('vr-origin-1', :hub_id, 'alta', 1, 'B12345674', 'Origin SL', 'F-0001', \
              '2026-08-01', 'F2', '2026-08-01T10:00:00+02:00', 'accepted', 'CSV1', \
              '2026-08-01T10:00:00Z')",
             &p,

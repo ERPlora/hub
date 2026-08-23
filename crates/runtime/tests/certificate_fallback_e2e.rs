@@ -138,7 +138,7 @@ async fn hub(hub_id: &str, slots: Slots) -> Runtime {
     std::fs::remove_dir_all(&dir).ok();
 
     let mut up = serde_json::Map::new();
-    up.insert("business_tax_id".into(), json!("B12345678"));
+    up.insert("business_tax_id".into(), json!("B12345674"));
     up.insert("business_legal_name".into(), json!("ACME SL"));
     rt.set_settings(&up, "u1").await.unwrap();
 

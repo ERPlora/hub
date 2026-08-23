@@ -217,7 +217,7 @@ async fn catalogue_offered_hours_ago(rt: &Runtime, installable: u64, hours: i64)
 async fn set_business_identity(rt: &Runtime) {
     let mut updates = serde_json::Map::new();
     updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-    updates.insert("business_tax_id".into(), json!("B12345678"));
+    updates.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&updates, "u1").await.unwrap();
 }
 
@@ -411,7 +411,7 @@ async fn the_core_items_flip_to_done_when_the_hub_is_actually_set_up() {
     // the checklist can never promise a gate that the runtime does not enforce.
     let mut updates = serde_json::Map::new();
     updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-    updates.insert("business_tax_id".into(), json!("B12345678"));
+    updates.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&updates, "u1").await.unwrap();
     assert_eq!(
         must(&status(&rt, &ctx).await, "business_identity")["state"],
@@ -453,12 +453,46 @@ async fn the_business_identity_item_needs_both_halves_like_the_fiscal_gate_does(
     );
 
     let mut with_id = serde_json::Map::new();
-    with_id.insert("business_tax_id".into(), json!("B12345678"));
+    with_id.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&with_id, "u1").await.unwrap();
     assert_eq!(
         must(&status(&rt, &ctx).await, "business_identity")["state"],
         "done"
     );
+}
+
+#[tokio::test]
+async fn a_legacy_invalid_tax_id_does_not_tick_the_business_identity_item() {
+    // hub#1088: before the door validated the format, `ZZZ999` could be stored — and the setup
+    // notice ticked «your business details» on it. The door refuses it now, so the notice
+    // cannot keep vouching for a value the runtime itself would not accept any more: the item
+    // goes back to pending, which is what sends whoever reads it to the screen that fixes it.
+    // The value is written straight into `hub_settings` on purpose: that is exactly the shape
+    // of a hub configured before the validation existed (the door would refuse the write).
+    let rt = runtime("hub-setup").await;
+    let ctx = ctx("hub-setup", ADMIN_SESSION);
+    let mut up = serde_json::Map::new();
+    up.insert("business_legal_name".into(), json!("Bar Manolo SL"));
+    rt.set_settings(&up, "u1").await.unwrap();
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("hub-setup"));
+    p.insert("value".into(), json!("ZZZ999"));
+    rt.db()
+        .execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+             VALUES (:hub_id, 'business_tax_id', :value, '2026-01-01T00:00:00Z', 'legacy')",
+            &p,
+        )
+        .await
+        .unwrap();
+
+    let doc = status(&rt, &ctx).await;
+    assert_eq!(
+        must(&doc, "business_identity")["state"],
+        "pending",
+        "a legacy `ZZZ999` is not a business identity: the notice must not tick it done"
+    );
+    assert_eq!(doc["blocking_pending"], 1, "the ⛔ is the point: it blocks");
 }
 
 // ── The union: module items are the ADR-0063 `setup` block, not a second system ───────────────

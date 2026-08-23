@@ -696,7 +696,7 @@ mod tests {
     #[test]
     fn a_compound_key_is_judged_as_a_pair_not_as_its_words() {
         let fields = shape(&[json!({
-            "tax_id": "B12345678",
+            "tax_id": "B12345674",
             "taxRate": 21,
             "card_number": "4111111111111111",
             "discount_code": "VERANO",

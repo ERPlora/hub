@@ -3221,7 +3221,7 @@ mod tests {
     /// Sets the hub's business identity in `hub_settings` (the single source, ADR-0061).
     async fn set_business_identity(db: &dyn DatabaseAdapter, hub_id: &str) {
         let mut updates = serde_json::Map::new();
-        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
         crate::settings::set_many(db, hub_id, &updates, "hub_user:1", false)
             .await
@@ -3287,7 +3287,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows.rows.len(), 1);
-        assert_eq!(rows.rows[0]["issuer_nif"], json!("B12345678"));
+        assert_eq!(rows.rows[0]["issuer_nif"], json!("B12345674"));
         assert_eq!(rows.rows[0]["issuer_name"], json!("ACME SL"));
     }
 

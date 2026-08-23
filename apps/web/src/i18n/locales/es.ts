@@ -484,6 +484,13 @@ export default {
         'El NIF ya no se puede cambiar: este negocio ya ha emitido con él.',
       hub_country_frozen:
         'El país ya no se puede cambiar: este negocio ya declara con sus normas fiscales. Escríbenos si el negocio se ha mudado de verdad.',
+      // hub#1088: una por cada motivo de rechazo del NIF — la letra/dígito de control que no
+      // cuadra se reescribe; «esto no tiene forma de NIF» es otra conversación.
+      invalid_tax_id_type: 'El NIF debe ser un texto.',
+      tax_id_too_long:
+        'El NIF es demasiado largo: el límite de la AEAT es de 20 caracteres.',
+      invalid_tax_id_format: 'Eso no tiene forma de NIF: DNI (12345678Z), NIE (X1234567L), CIF (B12345674) o identificador extranjero con prefijo de país (FR123456789).',
+      invalid_tax_id_control: 'La letra o dígito de control del NIF no es el que corresponde: revísalo y vuelve a escribirlo.',
     },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',

@@ -105,7 +105,7 @@ async fn insert_record(rt: &Runtime, hub: &str, seq: i64, num: &str, status: &st
             "INSERT INTO verifactu_record (id, hub_id, record_type, sequence_number, issuer_nif, \
              issuer_name, invoice_number, invoice_date, invoice_type, generation_timestamp, \
              status, aeat_csv, created_at) \
-             VALUES (:id, :hub_id, 'alta', :seq, 'B12345678', 'Demo SL', :num, '2026-07-31', 'F1', \
+             VALUES (:id, :hub_id, 'alta', :seq, 'B12345674', 'Demo SL', :num, '2026-07-31', 'F1', \
              '2026-07-31T10:00:00+02:00', :status, :csv, '2026-07-31T10:00:00Z')",
             &p,
         )

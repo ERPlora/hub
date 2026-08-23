@@ -87,7 +87,7 @@ async fn fiscal_chain() -> Runtime {
     // also the `IDEmisorFactura`/`ObligadoEmision` of the record. Country ES is what makes the
     // seeded rules resolve at all (ADR-0085: no country → no rule → the browser picks the VAT).
     let mut up = serde_json::Map::new();
-    up.insert("business_tax_id".into(), json!("B12345678"));
+    up.insert("business_tax_id".into(), json!("B12345674"));
     up.insert("business_legal_name".into(), json!("Bar Paco SL"));
     up.insert("country_code".into(), json!("ES"));
     rt.set_settings(&up, "u1").await.expect("set business identity");

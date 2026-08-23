@@ -120,11 +120,11 @@ const KNOWN: &[Setting] = &[
         validate: validate_theme_palette,
         parse_stored: |s| json!(s),
     },
-    // Identidad de NEGOCIO (FUENTE ÚNICA, país-agnóstica — ADR-0061): identificador fiscal universal
-    // (NIF en ES, SIREN/SIRET en FR, VAT-ID…), razón social y dirección del obligado tributario. La
-    // usan invoice (emisor) y los módulos fiscales por país (verifactu, …) + los documentos de venta.
-    // Lo específico de cada país (tipos IVA/IGIC, e-factura) NO vive aquí: va en el módulo `taxes` y en
-    // los módulos de compliance. Texto libre (vacío hasta que el dueño lo configure en /settings).
+    // Identidad de NEGOCIO (FUENTE ÚNICA — ADR-0061): identificador fiscal del obligado tributario,
+    // razón social y dirección. La usan invoice (emisor) y los módulos fiscales por país (verifactu, …)
+    // + los documentos de venta. El identificador se VALIDA en la puerta con el formato oficial
+    // español (DNI/NIE/CIF con su control) o el prefijo ISO de país para el extranjero (hub#1088) —
+    // es lo que la AEAT valida en cada registro, no un texto libre. Vacío hasta configurarlo.
     Setting {
         key: "business_tax_id",
         default: || json!(""),
@@ -439,20 +439,224 @@ fn validate_text(v: &Value) -> std::result::Result<String, String> {
     Ok(t.to_string())
 }
 
-/// Identificador fiscal del negocio (universal): texto libre normalizado a MAYÚSCULAS sin espacios
-/// (puede estar vacío). Vale para NIF/CIF (ES), SIREN/SIRET (FR), VAT-ID… La validación estricta del
-/// formato la hace cada módulo fiscal de país al transmitir; aquí solo normalizamos.
+/// Identificador fiscal del negocio: el obligado tributario que la AEAT valida en CADA registro
+/// y que se estampa como emisor en todas las facturas (hub#1088).
+///
+/// **Se valida en la puerta, formato oficial, no existencia**: DNI (8 dígitos + letra de la tabla
+/// del Ministerio del Interior), NIE (X/Y/Z + 7 dígitos + letra, con X→0/Y→1/Z→2 y la misma
+/// tabla), CIF (letra de organización + 7 dígitos + control según las reglas oficiales de la
+/// AEAT — A/B/E/H dígito, P/Q/R/S/N/W letra, resto ambos, y los cuerpos antiguos `<100000` con
+/// letra) — o un identificador **extranjero con prefijo ISO de país**, la forma en que el XSD de
+/// VeriFactu transporta al extranjero (`IDOtro{CodigoPais, IDType, ID≤20}`,
+/// `SuministroInformacion.xsd`): el país viaja CON el identificador, y aquí ese país es el
+/// prefijo (`FR123456789`). «ES» no vale de prefijo: el propio XSD prohíbe `CodigoPais=ES` para
+/// el identificador «de otro tipo» — un obligado español ES su NIF.
+///
+/// La grafía con puntos y guiones (`B-12.345.674`) es el MISMO contribuyente que `B12345674`, y
+/// se normaliza, no se rechaza. Vacío sigue siendo válido: el campo nace vacío y la completitud
+/// es pregunta del gate fiscal (hub#328), no del formato.
+///
+/// Cada tipo de fallo tiene su **código estable propio** (la UI traduce por código, es/en, igual
+/// que `business_tax_id_frozen`): no es lo mismo decirle a alguien que la LETRA no es la que
+/// toca —se reescribe— que lo que tecleó no tiene ninguna forma oficial.
+///
+/// ⚠️ La `Err` de este validador NO es prosa: es el CÓDIGO estable, y `set_many` la convierte en
+/// [`RuntimeError::InvalidTaxId`] — único validador del registro que habla en códigos.
 fn validate_tax_id(v: &Value) -> std::result::Result<String, String> {
-    let s = v.as_str().ok_or("debe ser un string")?;
-    let up = s
-        .trim()
-        .to_ascii_uppercase()
-        .replace(char::is_whitespace, "");
-    if up.chars().count() > 20 {
-        return Err("identificador fiscal demasiado largo".into());
+    let s = v.as_str().ok_or(INVALID_TAX_ID_TYPE.to_string())?;
+    // Canonical spelling: dots, dashes and spaces are typography, not identity.
+    let up: String = s
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if up.is_empty() {
+        return Ok(up);
     }
-    Ok(up)
+    if up.chars().count() > 20 {
+        return Err(TAX_ID_TOO_LONG.to_string());
+    }
+    match check_spanish_tax_id(&up) {
+        // Spanish shape: the control character decides.
+        Some(true) => Ok(up),
+        Some(false) => Err(INVALID_TAX_ID_CONTROL.to_string()),
+        // Not Spanish: the documented foreign form (ISO country prefix) or nothing.
+        None if is_foreign_prefixed_tax_id(&up) => Ok(up),
+        None => Err(INVALID_TAX_ID_FORMAT.to_string()),
+    }
 }
+
+/// Is a STORED tax id one the door would have accepted? (hub#1088.) The setup notice reads this
+/// so a value that predates the validation — legacy garbage like `ZZZ999` — cannot tick
+/// "your business details" the way it ticked the runtime's own gate.
+pub(crate) fn is_valid_tax_id(stored: &str) -> bool {
+    validate_tax_id(&Value::String(stored.to_string())).is_ok()
+}
+
+/// Stable codes of [`validate_tax_id`] (hub#1088). ABI público: la UI programa contra ellos.
+pub const INVALID_TAX_ID_TYPE: &str = "invalid_tax_id_type";
+/// The AEAT's own identifier ceiling: `IDOtro/ID` is `TextMax20Type` in the XSD.
+pub const TAX_ID_TOO_LONG: &str = "tax_id_too_long";
+/// Not shaped like any official identifier (Spanish NIF or foreign-prefixed).
+pub const INVALID_TAX_ID_FORMAT: &str = "invalid_tax_id_format";
+/// Right shape, wrong control: the letter/digit does not check out against the official algorithm.
+pub const INVALID_TAX_ID_CONTROL: &str = "invalid_tax_id_control";
+
+/// The four codes, for `set_many`'s Err→[`RuntimeError::InvalidTaxId`] routing.
+const TAX_ID_CODES: [&str; 4] =
+    [INVALID_TAX_ID_TYPE, TAX_ID_TOO_LONG, INVALID_TAX_ID_FORMAT, INVALID_TAX_ID_CONTROL];
+
+/// The English fallback the runtime attaches to each code — for the log; what the person reads is
+/// the UI's translation keyed by the code (es/en).
+fn tax_id_fallback_message(code: &str) -> &'static str {
+    match code {
+        INVALID_TAX_ID_TYPE => "the tax id must be a string",
+        TAX_ID_TOO_LONG => "tax id too long: the AEAT's own identifier ceiling is 20 characters",
+        INVALID_TAX_ID_CONTROL => {
+            "the control letter/digit does not check out against the official algorithm"
+        }
+        _ => "not shaped like a Spanish NIF (DNI 8 digits + letter, NIE X/Y/Z + 7 digits + \
+              letter, CIF organization letter + 7 digits + control) or a foreign identifier \
+              with its ISO country prefix (e.g. FR123456789)",
+    }
+}
+
+/// The official DNI/NIE control-letter table (Ministerio del Interior): letter = table[number
+/// mod 23], where a NIE's leading X/Y/Z counts as 0/1/2 in front of its 7 digits. This IS the
+/// table — 23 letters in this exact order — and not the 21-letter typo that circulates.
+const DNI_CONTROL_LETTERS: &[u8; 23] = b"TRWAGMYFPDXBNJZSQVHLCKE";
+
+/// The CIF control-letter table: control digit `d` maps to `JABCDEFGHI[d]`.
+const CIF_CONTROL_LETTERS: &[u8; 10] = b"JABCDEFGHI";
+
+/// Organization letters the AEAT assigns (Orden EHA/451/2008): A/B (sociedades), C/D
+/// (cooperativas/sociedades comandatarias), E (comunidades de bienes), F (sociedades civiles),
+/// G/H (asociaciones/acomunidades de propietarios), J (sociedades civiles con forma
+/// mercantil…), N (entidades extranjeras), P/Q/R (organismos públicos), S (organismos de la
+/// Administración), U (consorcios), V/W (entidades demás tipos / residentes no habituados).
+/// K/L/M (menores, españoles residentes en el extranjero y extranjeros — formatos NIF
+/// personales antiguos) quedan fuera: son NIF de personas, no CIF de organización.
+const CIF_ORGANIZATION_LETTERS: &[u8] = b"ABCDEFGHJNPQRSUVW";
+
+/// Organization letters whose CIF control is a DIGIT: sociedades (A/B/E/H).
+const CIF_DIGIT_CONTROL: &[u8] = b"ABEH";
+
+/// Organization letters whose CIF control is a LETTER: organismos públicos y entidades
+/// extranjeras (P/Q/R/S/N/W).
+const CIF_LETTER_CONTROL: &[u8] = b"PQRSNW";
+
+/// Is `id` — already normalized, non-empty, ≤20 — a Spanish NIF (DNI/NIE/CIF)?
+/// `Some(ok)` answers the CONTROL character when the shape is Spanish, `None` says «not a Spanish
+/// shape at all». The distinction is the two different errors of hub#1088: a mistyped control
+/// letter is retyped, a non-shape is a different conversation. Format only: nothing here asks
+/// anyone's census.
+fn check_spanish_tax_id(id: &str) -> Option<bool> {
+    let b = id.as_bytes();
+    if b.len() != 9 || !b[8].is_ascii_alphanumeric() {
+        return None;
+    }
+    // DNI (8 digits + letter) and NIE (X/Y/Z + 7 digits + letter): one control-letter algorithm.
+    let personal: Option<u64> = if b[0].is_ascii_digit() && b[1..8].iter().all(u8::is_ascii_digit)
+    {
+        id[..8].parse().ok()
+    } else if matches!(b[0], b'X' | b'Y' | b'Z')
+        && b[1..8].iter().all(u8::is_ascii_digit)
+    {
+        let prefix = match b[0] {
+            b'X' => 0,
+            b'Y' => 1,
+            _ => 2,
+        };
+        id[1..8].parse::<u64>().ok().map(|n| prefix * 10_000_000 + n)
+    } else {
+        None
+    };
+    if let Some(number) = personal {
+        let expected = DNI_CONTROL_LETTERS[(number % 23) as usize];
+        return Some(b[8].to_ascii_uppercase() == expected);
+    }
+    // CIF: organization letter + 7 digits + control, computed over the 7 digits — odd positions
+    // of the official counting doubled with their digits summed, even ones as they are, control
+    // = (10 − units) mod 10.
+    if !CIF_ORGANIZATION_LETTERS.contains(&b[0]) || !b[1..8].iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    let mut sum: u32 = 0;
+    for (i, byte) in b[1..8].iter().enumerate() {
+        let digit = (byte - b'0') as u32;
+        if i % 2 == 0 {
+            // Odd position of the official counting (1st, 3rd, 5th, 7th): double, sum digits.
+            sum += (digit * 2) / 10 + (digit * 2) % 10;
+        } else {
+            sum += digit;
+        }
+    }
+    let control = ((10 - (sum % 10)) % 10) as usize;
+    let body: u64 = id[1..8].parse().unwrap_or(u64::MAX);
+    // The control TYPE is part of the official shape: societies (A/B/E/H) carry a digit, public
+    // bodies and foreign entities (P/Q/R/S/N/W) a letter. The old «no residente» bodies (<100000)
+    // carried a letter too — except in societies, where the AEAT's own snippet keeps the digit:
+    // the exception lifts the «either» of the undefined letters, it does not override A/B/E/H.
+    let wants_digit = CIF_DIGIT_CONTROL.contains(&b[0]);
+    let wants_letter = CIF_LETTER_CONTROL.contains(&b[0]) || (!wants_digit && body < 100_000);
+    let given = b[8].to_ascii_uppercase();
+    let letter_ok = given.is_ascii_alphabetic() && given == CIF_CONTROL_LETTERS[control];
+    let digit_ok = given.is_ascii_digit() && given == b'0' + control as u8;
+    Some(match (wants_letter, wants_digit) {
+        (true, _) => letter_ok,
+        (_, true) => digit_ok,
+        // «Indefinido» (C/D/F/G/J/U/V): the AEAT admits number OR letter.
+        (false, false) => letter_ok || digit_ok,
+    })
+}
+
+/// Does `id` carry a foreign identifier with its ISO country prefix — the IDOtro shape
+/// (`CodigoPais` + `ID ≤ 20`) as this field stores it? The prefix must be a country the AEAT's
+/// own XSD enumerates (so «ZZ», the ISO's user-assigned no-country, opens no door), and `ES` is
+/// not one: the XSD itself forbids `CodigoPais=ES` for a non-NIF identifier.
+fn is_foreign_prefixed_tax_id(id: &str) -> bool {
+    let b = id.as_bytes();
+    if b.len() < 3 || !b[0].is_ascii_alphabetic() || !b[1].is_ascii_alphabetic() {
+        return false;
+    }
+    let prefix = &id[..2];
+    AEAT_COUNTRY_CODES
+        .binary_search(&prefix)
+        .is_ok()
+        && b[2..].iter().all(u8::is_ascii_alphanumeric)
+}
+
+/// The countries the AEAT's VeriFactu XSD accepts as `IDOtro/CodigoPais` (`CountryType2`,
+/// `SuministroInformacion.xsd`) minus `ES` — mirrored here so a foreign form this field accepts
+/// is exactly a foreign form the AEAT would carry, and no more. Sorted for `binary_search`.
+#[rustfmt::skip]
+const AEAT_COUNTRY_CODES: &[&str] = &[
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR",
+    "AS", "AT", "AU", "AW", "AZ", "BA", "BB", "BD", "BE", "BF",
+    "BG", "BH", "BI", "BJ", "BM", "BN", "BO", "BQ", "BR", "BS",
+    "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD", "CF", "CG",
+    "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV",
+    "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ",
+    "EC", "EE", "EG", "ER", "ET", "FI", "FJ", "FK", "FM", "FO",
+    "FR", "GA", "GB", "GD", "GE", "GG", "GH", "GI", "GL", "GM",
+    "GN", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM",
+    "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM", "IN", "IO",
+    "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG",
+    "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA",
+    "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY",
+    "MA", "MC", "MD", "ME", "MG", "MH", "MK", "ML", "MM", "MN",
+    "MO", "MP", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY",
+    "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP",
+    "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK",
+    "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY", "QA", "QU",
+    "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE",
+    "SG", "SH", "SI", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
+    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH",
+    "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW",
+    "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE",
+    "VG", "VI", "VN", "VU", "WF", "WS", "XB", "XG", "XN", "XU",
+    "YE", "YT", "ZA", "ZM", "ZW",
+];
 
 /// Paletas de tema válidas (espejo 1:1 de `@erplora/outfitkit/palettes.css` + el default).
 const THEME_PALETTES: &[&str] = &[
@@ -727,8 +931,8 @@ async fn stored_value(db: &dyn DatabaseAdapter, hub_id: &str, key: &str) -> Resu
 /// - **Reenviar el MISMO valor no es un cambio.** Ajustes → Negocio manda NIF + razón social +
 ///   dirección en un único `PUT` (`saveTaxSettings`), así que rechazar el no-op congelaría el
 ///   formulario entero: un hub que ya emitió no podría volver a corregir su dirección.
-/// - **Se compara con el valor ya normalizado**, no con el string crudo: `" b12345678 "` es el
-///   mismo obligado tributario que `B12345678`, y tratarlo como un cambio sería un 409 incomprensible.
+/// - **Se compara con el valor ya normalizado**, no con el string crudo: `" b12345674 "` es el
+///   mismo obligado tributario que `B12345674`, y tratarlo como un cambio sería un 409 incomprensible.
 ///
 /// `_hub_fiscal_profile.taxpayer_id` es la copia **congelada** con la que la cadena está anclada;
 /// esta guarda impide que las dos se separen más. Reconciliar una divergencia ya existente no se
@@ -979,10 +1183,21 @@ pub async fn set_many(
         match (setting.validate)(value) {
             Ok(persist) => normalized.push((setting.key, persist)),
             Err(detail) => {
+                // hub#1088: the tax id's validator speaks in CODES (its four stable refusals),
+                // not prose — the refusal travels as `InvalidTaxId` so the screen can say WHICH
+                // half is wrong and translate it (es/en) by code, like `business_tax_id_frozen`.
+                if setting.key == "business_tax_id" {
+                    if let Some(code) = TAX_ID_CODES.iter().find(|c| **c == detail) {
+                        return Err(RuntimeError::InvalidTaxId {
+                            code,
+                            message: tax_id_fallback_message(code).to_string(),
+                        });
+                    }
+                }
                 return Err(RuntimeError::InvalidPayload {
                     name: format!("settings.{key}"),
                     detail,
-                })
+                });
             }
         }
     }
@@ -1102,6 +1317,132 @@ mod tests {
         assert_eq!(validate_bool(&json!(false)).unwrap(), "false");
         assert!(validate_bool(&json!("true")).is_err());
         assert!(validate_bool(&json!(1)).is_err());
+    }
+
+    // ── NIF del obligado tributario validado EN LA PUERTA (hub#1088) ────────────────────
+    //
+    // El NIF no es un campo de texto más: es lo que la AEAT valida en cada registro y lo que
+    // acaba estampado como emisor en todas las facturas. Hasta aquí `validate_tax_id` solo
+    // miraba la longitud, y «ZZZ999» se guardaba, el aviso de setup lo daba por bueno y ese
+    // texto se convertía en el obligado de todo el registro VeriFactu del hub.
+    //
+    // Vectores con control OFICIAL verificados contra las fuentes: la letra del DNI/NIE por la
+    // tabla del Ministerio del Interior (12345678 → Z, 1 → R), y el dígito/letra del CIF por el
+    // algoritmo de la AEAT (A58818501, el ejemplo trabajado de la documentación).
+
+    #[test]
+    fn tax_id_los_dni_nie_y_cif_oficiales_pasan_con_su_control() {
+        // DNI: 8 dígitos + letra de la tabla oficial.
+        assert_eq!(validate_tax_id(&json!("12345678Z")).unwrap(), "12345678Z");
+        assert_eq!(validate_tax_id(&json!("00000001R")).unwrap(), "00000001R");
+        // NIE: X/Y/Z + 7 dígitos + letra (X→0, Y→1, Z→2 y la misma tabla).
+        assert_eq!(validate_tax_id(&json!("X1234567L")).unwrap(), "X1234567L");
+        assert_eq!(validate_tax_id(&json!("Y1234567X")).unwrap(), "Y1234567X");
+        assert_eq!(validate_tax_id(&json!("Z1234567R")).unwrap(), "Z1234567R");
+        // CIF: letra de organización + 7 dígitos + control numérico (A/B/E/H)…
+        assert_eq!(validate_tax_id(&json!("A58818501")).unwrap(), "A58818501");
+        assert_eq!(validate_tax_id(&json!("B12345674")).unwrap(), "B12345674");
+        // …de LETRA (P/Q/R/S/N/W y los cuerpos antiguos <100000)…
+        assert_eq!(validate_tax_id(&json!("P1234567D")).unwrap(), "P1234567D");
+        // …o AMBOS para el resto de letras (C/D/F/G/J/U/V).
+        assert_eq!(validate_tax_id(&json!("C12345674")).unwrap(), "C12345674");
+        assert_eq!(validate_tax_id(&json!("C1234567D")).unwrap(), "C1234567D");
+        // La grafía española con puntos y guiones es el MISMO contribuyente: se normaliza,
+        // no se rechaza.
+        assert_eq!(
+            validate_tax_id(&json!(" b-12.345.674 ")).unwrap(),
+            "B12345674"
+        );
+        // Vacío sigue siendo válido: el campo nace vacío y la completitud es pregunta del gate
+        // fiscal (hub#328), no del formato.
+        assert_eq!(validate_tax_id(&json!("")).unwrap(), "");
+    }
+
+    #[test]
+    fn tax_id_cada_fallo_con_su_codigo() {
+        // Un no-string no se interpreta: es un tipo, no un formato.
+        assert_eq!(
+            validate_tax_id(&json!(12345678)).unwrap_err(),
+            "invalid_tax_id_type"
+        );
+        // El techo de 20 es el del ID ≤ 20 de IDOtro en el XSD de la AEAT.
+        assert_eq!(
+            validate_tax_id(&json!("FR123456789012345678X")).unwrap_err(),
+            "tax_id_too_long"
+        );
+        // «ZZZ999», el caso de la issue: no tiene NINGUNA forma oficial.
+        assert_eq!(
+            validate_tax_id(&json!("ZZZ999")).unwrap_err(),
+            "invalid_tax_id_format"
+        );
+        assert_eq!(
+            validate_tax_id(&json!("1234")).unwrap_err(),
+            "invalid_tax_id_format"
+        );
+        // Forma bien, control mal: la letra que NO toca del DNI…
+        assert_eq!(
+            validate_tax_id(&json!("12345678A")).unwrap_err(),
+            "invalid_tax_id_control"
+        );
+        // …el dígito que NO toca del CIF…
+        assert_eq!(
+            validate_tax_id(&json!("A58818502")).unwrap_err(),
+            "invalid_tax_id_control"
+        );
+        // …y una letra donde la organización pide dígito (y el cuerpo no es el viejo <100000).
+        assert_eq!(
+            validate_tax_id(&json!("B1234567D")).unwrap_err(),
+            "invalid_tax_id_control"
+        );
+    }
+
+    #[test]
+    fn tax_id_extranjero_con_prefijo_iso_es_forma_valida_documentada() {
+        // El XSD de VeriFactu lleva al extranjero por IDOtro{CodigoPais, IDType, ID≤20}: el país
+        // VIAJA con el identificador. Aquí ese país es el prefijo — la forma documentada de
+        // guardar un identificador que no es español en el mismo campo.
+        assert_eq!(validate_tax_id(&json!("fr123456789")).unwrap(), "FR123456789");
+        assert_eq!(validate_tax_id(&json!("GB999888777")).unwrap(), "GB999888777");
+        // «ES» no es un prefijo extranjero: el propio XSD prohíbe CodigoPais=ES con
+        // identificador «de otro tipo» — un obligado español ES su NIF, no un escape con
+        // prefijo.
+        assert_eq!(
+            validate_tax_id(&json!("ES12345674")).unwrap_err(),
+            "invalid_tax_id_format"
+        );
+        // Y un prefijo que no es país (ZZ es zona de uso privado de la ISO, no un país) no
+        // abre la puerta a cualquier texto.
+        assert_eq!(
+            validate_tax_id(&json!("ZZ123ABC")).unwrap_err(),
+            "invalid_tax_id_format"
+        );
+        assert_eq!(
+            validate_tax_id(&json!("F1234567")).unwrap_err(),
+            "invalid_tax_id_format"
+        );
+    }
+
+    /// **La issue entera en un test**: «ZZZ999» se guardaba sin una queja. Ahora la PUERTA lo
+    /// rechaza con código estable propio (la UI traduce por código, como
+    /// `business_tax_id_frozen`), y el lote es atómico: no queda nada escrito.
+    #[tokio::test]
+    async fn set_many_rechaza_zzz999_con_codigo_propio_y_no_escribe_nada() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("business_tax_id".into(), json!("ZZZ999"));
+        updates.insert("business_legal_name".into(), json!("ACME SL"));
+        let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::InvalidTaxId { code, .. } if *code == "invalid_tax_id_format"),
+            "err = {err:?}"
+        );
+        // Atómico: ni el NIF ni la razón social del lote caído quedaron escritos.
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["business_tax_id"], json!(""));
+        assert_eq!(all["business_legal_name"], json!(""));
     }
 
     #[tokio::test]
@@ -1271,7 +1612,7 @@ mod tests {
 
         for key in ["business_tax_id", "business_legal_name"] {
             let mut updates = serde_json::Map::new();
-            updates.insert(key.into(), json!("B12345678"));
+            updates.insert(key.into(), json!("B12345674"));
             let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
                 .await
                 .unwrap_err();
@@ -1298,7 +1639,7 @@ mod tests {
         ensure_table(&db).await;
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));
-        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_tax_id".into(), json!("B12345674"));
         let err = set_many(&db, "hub-1", &updates, "hub_user:1", true)
             .await
             .unwrap_err();
@@ -1344,12 +1685,12 @@ mod tests {
         // profile (v27), which is what the freeze of hub#554 reads on this very path.
         booted(&db, "hub-1").await;
         let mut updates = serde_json::Map::new();
-        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
         let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .expect("a real hub configures the tax id it invoices with");
-        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_tax_id"], json!("B12345674"));
         assert_eq!(result["business_legal_name"], json!("Bar Manolo SL"));
     }
 
@@ -1400,10 +1741,10 @@ mod tests {
     async fn a_hub_that_already_emitted_refuses_a_different_tax_id() {
         let db = fresh_db().await;
         booted(&db, "hub-1").await;
-        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
-        emitted(&db, "hub-1", "B12345678").await;
+        write_tax_id(&db, "hub-1", "B12345674").await.unwrap();
+        emitted(&db, "hub-1", "B12345674").await;
 
-        let err = write_tax_id(&db, "hub-1", "B99999999").await.unwrap_err();
+        let err = write_tax_id(&db, "hub-1", "B99999997").await.unwrap_err();
 
         assert_eq!(
             crate::error_registry::error_code_of(&err),
@@ -1413,7 +1754,7 @@ mod tests {
         let all = get_all(&db, "hub-1").await.unwrap();
         assert_eq!(
             all["business_tax_id"],
-            json!("B12345678"),
+            json!("B12345674"),
             "the anchor of the emitted chain must not have moved"
         );
     }
@@ -1428,10 +1769,10 @@ mod tests {
         crate::fiscal_profile::ensure(&db, "hub-1").await.unwrap();
 
         write_tax_id(&db, "hub-1", "B00000000").await.unwrap();
-        let result = write_tax_id(&db, "hub-1", "B12345678")
+        let result = write_tax_id(&db, "hub-1", "B12345674")
             .await
             .expect("nothing was emitted: the identity is still being set up");
-        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_tax_id"], json!("B12345674"));
     }
 
     /// 🔴 **Re-sending the same tax id is not a change.** Ajustes → Negocio posts the tax id, the
@@ -1442,19 +1783,19 @@ mod tests {
     async fn re_sending_the_same_tax_id_still_saves_the_rest_of_the_form() {
         let db = fresh_db().await;
         booted(&db, "hub-1").await;
-        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
-        emitted(&db, "hub-1", "B12345678").await;
+        write_tax_id(&db, "hub-1", "B12345674").await.unwrap();
+        emitted(&db, "hub-1", "B12345674").await;
 
         let mut updates = serde_json::Map::new();
         // The same identifier the user is looking at, as the form sends it (spaces, lower case).
-        updates.insert("business_tax_id".into(), json!(" b12345678 "));
+        updates.insert("business_tax_id".into(), json!(" b12345674 "));
         updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
         updates.insert("business_address".into(), json!("Calle Nueva 1"));
         let result = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .expect("re-posting the same identifier is not a change of taxpayer");
 
-        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_tax_id"], json!("B12345674"));
         assert_eq!(result["business_legal_name"], json!("Bar Manolo SL"));
         assert_eq!(result["business_address"], json!("Calle Nueva 1"));
     }
@@ -1466,8 +1807,8 @@ mod tests {
     async fn the_first_record_freezes_the_identifier_and_nothing_else() {
         let db = fresh_db().await;
         booted(&db, "hub-1").await;
-        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
-        emitted(&db, "hub-1", "B12345678").await;
+        write_tax_id(&db, "hub-1", "B12345674").await.unwrap();
+        emitted(&db, "hub-1", "B12345674").await;
 
         let mut updates = serde_json::Map::new();
         updates.insert("business_legal_name".into(), json!("Bar Manolo SLU"));
@@ -1488,8 +1829,8 @@ mod tests {
     async fn a_hub_can_always_write_back_the_identifier_its_chain_is_anchored_to() {
         let db = fresh_db().await;
         booted(&db, "hub-1").await;
-        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
-        emitted(&db, "hub-1", "B12345678").await;
+        write_tax_id(&db, "hub-1", "B12345674").await.unwrap();
+        emitted(&db, "hub-1", "B12345674").await;
         // The setting is gone; the anchor in the profile is not.
         let mut p = Params::new();
         p.insert("hub_id".into(), json!("hub-1"));
@@ -1500,13 +1841,13 @@ mod tests {
         .await
         .unwrap();
 
-        let result = write_tax_id(&db, "hub-1", "B12345678")
+        let result = write_tax_id(&db, "hub-1", "B12345674")
             .await
             .expect("writing back the anchor is not a change of taxpayer");
-        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_tax_id"], json!("B12345674"));
 
         // …and a THIRD identifier is still refused: the way back is to the anchor, not anywhere.
-        let err = write_tax_id(&db, "hub-1", "B99999999").await.unwrap_err();
+        let err = write_tax_id(&db, "hub-1", "B99999997").await.unwrap_err();
         assert_eq!(
             crate::error_registry::error_code_of(&err),
             "business_tax_id_frozen",
@@ -1524,10 +1865,10 @@ mod tests {
         let db = fresh_db().await;
         ensure_table(&db).await; // solo `hub_settings`, como antes de las migraciones de sistema
 
-        let result = write_tax_id(&db, "hub-1", "B12345678")
+        let result = write_tax_id(&db, "hub-1", "B12345674")
             .await
             .expect("the freeze must not become a new requirement to write settings");
-        assert_eq!(result["business_tax_id"], json!("B12345678"));
+        assert_eq!(result["business_tax_id"], json!("B12345674"));
     }
 
     /// 🔴 The refusal takes the WHOLE batch, like every other rejection in this door: hiding the
@@ -1536,12 +1877,12 @@ mod tests {
     async fn a_frozen_tax_id_refuses_the_whole_batch() {
         let db = fresh_db().await;
         booted(&db, "hub-1").await;
-        write_tax_id(&db, "hub-1", "B12345678").await.unwrap();
-        emitted(&db, "hub-1", "B12345678").await;
+        write_tax_id(&db, "hub-1", "B12345674").await.unwrap();
+        emitted(&db, "hub-1", "B12345674").await;
 
         let mut updates = serde_json::Map::new();
         updates.insert("currency".into(), json!("USD"));
-        updates.insert("business_tax_id".into(), json!("B99999999"));
+        updates.insert("business_tax_id".into(), json!("B99999997"));
         let err = set_many(&db, "hub-1", &updates, "hub_user:1", false)
             .await
             .unwrap_err();
@@ -1553,7 +1894,7 @@ mod tests {
 
         let all = get_all(&db, "hub-1").await.unwrap();
         assert_eq!(all["currency"], json!("EUR"), "the batch is refused whole");
-        assert_eq!(all["business_tax_id"], json!("B12345678"));
+        assert_eq!(all["business_tax_id"], json!("B12345674"));
     }
 
     /// 🔴 Un hub REAL no puede DECLARARSE demo. Ser demo no es un setting: no hay clave que
@@ -1748,14 +2089,14 @@ mod tests {
         // …and neither does it clobber an identity that got there another way (a blueprint of the
         // hub's own, a restore). Whoever wrote it meant it more than a default does.
         db.execute_batch(
-            "UPDATE hub_settings SET value = 'B99999999' \
+            "UPDATE hub_settings SET value = 'B99999997' \
              WHERE hub_id = 'hub-1' AND key = 'business_tax_id';",
         )
         .await
         .unwrap();
         assert!(!ensure_demo_fiscal_identity(&db, "hub-1").await.unwrap());
         let all = get_all(&db, "hub-1").await.unwrap();
-        assert_eq!(all["business_tax_id"], json!("B99999999"));
+        assert_eq!(all["business_tax_id"], json!("B99999997"));
     }
 
     /// 🔴 The other direction, and the expensive one: a REAL hub is never handed an identity. A
@@ -1935,7 +2276,7 @@ mod tests {
         p.insert("hub_id".into(), json!(hub_id));
         db.execute(
             "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
-               taxpayer_id = 'B12345678', activated_at = '2026-08-01T09:00:00Z', \
+               taxpayer_id = 'B12345674', activated_at = '2026-08-01T09:00:00Z', \
                first_record_at = '2026-08-01T09:05:00Z' WHERE hub_id = :hub_id",
             &p,
         )

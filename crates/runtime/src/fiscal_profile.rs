@@ -1298,7 +1298,7 @@ mod tests {
         p.insert("hub_id".into(), json!("hub-es"));
         db.execute(
             "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
-               activated_at = '2026-08-08T10:00:00Z', taxpayer_id = 'B12345678' \
+               activated_at = '2026-08-08T10:00:00Z', taxpayer_id = 'B12345674' \
              WHERE hub_id = :hub_id",
             &p,
         )
@@ -1310,7 +1310,7 @@ mod tests {
         assert_eq!(after.country_code, "ES", "frozen at go-live");
         assert_eq!(after.fiscal_system, "verifactu");
         assert_eq!(after.status, FiscalStatus::Active);
-        assert_eq!(after.taxpayer_id, "B12345678");
+        assert_eq!(after.taxpayer_id, "B12345674");
     }
 
     /// **A hub that already emitted never falls back to "owes nothing".** Changing the country
@@ -1607,7 +1607,7 @@ mod tests {
     async fn without_a_certificate_a_hub_is_not_ready() {
         let db = fresh_db().await;
         booted_hub(&db, "hub-es", Some("ES")).await;
-        set_setting(&db, "hub-es", "business_tax_id", "B12345678").await;
+        set_setting(&db, "hub-es", "business_tax_id", "B12345674").await;
         set_setting(&db, "hub-es", "business_legal_name", "Bar Pepe SL").await;
         let reg = registry_with(&[(
             "verifactu",
@@ -1739,7 +1739,7 @@ mod tests {
     /// Deja el hub en `READY` de verdad: identidad + certificado + proveedor montado.
     async fn hub_ready_without_grant(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
         booted_hub(db, hub_id, Some("ES")).await;
-        set_setting(db, hub_id, "business_tax_id", "B12345678").await;
+        set_setting(db, hub_id, "business_tax_id", "B12345674").await;
         set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
         // Straight into the system table the gate reads (`_hub_certificate`, ADR-0081): going
         // through `set_business_certificate` would need the process-global `HUB_SECRETS_KEY`, and
@@ -1859,7 +1859,7 @@ mod tests {
         assert_eq!(after.status, FiscalStatus::Active);
         assert_eq!(after.environment, ENV_PRODUCTION);
         assert_eq!(
-            after.taxpayer_id, "B12345678",
+            after.taxpayer_id, "B12345674",
             "la copia CONGELADA con la que la cadena queda anclada"
         );
         assert!(!after.activated_at.is_empty());

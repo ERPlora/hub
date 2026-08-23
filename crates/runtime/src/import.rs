@@ -1855,7 +1855,7 @@ mod tests {
         let sql = format!(
             "{}{}{}{}",
             settings_row("country_code", "ES"),
-            settings_row("business_tax_id", "B12345678"),
+            settings_row("business_tax_id", "B12345674"),
             settings_row("language", "es"),
             settings_row("business_legal_name", "Bar Pepe SL"),
         );
@@ -1864,7 +1864,7 @@ mod tests {
         assert_eq!(dropped, 2, "two identity rows had to be dropped:\n{kept}");
         assert!(kept.contains("'country_code'") && kept.contains("'language'"), "the configuration must survive:\n{kept}");
         assert!(!kept.contains("business_tax_id"), "the tax id of another business must not be written:\n{kept}");
-        assert!(!kept.contains("B12345678"), "…nor its value:\n{kept}");
+        assert!(!kept.contains("B12345674"), "…nor its value:\n{kept}");
         assert!(!kept.contains("Bar Pepe SL"), "…nor the legal name:\n{kept}");
         // What survives is still exactly what the import will validate and run (same grammar).
         assert!(

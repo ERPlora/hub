@@ -39,7 +39,7 @@ async fn cash_method_id(rt: &Runtime, ctx: &RequestContext) -> String {
 /// (hub#328): without it, `invoice.*` commands are rejected with `FiscalPrecondition`.
 async fn set_business_identity(rt: &Runtime) {
     let mut up = serde_json::Map::new();
-    up.insert("business_tax_id".into(), json!("B12345678"));
+    up.insert("business_tax_id".into(), json!("B12345674"));
     up.insert("business_legal_name".into(), json!("Mi Empresa SL"));
     rt.set_settings(&up, "u1").await.expect("set business identity");
 }
@@ -83,7 +83,7 @@ async fn create_invoice_with_lines_and_numbering() {
     let rt = rt_invoice().await;
     let ctx = admin();
     let res = rt.execute_command("invoice.create", &params(json!({
-        "series_code": "FACT", "issuer_nif": "B12345678", "issuer_name": "Mi Empresa SL",
+        "series_code": "FACT", "issuer_nif": "B12345674", "issuer_name": "Mi Empresa SL",
         "customer_name": "ACME", "customer_tax_id": "B99",
         "items": [
             { "description": "Consultoría", "quantity": 1_000_000, "unit_price": 10000, "tax_rate": 21.0 },

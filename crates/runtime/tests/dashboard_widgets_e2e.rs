@@ -270,7 +270,7 @@ async fn verifactu_pending_kpi_counts_real_records() {
         "verifactu._insert_record",
         &params(json!({
             "record_id": "rec-1", "record_type": "alta", "sequence_number": 1, "invoice_id": null,
-            "issuer_nif": "B12345678", "issuer_name": "Bar Manolo SL",
+            "issuer_nif": "B12345674", "issuer_name": "Bar Manolo SL",
             "invoice_number": "F-0001", "invoice_date": "2026-07-17", "invoice_type": "F1",
             "description": "",
             "base_amount": 1000, "tax_rate": 21, "tax_breakdown": "", "tax_amount": 210, "total_amount": 1210,
