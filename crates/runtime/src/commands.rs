@@ -183,8 +183,11 @@ pub(crate) async fn execute_at(
         // taught the core start a fiscal chain. Both come from the core's own tables — never from
         // anything the caller sent. Degrading to `Unconfigured` with no triggers on a read error
         // keeps a failed query from inventing "nothing owed"; the gate below treats a missing mode
-        // as unresolved, never as permission.
-        let (fiscal_mode, fiscal_triggers, fiscal_providers) =
+        // as unresolved, never as permission. The environment travels with them for the same
+        // reason (ADR-0360, hub#1087): `enforce_fiscal_precondition` keys its certificate arm on
+        // WHICH AEAT this hub files to, and an unread profile must read as the conservative
+        // answer (empty → production's demand), never as permission.
+        let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) =
             match crate::fiscal_profile::ensure(db, &ctx.hub_id).await {
                 Ok(p) => (
                     crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
@@ -193,11 +196,13 @@ pub(crate) async fn execute_at(
                         .iter()
                         .map(|m| m.id.clone())
                         .collect(),
+                    p.environment.clone(),
                 ),
                 Err(_) => (
                     crate::fiscal_profile::FiscalMode::Unconfigured,
                     Vec::new(),
                     Vec::new(),
+                    String::new(),
                 ),
             };
         enriched_ctx = ctx
@@ -226,6 +231,10 @@ pub(crate) async fn execute_at(
             // default era un duplicado que podía pudrirse (taxes#40 lo demostró).
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
+            // Which AEAT this hub files to (ADR-0360, hub#1087): from the profile, next to the
+            // mode it feeds. The certificate arm of `enforce_fiscal_precondition` reads it —
+            // in `testing` there is nothing to authorize.
+            .with_fiscal_environment(fiscal_environment)
             // What this hub OWES right now (ADR-0273 D2, hub#550): resolved here, from the core's
             // own tables and the registry, next to the identity and the certificate — never from
             // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
@@ -1611,7 +1620,15 @@ fn references_param(sql: &str, param: &str) -> bool {
 /// 1. `business_legal_name` ∧ `business_tax_id` set in `hub_settings` (ADR-0061 source);
 /// 2. the business certificate loaded, while any INSTALLED module declares the
 ///    `certificate` capability (today: verifactu) — installed even if inactive: emitting
-///    without it would strand documents outside the fiscal chain.
+///    without it would strand documents outside the fiscal chain. **In `testing` this arm is
+///    lifted** (ADR-0360, hub#1087): a transmission to the tax authority's preproduction
+///    discharges no obligation and leaves no legally-valuable record — «en pruebas no hay
+///    nada que autorizar». The border is the ENVIRONMENT (the profile's own
+///    `_hub_fiscal_profile.environment`), never the kind of hub: a demo passes because the
+///    environment is pinned to `testing`, not because it is skipped. In `production` — and
+///    in an UNRESOLVED environment, read as production — the gate is exactly as before.
+///    Nothing is simulated: the filing to AEAT-testing keeps its normal flow, certificate or
+///    not.
 ///
 /// Structural and default-deny: no manifest flag a module could forget, no hardcoded
 /// module ids — the trigger is the SQL using the injected identity itself, so the runtime
@@ -1635,7 +1652,12 @@ fn enforce_fiscal_precondition<'a>(
     if ctx.business_tax_id.trim().is_empty() {
         missing.push("business_tax_id");
     }
-    if !ctx.has_certificate
+    // ADR-0360 (hub#1087): the certificate is demanded by the PRODUCTION environment only.
+    // `testing` is the profile's own word (the dispatcher stamps it from
+    // `_hub_fiscal_profile.environment`); anything else — production, or empty because the
+    // profile could not be read — keeps demanding it: fail CLOSED, the conservative answer.
+    if ctx.fiscal_environment() != crate::fiscal_profile::ENV_TESTING
+        && !ctx.has_certificate
         && registry
             .installed
             .iter()
@@ -3422,6 +3444,125 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(out["ok"], json!(true));
+    }
+
+    // ── In TESTS there is nothing to authorize (ADR-0360, hub#1087) ────────────────────────
+    //
+    // A new hub could not issue even ONE test invoice: `enforce_fiscal_precondition` demanded
+    // the certificate without looking at WHICH environment the records were going to. ADR-0360
+    // (2026-08-16) drew the border on the environment, not on the kind of hub: a transmission to
+    // preproduction discharges no obligation and leaves no record with legal value — there is no
+    // obligado to represent because there is no obligation. The certificate arm of the gate is
+    // lifted in `testing` ONLY; in `production` it stays exactly as it was. Nothing is simulated:
+    // the AEAT-testing filing keeps its own flow.
+
+    /// Registry with an installed module declaring the `certificate` capability (today:
+    /// verifactu) — the arm of the gate that refused a certificate-less hub even in TESTS.
+    fn registry_with_certificate_module() -> Registry {
+        let mut reg = Registry::new();
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0",
+                    "capabilities":{"certificate":{"purpose":"fiscal-sign"}}}"#,
+            )
+            .unwrap(),
+        );
+        reg
+    }
+
+    /// Context of a hub whose business identity IS set but which carries NO certificate, in the
+    /// named fiscal environment (the profile's own word — `_hub_fiscal_profile.environment`).
+    fn identity_ctx_without_certificate(environment: &str) -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()])
+            .with_business("B12345674", "ACME SL", "")
+            .with_certificate(false)
+            .with_fiscal_environment(environment)
+    }
+
+    /// **The red test of hub#1087.** A hub in `testing`, identity set, certificate-capable
+    /// module installed, NO certificate: the gate passes — the test invoice goes out to the
+    /// AEAT sandbox through its normal flow, certificate-less, because there is nothing to
+    /// authorize (ADR-0360).
+    #[test]
+    fn testing_environment_issues_without_certificate() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("testing");
+        enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .expect("in testing there is nothing to authorize (ADR-0360): the gate must pass");
+    }
+
+    /// The SAME hub, same everything, in `production`: the gate refuses exactly as before —
+    /// `missing = [certificate]` and nothing else. ADR-0360 lifts nothing for the real AEAT.
+    #[test]
+    fn production_environment_without_certificate_is_refused_as_before() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("production");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if *missing == vec!["certificate"]),
+            "got {err:?}"
+        );
+    }
+
+    /// An UNRESOLVED environment (empty — the profile could not be read) fails CLOSED like
+    /// production: the exemption is keyed on the profile's own word, never on a caller's
+    /// silence. Same conservative default ADR-0360 gave `select_transmission_route`.
+    #[test]
+    fn unresolved_environment_fails_closed_like_production() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if *missing == vec!["certificate"]),
+            "got {err:?}"
+        );
+    }
+
+    /// ADR-0360 lifts the CERTIFICATE, not the identity: in testing, a blank-issuer invoice is
+    /// still refused — the test record still needs an obligado to be filed under.
+    #[test]
+    fn testing_environment_still_requires_the_business_identity() {
+        let reg = registry_with_certificate_module();
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()])
+            .with_certificate(false)
+            .with_fiscal_environment("testing");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if missing.contains(&"business_tax_id")
+                    && missing.contains(&"business_legal_name")
+                    && !missing.contains(&"certificate")),
+            "got {err:?}"
+        );
     }
 
     // ── Fiscal environment pin in a DEMO hub (ADR-0197 §4 · hub#376) ───────────────────────

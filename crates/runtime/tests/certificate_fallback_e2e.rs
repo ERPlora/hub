@@ -104,11 +104,25 @@ fn fiscal_module(id: &str) -> PathBuf {
 }
 
 /// A hub with the business identity configured, the fiscal module installed, and its two
-/// certificate slots in the requested state.
+/// certificate slots in the requested state. Its fiscal profile is pinned to **production**:
+/// since ADR-0360 (hub#1087) the dispatcher gate demands the certificate in PRODUCTION only — in
+/// `testing` there is nothing to authorize — so hub#319's «one hub, one answer» is asserted on
+/// the environment where the certificate is still the question.
 async fn hub(hub_id: &str, slots: Slots) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.ensure_system_tables().await.unwrap();
+    let mut pin = Params::new();
+    pin.insert("hub_id".into(), json!(hub_id));
+    rt.db()
+        .execute(
+            "INSERT INTO _hub_fiscal_profile (hub_id, system_id, environment) \
+             VALUES (:hub_id, :hub_id, 'production') \
+             ON CONFLICT (hub_id) DO UPDATE SET environment = 'production'",
+            &pin,
+        )
+        .await
+        .unwrap();
     rt.db()
         .execute_batch(
             "CREATE TABLE fiscal_doc (issuer_nif TEXT, issuer_name TEXT);\
