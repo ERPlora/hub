@@ -230,6 +230,19 @@ pub enum RuntimeError {
     /// (the latter only while an installed module declares the `certificate` capability).
     #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
     FiscalPrecondition { missing: Vec<&'static str> },
+    /// `business_tax_id` refused at the door (hub#1088): the tax id is not free text — it is the
+    /// obligado the AEAT validates in every record and the issuer stamped on every invoice, and
+    /// until here anything shaped like `ZZZ999` was stored and became the emitter of the whole
+    /// VeriFactu registry.
+    ///
+    /// `code` is one of the four stable refusals of `settings::validate_tax_id`
+    /// (`invalid_tax_id_type` / `tax_id_too_long` / `invalid_tax_id_format` /
+    /// `invalid_tax_id_control`) and the UI translates by it (es/en), exactly like
+    /// [`Self::BusinessTaxIdFrozen`]: one flat «invalid» would not say WHICH half is wrong, and a
+    /// mistyped control letter is retyped while a non-shape is a different conversation.
+    /// `message` is the English fallback for the log.
+    #[error("{message}")]
+    InvalidTaxId { code: &'static str, message: String },
     /// `business_tax_id` is FROZEN: this hub already emitted its first fiscal record (ADR-0273,
     /// hub#554 — the ADR's own consequence: "`business_tax_id` stops being able to fork a live
     /// chain").

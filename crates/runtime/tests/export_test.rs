@@ -604,7 +604,7 @@ async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
 /// `auto_transmit`, ruta/clave del certificado), no plantilla ni dato de catálogo.
 ///
 /// Iba en el volcado del módulo `verifactu` como una tabla más, así que el blueprint publicado
-/// de julio sembraba `issuer_nif='B12345678'` + `auto_transmit=1` + `environment='testing'` en
+/// de julio sembraba `issuer_nif='B12345674'` + `auto_transmit=1` + `environment='testing'` en
 /// el hub de CADA cliente que lo importara: un negocio real arrancaba con el NIF de otro
 /// configurado y la transmisión automática encendida. Solo debe viajar si el usuario marca
 /// explícitamente la sección `fiscal` (que es la que ya mueve el certificado, ADR-0113 §2).
@@ -628,7 +628,7 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
             // identidad fiscal del negocio (NIF y nombre del emisor) solo viaja con `fiscal`.
             "INSERT INTO verifactu_config (id, hub_id, issuer_nif, issuer_name, environment, \
              enabled, is_deleted, created_at, updated_at) \
-             VALUES ('cfg1', :hub, 'B12345678', 'Restaurante Ejemplo SL', 'testing', 1, 0, \
+             VALUES ('cfg1', :hub, 'B12345674', 'Restaurante Ejemplo SL', 'testing', 1, 0, \
              '2026-07-31T00:00:00Z', '2026-07-31T00:00:00Z')",
             &p,
         )
@@ -650,7 +650,7 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
         .expect("export sin fiscal");
     let sql_sin = String::from_utf8(sin.files["data/verifactu.sql"].clone()).unwrap();
     assert!(
-        !sql_sin.contains("B12345678"),
+        !sql_sin.contains("B12345674"),
         "sin marcar «fiscal», el NIF del emisor NO puede viajar:\n{sql_sin}"
     );
 
@@ -659,7 +659,7 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
         .expect("export con fiscal");
     let sql_con = String::from_utf8(con.files["data/verifactu.sql"].clone()).unwrap();
     assert!(
-        sql_con.contains("B12345678"),
+        sql_con.contains("B12345674"),
         "marcando «fiscal» (backup/migración de hub) SÍ debe viajar:\n{sql_con}"
     );
 }

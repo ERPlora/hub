@@ -523,7 +523,7 @@ mod tests {
 
     fn full_capture() -> Capture {
         Capture {
-            obligado_nif: "B12345678".into(),
+            obligado_nif: "B12345674".into(),
             obligado_name: "Bar Manolo SL".into(),
             signer_nif: "12345678Z".into(),
             signer_name: "Manolo García".into(),
@@ -616,7 +616,7 @@ mod tests {
         assert!(document.contains("Manolo García"));
         assert!(document.contains("12345678Z"));
         assert!(document.contains("Bar Manolo SL"));
-        assert!(document.contains("B12345678"));
+        assert!(document.contains("B12345674"));
         assert!(document.contains(SIGNED_AT), "falta la fecha de la firma");
         // Y el trazo, DENTRO del documento: se archiva un fichero que se abre solo.
         assert!(document.contains("data:image/png;base64,"));
@@ -805,7 +805,7 @@ mod tests {
         let sent = body.lock().unwrap().clone();
         let sent = String::from_utf8_lossy(&sent);
         assert!(
-            sent.contains("B12345678"),
+            sent.contains("B12345674"),
             "el obligado declarado tiene que viajar"
         );
         assert!(

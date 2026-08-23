@@ -3430,6 +3430,11 @@ pub(crate) fn err_status_and_code(
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        // hub#1088: `business_tax_id` refused with its own stable code per failure kind — the
+        // same `422` as `invalid_payload` (what was sent does not validate) with the code the UI
+        // translates (es/en), so "the control letter is wrong" and "this is no NIF at all" are
+        // two different answers instead of one generic refusal.
+        E::InvalidTaxId { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, (*code).into()),
         // hub#1086: the payload does not carry a bind the query's own SQL references. `422`
         // like `invalid_payload` (it IS a payload-contract refusal, caught before any read),
         // with its own stable code so the caller can tell "you did not send what the query

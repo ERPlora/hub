@@ -691,14 +691,14 @@ mod tests {
         let merged = merge_payload(
             &claim,
             &json!({
-                "customer_tax_id": "B12345678",
+                "customer_tax_id": "B12345674",
                 "customer_name": "ACME SL",
                 "original_invoice_id": "f2-9999",
                 "items": [{"unit_price": 1}],
                 "status": "paid",
             }),
         );
-        assert_eq!(merged["customer_tax_id"], json!("B12345678"));
+        assert_eq!(merged["customer_tax_id"], json!("B12345674"));
         assert_eq!(merged["customer_name"], json!("ACME SL"));
         assert_eq!(
             merged["original_invoice_id"],
@@ -727,7 +727,7 @@ mod tests {
             redeemed_at: None,
             result_ref: String::new(),
         };
-        let merged = merge_payload(&claim, &json!({"customer_tax_id": "B12345678"}));
+        let merged = merge_payload(&claim, &json!({"customer_tax_id": "B12345674"}));
         assert!(!merged.contains_key("customer_address"));
     }
 

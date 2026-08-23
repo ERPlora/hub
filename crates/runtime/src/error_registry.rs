@@ -253,6 +253,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }
+        // hub#1088: a tax id that is not shaped like an official one is the caller's mistake at
+        // the settings door — expected, user-severity, never a Hub bug.
+        | E::InvalidTaxId { .. }
         // hub#376: a demo hub refusing to leave its sandbox is the deployment marker doing its
         // job (ADR-0197 §4) — expected, and never a Hub bug worth an issue.
         | E::DemoLocked { .. }
@@ -333,6 +336,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // from a generic error and surface it with the query that faltó.
         E::ReadUnavailable { .. } => "read_unavailable",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
+        // hub#1088: the SUBJECT is the stable code, one per failure kind — the screen has to be
+        // able to say "the control letter does not check out" instead of a flat "invalid", and
+        // each of the four has its own translation (es/en).
+        E::InvalidTaxId { code, .. } => code,
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
         // `demo_locked` could not tell which of the three doors refused.
         E::DemoLocked { lock } => lock.as_str(),
@@ -602,7 +609,7 @@ mod tests {
     #[test]
     fn a_frozen_tax_id_carries_its_own_stable_code() {
         let err = RuntimeError::BusinessTaxIdFrozen {
-            frozen_to: "B12345678".into(),
+            frozen_to: "B12345674".into(),
             since: "2026-08-08T10:00:00Z".into(),
         };
         assert_eq!(error_code_of(&err), "business_tax_id_frozen");
@@ -612,17 +619,54 @@ mod tests {
         assert_ne!(error_code_of(&err), DemoLock::FiscalIdentity.as_str());
     }
 
+    /// hub#1088: the refusal of an invalid tax id carries its own code PER FAILURE KIND — the
+    /// SUBJECT travels, exactly like the demo locks, because «the letter does not check out» and
+    /// «this is no official shape» are two different conversations on the screen.
+    #[test]
+    fn an_invalid_tax_id_carries_the_code_of_its_failure_kind() {
+        for (code, err) in [
+            (
+                crate::settings::INVALID_TAX_ID_TYPE,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_TYPE, message: String::new() },
+            ),
+            (
+                crate::settings::TAX_ID_TOO_LONG,
+                RuntimeError::InvalidTaxId { code: crate::settings::TAX_ID_TOO_LONG, message: String::new() },
+            ),
+            (
+                crate::settings::INVALID_TAX_ID_FORMAT,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_FORMAT, message: String::new() },
+            ),
+            (
+                crate::settings::INVALID_TAX_ID_CONTROL,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_CONTROL, message: String::new() },
+            ),
+        ] {
+            assert_eq!(error_code_of(&err), code, "the code IS the subject");
+            assert_eq!(severity_of(&err), severity::USER);
+        }
+        // And none of them collapses into the payload refusal: a shape problem at the settings
+        // door is not a broken request.
+        assert_ne!(
+            error_code_of(&RuntimeError::InvalidTaxId {
+                code: crate::settings::INVALID_TAX_ID_FORMAT,
+                message: String::new(),
+            }),
+            "invalid_payload"
+        );
+    }
+
     /// El mensaje dice **con qué identificador** está anclada la cadena y **desde cuándo**. Sin
     /// eso, el que se topa con el 409 no sabe si el que sobra es el NIF que acaba de teclear o el
     /// que el hub lleva dentro.
     #[test]
     fn a_frozen_tax_id_names_the_anchor_and_the_moment() {
         let message = RuntimeError::BusinessTaxIdFrozen {
-            frozen_to: "B12345678".into(),
+            frozen_to: "B12345674".into(),
             since: "2026-08-08T10:00:00Z".into(),
         }
         .to_string();
-        assert!(message.contains("B12345678"), "`{message}`");
+        assert!(message.contains("B12345674"), "`{message}`");
         assert!(message.contains("2026-08-08T10:00:00Z"), "`{message}`");
     }
 

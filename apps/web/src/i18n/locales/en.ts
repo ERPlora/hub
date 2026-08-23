@@ -517,6 +517,13 @@ export default {
         'The tax id can no longer be changed: this business has already issued under it.',
       hub_country_frozen:
         'The country can no longer be changed: this business already files under its tax rules. Get in touch with us if the business really did move.',
+      // hub#1088: one per refusal reason — a mistyped control character is retyped; "this is
+      // no official shape at all" is a different conversation.
+      invalid_tax_id_type: 'The tax id must be text.',
+      tax_id_too_long:
+        'The tax id is too long: the tax authority’s own limit is 20 characters.',
+      invalid_tax_id_format: 'That is not shaped like a tax id: DNI (12345678Z), NIE (X1234567L), CIF (B12345674), or a foreign identifier with its country prefix (FR123456789).',
+      invalid_tax_id_control: 'The tax id’s control letter or digit is not the right one: check it and type it again.',
     },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',

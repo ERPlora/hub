@@ -119,7 +119,7 @@ async fn a_demo_refuses_to_write_the_fiscal_identity_over_http() {
         &router,
         "/api/settings",
         &admin,
-        json!({ "business_tax_id": "B12345678", "business_legal_name": "Bar Manolo SL" }),
+        json!({ "business_tax_id": "B12345674", "business_legal_name": "Bar Manolo SL" }),
     )
     .await;
 
@@ -192,7 +192,7 @@ async fn the_demo_boots_with_an_identity_and_still_refuses_to_let_anyone_change_
         &router,
         "/api/settings",
         &admin,
-        json!({ "business_tax_id": "B12345678" }),
+        json!({ "business_tax_id": "B12345674" }),
     )
     .await;
     assert_eq!(response.status(), StatusCode::CONFLICT);
@@ -325,12 +325,12 @@ async fn a_real_hub_writes_its_fiscal_identity_over_http_as_always() {
         &router,
         "/api/settings",
         &admin,
-        json!({ "business_tax_id": "B12345678", "business_legal_name": "Bar Manolo SL" }),
+        json!({ "business_tax_id": "B12345674", "business_legal_name": "Bar Manolo SL" }),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
     let body = body_json(response).await;
-    assert_eq!(body["business_tax_id"], json!("B12345678"));
+    assert_eq!(body["business_tax_id"], json!("B12345674"));
     assert_eq!(body["business_legal_name"], json!("Bar Manolo SL"));
 }
 
@@ -346,7 +346,7 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
         &router,
         "/api/settings",
         &admin,
-        json!({ "business_tax_id": "B99999999", "demo": true, "is_demo": true }),
+        json!({ "business_tax_id": "B99999997", "demo": true, "is_demo": true }),
     )
     .await;
     assert_eq!(
@@ -366,7 +366,7 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
                 .header("x-hub-session", &admin)
                 .header("x-hub-demo", "1")
                 .header("x-demo", "true")
-                .body(Body::from(json!({ "business_tax_id": "B12345678" }).to_string()))
+                .body(Body::from(json!({ "business_tax_id": "B12345674" }).to_string()))
                 .unwrap(),
         )
         .await
@@ -376,7 +376,7 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
         StatusCode::OK,
         "una cabecera del navegador no convierte el hub en una demo"
     );
-    assert_eq!(body_json(response).await["business_tax_id"], json!("B12345678"));
+    assert_eq!(body_json(response).await["business_tax_id"], json!("B12345674"));
 }
 
 /// 🔴 **Las dos claves son INDEPENDIENTES, y esta es la mitad que lo demuestra.** Un hub de

@@ -407,7 +407,7 @@ mod fiscal_identity_tests {
     #[test]
     fn it_maps_the_business_identity_onto_the_billing_profile_fields() {
         let settings = json!({
-            "business_tax_id": " B12345678 ",
+            "business_tax_id": " B12345674 ",
             "business_legal_name": "Bar Manolo SL",
             "business_address": "Calle Falsa 123",
             "country_code": "ES",
@@ -415,7 +415,7 @@ mod fiscal_identity_tests {
         });
         let body = fiscal_identity_payload(&settings).expect("a filled-in identity publishes");
 
-        assert_eq!(body["tax_id"], json!("B12345678"), "trimmed");
+        assert_eq!(body["tax_id"], json!("B12345674"), "trimmed");
         assert_eq!(body["billing_name"], json!("Bar Manolo SL"));
         assert_eq!(body["billing_address"], json!("Calle Falsa 123"));
         assert_eq!(body["billing_country"], json!("ES"));

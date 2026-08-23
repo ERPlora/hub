@@ -742,9 +742,16 @@ async fn core_item_state(
         }
         // The SAME two settings the fiscal precondition reads (ADR-0203). Reading them from the
         // other side is what keeps "it blocks ⇔ the runtime rejects it" true instead of a colour.
-        // Half an identity is not an identity: both halves or nothing.
+        // Half an identity is not an identity: both halves or nothing — and since hub#1088 the
+        // tax id half must also be one the DOOR would accept. Emptiness stays its own question
+        // (the door accepts an empty field because the field is BORN empty; this item asks
+        // completeness): a value that predates the validation (legacy `ZZZ999`) is not a
+        // business identity either, and ticking «done» here would be the notice vouching for
+        // garbage the runtime would now refuse to re-save.
         ITEM_BUSINESS_IDENTITY => Some(done_or_pending(
-            !setting("business_legal_name").is_empty() && !setting("business_tax_id").is_empty(),
+            !setting("business_legal_name").is_empty()
+                && !setting("business_tax_id").is_empty()
+                && crate::settings::is_valid_tax_id(&setting("business_tax_id")),
         )),
         // At least one hub user besides the administrator. A solo business legitimately has one,
         // which is why this item is 🟡 recommended and never nags.

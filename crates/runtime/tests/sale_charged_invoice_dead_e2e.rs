@@ -237,7 +237,7 @@ async fn a_sale_that_cannot_be_invoiced_lands_in_the_dead_letter_and_is_recovera
     // A dead-letter that could not recover THIS failure would be a badge that only reports a loss.
     let mut identity = serde_json::Map::new();
     identity.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-    identity.insert("business_tax_id".into(), json!("B12345678"));
+    identity.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&identity, "u1")
         .await
         .expect("stamp the hub's fiscal identity");
