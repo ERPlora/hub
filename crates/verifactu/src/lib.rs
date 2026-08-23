@@ -734,9 +734,27 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             substitutes_number: str_field(&payload, "substitutes_number"),
             substitutes_date: str_field(&payload, "substitutes_date"),
             substitutes_nif: str_field(&payload, "substitutes_nif"),
+            // Rectificación (R1-R5, hub#1023). `rectification_type` vacío = lo deriva el XML de
+            // si vienen o no los importes rectificados; explícito (`S`/`I`) manda sobre él.
+            rectifies_number: str_field(&payload, "rectifies_number"),
+            rectifies_date: str_field(&payload, "rectifies_date"),
+            rectifies_nif: str_field(&payload, "rectifies_nif"),
+            rectification_type: str_field(&payload, "rectification_type"),
+            rectified_base_amount: optional_cents(&payload, "rectified_base_amount"),
+            rectified_tax_amount: optional_cents(&payload, "rectified_tax_amount"),
+            rectified_surcharge_amount: optional_cents(&payload, "rectified_surcharge_amount"),
         },
     )
     .await
+}
+
+/// Un importe **opcional** en céntimos, tal cual venga: `Json::Null` cuando nadie lo escribió.
+///
+/// No se normaliza a `0`: en el bloque `ImporteRectificacion` la diferencia entre «no hay importe»
+/// y «el importe es cero» es la diferencia entre no declarar el bloque y declarar a Hacienda que
+/// se rectifica una base de cero euros (hub#324). Quien decide es `aeat::importe_rectificacion`.
+fn optional_cents(payload: &Json, key: &str) -> Json {
+    payload.get(key).cloned().unwrap_or(Json::Null)
 }
 
 // ── ingest_invoice: alta automática desde el módulo invoice ───────────────────
@@ -772,10 +790,15 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         return Ok(Output::new()); // nada que ingerir
     }
 
-    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes). El
-    // LEFT JOIN a sí misma por `substitutes_invoice_id` trae, EN LA MISMA lectura (respeta la
-    // "única lectura acotada" de ADR-0058), los datos de la F2 sustituida cuando esta factura es
-    // una F3 — para el bloque XML FacturasSustituidas. NULL/'' si no es sustitución.
+    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes). Los dos
+    // LEFT JOIN a sí misma traen, EN LA MISMA lectura (respeta la "única lectura acotada" de
+    // ADR-0058), la factura enlazada de cada caso:
+    //
+    // - `substitutes_invoice_id` → la F2 que una F3 sustituye (bloque XML `FacturasSustituidas`);
+    // - `rectifies_invoice_id`   → la factura que una R1-R5 rectifica (`FacturasRectificadas`,
+    //   hub#1023) — el camino normal de una devolución en TPV.
+    //
+    // NULL/'' cuando la factura no enlaza nada, que es el caso de toda venta corriente.
     let rows = host
         .read(
             "SELECT i.invoice_type, i.number, i.issue_date, i.issuer_nif, i.issuer_name, \
@@ -783,10 +806,15 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
              i.base_amount, i.tax_amount, i.total_amount, i.tax_breakdown, \
              COALESCE(sub.number, '') AS substitutes_number, \
              COALESCE(sub.issue_date, '') AS substitutes_date, \
-             COALESCE(sub.issuer_nif, '') AS substitutes_nif \
+             COALESCE(sub.issuer_nif, '') AS substitutes_nif, \
+             COALESCE(rec.number, '') AS rectifies_number, \
+             COALESCE(rec.issue_date, '') AS rectifies_date, \
+             COALESCE(rec.issuer_nif, '') AS rectifies_nif \
              FROM invoice_invoice i \
              LEFT JOIN invoice_invoice sub \
                ON sub.id = i.substitutes_invoice_id AND sub.hub_id = i.hub_id AND sub.is_deleted = 0 \
+             LEFT JOIN invoice_invoice rec \
+               ON rec.id = i.rectifies_invoice_id AND rec.hub_id = i.hub_id AND rec.is_deleted = 0 \
              WHERE i.id = :invoice_id AND i.hub_id = :hub_id AND i.is_deleted = 0 LIMIT 1",
             &params(json!({ "invoice_id": invoice_id, "hub_id": ctx.hub_id })),
         )
@@ -874,6 +902,19 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             substitutes_number: str_field(&inv, "substitutes_number"),
             substitutes_date: str_field(&inv, "substitutes_date"),
             substitutes_nif: str_field(&inv, "substitutes_nif"),
+            // R1-R5 → FacturasRectificadas: datos de la factura rectificada (del LEFT JOIN).
+            rectifies_number: str_field(&inv, "rectifies_number"),
+            rectifies_date: str_field(&inv, "rectifies_date"),
+            rectifies_nif: str_field(&inv, "rectifies_nif"),
+            // `invoice.rectify` emite la rectificativa **negando** el original, así que los
+            // importes de esta factura SON el delta: es una rectificativa por diferencias, y el
+            // XML la deriva de que no haya importes rectificados (ver `aeat::rectification_type`).
+            // La sustitutiva (`S`) llega por `create_record`, que sí acepta los `rectified_*`;
+            // el módulo `invoice` todavía no tiene columna que distinga los dos (invoice#5).
+            rectification_type: String::new(),
+            rectified_base_amount: Json::Null,
+            rectified_tax_amount: Json::Null,
+            rectified_surcharge_amount: Json::Null,
         },
     )
     .await
@@ -911,6 +952,24 @@ struct RecordInput {
     substitutes_number: String,
     substitutes_date: String,
     substitutes_nif: String,
+    /// Factura RECTIFICADA (R1-R5 → la original, hub#1023): nº+serie, fecha de expedición y NIF
+    /// del emisor de la factura que esta rectificativa corrige. Alimentan el bloque XML
+    /// `FacturasRectificadas` (XSD `IDFacturaARType`, el mismo shape que las sustituidas). Vacíos
+    /// si el registro no rectifica nada, o si la rectificativa no identifica el original (una R5
+    /// de un tique puede no hacerlo: el bloque es `minOccurs="0"`).
+    rectifies_number: String,
+    rectifies_date: String,
+    rectifies_nif: String,
+    /// `TipoRectificativa`: `S` sustitutiva · `I` por diferencias. **Vacío = lo deriva el XML**
+    /// de si vienen o no los importes rectificados (`aeat::rectification_type`), que es la única
+    /// lectura que admite el esquema. Un valor explícito manda sobre la derivación.
+    rectification_type: String,
+    /// `ImporteRectificacion` (solo en una `S`): base, cuota y —opcional— recargo **rectificados**,
+    /// en CÉNTIMOS. `Json::Null` cuando no vienen: ahí «no hay importe» y «el importe es cero» son
+    /// cosas distintas ante Hacienda, así que no se normalizan a `0` (hub#324).
+    rectified_base_amount: Json,
+    rectified_tax_amount: Json,
+    rectified_surcharge_amount: Json,
 }
 
 /// Chaining core: reads the `(hub_id, issuer_nif, environment)` anchor, computes the SHA-256
@@ -1046,6 +1105,16 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_number": r.substitutes_number,
                 "substitutes_date": r.substitutes_date,
                 "substitutes_nif": r.substitutes_nif,
+                // R1-R5 → bloque rectificativo (hub#1023): mismo snapshot, mismo motivo. Un envío
+                // diferido (registro creado sin certificado y remitido a mano después) reconstruye
+                // el XML desde ESTA fila, así que lo que no esté aquí no llega a la AEAT.
+                "rectifies_number": r.rectifies_number,
+                "rectifies_date": r.rectifies_date,
+                "rectifies_nif": r.rectifies_nif,
+                "rectification_type": r.rectification_type,
+                "rectified_base_amount": r.rectified_base_amount,
+                "rectified_tax_amount": r.rectified_tax_amount,
+                "rectified_surcharge_amount": r.rectified_surcharge_amount,
             }),
         ))
         .with_operation(op(
@@ -1102,6 +1171,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_number": r.substitutes_number,
                 "substitutes_date": r.substitutes_date,
                 "substitutes_nif": r.substitutes_nif,
+                "rectifies_number": r.rectifies_number,
+                "rectifies_date": r.rectifies_date,
+                "rectifies_nif": r.rectifies_nif,
+                "rectification_type": r.rectification_type,
+                "rectified_base_amount": r.rectified_base_amount,
+                "rectified_tax_amount": r.rectified_tax_amount,
+                "rectified_surcharge_amount": r.rectified_surcharge_amount,
             });
             if let Ok((ops, events, _success)) =
                 transmit_one(
@@ -3320,6 +3396,81 @@ mod ingest_tests {
             } else {
                 Ok(vec![])
             }
+        }
+    }
+
+    /// Host que devuelve una **rectificativa** (R5 de un tique) con los datos de la factura que
+    /// rectifica, tal y como los trae el `LEFT JOIN` por `rectifies_invoice_id`. Guarda el SQL
+    /// para poder comprobar que la lectura los pide.
+    struct RectifyingInvoiceHost {
+        reads: std::sync::Mutex<Vec<String>>,
+    }
+    impl RectifyingInvoiceHost {
+        fn new() -> Self {
+            Self { reads: std::sync::Mutex::new(Vec::new()) }
+        }
+    }
+    #[async_trait::async_trait]
+    impl NativeHost for RectifyingInvoiceHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.reads.lock().unwrap().push(sql.to_string());
+            if sql.contains("FROM invoice_invoice") {
+                return Ok(vec![json!({
+                    "invoice_type": "R5", "number": "RECT-2026-000001",
+                    "issue_date": "2026-08-20", "issuer_nif": "B27593136",
+                    "issuer_name": "ERPLORA CLOUD SL",
+                    "customer_tax_id": "", "customer_name": "",
+                    "description": "Devolución", "base_amount": -1000,
+                    "tax_amount": -210, "total_amount": -1210,
+                    "tax_breakdown": r#"{"21.00":{"base":-1000,"tax":-210}}"#,
+                    "substitutes_number": "", "substitutes_date": "", "substitutes_nif": "",
+                    "rectifies_number": "TICKET-2026-000001",
+                    "rectifies_date": "2026-08-02",
+                    "rectifies_nif": "B27593136"
+                })]);
+            }
+            Ok(vec![])
+        }
+    }
+
+    /// hub#1023: una rectificativa nacida de una devolución tiene que llegar al XML con el enlace
+    /// a la factura que rectifica. El dato viaja en la MISMA lectura acotada (ADR-0058), por el
+    /// `LEFT JOIN` a `rectifies_invoice_id` — igual que la F3 hace con `substitutes_invoice_id`.
+    #[tokio::test]
+    async fn ingest_invoice_carries_the_rectified_invoice() {
+        let host = RectifyingInvoiceHost::new();
+        let input = json!({
+            "payload": { "new_id": "inv-r1" },
+            "context": {
+                "hub_id": "3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8",
+                "now": "2026-08-20T10:00:00+02:00", "current_user_id": "u1",
+                "new_ids": ["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3"]
+            }
+        });
+        let out = ingest_invoice(&input, &host).await.expect("la R5 se ingesta");
+
+        let sql = host.reads.lock().unwrap().join("\n");
+        assert!(
+            sql.contains("rectifies_invoice_id"),
+            "la lectura de la factura tiene que traer la rectificada: {sql}"
+        );
+
+        let insert = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_record")
+            .expect("se inserta el registro");
+        for (field, expected) in [
+            ("invoice_type", json!("R5")),
+            ("rectifies_number", json!("TICKET-2026-000001")),
+            ("rectifies_date", json!("2026-08-02")),
+            ("rectifies_nif", json!("B27593136")),
+        ] {
+            assert_eq!(
+                insert.params.get(field),
+                Some(&expected),
+                "el registro tiene que llevar `{field}`"
+            );
         }
     }
 
