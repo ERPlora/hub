@@ -1070,6 +1070,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 // Cloud tiene que observar para poder apagarlo.
                 let pending_activity = st.activity.pending();
                 usage.last_user_activity_at = pending_activity.map(activity::to_iso8601);
+                // hub#975: la telemetría de recursos viaja en el MISMO latido, del sampler único
+                // de `system_metrics` (fuera del lock de arriba: el muestreo de CPU duerme 100 ms).
+                // Best-effort: fuera de contenedor los campos viajan ausentes, nunca un 0 falso.
+                daily_usage::sample_resource_metrics()
+                    .await
+                    .apply_to(&mut usage);
                 let entitlement_request = entitlement::fetch_verified_claims(
                     &st.http,
                     &st.config.cloud_base_url,
