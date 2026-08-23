@@ -273,7 +273,14 @@ async fn verifactu_pending_kpi_counts_real_records() {
             "issuer_nif": "B12345674", "issuer_name": "Bar Manolo SL",
             "invoice_number": "F-0001", "invoice_date": "2026-07-17", "invoice_type": "F1",
             "description": "",
-            "base_amount": 1000, "tax_rate": 21, "tax_breakdown": "", "tax_amount": 210, "total_amount": 1210,
+            // hub#1132 — `tax_breakdown` NO puede ser cadena vacía: la columna es TEXT pero
+            // `verifactu` la lee como JSON (`JSON_EXISTS`), y `''` revienta el cast con
+            // `22P02 invalid input syntax for type json` ANTES de llegar a ninguna guarda.
+            // Se siembra el desglose real de esta fila (1000 al 21 % = 210), que además es lo
+            // que escribe una factura de verdad. El default de la columna es `'{}'`.
+            "base_amount": 1000, "tax_rate": 21,
+            "tax_breakdown": "[{\"base\": 1000, \"rate\": 21.0, \"quota\": 210}]",
+            "tax_amount": 210, "total_amount": 1210,
             "previous_hash": "", "record_hash": "seed-hash", "is_first_record": 1,
             "generation_timestamp": "2026-07-17T10:00:00Z", "qr_url": ""
         })),

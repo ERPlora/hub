@@ -112,7 +112,11 @@ async fn second_invoice_increments_series() {
     if !wasm() { eprintln!("SKIP"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
-    let p = params(json!({ "series_code": "FACT",
+    // hub#1132 — la serie FACT es F1, y una F1 SIN NIF de cliente la rechaza `invoice` desde
+    // invoice#52/#58 (`invoice.f1_requires_customer_tax_id`): sin él la AEAT la devuelve con el
+    // error 1189 y el documento es en realidad un tique simplificado. Este test mide la NUMERACIÓN,
+    // así que se le da el cliente que la serie exige y se deja intacto lo que comprueba.
+    let p = params(json!({ "series_code": "FACT", "customer_name": "ACME", "customer_tax_id": "B99",
         "items": [{ "description": "X", "quantity": 1_000_000, "unit_price": 1000, "tax_rate": 21.0 }] }));
     rt.execute_command("invoice.create", &p, &ctx).await.unwrap();
     rt.execute_command("invoice.create", &p, &ctx).await.unwrap();
@@ -128,7 +132,10 @@ async fn rectify_creates_negated_and_cancels_original() {
     if !wasm() { eprintln!("SKIP"); return; }
     let rt = rt_invoice().await;
     let ctx = admin();
+    // hub#1132 — misma razón: la original es una F1 y necesita el NIF del cliente para poder
+    // emitirse. Lo que este test comprueba (la R1 negada y la anulación) no cambia.
     rt.execute_command("invoice.create", &params(json!({ "series_code": "FACT", "customer_name": "ACME",
+        "customer_tax_id": "B99",
         "items": [{ "description": "X", "quantity": 1_000_000, "unit_price": 10000, "tax_rate": 21.0 }] })), &ctx).await.unwrap();
     let orig = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap()[0].clone();
     let orig_id = orig["id"].as_str().unwrap().to_string();
