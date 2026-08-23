@@ -877,6 +877,17 @@ pub struct RequestContext {
     /// D4/D6). Resolved by the dispatcher from the profile + the registry, so `CLOSED` can let a
     /// provider drain what it still owes **without the core naming a single module**.
     pub fiscal_providers: Vec<String>,
+    /// **Which AEAT this hub files to** (`testing` | `production`) — `_hub_fiscal_profile.environment`
+    /// (ADR-0273 D3: the go-live IS `testing → production`). Stamped by the dispatcher next to
+    /// [`Self::fiscal_mode`], from the core's own tables.
+    ///
+    /// Private with a `pub(crate)` setter for the same reason as [`Self::automation`]: this
+    /// struct crosses into `erplora-server`, where every context is built from something a
+    /// caller sent. The certificate arm of `commands::enforce_fiscal_precondition` is keyed on
+    /// this value (ADR-0360, hub#1087: in `testing` there is nothing to authorize), so a route
+    /// able to stamp it would hand a TPV the very requirement the ADR exists to enforce. Empty
+    /// means UNRESOLVED, and every gate that reads it fails CLOSED (production's answer).
+    fiscal_environment: String,
     /// `hub_user.id` of the manager whose approval let this command past the permission gate.
     /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
     /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
@@ -959,6 +970,7 @@ impl RequestContext {
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
             fiscal_providers: Vec::new(),
+            fiscal_environment: String::new(),
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
@@ -985,6 +997,21 @@ impl RequestContext {
     pub(crate) fn caused_by_event(mut self, event_id: impl Into<String>) -> Self {
         self.parent_event_id = event_id.into();
         self
+    }
+
+    /// Stamps which AEAT this hub files to (`testing` | `production`, hub#1087/ADR-0360). Only
+    /// the dispatcher calls it, from `_hub_fiscal_profile` — `pub(crate)` is the point: see
+    /// [`RequestContext::fiscal_environment`]. An empty value is UNRESOLVED and every gate that
+    /// reads it fails CLOSED.
+    pub(crate) fn with_fiscal_environment(mut self, environment: impl Into<String>) -> Self {
+        self.fiscal_environment = environment.into();
+        self
+    }
+
+    /// The fiscal environment the gate keys on (ADR-0360): `testing`, `production`, or `""` when
+    /// unresolved (read as production — the conservative answer).
+    pub fn fiscal_environment(&self) -> &str {
+        &self.fiscal_environment
     }
 
     /// The event that caused this request, or `""` when a person started it directly.
