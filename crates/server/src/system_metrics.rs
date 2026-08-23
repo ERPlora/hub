@@ -63,7 +63,9 @@ pub struct MemoryMetric {
 
 impl MemoryMetric {
     /// Fuera de contenedor (o error de lectura): todo `null` → la UI muestra «n/a».
-    fn unavailable() -> Self {
+    /// `pub(crate)`: el heartbeat (hub#975) la usa como degradación honesta si el hilo de
+    /// muestreo no vuelve.
+    pub(crate) fn unavailable() -> Self {
         Self { used_bytes: None, limit_bytes: None, fraction: None }
     }
 }
@@ -77,7 +79,7 @@ pub struct CpuMetric {
 }
 
 impl CpuMetric {
-    fn unavailable() -> Self {
+    pub(crate) fn unavailable() -> Self {
         Self { used_cores: None, limit_cores: None, fraction: None }
     }
 }

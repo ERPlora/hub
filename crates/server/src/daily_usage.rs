@@ -17,7 +17,7 @@ use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DailyUsageHeartbeat {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub orders_today: Option<u64>,
@@ -88,6 +88,79 @@ pub struct DailyUsageHeartbeat {
     /// changing that answer does not need a fleet-wide image bump.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verifactu_oldest_pending_at: Option<String>,
+    /// CPU del contenedor en %, `0..100` (hub#975). Mismas unidades que el Cloud ingiere
+    /// (`cpu_pct`, que alimenta las sparklines de `HubMetricSample`).
+    ///
+    /// Sale de la `fraction` del sampler ÚNICO de `system_metrics` (cgroup v2) — no hay segundo
+    /// lector de `/sys`. Ausente = no medible (fuera de contenedor, o cgroup sin límite de CPU:
+    /// `used_cores` solo no es un porcentaje). Nunca un `0` fabricado: pintaría cada hub de
+    /// escritorio como un hub muerto en el panel de flota.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_pct: Option<f64>,
+    /// Memoria usada del contenedor en MB (hub#975): `used_bytes` del sampler (ya sin la caché
+    /// de página, como `docker stats`) convertida a MB. Ausente = fuera de contenedor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_used_mb: Option<f64>,
+    /// Techo de memoria del contenedor en MB (hub#975): `memory.max` del cgroup. Ausente cuando
+    /// no hay techo (`"max"`) — el Cloud dejará su `memory_pct` a `null`, que es la verdad.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_limit_mb: Option<f64>,
+}
+
+/// Un MB en bytes, para la conversión a las unidades del Cloud (1024·1024, la misma base que
+/// `BYTES_PER_GIB` del contrato de BD: el ratio used/limit del Cloud es insensible a la base,
+/// pero el valor absoluto que guarda `last_metrics` no).
+const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
+
+/// Redondeo a 2 decimales: suficiente para una sparkline, y mantiene el payload estable
+/// (un `f64` sin acotar mandaría 17 dígitos por latido).
+fn round2(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
+impl DailyUsageHeartbeat {
+    /// Rellena la telemetría de recursos (hub#975) a partir de las métricas del sampler de
+    /// `system_metrics` — conversión de UNIDADES, no una segunda lectura del cgroup.
+    pub fn set_resource_metrics(
+        &mut self,
+        memory: crate::system_metrics::MemoryMetric,
+        cpu: crate::system_metrics::CpuMetric,
+    ) {
+        self.memory_used_mb = memory.used_bytes.map(|b| round2(b as f64 / BYTES_PER_MB));
+        self.memory_limit_mb = memory.limit_bytes.map(|b| round2(b as f64 / BYTES_PER_MB));
+        self.cpu_pct = cpu.fraction.map(|f| round2(f * 100.0));
+    }
+}
+
+/// Muestrea la telemetría de recursos del cgroup (hub#975) para el latido: el MISMO sampler
+/// testeado de `/api/system/metrics`, envuelto en `spawn_blocking` porque duerme 100 ms para la
+/// segunda muestra de CPU. Fuera de contenedor las métricas llegan «no disponibles» y los campos
+/// viajan ausentes — la telemetría nunca bloquea un latido que alimenta el reloj de actividad.
+pub async fn sample_resource_metrics() -> ResourceMetrics {
+    let (memory, cpu) = tokio::task::spawn_blocking(|| {
+        crate::system_metrics::sample_cgroup(&crate::system_metrics::SysCgroupReader)
+    })
+    .await
+    .unwrap_or_else(|_| {
+        (
+            crate::system_metrics::MemoryMetric::unavailable(),
+            crate::system_metrics::CpuMetric::unavailable(),
+        )
+    });
+    ResourceMetrics { memory, cpu }
+}
+
+/// Las métricas crudas del sampler, listas para [`DailyUsageHeartbeat::set_resource_metrics`].
+pub struct ResourceMetrics {
+    memory: crate::system_metrics::MemoryMetric,
+    cpu: crate::system_metrics::CpuMetric,
+}
+
+impl ResourceMetrics {
+    /// Las vierte en el latido (ver [`DailyUsageHeartbeat::set_resource_metrics`]).
+    pub fn apply_to(self, heartbeat: &mut DailyUsageHeartbeat) {
+        heartbeat.set_resource_metrics(self.memory, self.cpu);
+    }
 }
 
 /// What the control plane answered to a heartbeat (ADR-0202 §2.5 — hub#318).
@@ -225,6 +298,12 @@ pub async fn collect_daily_usage(
         hub_version: crate::version::HUB_VERSION.to_string(),
         verifactu_pending_depth: queue.as_ref().map(|q| q.depth),
         verifactu_oldest_pending_at: queue.and_then(|q| q.oldest_pending_at),
+        // La telemetría de recursos (hub#975) no se lee AQUÍ: la rellena el llamador (`serve` /
+        // `boot_announce`) con `sample_resource_metrics`, que muestrea el cgroup FUERA del lock
+        // del runtime — el sampler duerme 100 ms y no debe sostener el lock ni la BD.
+        cpu_pct: None,
+        memory_used_mb: None,
+        memory_limit_mb: None,
     }
 }
 
@@ -379,6 +458,9 @@ mod tests {
         hub_version: crate::version::HUB_VERSION.to_string(),
         verifactu_pending_depth: Some(2),
         verifactu_oldest_pending_at: Some("2026-07-25T08:00:00Z".into()),
+        cpu_pct: Some(50.0),
+        memory_used_mb: Some(10.0),
+        memory_limit_mb: Some(96.0),
     };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -405,6 +487,11 @@ mod tests {
                 // hub#326: the queue the SaaS alerts on travels under these exact names.
                 "verifactu_pending_depth": 2,
                 "verifactu_oldest_pending_at": "2026-07-25T08:00:00Z",
+                // hub#975: the resource telemetry rides the same beat, in the Cloud's units —
+                // these are the names `HubMetricSample` sparklines are fed from.
+                "cpu_pct": 50.0,
+                "memory_used_mb": 10.0,
+                "memory_limit_mb": 96.0,
             })
         );
         server.abort();
@@ -425,6 +512,9 @@ mod tests {
         hub_version: crate::version::HUB_VERSION.to_string(),
         verifactu_pending_depth: None,
         verifactu_oldest_pending_at: None,
+        cpu_pct: None,
+        memory_used_mb: None,
+        memory_limit_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
@@ -448,12 +538,134 @@ mod tests {
         hub_version: crate::version::HUB_VERSION.to_string(),
         verifactu_pending_depth: None,
         verifactu_oldest_pending_at: None,
+        cpu_pct: None,
+        memory_used_mb: None,
+        memory_limit_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert_eq!(body, json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION}));
         // Y la caducidad NO viaja: es justo lo que borra en el Cloud la fecha vieja de un hub
         // reprovisionado (§2.5, «el par se escribe entero»).
         assert!(body.get("cert_not_after").is_none());
+    }
+
+    // ── Resource telemetry (hub#975): the cgroup metrics ride the same beat ────────────────────
+
+    /// 🔴 [hub#975] The metrics `system_metrics` already reads travel in the Cloud's units.
+    ///
+    /// The sampler exists and `/api/system/metrics` serves it, but the heartbeat body never
+    /// carried it: 0/4 production hubs had `memory_used_mb`, and `HubMetricSample` (the fleet
+    /// sparklines `architecture/saas/hub-monitoring.md` documents) had zero rows. The conversion
+    /// is UNITS ONLY — bytes → MB for memory, fraction → % for CPU — because the sampler stays
+    /// the single reader of the cgroup (no second parser to drift).
+    #[test]
+    fn resource_metrics_ride_the_beat_in_cloud_units() {
+        let mut usage = DailyUsageHeartbeat {
+            orders_today: None,
+            last_sale_at: None,
+            terminals: None,
+            last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+        };
+        // La fixture del free tier real (system_metrics): 10 MiB usados de 96 MiB, 0,5 de 1 core.
+        usage.set_resource_metrics(
+            crate::system_metrics::MemoryMetric {
+                used_bytes: Some(10_485_760),
+                limit_bytes: Some(100_663_296),
+                fraction: Some(10_485_760.0 / 100_663_296.0),
+            },
+            crate::system_metrics::CpuMetric {
+                used_cores: Some(0.5),
+                limit_cores: Some(1.0),
+                fraction: Some(0.5),
+            },
+        );
+        let body = serde_json::to_value(&usage).unwrap();
+        assert_eq!(body["cpu_pct"], json!(50.0), "fracción 0..1 → porcentaje del Cloud");
+        assert_eq!(body["memory_used_mb"], json!(10.0), "bytes → MB (10 MiB exactos)");
+        assert_eq!(body["memory_limit_mb"], json!(96.0), "bytes → MB (96 MiB del plan free)");
+    }
+
+    /// 🔴 [hub#975] Outside a container (Tauri/desktop/dev) the cgroup does not exist: the
+    /// fields stay ABSENT, never a fabricated `0` — the same rule `orders_today` already
+    /// follows. A zero would paint every desktop hub as an idle one in the fleet panel.
+    #[test]
+    fn unmeasurable_metrics_travel_as_silence() {
+        let mut usage = DailyUsageHeartbeat {
+            orders_today: None,
+            last_sale_at: None,
+            terminals: None,
+            last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+        };
+        usage.set_resource_metrics(
+            crate::system_metrics::MemoryMetric {
+                used_bytes: None,
+                limit_bytes: None,
+                fraction: None,
+            },
+            crate::system_metrics::CpuMetric {
+                used_cores: None,
+                limit_cores: None,
+                fraction: None,
+            },
+        );
+        let body = serde_json::to_value(&usage).unwrap();
+        assert!(body.get("cpu_pct").is_none(), "sin cgroup no hay porcentaje");
+        assert!(body.get("memory_used_mb").is_none(), "sin cgroup no hay MB usados");
+        assert!(body.get("memory_limit_mb").is_none());
+    }
+
+    /// 🔴 [hub#975] CPU without a limit has no percentage either: `used_cores` alone is not a
+    /// `cpu_pct`, and sending it as one would report «0,7 %» for a hub at 70% of an unlabeled
+    /// machine. Memory does travel: `memory.max = "max"` still yields a real `used` against no
+    /// ceiling, and the Cloud's `memory_pct` simply stays null on its side.
+    #[test]
+    fn cpu_without_a_limit_has_no_percentage_but_memory_still_travels() {
+        let mut usage = DailyUsageHeartbeat {
+            orders_today: None,
+            last_sale_at: None,
+            terminals: None,
+            last_user_activity_at: None,
+            cert_version: None,
+            cert_not_after: None,
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            verifactu_pending_depth: None,
+            verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+        };
+        usage.set_resource_metrics(
+            crate::system_metrics::MemoryMetric {
+                used_bytes: Some(10_485_760),
+                limit_bytes: None, // `memory.max = "max"`: sin techo
+                fraction: None,
+            },
+            crate::system_metrics::CpuMetric {
+                used_cores: Some(0.7),
+                limit_cores: None, // `cpu.max = "max ..."`: sin techo
+                fraction: None,
+            },
+        );
+        let body = serde_json::to_value(&usage).unwrap();
+        assert!(body.get("cpu_pct").is_none(), "0,7 cores NO es un 0,7 %");
+        assert_eq!(body["memory_used_mb"], json!(10.0), "el uso medido sí viaja");
+        assert!(body.get("memory_limit_mb").is_none());
     }
 
     /// **A read failure is silence, never a zero.** Same rule `orders_today` already follows: the
@@ -471,6 +683,9 @@ mod tests {
         hub_version: crate::version::HUB_VERSION.to_string(),
         verifactu_pending_depth: None,
         verifactu_oldest_pending_at: None,
+        cpu_pct: None,
+        memory_used_mb: None,
+        memory_limit_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
@@ -608,6 +823,9 @@ mod tests {
             hub_version: crate::version::HUB_VERSION.to_string(),
             verifactu_pending_depth: None,
             verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
         },
         )
         .await
@@ -660,6 +878,9 @@ mod tests {
             hub_version: crate::version::HUB_VERSION.to_string(),
             verifactu_pending_depth: None,
             verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
         },
         )
         .await
@@ -690,6 +911,9 @@ mod tests {
             hub_version: crate::version::HUB_VERSION.to_string(),
             verifactu_pending_depth: None,
             verifactu_oldest_pending_at: None,
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
         };
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
