@@ -211,6 +211,20 @@ pub(crate) async fn execute_at(
             // que el SERVIDOR resuelve el impuesto contra el catálogo — sin ella, ninguna regla
             // casa y el handler se cree el % que le mande el cliente.
             .with_fiscal(get("country_code"), get("region_code"))
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): la MISMA resolución que usa el kernel de
+            // flujos (`settings::timezone_of` — la declarada o la deducida del país/región), para
+            // que `:timezone`/`context.timezone` y un trigger `cron` no puedan discrepar. Si la
+            // lectura falla, `timezone_name()` degrada a `UTC` (lo que el reloj hará de todos modos).
+            .with_timezone(
+                crate::settings::timezone_of(db, &ctx.hub_id)
+                    .await
+                    .map(|tz| tz.name().to_string())
+                    .unwrap_or_else(|_| "UTC".to_string()),
+            )
+            // EL IDIOMA DE QUIEN LLAMA (hub#1098): override personal → setting del hub → default
+            // del core. Aquí y solo aquí: mientras cada módulo lo resolviera en su propio SQL, el
+            // default era un duplicado que podía pudrirse (taxes#40 lo demostró).
+            .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
             // What this hub OWES right now (ADR-0273 D2, hub#550): resolved here, from the core's
             // own tables and the registry, next to the identity and the certificate — never from
@@ -861,6 +875,9 @@ async fn execute_wasm(
             // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
             "country_code": ctx.country_code,
             "region_code": ctx.region_code,
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): nombre IANA ya resuelto — «mañana a las
+            // 09:00» son las 09:00 de la TIENDA. Viaja también como `:timezone` en el payload.
+            "timezone": ctx.timezone_name(),
             "reads": reads,
         },
     });
@@ -994,6 +1011,9 @@ async fn execute_native(
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids.clone(),
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022), mismo contrato que el camino WASM: el
+            // handler nativo agenda con el mismo IANA resuelto que un guest.
+            "timezone": ctx.timezone_name(),
         },
     });
 

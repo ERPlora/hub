@@ -1,0 +1,28 @@
+{
+  "id": "ctxp",
+  "name": "Context params fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "ctxp.record": {
+      "permission": "",
+      "transaction": true,
+      "handler": {
+        "type": "native",
+        "function": "record"
+      }
+    },
+    "ctxp._insert": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/insert.sql"]
+    }
+  },
+  "queries": {
+    "ctxp.echo": {
+      "permission": "",
+      "sql": "sql/echo.sql"
+    }
+  }
+}

@@ -165,6 +165,17 @@ pub async fn execute_page(
                 get("business_legal_name"),
                 get("business_address"),
             )
+            // EL RELOJ y EL IDIOMA (hub#1022/hub#1098), misma resolución que `commands::execute`:
+            // sin esto, un SELECT que binde `:timezone`/`:caller_lang` vería los fallbacks UTC/`es`
+            // aunque el hub hubiera declarado otra cosa — y cada módulo volvería a resolvérselo en
+            // SQL (lo que taxes#38 hizo y taxes#40 rompió).
+            .with_timezone(
+                crate::settings::timezone_of(db, &ctx.hub_id)
+                    .await
+                    .map(|tz| tz.name().to_string())
+                    .unwrap_or_else(|_| "UTC".to_string()),
+            )
+            .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert);
         &enriched_ctx
     } else {

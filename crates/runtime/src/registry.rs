@@ -833,6 +833,23 @@ pub struct RequestContext {
     /// Subdivisión ISO-3166-2 (`ES-CN`…) o vacío = todo el país. Una regla con región gana a la del
     /// país (Canarias/IGIC, Ceuta y Melilla/IPSI).
     pub region_code: String,
+    /// **La zona horaria del NEGOCIO** (hub#731, hub#1022), como nombre IANA (`Europe/Madrid`) y ya
+    /// RESUELTA: la `timezone` declarada en settings o, lo normal, la deducida de
+    /// `country_code`/`region_code` (`settings::timezone_of`). La inyecta el dispatcher junto a la
+    /// identidad de negocio; `system_params` la expone como `:timezone` y el contexto de los
+    /// handlers WASM/nativos como `context.timezone`, para que un módulo que agenda «mañana a las
+    /// 09:00» sepa en qué reloj son las 09:00 sin adivinarlo del país. Vacía hasta que el
+    /// dispatcher la resuelve — [`Self::timezone_name`] degrada a `UTC`, igual que el boot del
+    /// server.
+    pub timezone: String,
+    /// **El idioma EFECTIVO de quien llama** (hub#1098): su override personal
+    /// (`hub_user_pref.language`) → el setting del hub (`hub_settings.language`) → el default del
+    /// core (`es`). Es la MISMA precedencia que el shell (`bootHubLanguage`) y la que taxes#38
+    /// reimplementaba en el SQL de cada módulo — con el default adivinado, y mal (taxes#40: era
+    /// `en` y el core dice `es`). La inyecta el dispatcher; `system_params` la expone como
+    /// `:caller_lang` para que cualquier SELECT que proyecte texto traducido deje de leer las
+    /// tablas del core. Vacía hasta resolver — [`Self::caller_lang`] degrada a `es`.
+    pub caller_lang: String,
     /// **Who is behind this request**: a person, or a machine (hub#361). See [`Principal`].
     pub principal: Principal,
     /// Reference to a **step-up approval** this runtime is holding (hub#361), if the caller
@@ -933,6 +950,8 @@ impl RequestContext {
             permissions: permissions.into_iter().collect(),
             country_code: String::new(),
             region_code: String::new(),
+            timezone: String::new(),
+            caller_lang: String::new(),
             business_tax_id: String::new(),
             business_legal_name: String::new(),
             business_address: String::new(),
@@ -1024,6 +1043,42 @@ impl RequestContext {
         self.country_code = country_code.into();
         self.region_code = region_code.into();
         self
+    }
+
+    /// Fija la **zona horaria resuelta del negocio** (hub#731, hub#1022). La llama el dispatcher
+    /// tras `settings::timezone_of`. Builder para no romper los `new(...)`/tests existentes.
+    pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
+        self.timezone = timezone.into();
+        self
+    }
+
+    /// Fija el **idioma efectivo de quien llama** (hub#1098). La llama el dispatcher tras leer
+    /// `hub_user_pref`/`hub_settings` (ver `effective_caller_lang`). Builder para no romper los
+    /// `new(...)`/tests existentes.
+    pub fn with_caller_lang(mut self, lang: impl Into<String>) -> Self {
+        self.caller_lang = lang.into();
+        self
+    }
+
+    /// La zona horaria del negocio como nombre IANA, lista para bindear/exponer. `UTC` si el
+    /// dispatcher aún no la resolvió — el mismo fallback documentado del boot del server, nunca
+    /// una cadena vacía que un `context.timezone` del guest leería como «no lo sé».
+    pub fn timezone_name(&self) -> &str {
+        if self.timezone.is_empty() {
+            "UTC"
+        } else {
+            &self.timezone
+        }
+    }
+
+    /// El idioma efectivo de quien llama, listo para bindear. `es` (el default del core,
+    /// taxes#40) si el dispatcher aún no lo resolvió — nunca una cadena vacía.
+    pub fn caller_lang(&self) -> &str {
+        if self.caller_lang.is_empty() {
+            "es"
+        } else {
+            &self.caller_lang
+        }
     }
 
     /// Copia con el flag de presencia del certificado fiscal del negocio (`_hub_certificate`, core).

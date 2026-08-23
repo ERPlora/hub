@@ -21,7 +21,7 @@ import { makeBridgeTransport } from './bridge-transport';
 import { getHubSession, logout, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
-import { hubSettings } from './hub-settings';
+import { hubSettings, hubTimezone, publishHubTimezone } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
@@ -78,6 +78,13 @@ export interface HubContext {
    * en el boot (i18n → bootHubLanguage). Ausente → degrada a 'es'.
    */
   language?: string | null;
+  /**
+   * Zona horaria IANA del NEGOCIO, ya RESUELTA (hub#731, hub#1022): la declarada o la deducida
+   * del país — nunca `null` cuando el runtime la envía. La publica `publishHubTimezone` para que
+   * módulos y shell lean el mismo reloj que el runtime da a los handlers (`context.timezone`).
+   * Ausente → degrada a UTC.
+   */
+  timezone?: string | null;
 }
 
 /**
@@ -324,6 +331,10 @@ export function getClient(): ErploraClient {
           return new Set(user.value?.permissions ?? []);
         },
         currency: hubCurrency,
+        // La zona horaria RESUELTA del negocio (hub#1022): misma fuente que el resto del shell
+        // (`hubTimezone()` ← `/api/hub/context`), para que un módulo que agende lea el MISMO
+        // reloj que el runtime le entrega a un handler (`context.timezone`).
+        timezone: hubTimezone,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
@@ -1444,6 +1455,11 @@ export async function bootHubContext(): Promise<HubContext | null> {
     // (i18n → bootHubLanguage), sin esperar a un GET /api/settings explícito.
     seedHubSettingsFromContext(ctx);
     bootHubLanguage(typeof ctx.language === 'string' ? ctx.language : null);
+    // Zona horaria RESUELTA del negocio (hub#731, hub#1022): se publica para módulos y shell
+    // (`erplora.timezone` / `hubTimezone()`), el mismo IANA que el runtime bindea como
+    // `:timezone` y entrega a los handlers como `context.timezone`. El context la trae SIEMPRE
+    // resuelta (nunca `null`); ausente/imposible → UTC, que es lo que el reloj hará de todos modos.
+    publishHubTimezone(ctx.timezone ?? null);
     return ctx;
   } catch {
     return null;
