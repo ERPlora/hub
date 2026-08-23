@@ -530,6 +530,19 @@ test('formatAmount formatea unidades; opts.currency sobreescribe la del hub', ()
   assert.equal(c.formatAmount(1234.5, { locale: 'en-US', currency: 'USD' }), '$1,234.50');
 });
 
+// hub#1090: CLDR deja sin agrupar los 4 dígitos en español (minimumGroupingDigits=2), pero la
+// regla vinculante del CLAUDE.md raíz es la del sector (Odoo, Holded, glibc, Excel): agrupar
+// SIEMPRE desde 4. Este formateador es el que usan los módulos de dinero vía
+// `globalThis.erplora.formatMoney` — el que ejecuta el SHELL, así que arreglarlo aquí arregla
+// las pantallas de módulo sin republicar módulos.
+test('formatMoney agrupa los millares DESDE 4 dígitos también en es (hub#1090)', () => {
+  // CLDR es separa cifra y € con un espacio INSEPARABLE (U+00A0), no un espacio normal.
+  const c = new ErploraClient({} as never, { currency: () => 'EUR' });
+  assert.equal(c.formatMoney(123456, { locale: 'es-ES' }), '1.234,56 €');
+  assert.equal(c.formatMoney(1234567, { locale: 'es-ES' }), '12.345,67 €');
+  assert.equal(c.formatAmount(1234.5, { locale: 'es-ES' }), '1.234,50 €');
+});
+
 // ── ADR-0196 §3: el SDK ya NO lleva canal WS local de hardware ──────────────────────────
 //
 // El único camino a la impresora es la app instalada (`IpcBridgeTransport` sobre `invoke`,
