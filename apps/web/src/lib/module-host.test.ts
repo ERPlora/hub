@@ -34,6 +34,35 @@ describe('module host', () => {
     expect(host).toContain('stopChrome?.()');
   });
 
+  // ── hub#1099 — la vista que Ionic deja ATRÁS sigue viva, y seguía trabajando ──────────────────
+  //
+  // Ionic NO desmonta la página que dejas cuando entras a otra con un `push` en dirección
+  // `forward`, y las TRES puertas a un módulo lo son (launcher de la topbar, tarjeta «Mis apps»,
+  // botón Abrir de /apps). La vista se queda montada, solo escondida: `onBeforeUnmount` NO llega a
+  // ejecutarse por ese camino. Así que cada navegación dejaba una copia más de esta vista, con su
+  // watcher de ruta, y CADA copia volvía a correr `mount()` entero —los 25 manifests, la
+  // navegación y el guard— en la siguiente navegación. De ahí que el coste creciera con cada
+  // navegación y no volviera a bajar nunca con el hub en reposo.
+  it('no vuelve a montarse mientras está fuera de pantalla (hub#1099)', () => {
+    expect(host).toContain('onIonViewDidLeave');
+    expect(host).toContain('onIonViewWillEnter');
+    // El watcher de ruta es quien multiplicaba: tiene que rendirse si esta copia no es la visible.
+    const idx = host.indexOf('watch(\n  () => [route.params.moduleId, route.params.navId]');
+    expect(idx).toBeGreaterThan(-1);
+    expect(host.slice(idx, idx + 600)).toContain('onScreen');
+  });
+
+  it('suelta lo que tenía enganchado al irse de pantalla, no solo al desmontarse (hub#1099)', () => {
+    // El listener de `focus` y el canal de chrome se soltaban SOLO en `onBeforeUnmount`, que por lo
+    // de arriba no llega: tras 8 navegaciones, un solo foco de ventana disparaba 8 consultas de
+    // entitlement al Cloud, y quedaban 8 MutationObserver mirando outlets escondidos.
+    const idx = host.indexOf('onIonViewDidLeave(() => {');
+    const after = host.slice(idx, idx + 700);
+    expect(after).toContain("removeEventListener('focus'");
+    expect(after).toContain('stopChrome');
+    expect(after).toContain('clearProtectsSubscription()');
+  });
+
   it('preserves complete module labels and scrolls before shrinking mobile tabs', () => {
     expect(host).toContain('class="ok-tabbar module-tabbar"');
     expect(host).toContain('scrollable');

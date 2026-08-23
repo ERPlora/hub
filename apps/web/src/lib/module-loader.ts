@@ -107,39 +107,142 @@ async function loadOutfitkitStamp(base: string, entry: string, moduleId: string)
   // Vive junto al bundle, como `icons.json`. Su ausencia NO es un defecto: es lo que traen los
   // módulos publicados antes del sello, y `warnOnOutfitkitSkew` se calla en ese caso.
   const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
-  try {
-    const res = await fetch(`${base}/${distDir ? `${distDir}/` : ''}outfitkit.json`);
-    if (!res.ok) return;
-    const stamp = (await res.json()) as { outfitkit?: string };
-    warnOnOutfitkitSkew(moduleId, stamp.outfitkit, __OUTFITKIT_VERSION__);
-  } catch {
-    // Sin sello legible no hay nada que comparar. Silencio: el módulo carga igual.
-  }
+  await readOnce(
+    `${base}/${distDir ? `${distDir}/` : ''}outfitkit.json`,
+    async (url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return false;
+        const stamp = (await res.json()) as { outfitkit?: string };
+        warnOnOutfitkitSkew(moduleId, stamp.outfitkit, __OUTFITKIT_VERSION__);
+        return true;
+      } catch {
+        // Sin sello legible no hay nada que comparar. Silencio: el módulo carga igual.
+        return false;
+      }
+    },
+    (ok) => !ok,
+  );
 }
 
 async function loadIconMap(base: string, entry: string): Promise<Record<string, string>> {
   // icons.json vive junto al bundle del WC (dist/), lo genera `module-toolkit build`.
   const distDir = entry.includes('/') ? entry.replace(/\/[^/]+$/, '') : '';
-  try {
-    const res = await fetch(`${base}/${distDir ? `${distDir}/` : ''}icons.json`);
-    if (!res.ok) return {};
-    const icons = (await res.json()) as Record<string, string>;
-    addIcons(moduleIconRegistry(icons));
-    return icons;
-  } catch {
-    return {};
+  return readOnce(
+    `${base}/${distDir ? `${distDir}/` : ''}icons.json`,
+    async (url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const icons = (await res.json()) as Record<string, string>;
+        // Registrar los iconos una vez es cuantas veces vale: `addIcons` alimenta un registro
+        // global del documento, y volver a llenarlo en cada pasada era trabajo puro.
+        addIcons(moduleIconRegistry(icons));
+        return icons;
+      } catch {
+        return null;
+      }
+    },
+    (icons) => icons === null,
+  ).then((icons) => icons ?? {});
+}
+
+/**
+ * Los `module.json` ya leídos en ESTA sesión, por módulo (hub#1099).
+ *
+ * Se guarda la PROMESA, no el manifest: eso hace la caché y el dedupe de peticiones en vuelo la
+ * misma cosa. Y hacen falta las dos: hay **tres** puertas que recorren todos los módulos instalados
+ * en cada montaje de ruta —`loadMenu`, `loadInstalledManifests` (widgets ADR-0054 + slots ADR-0043)
+ * y `resolveProtectsGuard` (hub#775)—, y arrancan solapadas, así que una caché que solo guardara el
+ * resultado no llegaría a tiempo para ninguna de las tres.
+ *
+ * Sin esto, con los 25 módulos de un hub real, cada navegación pedía los 25 manifests **4 veces**
+ * (~1,6 MB) y cualquier llamador repetido —`globalThis.erplora.loadSlot`, que main.ts cablea a
+ * `loadSlotComponents` → `loadInstalledManifests`— multiplicaba SU cadencia por 25. Ese era el
+ * amplificador que hacía crecer el ritmo hasta ~75 req/s con la pestaña en reposo: el shell no
+ * ponía techo a cuántas veces se podía preguntar lo mismo. Ahora lo pone, y el techo es UNA.
+ */
+const manifestCache = new Map<string, Promise<ModuleManifest | null>>();
+
+/**
+ * Los SIDECARS ya leídos, por url (hub#1099): `dist/icons.json`, `dist/outfitkit.json` y
+ * `locales/<lang>.json`. Se barren módulo a módulo en la misma pasada que el manifest, así que
+ * cachear solo el manifest habría dejado tres cuartas partes de la tormenta en pie.
+ *
+ * Se guarda por URL y no por módulo porque la url ya lleva dentro todo lo que distingue una lectura
+ * de otra —la versión instalada (hub#935) y el idioma activo—, así que un módulo actualizado o un
+ * cambio de idioma son direcciones distintas y no pueden servirse de lo guardado para la anterior.
+ */
+const sidecarCache = new Map<string, Promise<unknown>>();
+
+/**
+ * Hace `read(url)` UNA sola vez por url, en toda la sesión, y comparte la petición en vuelo con
+ * quien llegue mientras tanto. Los efectos de la lectura (registrar los iconos del módulo, avisar
+ * del desfase de OutfitKit) también ocurren una vez, que es exactamente cuantas veces valen.
+ *
+ * Un fallo no se recuerda, por el mismo motivo que en `loadManifest`: un 5xx pasajero dejaría al
+ * módulo sin iconos —mudos, sin ningún error— para el resto de la sesión.
+ */
+function readOnce<T>(url: string, read: (url: string) => Promise<T>, isFailure: (v: T) => boolean): Promise<T> {
+  const cached = sidecarCache.get(url) as Promise<T> | undefined;
+  if (cached) return cached;
+  const pending = read(url);
+  sidecarCache.set(url, pending as Promise<unknown>);
+  void pending.then(
+    (value) => {
+      if (isFailure(value) && sidecarCache.get(url) === pending) sidecarCache.delete(url);
+    },
+    () => sidecarCache.delete(url),
+  );
+  return pending;
+}
+
+/**
+ * Olvida lo cacheado (todo, o un módulo). Lo llama quien CAMBIA el conjunto instalado —instalar un
+ * módulo desde el drawer del asistente, otro dispositivo o un blueprint—, que es el único momento
+ * en que un manifest guardado puede haber dejado de ser el vigente sin recargar la página.
+ *
+ * Actualizar un módulo NO necesita esto: `reloadForModuleUpdate()` recarga la página entera (un
+ * custom element solo se registra una vez, hub#935) y la recarga se lleva esta caché por delante.
+ */
+export function invalidateManifestCache(moduleId?: string): void {
+  if (moduleId === undefined) {
+    manifestCache.clear();
+    sidecarCache.clear();
+    return;
+  }
+  manifestCache.delete(moduleId);
+  for (const url of sidecarCache.keys()) {
+    if (url.startsWith(`${MODULES_BASE}/${moduleId}/`)) sidecarCache.delete(url);
   }
 }
 
-/** Lee el `module.json` de un módulo instalado (`/modules/<id>/module.json`). `null` si falla. */
+/**
+ * Lee el `module.json` de un módulo instalado (`/modules/<id>/module.json`). `null` si falla.
+ * Una vez por sesión y por módulo: la segunda llamada —y las que lleguen mientras la primera sigue
+ * en vuelo— no vuelven a la red (hub#1099).
+ */
 export async function loadManifest(moduleId: string): Promise<ModuleManifest | null> {
-  try {
-    const res = await fetch(`${MODULES_BASE}/${moduleId}/module.json`);
-    if (!res.ok) return null;
-    return (await res.json()) as ModuleManifest;
-  } catch {
-    return null;
-  }
+  const cached = manifestCache.get(moduleId);
+  if (cached) return cached;
+
+  const pending = (async (): Promise<ModuleManifest | null> => {
+    try {
+      const res = await fetch(`${MODULES_BASE}/${moduleId}/module.json`);
+      if (!res.ok) return null;
+      return (await res.json()) as ModuleManifest;
+    } catch {
+      return null;
+    }
+  })();
+  manifestCache.set(moduleId, pending);
+  // Un fallo NO se recuerda. Cachear el `null` sería peor que no cachear nada: un 5xx pasajero
+  // durante el arranque dejaría al módulo sin menú, sin widgets y sin guard para el resto de la
+  // sesión —y sin nada en pantalla que lo explique—. Se recuerda solo lo que se leyó de verdad.
+  void pending.then((manifest) => {
+    if (!manifest && manifestCache.get(moduleId) === pending) manifestCache.delete(moduleId);
+  });
+  return pending;
 }
 
 /**
@@ -303,13 +406,19 @@ export async function loadModuleLocale(
   base: string,
   lang: string,
 ): Promise<ModuleLocaleFile | undefined> {
-  try {
-    const res = await fetch(`${base}/locales/${lang}.json`);
-    if (!res.ok) return undefined;
-    return (await res.json()) as ModuleLocaleFile;
-  } catch {
-    return undefined;
-  }
+  return readOnce(
+    `${base}/locales/${lang}.json`,
+    async (url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return undefined;
+        return (await res.json()) as ModuleLocaleFile;
+      } catch {
+        return undefined;
+      }
+    },
+    (locale) => locale === undefined,
+  );
 }
 
 /**

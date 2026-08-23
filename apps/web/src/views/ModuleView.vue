@@ -108,7 +108,8 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
-  IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner
+  IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner,
+  onIonViewDidLeave, onIonViewWillEnter
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
 import AppPage from '../components/AppPage.vue';
@@ -224,6 +225,27 @@ function params(): { moduleId: string; navId: string } {
   };
 }
 
+/**
+ * ¿Es ESTA copia de la vista la que está en pantalla? (hub#1099.)
+ *
+ * Ionic **no desmonta** la página que dejas atrás cuando entras en otra con un `push` en dirección
+ * `forward`, y las tres puertas a un módulo lo son: el launcher de la topbar, la tarjeta «Mis apps»
+ * del panel y el botón Abrir de /apps. La vista se queda montada y viva, solo escondida — así que
+ * `onBeforeUnmount` **no llega a ejecutarse** por ese camino.
+ *
+ * El resultado medido con 25 módulos: cada navegación dejaba una copia más de esta vista, cada
+ * copia conservaba su watcher de ruta, y el watcher volvía a correr `mount()` ENTERO —los 25
+ * manifests, `/api/navigation` y el guard `protects`— en todas las copias vivas a la vez. Por eso
+ * el coste crecía con cada navegación y no volvía a bajar: no era un bucle, era una copia más.
+ *
+ * Arranca en `true` a propósito. Si estos hooks no llegaran a dispararse (una ruta servida fuera
+ * del `ion-router-outlet`), el comportamiento es exactamente el de antes y ninguna pantalla se
+ * queda en blanco: solo `ionViewDidLeave` puede apagarlo.
+ */
+let onScreen = true;
+/** La ruta que esta copia tiene pintada. Al volver a pantalla, dice si hay que ponerse al día. */
+let mountedPath = '';
+
 let mountGeneration = 0;
 /**
  * Limpieza de la suscripción a `resume_on` del guard `protects` activo (hub#775). Se anulaba
@@ -239,6 +261,7 @@ function clearProtectsSubscription(): void {
 
 async function mount(): Promise<void> {
   const generation = ++mountGeneration;
+  mountedPath = route.fullPath;
   const { moduleId, navId } = params();
   status.value = 'loading';
   // Cada montaje empieza SIN guard: o se vuelve a evaluar abajo, o no aplica (p. ej. pestaña Plan).
@@ -403,9 +426,39 @@ onMounted(() => {
 watch(
   () => [route.params.moduleId, route.params.navId],
   () => {
+    // Una copia que Ionic dejó montada pero ESCONDIDA no es la que el usuario está mirando, y
+    // remontarla aquí es lo que multiplicaba el coste por el número de copias vivas (hub#1099).
+    // Cuando vuelva a pantalla se pondrá al día ella sola (`onIonViewWillEnter`).
+    if (!onScreen) return;
     if (route.name === 'module' && params().moduleId) void mount().then(revealActiveTab);
   },
 );
+
+/**
+ * Fuera de pantalla, pero VIVA. Se suelta aquí todo lo que se soltaba en `onBeforeUnmount` y que
+ * por lo de arriba no llegaba a soltarse nunca (hub#1099): tras 8 navegaciones quedaban 8 listeners
+ * de `focus` —un solo foco de ventana disparaba 8 consultas de entitlement al Cloud—, 8
+ * MutationObserver vigilando outlets escondidos y 8 suscripciones al `resume_on` del guard.
+ *
+ * Lo que NO se toca es el Web Component del módulo: sigue montado en su outlet. Destruirlo al
+ * cambiar de pantalla es otra decisión —afecta a lo que el cajero tiene a medias— y no es de esta
+ * issue; lo que esta issue exige es que la vista escondida deje de TRABAJAR, y eso ya está.
+ */
+onIonViewDidLeave(() => {
+  onScreen = false;
+  window.removeEventListener('focus', recheckEntitlement);
+  stopChrome?.();
+  stopChrome = null;
+  clearProtectsSubscription();
+});
+
+/** De vuelta en pantalla: se recupera lo soltado y se pone al día si la ruta se movió sin ella. */
+onIonViewWillEnter(() => {
+  onScreen = true;
+  window.addEventListener('focus', recheckEntitlement);
+  if (!stopChrome && outlet.value) stopChrome = installChrome(outlet.value, chromeControls);
+  if (mountedPath && mountedPath !== route.fullPath) void mount().then(revealActiveTab);
+});
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
