@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import {
   CAPABILITY_CATALOG,
@@ -34,6 +35,32 @@ describe('capabilityMeta — el catálogo de etiquetas', () => {
     const meta = capabilityMeta('some_future_capability');
     expect(meta.label).not.toBe('');
     expect(meta.description).not.toBe('');
+  });
+
+  // hub#1096 / ADR-0196: el Bridge se retiró (hub#339/#340). La copia que quedó aquí nombraba
+  // «a través del bridge» — la pieza que el dueño buscaría para instalarla ya no existe: es el
+  // callejón sin salida que cerró printing#12 en la pantalla de Impresión. Hoy la cola de
+  // impresión vive en el Hub y la drena erplora-app como host de impresión.
+  it('la descripción de printer no nombra el bridge retirado: dice cola del Hub + erplora-app', () => {
+    const meta = capabilityMeta('printer');
+    expect(meta.label).toBe('Impresora');
+    expect(meta.description).not.toMatch(/bridge/i);
+    expect(meta.description).toMatch(/cola de impresión/);
+    expect(meta.description).toMatch(/erplora-app/);
+  });
+
+  it('el espejo .ts y capability_meta de Rust dicen EXACTAMENTE lo mismo (una sola verdad)', () => {
+    // El texto vive dos veces A PROPÓSITO (el server es la autoridad, esto es el fallback de
+    // primera instalación — ver cabecera de module-capabilities.ts), pero tiene que ser UN texto:
+    // si solo se corrige un lado, el dueño ve descripciones distintas antes y después de instalar.
+    // Mismo patrón que bridge-token-retired.test.ts: el test lee la fuente que no puede ejecutar.
+    const rs = readFileSync(
+      new URL('../../../../crates/server/src/settings.rs', import.meta.url),
+      'utf8',
+    );
+    const arm = rs.match(/"printer"\s*=>\s*\(\s*"Impresora"\s*,\s*"([^"]+)"/);
+    expect(arm, 'no se encontró el brazo "printer" de capability_meta en settings.rs').not.toBeNull();
+    expect(CAPABILITY_CATALOG.printer.description).toBe(arm?.[1]);
   });
 });
 

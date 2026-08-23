@@ -1910,6 +1910,12 @@ export class ErploraClient {
     return new Intl.NumberFormat(opts?.locale ?? this.locale, {
       style: 'currency',
       currency: opts?.currency ?? this.currency,
+      // hub#1090: CLDR deja sin agrupar los 4 dígitos en español (minimumGroupingDigits=2), pero
+      // la regla vinculante del CLAUDE.md raíz es la del sector: agrupar SIEMPRE desde 4 dígitos
+      // («1.234,56 €»). `true` es la forma booleana del `'always'` de MDN y la única que tipa
+      // contra la lib ES2022 del shell. Este formateador es el que ejecutan los módulos de dinero
+      // (`globalThis.erplora.formatMoney`, cableado en el shell) — una sola puerta.
+      useGrouping: true,
       ...(opts?.maximumFractionDigits != null
         ? { maximumFractionDigits: opts.maximumFractionDigits }
         : {}),
