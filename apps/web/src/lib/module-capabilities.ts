@@ -42,7 +42,12 @@ export const CAPABILITY_CATALOG: Record<string, CapabilityMeta> = {
   },
   printer: {
     label: 'Impresora',
-    description: 'Permite imprimir en las impresoras de ticket/cocina a través del bridge.',
+    // hub#1096 / ADR-0196: el Bridge se retiró. La impresión va por la cola del runtime del Hub,
+    // que drena erplora-app (el dispositivo registrado como host de impresión). Espejo de
+    // `capability_meta` en `crates/server/src/settings.rs` — un test clava que digan lo mismo.
+    description:
+      'Permite imprimir en las impresoras de ticket/cocina a través de la cola de impresión del Hub, '
+      + 'que drena erplora-app como host de impresión.',
   },
   notify: {
     label: 'Notificaciones',

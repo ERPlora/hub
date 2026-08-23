@@ -88,9 +88,13 @@ fn capability_meta(id: &str) -> (&'static str, &'static str) {
             "Certificado del negocio (firma fiscal)",
             "Permite usar el certificado de la empresa para firmar y transmitir documentos (p.ej. a Hacienda). La clave privada nunca sale del Hub.",
         ),
+        // hub#1096 / ADR-0196: el Bridge se retiró (hub#339/#340). La impresión va por la cola del
+        // runtime del Hub (`crates/runtime/src/print_queue.rs`), que drena erplora-app por
+        // `GET /ws/print` como host de impresión registrado. Espejo en
+        // `apps/web/src/lib/module-capabilities.ts` — un test de vitest clava que digan lo mismo.
         "printer" => (
             "Impresora",
-            "Permite imprimir en las impresoras de ticket/cocina a través del bridge.",
+            "Permite imprimir en las impresoras de ticket/cocina a través de la cola de impresión del Hub, que drena erplora-app como host de impresión.",
         ),
         "notify" => (
             "Notificaciones",
@@ -364,6 +368,33 @@ pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: Header
             Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
         )
             .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod capability_meta_tests {
+    use super::*;
+
+    /// hub#1096 / ADR-0196: the standalone Bridge is retired (hub#339/#340). The copy the owner
+    /// reads to DECIDE whether to grant the printer permission must not name it: whoever goes
+    /// looking for «el bridge» to install it hits a dead end (the one printing#12 closed). Today
+    /// printing goes through the Hub's print queue, drained by erplora-app as the print host.
+    #[test]
+    fn printer_description_names_the_print_queue_not_the_retired_bridge() {
+        let (label, desc) = capability_meta("printer");
+        assert_eq!(label, "Impresora");
+        assert!(
+            !desc.to_lowercase().contains("bridge"),
+            "still names the retired bridge: {desc}"
+        );
+        assert!(
+            desc.contains("cola de impresión"),
+            "must say printing goes through the Hub's print queue: {desc}"
+        );
+        assert!(
+            desc.contains("erplora-app"),
+            "must name erplora-app as the print host: {desc}"
+        );
     }
 }
 
