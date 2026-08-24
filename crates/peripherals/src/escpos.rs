@@ -583,7 +583,21 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.set(Align::Center, false, false, false);
     b.text("================================\n");
 
-    if is_truthy(data, "table") {
+    // **La etiqueta de sala** (hub#1156 · ADR-0141/0144). El shell manda `label` desde siempre y
+    // aquí se leía `table`, un campo que no manda nadie: la comanda salía sin decir de qué mesa
+    // era, que en hora punta es papel inservible.
+    //
+    // `label` se imprime **tal cual, sin prefijo**: es opaca a propósito — «Mesa 4», «Barra»,
+    // «Recogida Ana». Cocina no sabe qué es una mesa, ni tiene por qué; anteponerle «Mesa: »
+    // produciría «Mesa: Recogida Ana».
+    //
+    // `table` sigue vivo detrás, con su prefijo de siempre: el contrato del dispositivo se amplía,
+    // nunca se sustituye. Hoy no hay ningún productor que lo mande —de ahí venía el fallo— pero
+    // arreglar el camino nuevo no puede dejar sin mesa a una integración que use el viejo.
+    if is_truthy(data, "label") {
+        b.set(Align::Left, true, true, false);
+        b.text(&format!("{}\n", str_field(data, "label", "")));
+    } else if is_truthy(data, "table") {
         b.set(Align::Left, true, true, false);
         b.text(&format!("Mesa: {}\n", str_field(data, "table", "")));
     }
@@ -591,6 +605,16 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.set(Align::Left, false, false, false);
     if is_truthy(data, "waiter") {
         b.text(&format!("Camarero: {}\n", str_field(data, "waiter", "")));
+    }
+
+    // La ronda distingue el segundo pase del primero en la misma mesa. Sólo a partir de la dos:
+    // «Ronda 1» sería una línea de ruido en el 99 % del papel, que es justo el que nadie relee.
+    let round = data
+        .get("round_number")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0);
+    if round > 1.0 {
+        b.text(&format!("Ronda {}\n", fmt_qty(data.get("round_number"), round)));
     }
 
     b.text(&format!("Hora: {}\n", now_hm()));
@@ -603,6 +627,18 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
 
             b.set(Align::Left, true, true, false);
             b.text(&format!("{}x {name}\n", fmt_qty(item.get("quantity"), qty)));
+
+            // **Los suplementos** (hub#1156 · pm#93). Van ANTES de la nota libre y con el mismo
+            // sangrado: el suplemento lo eligió el cliente en la carta y cambia el plato, la nota
+            // es texto del camarero. Se parten a mano conservando el sangrado — si lo cortara la
+            // térmica a 32 columnas, la continuación arrancaría pegada al margen y se leería como
+            // un plato más de la comanda.
+            if is_truthy(item, "modifiers") {
+                b.set(Align::Left, false, false, false);
+                for line in wrap_to_width(str_field(item, "modifiers", ""), LINE_WIDTH - 3) {
+                    b.text(&format!("   {line}\n"));
+                }
+            }
 
             if is_truthy(item, "notes") {
                 b.set(Align::Left, false, false, false);
@@ -742,6 +778,195 @@ fn render_generic(b: &mut EscposBuilder, data: &serde_json::Value) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    // ── La comanda de cocina imprime lo que la fila trae (hub#1156) ─────────────────────────────
+
+    /// Rinde una comanda y devuelve el papel **sin bytes de control**, que es lo que lee un
+    /// cocinero. Sin esto, cada aserción compara contra un texto salpicado de `ESC a`/`GS !` y
+    /// acaba pasando por casualidad.
+    fn paper(data: &serde_json::Value) -> String {
+        let bytes = render_document(DocumentType::KitchenOrder, data).expect("comanda válida");
+        strip_escpos(&bytes)
+    }
+
+    /// Quita los mandos ESC/POS y deja el texto que un cocinero lee.
+    ///
+    /// Filtrar «bytes de control» a secas NO vale y es una trampa que ya mordió: en `ESC a 0` sólo
+    /// el `ESC` es de control — la `a` y el `0` son ASCII imprimible, así que la comanda se leía
+    /// como `aE!0COCINA` y cualquier `contains` pasaba por casualidad sobre basura.
+    ///
+    /// Los mandos de la comanda son todos de tres bytes (`ESC a n`, `ESC E n`, `ESC M n`,
+    /// `GS ! n`, `GS V n`): no hay QR ni código de barras aquí, que son los de longitud variable.
+    /// Si algún día entra uno, este helper lo delata en vez de tragárselo.
+    fn strip_escpos(bytes: &[u8]) -> String {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                0x1b | 0x1d => {
+                    assert!(
+                        i + 2 < bytes.len(),
+                        "mando ESC/POS truncado en {i}: el renderizador emitió bytes a medias"
+                    );
+                    assert!(
+                        !matches!((bytes[i], bytes[i + 1]), (0x1d, 0x28) | (0x1d, 0x6b)),
+                        "mando de longitud variable (QR/barcode) en una comanda: este helper \
+                         sólo sabe de mandos de 3 bytes y lo estaría cortando mal"
+                    );
+                    i += 3;
+                }
+                b => {
+                    out.push(b);
+                    i += 1;
+                }
+            }
+        }
+        String::from_utf8_lossy(&out).into_owned()
+    }
+
+    /// El helper de arriba es el que sostiene todas las aserciones de la comanda, así que se prueba
+    /// a sí mismo: si dejara residuo, un `contains("Mesa 4")` seguiría pasando sobre `aE!0Mesa 4`
+    /// y las pruebas de este bloque valdrían para nada.
+    #[test]
+    fn the_paper_helper_leaves_no_command_residue() {
+        let mut b = EscposBuilder::new();
+        b.set(Align::Center, true, true, true).text("COCINA\n");
+        b.set(Align::Left, false, false, false).text("2x Croquetas\n");
+        assert_eq!(strip_escpos(&b.finish()), "COCINA\n2x Croquetas\n");
+    }
+
+    /// **El suplemento sale por la impresora, no sólo por la pantalla** (hub#1156 · pm#93).
+    ///
+    /// «Sin cebolla» se congela en la fila y el KDS lo pinta, pero la cocina caliente ES papel: en
+    /// la plancha nadie mira una pantalla con las manos ocupadas. Un suplemento que no se imprime
+    /// es el plato que vuelve, y eso no es cosmética.
+    #[test]
+    fn a_supplement_reaches_the_paper_under_its_own_line() {
+        let text = paper(&json!({
+            "receipt_id": "K-217",
+            "items": [{ "name": "Entrecot", "quantity": 1, "modifiers": "Al punto, sin cebolla" }],
+        }));
+        assert!(text.contains("Entrecot"), "el plato está en el papel:\n{text}");
+        assert!(
+            text.contains("Al punto, sin cebolla"),
+            "el suplemento está en el papel — es lo que hace que el plato vuelva:\n{text}"
+        );
+        // Debajo de SU plato, no al final de la hoja: en una comanda de ocho líneas, un suplemento
+        // suelto al pie no dice a qué plato pertenece.
+        let plato = text.find("Entrecot").expect("el plato");
+        let suplemento = text.find("Al punto").expect("el suplemento");
+        assert!(suplemento > plato, "el suplemento va DEBAJO de su línea:\n{text}");
+    }
+
+    /// **El suplemento y la nota conviven, y el suplemento va primero.** Son dos cosas distintas:
+    /// el suplemento lo eligió el cliente en la carta y cambia el plato; la nota es texto libre del
+    /// camarero. Perder una al pintar la otra fue el fallo original.
+    #[test]
+    fn a_line_can_carry_both_a_supplement_and_a_free_note() {
+        let text = paper(&json!({
+            "items": [{ "name": "Croquetas", "quantity": 2, "modifiers": "Sin gluten", "notes": "para compartir" }],
+        }));
+        let mods = text.find("Sin gluten").expect("el suplemento está en el papel");
+        let notes = text.find("para compartir").expect("la nota está en el papel");
+        assert!(mods < notes, "el suplemento va antes que la nota libre:\n{text}");
+    }
+
+    /// **La comanda dice de qué mesa es** (hub#1156 · ADR-0141/0144).
+    ///
+    /// El shell manda `label` desde siempre y el renderizador leía `table`, un campo que no manda
+    /// nadie: la comanda salía sin la única cosa que cocina sabe de la sala. En hora punta, una
+    /// comanda sin mesa es papel que no sirve para nada.
+    ///
+    /// La etiqueta se imprime **tal cual**, sin prefijo: es opaca a propósito — «Mesa 4», «Barra»,
+    /// «Recogida Ana». Cocina no sabe qué es una mesa, ni tiene por qué.
+    #[test]
+    fn the_kitchen_order_says_which_table_it_is_for() {
+        let text = paper(&json!({
+            "receipt_id": "K-217",
+            "label": "Mesa 4",
+            "round_number": 2,
+            "items": [{ "name": "Croquetas", "quantity": 2 }],
+        }));
+        assert!(text.contains("Mesa 4"), "la etiqueta de sala está en el papel:\n{text}");
+        assert!(!text.contains("Mesa: Mesa 4"), "tal cual, sin prefijo: la etiqueta es opaca:\n{text}");
+        // La ronda distingue el segundo pase del primero en la misma mesa. Viajaba y nadie la leía.
+        // Se afirma la palabra entera: `contains('2')` habría pasado por el «K-217» de arriba —
+        // un control que acierta por casualidad no prueba nada.
+        assert!(text.contains("Ronda 2"), "la ronda está en el papel:\n{text}");
+    }
+
+    /// **La primera ronda NO se anuncia.** Es el caso normal —una comanda que no es un segundo
+    /// pase— y ponerle «Ronda 1» le añadiría una línea de ruido al 99 % del papel. La ronda dice
+    /// «esto ya es el segundo envío de esta mesa», y eso sólo es cierto a partir de la dos.
+    #[test]
+    fn the_first_round_is_not_announced() {
+        let text = paper(&json!({
+            "label": "Mesa 4", "round_number": 1,
+            "items": [{ "name": "Croquetas", "quantity": 2 }],
+        }));
+        assert!(text.contains("Mesa 4"), "la mesa sí:\n{text}");
+        assert!(!text.contains("Ronda"), "la ronda no:\n{text}");
+    }
+
+    /// **Un suplemento largo se parte con su sangrado, no lo parte la impresora.** A 32 columnas,
+    /// «Al punto, sin cebolla, sin sal, extra salsa» desborda; si lo corta la térmica, el resto
+    /// arranca pegado al margen y se lee como un plato más de la comanda.
+    #[test]
+    fn a_long_supplement_wraps_keeping_its_indent() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Entrecot", "quantity": 1,
+                "modifiers": "Al punto, sin cebolla, sin sal, extra salsa aparte",
+            }],
+        }));
+        let partes: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("salsa") || l.contains("Al punto"))
+            .collect();
+        // Sin esto el `for` de abajo no se ejecutaría nunca y el test saldría verde sobre una
+        // comanda que ni siquiera imprime el suplemento — un bucle vacío no prueba nada.
+        assert!(
+            partes.len() >= 2,
+            "el suplemento largo se parte en varias líneas, no se pierde:\n{text}"
+        );
+        for line in partes {
+            assert!(line.starts_with("   "), "la continuación conserva el sangrado: {line:?}");
+            assert!(
+                line.chars().count() <= LINE_WIDTH,
+                "y cabe en el papel ({LINE_WIDTH} columnas): {line:?}"
+            );
+        }
+    }
+
+    /// **Lo que ya mandaba `table` sigue imprimiéndose.** No hay ningún productor vivo que lo mande
+    /// —de ahí el fallo— pero el contrato del dispositivo se amplía, nunca se sustituye: una
+    /// integración que lo use no puede quedarse sin mesa por arreglar el camino nuevo.
+    #[test]
+    fn the_legacy_table_field_still_prints() {
+        let text = paper(&json!({ "table": "4", "items": [{ "name": "Croquetas", "quantity": 2 }] }));
+        assert!(text.contains("Mesa: 4"), "la forma vieja conserva su prefijo:\n{text}");
+    }
+
+    /// **Una comanda a la carta sale EXACTAMENTE igual que antes de hub#1156.** Es el 99 % de las
+    /// comandas: romper esto es romper la cocina entera para arreglar un caso raro.
+    #[test]
+    fn an_ordinary_order_prints_exactly_as_it_did_before() {
+        let text = paper(&json!({
+            "receipt_id": "K-9",
+            "items": [
+                { "name": "Croquetas", "quantity": 2, "notes": "sin gluten" },
+                { "name": "Flan", "quantity": 1 }
+            ],
+        }));
+        assert_eq!(
+            text,
+            "COCINA\n#K-9\n================================\nHora: HH:MM\n\
+             --------------------------------\n2x Croquetas\n   >> sin gluten\n1x Flan\n\
+             ================================\n\n\n\n\n"
+                .replace("HH:MM", &now_hm()),
+            "el papel de siempre, byte a byte"
+        );
+    }
 
     /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same eight names
     /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) and refuses anything else at the door; the
