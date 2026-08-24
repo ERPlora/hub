@@ -19,9 +19,14 @@ const PUBLIC_DST = join(HERE, 'public/modules');
 // fires for one that is listed and has no `module.json`), and then the bench contradicts itself:
 // the runtime reports the module installed while the shell answers «no se pudo cargar el módulo».
 // That is what happened to `flows`, the 25th (pm#110) — added below, and pinned by a test.
+//
+// A RETIRED module is the mirror case and is deliberately absent: `invoice_series` was retired by
+// ADR-0369 (invoice_series#20) because fiscal numbering has a single owner, `invoice`. Listing it
+// here brought back the duplicated «Tu numeración de facturas» setup step on every local bench.
+// Its absence is pinned by a test too, so nobody re-adds it by copying an old list.
 export const MODULES = [
   'appointments', 'cart_checkout', 'cash_register', 'customers', 'flows', 'inventory',
-  'invoice', 'invoice_series', 'kitchen', 'online_booking',
+  'invoice', 'kitchen', 'online_booking',
   'payment_gateways', 'payments', 'pricing', 'reservations',
   'printing', 'sales', 'schedules', 'services', 'staff', 'tables',
   'tasks', 'taxes', 'tickets', 'verifactu', 'whatsapp_inbox',
