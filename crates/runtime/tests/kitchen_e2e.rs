@@ -56,12 +56,19 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
 
 /// Abre un pedido con una línea y devuelve su id.
 async fn open_order(rt: &Runtime, ctx: &RequestContext, product: &str) -> String {
+    open_order_with(rt, ctx, json!([{ "product_name": product, "price": 350, "quantity": 2_000_000 }]))
+        .await
+}
+
+/// Abre un pedido con las líneas EXACTAS que se le pidan.
+///
+/// Existe porque `sales.order.fire` dejó de fiarse de `payload.items` (kitchen#54): las líneas que
+/// bajan a cocina salen de la read declarada sobre `sales_order_item`, o sea de filas reales. Un
+/// test que quiera dos líneas, media ración o un `product_id` enrutado tiene que **sembrarlo aquí**;
+/// mandarlo en el disparo ya no hace nada.
+async fn open_order_with(rt: &Runtime, ctx: &RequestContext, items: serde_json::Value) -> String {
     let res = rt
-        .execute_command(
-            "sales.order.open",
-            &params(json!({ "items": [{ "product_name": product, "price": 350, "quantity": 2_000_000 }] })),
-            ctx,
-        )
+        .execute_command("sales.order.open", &params(json!({ "items": items })), ctx)
         .await
         .unwrap();
     res["new_ids"][0].as_str().unwrap().to_string()
@@ -200,16 +207,18 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         .expect("enrutar el producto a su estación");
     }
 
-    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([
+            { "product_id": "prod-croquetas", "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 },
+            { "product_id": "prod-canas", "product_name": "Cañas", "price": 250, "quantity": 2_000_000 }
+        ]),
+    )
+    .await;
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [
-                { "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 },
-                { "product_id": "prod-canas", "product_name": "Cañas", "quantity": 2_000_000, "unit_price": 250 }
-            ]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
@@ -256,14 +265,16 @@ async fn media_racion_llega_a_cocina_como_media_racion() {
     // en cada disparo, para siempre.
     let (rt, _) = fresh().await;
     let ctx = admin();
-    let oid = open_order(&rt, &ctx, "Gambas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([{ "product_name": "Gambas", "price": 2400, "quantity": 500_000 }]),
+    )
+    .await;
 
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_name": "Gambas", "quantity": 500_000, "unit_price": 2400 }]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
@@ -323,13 +334,15 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
     .await
     .unwrap();
 
-    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([{ "product_id": "prod-croquetas", "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 }]),
+    )
+    .await;
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 }]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
