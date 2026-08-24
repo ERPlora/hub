@@ -1,0 +1,51 @@
+DROP TABLE IF EXISTS kitchen_order_modifier;
+
+-- Kitchen · migration 007 — the normalized modifier table is retired: the supplements of a line
+-- travel in the JSON snapshot `kitchen_order_item.modifiers` (kitchen#55, ADR-0376).
+--
+-- 🔴 THE PROSE IS AT THE BOTTOM ON PURPOSE, AND MOVING IT UP DESTROYS DATA. This file is declared
+-- `kind: "contract"` (hub#542/#1093), the only declaration under which the runtime accepts a
+-- `DROP` — and it accepts it by TRANSLATING it: `migration_guard::set_aside_instead_of_dropping`
+-- turns `DROP TABLE t` into `ALTER TABLE t RENAME TO _deprecated_t`, so the rows are set aside,
+-- not destroyed, and reverting is a rename back. That translation matches `DROP TABLE ` at the
+-- START of the statement text, and the guard's splitter keeps a preceding comment INSIDE the
+-- statement it precedes. A header comment above the first `DROP` therefore makes the translation
+-- miss in silence and the hub runs a real, irreversible `DROP TABLE` on a customer database.
+-- `tests/retire_order_modifier.pg.test.py` goes red if anyone tidies these lines back to the top;
+-- the hub-side fix is ERPlora/hub#1137, still open.
+--
+-- WHAT IS BEING RETIRED, AND WHY IT IS SAFE. `kitchen_order_modifier` was created by
+-- `001_init.sql` and never got a door: no command writes it, no query reads it, no JSON Schema
+-- names it, the WASM handler and the KDS Web Component ignore it. A sweep of `origin` over the 26
+-- module repositories, the hub, the SaaS, the blueprints, the module toolkit and OutfitKit finds
+-- the name in exactly two places: this module's `001_init.sql`, and the hub's
+-- `money_backfill.rs::MONEY_COLUMNS` — an inventory that skips in silence whatever the database
+-- does not have (`declared_type` returns nothing and the entry is ignored), so it reads the table
+-- but never writes it and stops mattering the moment the table is set aside.
+--
+-- What DOES carry the supplements is the immutable snapshot `kitchen_order_item.modifiers`,
+-- written by `commands/_insert_item.sql` and painted under the line by `erp-kitchen-display.ts`.
+-- That is the right call, not an accident: ADR-0376 rule 4 makes the snapshot immutable by
+-- contract, so a normalized table with a foreign key adds nothing and adds one more write that
+-- can end up half done. Same criterion as the destination and the station name, frozen in that
+-- very row because they are a historical fact of THIS dispatch. A table that exists and nobody
+-- writes is a false promise in the schema: the next reader assumes there are rows in it, or
+-- writes against it believing it is the good road while the KDS keeps reading the JSON.
+--
+-- No hub can hold data here — there is no statement in the module that could ever have written a
+-- row — and no exported bundle can carry one either: `export.rs` dumps a table row by row and
+-- zero rows produce zero `INSERT`s, so no blueprint or backup already out there names this table.
+-- Checked on the published seeds too: `starter_catalogs/es/{beauty,restaurant}/seed.sql` insert
+-- into fourteen and five tables respectively, none of them this one. The rename is belt and
+-- braces on top of that, not the reason to trust it.
+--
+-- `001_init.sql` keeps its `CREATE TABLE`. `_hub_migrations` records by FILE NAME, so editing an
+-- applied migration re-runs nothing where it is applied and only rewrites history where it is
+-- not: a new hub creates the table at 001 and sets it aside here, six migrations later.
+-- `IF EXISTS`, so a boot that died halfway through this file can simply run it again.
+--
+-- The two indexes `ix_kitchen_modifier_item` and `idx_kitchen_order_modifier_hub` need no
+-- statement of their own, and must not have one: a `DROP INDEX` is NOT translated by the guard —
+-- it would be the one genuinely destructive line in a migration whose whole point is that nothing
+-- is destroyed. Postgres carries an index along with its table through a rename, so both follow
+-- `_deprecated_kitchen_order_modifier` and go quiet with it.

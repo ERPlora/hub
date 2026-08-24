@@ -1,0 +1,41 @@
+DROP TABLE IF EXISTS services_addon_services;
+DROP TABLE IF EXISTS services_addon;
+
+-- Services · migration 009 — the addon schema is retired: `modifiers` owns the concept now
+-- (services#67, ADR-0376).
+--
+-- 🔴 THE PROSE IS AT THE BOTTOM ON PURPOSE, AND MOVING IT UP DESTROYS DATA. This file is declared
+-- `kind: "contract"` (hub#542/#1093), the only declaration under which the runtime accepts a
+-- `DROP` — and it accepts it by TRANSLATING it: `migration_guard::set_aside_instead_of_dropping`
+-- turns `DROP TABLE t` into `ALTER TABLE t RENAME TO _deprecated_t`, so the rows are set aside,
+-- not destroyed, and reverting is a rename back. That translation matches `DROP TABLE ` at the
+-- START of the statement text, and the guard's splitter keeps a preceding comment INSIDE the
+-- statement it precedes. A header comment above the first `DROP` therefore makes the translation
+-- miss in silence and the hub runs a real, irreversible `DROP TABLE`. Measured by compiling that
+-- very function and feeding it this file both ways. `tests/retire_addon.postgres.test.py` fails if
+-- anyone tidies these lines back to the top; the hub-side fix is ERPlora/hub#1137.
+--
+-- WHAT IS BEING RETIRED, AND WHY IT IS SAFE. `services_addon` and `services_addon_services` were
+-- created by `001_init.sql` and never got a door: no command writes them, no query reads them, no
+-- JSON Schema names them, the WASM handler ignores them. services#14 took variants and addons out
+-- of scope on 2026-08-06 and closed, leaving the schema behind — a table that has promised a
+-- feature ever since without one line able to deliver it. ADR-0376 gave the concept its real
+-- owner: `modifiers`, a module of its own that owns groups and options, which `services` links to
+-- by opaque reference (`target_kind`/`target_ref`) and WITHOUT gaining a `depends_on` (ADR-0127).
+-- The «+ keratin treatment» a salon charges is a modifier, which is exactly what this pair was
+-- created for and never managed to be.
+--
+-- No hub can hold data here — there is no statement in the module that could have written a row —
+-- and no exported bundle can carry one either: `export.rs` dumps a table row by row, and zero rows
+-- produce zero `INSERT`s, so no blueprint or backup already out there names these tables. The
+-- rename is belt and braces on top of that, not the reason to trust it.
+--
+-- `001_init.sql` keeps its `CREATE TABLE`. `_hub_migrations` records by FILE NAME, so editing an
+-- applied migration re-runs nothing where it is applied and only rewrites history where it is not:
+-- a new hub creates the pair at 001 and sets it aside here, three statements later. `IF EXISTS` on
+-- both, so a boot that died halfway through this file can simply run it again.
+--
+-- The index `ix_services_addon_hub` needs no statement of its own, and must not have one: a
+-- `DROP INDEX` is NOT translated by the guard — it would be the one genuinely destructive line in
+-- a migration whose whole point is that nothing is destroyed. Postgres carries an index along with
+-- its table through a rename, so it follows `_deprecated_services_addon` and goes quiet with it.
