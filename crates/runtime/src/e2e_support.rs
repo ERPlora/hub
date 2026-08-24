@@ -169,6 +169,69 @@ pub fn require_modules_workspace() -> bool {
     }
 }
 
+/// ¿La versión `found` cubre lo que un test necesita (`needed`)?
+///
+/// Comparación por NÚMERO, componente a componente. Como texto, `"2.3.9" > "2.3.27"` — y por ahí
+/// se cuela un falso verde. Una versión ilegible (vacía, con letras) devuelve `false`: un
+/// `module.json` que no se puede leer no es permiso para asegurar nada. Las formas cortas se
+/// completan con ceros (`"3"` = `3.0.0`).
+fn version_is_at_least(found: &str, needed: &str) -> bool {
+    fn parts(v: &str) -> Option<(u64, u64, u64)> {
+        let mut it = v.trim().split('.');
+        let mut next = || -> Option<u64> {
+            match it.next() {
+                None => Some(0),
+                Some(x) => x.trim().parse::<u64>().ok(),
+            }
+        };
+        let (a, b, c) = (next()?, next()?, next()?);
+        Some((a, b, c))
+    }
+    match (parts(found), parts(needed)) {
+        (Some(f), Some(n)) => f >= n,
+        _ => false,
+    }
+}
+
+/// Guard de VERSIÓN para un e2e que asegura algo de un módulo concreto.
+///
+/// Hermano de [`require_modules_workspace`], y por el mismo motivo. Los e2e cargan los módulos de
+/// `modules-workspace/modules/<id>`, que es un checkout **compartido** por la flota: casi siempre
+/// está en la rama de otro y varias releases por detrás de lo publicado. Un test que asegura algo
+/// que llegó en una versión nueva se pone rojo ahí — y no en el worktree de quien lo escribió,
+/// sino en el **gate pre-push de todo el que empuje después**. Ha puesto el gate de la flota en
+/// rojo dos veces esta semana.
+///
+/// - `true` → el módulo del disco cubre la versión: el test corre.
+/// - `false` → se OMITE, imprimiendo **las dos versiones y el módulo**. Visible a propósito: un
+///   skip mudo es un verde vacío, que es justo lo que `require_modules_workspace` ya rechaza.
+///
+/// ```ignore
+/// if !erplora_runtime::require_module_version("kitchen", "2.3.27") { return; }
+/// ```
+pub fn require_module_version(module_id: &str, needed: &str) -> bool {
+    let manifest = modules_root().join(module_id).join("module.json");
+    let found = std::fs::read_to_string(&manifest)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .and_then(|v| v.get("version").and_then(|x| x.as_str()).map(str::to_owned))
+        .unwrap_or_default();
+
+    if version_is_at_least(&found, needed) {
+        return true;
+    }
+    println!(
+        "⏭  SKIP e2e: `{module_id}` en disco es {} y este test necesita >= {needed}. \
+         Este test NO se ejecutó.\n   {} \n   \
+         El checkout de módulos lo comparte toda la flota y suele ir por detrás: \
+         actualízalo (`git -C <ese checkout> fetch && git checkout main`) o apunta a otro con \
+         ERPLORA_MODULES_DIR=... para ejecutarlo de verdad.",
+        if found.is_empty() { "ilegible/ausente".to_string() } else { found },
+        manifest.display(),
+    );
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,6 +241,50 @@ mod tests {
     // Estos tests fijan la matriz de decisión del guard. Son la prueba de que el modo de fallo
     // silencioso (ERPlora/hub#253) es ahora ruidoso: en local, módulos ausentes → FailLoud (nunca
     // Run, nunca un LegitSkip encubierto). Solo CI u override explícito permiten el skip.
+
+    // ── El módulo DEL DISCO puede ir por detrás de lo que el test asegura ──────────────────
+    //
+    // Los e2e cargan los módulos de `modules-workspace/modules/<id>`, que es un checkout
+    // COMPARTIDO por toda la flota y que a menudo está en la rama de otro, varias releases por
+    // detrás de lo publicado. Un test que asegura algo de una versión nueva se pone rojo ahí — y
+    // no en su propio worktree, sino en el gate pre-push de TODO el que empuje después.
+    //
+    // Ha pasado dos veces esta semana. La política: si el módulo del disco es más viejo que lo que
+    // el test necesita, se OMITE, pero nombrando las dos versiones — nunca en silencio, que es lo
+    // que convierte un guard en un verde vacío.
+
+    #[test]
+    fn una_version_igual_o_mayor_corre_el_test() {
+        assert!(version_is_at_least("2.3.27", "2.3.27"));
+        assert!(version_is_at_least("2.3.28", "2.3.27"));
+        assert!(version_is_at_least("2.4.0", "2.3.27"));
+        assert!(version_is_at_least("3.0.0", "2.3.27"));
+    }
+
+    #[test]
+    fn una_version_mas_vieja_no_corre_el_test() {
+        // El caso real: el checkout compartido en 2.3.20 mientras lo publicado es 2.3.27.
+        assert!(!version_is_at_least("2.3.20", "2.3.27"));
+        assert!(!version_is_at_least("2.2.99", "2.3.27"));
+        assert!(!version_is_at_least("1.9.9", "2.3.27"));
+    }
+
+    #[test]
+    fn se_compara_por_numero_y_no_por_texto() {
+        // `"2.3.9" > "2.3.27"` como CADENA, y por ahí se cuela un falso verde.
+        assert!(!version_is_at_least("2.3.9", "2.3.27"));
+        assert!(version_is_at_least("2.10.0", "2.9.0"));
+    }
+
+    #[test]
+    fn una_version_ilegible_no_se_da_por_buena() {
+        // Un `module.json` que no se puede leer no es permiso para asegurar nada.
+        assert!(!version_is_at_least("", "2.3.27"));
+        assert!(!version_is_at_least("no-soy-una-version", "2.3.27"));
+        // Y las formas cortas se completan con ceros en vez de reventar.
+        assert!(version_is_at_least("3", "2.3.27"));
+        assert!(!version_is_at_least("2.3", "2.3.27"));
+    }
 
     #[test]
     fn decide_run_cuando_los_modulos_existen() {
