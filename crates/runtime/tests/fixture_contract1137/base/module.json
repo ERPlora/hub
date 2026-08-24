@@ -1,0 +1,8 @@
+{
+  "id": "contract1137",
+  "name": "Contract 1137",
+  "version": "1.0.0",
+  "migrations": {
+    "postgres": [{ "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" }]
+  }
+}
