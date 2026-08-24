@@ -129,9 +129,21 @@ async fn seed_cash_sale_movement(rt: &Runtime, ctx: &RequestContext, sid: &str, 
 }
 
 /// Aplica el descuento de stock que `decrease_on_sale` habría hecho al cobrar (command real).
-async fn seed_stock_decrease(rt: &Runtime, ctx: &RequestContext, pid: &str, qty: i64) {
-    rt.execute_command("inventory.stock.decrease", &params(json!({ "product_id": pid, "qty": qty })), ctx)
-        .await.unwrap();
+///
+/// 🔴 CON `sale_id`, que es lo que hace el listener de verdad. Sin él el movimiento entra en el
+/// ledger como un `decrease` DIRECTO y sin referencia —un ajuste a mano, no una venta—, así que
+/// la siembra no era el descuento que dice ser. Daba igual mientras la restitución del void se
+/// re-derivaba de `sales_sale_item`; desde `ERPlora/inventory#69` (ADR-0381) el void REVIERTE EL
+/// LEDGER, porque los componentes de un combo no están en filas de la venta y porque la fuente
+/// vieja devolvía hasta descuentos RECHAZADOS por falta de stock. Con la referencia puesta, esta
+/// siembra vuelve a ser equivalente al camino real y el test comprueba la misma promesa.
+async fn seed_stock_decrease(rt: &Runtime, ctx: &RequestContext, sale_id: &str, pid: &str, qty: i64) {
+    rt.execute_command(
+        "inventory.stock.decrease",
+        &params(json!({ "product_id": pid, "qty": qty, "sale_id": sale_id })),
+        ctx,
+    )
+    .await.unwrap();
 }
 
 /// Listeners de sale.voided registrados por ambos módulos.
@@ -164,7 +176,7 @@ async fn cash_sale_void_reverts_cash_and_stock() {
     // Precondición: venta cash de 30,00 € de 2 uds → caja +3000, stock 10→8.
     seed_sale(&rt, "sale-1", "S-1", 3000, "cash", &[(&pid, 0, 2_000_000.0)]).await;
     seed_cash_sale_movement(&rt, &ctx, &sid, "sale-1", 3000).await;
-    seed_stock_decrease(&rt, &ctx, &pid, 2_000_000).await;
+    seed_stock_decrease(&rt, &ctx, "sale-1", &pid, 2_000_000).await;
     assert_eq!(expected_cash(&rt, &ctx).await, opening + 3000, "la venta cash subió la caja");
     assert_eq!(stock_of(&rt, &ctx, &pid).await, 8_000_000.0, "la venta bajó el stock");
 
@@ -209,7 +221,7 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
 
     // Card sale: does NOT create a cash movement; only lowers stock 7→4 (10^6 fixed point).
     seed_sale(&rt, "sale-2", "S-2", 3000, "card", &[(&pid, 0, 3_000_000.0)]).await;
-    seed_stock_decrease(&rt, &ctx, &pid, 3_000_000).await;
+    seed_stock_decrease(&rt, &ctx, "sale-2", &pid, 3_000_000).await;
     assert_eq!(expected_cash(&rt, &ctx).await, opening, "tarjeta no toca la caja");
     assert_eq!(stock_of(&rt, &ctx, &pid).await, 4_000_000.0);
 
