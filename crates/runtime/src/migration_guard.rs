@@ -55,6 +55,10 @@ pub enum GuardError {
     ReservedNamespace { table: String },
     /// El SQL no hace lo que el `kind` declara.
     KindMismatch { kind: Kind, found: String },
+    /// Un `contract` destruye FILAS. No hay traducción posible: se rechaza (hub#1145).
+    RowDestruction { verb: &'static str },
+    /// Un `DROP` que nombra varias cosas en una sentencia. La traducción es 1:1 o no es (hub#1145).
+    DropsMoreThanOne { what: &'static str, statement: String },
 }
 
 impl std::fmt::Display for GuardError {
@@ -73,6 +77,20 @@ impl std::fmt::Display for GuardError {
                 f,
                 "la migración se declara `{kind:?}` pero contiene `{found}`. Si es intencionado, \
                  declárala `contract` (y llevará `since`); si no, sobra."
+            ),
+            GuardError::RowDestruction { verb } => write!(
+                f,
+                "la migración se declara `contract` pero contiene `{verb}`, que DESTRUYE FILAS sin \
+                 vuelta atrás. Un `contract` retira ESTRUCTURA y el runtime la aparta a \
+                 `_deprecated_*`; de las filas no hay nada que apartar. Si de verdad hay que \
+                 limpiarlas, va en una migración `backfill`, que es donde el DML tiene su sitio y \
+                 donde se ve que no admite vuelta atrás."
+            ),
+            GuardError::DropsMoreThanOne { what, statement } => write!(
+                f,
+                "la migración `contract` retira más de una {what} en la misma sentencia, y la \
+                 traducción a `RENAME` es de una sentencia a una sentencia: `{statement}`. Escribe \
+                 una {what} por sentencia."
             ),
         }
     }
@@ -149,6 +167,11 @@ pub fn kind_matches(sql: &str, kind: Kind) -> Result<(), GuardError> {
                     return Err(GuardError::KindMismatch { kind, found });
                 }
             }
+            // Aquí `contract` significa «declaro que esto no admite vuelta atrás», y esa
+            // declaración es justamente lo que se pedía: no hay nada que comprobar. La regla de
+            // hub#1145 —un `contract` no destruye filas— vive en [`check`], que es la puerta de las
+            // migraciones de MÓDULO, las únicas cuyo `DROP` se traduce. Las de sistema son nuestras,
+            // se leen en una PR y `MIGRATIONS` lleva su inventario de versiones sin rollback.
             Kind::Contract => {}
         }
     }
@@ -198,7 +221,15 @@ pub fn check(
                 out.push(statement);
             }
             // El único sitio donde `DROP` está admitido — y aun así se aparta, no se destruye.
-            Kind::Contract => out.push(set_aside_instead_of_dropping(&statement)),
+            Kind::Contract => {
+                // 🔴 Lo que NO se puede apartar, no entra (hub#1145). `set_aside_instead_of_dropping`
+                // solo sabe traducir `DROP TABLE` y `DROP COLUMN`; cualquier otro verbo destructivo
+                // salía por aquí **tal cual** y se ejecutaba de verdad.
+                if let Some(verb) = row_destroying_verb(&statement) {
+                    return Err(GuardError::RowDestruction { verb });
+                }
+                out.push(set_aside_instead_of_dropping(&statement)?);
+            }
         }
     }
 
@@ -230,7 +261,15 @@ pub fn check(
 /// migraciones madura (Rails, Django, Flyway, Liquibase) aparta índices. Y en un `DROP TABLE` ni
 /// siquiera hace falta escribirlo: Postgres se lleva los índices con la tabla — y con la tabla
 /// apartada, se van con ella.
-fn set_aside_instead_of_dropping(statement: &str) -> String {
+///
+/// 🔴 **La traducción es de UNA sentencia a UNA sentencia** (hub#1145). `DROP TABLE a, b;` es SQL
+/// válido, pero `ALTER TABLE … RENAME TO` acepta **una sola** tabla, así que una lista tendría que
+/// salir como N sentencias. Cuando esto se limitaba a coger el primer nombre, lo que se ejecutaba
+/// era `ALTER TABLE a, RENAME TO _deprecated_a,` — un `syntax error at or near ","` que no explica
+/// nada y que además dejaba `b` sin retirar. Se rechaza en el guard, con el error diciendo qué
+/// escribir: romper el 1:1 por una forma que nadie usa cuesta lo único que hace auditable la
+/// traducción — que el autor pueda leer el SQL reescrito y casarlo con el suyo línea a línea.
+fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> {
     let (prose, rest) = leading_prose(statement);
     // El SQL de verdad, sin comentarios: es lo único sobre lo que se puede decidir.
     let cleaned = strip_comments(rest);
@@ -238,21 +277,68 @@ fn set_aside_instead_of_dropping(statement: &str) -> String {
     let upper = sql.to_uppercase();
 
     if let Some(at) = upper.find(" DROP COLUMN ") {
+        // Una coma en cualquier sitio significa que el `ALTER` lleva más de una acción — sea
+        // `DROP COLUMN a, DROP COLUMN b` o `ADD COLUMN x TEXT, DROP COLUMN y`. Las dos formas
+        // producían un `RENAME` roto con la coma pegada dentro.
+        if sql.trim_end_matches(';').contains(',') {
+            return Err(GuardError::DropsMoreThanOne {
+                what: "columna",
+                statement: sql.to_string(),
+            });
+        }
         let head = sql[..at].trim_end(); // "ALTER TABLE sales_sale"
         let rest = sql[at + " DROP COLUMN ".len()..].trim();
         let (guard, column) = strip_if_exists(rest);
         let column = column.split_whitespace().next().unwrap_or(column).trim_end_matches(';');
-        return format!("{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}");
+        return Ok(format!("{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}"));
     }
 
     if upper.starts_with("DROP TABLE ") {
         let named = sql["DROP TABLE ".len()..].trim();
         let (guard, table) = strip_if_exists(named);
+        // `DROP TABLE t CASCADE` no lleva coma y sigue siendo una tabla: el `CASCADE` se cae solo
+        // al renombrar, porque renombrar no arrastra a nadie.
+        if table.trim_end_matches(';').contains(',') {
+            return Err(GuardError::DropsMoreThanOne {
+                what: "tabla",
+                statement: sql.to_string(),
+            });
+        }
         let table = table.split_whitespace().next().unwrap_or(table).trim_end_matches(';');
-        return format!("{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}");
+        return Ok(format!("{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}"));
     }
 
-    statement.to_string()
+    Ok(statement.to_string())
+}
+
+/// El verbo que destruye FILAS, si la sentencia lleva alguno (hub#1145).
+///
+/// Solo `TRUNCATE` y `DELETE FROM`, y a propósito: es lo que un `contract` **no puede traducir**.
+/// `DROP TABLE`/`DROP COLUMN` se apartan, y `DROP CONSTRAINT` no toca ni una fila —de hecho una de
+/// las tres migraciones `contract` publicadas es exactamente eso, un swap atómico de constraint—,
+/// así que meterlos aquí pondría en rojo trabajo correcto ya publicado.
+///
+/// Compara **tokens enteros**, no subcadenas: `contains("TRUNCATE")` caza una columna llamada
+/// `truncate_at`, y un falso positivo aquí deja un módulo sin instalar. Por lo mismo `DELETE` solo
+/// cuenta cuando le sigue `FROM` — `ON DELETE CASCADE` es una constraint, no un borrado — y se mira
+/// token a token en vez de buscar la frase `"DELETE FROM"`, que un salto de línea partiría.
+fn row_destroying_verb(statement: &str) -> Option<&'static str> {
+    let cleaned = strip_comments(statement).to_uppercase();
+    let tokens: Vec<&str> = cleaned.split_whitespace().map(bare_token).collect();
+    for (i, token) in tokens.iter().enumerate() {
+        if *token == "TRUNCATE" {
+            return Some("TRUNCATE");
+        }
+        if *token == "DELETE" && tokens.get(i + 1) == Some(&"FROM") {
+            return Some("DELETE FROM");
+        }
+    }
+    None
+}
+
+/// El token sin la puntuación que lo rodea: `t);` → `T`. Deja `_` dentro, que es parte del nombre.
+fn bare_token(token: &str) -> &str {
+    token.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '_')
 }
 
 /// Parte la sentencia en (prosa de cabecera, SQL). La prosa es todo lo que precede al primer
@@ -763,6 +849,136 @@ mod tests {
             ],
             "lo que no se traduce se ejecuta TAL CUAL, prosa incluida"
         );
+    }
+
+    // ── Un `contract` retira ESTRUCTURA, no filas (hub#1145) ─────────────────────────
+
+    /// 🔴 El agujero: `Kind::Contract` no comprobaba **ningún** verbo, y
+    /// `set_aside_instead_of_dropping` solo sabe traducir `DROP TABLE`/`DROP COLUMN`. Un `TRUNCATE`
+    /// salía por el `_ => statement` final y se ejecutaba tal cual sobre la BD de un cliente.
+    #[test]
+    fn a_contract_may_not_truncate() {
+        let refused = contract("TRUNCATE sales_line").expect_err("un `contract` no vacía tablas");
+        let message = refused.to_string();
+        assert!(message.contains("TRUNCATE"), "{message}");
+        assert!(message.contains("backfill"), "y dice por dónde SÍ se limpian filas: {message}");
+    }
+
+    /// La otra mitad, y la que más se parece a un cambio inocente.
+    #[test]
+    fn a_contract_may_not_delete_rows() {
+        for sql in [
+            "DELETE FROM sales_line WHERE legacy = 'yes'",
+            "DELETE FROM sales_line",
+            // Un salto de línea entre el verbo y el `FROM` es la razón de mirar token a token en
+            // vez de buscar la frase entera.
+            "DELETE\n  FROM sales_line",
+            "-- retirar lo viejo\nTRUNCATE TABLE sales_line",
+        ] {
+            let refused = contract(sql).expect_err("un `contract` no destruye filas");
+            assert!(
+                matches!(refused, GuardError::RowDestruction { .. }),
+                "`{sql}` tenía que rechazarse por destruir filas: {refused}"
+            );
+        }
+    }
+
+    /// El mismo verbo en un `backfill` es **el camino que el error recomienda**, así que tiene que
+    /// existir de verdad. Sin este test, «vete a un backfill» podría estar mandando a una puerta
+    /// cerrada. `TRUNCATE` no: es incondicional y no lo admite ningún `kind`.
+    #[test]
+    fn deleting_rows_is_what_a_backfill_is_for() {
+        check(
+            "sales",
+            "migrations/postgres/012_clean_legacy.sql",
+            "DELETE FROM sales_line WHERE legacy = 'yes'",
+            Kind::Backfill,
+        )
+        .expect("limpiar filas propias es DML, y el DML vive en un `backfill`");
+
+        check("sales", "m.sql", "TRUNCATE sales_line", Kind::Backfill)
+            .expect_err("un `TRUNCATE` no admite `WHERE` ni vuelta atrás: no cabe en ningún `kind`");
+    }
+
+    /// 🔴 **Control de falsos positivos.** Un falso positivo aquí deja un módulo sin instalar, que
+    /// es peor que el problema: por eso se comparan tokens enteros y `DELETE` solo cuenta con su
+    /// `FROM` detrás. Las tres formas de abajo son SQL correcto y frecuente.
+    #[test]
+    fn words_that_only_look_like_a_destructive_verb_are_not_one() {
+        for sql in [
+            // `truncate_at` es una columna, no el verbo.
+            "ALTER TABLE sales_line DROP COLUMN truncate_at",
+            // `ON DELETE CASCADE` es una constraint: no borra nada al migrar.
+            "ALTER TABLE sales_line ADD CONSTRAINT sales_line_sale_fk FOREIGN KEY (sale_id) \
+             REFERENCES sales_sale (id) ON DELETE CASCADE",
+            // La palabra dentro de un comentario tampoco es SQL.
+            "-- esto NO hace TRUNCATE ni DELETE FROM nada\nDROP TABLE sales_line",
+        ] {
+            contract(sql).unwrap_or_else(|e| panic!("`{sql}` es correcto y tiene que pasar: {e}"));
+        }
+    }
+
+    /// 🔴 **El radio de explosión de la regla es CERO**: las tres migraciones `contract` publicadas
+    /// siguen pasando. La tercera es un `DROP CONSTRAINT`, que no toca ni una fila — meterlo en la
+    /// regla pondría en rojo trabajo correcto ya publicado.
+    #[test]
+    fn the_three_published_contracts_still_pass() {
+        let published = [
+            ("services", "DROP TABLE IF EXISTS services_addon;\nDROP TABLE IF EXISTS services_addon_group"),
+            ("services", "DROP TABLE IF EXISTS services_variant"),
+            (
+                "verifactu",
+                "ALTER TABLE verifactu_gate DROP CONSTRAINT IF EXISTS verifactu_gate_ok;\n\
+                 ALTER TABLE verifactu_gate ADD CONSTRAINT verifactu_gate_is_declared CHECK (ok = 1)",
+            ),
+        ];
+        for (module, sql) in published {
+            check(module, "migrations/postgres/099_x.sql", sql, Kind::Contract)
+                .unwrap_or_else(|e| panic!("`{module}` está publicado y tiene que seguir pasando: {e}"));
+        }
+    }
+
+    // ── Una sentencia entra, una sentencia sale (hub#1145) ───────────────────────────
+
+    /// `DROP TABLE a, b;` es SQL válido, pero `ALTER TABLE … RENAME TO` acepta **una sola** tabla.
+    /// Coger el primer nombre producía `ALTER TABLE a, RENAME TO _deprecated_a,` — un
+    /// `syntax error at or near ","` que no explica nada, y `b` se quedaba sin retirar.
+    #[test]
+    fn a_drop_that_names_two_tables_is_refused_with_the_fix_in_the_message() {
+        let refused = contract("DROP TABLE sales_a, sales_b")
+            .expect_err("la traducción es de una sentencia a una sentencia");
+        let message = refused.to_string();
+        assert!(
+            message.contains("una tabla por sentencia"),
+            "el error tiene que decir qué escribir en su lugar: {message}"
+        );
+        assert!(message.contains("sales_a"), "y enseñar la sentencia que lo provoca: {message}");
+    }
+
+    /// La misma grieta por el lado de la columna, que la issue no nombraba: un `ALTER` con más de
+    /// una acción metía la coma dentro del `RENAME`.
+    #[test]
+    fn an_alter_with_more_than_one_action_is_refused_too() {
+        for sql in [
+            "ALTER TABLE sales_sale DROP COLUMN a, DROP COLUMN b",
+            "ALTER TABLE sales_sale ADD COLUMN x TEXT, DROP COLUMN y",
+        ] {
+            let refused = contract(sql).expect_err("una acción por sentencia");
+            assert!(
+                refused.to_string().contains("una columna por sentencia"),
+                "`{sql}`: {refused}"
+            );
+        }
+    }
+
+    /// Y lo que **no** es una lista sigue traduciéndose: `CASCADE` no lleva coma y se cae solo al
+    /// renombrar, porque renombrar no arrastra a nadie.
+    #[test]
+    fn cascade_is_not_a_list_of_tables() {
+        let Plan::Rewritten(rewritten) = contract("DROP TABLE sales_old CASCADE").unwrap() else {
+            panic!("un contract se reescribe");
+        };
+        assert_eq!(rewritten, vec!["ALTER TABLE sales_old RENAME TO _deprecated_sales_old"]);
     }
 
     /// **Un comentario no es SQL.** Comprobado contra los 24 módulos publicados: las palabras de

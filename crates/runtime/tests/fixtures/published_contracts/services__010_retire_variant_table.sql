@@ -1,0 +1,44 @@
+DROP TABLE IF EXISTS services_variant;
+
+-- Services · migration 010 — the variant schema is retired: it never had a door, and the concept
+-- it promised has no owner here (services#69, closes the half of services#14 that was left).
+--
+-- 🔴 THE PROSE IS AT THE BOTTOM ON PURPOSE, AND MOVING IT UP DESTROYS DATA. This file is declared
+-- `kind: "contract"` (hub#542/#1093), the only declaration under which the runtime accepts a
+-- `DROP` — and it accepts it by TRANSLATING it: `migration_guard::set_aside_instead_of_dropping`
+-- turns `DROP TABLE t` into `ALTER TABLE t RENAME TO _deprecated_t`, so the rows are set aside,
+-- not destroyed, and reverting is a rename back. That translation matches `DROP TABLE ` at the
+-- START of the statement text, and the guard's splitter keeps a preceding comment INSIDE the
+-- statement it precedes. A header comment above the `DROP` therefore makes the translation miss
+-- in silence and the hub runs a real, irreversible `DROP TABLE` on a customer database.
+-- `tests/retire_variant.postgres.test.py` fails if anyone tidies these lines back to the top; the
+-- hub-side fix is ERPlora/hub#1137, still open at the time of writing.
+--
+-- WHAT IS BEING RETIRED, AND WHY IT IS SAFE. `services_variant` was created by `001_init.sql` and
+-- never got a door: no command writes it, no query reads it, no JSON Schema names it, no
+-- permission mentions it, the WASM handler ignores it. services#14 took variants and addons out of
+-- scope on 2026-08-06 and closed, leaving the schema behind — a table that has promised a feature
+-- ever since without one line able to deliver it. The addon half went with `009` (services#67,
+-- ADR-0376); this is the half that was left.
+--
+-- Retiring the table is NOT a ruling that a service can never have priced options. It is the
+-- opposite: today the option with a price delta belongs to `modifiers` (ADR-0376), linked from
+-- here by opaque reference and without `services` gaining any `depends_on` (ADR-0127). If a
+-- pricing variant proper ever earns its own schema, it will arrive designed — with commands,
+-- queries, permissions and UI — instead of inheriting eight columns nobody specified.
+--
+-- No hub can hold data here — there is no statement in the module that could have written a row —
+-- and no exported bundle can carry one either: `export.rs` dumps a table row by row and zero rows
+-- produce zero `INSERT`s, so no blueprint or backup already out there names this table. The
+-- rename is belt and braces on top of that, not the reason to trust it.
+--
+-- `001_init.sql` keeps its `CREATE TABLE`. `_hub_migrations` records by FILE NAME, so editing an
+-- applied migration re-runs nothing where it is applied and only rewrites history where it is not:
+-- a new hub creates the table at 001 and sets it aside here, nine files later. `IF EXISTS`, so a
+-- boot that died halfway through this file can simply run it again.
+--
+-- The indexes `uq_services_variant_service_name` and `ix_services_variant_service` need no
+-- statement of their own, and must not have one: a `DROP INDEX` is NOT translated by the guard —
+-- it would be the one genuinely destructive line in a migration whose whole point is that nothing
+-- is destroyed. Postgres carries an index along with its table through a rename, so both follow
+-- `_deprecated_services_variant` and go quiet with it.

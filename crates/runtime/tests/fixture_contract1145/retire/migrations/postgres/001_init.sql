@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS contract1145_thing (
+  id TEXT PRIMARY KEY,
+  hub_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  legacy TEXT NOT NULL DEFAULT 'no'
+);
+CREATE TABLE IF NOT EXISTS contract1145_other (
+  id TEXT PRIMARY KEY,
+  hub_id TEXT NOT NULL,
+  name TEXT NOT NULL
+);
