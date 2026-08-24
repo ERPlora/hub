@@ -86,7 +86,7 @@ pub use registry::{
 // `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
 // diverges from the guard and reintroduces hub#253 (the guard says "run", every path is wrong,
 // the test skips itself and still reports `ok`).
-pub use e2e_support::{modules_root, require_modules_workspace};
+pub use e2e_support::{modules_root, require_module_version, require_modules_workspace};
 
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]

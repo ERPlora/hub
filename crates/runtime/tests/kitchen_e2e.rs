@@ -480,6 +480,10 @@ async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
     }
 }
 
+/// La versión de `kitchen` que trae la expansión del combo (ADR-0381). Los dos tests de abajo
+/// aseguran cosas que NO existen por debajo de ella, y el checkout de módulos es compartido.
+const COMBO_SINCE: &str = "2.3.27";
+
 /// kitchen#57 · **cada componente del menú llega a SU estación, y siguen siendo un menú**
 /// (ADR-0381).
 ///
@@ -496,6 +500,10 @@ async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
 #[tokio::test]
 async fn cada_componente_del_menu_llega_a_su_estacion_y_siguen_siendo_un_menu() {
     if !erplora_runtime::require_modules_workspace() { return; }
+    // La expansión del combo llegó en kitchen 2.3.27. El checkout de módulos lo comparte la flota
+    // y casi siempre va por detrás: sin este guard, este test pone en rojo el gate pre-push de
+    // TODO el que empuje después, y no el de quien lo escribió.
+    if !erplora_runtime::require_module_version("kitchen", COMBO_SINCE) { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
@@ -608,6 +616,7 @@ async fn cada_componente_del_menu_llega_a_su_estacion_y_siguen_siendo_un_menu() 
 #[tokio::test]
 async fn un_menu_sin_nada_elegido_no_abre_comanda() {
     if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_module_version("kitchen", COMBO_SINCE) { return; }
     if !wasm_present() {
         eprintln!("SKIP: falta handler.wasm");
         return;
