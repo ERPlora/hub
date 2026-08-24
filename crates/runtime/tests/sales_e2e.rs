@@ -122,13 +122,29 @@ async fn complete_sale_creates_header_and_lines() {
             { "product_name": "Agua", "price": 110, "quantity": 1_000_000, "tax_rate": 10.0 }
         ]
     })), &ctx).await.expect("complete_sale WASM");
-    assert_eq!(res["operations"], json!(4)); // counter + sale + 2 líneas
+    // ADR-0386 (sales#158): + la fila del cobro. Toda venta registra su tender, también la de un
+    // solo medio — si no, `sales_sale_payment` nacería vacía para todo lo cobrado hasta que llegue
+    // la pantalla de cobro mixto (sales#159).
+    assert_eq!(res["operations"], json!(5)); // counter + sale + 2 líneas + 1 cobro
 
     let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(sales.len(), 1);
     let sale = &sales[0];
     assert!(sale["sale_number"].as_str().unwrap().ends_with("-0001"));
     assert_eq!(sale["total"].as_i64().unwrap(), 352); // 242 + 110 céntimos = 3.52€
+
+    // ADR-0386 — el desglose del cobro es una tabla hija, y se lee por su propia puerta. Una venta
+    // de un solo medio es una lista de UNA pata que cubre el total entero; el cambio (20,00 €
+    // entregados sobre 3,52 €) se imputa a la pata de EFECTIVO, que es de donde sale.
+    let payments = rt
+        .execute_query("sales.payments", &params(json!({"sale_id": sale["id"]})), &ctx)
+        .await
+        .expect("sales.payments");
+    assert_eq!(payments.len(), 1, "una venta mono-pago sigue teniendo su fila de cobro");
+    assert_eq!(payments[0]["amount"].as_i64().unwrap(), 352);
+    assert_eq!(payments[0]["payment_method_type"], json!("cash"));
+    assert_eq!(payments[0]["amount_tendered"].as_i64().unwrap(), 2000);
+    assert_eq!(payments[0]["change_due"].as_i64().unwrap(), 1648);
 
     let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
     assert_eq!(lines.len(), 2);
