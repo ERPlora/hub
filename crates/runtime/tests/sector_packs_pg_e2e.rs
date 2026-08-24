@@ -25,12 +25,19 @@ fn module_dir(id: &str) -> PathBuf {
     erplora_runtime::e2e_support::modules_root().join(id)
 }
 
-/// Resuelto por el MISMO sitio que los módulos (`e2e_support`, hub#541): una ruta relativa
-/// hardcodeada aquí no resuelve desde un worktree fuera del monorepo y el test moría con un
-/// `NotFound` pelado en vez de poder apuntarse con `ERPLORA_BLUEPRINTS_DIR`.
+/// The sector seed this e2e applies. It is a fixture **of this repo** (hub#1050).
+///
+/// It used to be read out of the sibling `blueprints` checkout, from the hand-written catalogue
+/// model that ADR-0121 retired: the sector seed is no longer written by hand, it comes out of a
+/// hub's Export as a `.blueprint.zip`. That left the hub as the only live consumer of a dead model
+/// — blueprints#8 could not delete it without turning this suite red — and made the suite depend on
+/// a directory of ANOTHER repo, which a checkout is free not to have.
+///
+/// Resolved from `CARGO_MANIFEST_DIR`, so it lands wherever the crate itself is: no sibling repo,
+/// no `ERPLORA_BLUEPRINTS_DIR` override to point at one, no worktree layout to get right.
 fn blueprint_seed(sector: &str) -> PathBuf {
-    erplora_runtime::e2e_support::blueprints_root()
-        .join("starter_catalogs/es")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/sector_pack_es")
         .join(sector)
         .join("seed.sql")
 }
@@ -165,6 +172,38 @@ async fn run_sector(sector: &str) {
         "\n=== {} reds en el pack '{sector}' sobre Postgres ===\n{}\n",
         failures.len(),
         failures.join("\n")
+    );
+}
+
+/// hub#1050 — the sector seeds are fixtures OF THIS REPO, and must stay that way.
+///
+/// The two `run_sector` tests need a Postgres and the module fixtures; this one needs neither, so
+/// it is the assertion that still holds in a bare checkout. Two things are pinned: the seeds are
+/// readable from the crate itself, and the suite does not go back to the hand-written catalogue
+/// directory of the sibling `blueprints` repo that ADR-0121 retired. Without the second half,
+/// "the fixture lives in the hub" would hold only until the next edit re-pointed the path — which
+/// is how that dead model outlived its retirement by six weeks, blocking blueprints#8 the whole
+/// time.
+#[test]
+fn sector_seeds_are_fixtures_of_this_repo() {
+    for sector in ["restaurant", "beauty"] {
+        let path = blueprint_seed(sector);
+        let sql = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!("the '{sector}' seed fixture is unreadable at {}: {e}", path.display())
+        });
+        assert!(
+            sql.contains("INSERT INTO"),
+            "the '{sector}' fixture must carry the seed statements this suite applies (read {} bytes)",
+            sql.len()
+        );
+    }
+    // Spelled in two halves on purpose: written whole, the needle would match itself here and the
+    // assertion could never fail.
+    let retired_catalog_dir = concat!("starter_", "catalogs");
+    assert!(
+        !include_str!("sector_packs_pg_e2e.rs").contains(retired_catalog_dir),
+        "this suite must not read the retired ADR-0121 catalogue model again: it is what kept \
+         blueprints#8 blocked (hub#1050)"
     );
 }
 
