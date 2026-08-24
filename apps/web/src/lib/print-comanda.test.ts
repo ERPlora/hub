@@ -210,3 +210,51 @@ describe('aviso al entrar una comanda', () => {
     expect(print).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── Lo que la fila SÍ trae y el papel perdía (hub#1156) ─────────────────────────────────────────
+// `kitchen.orders.items` devuelve `modifiers`, `combo_ref` y `combo_name` desde kitchen 2.3.27,
+// pero el shell copiaba a la línea sólo nombre/cantidad/notas. El KDS los pinta y la térmica no,
+// que es justo al revés de lo que hace falta: en la plancha nadie mira una pantalla.
+describe('lo que la línea arrastra al papel (hub#1156)', () => {
+  it('un SUPLEMENTO llega a la hoja — «sin cebolla» es el plato que vuelve, no un adorno', () => {
+    const groups = buildComandaGroups([{ ...CROQUETAS, modifiers: 'Sin cebolla', notes: '' }]);
+    expect(groups[0].items[0]).toMatchObject({ name: 'Croquetas', modifiers: 'Sin cebolla' });
+  });
+
+  it('sin suplemento la línea NO gana un campo vacío (la hoja vieja se imprime igual)', () => {
+    // El 99 % de las comandas no llevan suplemento: si les colásemos `modifiers: ''` cambiaríamos
+    // la forma de `items` para todas, y `render_kitchen_order` pinta lo que es truthy.
+    const groups = buildComandaGroups([{ ...CROQUETAS, notes: '' }]);
+    expect(groups[0].items[0]).toEqual({ name: 'Croquetas', quantity: 2 });
+    expect(groups[0].items[0]).not.toHaveProperty('modifiers');
+  });
+
+  it('los componentes de un MENÚ llevan su marca de menú a la hoja', () => {
+    const groups = buildComandaGroups([
+      { ...CROQUETAS, product_name: 'Gazpacho', quantity: 1_000_000, notes: '', combo_ref: 'c1', combo_name: 'Menú del día' },
+      { ...CROQUETAS, product_name: 'Entrecot', quantity: 1_000_000, notes: '', combo_ref: 'c1', combo_name: 'Menú del día' },
+    ]);
+    expect(groups[0].items).toEqual([
+      { name: 'Gazpacho', quantity: 1, combo_ref: 'c1', combo_name: 'Menú del día' },
+      { name: 'Entrecot', quantity: 1, combo_ref: 'c1', combo_name: 'Menú del día' },
+    ]);
+  });
+
+  it('una línea A LA CARTA no gana ningún campo de menú', () => {
+    const groups = buildComandaGroups([{ ...CROQUETAS, notes: '', combo_ref: null, combo_name: '' }]);
+    expect(groups[0].items[0]).toEqual({ name: 'Croquetas', quantity: 2 });
+  });
+
+  it('la marca del menú viaja a CADA hoja que recibe un componente (Simphony, opción 11)', () => {
+    // El menú se reparte entre plancha y barra. Un cocinero que no lee «MENÚ» no sabe que su
+    // entrecot va acoplado a un gazpacho, y lo saca cuando le viene bien.
+    const groups = buildComandaGroups([
+      { ...CROQUETAS, product_name: 'Entrecot', quantity: 1_000_000, notes: '', printer_role: 'kitchen', combo_ref: 'c1', combo_name: 'Menú del día' },
+      { ...FLAN, product_name: 'Flan', notes: '', printer_role: 'bar', combo_ref: 'c1', combo_name: 'Menú del día' },
+    ]);
+    expect(groups).toHaveLength(2);
+    for (const g of groups) {
+      expect(g.items.every((i) => i.combo_ref === 'c1' && i.combo_name === 'Menú del día')).toBe(true);
+    }
+  });
+});

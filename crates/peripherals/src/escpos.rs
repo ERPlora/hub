@@ -583,7 +583,29 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.set(Align::Center, false, false, false);
     b.text("================================\n");
 
-    if is_truthy(data, "table") {
+    // **La etiqueta de sala** (hub#1156 · ADR-0141/0144). El shell manda `label` desde siempre y
+    // aquí se leía `table`, un campo que no manda nadie: la comanda salía sin decir de qué mesa
+    // era, que en hora punta es papel inservible.
+    //
+    // `label` se imprime **tal cual, sin prefijo**: es opaca a propósito — «Mesa 4», «Barra»,
+    // «Recogida Ana». Cocina no sabe qué es una mesa, ni tiene por qué; anteponerle «Mesa: »
+    // produciría «Mesa: Recogida Ana».
+    //
+    // `table` sigue vivo detrás, con su prefijo de siempre: el contrato del dispositivo se amplía,
+    // nunca se sustituye. Hoy no hay ningún productor que lo mande —de ahí venía el fallo— pero
+    // arreglar el camino nuevo no puede dejar sin mesa a una integración que use el viejo.
+    // Doble alto Y doble ancho: la mesa es lo más grande del papel a propósito. Es el único campo
+    // que se lee desde el OTRO LADO del pase, a velocidad, para casar un plato con su destino — el
+    // plato se lee a distancia de brazo. Toast lo pone «in large, bold font in the top-left corner»
+    // y Eats365 le da tamaño propio junto al número de pedido, los dos únicos campos del chit que
+    // lo tienen. Renuncia al doble ancho si no cabe: una etiqueta partida en dos trozos por la
+    // impresora es justo lo contrario de un campo que existe para leerse de un vistazo.
+    if is_truthy(data, "label") {
+        let label = str_field(data, "label", "");
+        let wide = label.chars().count() * 2 <= LINE_WIDTH;
+        b.set(Align::Left, true, true, wide);
+        b.text(&format!("{label}\n"));
+    } else if is_truthy(data, "table") {
         b.set(Align::Left, true, true, false);
         b.text(&format!("Mesa: {}\n", str_field(data, "table", "")));
     }
@@ -593,20 +615,81 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
         b.text(&format!("Camarero: {}\n", str_field(data, "waiter", "")));
     }
 
+    // La ronda distingue el segundo pase del primero en la misma mesa. Sólo a partir de la dos:
+    // «Ronda 1» sería una línea de ruido en el 99 % del papel, que es justo el que nadie relee.
+    let round = data
+        .get("round_number")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0);
+    if round > 1.0 {
+        b.text(&format!("Ronda {}\n", fmt_qty(data.get("round_number"), round)));
+    }
+
     b.text(&format!("Hora: {}\n", now_hm()));
     b.text("--------------------------------\n");
 
     if let Some(items) = data.get("items").and_then(|v| v.as_array()) {
+        // El MENÚ se pinta como una TIRADA de líneas consecutivas con el mismo `combo_ref`
+        // (hub#1156 · kitchen#57 · ADR-0381), igual que `groupCombos()` en el KDS. Las líneas
+        // llegan ordenadas por `line_seq`, así que la tirada ES el grupo.
+        let mut combo: Option<&str> = None;
         for item in items {
+            let this_combo = item
+                .get("combo_ref")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty());
+
+            if this_combo != combo {
+                combo = this_combo;
+                // **La cabecera del menú va SIN negrita y a altura normal.** El realce es para los
+                // CAMBIOS —alérgenos y suplementos—, nunca para la jerarquía: un menú en negrita le
+                // roba el ojo a lo que hay que cocinar. De quince productos revisados en kitchen#57,
+                // CERO imprimen el nombre del combo en doble altura y CERO en Font B; la jerarquía
+                // del chit se hace con SANGRADO (Simphony: «indented beneath the combo meal name»,
+                // y lo dice para modo chit; Aloha lo tiene como parámetro, `QC indentation size`).
+                //
+                // Se emite sólo si el menú tiene nombre: sin él el sangrado agrupa igual y no hay
+                // que inventarse un relleno — que además sería una cadena nueva cableada en un
+                // renderizador que hoy no traduce nada.
+                if this_combo.is_some() && is_truthy(item, "combo_name") {
+                    b.set(Align::Left, false, false, false);
+                    b.text(&format!("{}\n", str_field(item, "combo_name", "")));
+                }
+            }
+
+            // Dos niveles como mucho: a 32 columnas un tercero deja el texto sin sitio.
+            let indent = if combo.is_some() { "  " } else { "" };
             let qty = item.get("quantity").and_then(|v| v.as_f64()).unwrap_or(1.0);
             let name = str_field(item, "name", "");
 
             b.set(Align::Left, true, true, false);
-            b.text(&format!("{}x {name}\n", fmt_qty(item.get("quantity"), qty)));
+            b.text(&format!(
+                "{indent}{}x {name}\n",
+                fmt_qty(item.get("quantity"), qty)
+            ));
 
+            // **Los suplementos** (hub#1156 · pm#93). Van ANTES de la nota libre y con el mismo
+            // sangrado: el suplemento lo eligió el cliente en la carta y cambia el plato, la nota
+            // es texto del camarero. Se parten a mano conservando el sangrado — si lo cortara la
+            // térmica a 32 columnas, la continuación arrancaría pegada al margen y se leería como
+            // un plato más de la comanda.
+            //
+            // Y EN NEGRITA: el realce es la otra mitad de la misma regla — el suplemento es un
+            // CAMBIO, y un cambio es lo que devuelve el plato. Toast imprime el plato en negro y el
+            // modificador en rojo, Lightspeed tiene `print sub-items in red`, Revel igual: tres de
+            // tres realzan el cambio. En una térmica sin cinta bicolor, el equivalente es la negrita.
+            let sub = format!("{indent}   ");
+            if is_truthy(item, "modifiers") {
+                b.set(Align::Left, true, false, false);
+                for line in wrap_to_width(str_field(item, "modifiers", ""), LINE_WIDTH - sub.len()) {
+                    b.text(&format!("{sub}{line}\n"));
+                }
+            }
+
+            // La nota libre del camarero NO es un cambio de la carta: se lee, no se grita.
             if is_truthy(item, "notes") {
                 b.set(Align::Left, false, false, false);
-                b.text(&format!("   >> {}\n", str_field(item, "notes", "")));
+                b.text(&format!("{sub}>> {}\n", str_field(item, "notes", "")));
             }
         }
     }
@@ -742,6 +825,479 @@ fn render_generic(b: &mut EscposBuilder, data: &serde_json::Value) {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    // ── La comanda de cocina imprime lo que la fila trae (hub#1156) ─────────────────────────────
+
+    /// Rinde una comanda y devuelve el papel **sin bytes de control**, que es lo que lee un
+    /// cocinero. Sin esto, cada aserción compara contra un texto salpicado de `ESC a`/`GS !` y
+    /// acaba pasando por casualidad.
+    fn paper(data: &serde_json::Value) -> String {
+        let bytes = render_document(DocumentType::KitchenOrder, data).expect("comanda válida");
+        strip_escpos(&bytes)
+    }
+
+    /// Quita los mandos ESC/POS y deja el texto que un cocinero lee.
+    ///
+    /// Filtrar «bytes de control» a secas NO vale y es una trampa que ya mordió: en `ESC a 0` sólo
+    /// el `ESC` es de control — la `a` y el `0` son ASCII imprimible, así que la comanda se leía
+    /// como `aE!0COCINA` y cualquier `contains` pasaba por casualidad sobre basura.
+    ///
+    /// Los mandos de la comanda son todos de tres bytes (`ESC a n`, `ESC E n`, `ESC M n`,
+    /// `GS ! n`, `GS V n`): no hay QR ni código de barras aquí, que son los de longitud variable.
+    /// Si algún día entra uno, este helper lo delata en vez de tragárselo.
+    fn strip_escpos(bytes: &[u8]) -> String {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                0x1b | 0x1d => {
+                    assert!(
+                        i + 2 < bytes.len(),
+                        "mando ESC/POS truncado en {i}: el renderizador emitió bytes a medias"
+                    );
+                    assert!(
+                        !matches!((bytes[i], bytes[i + 1]), (0x1d, 0x28) | (0x1d, 0x6b)),
+                        "mando de longitud variable (QR/barcode) en una comanda: este helper \
+                         sólo sabe de mandos de 3 bytes y lo estaría cortando mal"
+                    );
+                    i += 3;
+                }
+                b => {
+                    out.push(b);
+                    i += 1;
+                }
+            }
+        }
+        String::from_utf8_lossy(&out).into_owned()
+    }
+
+    /// Cómo sale IMPRESA cada línea, no sólo qué dice: `(texto, negrita, doble_alto)`.
+    ///
+    /// La jerarquía del papel se decide en los modos ESC/POS, no en el texto, así que un test que
+    /// sólo mire el texto no puede distinguir una cabecera discreta de una cabecera que le roba el
+    /// ojo al plato — que es justo lo que hub#1156 tiene que garantizar.
+    fn lines_with_modes(bytes: &[u8]) -> Vec<(String, bool, bool)> {
+        let (mut bold, mut double_h) = (false, false);
+        let (mut out, mut cur) = (Vec::new(), Vec::new());
+        // El modo vigente cuando ARRANCA la línea es el que la imprime.
+        let (mut line_bold, mut line_double) = (false, false);
+        let mut fresh = true;
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                0x1b if bytes.get(i + 1) == Some(&0x45) => {
+                    bold = bytes[i + 2] == 1;
+                    i += 3;
+                }
+                0x1d if bytes.get(i + 1) == Some(&0x21) => {
+                    double_h = bytes[i + 2] & 0x10 != 0;
+                    i += 3;
+                }
+                0x1b | 0x1d => i += 3,
+                b'\n' => {
+                    out.push((
+                        String::from_utf8_lossy(&cur).into_owned(),
+                        line_bold,
+                        line_double,
+                    ));
+                    cur.clear();
+                    fresh = true;
+                    i += 1;
+                }
+                b => {
+                    if fresh {
+                        line_bold = bold;
+                        line_double = double_h;
+                        fresh = false;
+                    }
+                    cur.push(b);
+                    i += 1;
+                }
+            }
+        }
+        out
+    }
+
+    /// Si la línea `txt` se imprimió con doble ancho (`GS ! n`, bit 0x20).
+    fn double_width_of(bytes: &[u8], txt: &str) -> bool {
+        let (mut wide, mut i) = (false, 0usize);
+        while i < bytes.len() {
+            match bytes[i] {
+                0x1d if bytes.get(i + 1) == Some(&0x21) => {
+                    wide = bytes[i + 2] & 0x20 != 0;
+                    i += 3;
+                }
+                0x1b | 0x1d => i += 3,
+                _ => {
+                    if bytes[i..].starts_with(txt.as_bytes()) {
+                        return wide;
+                    }
+                    i += 1;
+                }
+            }
+        }
+        panic!("«{txt}» no está en el papel");
+    }
+
+    /// Los dos lectores de arriba se prueban a sí mismos, por lo mismo que `strip_escpos`: si
+    /// devolvieran siempre `false`, las aserciones de jerarquía saldrían verdes sobre cualquier cosa.
+    #[test]
+    fn the_mode_reader_tells_a_loud_line_from_a_quiet_one() {
+        let mut b = EscposBuilder::new();
+        b.set(Align::Left, true, true, true).text("PLATO\n");
+        b.set(Align::Left, false, false, false).text("nota\n");
+        let bytes = b.finish();
+        assert_eq!(
+            lines_with_modes(&bytes),
+            vec![
+                ("PLATO".to_string(), true, true),
+                ("nota".to_string(), false, false),
+            ]
+        );
+        assert!(double_width_of(&bytes, "PLATO"));
+        assert!(!double_width_of(&bytes, "nota"));
+    }
+
+    /// El helper de arriba es el que sostiene todas las aserciones de la comanda, así que se prueba
+    /// a sí mismo: si dejara residuo, un `contains("Mesa 4")` seguiría pasando sobre `aE!0Mesa 4`
+    /// y las pruebas de este bloque valdrían para nada.
+    #[test]
+    fn the_paper_helper_leaves_no_command_residue() {
+        let mut b = EscposBuilder::new();
+        b.set(Align::Center, true, true, true).text("COCINA\n");
+        b.set(Align::Left, false, false, false).text("2x Croquetas\n");
+        assert_eq!(strip_escpos(&b.finish()), "COCINA\n2x Croquetas\n");
+    }
+
+    /// **El suplemento sale por la impresora, no sólo por la pantalla** (hub#1156 · pm#93).
+    ///
+    /// «Sin cebolla» se congela en la fila y el KDS lo pinta, pero la cocina caliente ES papel: en
+    /// la plancha nadie mira una pantalla con las manos ocupadas. Un suplemento que no se imprime
+    /// es el plato que vuelve, y eso no es cosmética.
+    #[test]
+    fn a_supplement_reaches_the_paper_under_its_own_line() {
+        let text = paper(&json!({
+            "receipt_id": "K-217",
+            "items": [{ "name": "Entrecot", "quantity": 1, "modifiers": "Al punto, sin cebolla" }],
+        }));
+        assert!(text.contains("Entrecot"), "el plato está en el papel:\n{text}");
+        assert!(
+            text.contains("Al punto, sin cebolla"),
+            "el suplemento está en el papel — es lo que hace que el plato vuelva:\n{text}"
+        );
+        // Debajo de SU plato, no al final de la hoja: en una comanda de ocho líneas, un suplemento
+        // suelto al pie no dice a qué plato pertenece.
+        let plato = text.find("Entrecot").expect("el plato");
+        let suplemento = text.find("Al punto").expect("el suplemento");
+        assert!(suplemento > plato, "el suplemento va DEBAJO de su línea:\n{text}");
+    }
+
+    /// **El suplemento y la nota conviven, y el suplemento va primero.** Son dos cosas distintas:
+    /// el suplemento lo eligió el cliente en la carta y cambia el plato; la nota es texto libre del
+    /// camarero. Perder una al pintar la otra fue el fallo original.
+    #[test]
+    fn a_line_can_carry_both_a_supplement_and_a_free_note() {
+        let text = paper(&json!({
+            "items": [{ "name": "Croquetas", "quantity": 2, "modifiers": "Sin gluten", "notes": "para compartir" }],
+        }));
+        let mods = text.find("Sin gluten").expect("el suplemento está en el papel");
+        let notes = text.find("para compartir").expect("la nota está en el papel");
+        assert!(mods < notes, "el suplemento va antes que la nota libre:\n{text}");
+    }
+
+    /// **La comanda dice de qué mesa es** (hub#1156 · ADR-0141/0144).
+    ///
+    /// El shell manda `label` desde siempre y el renderizador leía `table`, un campo que no manda
+    /// nadie: la comanda salía sin la única cosa que cocina sabe de la sala. En hora punta, una
+    /// comanda sin mesa es papel que no sirve para nada.
+    ///
+    /// La etiqueta se imprime **tal cual**, sin prefijo: es opaca a propósito — «Mesa 4», «Barra»,
+    /// «Recogida Ana». Cocina no sabe qué es una mesa, ni tiene por qué.
+    #[test]
+    fn the_kitchen_order_says_which_table_it_is_for() {
+        let text = paper(&json!({
+            "receipt_id": "K-217",
+            "label": "Mesa 4",
+            "round_number": 2,
+            "items": [{ "name": "Croquetas", "quantity": 2 }],
+        }));
+        assert!(text.contains("Mesa 4"), "la etiqueta de sala está en el papel:\n{text}");
+        assert!(!text.contains("Mesa: Mesa 4"), "tal cual, sin prefijo: la etiqueta es opaca:\n{text}");
+        // La ronda distingue el segundo pase del primero en la misma mesa. Viajaba y nadie la leía.
+        // Se afirma la palabra entera: `contains('2')` habría pasado por el «K-217» de arriba —
+        // un control que acierta por casualidad no prueba nada.
+        assert!(text.contains("Ronda 2"), "la ronda está en el papel:\n{text}");
+    }
+
+    /// **La primera ronda NO se anuncia.** Es el caso normal —una comanda que no es un segundo
+    /// pase— y ponerle «Ronda 1» le añadiría una línea de ruido al 99 % del papel. La ronda dice
+    /// «esto ya es el segundo envío de esta mesa», y eso sólo es cierto a partir de la dos.
+    #[test]
+    fn the_first_round_is_not_announced() {
+        let text = paper(&json!({
+            "label": "Mesa 4", "round_number": 1,
+            "items": [{ "name": "Croquetas", "quantity": 2 }],
+        }));
+        assert!(text.contains("Mesa 4"), "la mesa sí:\n{text}");
+        assert!(!text.contains("Ronda"), "la ronda no:\n{text}");
+    }
+
+    /// **Un suplemento largo se parte con su sangrado, no lo parte la impresora.** A 32 columnas,
+    /// «Al punto, sin cebolla, sin sal, extra salsa» desborda; si lo corta la térmica, el resto
+    /// arranca pegado al margen y se lee como un plato más de la comanda.
+    #[test]
+    fn a_long_supplement_wraps_keeping_its_indent() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Entrecot", "quantity": 1,
+                "modifiers": "Al punto, sin cebolla, sin sal, extra salsa aparte",
+            }],
+        }));
+        let partes: Vec<&str> = text
+            .lines()
+            .filter(|l| l.contains("salsa") || l.contains("Al punto"))
+            .collect();
+        // Sin esto el `for` de abajo no se ejecutaría nunca y el test saldría verde sobre una
+        // comanda que ni siquiera imprime el suplemento — un bucle vacío no prueba nada.
+        assert!(
+            partes.len() >= 2,
+            "el suplemento largo se parte en varias líneas, no se pierde:\n{text}"
+        );
+        for line in partes {
+            assert!(line.starts_with("   "), "la continuación conserva el sangrado: {line:?}");
+            assert!(
+                line.chars().count() <= LINE_WIDTH,
+                "y cabe en el papel ({LINE_WIDTH} columnas): {line:?}"
+            );
+        }
+    }
+
+    /// **Lo que ya mandaba `table` sigue imprimiéndose.** No hay ningún productor vivo que lo mande
+    /// —de ahí el fallo— pero el contrato del dispositivo se amplía, nunca se sustituye: una
+    /// integración que lo use no puede quedarse sin mesa por arreglar el camino nuevo.
+    #[test]
+    fn the_legacy_table_field_still_prints() {
+        let text = paper(&json!({ "table": "4", "items": [{ "name": "Croquetas", "quantity": 2 }] }));
+        assert!(text.contains("Mesa: 4"), "la forma vieja conserva su prefijo:\n{text}");
+    }
+
+    /// **Un MENÚ sale como cabecera + componentes SANGRADOS, nunca como párrafo** (hub#1156 ·
+    /// kitchen#57 · ADR-0381).
+    ///
+    /// El sangrado es el eje de jerarquía del sector, no el tamaño: Simphony documenta los
+    /// componentes *«indented beneath the combo meal name»* **y dice explícitamente que vale en
+    /// modo chit**, y Aloha lo eleva a parámetro numérico (`QC indentation size`). El fallo
+    /// estrella es el contrario: Square amontona el combo en *«one long run-on paragraph, which
+    /// makes it kind of hard to decipher when in the kitchen»*, y su comunidad lo tiene abierto
+    /// desde hace años con «comprar otra impresora» como único remedio.
+    #[test]
+    fn a_menu_prints_a_header_with_its_components_indented_below() {
+        let text = paper(&json!({
+            "label": "Mesa 4",
+            "items": [
+                { "name": "Croquetas", "quantity": 2 },
+                { "name": "Gazpacho", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" },
+                { "name": "Entrecot", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" }
+            ],
+        }));
+        let lines: Vec<&str> = text.lines().collect();
+        assert!(
+            lines.contains(&"MENU DEL DIA"),
+            "la cabecera del menú está en el papel, a la izquierda del todo:\n{text}"
+        );
+        // Cada componente en SU línea y sangrado dos columnas. Un párrafo corrido sería el fallo de
+        // Square; la misma columna que las croquetas los haría tres platos sueltos.
+        assert!(lines.contains(&"  1x Gazpacho"), "componente sangrado:\n{text}");
+        assert!(lines.contains(&"  1x Entrecot"), "componente sangrado:\n{text}");
+        assert!(lines.contains(&"2x Croquetas"), "lo de la carta NO se sangra:\n{text}");
+    }
+
+    /// 🔴 **La cabecera del menú NO le roba el ojo al plato** (kitchen#57).
+    ///
+    /// La regla es «el realce es para alérgenos y cambios, NUNCA para jerarquía», y en papel se
+    /// traduce quitándole la NEGRITA a la cabecera, no encogiéndola: de quince productos revisados,
+    /// **cero** imprimen el nombre del combo en doble altura y **cero** en Font B. Eats365 da
+    /// tamaño propio a seis campos del chit —nº de pedido, mesa, notas…— y al nombre del combo sólo
+    /// un interruptor de visibilidad: cuando un fabricante te da tamaño para seis cosas y para la
+    /// séptima sólo «sí/no», te está diciendo que esa séptima no es una instrucción de cocina.
+    ///
+    /// Se afirma sobre los MODOS ESC/POS, no sobre el texto: la jerarquía del papel vive ahí, y un
+    /// test que sólo leyera el texto no distinguiría una cabecera discreta de una que grita.
+    #[test]
+    fn the_menu_header_never_steals_the_eye_from_the_dishes() {
+        let bytes = render_document(
+            DocumentType::KitchenOrder,
+            &json!({
+                "items": [
+                    { "name": "Gazpacho", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" },
+                    { "name": "Entrecot", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" }
+                ],
+            }),
+        )
+        .unwrap();
+        let modes = lines_with_modes(&bytes);
+        let cabecera = modes
+            .iter()
+            .find(|(t, _, _)| t == "MENU DEL DIA")
+            .expect("la cabecera está en el papel");
+        assert_eq!(
+            (cabecera.1, cabecera.2),
+            (false, false),
+            "la cabecera del menú va SIN negrita y a altura normal: es contexto, no trabajo"
+        );
+        // Control positivo, que es lo que hace que la aserción de arriba signifique algo: los
+        // platos —lo que de verdad hay que cocinar— sí van realzados.
+        for plato in ["  1x Gazpacho", "  1x Entrecot"] {
+            let l = modes.iter().find(|(t, _, _)| t == plato).expect(plato);
+            assert_eq!(
+                (l.1, l.2),
+                (true, true),
+                "el plato manda sobre la cabecera: {plato}"
+            );
+        }
+    }
+
+    /// **El suplemento SÍ va realzado** — la otra mitad de la misma regla. El realce es para los
+    /// CAMBIOS, y un cambio es exactamente lo que es un suplemento. Toast imprime el plato en negro
+    /// y el modificador en ROJO, Lightspeed tiene `print sub-items in red` y Revel igual: tres de
+    /// tres realzan el cambio. En una térmica sin cinta bicolor, el equivalente es la negrita.
+    #[test]
+    fn a_supplement_is_emphasised_because_it_is_a_change_not_a_hierarchy() {
+        let bytes = render_document(
+            DocumentType::KitchenOrder,
+            &json!({ "items": [{ "name": "Entrecot", "quantity": 1, "modifiers": "SIN CEBOLLA", "notes": "mesa con prisa" }] }),
+        )
+        .unwrap();
+        let modes = lines_with_modes(&bytes);
+        let sup = modes.iter().find(|(t, _, _)| t.contains("SIN CEBOLLA")).expect("el suplemento");
+        assert!(sup.1, "el suplemento va en negrita: es el cambio que devuelve el plato");
+        assert!(!sup.2, "pero a altura normal: el plato sigue mandando");
+        // La nota libre del camarero NO es un cambio de la carta: se lee, no se grita.
+        let nota = modes.iter().find(|(t, _, _)| t.contains("mesa con prisa")).expect("la nota");
+        assert!(!nota.1, "la nota libre no compite con el suplemento");
+    }
+
+    /// **La cabecera se repite en CADA hoja de estación** (opción `11 - Send to Combo Parent Order
+    /// Devices` de Simphony; TouchBistro lo hace por defecto y sin opción).
+    ///
+    /// Cada hoja es un documento propio con las líneas de SU rol, así que se comprueba como se
+    /// imprime: dos renderizados. Un cocinero de la plancha que no lee «MENÚ» no sabe que su
+    /// entrecot va acoplado a un gazpacho, y lo saca cuando le viene bien. El modo huérfano de
+    /// Toast —el componente sin el nombre del padre— es al que se entra a propósito, no el defecto.
+    #[test]
+    fn the_menu_header_repeats_on_every_station_sheet() {
+        let plancha = paper(&json!({
+            "items": [{ "name": "Entrecot", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" }],
+        }));
+        let barra = paper(&json!({
+            "items": [{ "name": "Tinto", "quantity": 1, "combo_ref": "c1", "combo_name": "MENU DEL DIA" }],
+        }));
+        for (estacion, hoja) in [("plancha", &plancha), ("barra", &barra)] {
+            assert!(
+                hoja.lines().any(|l| l == "MENU DEL DIA"),
+                "la hoja de {estacion} dice de qué menú es:\n{hoja}"
+            );
+        }
+    }
+
+    /// **Un menú sin nombre sigue agrupándose por el SANGRADO**, sin una línea en blanco donde
+    /// iría la cabecera. El sangrado es el mecanismo principal, no la cabecera: se sostiene solo.
+    /// Y así no hay que inventarse un «MENÚ» de relleno, que sería una cadena nueva cableada en un
+    /// renderizador que hoy no traduce nada.
+    #[test]
+    fn a_nameless_menu_still_groups_its_components_by_indentation() {
+        let text = paper(&json!({
+            "items": [
+                { "name": "Gazpacho", "quantity": 1, "combo_ref": "c1", "combo_name": "" },
+                { "name": "Entrecot", "quantity": 1, "combo_ref": "c1", "combo_name": "" }
+            ],
+        }));
+        assert!(text.contains("  1x Gazpacho"), "sigue sangrado:\n{text}");
+        assert!(text.contains("  1x Entrecot"), "sigue sangrado:\n{text}");
+        // Y no se cuela una línea vacía donde iría la cabecera: el primer componente va PEGADO a la
+        // regla que abre la lista. (Se mira el vecino, no «hay alguna línea vacía»: el corte de
+        // papel deja tres al final y esa comprobación saltaría siempre.)
+        let lines: Vec<&str> = text.lines().collect();
+        let i = lines.iter().position(|l| *l == "  1x Gazpacho").expect("el componente");
+        assert!(
+            lines[i - 1].starts_with('-'),
+            "el componente sigue a la regla, sin cabecera en blanco por medio:\n{text}"
+        );
+    }
+
+    /// **El suplemento de un componente se sangra un nivel más** (0 → 2 → 5). Dos niveles como
+    /// mucho: a 32 columnas, un tercero deja el texto sin sitio y lo parte la impresora.
+    #[test]
+    fn a_supplement_of_a_menu_component_indents_one_level_further() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Entrecot", "quantity": 1, "modifiers": "Al punto",
+                "combo_ref": "c1", "combo_name": "MENU DEL DIA",
+            }],
+        }));
+        assert!(text.contains("\n     Al punto\n"), "sangrado a 5, bajo su componente:\n{text}");
+    }
+
+    /// **La mesa es lo MÁS GRANDE del papel**: doble alto y doble ancho.
+    ///
+    /// Es el único campo que se lee desde el otro lado del pase, a velocidad, para casar un plato
+    /// con su destino — el plato se lee a distancia de brazo, la mesa a distancia de sala. Toast lo
+    /// pone *«in large, bold font in the top-left corner»* y Eats365 le da tamaño propio junto al
+    /// número de pedido, los dos únicos campos del chit que lo tienen.
+    #[test]
+    fn the_table_is_the_biggest_thing_on_the_paper() {
+        let bytes = render_document(
+            DocumentType::KitchenOrder,
+            &json!({ "label": "Mesa 4", "items": [{ "name": "Croquetas", "quantity": 2 }] }),
+        )
+        .unwrap();
+        let modes = lines_with_modes(&bytes);
+        let mesa = modes.iter().find(|(t, _, _)| t == "Mesa 4").expect("la mesa");
+        assert!(mesa.1 && mesa.2, "la mesa va en negrita y doble alto");
+        assert!(
+            double_width_of(&bytes, "Mesa 4"),
+            "y en doble ancho: es lo que se lee desde el otro lado del pase"
+        );
+    }
+
+    /// **Una etiqueta larga renuncia al doble ancho antes que partirse.** «Recogida Ana Martinez» a
+    /// doble ancho ocupa 42 de las 32 columnas del papel: la impresora la corta por donde le toca y
+    /// la mesa —el campo que existe para leerse de un vistazo— acaba en dos trozos.
+    #[test]
+    fn a_long_label_gives_up_double_width_before_it_wraps() {
+        let bytes = render_document(
+            DocumentType::KitchenOrder,
+            &json!({ "label": "Recogida Ana Martinez", "items": [{ "name": "Cafe", "quantity": 1 }] }),
+        )
+        .unwrap();
+        assert!(
+            !double_width_of(&bytes, "Recogida Ana Martinez"),
+            "cabe entera aunque sea a un solo ancho"
+        );
+        let text = strip_escpos(&bytes);
+        assert!(text.contains("Recogida Ana Martinez"), "y no se pierde:\n{text}");
+    }
+
+    /// **Una comanda a la carta sale EXACTAMENTE igual que antes de hub#1156.** Es el 99 % de las
+    /// comandas: romper esto es romper la cocina entera para arreglar un caso raro.
+    #[test]
+    fn an_ordinary_order_prints_exactly_as_it_did_before() {
+        let text = paper(&json!({
+            "receipt_id": "K-9",
+            "items": [
+                { "name": "Croquetas", "quantity": 2, "notes": "sin gluten" },
+                { "name": "Flan", "quantity": 1 }
+            ],
+        }));
+        assert_eq!(
+            text,
+            "COCINA\n#K-9\n================================\nHora: HH:MM\n\
+             --------------------------------\n2x Croquetas\n   >> sin gluten\n1x Flan\n\
+             ================================\n\n\n\n\n"
+                .replace("HH:MM", &now_hm()),
+            "el papel de siempre, byte a byte"
+        );
+    }
 
     /// **The wire vocabulary, pinned from this side.** The hub's queue keeps the same eight names
     /// (`erplora_runtime::print_queue::DOCUMENT_TYPES`) and refuses anything else at the door; the
