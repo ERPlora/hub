@@ -88,7 +88,13 @@ pub const ORDER_ALTA: &[&str] = &[
     "IDFactura",
     "NombreRazonEmisor",
     "TipoFactura",
+    // Bloque rectificativo (hub#1023). El `xs:sequence` oficial intercala `FacturasSustituidas`
+    // entre las rectificadas y el importe: no es un bloque contiguo, y emitirlo como tal sería
+    // un 4102.
+    "TipoRectificativa",
+    "FacturasRectificadas",
     "FacturasSustituidas",
+    "ImporteRectificacion",
     "DescripcionOperacion",
     "Destinatarios",
     "Desglose",
@@ -114,6 +120,14 @@ const ORDER_ANULACION: &[&str] = &[
 
 /// `ClaveTipoFacturaType`. F1–F3 y R1–R5 son los que emite el módulo (`INVOICE_TYPES`).
 const TIPO_FACTURA: &[&str] = &["F1", "F2", "F3", "R1", "R2", "R3", "R4", "R5"];
+
+/// `ClaveTipoRectificativaType` (hub#1023): `S` sustitutiva · `I` incremental (por diferencias).
+/// Público para que `tests/rectificativa.rs` lo contraste contra el XSD oficial vendorizado.
+pub const TIPO_RECTIFICATIVA: &[&str] = &["S", "I"];
+
+/// Tipos de factura que **son** una rectificativa. Fuera de ellos, informar `TipoRectificativa`,
+/// `FacturasRectificadas` o `ImporteRectificacion` es un rechazo de la AEAT.
+const TIPOS_RECTIFICATIVOS: &[&str] = &["R1", "R2", "R3", "R4", "R5"];
 
 // ── DetalleDesglose ────────────────────────────────────────────────────────────────────────
 //
@@ -426,6 +440,7 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
                  error 1189 (una venta sin NIF de cliente es una simplificada F2)"
             )));
         }
+        validate_rectificativa(&elements, tipo, nivel)?;
     }
 
     let id_si = text_of(&elements, "IdSistemaInformatico").unwrap_or_default();
@@ -457,6 +472,80 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     }
 
     Ok(())
+}
+
+/// El bloque **rectificativo** del `RegistroAlta` (hub#1023) — las tres reglas que el XSD deja
+/// pasar porque sus tres elementos son `minOccurs="0"`.
+///
+/// El esquema admite una R1 sin `TipoRectificativa`, una F1 con él, y una rectificativa por
+/// diferencias que además declara el importe sustituido. La AEAT no: rechaza las tres, y para
+/// entonces el registro **ya ha gastado su número de cadena**.
+///
+/// 1. **Toda R1–R5 declara `TipoRectificativa`.** Es lo que dice si los importes del registro son
+///    los corregidos (`S`) o el delta (`I`); sin él, Hacienda no puede leer la devolución.
+/// 2. **Nada rectificativo fuera de una R.** `TipoRectificativa`, `FacturasRectificadas` e
+///    `ImporteRectificacion` solo son informables en una rectificativa.
+/// 3. **`ImporteRectificacion` ⇔ `S`.** Es el desglose de lo que se sustituye: en una `S` es
+///    obligatorio, y en una `I` —donde el registro ya declara el delta— sobra.
+///
+/// `FacturasRectificadas` se queda opcional a propósito: el esquema lo permite, y una R5 de un
+/// tique puede no identificar el original. Exigirlo pararía el TPV por algo que la AEAT acepta.
+fn validate_rectificativa(
+    elements: &[Element<'_>],
+    tipo: &str,
+    nivel: usize,
+) -> Result<(), VerifactuError> {
+    let rectificativa = TIPOS_RECTIFICATIVOS.contains(&tipo);
+    let tipo_rect = text_at(elements, "TipoRectificativa", nivel);
+    let importe = present_at(elements, "ImporteRectificacion", nivel);
+
+    if !rectificativa {
+        for tag in [
+            "TipoRectificativa",
+            "FacturasRectificadas",
+            "ImporteRectificacion",
+        ] {
+            if present_at(elements, tag, nivel) {
+                return Err(err(format!(
+                    "una factura {tipo} no rectifica nada, así que no puede informar {tag}: la \
+                     AEAT solo lo admite con TipoFactura {}",
+                    TIPOS_RECTIFICATIVOS.join("|")
+                )));
+            }
+        }
+        return Ok(());
+    }
+
+    let tipo_rect = match tipo_rect {
+        Some(v) if !v.is_empty() => v,
+        _ => {
+            return Err(err(format!(
+                "una rectificativa {tipo} exige TipoRectificativa ({}): sin él la AEAT la rechaza \
+                 y el registro ya ha gastado su número de cadena",
+                TIPO_RECTIFICATIVA.join("|")
+            )))
+        }
+    };
+    if !TIPO_RECTIFICATIVA.contains(&tipo_rect) {
+        return Err(err(format!(
+            "TipoRectificativa `{tipo_rect}` no está en la enumeración del esquema ({})",
+            TIPO_RECTIFICATIVA.join("|")
+        )));
+    }
+
+    match (tipo_rect, importe) {
+        // Sustitutiva: el desglose de lo que sustituye es obligatorio.
+        ("S", false) => Err(err(
+            "una rectificativa por sustitución (TipoRectificativa=S) exige ImporteRectificacion \
+             con la base y la cuota rectificadas",
+        )),
+        // Por diferencias: el registro YA declara el delta; el bloque sobra.
+        ("I", true) => Err(err(
+            "una rectificativa por diferencias (TipoRectificativa=I) ya declara el delta en sus \
+             propios importes: ImporteRectificacion solo se informa con TipoRectificativa=S",
+        )),
+        _ => Ok(()),
+    }
 }
 
 // ── Desglose / DetalleDesglose ─────────────────────────────────────────────────────────────

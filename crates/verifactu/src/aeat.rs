@@ -215,6 +215,148 @@ fn facturas_sustituidas(record: &Json) -> String {
     )
 }
 
+/// Tipos de factura que **son** una rectificativa (`ClaveTipoFacturaType` R1–R5).
+const RECTIFYING_TYPES: &[&str] = &["R1", "R2", "R3", "R4", "R5"];
+
+/// `ClaveTipoRectificativaType`: `S` sustitutiva · `I` incremental (por diferencias).
+const RECTIFICATION_SUBSTITUTION: &str = "S";
+const RECTIFICATION_DIFFERENCE: &str = "I";
+
+/// ¿El registro es una rectificativa?
+fn is_rectifying(record: &Json) -> bool {
+    RECTIFYING_TYPES.contains(&s(record, "invoice_type").as_str())
+}
+
+/// Cómo se relacionan los importes de ESTE registro con los de la factura que rectifica:
+/// `Some("S")` sustitutiva · `Some("I")` por diferencias · `None` si no es una rectificativa.
+///
+/// **No se rellena un hueco, se lee el registro** (a diferencia de hub#324, donde el valor
+/// ausente era dinero). El propio registro ya dice cuál de los dos es:
+///
+/// - trae `rectified_*` (base/cuota rectificadas) → sus importes son los **corregidos** y
+///   sustituyen a los del original: **`S`**;
+/// - no los trae → el esquema no admite otra lectura (`ImporteRectificacion` **solo** es
+///   informable con `S`), así que sus importes son el **delta**: **`I`**. Es justo lo que emite
+///   una devolución de TPV, que declara el importe en negativo.
+///
+/// Un `rectification_type` explícito manda sobre la derivación, pero tiene que estar en la
+/// enumeración: un valor inventado se para aquí, no en la AEAT.
+fn rectification_type(record: &Json) -> Result<Option<String>, VerifactuError> {
+    if !is_rectifying(record) {
+        return Ok(None);
+    }
+    let declared = s(record, "rectification_type");
+    if declared.is_empty() {
+        return Ok(Some(
+            if has_rectified_amounts(record) {
+                RECTIFICATION_SUBSTITUTION
+            } else {
+                RECTIFICATION_DIFFERENCE
+            }
+            .to_string(),
+        ));
+    }
+    if declared != RECTIFICATION_SUBSTITUTION && declared != RECTIFICATION_DIFFERENCE {
+        return Err(VerifactuError::Payload(format!(
+            "TipoRectificativa `{declared}` no está en la enumeración del esquema \
+             ({RECTIFICATION_SUBSTITUTION}=sustitutiva|{RECTIFICATION_DIFFERENCE}=por diferencias)"
+        )));
+    }
+    Ok(Some(declared))
+}
+
+/// ¿El registro trae los importes de la rectificación (`ImporteRectificacion`)?
+fn has_rectified_amounts(record: &Json) -> bool {
+    ["rectified_base_amount", "rectified_tax_amount"]
+        .iter()
+        .any(|k| !matches!(record.get(k), None | Some(Json::Null)))
+}
+
+/// Elemento `TipoRectificativa` (XSD: tras `TipoFactura`, antes de `FacturasRectificadas`).
+///
+/// La AEAT lo exige **en cuanto el `TipoFactura` es R1–R5**: sin él el registro se rechaza cuando
+/// ya ha gastado su número de cadena (hub#1023). Vacío en todo lo que no sea una rectificativa —
+/// informarlo en una F1/F2/F3 es también un rechazo.
+fn tipo_rectificativa(record: &Json) -> Result<String, VerifactuError> {
+    Ok(match rectification_type(record)? {
+        None => String::new(),
+        Some(tipo) => format!(
+            "<sum1:TipoRectificativa>{}</sum1:TipoRectificativa>",
+            esc(&tipo)
+        ),
+    })
+}
+
+/// Bloque `FacturasRectificadas` (XSD: tras `TipoRectificativa`, antes de `FacturasSustituidas`).
+///
+/// Identifica la factura que esta R rectifica (`IDFacturaARType`: NIF del emisor + nº+serie +
+/// fecha de expedición) — el mismo shape que `FacturasSustituidas`, y por el mismo motivo: es lo
+/// que permite a Hacienda casar la devolución con la venta. `minOccurs="0"` en el esquema, así que
+/// una rectificativa que no identifica el original (una R5 de un tique) se declara igual, con su
+/// `TipoRectificativa`, en vez de emitir un bloque vacío que sí sería un rechazo.
+fn facturas_rectificadas(record: &Json) -> String {
+    if !is_rectifying(record) {
+        return String::new();
+    }
+    let num = s(record, "rectifies_number");
+    if num.is_empty() {
+        return String::new();
+    }
+    format!(
+        "<sum1:FacturasRectificadas><sum1:IDFacturaRectificada>\
+         <sum1:IDEmisorFactura>{nif}</sum1:IDEmisorFactura>\
+         <sum1:NumSerieFactura>{num}</sum1:NumSerieFactura>\
+         <sum1:FechaExpedicionFactura>{fecha}</sum1:FechaExpedicionFactura>\
+         </sum1:IDFacturaRectificada></sum1:FacturasRectificadas>",
+        nif = esc(&s(record, "rectifies_nif")),
+        num = esc(&num),
+        fecha = esc(&format_date(&s(record, "rectifies_date"))),
+    )
+}
+
+/// Bloque `ImporteRectificacion` (XSD: tras `FacturasSustituidas`, antes de `FechaOperacion`).
+///
+/// `DesgloseRectificacionType` = base y cuota **rectificadas** (las del original que se sustituye)
+/// y, opcional, el recargo de equivalencia. Solo existe en una rectificativa **por sustitución**.
+///
+/// **Sin los importes no hay bloque, y sin bloque no hay `S`** (hub#324): un `0,00` inventado aquí
+/// declararía a Hacienda que se rectifica una base de cero euros, con su huella y su número de
+/// cadena ya gastado. Se para antes de la red.
+fn importe_rectificacion(record: &Json) -> Result<String, VerifactuError> {
+    if rectification_type(record)?.as_deref() != Some(RECTIFICATION_SUBSTITUTION) {
+        return Ok(String::new());
+    }
+    if !has_rectified_amounts(record) {
+        return Err(VerifactuError::Payload(
+            "una rectificativa por sustitución (TipoRectificativa=S) exige el bloque \
+             ImporteRectificacion: faltan `rectified_base_amount`/`rectified_tax_amount`, y un \
+             0,00 inventado declararía que se rectifica una base de cero euros"
+                .into(),
+        ));
+    }
+    // Importes en CÉNTIMOS (ADR-0007) → euros con 2 decimales, igual que el resto del sobre.
+    let base = amount(record, "rectified_base_amount")? / 100.0;
+    let cuota = amount(record, "rectified_tax_amount")? / 100.0;
+    let recargo = match record.get("rectified_surcharge_amount") {
+        None | Some(Json::Null) => String::new(),
+        _ => format!(
+            "<sum1:CuotaRecargoRectificado>{}</sum1:CuotaRecargoRectificado>",
+            esc(&format_amount(
+                amount(record, "rectified_surcharge_amount")? / 100.0
+            ))
+        ),
+    };
+    Ok(format!(
+        "<sum1:ImporteRectificacion>\
+         <sum1:BaseRectificada>{base}</sum1:BaseRectificada>\
+         <sum1:CuotaRectificada>{cuota}</sum1:CuotaRectificada>{recargo}\
+         </sum1:ImporteRectificacion>",
+        base = esc(&format_amount(base)),
+        cuota = esc(&format_amount(cuota)),
+        recargo = recargo,
+    ))
+}
+
 /// Bloque `SistemaInformatico` — y **quién declara cada campo** (ADR-0202 §5.1, hub#323).
 ///
 /// Mezcla dos clases de hecho con dueños distintos, y confundirlos es lo que había:
@@ -606,7 +748,7 @@ pub fn build_soap(
              </sum1:IDFactura>\
              <sum1:NombreRazonEmisor>{issuer_name}</sum1:NombreRazonEmisor>\
              <sum1:TipoFactura>{tipo}</sum1:TipoFactura>\
-             {sustituidas}\
+             {tipo_rectificativa}{rectificadas}{sustituidas}{importe_rectificacion}\
              <sum1:DescripcionOperacion>{desc}</sum1:DescripcionOperacion>\
              {destinatarios}\
              <sum1:Desglose>{desglose}</sum1:Desglose>\
@@ -622,7 +764,12 @@ pub fn build_soap(
             fecha = esc(&format_date(&s(record, "invoice_date"))),
             issuer_name = esc(&s(record, "issuer_name")),
             tipo = esc(&s(record, "invoice_type")),
+            // Bloque rectificativo (hub#1023), en el orden del `xs:sequence` oficial:
+            // TipoRectificativa → FacturasRectificadas → FacturasSustituidas → ImporteRectificacion.
+            tipo_rectificativa = tipo_rectificativa(record)?,
+            rectificadas = facturas_rectificadas(record),
             sustituidas = facturas_sustituidas(record),
+            importe_rectificacion = importe_rectificacion(record)?,
             desc = esc(&s(record, "description")),
             destinatarios = destinatarios(record),
             // Una línea de desglose por tipo REAL de la factura (ver `desglose`). Los importes están
