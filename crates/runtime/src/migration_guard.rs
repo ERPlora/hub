@@ -210,26 +210,86 @@ pub fn check(
 }
 
 /// `DROP COLUMN x` → `RENAME COLUMN x TO _deprecated_x`; `DROP TABLE t` → `RENAME TO _deprecated_t`.
+///
+/// 🔴 **Decide sobre el SQL, nunca sobre el texto de la sentencia** (hub#1137). [`split_statements`]
+/// conserva el comentario DENTRO de la sentencia que lo sigue —a propósito, es el arreglo de
+/// hub#1027— así que una sentencia real EMPIEZA por la prosa del autor, no por su verbo. Cuando
+/// esto casaba `DROP TABLE ` al principio del texto, un bloque de cabecera encima del primer `DROP`
+/// —la forma que tienen las 123 migraciones publicadas, porque el repo la pide— hacía que no
+/// casara: la función devolvía la sentencia tal cual y el hub ejecutaba un `DROP TABLE` **real e
+/// irreversible** sobre la BD de un cliente, en silencio. El ` DROP COLUMN ` sobrevivía porque
+/// buscaba en medio del texto, y esa asimetría es justo lo que lo hacía imposible de ver.
+///
+/// Lo que se reescribe se emite con **la prosa de cabecera delante**: lo que cambia es el SQL que
+/// se ejecuta, no la explicación de por qué se ejecuta. Un comentario que fuera EN MEDIO de la
+/// sentencia no viaja con el rename — es prosa, y lo que corre es el rename.
+///
+/// Lo que **no** se traduce, y a propósito: `DROP INDEX`. Un índice no guarda datos, su definición
+/// vive en el `.sql` que lo creó y volver a crearlo es una línea; apartarlo a `_deprecated_*` lo
+/// dejaría cobrando su coste de escritura para siempre a cambio de nada. Ninguna herramienta de
+/// migraciones madura (Rails, Django, Flyway, Liquibase) aparta índices. Y en un `DROP TABLE` ni
+/// siquiera hace falta escribirlo: Postgres se lleva los índices con la tabla — y con la tabla
+/// apartada, se van con ella.
 fn set_aside_instead_of_dropping(statement: &str) -> String {
-    let upper = statement.to_uppercase();
+    let (prose, rest) = leading_prose(statement);
+    // El SQL de verdad, sin comentarios: es lo único sobre lo que se puede decidir.
+    let cleaned = strip_comments(rest);
+    let sql = cleaned.trim();
+    let upper = sql.to_uppercase();
 
     if let Some(at) = upper.find(" DROP COLUMN ") {
-        let head = statement[..at].trim_end().to_string(); // "ALTER TABLE sales_sale"
-        let rest = statement[at + " DROP COLUMN ".len()..].trim();
+        let head = sql[..at].trim_end(); // "ALTER TABLE sales_sale"
+        let rest = sql[at + " DROP COLUMN ".len()..].trim();
         let (guard, column) = strip_if_exists(rest);
         let column = column.split_whitespace().next().unwrap_or(column).trim_end_matches(';');
-        return format!("{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}");
+        return format!("{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}");
     }
 
-    if let Some(rest) = upper.strip_prefix("DROP TABLE ") {
-        let original = &statement["DROP TABLE ".len()..];
-        let _ = rest;
-        let (guard, table) = strip_if_exists(original.trim());
+    if upper.starts_with("DROP TABLE ") {
+        let named = sql["DROP TABLE ".len()..].trim();
+        let (guard, table) = strip_if_exists(named);
         let table = table.split_whitespace().next().unwrap_or(table).trim_end_matches(';');
-        return format!("ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}");
+        return format!("{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}");
     }
 
     statement.to_string()
+}
+
+/// Parte la sentencia en (prosa de cabecera, SQL). La prosa es todo lo que precede al primer
+/// carácter que no es espacio ni comentario — comentarios de línea y de bloque incluidos.
+///
+/// Existe para que reescribir un `DROP` no borre la explicación del autor: el trozo devuelto se
+/// repone **verbatim** delante del `ALTER … RENAME`. Es un corte, no un parser: si la sentencia es
+/// solo prosa, devuelve `("", statement)` y el llamante la deja como estaba.
+fn leading_prose(statement: &str) -> (&str, &str) {
+    let bytes = statement.as_bytes();
+    let mut i = 0;
+    loop {
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if statement[i..].starts_with("--") {
+            match statement[i..].find('\n') {
+                Some(end) => i += end + 1,
+                // Un `--` sin salto de línea se come el resto: la sentencia es solo prosa.
+                None => return ("", statement),
+            }
+            continue;
+        }
+        if statement[i..].starts_with("/*") {
+            match statement[i..].find("*/") {
+                Some(end) => i += end + "*/".len(),
+                // Bloque sin cerrar: no se entiende, no se toca.
+                None => return ("", statement),
+            }
+            continue;
+        }
+        break;
+    }
+    if i >= statement.len() {
+        return ("", statement);
+    }
+    statement.split_at(i)
 }
 
 /// Devuelve (`"IF EXISTS "` si lo llevaba, resto). Se conserva: un `contract` que se reintenta —
@@ -559,6 +619,149 @@ mod tests {
         assert!(
             rewritten[0].contains("IF EXISTS") || rewritten[0].contains("RENAME"),
             "un contract repetido no puede reventar el arranque: {rewritten:?}"
+        );
+    }
+
+    // ── 🔑 …y la prosa del autor no puede anularlo (hub#1137) ───────────────────────
+
+    /// 🔴 **El caso que destruía datos de verdad.** `split_statements` conserva el comentario
+    /// DENTRO de la sentencia que lo sigue (hub#1027, y está bien: sin eso `printing/002_jobs.sql`
+    /// se partía a mitad de un `--`). El traductor casaba `DROP TABLE ` al PRINCIPIO del texto, así
+    /// que un bloque de prosa de cabecera —la forma que tienen las 123 migraciones publicadas,
+    /// porque el repo la pide— empujaba el `DROP` fuera del principio, no casaba, y el `DROP TABLE`
+    /// salía **tal cual** hacia la BD del cliente. La decisión se toma sobre el SQL, no sobre el
+    /// texto; la prosa se repone delante de lo reescrito.
+    #[test]
+    fn a_header_comment_above_the_drop_does_not_defeat_the_translation() {
+        let Plan::Rewritten(rewritten) = contract(
+            "-- Sales · migration 013 — retire the legacy cart.\n\
+             -- The feature moved into the core; this file is how the table stops being used.\n\
+             DROP TABLE IF EXISTS sales_old_line",
+        )
+        .unwrap() else {
+            panic!("un contract se reescribe");
+        };
+
+        assert!(
+            !rewritten[0].to_uppercase().contains("DROP TABLE"),
+            "🔴 un `DROP TABLE` REAL e irreversible se escapó a la BD del cliente: {rewritten:?}"
+        );
+        assert!(
+            rewritten[0].ends_with(
+                "ALTER TABLE IF EXISTS sales_old_line RENAME TO _deprecated_sales_old_line"
+            ),
+            "la tabla se aparta, no se destruye: {rewritten:?}"
+        );
+        assert!(
+            rewritten[0].starts_with("-- Sales · migration 013"),
+            "y la explicación del autor viaja con lo que se ejecuta: {rewritten:?}"
+        );
+    }
+
+    /// Lo mismo con un comentario de **bloque**: `/* … */` también viaja dentro de la sentencia.
+    #[test]
+    fn a_block_comment_above_the_drop_does_not_defeat_the_translation() {
+        let Plan::Rewritten(rewritten) =
+            contract("/* retire the legacy cart (sales#12) */\nDROP TABLE sales_old_line").unwrap()
+        else {
+            panic!("un contract se reescribe");
+        };
+
+        assert!(
+            rewritten[0].ends_with(
+                "ALTER TABLE sales_old_line RENAME TO _deprecated_sales_old_line"
+            ),
+            "un comentario de bloque tampoco anula la traducción: {rewritten:?}"
+        );
+    }
+
+    /// Y el `DROP` no tiene por qué ser el primero del fichero: cada sentencia se traduce donde
+    /// esté, lleve prosa delante o no.
+    #[test]
+    fn every_drop_of_the_file_is_translated_wherever_it_sits() {
+        let Plan::Rewritten(rewritten) = contract(
+            "-- Sales · migration 013 — retire the legacy cart.\n\
+             CREATE TABLE sales_new_line (id BIGINT);\n\
+             -- first the child, then the parent\n\
+             DROP TABLE sales_old_line;\n\
+             ALTER TABLE sales_sale DROP COLUMN legacy_total;\n\
+             /* and the index goes with it */\n\
+             DROP TABLE IF EXISTS sales_old_cart",
+        )
+        .unwrap() else {
+            panic!("un contract se reescribe");
+        };
+
+        let escaped: Vec<&String> =
+            rewritten.iter().filter(|s| s.to_uppercase().contains("DROP ")).collect();
+        assert!(
+            escaped.is_empty(),
+            "🔴 estos `DROP` se escaparon sin traducir: {escaped:?}"
+        );
+        assert!(rewritten[1].ends_with("RENAME TO _deprecated_sales_old_line"), "{rewritten:?}");
+        assert!(
+            rewritten[2].ends_with("RENAME COLUMN legacy_total TO _deprecated_legacy_total"),
+            "{rewritten:?}"
+        );
+        assert!(rewritten[3].ends_with("RENAME TO _deprecated_sales_old_cart"), "{rewritten:?}");
+    }
+
+    /// La red de seguridad: **ningún** `contract` puede dejar salir un `DROP TABLE`/`DROP COLUMN`
+    /// sin traducir, escríbalo el autor como lo escriba. Es el test que se pone rojo si alguien
+    /// vuelve a decidir sobre el texto crudo en vez de sobre el SQL.
+    #[test]
+    fn no_contract_ever_emits_an_untranslated_drop() {
+        let shapes = [
+            "DROP TABLE sales_x",
+            "  DROP TABLE sales_x",
+            "-- prosa\nDROP TABLE sales_x",
+            "-- prosa\n-- más prosa\nDROP TABLE IF EXISTS sales_x",
+            "/* prosa */ DROP TABLE sales_x",
+            "/* prosa */\n  DROP TABLE IF EXISTS sales_x",
+            "-- prosa\nALTER TABLE sales_sale DROP COLUMN tax_rate",
+            "/* prosa */ ALTER TABLE sales_sale DROP COLUMN IF EXISTS tax_rate",
+        ];
+
+        for sql in shapes {
+            let Plan::Rewritten(rewritten) = contract(sql).unwrap() else {
+                panic!("un contract se reescribe: {sql:?}");
+            };
+            for statement in &rewritten {
+                let executed = strip_comments(statement).to_uppercase();
+                assert!(
+                    !executed.contains("DROP TABLE") && !executed.contains("DROP COLUMN"),
+                    "🔴 `{sql}` deja escapar un DROP real: {statement:?}"
+                );
+                assert!(
+                    executed.contains("RENAME"),
+                    "`{sql}` tenía que apartarse con un RENAME: {statement:?}"
+                );
+            }
+        }
+    }
+
+    /// El otro `contract` publicado (`verifactu/012_named_gate_constraints.sql`) **sí** abre con un
+    /// bloque de prosa, y lo suyo es un `DROP CONSTRAINT` — que el guard NO traduce y no tiene por
+    /// qué: una restricción no guarda filas y su definición viaja en el mismo fichero que la
+    /// repone. Lo que este test fija es que reponer la prosa delante no cambia lo que se ejecuta
+    /// cuando NO hay nada que traducir: la sentencia sale intacta, comentario incluido.
+    #[test]
+    fn what_the_guard_does_not_translate_comes_out_untouched() {
+        let sql = "-- Each gate refuses UNDER ITS OWN NAME (verifactu#40).\n\
+                   ALTER TABLE sales_gate DROP CONSTRAINT IF EXISTS sales_gate_ok_check;\n\
+                   ALTER TABLE sales_gate ADD CONSTRAINT sales_gate_is_declared CHECK (ok = 1)";
+
+        let Plan::Rewritten(rewritten) = contract(sql).unwrap() else {
+            panic!("un contract se reescribe");
+        };
+
+        assert_eq!(
+            rewritten,
+            vec![
+                "-- Each gate refuses UNDER ITS OWN NAME (verifactu#40).\nALTER TABLE sales_gate DROP CONSTRAINT IF EXISTS sales_gate_ok_check".to_string(),
+                "ALTER TABLE sales_gate ADD CONSTRAINT sales_gate_is_declared CHECK (ok = 1)".to_string(),
+            ],
+            "lo que no se traduce se ejecuta TAL CUAL, prosa incluida"
         );
     }
 
