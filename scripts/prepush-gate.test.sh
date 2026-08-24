@@ -170,7 +170,7 @@ wait $first $second
 make_monorepo() {
     local base
     base=$(cd "$(mktemp -d)" && pwd -P)
-    mkdir -p "$base/modules-workspace/modules" "$base/blueprints" "$base/hub"
+    mkdir -p "$base/modules-workspace/modules" "$base/hub"
     git -C "$base/hub" init -q
     git -C "$base/hub" config user.email gate@test
     git -C "$base/hub" config user.name gate
@@ -224,29 +224,16 @@ got=$(cat "$repo/ENV" 2>/dev/null)
     && ok "opt-in with no modules on disk: skips instead of panicking" \
     || bad "opt-in with no modules on disk: skips instead of panicking" "exit=$code got='$got'"
 
-# ── 12. `blueprints/` is resolved too, or the gate red-lines from every worktree ─
-#    `sector_packs_pg_e2e` reads the sector seeds out of the SIBLING repo
-#    (`blueprints/starter_catalogs/es/<sector>/seed.sql`). Unlike the module e2e
-#    there is no opt-in: those two tests run always, so from a worktree outside
-#    the monorepo the relative path misses and the gate fails with
-#    "no se pudo leer …/seed.sql" — a red that has nothing to do with the push.
+# ── 12. `blueprints/` is NOT a dependency of the gate any more ────────────────
+#    It used to be: `sector_packs_pg_e2e` read its sector seeds out of that sibling
+#    repo, those two tests have no opt-in, and from a worktree outside the monorepo
+#    the relative path missed and the gate died with "no se pudo leer …/seed.sql" —
+#    a red that had nothing to do with the push, on EVERY gated push of a fleet that
+#    works out of /private/tmp. The hook grew a `resolve_blueprints_dir` for it.
 #
-#    Measured 2026-08-09: the whole fleet works out of /private/tmp worktrees, so
-#    that was every gated push. `ERPLORA_BLUEPRINTS_DIR` is the escape the test
-#    already documents; the hook just never set it, the way it does for modules.
-base=$(make_monorepo)
-sha=$(git -C "$base/hub" rev-parse HEAD)
-code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_BLUEPRINTS_DIR:-}\" > $base/ENV; true")
-got=$(cat "$base/ENV" 2>/dev/null)
-[ "$code" = 0 ] && [ "$got" = "dir=$base/blueprints" ] \
-    && ok "the suite is pointed at blueprints/, wherever the worktree is" \
-    || bad "the suite is pointed at blueprints/, wherever the worktree is" "exit=$code got='$got'"
-
-# ── 13. No blueprints on disk: the gate still runs, it just cannot point at them ─
-#    Refusing the push would be worse than the red it prevents: a checkout without
-#    the sibling repo is a legitimate state, and the two tests say so themselves.
+#    hub#1050 moved the seeds into this repo, so the hook resolves nothing and this
+#    asserts the contract that replaced it: a bare checkout, no sibling repo of any
+#    kind on disk, and the gate still runs the suite and lets the push through.
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -254,11 +241,11 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" HOME="$repo/nowhere" \
     HUB_GATE_TEST_CMD="true")
 [ "$code" = 0 ] \
-    && ok "no blueprints on disk: the gate still runs" \
-    || bad "no blueprints on disk: the gate still runs" "exit=$code"
+    && ok "no sibling repos on disk: the gate still runs" \
+    || bad "no sibling repos on disk: the gate still runs" "exit=$code"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14–18 — the attestation must never fail SILENTLY (hub#739)
+# 13–17 — the attestation must never fail SILENTLY (hub#739)
 #
 # Everything above drives the publish step through HUB_GATE_STATUS_CMD, which is
 # precisely the path that never broke. The one that did is the DEFAULT: plain
@@ -292,7 +279,7 @@ make_path_without_gh() {
     echo "$dir"
 }
 
-# ── 14. The account cannot see the repo → say so, do not exit 0 in silence ────
+# ── 13. The account cannot see the repo → say so, do not exit 0 in silence ────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -325,14 +312,14 @@ grep -qi 'without checks\|no checks' <<<"$out"   || errs="$errs no-symptom"
     && ok "unpublishable status: the hook names the account and gh's error" \
     || bad "unpublishable status: the hook names the account and gh's error" "$errs"
 
-# ── 15. …and the push still goes through: the suite WAS green ─────────────────
+# ── 14. …and the push still goes through: the suite WAS green ─────────────────
 #    Aborting here would punish a green tree for a credential problem, and Ioan
 #    switches the account by hand. The hook reports; it does not block.
 [ "$code" = 0 ] && grep -qi 'green' <<<"$out" \
     && ok "unpublishable status: the push is not blocked, the green is stated" \
     || bad "unpublishable status: the push is not blocked, the green is stated" "exit=$code"
 
-# ── 16. The failure is also left on disk, because it is printed asynchronously ─
+# ── 15. The failure is also left on disk, because it is printed asynchronously ─
 #    The publish step outlives the hook, so its shout can land after the shell
 #    prompt is back. A log makes it recoverable instead of merely scrolled past.
 log="$repo/.state/publish-status.log"
@@ -340,7 +327,7 @@ log="$repo/.state/publish-status.log"
     && ok "unpublishable status: the reason is recorded in publish-status.log" \
     || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(cat "$log" 2>/dev/null | head -3)"
 
-# ── 17. `gh` not installed at all is the same silent hole ─────────────────────
+# ── 16. `gh` not installed at all is the same silent hole ─────────────────────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -358,7 +345,7 @@ grep -qi "gh.*not\( on\)\? \(installed\|on PATH\)\|not on PATH" <<<"$out" || err
     && ok "no gh on PATH: the hook says the attestation is missing" \
     || bad "no gh on PATH: the hook says the attestation is missing" "$errs"
 
-# ── 18. The POST itself failing must shout too, not just the repo lookup ──────
+# ── 17. The POST itself failing must shout too, not just the repo lookup ──────
 #    This is the half that runs in the background, after the commit lands.
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
@@ -390,7 +377,7 @@ grep -q 'other-company' "$log" 2>/dev/null  || errs="$errs no-account"
     && ok "the status POST failing is reported, not swallowed" \
     || bad "the status POST failing is reported, not swallowed" "$errs log=$(head -3 "$log" 2>/dev/null)"
 
-# ── 19. The happy default path still publishes — and says it did ──────────────
+# ── 18. The happy default path still publishes — and says it did ──────────────
 #    The regression guard for 14–18: making failure loud must not make success
 #    stop working, and this is the only test that drives `gh` all the way.
 repo=$(make_repo)
@@ -420,7 +407,7 @@ grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
     || bad "green + a working gh: the status is posted and nothing cries wolf" "$errs"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 20–22 — the INSTALLED copy must not drift silently from the versioned hook
+# 19–21 — the INSTALLED copy must not drift silently from the versioned hook
 # (hub#746)
 #
 # On the real machine `core.hooksPath` points OUTSIDE the repo
@@ -430,7 +417,7 @@ grep -qi 'could not be published' <<<"$out" && errs="$errs false-alarm"
 # carries the hash of the copy that actually ran.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 20. Running copy differs from the versioned hook → loud drift warning ─────
+# ── 19. Running copy differs from the versioned hook → loud drift warning ─────
 #    The fixture commits a MODIFIED `.githooks/pre-push`, while the copy that
 #    runs is the real one — exactly the installed-copy-is-stale shape.
 repo=$(make_repo)
@@ -453,7 +440,7 @@ grep -q 'install-hooks.sh' <<<"$out"           || errs="$errs no-resync-command"
     && ok "drifted installed copy: the hook says so and names the resync command" \
     || bad "drifted installed copy: the hook says so and names the resync command" "$errs"
 
-# ── 21. Running copy identical to the versioned hook → silence ────────────────
+# ── 20. Running copy identical to the versioned hook → silence ────────────────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 mkdir -p "$repo/.githooks"
@@ -472,7 +459,7 @@ grep -qi 'out of sync' <<<"$out"      && errs="$errs false-drift-alarm"
     && ok "in-sync copies: no drift warning" \
     || bad "in-sync copies: no drift warning" "$errs"
 
-# ── 22. The attestation names the hook that ran (hash in the description) ─────
+# ── 21. The attestation names the hook that ran (hash in the description) ─────
 #    Option 4 of hub#746: a stale gate's green becomes DISTINGUISHABLE on the
 #    PR, because the status says which hook produced it.
 repo=$(make_repo)
@@ -500,7 +487,7 @@ grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-h
     || bad "the posted status says which hook attested (12-hex hash)" "$errs"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 23–26 — the lock must know its OWNER, and detect that the owner died
+# 22–25 — the lock must know its OWNER, and detect that the owner died
 # (hub#575)
 #
 # A push killed mid-suite (turn timeout, Ctrl-C, SIGKILL on the process tree)
@@ -511,7 +498,7 @@ grep -qE 'hook [0-9a-f]{12}' "$repo/POSTARGS" 2>/dev/null    || errs="$errs no-h
 # in parallel (the exact condition the lock exists to prevent, hub#526).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 23. Holding the lock writes an owner file; releasing cleans it all up ─────
+# ── 22. Holding the lock writes an owner file; releasing cleans it all up ─────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -527,7 +514,7 @@ grep -q '^since=[0-9]' "$repo/OWNER" 2>/dev/null || errs="$errs no-since"
     && ok "the lock carries pid + since while held, and is removed on exit" \
     || bad "the lock carries pid + since while held, and is removed on exit" "$errs"
 
-# ── 24. Orphan lock (owner is dead): break it, say whose it was, run the suite ─
+# ── 23. Orphan lock (owner is dead): break it, say whose it was, run the suite ─
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -550,7 +537,7 @@ grep -q "$dead_pid" <<<"$out"          || errs="$errs dead-pid-not-named"
     && ok "orphan lock: broken automatically, naming the dead owner's PID" \
     || bad "orphan lock: broken automatically, naming the dead owner's PID" "$errs out='$out'"
 
-# ── 25. LIVE owner: wait (never break), name who is holding, time out clearly ──
+# ── 24. LIVE owner: wait (never break), name who is holding, time out clearly ──
 #    Conservative by contract: breaking a live lock starts two suites in
 #    parallel, which is the hub#526 failure the lock exists to prevent.
 repo=$(make_repo)
@@ -573,7 +560,7 @@ grep -q "rm -rf" <<<"$out"             || errs="$errs no-manual-removal-command"
     && ok "live owner: waits without breaking, names the PID, and times out with the exact command" \
     || bad "live owner: waits without breaking, names the PID, and times out with the exact command" "$errs out='$out'"
 
-# ── 26. Lock WITHOUT an owner file: when in doubt, wait — never break ─────────
+# ── 25. Lock WITHOUT an owner file: when in doubt, wait — never break ─────────
 #    A pre-hub#575 lock, or an owner file whose write is still in flight,
 #    is indistinguishable from a live suite. The conservative direction is
 #    to wait for the timeout, exactly as before.
@@ -594,7 +581,7 @@ errs=""
     || bad "ownerless lock: waits conservatively instead of breaking it" "$errs"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 27–29 — the SSH keepalive lives in the REPO, and the lock wait must never
+# 26–28 — the SSH keepalive lives in the REPO, and the lock wait must never
 # outlast what the connection tolerates (hub#788)
 #
 # `git push` opens the SSH transport BEFORE this hook runs. A lock wait of
@@ -605,7 +592,7 @@ errs=""
 # wait, never by trusting the connection.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 27. A repo without keepalive: the hook installs it for the NEXT pushes ────
+# ── 26. A repo without keepalive: the hook installs it for the NEXT pushes ────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -620,7 +607,7 @@ grep -q 'ServerAliveInterval' <<<"$sshcmd"      || errs="$errs keepalive-not-ins
     && ok "no keepalive configured: the hook arms core.sshCommand itself" \
     || bad "no keepalive configured: the hook arms core.sshCommand itself" "$errs"
 
-# ── 28. UNPROTECTED connection: fail fast on lock contention, never wait 1h ───
+# ── 27. UNPROTECTED connection: fail fast on lock contention, never wait 1h ───
 #    The keepalive the hook just installed does not protect THIS push — its
 #    connection was opened before. Waiting the full HUB_GATE_LOCK_WAIT on it
 #    reproduces the silent death; the hook must cap the wait and say why.
@@ -645,7 +632,7 @@ grep -qi 'keepalive' <<<"$out"        || errs="$errs no-keepalive-explanation"
     && ok "unprotected connection + lock contention: capped wait, fast clear failure" \
     || bad "unprotected connection + lock contention: capped wait, fast clear failure" "$errs out='$out'"
 
-# ── 29. PROTECTED connection: the wait is clamped BELOW the keepalive margin ──
+# ── 28. PROTECTED connection: the wait is clamped BELOW the keepalive margin ──
 #    The inequality margin > wait must hold even if someone raises
 #    HUB_GATE_LOCK_WAIT: the hook clamps the wait to the margin, it never
 #    trusts the connection past what the keepalive guarantees.
@@ -672,7 +659,7 @@ grep -qi 'clamp' <<<"$out"            || errs="$errs no-clamp-message"
     || bad "wait ≥ keepalive margin: clamped below it, with a message naming both" "$errs out='$out'"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 30–33 — the gate must TEST the tree it ATTESTS (hub#855, P0)
+# 29–32 — the gate must TEST the tree it ATTESTS (hub#855, P0)
 #
 # The suite runs on the WORKING TREE; the cache key and the attestation name
 # the PUSHED sha. When they differ — pushing another branch from the same
@@ -686,7 +673,7 @@ grep -qi 'clamp' <<<"$out"            || errs="$errs no-clamp-message"
 # all (test 33): the attestation is about content, and that content ran.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 30. Pushing a sha whose tree is NOT the working tree → refuse ─────────────
+# ── 29. Pushing a sha whose tree is NOT the working tree → refuse ─────────────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 old_sha=$(git -C "$repo" rev-parse HEAD)
@@ -707,7 +694,7 @@ grep -qi 'working tree' <<<"$out"                 || errs="$errs no-explanation"
     && ok "pushed sha != working tree: refused, nothing tested, nothing attested" \
     || bad "pushed sha != working tree: refused, nothing tested, nothing attested" "$errs out='$out'"
 
-# ── 31. Dirty working tree → refuse (the suite would test the dirt) ───────────
+# ── 30. Dirty working tree → refuse (the suite would test the dirt) ───────────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -726,7 +713,7 @@ ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
     && ok "dirty working tree: refused — a green here would sign untested content" \
     || bad "dirty working tree: refused — a green here would sign untested content" "$errs out='$out'"
 
-# ── 32. Pushing a TAG from a checkout that moved on → refuse ──────────────────
+# ── 31. Pushing a TAG from a checkout that moved on → refuse ──────────────────
 #    The worst of the three shapes (hub#855's third door): a tag is pushed
 #    from WHATEVER checkout is current, and nobody switches branches to tag.
 repo=$(make_repo)
@@ -747,7 +734,7 @@ ls "$repo/.state"/*.green >/dev/null 2>&1  && errs="$errs green-recorded"
     && ok "tag pushed from a moved-on checkout: refused instead of caching a lie" \
     || bad "tag pushed from a moved-on checkout: refused instead of caching a lie" "$errs"
 
-# ── 33. A tree ALREADY proven green needs no working tree: cache-hit passes ───
+# ── 32. A tree ALREADY proven green needs no working tree: cache-hit passes ───
 #    Deliberate: the attestation is about content. Once the pushed tree really
 #    ran (recorded by a matching run), pushing that same sha again — or a tag
 #    on it — from any checkout state is truthful and instant.
@@ -771,7 +758,7 @@ errs=""
     || bad "already-green tree: passes from any checkout without rerunning" "$errs"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 34–36 — the attestation is the CONSEQUENCE of the push landing (hub#574)
+# 33–35 — the attestation is the CONSEQUENCE of the push landing (hub#574)
 #
 # A pre-push hook cannot know whether the transfer will succeed — it runs
 # before it. The publish step therefore verifies, from the background, that
@@ -785,7 +772,7 @@ errs=""
 #   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 34. The push DIES: ref never advances → NO status, and the log says so ────
+# ── 33. The push DIES: ref never advances → NO status, and the log says so ────
 repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
@@ -815,7 +802,7 @@ grep -qi 'retry' "$log" 2>/dev/null              || errs="$errs no-retry-instruc
     && ok "dead push: no orphan status, and the log says the push did not land + retry" \
     || bad "dead push: no orphan status, and the log says the push did not land + retry" "$errs"
 
-# ── 35. The ref advanced to the sha → the status posts, and the terminal is honest ─
+# ── 34. The ref advanced to the sha → the status posts, and the terminal is honest ─
 #    The green message must attest the TEST and defer the push/attestation
 #    claim to the verification — not announce "pushing" as a fact.
 repo=$(make_repo)
@@ -846,7 +833,7 @@ grep -qiE 'green → pushing|green -> pushing' <<<"$out" && errs="$errs still-cl
     && ok "landed push: status posted, and the terminal attests the test, not the push" \
     || bad "landed push: status posted, and the terminal attests the test, not the push" "$errs out='$out'"
 
-# ── 36. The ref already moved PAST the sha (another worker pushed on top) ─────
+# ── 35. The ref already moved PAST the sha (another worker pushed on top) ─────
 #    Landing is "the ref contains the pushed sha", not "the ref equals it":
 #    a fleet mate merging on top seconds later must not turn a real landing
 #    into a false 'did not land'.

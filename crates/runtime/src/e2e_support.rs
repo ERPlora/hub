@@ -67,22 +67,12 @@ fn default_modules_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
 }
 
-/// Canonical root of the blueprint catalogues: `$ERPLORA_BLUEPRINTS_DIR` when set, otherwise
-/// `<CARGO_MANIFEST_DIR>/../../../blueprints` (relative to the monorepo).
-///
-/// Same policy as [`modules_root`], for the same reason (hub#540/#541): `blueprints/` is another
-/// sibling repo, so a worktree created OUTSIDE the monorepo tree cannot resolve it by a relative
-/// path. Without one shared resolver, a test that hardcodes the relative path fails with a bare
-/// `NotFound` in exactly the setup the override exists for.
-pub fn blueprints_root() -> PathBuf {
-    resolve_root(std::env::var("ERPLORA_BLUEPRINTS_DIR").ok(), default_blueprints_root)
-}
-
-/// The monorepo-relative default, WITHOUT the `$ERPLORA_BLUEPRINTS_DIR` override
-/// (same split, same reason, as [`default_modules_root`]).
-fn default_blueprints_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../blueprints")
-}
+// There was a `blueprints_root()` here (plus `$ERPLORA_BLUEPRINTS_DIR`), because
+// `sector_packs_pg_e2e` read its sector seeds out of the sibling `blueprints` checkout. That was
+// the hand-written catalogue model ADR-0121 retired, and the hub was its only live consumer
+// (hub#1050): the seeds are now fixtures of this repo, resolved from the crate's own
+// `CARGO_MANIFEST_DIR`, so there is no second sibling repo left to locate. `modules-workspace` is
+// still one, and keeps its resolver below.
 
 /// ¿Estamos corriendo en CI? GitHub Actions (y la mayoría de runners) inyectan `CI=true`.
 fn running_in_ci() -> bool {
@@ -233,7 +223,6 @@ mod tests {
         // función que el entorno pisa, el test se ponía rojo con `ERPLORA_MODULES_DIR` apuntando a
         // cualquier ruta propia — o sea, justo al correr los e2e como el módulo dice que se corren.
         assert!(default_modules_root().ends_with("modules-workspace/modules"));
-        assert!(default_blueprints_root().ends_with("blueprints"));
     }
 
     #[test]
@@ -242,8 +231,8 @@ mod tests {
         // que permite correr los e2e desde un worktree fuera del monorepo, donde la ruta relativa
         // no resuelve (hub#253/#541). Sin esto, romper el override no rompe ningún test.
         //
-        // Se ejerce `resolve_root`, que es LA función que usan `modules_root`/`blueprints_root` —
-        // no una copia de su lógica en el test. Mismo motivo que `decide()`: la política se factoriza
+        // Se ejerce `resolve_root`, que es LA función que usa `modules_root` — no una copia de su
+        // lógica en el test. Mismo motivo que `decide()`: la política se factoriza
         // para poder probarla sin mutar el entorno, que es del PROCESO y provocaría carreras.
         assert_eq!(
             resolve_root(Some("/tmp/mis-modulos".to_string()), default_modules_root),

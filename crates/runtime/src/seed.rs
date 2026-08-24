@@ -478,7 +478,8 @@ mod tests {
     /// The exact shape every seed in the wild still carries: `INSERT INTO hub_user` with an
     /// explicit column list that predates `hub_id`. It is not a hypothetical — this is, verbatim
     /// modulo the hash, what `saas/…/hetzner/hub_demo_seed.sql` hands to `HUB_SEED_SQL` today and
-    /// what `blueprints/starter_catalogs/es/*/seed.sql` carries for its cashiers.
+    /// what the sector seeds carry for their cashiers
+    /// (`crates/runtime/tests/fixtures/sector_pack_es/*/seed.sql`).
     ///
     /// Against the `NOT NULL` of system migration v42 (hub#497) this used to be a not-null
     /// violation, and [`apply`]'s failure ABORTS BOOT (`server/lib.rs`, `apply_seed(&seed_sql)?`):
