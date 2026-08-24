@@ -1,0 +1,76 @@
+# `@erplora/module-sdk` puesto en el disco de un runner que NO puede hacer checkout de este repo
+# (ERPlora/hub#1097).
+#
+# QUÉ PROBLEMA RESUELVE. El gate compartido de los 26 repos de módulo
+# (`ERPlora/module-toolkit/.github/actions/validate-module`) ejecuta los `ui/**/*.test.ts` del
+# módulo bajo vitest. Cuatro de los cinco paquetes que hacen falta salen de npm; el quinto es
+# `packages/module-sdk` de ESTE repo, privado y sin publicar. Sin él vitest no dice «falta un
+# paquete»: da un error de resolución POR FICHERO, que se lee igual que 51 tests rotos. Por eso el
+# toolkit los declaraba SIN CORRER — 232 de los 245 ficheros de los 26 módulos, ≈3.044 tests, con
+# el gate en verde en 28 s. Un aviso es un verde con adorno.
+#
+# POR QUÉ UNA COMPOSITE ACTION Y NO UN CHECKOUT. En el plan Free los secretos de organización **no
+# llegan a un repo privado**, así que `actions/checkout` de ERPlora/hub desde el repo de un módulo
+# no tiene credencial, y meter un PAT en 26 repos es una decisión de seguridad, no un detalle de
+# CI. Una composite action de un repo privado con *Settings → Actions → Access: organization* es la
+# ÚNICA forma que GitHub resuelve **sin credencial**: para ejecutarla, el runner se trae este repo
+# entero a `${{ github.action_path }}/../../..`. Es el mismo camino por el que los 26 módulos
+# corren `validate-module`, y el que module-toolkit#61/#66 abrió para los espejos canónicos.
+#
+# POR QUÉ NO SE PUBLICA EN npm. Publicar crea un eje de deriva nuevo: el gate probaría los módulos
+# contra una VERSIÓN publicada del SDK, no contra el que el hub va a servir. Por aquí no hay copia
+# ni versión — es el `packages/module-sdk` del ref al que apunte el `uses:`, y punto. (La otra
+# mitad del motivo es que publicar expone el paquete al mundo y arrastra el gate de higiene
+# pre-publicación, module-toolkit#25, congelado tras «apertura del marketplace a terceros».)
+#
+# EL PAQUETE NO SE COMPILA. `package.json` dice `"main": "src/index.ts"`: se consume como FUENTE
+# TypeScript y vitest lo transpila. Que el directorio esté ahí es todo lo que hace falta — no hay
+# build, ni artefacto, ni versión que casar.
+name: ERPlora module SDK on disk
+description: >
+  Exposes this repository's `packages/module-sdk` on the runner, for a workflow that cannot check
+  ERPlora/hub out. Resolved through Actions sharing, with no credential.
+
+outputs:
+  path:
+    description: Absolute path of the `@erplora/module-sdk` package directory on this runner.
+    value: ${{ steps.resolve.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        # `$ACTION_PATH` es `<repo>/.github/actions/module-sdk`: tres niveles arriba está la raíz
+        # del checkout que el runner se ha traído para poder ejecutar esta action.
+        hub=$(cd "$ACTION_PATH/../../.." && pwd)
+        sdk="$hub/packages/module-sdk"
+        # 🔴 Se comprueba, no se promete. Si alguien mueve el paquete, este paso se cae en ROJO
+        # aquí — donde se lee — en vez de dejar que el consumidor enlace una ruta muerta y los
+        # tests del módulo salgan rojos por «Cannot find module», que es el fallo que parece del
+        # módulo y no lo es.
+        if [ ! -f "$sdk/package.json" ]; then
+          echo "::error::no encuentro packages/module-sdk en el checkout de ERPlora/hub ($hub) — ¿se ha movido el paquete?"
+          exit 1
+        fi
+        # 🔴 Sin `node`. Este paso corre ANTES del `setup-node` del gate, y `ci-runner-1` es un
+        # Ubuntu pelado: dar por hecho un intérprete aquí convertiría «el paquete está» en «este
+        # runner traía node», que es otra pregunta. `grep`/`sed` sobre un fichero de cuatro líneas
+        # que es nuestro.
+        if ! grep -q '"@erplora/module-sdk"' "$sdk/package.json"; then
+          echo "::error::$sdk/package.json no se llama '@erplora/module-sdk'"
+          exit 1
+        fi
+        # Y que el punto de entrada que declara EXISTA: un `main` que apunta a un fichero borrado
+        # deja el paquete «instalado» y sin resolver, que es el mismo verde falso una capa abajo.
+        main=$(sed -n 's/.*"main"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$sdk/package.json" | head -1)
+        if [ -z "$main" ] || [ ! -f "$sdk/$main" ]; then
+          echo "::error::$sdk/package.json declara main='$main' y ese fichero no está"
+          exit 1
+        fi
+        echo "path=$sdk" >> "$GITHUB_OUTPUT"
+        echo "→ @erplora/module-sdk en $sdk (main: $main)"
