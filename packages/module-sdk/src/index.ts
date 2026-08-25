@@ -375,6 +375,13 @@ export class ErploraError extends Error {
      * A flat `permission_denied` leaves it `undefined` on purpose: it is not an offer to elevate.
      */
     public readonly permission?: string,
+    /**
+     * The fields the payload schema refused, present only on `invalid_payload` (hub#1094): the
+     * runtime splits them off the detail (`registry::invalid_payload_fields`) so the screen can
+     * MARK those controls. Read the field, never parse the message — the message is prose and
+     * translatable, the list is not. `undefined` on every refusal that names no field.
+     */
+    public readonly fields?: readonly string[],
   ) {
     super(message);
     this.name = 'ErploraError';
@@ -506,13 +513,20 @@ export class UnknownOutcomeError extends ErploraError {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: { code: string; message: string; permission?: string };
+  error?: { code: string; message: string; permission?: string; fields?: string[] };
 }
 
 function unwrap(env: Envelope): unknown {
   if (!env.ok) {
     const e = env.error;
-    throw new ErploraError(e?.code ?? 'error', e?.message ?? 'unknown error', e?.permission);
+    throw new ErploraError(
+      e?.code ?? 'error',
+      e?.message ?? 'unknown error',
+      e?.permission,
+      // hub#1094: absent stays absent. An empty array would read as «the runtime looked and found
+      // no bad field», which is a different statement from «this refusal is not about fields».
+      e?.fields?.length ? e.fields : undefined,
+    );
   }
   return env.data;
 }
