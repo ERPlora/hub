@@ -178,6 +178,12 @@ const catalog = ref<CatalogBlueprint[]>([]);
 const requested = ref<boolean>(false);
 const run = ref<HeroRun | null>(null);
 const dismissed = ref<boolean>(false);
+/**
+ * The card has been on screen at least once (hub#1120). Latched, never cleared: it is what stops
+ * the offer from being pulled out from under the pointer when `hub.setup.status` refreshes. The
+ * rule itself lives in `heroVisible`.
+ */
+const shown = ref<boolean>(false);
 
 const canAdminister = computed<boolean>(() => mayAdminister(user.value?.permissions));
 
@@ -195,7 +201,18 @@ const visible = computed<boolean>(() =>
     offers: offers.value,
     run: run.value,
     dismissed: dismissed.value,
+    shown: shown.value,
   }),
+);
+
+// The latch of `shown`. A watcher and not a side effect inside the computed: a computed that writes
+// state it also reads is a loop waiting to happen, and this one only ever goes false → true.
+watch(
+  visible,
+  (yes) => {
+    if (yes) shown.value = true;
+  },
+  { immediate: true },
 );
 
 /**

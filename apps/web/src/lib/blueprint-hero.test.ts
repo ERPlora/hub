@@ -77,6 +77,7 @@ function input(over: Partial<HeroInput> = {}): HeroInput {
     offers: [offer()],
     run: null,
     dismissed: false,
+    shown: false,
     ...over,
   };
 }
@@ -200,6 +201,33 @@ describe('when the card is on screen', () => {
         }),
       ),
     ).toBe(true);
+  });
+
+  // 🔴 hub#1120 — the door must not close under the pointer.
+  //
+  // A FREE hub is provisioned with `customers` already installed, so the runtime's `apps` item
+  // ticks `done` on a business that has configured NOTHING — and the panel re-reads
+  // `hub.setup.status` while the owner is reading the card. The card would then be pulled out of
+  // the DOM mid-reading, and a press aimed at «Use this» lands on empty space: no spinner, no
+  // error, no request. That is the shape the owner reported, and it is indistinguishable from a
+  // dead button.
+  //
+  // So once the card has been shown to THIS session it stays until the owner acts on it or closes
+  // it — the same contract as the onboarding guides of Shopify, Odoo or Square. The protection is
+  // untouched: `shown` only latches AFTER the business legitimately counted as empty, so a hub
+  // that already had apps still never sees the offer.
+  it('does not close on its own once it is up, even when `apps` ticks done', () => {
+    expect(heroVisible(input({ shown: true, status: status([item({ state: 'done' })]) }))).toBe(true);
+  });
+
+  it('a business that already had apps still never gets it', () => {
+    expect(heroVisible(input({ shown: false, status: status([item({ state: 'done' })]) }))).toBe(false);
+  });
+
+  it('does not survive on an empty offer: the card that has nothing to offer goes anyway', () => {
+    // The latch keeps a card that CAN still be pressed. With no template left to press it is a
+    // promise we cannot keep — the same rule as the first render.
+    expect(heroVisible(input({ shown: true, offers: [] }))).toBe(false);
   });
 
   it('goes when the outcome has been read and closed', () => {

@@ -41,9 +41,9 @@ vi.mock('../lib/app-names', async () => {
   // `appLabel` NO se stubea: la regla de «nombre o id, nunca un invento» es el contrato bajo prueba.
   return { appLabel: actual.appLabel, loadAppNames: async () => appNames };
 });
-// Ref mutable: varios tests necesitan alternar owner/admin ↔ sin permiso.
-const isAdminRef = vi.hoisted(() => ({ value: true }));
-vi.mock('../lib/session', () => ({ isAdmin: isAdminRef }));
+// La sesión NO se stubea (hub#1120): quién puede importar es justo el contrato bajo prueba, y una
+// puerta que se prueba con su propio interruptor no prueba nada. Los tests mueven la sesión REAL
+// con `setUser`, la misma que escribe el login.
 vi.mock('../lib/nav', () => ({ refreshModuleNav: vi.fn() }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 // HubIcon hornea todos los SVG del shell vía `~icons/…?raw`, que el entorno de test deniega.
@@ -51,8 +51,14 @@ vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import ImportPanel from './ImportPanel.vue';
+import { setUser, type SessionUser } from '../lib/session';
 // Real English catalogue: the blocked row is tested through the sentence the user reads.
 import en from '../i18n/locales/en';
+
+/** La sesión que el runtime escribe para un owner: rol + comodín (`identity::session_permissions`). */
+function signInAsOwner(overrides: Partial<SessionUser> = {}): void {
+  setUser({ id: 'u-1', name: 'Owner', email: 'owner@example.com', role: 'owner', permissions: ['*'], ...overrides });
+}
 
 const i18n = createI18n({
   legacy: false,
@@ -72,7 +78,7 @@ beforeEach(() => {
   fetchImportReport.mockReset();
   retryImport.mockReset();
   appNames.clear();
-  isAdminRef.value = true;
+  signInAsOwner();
 });
 
 describe('ImportPanel · paso pick', () => {
@@ -87,6 +93,30 @@ describe('ImportPanel · paso pick', () => {
     const table = w.get('[data-testid="import-blueprint-table"]');
     expect(table.attributes('default-view')).toBe('cards');
     expect(table.attributes('row-key-field')).toBe('slug');
+  });
+
+  // 🔴 hub#1120 — quién puede importar lo decide el PERMISO, no la cadena `role`.
+  //
+  // El panel preguntaba por `isAdmin`, que compara `user.role` con «owner»/«admin». Ese campo es
+  // OPCIONAL por contrato (`SessionUser.role`: «las sesiones legacy / el fallback demo no lo
+  // traen»), mientras que el permiso `hub.administer` lo concede el runtime a esos MISMOS roles
+  // (`identity::session_permissions`) y es la puerta que usa el resto de la administración desde
+  // ADR-0248 (hub#506: una sola definición del símbolo). Cuando las dos discrepan sale exactamente
+  // lo que se vio en producción: el hero del dashboard —que sí mira el permiso— ofrece las cuatro
+  // plantillas, y esta tabla se queda vacía SIN pedir siquiera el catálogo. Ni error, ni petición,
+  // ni filas: el onboarding de un clic deja de tener puerta.
+  it('pide el catálogo a quien puede ADMINISTRAR el hub, aunque su sesión no traiga `role`', async () => {
+    signInAsOwner({ role: undefined, permissions: ['hub.administer'] });
+    fetchBlueprintCatalog.mockResolvedValue([
+      { slug: 'rest', name: 'Restaurante', description: 'TPV', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(1);
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).not.toBe(
+      'importPage.catalogForbidden',
+    );
   });
 
   it('SIEMPRE ofrece «subir desde archivo», haya o no blueprints', async () => {
@@ -117,7 +147,7 @@ describe('ImportPanel · el empty-state no puede mentir', () => {
   // hubiera: es que ni se pedía el catálogo (`onMounted` solo lo carga `if (isAdmin)`), y el
   // empty-state genérico afirmaba lo contrario.
   it('sin permiso NO afirma que no haya plantillas', async () => {
-    isAdminRef.value = false;
+    signInAsOwner({ role: 'cashier', permissions: ['sales.sell'] });
     const w = mountPanel();
     await flushPromises();
 

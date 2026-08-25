@@ -212,6 +212,25 @@ describe('when the card asks the cloud anything at all', () => {
     expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(1);
   });
 
+  // 🔴 hub#1120 — the offer must not be pulled out from under the pointer.
+  //
+  // A FREE hub is provisioned with `customers` already installed, so `hub.setup.status` ticks the
+  // `apps` item `done` on a business that has configured nothing — and the panel re-reads that
+  // document while the owner is reading the card. The card used to leave with it, so a press aimed
+  // at «Use this» landed on empty space: no spinner, no error, no request. That is exactly how a
+  // live button gets reported as dead, and it left the one-click onboarding with no door at all.
+  it('does not disappear under the owner when the checklist ticks `apps` (hub#1120)', async () => {
+    const w = mountCard();
+    await flushPromises();
+    expect(w.find('[data-testid="hero-use"]').exists()).toBe(true);
+
+    await w.setProps({ status: emptyBusiness('done') });
+    await flushPromises();
+
+    expect(w.find('[data-testid="hero-card"]').exists()).toBe(true);
+    expect(w.find('[data-testid="hero-use"]').exists()).toBe(true);
+  });
+
   it('stays quiet when the cloud has nothing (or cannot answer): no empty hero', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     const w = mountCard();
