@@ -148,7 +148,7 @@ import {
   cloudInvoices, cloudSubscriptions, getAccessToken, hasIndependentLocalSession,
   type CloudInvoice, type CloudSubscription
 } from '../lib/cloud';
-import { config } from '../lib/config';
+import { cloudApiUrlReady, config } from '../lib/config';
 import { formatAmount } from '../lib/money';
 
 type BillingTab = 'invoices' | 'subscriptions' | 'payments';
@@ -389,6 +389,7 @@ onBeforeUnmount(() => {
 async function downloadInvoice(invoice: CloudInvoice): Promise<void> {
   const token = getAccessToken();
   try {
+    await cloudApiUrlReady();
     const res = await fetch(`${config.cloudApiUrl}/api/v1/billing/invoices/${invoice.id}/download/`, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

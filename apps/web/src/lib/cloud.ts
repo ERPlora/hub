@@ -1,7 +1,7 @@
 // Cliente del Cloud Portal. hub NUNCA habla con LLMs directamente; auth/marketplace/
 // billing van por aquí (ARQUITECTURA.md §2.1–2.3). Si el Cloud no es accesible (sandbox),
 // las llamadas lanzan y la capa de auth degrada a modo demo.
-import { config, isLocalHub } from './config';
+import { cloudApiUrlReady, config, isLocalHub } from './config';
 import { loginHeaders, resolveDeviceId } from './device';
 import { getLocale } from '../i18n';
 import { beginRequest, endRequest } from './shell';
@@ -185,6 +185,7 @@ async function refreshTokens(): Promise<string | null> {
     const refresh = getRefreshToken();
     if (!refresh) return null;
     try {
+      await cloudApiUrlReady();
       const res = await fetch(`${config.cloudApiUrl}/api/v1/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub' },
@@ -210,7 +211,8 @@ async function refreshTokens(): Promise<string | null> {
 /** `fetch` con auth + reintento único en 401 vía refresh. Base de get/post. */
 async function authedFetch(path: string, init: RequestInit, timeoutMs = 8000): Promise<Response> {
   beginRequest(); // barra de progreso de la topbar
-  const doFetch = (token: string | null): Promise<Response> => {
+  const doFetch = async (token: string | null): Promise<Response> => {
+    await cloudApiUrlReady();
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     const headers: Record<string, string> = {
@@ -573,6 +575,7 @@ async function post<T>(
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   beginRequest();
   try {
+    await cloudApiUrlReady();
     const res = await fetch(`${config.cloudApiUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub', ...extraHeaders },
@@ -638,6 +641,7 @@ async function loginRequest(
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   beginRequest();
   try {
+    await cloudApiUrlReady();
     return await fetch(`${config.cloudApiUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'hub', ...extraHeaders },
@@ -839,6 +843,7 @@ async function meRequest(access: string): Promise<CloudUser> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
   try {
+    await cloudApiUrlReady();
     const res = await fetch(`${config.cloudApiUrl}/api/v1/auth/me/`, {
       headers: { Authorization: `Bearer ${access}` },
       signal: ctrl.signal,
