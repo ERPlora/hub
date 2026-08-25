@@ -6,24 +6,26 @@
 # cargo release de erplora-server → debian-slim) y la publica en el GitHub Container
 # Registry (GHCR). Sustituye a ECR (AWS apagado, migración a Hetzner/Dokploy).
 #
-# Tags publicados (repo GHCR `ghcr.io/erplora/hub`, PRIVADO):
-#   - ghcr.io/erplora/hub:latest      (tag móvil que consumen los HUBS REALES: el provisioning
-#                                      del Cloud/Dokploy registra el servicio con `…/hub:latest`).
-#                                      ESTE es el tag canónico — sin él no se puede hacer pull.
-#                                      SOLO se mueve desde `main` o un tag `v*` (hub#872).
-#   - ghcr.io/erplora/hub:<git-sha>   (tag inmutable por commit, para pin/rollback)
-#   - ghcr.io/erplora/hub:<semver>    (solo en tag v*: :1.2.3 inmutable + :1.2 y :1 móviles,
-#                                      para poder decir "la última 1.x" y distinguir un parche de
-#                                      seguridad de una versión nueva — hub#515, ADR-0269)
+# Canales de imagen (repo GHCR `ghcr.io/erplora/hub`, PRIVADO) — hub#1170, decisión 2026-08-25.
+# Todos llevan además `:<git-sha>` (inmutable por commit, para pin/rollback). La lógica y sus tests
+# de contrato viven en `scripts/image-tags.sh` + `scripts/tests/image-tags.test.sh`:
 #
-# Pipeline:
-#   push a main       ─► build ─► push GHCR (:latest + :<sha>)
-#   tag v*            ─► build ─► push GHCR (:latest + :<sha> + :<semver>)  + reescribe Cargo
-#   workflow_dispatch ─► build ─► push GHCR (manual). Desde `main`/`v*` etiqueta como arriba;
-#                        desde CUALQUIER otra rama publica SOLO `:<sha>` (hub#872): un build
-#                        manual de `develop` no debe mover `:latest` — cambiaría el código de
-#                        TODA la flota. El `:<sha>` inmutable sirve para probar esa imagen en
-#                        UN hub concreto repuntando su servicio.
+#   - `stable` = `latest`   tag `vX.Y.Z` final → :X.Y.Z (inmutable) :X.Y :X :latest :stable.
+#                            `latest` es el tag que el provisioning registra en TODO hub real y el
+#                            que estrena un hub nuevo; `stable` es su alias (mismo digest).
+#   - `canary`              tag `vX.Y.Z-rc.N` → :X.Y.Z-rc.N (inmutable) + :canary. La candidata que
+#                            el SaaS promueve a un SUBCONJUNTO de hubs de prod. NO mueve :latest.
+#   - `dev`                 push a `develop` (o `workflow_dispatch` desde develop) → :dev. Es lo que
+#                            despliega PRE. La versión horneada es la prerelease
+#                            `X.Y.Z-dev.<n>+g<sha>` (de `git describe --tags --long`), no el hueco
+#                            del Cargo: servir `1.0.0` desde develop era el bug de hub#1170.
+#   - `main`                push a `main` → :latest + :<sha>, como siempre (main = prod).
+#   - otra rama             `workflow_dispatch` → SOLO :<sha> (hub#872): sirve para probar esa
+#                            imagen en UN hub concreto sin cambiar el código de la flota.
+#
+# La versión (`steps.tags.outputs.version`) se estampa en Cargo.toml antes de compilar en todo canal
+# salvo `main`, así `/readyz`, `/api/hub/context`, el latido y `error_sink` dicen el número con el
+# que se llama la imagen.
 #
 # Auth: `GITHUB_TOKEN` del propio workflow (permiso `packages: write`). No hacen falta claves
 # estáticas ni OIDC de AWS. El paquete queda PRIVADO por defecto; para que Dokploy/provisioning
@@ -34,14 +36,15 @@ name: Build Hub Image (latest)
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: [main, develop]
+    tags: ['v*']   # vX.Y.Z (stable) y vX.Y.Z-rc.N (canary); el guard rechaza cualquier otra forma
   workflow_dispatch:
 
 # En `main` cada push debe PUBLICAR su imagen (16-19 min de build). Como la flota mergea cada
 # ~10 min, `cancel-in-progress: true` cancelaba el build anterior antes de terminar → cero
 # imágenes publicadas (hub#265). En `main` se deja correr hasta el final para no perder la
-# publicación; el resto de ramas sí se cancelan para ahorrar minutos.
+# publicación; el resto de ramas sí se cancelan para ahorrar minutos. En `develop` eso es a
+# propósito: `:dev` es un tag móvil y solo importa el ÚLTIMO commit (hub#1170).
 concurrency:
   group: build-hub-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -72,6 +75,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Historial y tags completos: la versión de `dev` sale de `git describe --tags --long`
+          # (último tag `v*` alcanzable + nº de commits). Con el checkout superficial por defecto
+          # no hay tags, y el guard se NIEGA a publicar antes que hornear el hueco del Cargo.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -98,21 +107,24 @@ jobs:
       # Rechaza: tag que no es semver · versión YA publicada · versión MENOR o igual que la última ·
       # registro ilegible (refuse-by-default; override `IMAGE_TAGS_ALLOW_UNVERIFIED=1`).
       #
-      # Devuelve `version` y `tags` — sustituye a los pasos «Compute image tags» y «Compute app
-      # version», que calculaban lo mismo en bash inline y sin probar.
-      - name: Guarda de versión (semver · no publicada · monótona)
+      # Devuelve `version`, `channel`, `stamp` y `tags` — sustituye a los pasos «Compute image
+      # tags» y «Compute app version», que calculaban lo mismo en bash inline y sin probar.
+      - name: Guarda de versión (semver · no publicada · monótona) y canal
         id: tags
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./scripts/image-tags.sh \
-            --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}"
+            --image "${IMAGE}" --ref "${GITHUB_REF}" --sha "${GITHUB_SHA}" \
+            --describe "$(git describe --tags --long --match 'v*' 2>/dev/null || true)"
 
-      # En un tag `v*`, lo que el runtime reporta (`env!("CARGO_PKG_VERSION")` → `/system`,
-      # el latido, `error_sink`) debe ser la versión del TAG, no el «en desarrollo» del commit.
-      # Va DESPUÉS de la guarda: no se reescribe nada por un tag que se va a rechazar.
+      # Lo que el runtime reporta (`env!("CARGO_PKG_VERSION")` → `/readyz`, `/api/hub/context`,
+      # el latido, `error_sink`) debe ser la versión con la que se llama la imagen: la del TAG
+      # (`X.Y.Z` o `X.Y.Z-rc.N`) o la prerelease de `develop` (`X.Y.Z-dev.<n>+g<sha>`), no el
+      # «en desarrollo» del Cargo. `main` no se estampa (como siempre). Va DESPUÉS de la guarda:
+      # no se reescribe nada por un tag que se va a rechazar.
       - name: Estampar la versión en Cargo.toml
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.tags.outputs.stamp == '1'
         env:
           V: ${{ steps.tags.outputs.version }}
         run: |
@@ -154,16 +166,18 @@ jobs:
           provenance: false
           sbom: false
 
-      # Prints the tags the guard actually computed: after hub#872 a dispatch from a
-      # non-main branch publishes only `:<sha>`, so hardcoding `:latest` here would lie.
+      # Prints the tags the guard actually computed: the channel decides them (hub#1170), so
+      # hardcoding `:latest` here would lie.
       - name: Output image URIs
         env:
           TAGS: ${{ steps.tags.outputs.tags }}
+          CHANNEL: ${{ steps.tags.outputs.channel }}
+          VERSION: ${{ steps.tags.outputs.version }}
         run: |
-          echo "Imagen publicada (GHCR, privada):"
+          echo "Imagen publicada (GHCR, privada) — canal: $CHANNEL · versión servida: $VERSION"
           printf '%s\n' "$TAGS" | sed 's/^/  /'
           echo ""
-          echo "(:latest = hubs reales — solo se mueve desde main o un tag v*, hub#872)"
+          echo "(:latest/:stable = hubs reales, solo desde main o un tag vX.Y.Z · :canary = tag rc · :dev = develop → pre)"
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
 # ==============================================================================
