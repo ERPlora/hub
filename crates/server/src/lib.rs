@@ -3539,6 +3539,18 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     if let E::ManifestRejected { at, .. } = &e {
         error["at"] = json!(at);
     }
+    // hub#1094: same rule again — the fields the schema refused. The Settings screen the shell
+    // generates for ANY module swallowed this 422 (press «Save», nothing changes) precisely
+    // because a sentence is all it got, and it will not parse one. The split happens at the
+    // runtime, one function below the `format!` that wrote the detail. The key is ABSENT when the
+    // refusal names no field (the ~25 doors that raise `InvalidPayload` by hand write prose): a
+    // caller that keys on its presence must not read "this is about fields" into all of them.
+    if let E::InvalidPayload { detail, .. } = &e {
+        let fields = erplora_runtime::registry::invalid_payload_fields(detail);
+        if !fields.is_empty() {
+            error["fields"] = json!(fields);
+        }
+    }
     (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }
 
@@ -4691,5 +4703,42 @@ mod err_response_tests {
         .await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["error"]["code"], "not_found");
+    }
+
+    /// hub#1094: the generic Settings screen swallowed the 422 — «Save» came back
+    /// `invalid_payload` and nothing on screen changed. It cannot mark the offending controls
+    /// while the only thing it gets is a sentence, and parsing the sentence is exactly what this
+    /// house does not do: the list travels as a FIELD, like `permission` (hub#360) and
+    /// `dependents` (hub#1101) already do.
+    #[tokio::test]
+    async fn invalid_payload_names_the_offending_fields_as_a_field_of_the_envelope() {
+        let (status, body) = shape(RuntimeError::InvalidPayload {
+            name: "kitchen.settings.update".into(),
+            detail: "/auto_bump_delay_seconds: null is not of type \"integer\"; \
+                     /default_order_type: \"\" is not one of [\"dine_in\"]"
+                .into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(body["error"]["code"], "invalid_payload");
+        assert_eq!(
+            body["error"]["fields"],
+            serde_json::json!(["auto_bump_delay_seconds", "default_order_type"]),
+        );
+    }
+
+    /// The other refusals must NOT grow the field: a caller that keys on its presence would read
+    /// «this one is about fields» into every hand-written rejection in the runtime.
+    #[tokio::test]
+    async fn a_refusal_that_names_no_field_carries_no_fields_key() {
+        let (_, body) = shape(RuntimeError::InvalidPayload {
+            name: "hub.device_mode.set".into(),
+            detail: "modo de dispositivo desconocido: `kiosko`".into(),
+        })
+        .await;
+        assert!(
+            body["error"].get("fields").is_none(),
+            "una negativa sin campos no debe inventarse la clave, got {body}"
+        );
     }
 }

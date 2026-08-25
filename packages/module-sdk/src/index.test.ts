@@ -1548,3 +1548,41 @@ test('hub#363: the code alone decides — a refusal without the permission field
   assert.equal(asks[0].permission, '', 'nothing invented for a field the runtime did not send');
   assert.equal(calls[1].headers['X-Elevation-Token'], 'tok-abc');
 });
+
+// hub#1094: the fields a `422 invalid_payload` refused travel as a FIELD of the envelope
+// (`crates/server` `err_response`, split at `registry::invalid_payload_fields`). The generic
+// Settings screen the shell paints for ANY module marks those controls; parsing them out of the
+// message is exactly what `permission` (hub#360) and `dependents` (hub#1101) already refuse to do.
+test('hub#1094: the refused field names reach the caller as a field, never as prose', async () => {
+  const fetchImpl = (async () => ({
+    json: async () => ({
+      ok: false,
+      error: {
+        code: 'invalid_payload',
+        message: 'payload inválido para `kitchen.settings.update`: …',
+        fields: ['auto_bump_delay_seconds', 'default_order_type'],
+      },
+    }),
+  })) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('kitchen.settings.update', {}),
+    (e: unknown) =>
+      e instanceof ErploraError &&
+      e.code === 'invalid_payload' &&
+      JSON.stringify(e.fields) === JSON.stringify(['auto_bump_delay_seconds', 'default_order_type']),
+  );
+});
+
+test('hub#1094: a refusal that names no field leaves `fields` undefined, not an empty array', async () => {
+  const fetchImpl = (async () => ({
+    json: async () => ({ ok: false, error: { code: 'permission_denied', message: 'no' } }),
+  })) as unknown as typeof fetch;
+
+  const t = new HttpWsTransport({ fetchImpl });
+  await assert.rejects(
+    () => t.command('kitchen.settings.update', {}),
+    (e: unknown) => e instanceof ErploraError && e.fields === undefined,
+  );
+});

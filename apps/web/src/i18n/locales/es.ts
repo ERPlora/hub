@@ -1394,6 +1394,8 @@ export default {
     saveError: 'No se pudieron guardar los ajustes.',
     adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
     textPlaceholder: 'Escribe aquí…',
+    invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
+    fieldInvalid: 'Este valor no se admite.',
   },
   modulePlan: {
     tab: 'Plan',

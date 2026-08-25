@@ -1518,6 +1518,8 @@ export default {
     saveError: 'Could not save settings.',
     adminOnly: 'Only an administrator can change these settings.',
     textPlaceholder: 'Type here…',
+    invalidFields: 'Check the fields marked below and save again.',
+    fieldInvalid: 'This value is not accepted.',
   },
   modulePlan: {
     tab: 'Plan',
