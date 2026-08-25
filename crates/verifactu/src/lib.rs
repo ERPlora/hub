@@ -627,18 +627,59 @@ fn resolve_invoice_type(declared: &str, recipient_nif: &str) -> String {
 /// una RECTIFICATIVA (R1…R5), que es el camino legal de una devolución y sí puede serlo.
 ///
 /// Espejo exacto de `invoice.NON_NEGATIVE_TYPES` y de la restricción
-/// `ck_verifactu_record_ordinary_total_not_negative` del módulo: tres puertas, un solo criterio.
+/// `ck_verifactu_record_ordinary_total_not_negative` del módulo. **De esta regla** —el signo— sí
+/// miden lo mismo las tres puertas; la de la cuota contra su tipo no puede (ver
+/// [`line_rate_tolerance_cents`]), y decir lo contrario fue el error que devolvió hub#1180 con
+/// cambios.
 const NON_NEGATIVE_TYPES: [&str; 3] = ["F1", "F2", "F3"];
 
-/// Tolerancia de redondeo al contrastar la cuota de una línea del desglose contra su propio tipo,
-/// en céntimos.
+/// Tolerancia, en céntimos, al contrastar la cuota de una entrada del desglose contra su propio
+/// tipo — **en función de cuántas líneas de factura se agregaron en ella**.
 ///
-/// Un céntimo por la regla de redondeo de `taxes` (con precios IVA incluido la cuota es
-/// `bruto − base`, que difiere hasta un céntimo de `base × tipo`) y medio más porque se compara
-/// contra el valor **sin redondear**. Es el mismo `1.5` que usa
-/// `ck_verifactu_record_quota_matches_declared_rate`: si las dos puertas midieran distinto, una
-/// factura pasaría aquí para morir con un error crudo de Postgres una línea después.
-const LINE_ROUNDING_TOLERANCE_CENTS: f64 = 1.5;
+/// # Por qué NO puede ser un número fijo
+///
+/// `invoice.build_invoice` acumula en el desglose la cuota **redondeada POR LÍNEA**
+/// (`e.quota += main_quota`; es deliberado y está comentado allí — ADR-0123 §4 pendiente de
+/// aplicar en `invoice`, issue `invoice#65`). El desglose que emite, por tanto, **no cumple
+/// `cuota = base × tipo`**: se desvía hasta medio céntimo por línea, y las desviaciones **suman**.
+/// Por eso `invoice.audit` tolera **un céntimo por línea agregada** (`e.lines.max(1)`).
+///
+/// Con una tolerancia fija de 1,5 céntimos, cuatro líneas de 0,50 € al 21 % —un tique
+/// perfectamente legítimo: `round_half_up(10,5) = 11` cuatro veces → `base 200 / cuota 44`, y el
+/// 21 % de 200 son 42— se quedaban **sin registro fiscal**. Con doce líneas al 10 % le pasaba a
+/// **uno de cada tres** tiques. Medido en la revisión de hub#1180.
+///
+/// # Por qué `+ 0.5`
+///
+/// `invoice.audit` compara contra `money::percent_of` (ya redondeado) y aquí se compara contra el
+/// valor **sin redondear**, que dista hasta medio céntimo de aquél. Con ese medio céntimo esta
+/// puerta **nunca es más estricta** que la de `invoice`: si `invoice` lo emitió, aquí pasa.
+///
+/// # El conteo
+///
+/// `lines` es el número de líneas de la **factura entera**, que es lo que se puede leer de una vez
+/// (`ingest_invoice`); `invoice.audit` usa el de **cada entrada**, que es menor o igual. Usar el
+/// total es por tanto igual de permisivo o más, nunca menos — que es el lado seguro. `None`
+/// (nadie sabe cuántas líneas hay: `records.create`, cuyo esquema ni siquiera admite desglose)
+/// cae a **una**, la factura de una sola línea.
+///
+/// # Y el segundo techo: el que también sabe medir la TABLA
+///
+/// El `CHECK` del módulo no puede contar líneas —la fila guarda el desglose, no el documento—, así
+/// que desde `015_quota_rate_check_needs_the_line_count.sql` mide otra cosa que sí es row-local:
+/// que la cuota no se aleje de lo que su tipo justifica **más que ese mismo importe, más un
+/// céntimo** (o sea, que no lo doble). Es demostrablemente inofensivo para el redondeo por línea
+/// —`|Σq − Σe| ≤ 0,5 × líneas ≤ |e| + 1` en las 420.000 combinaciones legítimas comprobadas— y
+/// caza igual el caso del QA (99,99 € donde el tipo justifica 1,14 €).
+///
+/// Se aplica **el menor de los dos**, y no por cinturón y tirantes: así este motor es siempre
+/// **igual o más estricto** que la tabla, y un registro no puede pasar por aquí para morir un
+/// `INSERT` después con un error crudo de Postgres — que es justo lo que hub#1103 vino a evitar.
+fn line_rate_tolerance_cents(lines: Option<i64>, expected_cents: f64) -> f64 {
+    let by_lines = lines.unwrap_or(1).max(1) as f64 + 0.5;
+    let by_magnitude = expected_cents.abs() + 1.0;
+    by_lines.min(by_magnitude)
+}
 
 /// Margen al comparar dos importes que son **enteros de céntimos** viajando en `f64`.
 const CENT_EPSILON: f64 = 0.5;
@@ -716,10 +757,20 @@ fn audit_lines(tax_breakdown: &str) -> Vec<AuditLine> {
 /// rechazo revierte su propia transacción y el evento se iría con ella. El motivo viaja en el
 /// error, que es lo que ve el llamante y lo que registra el runtime.)*
 ///
+/// Y hay una cosa que la tabla **no puede** comprobar y aquí sí: cuántas líneas de factura se
+/// agregaron en cada entrada del desglose. `invoice` redondea la cuota por línea y suma, así que
+/// sin ese dato ninguna tolerancia fija sirve — la de 1,5 céntimos de `013` rechazaba tiques
+/// legítimos de varias líneas (verifactu#60). Las dos puertas miden **cosas distintas a
+/// propósito**, y esta es siempre la más estricta de las dos: ver
+/// [`line_rate_tolerance_cents`].
+///
 /// # Qué se comprueba, y qué NO
 ///
 ///   * **la cuota contra SU tipo declarado** — sí, y es la única que caza el caso del QA:
-///     `base + cuota = total` cuadra igual (545 + 9999 = 10544 es internamente consistente).
+///     `base + cuota = total` cuadra igual (545 + 9999 = 10544 es internamente consistente). Con
+///     la tolerancia que impone el redondeo por línea de `invoice`, ni un céntimo menos
+///     ([`line_rate_tolerance_cents`]): una guarda que rechaza una mesa de doce no es una guarda,
+///     es una caja que no factura.
 ///   * **la cuota contra `quantity × unit_price`** — NO, y no es un olvido: `sales` prorratea el
 ///     descuento DENTRO de la línea y deja `unit_price` en el bruto. Esa comparación rechazaría
 ///     toda venta con descuento y toda invitación (razonado en `invoice#50`).
@@ -747,21 +798,24 @@ fn audit_amounts(r: &RecordInput) -> Option<String> {
         declared_quota += line.quota + line.surcharge_quota;
 
         let expected = line.base * line.rate / 100.0;
-        if (line.quota - expected).abs() > LINE_ROUNDING_TOLERANCE_CENTS {
+        let tolerance = line_rate_tolerance_cents(r.line_count, expected);
+        if (line.quota - expected).abs() > tolerance {
             return Some(format!(
                 "quota_rate_mismatch: el desglose declara {} de cuota sobre una base de {} al {} %, \
-                 y ese tipo justifica {expected:.2} (tolerancia {LINE_ROUNDING_TOLERANCE_CENTS} \
-                 céntimos de redondeo). Cobrar un importe y declarar otro es lo que rompe el cruce \
-                 de la AEAT",
-                line.quota, line.base, line.rate
+                 y ese tipo justifica {expected:.2} (tolerancia {tolerance} céntimos, el redondeo \
+                 por línea de una factura de {} línea(s)). Cobrar un importe y declarar otro es lo \
+                 que rompe el cruce de la AEAT",
+                line.quota, line.base, line.rate, r.line_count.unwrap_or(1)
             ));
         }
         if line.has_surcharge {
             let expected_surcharge = line.base * line.surcharge_rate / 100.0;
-            if (line.surcharge_quota - expected_surcharge).abs() > LINE_ROUNDING_TOLERANCE_CENTS {
+            let tolerance = line_rate_tolerance_cents(r.line_count, expected_surcharge);
+            if (line.surcharge_quota - expected_surcharge).abs() > tolerance {
                 return Some(format!(
                     "quota_rate_mismatch: el desglose declara {} de recargo de equivalencia sobre \
-                     una base de {} al {} %, y ese tipo justifica {expected_surcharge:.2}",
+                     una base de {} al {} %, y ese tipo justifica {expected_surcharge:.2} \
+                     (tolerancia {tolerance} céntimos)",
                     line.surcharge_quota, line.base, line.surcharge_rate
                 ));
             }
@@ -919,6 +973,10 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_number,
             invoice_date,
             invoice_type,
+            // El esquema de `records.create` (`additionalProperties: false`) no admite
+            // `tax_breakdown`, así que por esta puerta no llega desglose que contrastar y no hay
+            // líneas que contar: manda la regla del `tax_rate` de la fila.
+            line_count: None,
             // El command público declara el tipo que quiere y no se le toca: aquí no hay
             // degradación que anotar (la resuelve `ingest_invoice`, que sí conoce al destinatario).
             downgraded_from: String::new(),
@@ -1000,6 +1058,12 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     //   hub#1023) — el camino normal de una devolución en TPV.
     //
     // NULL/'' cuando la factura no enlaza nada, que es el caso de toda venta corriente.
+    //
+    // Y el `COUNT` de líneas (hub#1180): `invoice` redondea la cuota POR LÍNEA y suma, así que sin
+    // saber cuántas se agregaron no se puede juzgar si el desglose cuadra — con una tolerancia fija
+    // se rechazaban tiques legítimos de varias líneas (ver `line_rate_tolerance_cents`). Va como
+    // subconsulta de ESTA lectura, no como una segunda: un listener que abre dos lecturas por venta
+    // es una lectura de más en cada tique, y ADR-0058 acota la excepción a UNA.
     let rows = host
         .read(
             "SELECT i.invoice_type, i.number, i.issue_date, i.issuer_nif, i.issuer_name, \
@@ -1010,7 +1074,9 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
              COALESCE(sub.issuer_nif, '') AS substitutes_nif, \
              COALESCE(rec.number, '') AS rectifies_number, \
              COALESCE(rec.issue_date, '') AS rectifies_date, \
-             COALESCE(rec.issuer_nif, '') AS rectifies_nif \
+             COALESCE(rec.issuer_nif, '') AS rectifies_nif, \
+             (SELECT COUNT(*) FROM invoice_invoiceitem it \
+                WHERE it.invoice_id = i.id AND it.hub_id = i.hub_id) AS line_count \
              FROM invoice_invoice i \
              LEFT JOIN invoice_invoice sub \
                ON sub.id = i.substitutes_invoice_id AND sub.hub_id = i.hub_id AND sub.is_deleted = 0 \
@@ -1086,6 +1152,9 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_number: invoice_number.clone(),
             invoice_date: str_field(&inv, "issue_date"),
             invoice_type,
+            // Viene del `COUNT` de la MISMA lectura acotada: es lo que hace juzgable la cuota del
+            // desglose sin abrir una segunda consulta por cada venta.
+            line_count: Some(int_field(&inv, "line_count", 1)),
             downgraded_from,
             description,
             // El módulo invoice guarda importes en CÉNTIMOS (ADR-0007), igual que `create_record`;
@@ -1139,6 +1208,13 @@ struct RecordInput {
     invoice_number: String,
     invoice_date: String,
     invoice_type: String,
+    /// Cuántas **líneas** tiene la factura de la que sale este registro, cuando se sabe.
+    ///
+    /// Es el dato que hace juzgable la cuota del desglose: `invoice` redondea por línea y suma, así
+    /// que la desviación admisible crece con el número de líneas (ver
+    /// [`line_rate_tolerance_cents`]). `None` = nadie lo sabe, y entonces se juzga como una factura
+    /// de una línea.
+    line_count: Option<i64>,
     /// Tipo que **declaraba el documento** cuando `invoice_type` es el resultado de una
     /// degradación (hub#1104), y vacío cuando nadie degradó nada.
     ///
@@ -5325,11 +5401,26 @@ mod ingest_integrity_tests {
         }
     }
 
-    /// Host que sirve UNA factura del módulo `invoice`, tal cual la lee `ingest_invoice`.
-    struct InvoiceHost(Json);
+    /// Host que sirve UNA factura del módulo `invoice`, tal cual la lee `ingest_invoice`, con el
+    /// número de líneas que trae el `COUNT` de la misma lectura. Guarda el SQL que se le pide.
+    struct InvoiceHost {
+        invoice: Json,
+        line_count: i64,
+        reads: std::sync::Mutex<Vec<String>>,
+    }
+    impl InvoiceHost {
+        /// Una factura de UNA línea, que es el caso corriente del camino manual.
+        fn new(invoice: Json) -> Self {
+            Self::with_lines(invoice, 1)
+        }
+        fn with_lines(invoice: Json, line_count: i64) -> Self {
+            Self { invoice, line_count, reads: std::sync::Mutex::new(Vec::new()) }
+        }
+    }
     #[async_trait::async_trait]
     impl NativeHost for InvoiceHost {
         async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.reads.lock().unwrap().push(sql.to_string());
             if sql.contains("FROM verifactu_config") {
                 return Ok(vec![json!({
                     "hub_id": HUB, "environment": "testing",
@@ -5337,7 +5428,11 @@ mod ingest_integrity_tests {
                 })]);
             }
             if sql.contains("FROM invoice_invoice") {
-                return Ok(vec![self.0.clone()]);
+                let mut row = self.invoice.clone();
+                if let Some(m) = row.as_object_mut() {
+                    m.insert("line_count".into(), json!(self.line_count));
+                }
+                return Ok(vec![row]);
             }
             Ok(vec![])
         }
@@ -5559,7 +5654,7 @@ mod ingest_integrity_tests {
     /// Y la MISMA guarda cubre el camino automático: el listener de `invoice.created`.
     #[tokio::test]
     async fn the_listener_refuses_the_same_amounts_the_public_command_refuses() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "F1",
             "87654321X",
             545,
@@ -5571,6 +5666,128 @@ mod ingest_integrity_tests {
         assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
     }
 
+    /// 🔴 **El contraejemplo que devolvió esta PR con CAMBIOS.**
+    ///
+    /// `invoice.build_invoice` acumula en el desglose la cuota **redondeada POR LÍNEA**
+    /// (`e.quota += main_quota`, deliberado y comentado allí — ADR-0123 seguimiento, `invoice#65`),
+    /// así que el desglose que emite **no** cumple `cuota = base × tipo` salvo por tolerancia. Por
+    /// eso `invoice.audit` tolera **un céntimo por línea agregada** (`e.lines.max(1)`).
+    ///
+    /// Cuatro líneas de 0,50 € al 21 %: `round_half_up(10,5) = 11` por línea → el desglose sale
+    /// `base 200 / quota 44` cuando `200 × 21 % = 42`. `invoice` lo emite (tolerancia 4); con una
+    /// tolerancia fija de 1,5 céntimos este gate lo rechazaba — y el tique se quedaba sin registro
+    /// fiscal. Con 12 líneas al 10 % eso alcanzaba a ~1 de cada 3 tiques legítimos.
+    #[tokio::test]
+    async fn a_ticket_of_several_lines_at_the_same_rate_is_sealed() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                200,
+                44,
+                244,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            ),
+            4,
+        );
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("4 líneas de 0,50 € al 21 % son un tique legítimo: se sella");
+    }
+
+    /// El segundo techo (el que también sabe medir la tabla, migración `015`): una cuota que DOBLA
+    /// lo que su tipo justifica no la explica ningún redondeo, por muchas líneas que declare la
+    /// factura. Sin él, este motor sería más permisivo que el `CHECK` y el registro moriría un
+    /// `INSERT` después con un error crudo de Postgres — lo que hub#1103 vino a evitar.
+    #[tokio::test]
+    async fn the_engine_is_never_laxer_than_the_table() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                20,
+                10,
+                30,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":20,"quota":10}]"#,
+            ),
+            // 20 líneas de 1 céntimo al 21 % redondean a cuota CERO, no a 10.
+            20,
+        );
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// La mesa de doce del contraejemplo: 12 líneas de 0,55 € al 10 % → `round_half_up(5,5) = 6`
+    /// por línea → `base 660 / quota 72`, y el tipo justifica 66.
+    #[tokio::test]
+    async fn a_twelve_line_table_at_ten_percent_is_sealed() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                660,
+                72,
+                732,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":660,"quota":72}]"#,
+            ),
+            12,
+        );
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("una mesa de 12 líneas al 10 % se sella");
+    }
+
+    /// …y la tolerancia NO puede tragárselo todo: el caso del QA sigue muriendo aunque la factura
+    /// declare muchas líneas. 99,99 € de cuota sobre 5,45 € al 21 % no lo explica ningún redondeo.
+    #[tokio::test]
+    async fn the_line_count_does_not_excuse_an_impossible_quota() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F1",
+                "87654321X",
+                545,
+                9999,
+                10544,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
+            ),
+            40,
+        );
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// La lectura del número de líneas viaja en la MISMA lectura acotada de la factura (ADR-0058),
+    /// no en una segunda consulta: un listener que abre dos lecturas por venta es una lectura de
+    /// más en cada tique.
+    #[tokio::test]
+    async fn the_line_count_travels_in_the_same_scoped_read() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                200,
+                44,
+                244,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            ),
+            4,
+        );
+        ingest_invoice(&ingest_input(), &host).await.expect("se ingesta");
+        let reads = host.reads.lock().unwrap();
+        let invoice_reads: Vec<&String> =
+            reads.iter().filter(|s| s.contains("invoice_invoice")).collect();
+        assert_eq!(
+            invoice_reads.len(),
+            1,
+            "una sola lectura de la factura, no dos: {invoice_reads:?}"
+        );
+        assert!(
+            invoice_reads[0].contains("invoice_invoiceitem"),
+            "el conteo de líneas va DENTRO de esa lectura: {}",
+            invoice_reads[0]
+        );
+    }
+
     // ── hub#1104 · la degradación no puede ser muda ─────────────────────────────────────────
 
     /// Una F1 sin NIF de destinatario se sigue degradando a F2 —sin eso la AEAT responde 1189 con
@@ -5578,7 +5795,7 @@ mod ingest_integrity_tests {
     /// `warning`, que nombra el tipo declarado, el efectivo y el motivo.
     #[tokio::test]
     async fn a_silent_downgrade_leaves_a_trace() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "F1",
             "",
             10000,
@@ -5613,7 +5830,7 @@ mod ingest_integrity_tests {
     /// fiscal (por diferencias → de simplificada) y también tiene que verse.
     #[tokio::test]
     async fn a_corrective_downgraded_to_r5_leaves_the_same_trace() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "R1",
             "",
             -1000,
@@ -5644,7 +5861,7 @@ mod ingest_integrity_tests {
     /// deja de ser un aviso.
     #[tokio::test]
     async fn an_invoice_with_a_recipient_is_not_downgraded_and_warns_about_nothing() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "F1",
             "87654321X",
             10000,
@@ -5670,7 +5887,7 @@ mod ingest_integrity_tests {
     /// para ANTES de sellar.
     #[tokio::test]
     async fn a_downgrade_that_would_break_the_f2_ceiling_is_refused() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "F1",
             "",
             400_000,
@@ -5686,7 +5903,7 @@ mod ingest_integrity_tests {
     /// regla, no un detalle.
     #[tokio::test]
     async fn a_downgrade_right_at_the_ceiling_is_sealed() {
-        let host = InvoiceHost(invoice_row(
+        let host = InvoiceHost::new(invoice_row(
             "F1",
             "",
             301_000,
