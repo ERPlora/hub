@@ -54,6 +54,24 @@ describe('a control that declares `fill` must declare mode="md" (hub#760)', () =
     ).toBe(true);
   });
 
+  it('the shell hooks element registration BEFORE @ionic/vue registers anything (hub#1060)', () => {
+    // The per-control rule above only reaches source we own. Everything a merchant types into is a
+    // module Web Component from another repo, so the shell also normalizes `fill` → `mode="md"` at
+    // `customElements.define` time (`src/lib/ionic-fill.ts`). That hook only exists if its import
+    // comes first: `@ionic/vue` registers `ion-input` & co. on import, and the HTML spec captures a
+    // custom element's lifecycle callbacks inside `define`. Move the import down and the fix
+    // vanishes with no error at all — which is the exact failure mode this whole file is about.
+    const main = readFileSync(join(SRC, 'main.ts'), 'utf8');
+    const boot = main.indexOf("import './lib/ionic-fill.boot'");
+    const ionic = main.indexOf("from '@ionic/vue'");
+    expect(boot, 'main.ts must import ./lib/ionic-fill.boot').toBeGreaterThanOrEqual(0);
+    expect(ionic, 'main.ts is supposed to import @ionic/vue').toBeGreaterThanOrEqual(0);
+    expect(
+      boot < ionic,
+      'the fill hook must be imported before @ionic/vue, or it silently stops working',
+    ).toBe(true);
+  });
+
   it('Ionic ships outline styling only for `md`, not for `ios`', () => {
     // Pinned to the dependency itself, not to a snapshot of it: if a future Ionic starts styling
     // `fill` in `ios`, this test tells us the guard can go instead of quietly outliving its cause.

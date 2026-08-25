@@ -1,3 +1,11 @@
+// 🔴 PRIMER import del shell, y el orden importa (hub#1060). Hace que `fill="outline"` pinte caja
+// en TODA la app — shell, OutfitKit y los Web Components de los 25 módulos, dentro de su Shadow
+// DOM incluidos— enganchando `customElements.define` ANTES de que nadie registre los ion-*.
+// `@ionic/vue` los registra al importarse, y la spec congela los callbacks del custom element
+// dentro de `define`: si este import baja de aquí, el arreglo deja de existir en silencio.
+// Guard: `src/theme/ionic-fill-needs-md.test.ts`. Detalle: `src/lib/ionic-fill.ts`.
+import './lib/ionic-fill.boot';
+
 import { createApp } from 'vue';
 import { IonicVue } from '@ionic/vue';
 import { addIcons } from 'ionicons';
