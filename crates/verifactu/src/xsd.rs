@@ -416,10 +416,10 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     let mut esperado = order.iter();
     for tag in &emitidos {
         if !esperado.any(|e| e == tag) {
-            return Err(err(format!(
-                "`{tag}` va fuera de orden: la secuencia del esquema es {}",
-                order.join(" → ")
-            )));
+            return Err(VerifactuError::OutOfOrder {
+                tag: tag.to_string(),
+                sequence: order.join(" → "),
+            });
         }
     }
 
@@ -607,10 +607,10 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         let mut esperado = ORDER_DETALLE.iter();
         for (tag, _) in g {
             if !esperado.any(|e| e == tag) {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: `{tag}` va fuera de orden; la secuencia del esquema es {}",
-                    ORDER_DETALLE.join(" → ")
-                )));
+                return Err(VerifactuError::OutOfOrder {
+                    tag: tag.to_string(),
+                    sequence: format!("DetalleDesglose #{n}: {}", ORDER_DETALLE.join(" → ")),
+                });
             }
         }
 

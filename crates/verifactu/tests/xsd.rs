@@ -14,7 +14,7 @@
 //! —obligatorios presentes, orden de la secuencia, y los formatos/enumeraciones de los campos que
 //! este módulo emite—, y un test de este fichero contrasta esa tabla contra el **XSD oficial**
 //! vendorizado en `schemas/aeat/`, para que no se separe del esquema en silencio.
-use erplora_verifactu::{aeat, xsd};
+use erplora_verifactu::{aeat, xsd, VerifactuError};
 use serde_json::{json, Value};
 
 fn config() -> Value {
@@ -166,7 +166,10 @@ fn el_orden_de_la_secuencia_es_parte_del_esquema() {
     );
     assert_ne!(desordenado, xml, "el reemplazo debe haber aplicado");
     let err = xsd::validate_registro(&desordenado).expect_err("orden alterado");
-    assert!(err.to_string().contains("orden"), "{err}");
+    assert!(
+        matches!(&err, VerifactuError::OutOfOrder { tag, .. } if tag == "CuotaTotal"),
+        "the out-of-order tag is reported by code: {err}"
+    );
 }
 
 // ── Reglas de negocio que la AEAT castiga con código propio ───────────────────────────────
@@ -487,7 +490,10 @@ fn el_orden_dentro_del_detalle_es_parte_del_esquema() {
          <sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
          </sum1:DetalleDesglose>";
     let err = xsd::validate_registro(&con_desglose(desordenado)).expect_err("orden alterado");
-    assert!(err.to_string().contains("orden"), "{err}");
+    assert!(
+        matches!(&err, VerifactuError::OutOfOrder { .. }),
+        "the out-of-order tag is reported by code: {err}"
+    );
 }
 
 /// Las enumeraciones del validador tampoco pueden separarse del XSD oficial: si la AEAT añade un

@@ -210,7 +210,7 @@ async fn owner_creates_edits_and_deactivates_users() {
     )
     .await;
     assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(body_json(bad).await["error"].to_string().contains("rol"));
+    assert_eq!(body_json(bad).await["error"]["field"], "role");
     std::fs::remove_dir_all(f.media).ok();
 }
 
@@ -264,11 +264,7 @@ async fn the_hub_can_never_be_left_without_an_administrator() {
     )
     .await;
     assert_eq!(demote.status(), StatusCode::BAD_REQUEST);
-    assert!(body_json(demote)
-        .await
-        .to_string()
-        .to_lowercase()
-        .contains("administrador"));
+    assert_eq!(body_json(demote).await["error"]["code"], "last_admin");
 
     // Con un segundo admin, degradar al primero ya es legítimo. Un administrador es siempre un
     // usuario de CUENTA (hub#356: administrar sale de una cuenta de ERPlora, nunca de un PIN), así

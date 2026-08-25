@@ -17,7 +17,7 @@
 //!
 //! Y un cuarto, silencioso: un **SOAP Fault** se leía como «0 registros», que es la peor
 //! lectura posible cuando lo que se intenta es recuperar la cadena.
-use erplora_verifactu::aeat;
+use erplora_verifactu::{aeat, VerifactuError};
 
 /// Respuesta **REAL** de la AEAT de preproducción, capturada tal cual con el certificado de
 /// ERPlora el 2026-08-01 (`tests/aeat_live.rs`). No es una respuesta inventada, y la diferencia
@@ -295,8 +295,10 @@ fn sobrevive_a_un_registro_sin_marca_temporal() {
 fn el_sobre_de_consulta_sin_periodo_no_se_construye() {
     let err = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "")
         .expect_err("sin Periodo la AEAT responde 4102: no se manda");
-    let msg = err.to_string().to_lowercase();
-    assert!(msg.contains("periodo"), "el error debe nombrar el campo: {msg}");
+    assert!(
+        matches!(&err, VerifactuError::MissingField(field) if *field == "Periodo"),
+        "the error names the field by code, not by prose: {err}"
+    );
 }
 
 #[test]

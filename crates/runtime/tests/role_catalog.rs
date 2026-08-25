@@ -17,7 +17,7 @@
 use erplora_db::testutil::{fresh_db, TestDb};
 use erplora_runtime::hub_users::{is_admin_role, NewHubUser, BASE_ROLES};
 use erplora_runtime::roles::RoleSource;
-use erplora_runtime::Runtime;
+use erplora_runtime::{Runtime, RuntimeError};
 
 /// A module folder with just its `module.json` — enough for the installer.
 fn fixture(manifest: &str) -> std::path::PathBuf {
@@ -199,10 +199,17 @@ async fn activation_never_mints_a_role_no_installed_module_declares() {
     let error = rt
         .set_role_active("superadmin", true, "user-1")
         .await
-        .expect_err("the write door is not a place to invent role keys")
-        .to_string();
+        .expect_err("the write door is not a place to invent role keys");
     assert!(
-        error.contains("superadmin"),
+        matches!(
+            &error,
+            RuntimeError::InvalidField { field, reason, .. }
+                if field == "role_key" && reason == "unknown"
+        ),
+        "the refusal is a structured unknown-role rejection: {error}"
+    );
+    assert!(
+        error.to_string().contains("superadmin"),
         "the refusal names the role: {error}"
     );
     assert!(
@@ -220,15 +227,21 @@ async fn a_base_role_is_always_live_and_cannot_be_switched_off() {
         let error = rt
             .set_role_active(base, false, "user-1")
             .await
-            .expect_err("switching off a base role would leave the hub unusable")
-            .to_string();
-        assert!(error.contains(base), "the refusal names the role: {error}");
+            .expect_err("switching off a base role would leave the hub unusable");
+        assert!(
+            error.to_string().contains(base),
+            "the refusal names the role: {error}"
+        );
         // …and says WHY, because "base role" and "nobody declares it" are different answers: the
         // first means never, the second means install the module that declares it. A refusal the
         // administrator cannot act on is a refusal that gets read as a bug.
         assert!(
-            error.contains("base role"),
-            "the refusal explains that it is a base role: {error}"
+            matches!(
+                &error,
+                RuntimeError::InvalidField { field, reason, .. }
+                    if field == "role_key" && reason == "immutable"
+            ),
+            "the refusal says, by code, that a base role cannot be switched off: {error}"
         );
         assert!(
             entry(&rt, base).await.unwrap().active,
