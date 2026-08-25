@@ -67,7 +67,11 @@ describe('setRoleActivation', () => {
     respondWith(422, {
       ok: false,
       error: {
-        code: 'invalid_payload',
+        // hub#1070/#1185: el catálogo responde `invalid_field` y el MOTIVO viaja como campo
+        // (`reason`), que es lo que distingue los dos rechazos sin leer la frase.
+        code: 'invalid_field',
+        field: 'role_key',
+        reason: 'immutable',
         message:
           'role `admin` is a base role of the hub: base roles are always active and cannot be switched off',
       },
@@ -77,7 +81,7 @@ describe('setRoleActivation', () => {
 
     expect(err).toBeInstanceOf(RoleActivationError);
     const failure = err as RoleActivationError;
-    expect(failure.code).toBe('invalid_payload');
+    expect(failure.code).toBe('invalid_field');
     expect(failure.message).toContain('base role');
   });
 
@@ -85,7 +89,9 @@ describe('setRoleActivation', () => {
     respondWith(422, {
       ok: false,
       error: {
-        code: 'invalid_payload',
+        code: 'invalid_field',
+        field: 'role_key',
+        reason: 'unknown',
         message:
           'role `waiter` is not declared by any installed module: a hub activates the roles of its catalogue, it does not create new ones',
       },
@@ -93,10 +99,12 @@ describe('setRoleActivation', () => {
 
     const err = (await setRoleActivation('waiter', true).catch((e: unknown) => e)) as RoleActivationError;
 
-    // Los dos rechazos comparten código HTTP; lo que los distingue —y lo que el admin necesita
-    // para saber si instalar un módulo o dejarlo estar— es el mensaje. Debe llegar entero.
+    // Los dos rechazos comparten código HTTP (422); lo que los distingue —y lo que el admin
+    // necesita para saber si instalar un módulo o dejarlo estar— es el CÓDIGO desde hub#1070. El
+    // mensaje sigue llegando entero, pero ya no es lo único que los separa: por eso ahora se puede
+    // traducir sin que nadie se quede sin poder distinguirlos.
+    expect(err.code).toBe('invalid_field');
     expect(err.message).toContain('not declared by any installed module');
-    expect(err.message).not.toContain('base role');
   });
 
   it('un 403 (sesión sin permiso) también llega con su motivo', async () => {

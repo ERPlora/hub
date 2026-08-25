@@ -216,7 +216,7 @@ describe('RolesPanel · el motivo del rechazo', () => {
     setRoleActivation.mockRejectedValue(
       new RoleActivationError(
         'role `admin` is a base role of the hub: base roles are always active and cannot be switched off',
-        'invalid_payload',
+        'invalid_field',
       ),
     );
     const panel = await mountPanel();
@@ -231,7 +231,7 @@ describe('RolesPanel · el motivo del rechazo', () => {
     setRoleActivation.mockRejectedValue(
       new RoleActivationError(
         'role `waiter` is not declared by any installed module: a hub activates the roles of its catalogue, it does not create new ones',
-        'invalid_payload',
+        'invalid_field',
       ),
     );
     const panel = await mountPanel();
@@ -255,7 +255,7 @@ describe('RolesPanel · el motivo del rechazo', () => {
   });
 
   it('un rechazo deja el catálogo como estaba: nada de pintar un cambio que no ocurrió', async () => {
-    setRoleActivation.mockRejectedValue(new RoleActivationError('nope', 'invalid_payload'));
+    setRoleActivation.mockRejectedValue(new RoleActivationError('nope', 'invalid_field'));
     const panel = await mountPanel();
 
     await panel.vm.setActive({ name: 'kitchen', source: { kind: 'module', module_id: 'kds' }, active: false }, true);
