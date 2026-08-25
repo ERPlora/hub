@@ -192,8 +192,120 @@ pub async fn execute_page(
             Ok(QueryPage { rows, total, limit: total, offset: 0 })
         }
         // Query de lista: compone el SQL paginado de forma genérica.
-        Some(spec) => run_list(db, name, &q.sql, spec, &bound).await,
+        // hub#1173: the vocabulary check runs on the params the CALLER sent, never on `bound` —
+        // `system_params` injects `:hub_id`, `:now`, `:caller_lang`… into every call, and checking
+        // the enriched map would refuse the runtime's own context on the first request.
+        Some(spec) => {
+            reject_undeclared_params(name, &q.sql, spec, params)?;
+            run_list(db, name, &q.sql, spec, &bound).await
+        }
     }
+}
+
+// ── vocabulario de una lista (hub#1173) ──────────────────────────────────────────────────────
+
+/// Los nombres de parámetro que una query de lista ACEPTA, en el orden en que un autor los busca.
+///
+/// Son exactamente los tres sitios donde una lista declara algo que se pueda pasar:
+///
+///  1. el vocabulario del propio motor — `limit`/`offset`/`search`/`sort`/`dir`;
+///  2. un `f_<col>` por cada filtro `eq`/`like` del bloque `list`, y el par `f_<col>_from` /
+///     `f_<col>_to` por cada `range` — que es la forma que el SDK pone en el cable
+///     (`buildListParams` aplana `filters` a `f_<col>` **diga lo que diga el manifest**, así que
+///     una columna no declarada llega bien prefijada y hay que cazarla igual);
+///  3. cualquier bind que su SQL base referencie (`:cart_id`) — que es donde una lista declara sus
+///     params de contexto (hub#1086), y por eso se lee del SQL y no de una segunda lista.
+///
+/// Los params de sistema NO entran: no los manda el llamador, los inyecta
+/// [`crate::system_params`] después. Ver [`reject_undeclared_params`].
+pub(crate) fn accepted_params(base_sql: &str, spec: &ListSpec) -> Vec<String> {
+    let mut out: Vec<String> = ["limit", "offset", "search", "sort", "dir"]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    for (col, f) in &spec.filters {
+        match f.op {
+            FilterOp::Range => {
+                out.push(format!("f_{col}_from"));
+                out.push(format!("f_{col}_to"));
+            }
+            FilterOp::Eq | FilterOp::Like => out.push(format!("f_{col}")),
+        }
+    }
+    out.extend(all_binds(base_sql));
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Rechaza el primer parámetro que la query de lista no declara (hub#1173).
+///
+/// El fallo que cierra es el «éxito silencioso»: un filtro que la query no tiene se ignoraba y la
+/// página respondía `200 ok` **con la lista entera**, indistinguible de un filtro que corrió y no
+/// casó nada. Se refuta en vez de avisar porque el barrido de los 27 repos de módulo
+/// (`origin/main`, 25/08/2026) encontró **dos** llamadas en el catálogo entero fuera del
+/// vocabulario de su query, y las dos eran este mismo fallo vivo: `payments.methods.list` con
+/// `active_only` (que solo existe en un COMENTARIO de su SQL — el cajero ve los métodos de pago
+/// desactivados) y `services.services.list` con `page_size` (el param que el propio SDK documenta
+/// como inexistente). No hay llamador legítimo al que romper.
+///
+/// Se rechaza UNO, el primero en orden estable: un error nombra el parámetro que hay que
+/// arreglar, no una lista que hay que leer entera.
+pub(crate) fn reject_undeclared_params(
+    query: &str,
+    base_sql: &str,
+    spec: &ListSpec,
+    params: &Params,
+) -> Result<()> {
+    let accepted = accepted_params(base_sql, spec);
+    let mut sent: Vec<&String> = params.keys().collect();
+    sent.sort();
+    for name in sent {
+        if !accepted.iter().any(|a| a == name) {
+            return Err(RuntimeError::UnknownFilter {
+                query: query.to_string(),
+                param: name.clone(),
+                accepted,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Todos los binds `:name` que un SQL referencia, con las MISMAS reglas de lectura que
+/// [`required_binds`] (`::` no es bind, literales y comentarios verbatim) — pero sin la distinción
+/// COALESCE, que aquí no aplica: un bind opcional que el módulo guardó él mismo sigue siendo un
+/// bind que su SQL declara, y por lo tanto vocabulario.
+fn all_binds(sql: &str) -> Vec<String> {
+    let bytes = sql.as_bytes();
+    let mut out: Vec<String> = Vec::new();
+    for (start, end) in code_spans(bytes) {
+        let seg = &sql[start..end];
+        let b = seg.as_bytes();
+        let mut i = 0usize;
+        while i < seg.len() {
+            if b[i] == b':' {
+                if b.get(i + 1) == Some(&b':') {
+                    i += 2;
+                    continue;
+                }
+                let mut j = i + 1;
+                while j < seg.len() && (b[j].is_ascii_alphanumeric() || b[j] == b'_') {
+                    j += 1;
+                }
+                if j > i + 1 {
+                    let name = &seg[i + 1..j];
+                    if !out.iter().any(|n| n == name) {
+                        out.push(name.to_string());
+                    }
+                    i = j;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+    }
+    out
 }
 
 /// Compone y ejecuta el SQL paginado a partir del SELECT base y el `ListSpec`.

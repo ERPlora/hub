@@ -610,6 +610,26 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                 manifest.id
             )));
         }
+        // hub#1091, the other half: `min_affected_rows` counts the BATCH exactly like
+        // `expect_rows` did, and — being a plain integer — it has nowhere to name the statement
+        // that carries the guard. So over more than one statement it is the neutralizable shape
+        // with no cure available: an unconditional sibling satisfies the minimum on behalf of the
+        // statement that missed, and the caller gets `200 ok` with an event for a fact that never
+        // happened. Refusing it at the door is the whole fix — there is no second mechanism to
+        // build, because `expect_rows.statement` already expresses the intent, and the sweep of
+        // the 27 module repos (`origin/main`, 25/08/2026) finds ONE `min_affected_rows` in the
+        // entire published catalogue (`flows.drafts.resolve`, a single statement), so nothing
+        // in flight has to migrate.
+        if command.min_affected_rows.is_some() && command.sql.len() > 1 {
+            return Err(RuntimeError::Other(format!(
+                "manifest `{}`: command `{name}` declares `min_affected_rows` over {} sql statements; \
+                 that gate counts the BATCH and cannot be anchored, so an unconditional statement \
+                 would satisfy it on behalf of the one that missed — declare `expect_rows` with \
+                 `expect_rows.statement` naming the guarded statement instead",
+                manifest.id,
+                command.sql.len()
+            )));
+        }
         if let Some(expect) = &command.expect_rows {
             if !crate::errors::valid_domain_code(&manifest.id, &expect.error) {
                 return Err(RuntimeError::Other(format!(

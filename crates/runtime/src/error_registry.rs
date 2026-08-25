@@ -240,6 +240,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#1086: a payload missing a bind the query's SQL references is the caller's
         // mistake, same family as an invalid payload — never a Hub bug.
         | E::MissingRequiredParam { .. }
+        // hub#1173: a param the list query does not declare is the caller's mistake at the
+        // same door — expected, never a Hub bug.
+        | E::UnknownFilter { .. }
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
@@ -327,6 +330,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // hub#1086: its own stable code, so a caller can tell "you did not send what the
         // query needs" from "what you sent does not validate".
         E::MissingRequiredParam { .. } => "missing_required_param",
+        // hub#1173: its own stable code, so a caller can tell "the query does not have that
+        // filter" from "you did not send what it needs" — and fix the call instead of trusting
+        // a page that quietly held the whole list.
+        E::UnknownFilter { .. } => "unknown_filter",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero
