@@ -253,6 +253,41 @@ describe('hub#1094 · the generic settings screen speaks the hub language and sh
     expect(wrapper.find('ok-inline-feedback').text()).toContain('no puedes tocar esto');
   });
 
+  it('re-labels the mounted screen when the hub language changes (ADR-0055, hub#781)', async () => {
+    const KITCHEN_EN = {
+      settings: { fields: { warning_time_minutes: { label: 'Amber warning (minutes)' } } },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith('/locales/es.json')) return { ok: true, json: async () => KITCHEN_ES };
+        if (String(url).endsWith('/locales/en.json')) return { ok: true, json: async () => KITCHEN_EN };
+        return { ok: true, json: async () => KITCHEN_SCHEMA };
+      }),
+    );
+    const wrapper = mount(ModuleSettingsForm, {
+      props: {
+        moduleId: 'kitchen',
+        settings: {
+          title: 'Kitchen',
+          schema: 'schemas/settings_update.json',
+          get: 'kitchen.settings.get',
+          set: 'kitchen.settings.update',
+        },
+      },
+      global: { plugins: [es] },
+    });
+    await flushPromises();
+    expect(wrapper.html()).toContain('Aviso ámbar (minutos)');
+
+    // Same screen, still open: the person switches the hub to English from the profile.
+    es.global.locale.value = 'en';
+    await flushPromises();
+
+    expect(wrapper.html()).toContain('Amber warning (minutes)');
+    expect(wrapper.html()).not.toContain('Aviso ámbar (minutos)');
+  });
+
   it('clears the previous refusal when the next save succeeds', async () => {
     const { ErploraError } = await import('@erplora/module-sdk');
     command.mockRejectedValueOnce(new ErploraError('invalid_payload', 'malo', undefined, ['warning_time_minutes']));
