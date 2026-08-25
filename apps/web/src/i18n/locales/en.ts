@@ -679,6 +679,10 @@ export default {
     installedLoadError:
       'We could not read your apps. There was no answer, or this session is no longer valid — sign in again if it keeps happening.',
     emptyCatalog: 'No apps match your search.',
+    // hub#1129: and the catalogue gets the same three sentences as the installed list above.
+    // «Nothing matches your search» was also being said while it loaded and after it failed — on
+    // the one screen whose whole job is to let a brand-new business install its first app.
+    loadingCatalog: 'Loading the catalog…',
     catalogLoadError:
       'The catalog could not be loaded. Check the connection or this device registration.',
     retryCatalog: 'Retry',
