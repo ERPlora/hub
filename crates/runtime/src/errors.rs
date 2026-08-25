@@ -249,7 +249,10 @@ pub enum RuntimeError {
     /// degrade with a silent empty catalog. The canonical case is the tax catalog: without it a
     /// handler cannot tell «this category has no rule» from «the catalog never arrived», and
     /// guessing the rate is exactly what sales#21 prohibits.
-    #[error("required read `{query}` is unavailable — the command was aborted (hub#701)")]
+    /// The sentence names the query and NOTHING else: no issue number, no advice. The screen
+    /// translates the stable code `read_unavailable` and reads `query` as a field (hub#1102) —
+    /// this text is the fallback a log keeps, not what a cashier is shown.
+    #[error("a required read (`{query}`) could not be resolved, so the command was aborted")]
     ReadUnavailable { query: String },
     /// A `protects` guard declared by one module over another refused the command (hub#775).
     ///

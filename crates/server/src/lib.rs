@@ -3504,35 +3504,187 @@ pub(crate) fn err_status_and_code(
         // against an error it cannot tell apart.
         E::HasDependents { .. } => (StatusCode::CONFLICT, "has_dependents".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
-        _ => (StatusCode::BAD_REQUEST, "error".into()),
+        // hub#1074: everything else keeps the `400` it always had, but NOT the flat `"error"` code
+        // it used to collapse into. `error_code_of` is the registry of stable codes this hub
+        // already publishes upstream (`db`, `read_unavailable`, `certificate`…), so the code a
+        // caller reads over HTTP is the same one the error report carries — one table, not two.
+        // That flat bucket is what forced the UI to paint `error.message`: with nothing to branch
+        // on, the raw sentence was all a screen had (hub#1102).
+        _ => (
+            StatusCode::BAD_REQUEST,
+            erplora_runtime::error_registry::error_code_of(e),
+        ),
     }
 }
 
-pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
+/// What a client is told when the failure is the hub's own plumbing (hub#1074).
+///
+/// Deliberately generic and stable: the `code` beside it is what a caller branches on and what the
+/// shell translates (ADR-0055), and the detail belongs in the server log, not in a cashier's
+/// dialog.
+const REDACTED_MESSAGE: &str = "the request could not be completed — the hub recorded the details";
+
+/// Does this sentence carry the database driver's own words?
+///
+/// Second line of defence behind [`may_reach_the_client`] (hub#1074). Several variants whose
+/// message IS authored by us wrap a `DbError` inside it —
+/// `Other("reset: la transacción falló, nada se borró: {e}")` is the pattern, and there are ~50
+/// `Other` sites — so a per-variant rule alone would keep publishing `sqlx` through the very
+/// variants we deliberately let speak. Matching the driver's signature covers those without
+/// silencing the half of `Other` that says something a person can act on ("usuario no encontrado").
+fn carries_driver_text(message: &str) -> bool {
+    const MARKS: [&str; 4] = [
+        "sqlx",
+        "error returned from database",
+        "PoolTimedOut",
+        " at line ",
+    ];
+    MARKS.iter().any(|mark| message.contains(mark))
+}
+
+/// May the `Display` of this error travel to the caller as human text? (hub#1074)
+///
+/// The rule the PUBLIC door already applied (`public_door::domain_detail`), brought to the
+/// AUTHENTICATED one — the door the UI, the assistant, the flows and the API all come through. A
+/// pool error tells the cashier nothing and tells a stranger too much, and until this gate
+/// `/api/command` answered a foreign-key violation with the engine, its driver, the table, the
+/// constraint and an internal line number (ERPlora/pricing#29 painted exactly that in red in front
+/// of a user).
+///
+/// The match is **exhaustive on purpose**: a new variant must not inherit either answer by falling
+/// into a `_` arm — whoever adds it has to say which side of the door it stands on.
+fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
     use erplora_runtime::RuntimeError as E;
-    let (status, code) = err_status_and_code(&e);
-    let mut error = json!({ "code": code, "message": e.to_string() });
+    match e {
+        // ── Plumbing. Each of these is the `Display` of a foreign library (sqlx, serde, wasmtime,
+        // jsonschema, std::io) and none of it is anything a caller can act on.
+        E::Io(_) | E::Manifest { .. } | E::Db(_) | E::Wasm(_) | E::Native(_) | E::Schema { .. } => {
+            false
+        }
+        // ── Sentences this hub, or a module, wrote ON PURPOSE for whoever reads them: they name
+        // the operation, the permission, the app or the business rule that refused, which is what
+        // the screen has to be able to say. What they must never do is smuggle driver text in, and
+        // `carries_driver_text` is the net underneath them.
+        E::ManifestUnknownField { .. }
+        | E::CoreVersionTooOld { .. }
+        | E::ManifestCoreFloorUnreadable { .. }
+        | E::QueryNotFound(_)
+        | E::ModuleNotInstalled { .. }
+        | E::ModuleInactive { .. }
+        | E::CommandNotFound(_)
+        | E::InternalCommand(_)
+        | E::MinAffectedRows { .. }
+        | E::Domain { .. }
+        | E::PermissionDenied(_)
+        | E::RequiresElevation { .. }
+        | E::CapabilityDenied { .. }
+        | E::MissingDependency { .. }
+        | E::HasDependents { .. }
+        | E::DependencyTooOld { .. }
+        | E::DependencyFloorUnreadable { .. }
+        | E::DependencyCycle { .. }
+        | E::EventLoop
+        | E::EventNotDeclared { .. }
+        | E::InvalidPayload { .. }
+        // hub#1070 (#1185): the three shapes the core refuses a CONTRACT with — a field of a
+        // payload, a certificate whose declared type is not the one served, a manifest that
+        // breaks an installer rule. All three are authored by us for whoever has to fix them
+        // (a user, a module author), and all three carry their own stable code.
+        | E::InvalidField { .. }
+        | E::CertificateTypeMismatch { .. }
+        | E::ManifestRejected { .. }
+        | E::MissingRequiredParam { .. }
+        | E::Notify(_)
+        | E::Print(_)
+        | E::Storage(_)
+        | E::Certificate(_)
+        | E::ReadUnavailable { .. }
+        | E::ProtectsGuard { .. }
+        | E::FiscalPrecondition { .. }
+        | E::InvalidTaxId { .. }
+        | E::DemoLocked { .. }
+        | E::BusinessTaxIdFrozen { .. }
+        | E::HubCountryFrozen { .. }
+        | E::NotImplemented(_)
+        | E::Other(_) => true,
+    }
+}
+
+/// Status + body of the error envelope every authenticated door answers with.
+///
+/// Split out of [`err_response`] (hub#1074) so the redaction policy can be exercised variant by
+/// variant without an HTTP round trip and without a database: what a client is allowed to read is
+/// a security rule, and a rule that can only be tested through a fixture that happens to fail in
+/// the right way is a rule with holes in its coverage.
+pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, Value) {
+    use erplora_runtime::RuntimeError as E;
+    let (status, code) = err_status_and_code(e);
+    // hub#1074: the detail is not thrown away, it changes audience. Until here it travelled to the
+    // client and left NO trace on the server; now it is the other way round.
+    // hub#1074 + #1185: `InvalidField` is the one refusal whose `Display` is built FOR THE LOG —
+    // «`hub.users`: field `name` required: the name is required». `name`, `field` and `reason` are
+    // the contract, and they already travel as data below; putting them in front of the person
+    // filling the form puts backticks and an internal door name on a screen, which is the exact
+    // shape hub#1102 took off the till. So the sentence that travels is the authored `detail`, and
+    // the structure stays structure.
+    let detail = match e {
+        E::InvalidField { detail, .. } => detail.clone(),
+        _ => e.to_string(),
+    };
+    let message = if may_reach_the_client(e) && !carries_driver_text(&detail) {
+        detail
+    } else {
+        tracing::error!(code = %code, detail = %detail, "la respuesta al cliente se redacta (hub#1074)");
+        REDACTED_MESSAGE.to_string()
+    };
+    let mut error = json!({ "code": code, "message": message });
     // hub#360: the missing permission travels as a FIELD, never parsed out of the message — it is
     // what the dialog names and what hub#361 re-checks. Only on the elevation branch: a flat
     // refusal must not look like an offer to elevate.
-    if let E::RequiresElevation { permission } = &e {
+    if let E::RequiresElevation { permission } = e {
         error["permission"] = json!(permission);
     }
     // hub#1101: same rule — the apps that would break travel as a FIELD, never parsed out of the
     // sentence, because that list is what the confirmation dialog enumerates.
-    if let E::HasDependents { dependents, .. } = &e {
+    if let E::HasDependents { dependents, .. } = e {
         error["dependents"] = json!(dependents);
     }
     // hub#1070: the field and the reason travel as data, so the UI translates by code and a
     // client never has to read the prose.
-    if let E::InvalidField { field, reason, .. } = &e {
+    if let E::InvalidField { field, reason, .. } = e {
         error["field"] = json!(field);
         error["reason"] = json!(reason);
     }
-    if let E::ManifestRejected { at, .. } = &e {
+    if let E::ManifestRejected { at, .. } = e {
         error["at"] = json!(at);
     }
-    (status, Json(json!({ "ok": false, "error": error }))).into_response()
+    // hub#1102: and the same rule again for the read a `required` preload could not resolve. The
+    // shell translates the CODE (`read_unavailable`) and names the missing app from this field;
+    // before it, the only place that query lived was inside an English sentence the till printed
+    // verbatim on the Charge dialog.
+    if let E::ReadUnavailable { query } = e {
+        error["query"] = json!(query);
+    }
+    // hub#1102: the APP a refusal is about, for the refusals whose remedy names one — install it,
+    // switch it back on, grant it a permission. Same rule as the fields above: the sentence that
+    // names it («Falta la app Impuestos») must not be built by pulling backticks out of
+    // «módulo no instalado: `taxes` (requerido por `sales.complete_sale`)».
+    //
+    // On `MissingDependency` the app that is missing is `dep`, NOT `module`: `module` is the one
+    // being installed, and sending the owner after that one is sending them nowhere.
+    match e {
+        E::ModuleNotInstalled { module, .. }
+        | E::ModuleInactive { module, .. }
+        | E::CapabilityDenied { module, .. } => error["module"] = json!(module),
+        E::MissingDependency { dep, .. } => error["module"] = json!(dep),
+        _ => {}
+    }
+    (status, json!({ "ok": false, "error": error }))
+}
+
+pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
+    let (status, body) = error_payload(&e);
+    (status, Json(body)).into_response()
 }
 
 /// Respuesta para un fallo de **enrutado multi-tenant** (ADR-0005, hub#24):
@@ -4684,5 +4836,220 @@ mod err_response_tests {
         .await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["error"]["code"], "not_found");
+    }
+}
+
+#[cfg(test)]
+mod error_redaction_tests {
+    //! hub#1074 / hub#1102 — WHAT a client is allowed to read when the hub fails.
+    //!
+    //! The HTTP end of this lives in `tests/error_redaction_door.rs` (a real foreign-key violation
+    //! through `/api/command`). Here the policy is pinned variant by variant, because the door test
+    //! can only reach the variants a fixture happens to be able to provoke — and a security rule
+    //! whose coverage depends on that has holes exactly where nobody looks.
+    use super::{error_payload, REDACTED_MESSAGE};
+    use erplora_runtime::RuntimeError;
+
+    fn error_of(e: RuntimeError) -> serde_json::Value {
+        error_payload(&e).1["error"].clone()
+    }
+
+    /// Plumbing that wraps a foreign library never speaks to a client. (The `Db` variant of the
+    /// same family needs a real `sqlx::Error` to build, so it is pinned where it actually happens:
+    /// `tests/error_redaction_door.rs` provokes a genuine foreign-key violation over
+    /// `/api/command` and asserts the driver's words never come back.)
+    #[test]
+    fn plumbing_is_redacted_and_keeps_its_stable_code() {
+        let e = RuntimeError::Io(std::io::Error::other("/srv/erplora/modules/sales: permission denied"));
+
+        let error = error_of(e);
+        assert_eq!(error["message"], REDACTED_MESSAGE);
+        assert_eq!(error["code"], "io");
+    }
+
+    /// The net under the variants we DO let speak: `Other` is a grab-bag of ~50 sites, half of
+    /// which wrap a `DbError` inside an otherwise perfectly readable sentence
+    /// (`reset: la transacción falló, nada se borró: {e}`). Per-variant rules alone would keep
+    /// publishing the driver through them.
+    #[test]
+    fn driver_text_smuggled_inside_an_authored_sentence_is_redacted_too() {
+        let e = RuntimeError::Other(
+            "reset: la transacción falló, nada se borró: sqlx: error returned from database".into(),
+        );
+        assert_eq!(error_of(e)["message"], REDACTED_MESSAGE);
+    }
+
+    /// …and the other half of `Other` still says something a person can act on.
+    #[test]
+    fn an_authored_sentence_without_driver_text_still_reaches_the_client() {
+        let e = RuntimeError::Other("usuario no encontrado".into());
+        assert_eq!(error_of(e)["message"], "usuario no encontrado");
+    }
+
+    /// ADR-0205 / hub#139: the one channel a module has to say something true about the request.
+    /// Redacting this would silence the modules, which is the opposite of the point.
+    #[test]
+    fn a_module_domain_rejection_is_never_redacted() {
+        let e = RuntimeError::Domain {
+            code: "inventory.insufficient_stock".into(),
+            message: "Not enough stock".into(),
+        };
+        let error = error_of(e);
+        assert_eq!(error["code"], "inventory.insufficient_stock");
+        assert_eq!(error["message"], "Not enough stock");
+    }
+
+    /// hub#1102: the cashier's dialog printed `required read \`taxes.rules.list\` is unavailable —
+    /// the command was aborted (hub#701)`. The code is what the shell translates and the query is
+    /// a field it reads; neither the backticks nor the issue number belong on a till.
+    #[test]
+    fn an_unavailable_required_read_carries_a_code_and_the_query_as_a_field() {
+        let error = error_of(RuntimeError::ReadUnavailable {
+            query: "taxes.rules.list".into(),
+        });
+
+        assert_eq!(error["code"], "read_unavailable");
+        assert_eq!(error["query"], "taxes.rules.list");
+        assert!(
+            !error["message"].as_str().unwrap_or_default().contains("hub#"),
+            "an issue number is not something a cashier can act on: {error}"
+        );
+    }
+
+    /// A WASM trap is the hub's plumbing, not the module talking: a handler that wants to say
+    /// something to the caller returns `Output.error`, which arrives as `Domain`.
+    #[test]
+    fn a_wasm_trap_is_plumbing() {
+        assert_eq!(
+            error_of(RuntimeError::Wasm("unreachable executed at 0x4f2".into()))["message"],
+            REDACTED_MESSAGE
+        );
+    }
+
+    /// The three variants #1185 added while this branch was open (`InvalidField`,
+    /// `CertificateTypeMismatch`, `ManifestRejected`). The exhaustive `match` of
+    /// `may_reach_the_client` made the compiler ask which side of the door each stands on; this
+    /// pins the ANSWER, because «it compiles» only proves somebody chose, not that they chose
+    /// right. All three are authored by us for whoever has to fix them, and all three carry a
+    /// code and the offending element as data.
+    #[test]
+    fn the_contract_refusals_of_1185_reach_the_client_with_their_code_and_their_data() {
+        let field = error_of(RuntimeError::InvalidField {
+            name: "hub.users".into(),
+            field: "name".into(),
+            reason: "required".into(),
+            detail: "the name is required".into(),
+        });
+        assert_eq!(field["code"], "invalid_field");
+        assert_eq!(field["field"], "name");
+        assert_eq!(field["reason"], "required");
+        assert_eq!(field["message"], "the name is required");
+
+        let manifest = error_of(RuntimeError::ManifestRejected {
+            module: "kitchen".into(),
+            at: "roles[0]".into(),
+            code: "role_grants_admin".into(),
+            detail: "a module never grants administration of the hub".into(),
+        });
+        assert_eq!(manifest["code"], "role_grants_admin");
+        assert_eq!(manifest["at"], "roles[0]");
+        assert_ne!(manifest["message"], REDACTED_MESSAGE);
+
+        let cert = error_of(RuntimeError::CertificateTypeMismatch {
+            declared: "seal".into(),
+            served: "representative".into(),
+        });
+        assert_eq!(cert["code"], "certificate_type_mismatch");
+        assert_ne!(cert["message"], REDACTED_MESSAGE);
+    }
+
+    /// …and the net still runs under them. `InvalidField.detail` is authored today, but the whole
+    /// point of `carries_driver_text` is that «authored» is a habit, not a guarantee: the day a
+    /// refusal interpolates a `DbError` into its detail, the driver must still not come out.
+    #[test]
+    fn a_contract_refusal_that_smuggles_driver_text_is_redacted_anyway() {
+        let error = error_of(RuntimeError::InvalidField {
+            name: "hub.users".into(),
+            field: "name".into(),
+            reason: "duplicate".into(),
+            detail: "could not check: sqlx: error returned from database".into(),
+        });
+        assert_eq!(error["message"], REDACTED_MESSAGE);
+        // The code and the data survive: what is redacted is the PROSE, never the contract.
+        assert_eq!(error["code"], "invalid_field");
+        assert_eq!(error["field"], "name");
+    }
+
+    /// The refusals a screen ACTS on keep their sentence AND their field. Redacting by default and
+    /// exempting case by case would have swallowed these the day someone added a variant.
+    #[test]
+    fn refusals_the_screen_acts_on_keep_their_sentence() {
+        let elevation = error_of(RuntimeError::RequiresElevation {
+            permission: "sales.refund".into(),
+        });
+        assert_eq!(elevation["permission"], "sales.refund");
+        assert!(
+            elevation["message"].as_str().unwrap_or_default().contains("sales.refund"),
+            "{elevation}"
+        );
+
+        let dependents = error_of(RuntimeError::HasDependents {
+            module: "taxes".into(),
+            dependents: vec!["sales".into(), "invoicing".into()],
+        });
+        assert_eq!(dependents["code"], "has_dependents");
+        assert_eq!(dependents["dependents"][0], "sales");
+        assert!(
+            dependents["message"].as_str().unwrap_or_default().contains("sales"),
+            "{dependents}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod error_field_tests {
+    //! hub#1102 — the app an error is ABOUT travels as a field, never inside the sentence.
+    //!
+    //! Same rule as `permission` (hub#360) and `dependents` (hub#1101), for the same reason: the
+    //! screen names the app («Falta la app Impuestos»), and the only way to name it from a message
+    //! like «módulo no instalado: `taxes` (requerido por `sales.complete_sale`)» is to parse
+    //! backticks out of prose — which is how a screen silently stops naming anything.
+    use super::error_payload;
+    use erplora_runtime::RuntimeError;
+
+    fn error_of(e: RuntimeError) -> serde_json::Value {
+        error_payload(&e).1["error"].clone()
+    }
+
+    #[test]
+    fn a_missing_module_names_it_as_a_field() {
+        let error = error_of(RuntimeError::ModuleNotInstalled {
+            module: "taxes".into(),
+            operation: "taxes.rules.list".into(),
+        });
+        assert_eq!(error["code"], "module_not_installed");
+        assert_eq!(error["module"], "taxes");
+    }
+
+    #[test]
+    fn a_switched_off_module_names_it_as_a_field() {
+        let error = error_of(RuntimeError::ModuleInactive {
+            module: "taxes".into(),
+            operation: "taxes.rules.list".into(),
+        });
+        assert_eq!(error["code"], "module_inactive");
+        assert_eq!(error["module"], "taxes");
+    }
+
+    /// The install-time twin: the app that is MISSING is `dep`, not the one being installed — that
+    /// is the one the sentence has to send the owner after.
+    #[test]
+    fn an_unsatisfied_dependency_names_the_app_that_is_missing() {
+        let error = error_of(RuntimeError::MissingDependency {
+            module: "sales".into(),
+            dep: "taxes".into(),
+        });
+        assert_eq!(error["code"], "missing_dependency");
+        assert_eq!(error["module"], "taxes");
     }
 }
