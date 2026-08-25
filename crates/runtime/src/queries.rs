@@ -196,7 +196,13 @@ pub async fn execute_page(
         // `system_params` injects `:hub_id`, `:now`, `:caller_lang`… into every call, and checking
         // the enriched map would refuse the runtime's own context on the first request.
         Some(spec) => {
-            reject_undeclared_params(name, &q.sql, spec, params)?;
+            reject_undeclared_params(
+                name,
+                &q.sql,
+                spec,
+                q.schema.as_ref().map(|s| s.raw.as_ref()),
+                params,
+            )?;
             run_list(db, name, &q.sql, spec, &bound).await
         }
     }
@@ -214,11 +220,21 @@ pub async fn execute_page(
 ///     (`buildListParams` aplana `filters` a `f_<col>` **diga lo que diga el manifest**, así que
 ///     una columna no declarada llega bien prefijada y hay que cazarla igual);
 ///  3. cualquier bind que su SQL base referencie (`:cart_id`) — que es donde una lista declara sus
-///     params de contexto (hub#1086), y por eso se lee del SQL y no de una segunda lista.
+///     params de contexto (hub#1086), y por eso se lee del SQL y no de una segunda lista;
+///  4. las `properties` de su JSON Schema (`queries.<name>.schema`), si lo declara. Una propiedad
+///     que el módulo ESCRIBIÓ en su schema es una declaración deliberada, no el descuido que esta
+///     guarda caza, así que entra aunque no sea filtro ni bind. Ninguna query del catálogo
+///     publicado lo necesita hoy (`customers.purchases` es la única lista con schema y su única
+///     propiedad ES un bind de su SQL); está para que la guarda no sorprenda a quien usa una puerta
+///     que el manifest ya ofrece.
 ///
 /// Los params de sistema NO entran: no los manda el llamador, los inyecta
 /// [`crate::system_params`] después. Ver [`reject_undeclared_params`].
-pub(crate) fn accepted_params(base_sql: &str, spec: &ListSpec) -> Vec<String> {
+pub(crate) fn accepted_params(
+    base_sql: &str,
+    spec: &ListSpec,
+    schema: Option<&serde_json::Value>,
+) -> Vec<String> {
     let mut out: Vec<String> = ["limit", "offset", "search", "sort", "dir"]
         .iter()
         .map(|s| (*s).to_string())
@@ -233,6 +249,12 @@ pub(crate) fn accepted_params(base_sql: &str, spec: &ListSpec) -> Vec<String> {
         }
     }
     out.extend(all_binds(base_sql));
+    if let Some(props) = schema
+        .and_then(|raw| raw.get("properties"))
+        .and_then(|p| p.as_object())
+    {
+        out.extend(props.keys().cloned());
+    }
     out.sort();
     out.dedup();
     out
@@ -255,9 +277,10 @@ pub(crate) fn reject_undeclared_params(
     query: &str,
     base_sql: &str,
     spec: &ListSpec,
+    schema: Option<&serde_json::Value>,
     params: &Params,
 ) -> Result<()> {
-    let accepted = accepted_params(base_sql, spec);
+    let accepted = accepted_params(base_sql, spec, schema);
     let mut sent: Vec<&String> = params.keys().collect();
     sent.sort();
     for name in sent {

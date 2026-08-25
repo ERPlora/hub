@@ -173,3 +173,45 @@ async fn a_coalesce_guarded_optional_bind_is_still_accepted() {
         .expect("`:include_archived` is referenced by the base SQL: it is vocabulary, not a filter");
     assert_eq!(page.total, 3, "archived cart included: {:?}", page.rows);
 }
+
+/// The FOURTH place a query declares something passable: its own JSON Schema. A property the
+/// module wrote in `schemas/*.json` is a deliberate declaration — not the typo this guard exists
+/// to catch — so it is vocabulary even when it is neither a filter nor a bind of the base SQL.
+///
+/// Zero queries in the published catalogue need it today (`customers.purchases` is the only list
+/// with a schema, and its one property IS an SQL bind). It is here so the guard cannot surprise
+/// the author who uses the door the manifest already offers.
+#[tokio::test]
+async fn a_param_the_query_schema_declares_is_vocabulary() {
+    let rt = hub().await;
+
+    let page = rt
+        .execute_query_page(
+            "lbind.items.scoped",
+            &params(&[("cart_id", json!("cart-a")), ("audit_tag", json!("who-asked"))]),
+            &ctx(),
+        )
+        .await
+        .expect("`audit_tag` is declared in the query's own JSON Schema: it is vocabulary");
+    assert_eq!(page.total, 3, "the scope still applies: {:?}", page.rows);
+}
+
+/// And the guard still bites on that same query: declaring a schema does not open the door to
+/// everything — only to what the schema actually names.
+#[tokio::test]
+async fn a_query_with_a_schema_still_refuses_what_it_never_declared() {
+    let rt = hub().await;
+
+    let err = rt
+        .execute_query_page(
+            "lbind.items.scoped",
+            &params(&[("cart_id", json!("cart-a")), ("category_id", json!("x"))]),
+            &ctx(),
+        )
+        .await
+        .expect_err("a schema that declares `audit_tag` does not declare `category_id`");
+    match err {
+        RuntimeError::UnknownFilter { param, .. } => assert_eq!(param, "category_id"),
+        other => panic!("expected the stable unknown-filter refusal, got {other:?}"),
+    }
+}
