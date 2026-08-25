@@ -15,7 +15,7 @@ import type { InjectionKey } from 'vue';
 import { ref } from 'vue';
 import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { toast, type ToastColor } from './toast';
-import { config } from './config';
+import { config, markCloudApiUrlPending, resolveCloudApiUrl } from './config';
 import { getAccessToken } from './cloud';
 import { makeBridgeTransport } from './bridge-transport';
 import { getHubSession, logout, user } from './session';
@@ -85,6 +85,12 @@ export interface HubContext {
    * Ausente → degrada a UTC.
    */
   timezone?: string | null;
+  /**
+   * Which Cloud this hub belongs to (`HUB_CLOUD_API_URL`, the same value its CSP `connect-src`
+   * allows — hub#1164). Non-empty → becomes `config.cloudApiUrl`; empty/absent → build-time
+   * fallback (`VITE_CLOUD_API_URL`, dev/local only).
+   */
+  cloud_base_url?: string | null;
 }
 
 /**
@@ -1452,12 +1458,17 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
  * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
  */
 export async function bootHubContext(): Promise<HubContext | null> {
+  // Cloud callers wait for this answer (hub#1164): a login that raced ahead would hit the
+  // build-time URL and be blocked by the hub's own CSP.
+  markCloudApiUrlPending();
+  let cloudBaseUrl: string | null = null;
   try {
     const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
+    cloudBaseUrl = typeof ctx.cloud_base_url === 'string' ? ctx.cloud_base_url : null;
     hubContextReady.value = true;
     machineRegistered.value = Boolean(ctx.machine_registered);
     machineRegistrationRequired.value = Boolean(ctx.registration_required);
@@ -1490,6 +1501,9 @@ export async function bootHubContext(): Promise<HubContext | null> {
     return ctx;
   } catch {
     return null;
+  } finally {
+    // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
+    resolveCloudApiUrl(cloudBaseUrl);
   }
 }
 

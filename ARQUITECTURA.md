@@ -66,9 +66,13 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
 
 3. **`hub_id` inyectado por despliegue (1 contenedor = 1 hub)** — el server lee `HUB_ID` del entorno
-   y lo expone en **`GET /api/hub/context` → `{hub_id, user}`**; `apps/web` lo resuelve al arrancar
-   (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay selector de hub.** Liga
-   con la tenancy de §2.5. `[✓ verificado]`
+   y lo expone en **`GET /api/hub/context` → `{hub_id, user, cloud_base_url, …}`**; `apps/web` lo
+   resuelve al arrancar (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay
+   selector de hub.** Liga con la tenancy de §2.5. `[✓ verificado]`
+   La misma respuesta trae **`cloud_base_url`** (= `HUB_CLOUD_API_URL`, el valor que ya alimenta la
+   CSP `connect-src`): `config.cloudApiUrl` se fija en runtime desde ahí y `VITE_CLOUD_API_URL` es
+   solo fallback dev/local; toda llamada al Cloud espera `cloudApiUrlReady()` (hub#1164, una misma
+   imagen sirve pre y prod).
 
 4. **Login de usuario real contra el SaaS** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con

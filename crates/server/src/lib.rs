@@ -2038,6 +2038,11 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         "machine_registered": machine_registered,
         "registration_required": !demo && !machine_registered,
         "public_key_loaded": st.config.jwt_public_key.is_some(),
+        // Which Cloud this hub belongs to (hub#1164): the same `HUB_CLOUD_API_URL` the CSP
+        // `connect-src` is built from. The web app resolves its Cloud base URL from here at boot
+        // instead of a build-time constant, so one image serves pre and prod alike. Empty when no
+        // Cloud is configured (dev binary): the shell then keeps its build-time fallback.
+        "cloud_base_url": st.config.cloud_base_url,
         "business_type": sector,
         "sector": sector,
         // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de
