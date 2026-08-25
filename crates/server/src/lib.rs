@@ -3634,7 +3634,7 @@ pub(crate) fn error_payload(e: &erplora_runtime::RuntimeError) -> (StatusCode, V
     let message = if may_reach_the_client(e) && !carries_driver_text(&detail) {
         detail
     } else {
-        tracing::error!(code = %code, detail = %detail, "la respuesta al cliente se redacta (hub#1074)");
+        tracing::error!(code = %code, detail = %detail, "response to the client redacted: the detail stays in this log (hub#1074)");
         REDACTED_MESSAGE.to_string()
     };
     let mut error = json!({ "code": code, "message": message });
