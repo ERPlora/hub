@@ -86,6 +86,11 @@ pub const STATUS_PRINTING: &str = "printing";
 pub const STATUS_DONE: &str = "done";
 /// Gave up after [`MAX_ATTEMPTS`] hand-outs. Terminal, kept for diagnosis.
 pub const STATUS_DEAD: &str = "dead";
+/// Retired by a person who knows that paper is never coming out (hub#1108). Terminal, and **kept**:
+/// the row is the only proof the ticket existed, and a discard is a decision somebody took — both
+/// have to survive the gesture that closed them. No print host is ever handed it again, because
+/// [`claim_next`] only ever claims [`STATUS_PENDING`].
+pub const STATUS_DISCARDED: &str = "discarded";
 
 /// Paper of the document. Not cosmetic: it is what lets the print host render an 80mm ticket as a
 /// ticket and an invoice as A4 (same contract as `PrintRequest.format` in the web shell).
@@ -452,6 +457,30 @@ pub async fn list(
     Ok(res.rows.iter().map(row_to_job).collect())
 }
 
+/// **A queued job as a STATUS view**: everything except the document.
+///
+/// One definition, two doors (hub#1107). `GET /api/print/jobs` served this shape from the server
+/// crate and the core query `hub.print.jobs` serves it from the dispatcher: two hand-written copies
+/// of "what the queue looks like from outside" would drift, and the field that would drift first is
+/// the one that must never appear.
+///
+/// **`document` is not here, and that is the contract**: `documentType` is state — "a kitchen order
+/// is waiting" is exactly what a screen showing a stuck queue has to say — while `document` is the
+/// ticket itself (names, lines, totals, the fiscal QR) and only ever leaves through the drain, past
+/// both of its guards (hub#343).
+pub fn status_view(job: &PrintJob) -> serde_json::Value {
+    json!({
+        "jobId": job.job_id,
+        "role": job.role,
+        "documentType": job.document_type,
+        "format": job.format,
+        "status": job.status,
+        "attempts": job.attempts,
+        "createdAt": job.created_at,
+        "lastError": job.last_error,
+    })
+}
+
 /// Which printer role a job belongs to, or `None` when **this hub** has no such job.
 ///
 /// Exists for the drain's authorisation (hub#343): a print host may only close a job of a role it
@@ -476,6 +505,174 @@ pub async fn role_of(
         .first()
         .and_then(|r| r["role"].as_str())
         .map(str::to_string))
+}
+
+// ── Getting a stuck job UNSTUCK (hub#1108) ────────────────────────────────────────────────────
+//
+// Everything above is the machine: it hands out, it retries, it gives up. None of it is a person.
+// A job that ran out of hand-outs stayed `dead` for good, and one nobody was ever going to print —
+// from a QA session, from a badly written flow — sat in the queue forever; the only ways out were
+// draining it or waiting.
+//
+// The shape is the outbox's dead-letter (hub#660, exposed to modules by hub#953), because it is the
+// same problem on the runtime's other durable queue and this codebase already answered it: **put it
+// back** or **close it, with evidence**.
+
+/// What [`requeue`] did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequeueOutcome {
+    /// The job is `pending` again, with its full budget of hand-outs back.
+    Requeued,
+    /// No job with that `job_id` **in this hub** (never existed, or another tenant's — the two are
+    /// indistinguishable on purpose).
+    NotFound,
+    /// The job exists and is not `dead`. Named so a screen can say why instead of reporting a move
+    /// that never happened.
+    NotRequeueable { status: String },
+}
+
+/// What [`discard`] did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiscardOutcome {
+    /// The job is closed, and this is the stamp that was written.
+    Discarded(DiscardStamp),
+    /// No job with that `job_id` in this hub.
+    NotFound,
+    /// The job exists but is not in a state a person may retire — see [`discard`].
+    NotDiscardable { status: String },
+}
+
+/// The stamp a discard leaves, read back from the row that was written (never from what arrived).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardStamp {
+    pub job_id: String,
+    pub discarded_at: String,
+    pub discarded_by: String,
+    pub discard_reason: String,
+}
+
+/// The status of `job_id` **in this hub**, or `None` when there is no such job here.
+async fn status_of(db: &dyn DatabaseAdapter, hub_id: &str, job_id: &str) -> Result<Option<String>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("job_id".into(), json!(job_id));
+    let res = db
+        .query(
+            "SELECT status FROM _print_queue WHERE hub_id = :hub_id AND job_id = :job_id",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .map(|r| r["status"].as_str().unwrap_or_default().to_string()))
+}
+
+/// **Puts a dead job back in front of the print hosts**: `pending`, `attempts` reset, lease and
+/// reason cleared.
+///
+/// Resetting `attempts` is the whole point and not a detail: [`MAX_ATTEMPTS`] is what sent the job
+/// to [`STATUS_DEAD`], so a retry that kept the count would die on its first hand-out. The market's
+/// universal gesture here is *reprint the document* rather than *requeue the job*, but the honest
+/// equivalent in THIS queue is the requeue: it keeps the `job_id`, and with it the idempotency the
+/// producer relies on. Re-enqueueing the same id cannot be the answer — the PK is
+/// `(hub_id, job_id)` with `ON CONFLICT DO NOTHING`, so it is a no-op by construction.
+///
+/// **Only a `dead` job.** A `pending` one is already in the queue, a `printing` one belongs to a
+/// host (and the lease already covers the host that died — see [`reclaim_expired`]), a `done` one
+/// came out of the printer, and a `discarded` one is a decision somebody took. Each of those is
+/// refused NAMING the state, so a screen can explain instead of reporting a move that never
+/// happened — the same discipline as the outbox's `NotRetryable`.
+///
+/// If the cause is still there the job simply dies again and is listed again; the queue is
+/// self-healing, not magic.
+pub async fn requeue(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    job_id: &str,
+) -> Result<RequeueOutcome> {
+    // Read the state FIRST: after the UPDATE a refusal and a missing row are both `affected = 0`,
+    // and the two must not collapse into one answer.
+    let Some(status) = status_of(db, hub_id, job_id).await? else {
+        return Ok(RequeueOutcome::NotFound);
+    };
+    if status != STATUS_DEAD {
+        return Ok(RequeueOutcome::NotRequeueable { status });
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("job_id".into(), json!(job_id));
+    p.insert("dead".into(), json!(STATUS_DEAD));
+    let sql = format!(
+        "UPDATE _print_queue \
+         SET status = '{STATUS_PENDING}', attempts = 0, last_error = '', claimed_by = '', \
+             lease_expires_at = '', completed_at = NULL \
+         WHERE hub_id = :hub_id AND job_id = :job_id AND status = :dead"
+    );
+    Ok(if db.execute(&sql, &p).await?.affected > 0 {
+        RequeueOutcome::Requeued
+    } else {
+        // Somebody moved the row between the read and the write. Not a silent success.
+        RequeueOutcome::NotFound
+    })
+}
+
+/// **Retires a job a person knows is never coming out**: status [`STATUS_DISCARDED`] plus who, when
+/// and why.
+///
+/// **The gesture never `DELETE`s.** ADR-0196's reading of `dead` ("diagnosis, not deletion") applies
+/// harder to a decision a person took: a row that vanished would make invisible exactly what
+/// happened. `claim_next` only claims `pending`, so no print host is handed it again, and
+/// `print_stations::delete` counts only `pending`/`printing`, so a retired job stops holding a
+/// station hostage — which is the practical thing this unblocks.
+///
+/// **`pending` and `dead` only.** A `printing` job is in a host's hands and the lease already covers
+/// the host that died (it returns to `pending`, and THEN it can be retired); binning it while a real
+/// host is rendering it would be the silent loss this queue exists to prevent. `done` came out.
+///
+/// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
+/// anything the caller sent. `reason`, on the other hand, IS the caller's — it is the one half of
+/// the stamp only the person closing the row knows — and it is stored trimmed and capped by
+/// [`crate::outbox::clamp_discard_reason`]: one implementation for the hub's two durable queues, so
+/// what a tray renders and what a row holds cannot drift apart. Leaving it empty stays a legitimate
+/// gesture: a queue that demands an essay to close a row is a queue nobody drains.
+pub async fn discard(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    job_id: &str,
+    discarded_by: &str,
+    reason: &str,
+) -> Result<DiscardOutcome> {
+    let Some(status) = status_of(db, hub_id, job_id).await? else {
+        return Ok(DiscardOutcome::NotFound);
+    };
+    if status != STATUS_PENDING && status != STATUS_DEAD {
+        return Ok(DiscardOutcome::NotDiscardable { status });
+    }
+    let stamp = DiscardStamp {
+        job_id: job_id.to_string(),
+        discarded_at: now_rfc3339(),
+        discarded_by: discarded_by.to_string(),
+        discard_reason: crate::outbox::clamp_discard_reason(reason),
+    };
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("job_id".into(), json!(job_id));
+    p.insert("status".into(), json!(status));
+    p.insert("discarded".into(), json!(STATUS_DISCARDED));
+    p.insert("now".into(), json!(stamp.discarded_at));
+    p.insert("by".into(), json!(stamp.discarded_by));
+    p.insert("reason".into(), json!(stamp.discard_reason));
+    let sql = "UPDATE _print_queue \
+               SET status = :discarded, discarded_at = :now, discarded_by = :by, \
+                   discard_reason = :reason, claimed_by = '', lease_expires_at = '' \
+               WHERE hub_id = :hub_id AND job_id = :job_id AND status = :status";
+    Ok(if db.execute(sql, &p).await?.affected > 0 {
+        DiscardOutcome::Discarded(stamp)
+    } else {
+        DiscardOutcome::NotFound
+    })
 }
 
 /// Row of [`JOB_COLUMNS`] → [`PrintJob`].

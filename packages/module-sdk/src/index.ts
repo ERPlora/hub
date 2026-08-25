@@ -1622,6 +1622,98 @@ export class EventsApi {
   }
 }
 
+/** Where the hub's print queue lives. Every path {@link PrintApi} can build starts here. */
+export const PRINT_JOBS_BASE_PATH = '/api/print/jobs';
+
+/** What `POST /api/print/jobs/{jobId}/retry` answers: the job, back in the queue. */
+export interface PrintRetryResult {
+  jobId: string;
+  /** Always `"pending"` on success — the job is waiting for a print host again. */
+  status: string;
+}
+
+/** What `POST /api/print/jobs/{jobId}/discard` answers: the stamp the row now carries (hub#1108). */
+export interface PrintDiscardResult {
+  jobId: string;
+  discardedAt: string;
+  /** `hub_user:<id>`, resolved by the runtime from the session — never sent by the caller. */
+  discardedBy: string;
+  /** The STORED reason: trimmed and capped, not the string that was sent. */
+  discardReason: string;
+}
+
+/**
+ * **Getting a stuck print job unstuck** (hub#1108) — put it back, or close it for good.
+ *
+ * Not the queue itself: READING it is `hub.print.coverage` / `hub.print.jobs` (hub#1107), core
+ * queries that travel through the dispatcher like any other, so `erplora().query(…)` is all a screen
+ * needs to draw the ticket that is not coming out. This is the other half — the two gestures that
+ * make the failure recoverable — and they are core REST for the same reason flows are (ADR-0283 §9).
+ *
+ * **Both sit behind two gates** and neither replaces the other: an owner/admin session the runtime
+ * checks, plus the **`printer`** capability declared in the calling module's `module.json` and
+ * granted by the owner. Reading the queue is any local session on purpose (hub#987: whoever is
+ * standing next to the printer is who can turn the till on); binning a ticket or re-firing one is
+ * the owner's gesture. Without the capability, "an admin is logged in" would mean every installed
+ * module can bin every other one's tickets. A refusal arrives as `capability_denied`, so a screen
+ * can ask for the grant instead of showing «error».
+ *
+ * Two methods, two routes, no method that takes a path — the same discipline as {@link FlowsApi} and
+ * {@link EventsApi}, pinned by the same kind of test file.
+ */
+export class PrintApi {
+  constructor(private readonly send: (req: CoreRequest) => Promise<unknown>) {}
+
+  /**
+   * `POST /api/print/jobs/{jobId}/retry` — put a **dead** job back in front of the print hosts, with
+   * its hand-outs reset.
+   *
+   * It cannot be "queue it again": the queue is keyed by `(hub_id, jobId)` with
+   * `ON CONFLICT DO NOTHING`, so re-enqueueing the same id is a no-op by construction — and a new id
+   * is not an option either, because the document does not travel in the status view. Resetting the
+   * attempts is the substance: the attempt ceiling is what sent the job to `dead`, so a retry that
+   * kept the count would die on its first hand-out.
+   *
+   * **Rejects when the job is not `dead`**, with `print.job_not_requeueable` and the state it IS in,
+   * so a screen can explain instead of reporting a move that never happened.
+   */
+  async retry(jobId: string): Promise<PrintRetryResult> {
+    const job = checkedSegment('job id', jobId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${PRINT_JOBS_BASE_PATH}/${job}/retry`,
+    }) as Promise<PrintRetryResult>;
+  }
+
+  /**
+   * `POST /api/print/jobs/{jobId}/discard` — retire a job nobody is ever going to print, optionally
+   * saying WHY.
+   *
+   * **Never a delete**: the row survives as the only proof the ticket existed, stamped with
+   * `discardedAt` and a `discardedBy` the runtime takes from the resolved session. No print host is
+   * handed it again, and it stops holding its station hostage — deleting a station answers `409`
+   * while anything is still queued for it.
+   *
+   * `reason` is the one part of the stamp the hub cannot know, so it is the one thing this body
+   * carries. It is stored trimmed and capped and comes back as
+   * {@link PrintDiscardResult.discardReason} — the stored value, not the string that was sent.
+   * Leaving it out sends no body at all: a queue that demands an essay to close a row is a queue
+   * nobody drains.
+   *
+   * **Rejects a job a host is printing** (`print.job_not_discardable`): the lease already covers the
+   * host that died, and binning a ticket a live host is rendering would be the silent loss the queue
+   * exists to prevent.
+   */
+  async discard(jobId: string, reason?: string): Promise<PrintDiscardResult> {
+    const job = checkedSegment('job id', jobId, ID_PATTERN);
+    return this.send({
+      method: 'POST',
+      path: `${PRINT_JOBS_BASE_PATH}/${job}/discard`,
+      ...(reason === undefined ? {} : { body: { reason } }),
+    }) as Promise<PrintDiscardResult>;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1632,6 +1724,7 @@ export class ErploraClient {
   private moduleId?: string;
   private flowsApi?: FlowsApi;
   private eventsApi?: EventsApi;
+  private printApi?: PrintApi;
 
   constructor(
     private readonly transport: ErploraTransport,
@@ -1775,6 +1868,42 @@ export class ErploraClient {
       );
     }
     return (this.eventsApi ??= new EventsApi((req) =>
+      transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
+    ));
+  }
+
+  /**
+   * **The print queue's recovery gestures** (hub#1108) — put a dead ticket back, or retire one that
+   * is never coming out.
+   *
+   * Reading the queue does not come through here: `hub.print.coverage` and `hub.print.jobs` are core
+   * queries (hub#1107), so a screen draws the stuck ticket with `erplora.query(…)` like any other
+   * data. This getter is the WRITE half, and it is module-scoped and gated: an owner/admin session
+   * the runtime checks, plus `printer` declared in the module's `module.json` and granted by the
+   * owner in Settings → Permissions.
+   */
+  /**
+   * ⚠️ **Not `print`.** `erplora.print(req)` is a PUBLISHED contract — the shell bolts the print
+   * service onto this very instance in `apps/web/src/main.ts` and every module calls it to QUEUE a
+   * document. Taking that name for a getter would silently break printing in every installed
+   * module, so the queue's recovery gestures live one word away.
+   */
+  get printQueue(): PrintApi {
+    const moduleId = this.moduleId;
+    if (!moduleId) {
+      throw new ErploraError(
+        MODULE_SCOPE_REQUIRED,
+        'the print recovery gestures are module-scoped: use `erplora.forModule("<your module id>").printQueue`',
+      );
+    }
+    const transport = this.transport as Partial<CoreApiTransport>;
+    if (typeof transport.coreRequest !== 'function') {
+      throw new ErploraError(
+        SERVER_UNAVAILABLE,
+        'this transport cannot reach the core REST surface',
+      );
+    }
+    return (this.printApi ??= new PrintApi((req) =>
       transport.coreRequest!(req, { [MODULE_HEADER]: moduleId }),
     ));
   }

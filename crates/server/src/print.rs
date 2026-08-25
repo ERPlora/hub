@@ -1,7 +1,10 @@
 //! Print queue — HTTP layer over `erplora_runtime::print_queue` (hub#341, ADR-0196 §6).
 //!
 //! Two endpoints, both mounted in [`crate::app`] and both behind a **user session** (the same gate
-//! as the rest of the core API — enqueueing is not anonymous):
+//! as the rest of the core API — enqueueing is not anonymous). The queue is also readable through
+//! the **dispatcher** since hub#1107 (`hub.print.coverage` / `hub.print.jobs`, `hub_users::core_query`),
+//! which is how a MODULE gets at it; both doors share one shape (`print_queue::status_view`,
+//! `print_hosts::coverage_view`) so they cannot drift:
 //!
 //!  - `POST /api/print/jobs` → body `{ jobId, role?, documentType, document, format? }`. Enqueues
 //!    the document. **`role` is optional since hub#987**: omitted — the normal shape — the hub
@@ -12,6 +15,17 @@
 //!  - `GET  /api/print/jobs?role=&status=&limit=` → the queue as a **status view**: what is waiting,
 //!    what is printing, what died and why. It deliberately omits the document, which travels to the
 //!    print host that claims the job (hub#343), not to whoever polls the queue.
+//!
+//! And two more that get **one** job unstuck (hub#1108) — the half no layer had at all:
+//!
+//! | Endpoint | Auth | Contract |
+//! |----------|------|----------|
+//! | `POST /api/print/jobs/{jobId}/retry` | **admin** (+ `printer` if a module names itself) | A `dead` job back to `pending`, `attempts = 0`. `409` naming the state otherwise. |
+//! | `POST /api/print/jobs/{jobId}/discard` | **admin** (+ `printer`) | Retires a `pending`/`dead` job, stamped with who, when and why. **Never a delete.** |
+//!
+//! **Writing to the queue is admin, reading it is any session, and that asymmetry is the point**:
+//! hub#987 decided the reader is whoever is standing next to the printer; binning a ticket is the
+//! owner's gesture, behind the same door as the station CRUD.
 //!
 //! And three more for the **print host registry** (hub#342), the other half of ADR-0196 §6 — who
 //! is going to take the job out:
@@ -56,7 +70,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use erplora_runtime::print_hosts::{self, PrintHost, RoleCoverage};
-use erplora_runtime::print_queue::{EnqueueOutcome, NewPrintJob, PrintJob};
+use erplora_runtime::print_queue::{self, EnqueueOutcome, NewPrintJob, PrintJob};
 use erplora_runtime::print_stations::{DeleteOutcome, PrintStation};
 use serde_json::{json, Value};
 
@@ -91,20 +105,12 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// A queued job as the listing reports it: everything **except** the document.
 ///
-/// `documentType` is state, not content — "a kitchen order is waiting" is exactly what the screen
-/// showing a stuck queue has to say — while `document` is the ticket itself and only ever leaves
-/// through the drain, past both of its guards.
+/// **The shape lives in the runtime** (`print_queue::status_view`), not here (hub#1107): the same
+/// view is served by the core query `hub.print.jobs`, which a module reads through the dispatcher,
+/// and two hand-written copies of "the queue seen from outside" would drift — starting with the
+/// field that must never appear.
 fn summary(job: &PrintJob) -> Value {
-    json!({
-        "jobId": job.job_id,
-        "role": job.role,
-        "documentType": job.document_type,
-        "format": job.format,
-        "status": job.status,
-        "attempts": job.attempts,
-        "createdAt": job.created_at,
-        "lastError": job.last_error,
-    })
+    print_queue::status_view(job)
 }
 
 /// POST /api/print/jobs — enqueue a document for a printer role. Auth = any user session.
@@ -196,6 +202,177 @@ pub async fn list_jobs(
     }
 }
 
+// ── Getting a stuck job UNSTUCK (hub#1108) ────────────────────────────────────────────────────
+//
+// `_print_queue` had no way out at any level: no endpoint, no runtime op, no command, no SDK
+// surface. A `dead` job stayed dead and a job nobody was ever going to print (a QA session, a badly
+// written flow) held its station hostage forever — `DELETE /api/print/stations/{id}` answers `409`
+// while anything is `pending`.
+//
+// **Two gates, and the order is not cosmetic** (the same pattern as `outbox_admin`):
+//
+//  1. The person: an **admin** session. Reading the queue is any session (hub#987 — whoever is
+//     standing next to the printer is who can turn the till on), but throwing a ticket in the bin or
+//     re-firing one is the owner's or the manager's gesture, and it has the precedent of the station
+//     CRUD next door. Putting the capability first would answer `403` to a caller who never
+//     authenticated.
+//  2. The module: if the request NAMES one (`X-Erplora-Module`, stamped by `@erplora/module-sdk`),
+//     that module needs the **`printer`** capability declared in its manifest and granted by the
+//     owner. Without it, "an admin is logged in" would mean every installed module can bin every
+//     other one's tickets. A caller that names no module — the shell, `curl` — passes on the session
+//     alone.
+
+/// `401` when the session is missing or invalid, `403` when it is valid but the role does not
+/// administer the hub. The distinction is not cosmetic: re-authenticating gets a cashier nowhere.
+///
+/// The older handlers in this file answer `401` to both through [`unauthorized`]; that is theirs to
+/// keep, and copying it into a new door would spread it.
+fn admin_rejected(e: auth::AuthError) -> Response {
+    let (status, code) = if e.is_forbidden() {
+        (StatusCode::FORBIDDEN, "forbidden")
+    } else {
+        (StatusCode::UNAUTHORIZED, "unauthorized")
+    };
+    (
+        status,
+        Json(json!({ "ok": false, "error": { "code": code, "message": e.message() } })),
+    )
+        .into_response()
+}
+
+/// `404` when there is no such job **in this hub**: never existed, or another tenant's — the two are
+/// indistinguishable on purpose. Never a silent `200` that pretends something moved.
+fn no_such_job() -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({
+            "ok": false,
+            "error": { "code": "not_found", "message": "no hay ningún trabajo con ese jobId" }
+        })),
+    )
+        .into_response()
+}
+
+/// `409` naming the state the job is really in, so a screen can say WHY instead of reporting a move
+/// that never happened. `code` is stable and machine-readable; the state travels as data.
+fn wrong_state(code: &str, status: String, message: &str) -> Response {
+    (
+        StatusCode::CONFLICT,
+        Json(json!({
+            "ok": false,
+            "error": { "code": code, "message": message, "status": status }
+        })),
+    )
+        .into_response()
+}
+
+/// Resolves the admin session AND the module capability, in that order. Returns who is doing this,
+/// already in the `hub_user:<id>` form the audit columns store.
+async fn admin_and_printer_capability(
+    headers: &HeaderMap,
+    st: &AppState,
+    rt: &erplora_runtime::Runtime,
+) -> Result<String, Response> {
+    let admin = auth::require_admin_session(headers, &st.config, rt)
+        .await
+        .map_err(admin_rejected)?;
+    crate::flows_api::require_module_capability(
+        headers,
+        rt,
+        erplora_runtime::manifest::CapabilityKind::Printer,
+    )
+    .await?;
+    Ok(format!("hub_user:{}", admin.id))
+}
+
+/// POST /api/print/jobs/{jobId}/retry — put a dead job back in front of the print hosts, with its
+/// hand-outs reset. Auth = **admin** session (+ `printer` if a module names itself).
+///
+/// `409` when the job is not `dead`, naming the state it IS in: a `pending` one is already waiting,
+/// a `printing` one is in a host's hands (and the lease already covers a host that died), a `done`
+/// one came out of the printer and a `discarded` one is a decision somebody took.
+pub async fn retry_job(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(job_id): Path<String>,
+) -> Response {
+    use erplora_runtime::print_queue::RequeueOutcome;
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(response) = admin_and_printer_capability(&headers, &st, &rt).await {
+        return response;
+    }
+    match rt.retry_print_job(&job_id).await {
+        Ok(RequeueOutcome::Requeued) => Json(json!({
+            "ok": true,
+            "data": { "jobId": job_id, "status": print_queue::STATUS_PENDING }
+        }))
+        .into_response(),
+        Ok(RequeueOutcome::NotFound) => no_such_job(),
+        Ok(RequeueOutcome::NotRequeueable { status }) => wrong_state(
+            "print.job_not_requeueable",
+            status,
+            "solo un trabajo `dead` se puede reintentar",
+        ),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// Body of `POST …/discard`: **one field**, the reason (same shape as the outbox's, hub#955).
+///
+/// Everything else in the stamp comes from inside — `discardedAt` from the clock, `discardedBy` from
+/// the resolved session — so this body has no more surface than the reason needs. It is optional:
+/// demanding an explanation to close a row is how a recovery queue stops being drained.
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct DiscardReq {
+    reason: Option<String>,
+}
+
+/// POST /api/print/jobs/{jobId}/discard — retire a job nobody is ever going to print. Auth =
+/// **admin** session (+ `printer` if a module names itself).
+///
+/// **Never a delete**: the row survives, stamped with `discardedAt`, `discardedBy` and
+/// `discardReason`, and no print host is handed it again. `409` for a `printing` job — the lease
+/// already covers the host that died, and binning a ticket a live host is rendering would be the
+/// silent loss this queue exists to prevent.
+pub async fn discard_job(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(job_id): Path<String>,
+    body: Option<Json<DiscardReq>>,
+) -> Response {
+    use erplora_runtime::print_queue::DiscardOutcome;
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    let who = match admin_and_printer_capability(&headers, &st, &rt).await {
+        Ok(who) => who,
+        Err(response) => return response,
+    };
+    // The audit half comes from the SESSION, never from the body: `DiscardReq` has no
+    // `discardedBy` field, so a payload carrying one changes nothing.
+    let reason = body
+        .and_then(|Json(b)| b.reason)
+        .unwrap_or_default();
+    match rt.discard_print_job(&job_id, &who, &reason).await {
+        Ok(DiscardOutcome::Discarded(stamp)) => {
+            Json(json!({ "ok": true, "data": stamp })).into_response()
+        }
+        Ok(DiscardOutcome::NotFound) => no_such_job(),
+        Ok(DiscardOutcome::NotDiscardable { status }) => wrong_state(
+            "print.job_not_discardable",
+            status,
+            "un trabajo que un host está imprimiendo no se descarta bajo sus manos",
+        ),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 // ── Print host registry (hub#342) ─────────────────────────────────────────────────────────────
 
 /// The device the request comes FROM, trimmed, or `""` when the client identifies none.
@@ -240,18 +417,11 @@ fn host_json(host: &PrintHost) -> Value {
 
 /// Per-role coverage over the wire: facts, not a sentence. The phrasing the owner reads ("nothing
 /// is printing the kitchen's tickets") belongs to the UI, which is the layer that can translate it.
+/// Same story as [`summary`]: the shape is `print_hosts::coverage_view`, shared with the core query
+/// `hub.print.coverage` (hub#1107), so the shell's settings tab and a module's Printers screen
+/// cannot disagree about which station is stuck.
 fn coverage_json(c: &RoleCoverage) -> Value {
-    json!({
-        "role": c.role,
-        "waiting": c.waiting,
-        "liveHosts": c.live_hosts,
-        // How long the oldest job has been waiting (hub#987). The screen needs it to say "for four
-        // minutes" instead of just "waiting", and it is what the threshold below is compared against.
-        "waitingSeconds": c.waiting_seconds,
-        // Resolved by the runtime, never re-derived by the client: one definition of "stuck"
-        // (`print_hosts::is_undrained`), so the badge and the row cannot disagree.
-        "undrained": print_hosts::is_undrained(c),
-    })
+    print_hosts::coverage_view(c)
 }
 
 /// A routed document type as the API reports it.
