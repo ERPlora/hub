@@ -39,18 +39,33 @@
       </div>
 
       <!-- The rest of the catalogue, with its search and its own honest empty-state. The card shows
-           four; it is not the catalogue and must not grow into one. -->
-      <ion-button
-        v-else
-        class="hero-more"
-        fill="clear"
-        size="small"
-        router-link="/settings?tab=data"
-        router-direction="forward"
-        data-testid="hero-more"
-      >
-        {{ t('setup.hero.more') }}
-      </ion-button>
+           four; it is not the catalogue and must not grow into one. Next to it, the way OUT: the
+           card outlives the business being empty (see `shown` in `heroVisible`), so it has to be
+           closable from the offer itself — otherwise an owner who set the shop up by hand keeps
+           being offered templates until a full page reload, because `IonRouterOutlet` keeps the
+           panel alive between navigations. Same contract as the onboarding guides of Shopify,
+           Odoo or Square. -->
+      <div v-else class="hero-offer-actions">
+        <ion-button
+          class="hero-more"
+          fill="clear"
+          size="small"
+          router-link="/settings?tab=data"
+          router-direction="forward"
+          data-testid="hero-more"
+        >
+          {{ t('setup.hero.more') }}
+        </ion-button>
+        <ion-button
+          class="hero-more"
+          fill="clear"
+          size="small"
+          data-testid="hero-dismiss"
+          @click="dismissed = true"
+        >
+          {{ t('setup.hero.dismiss') }}
+        </ion-button>
+      </div>
     </template>
 
     <!-- ── The result ── best-effort engine: it can get most of the way. Each shape says something
@@ -460,6 +475,11 @@ function messageOf(err: unknown): string {
   margin-top: 0.75rem;
   font-size: 0.875rem;
   color: var(--ion-color-medium);
+}
+.hero-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 .hero-more {
   margin-top: 0.5rem;

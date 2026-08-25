@@ -158,6 +158,43 @@ describe('ImportPanel · el empty-state no puede mentir', () => {
     );
   });
 
+  // 🔴 Revisión de hub#1120 — un fallo del catálogo tiene que poder DESHACERSE desde la pantalla.
+  //
+  // Reproducido el 2026-08-25 en un hub real (`qa-pm149-20260822-1435`): el SaaS estranguló
+  // `GET /api/blueprints/catalog` con un **429** («Request was throttled. Expected available in
+  // 1127 seconds») y el panel degradó en silencio a lista vacía. La degradación es correcta —el
+  // fichero local sigue siendo el fallback—, pero era **definitiva**: el catálogo se pide una vez
+  // al montar y la pestaña Datos vive entre navegaciones, así que un negocio nuevo se quedaba sin
+  // plantillas hasta recargar la página entera. Un estrangulamiento dura minutos; la pantalla no
+  // puede durar más que él.
+  it('tras un fallo del catálogo ofrece reintentarlo, y el reintento lo trae', async () => {
+    fetchBlueprintCatalog.mockRejectedValueOnce(new Error('429'));
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
+      'importPage.catalogUnavailable',
+    );
+
+    fetchBlueprintCatalog.mockResolvedValueOnce([
+      { slug: 'rest', name: 'Restaurante', description: 'TPV', locale: 'es', latest_version: '1.0.0' },
+    ]);
+    await w.get('[data-testid="import-catalog-retry"]').trigger('click');
+    await flushPromises();
+
+    expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(2);
+    expect(w.get('[data-testid="import-blueprint-table"]').attributes('empty-message')).toBe(
+      'importPage.catalogEmpty',
+    );
+  });
+
+  it('el reintento SOLO se ofrece cuando el catálogo falló: no cuando está vacío de verdad', async () => {
+    // «Vacío» es una afirmación sobre el catálogo, no sobre nosotros: ahí no hay nada que reintentar.
+    fetchBlueprintCatalog.mockResolvedValue([]);
+    const w = mountPanel();
+    await flushPromises();
+    expect(w.find('[data-testid="import-catalog-retry"]').exists()).toBe(false);
+  });
+
   it('si el catálogo FALLA tampoco afirma que no haya (dice que no se pudo cargar)', async () => {
     fetchBlueprintCatalog.mockRejectedValue(new Error('hub sin credencial'));
     const w = mountPanel();

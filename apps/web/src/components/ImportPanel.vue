@@ -69,6 +69,24 @@
         page-size="24"
       ></ok-data-table>
 
+      <!-- La salida de un catálogo que NO se pudo leer (hub#1120). Reproducido en un hub real: el
+           SaaS estrangula `GET /api/blueprints/catalog` con un 429 de ~19 min y el panel degradaba
+           a lista vacía **para siempre** —se pide una vez al montar y la pestaña vive entre
+           navegaciones—, así que un negocio nuevo se quedaba sin plantillas hasta recargar. Solo
+           aparece cuando el catálogo FALLÓ: un catálogo vacío de verdad no tiene nada que
+           reintentar. -->
+      <ion-button
+        v-if="catalogState === 'unavailable' && !loadingCatalog"
+        class="catalog-retry"
+        fill="clear"
+        size="small"
+        data-testid="import-catalog-retry"
+        @click="loadCatalog"
+      >
+        <HubIcon slot="start" name="refresh-outline" />
+        {{ t('importPage.catalogRetry') }}
+      </ion-button>
+
       <ion-note v-if="error" data-testid="import-error" color="danger" class="error-note">
         {{ t('importPage.inspectErrorTitle') }}: {{ error }}
       </ion-note>
@@ -1088,6 +1106,10 @@ ion-checkbox::part(label) {
 }
 ok-data-table {
   display: block;
+}
+.catalog-retry {
+  margin-top: 0.35rem;
+  text-transform: none;
 }
 .cloud-loading {
   display: flex;
