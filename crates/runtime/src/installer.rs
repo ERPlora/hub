@@ -589,6 +589,20 @@ fn sql_words(sql: &str) -> Vec<String> {
 /// Schema alone (hub#139): the error namespace must be the module's own, and the legacy gate
 /// (`min_affected_rows`) is mutually exclusive with the translatable one (`expect_rows`).
 fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
+    // ADR-0398 (hub#1177): the `errors` catalog, when present, is the list of codes this module
+    // may raise. Every entry must be a code of the module's own namespace, and every
+    // `expect_rows.error` below must be in it — a code that is emitted and not declared is
+    // exactly the silent surface the catalog exists to make visible.
+    if let Some(catalog) = &manifest.errors {
+        for code in catalog.keys() {
+            if !crate::errors::valid_domain_code(&manifest.id, code) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: `errors` declares the invalid domain code `{code}`; expected `{}.<snake_case>`",
+                    manifest.id, manifest.id
+                )));
+            }
+        }
+    }
     for (name, command) in &manifest.commands {
         if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
             return Err(RuntimeError::Other(format!(
@@ -601,6 +615,16 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                 return Err(RuntimeError::Other(format!(
                     "manifest `{}`: command `{name}` declares the invalid domain code `{}`; expected `{}.<snake_case>`",
                     manifest.id, expect.error, manifest.id
+                )));
+            }
+            if manifest
+                .errors
+                .as_ref()
+                .is_some_and(|catalog| !catalog.contains_key(&expect.error))
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` raises `{}` in `expect_rows`, which the `errors` catalog does not declare (ADR-0398)",
+                    manifest.id, expect.error
                 )));
             }
             if expect
@@ -1458,6 +1482,58 @@ mod tests {
         let mut ids: Vec<usize> = order.clone();
         ids.sort_unstable();
         assert_eq!(ids, vec![0, 1, 2]);
+    }
+
+    /// ADR-0398 (hub#1177): with an `errors` catalog present, every `expect_rows.error` must be
+    /// in it, and every catalog entry must be a valid code of the module's own namespace. Without
+    /// the catalog the legacy check (namespace only) is all there is.
+    #[test]
+    fn errors_catalog_governs_expect_rows_codes() {
+        let manifest = |errors: serde_json::Value, code: &str| -> crate::manifest::Manifest {
+            let mut doc = serde_json::json!({
+                "id": "inventory", "name": "Inventory", "version": "1.0.0",
+                "commands": {
+                    "inventory.consume": {
+                        "permission": "inventory.consume",
+                        "expect_rows": { "op": "min", "n": 1, "error": code }
+                    }
+                }
+            });
+            if !errors.is_null() {
+                doc["errors"] = errors;
+            }
+            serde_json::from_value(doc).unwrap()
+        };
+
+        let undeclared = manifest(
+            serde_json::json!({ "inventory.other": {} }),
+            "inventory.insufficient_stock",
+        );
+        let err = super::validate_command_contracts(&undeclared)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("inventory.insufficient_stock") && err.contains("inventory.consume"),
+            "names command and code: {err}"
+        );
+
+        let declared = manifest(
+            serde_json::json!({ "inventory.insufficient_stock": {} }),
+            "inventory.insufficient_stock",
+        );
+        assert!(super::validate_command_contracts(&declared).is_ok());
+
+        let foreign_entry = manifest(
+            serde_json::json!({ "sales.oops": {}, "inventory.insufficient_stock": {} }),
+            "inventory.insufficient_stock",
+        );
+        assert!(
+            super::validate_command_contracts(&foreign_entry).is_err(),
+            "a catalog entry outside the module namespace is refused"
+        );
+
+        let no_catalog = manifest(serde_json::Value::Null, "inventory.insufficient_stock");
+        assert!(super::validate_command_contracts(&no_catalog).is_ok());
     }
 
     /// hub#139: `expect_rows` is validated at INSTALL time — a foreign-namespace code or a
