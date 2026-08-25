@@ -91,6 +91,22 @@ export interface CollectedWidgets {
  */
 export const MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR = 6;
 
+/** Toma hasta `limit` elementos alternando entre grupos (1º de cada grupo, luego 2º de cada…). */
+function roundRobin(groups: string[][], limit: number): string[] {
+  const out: string[] = [];
+  for (let round = 0; out.length < limit; round++) {
+    let took = false;
+    for (const g of groups) {
+      if (round < g.length && out.length < limit) {
+        out.push(g[round]!);
+        took = true;
+      }
+    }
+    if (!took) break;
+  }
+  return out;
+}
+
 // ── Normalización del resultado de una query ─────────────────────────────────────────────────────
 
 /**
@@ -753,8 +769,9 @@ export function buildWidgetsFromManifests(
 
   const widgets: WidgetDef[] = [];
   const recommended: string[] = [];
-  // `default:true` sin mirar el sector: el respaldo de un hub que aún no tiene uno (hub#1100).
-  const suggested: string[] = [];
+  // `default:true` sin mirar el sector, AGRUPADOS por módulo: el respaldo de un hub que aún no
+  // tiene sector (hub#1100). Se agrupan para que el recorte reparta entre módulos (ver abajo).
+  const suggestedByModule = new Map<string, string[]>();
 
   for (const mod of mods) {
     const map = (mod.manifest as ModuleManifest).widgets;
@@ -791,7 +808,9 @@ export function buildWidgetsFromManifests(
       // Preset "Recomendado": widgets con default===true cuyo sectors incluye el sector del hub
       // (o sin sectors = todos). Sin sector conocido → no se recomienda nada (preset vacío).
       if (def.default) {
-        suggested.push(id);
+        const bucket = suggestedByModule.get(mod.moduleId) ?? [];
+        bucket.push(id);
+        suggestedByModule.set(mod.moduleId, bucket);
         if (sector) {
           const sectors = def.sectors;
           const applies = !sectors || sectors.length === 0 || sectors.includes(sector as never);
@@ -810,9 +829,13 @@ export function buildWidgetsFromManifests(
   // (`default` ∩ `sectors`), sin tope. Sin sector no hay nada contra lo que casar `sectors`, así
   // que se cae a los `default:true` recortados a un puñado legible. Un `default:false` NUNCA entra
   // por ninguna de las dos vías: eso lo activa el usuario desde el ⋮.
+  //
+  // El recorte va en ROUND-ROBIN por módulo (el primer `default:true` de cada módulo antes que el
+  // segundo de ninguno): un corte por orden de instalación dejaba, en el banco real, 3 de inventario
+  // + 3 de personal y fuera «Ventas hoy» y «Caja» — un puñado legible tiene que ser representativo.
   const defaultActive = sector
     ? recommended
-    : suggested.slice(0, MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
+    : roundRobin([...suggestedByModule.values()], MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
 
   return { widgets, presets, defaultActive };
 }

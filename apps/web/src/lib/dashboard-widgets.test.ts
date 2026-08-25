@@ -678,6 +678,36 @@ describe('hub#1100 — qué arranca ACTIVO (defaultActive), no el catálogo ente
     expect(defaultActive.length).toBeLessThanOrEqual(MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
   });
 
+  it('SIN sector: el recorte reparte entre módulos — un `default:true` de CADA módulo antes que el segundo de ninguno', () => {
+    // Revisión de la PR #1194: con `suggested.slice(0, 6)` el corte seguía el orden de instalación,
+    // y en el banco real (inventory y staff antes que sales y cash_register) el Inicio arrancaba con
+    // 3 de inventario + 3 de personal y SIN «Ventas hoy» ni «Caja» — los dos KPI que todo TPV pone
+    // primero. Un puñado legible tiene que ser un puñado REPRESENTATIVO: round-robin por módulo.
+    const moduleOf = (id: string): string => id.split('.')[0]!;
+    // Cada módulo con SU manifest, en el orden en que los devolvió el hub del banco.
+    const byModule = new Map<string, Record<string, WidgetManifestDef>>();
+    for (const m of ['inventory', 'staff', 'sales', 'cash_register', 'verifactu']) byModule.set(m, {});
+    for (const [id, def] of Object.entries(REAL_WIDGETS)) byModule.get(moduleOf(id))![id] = def;
+    const mods = [...byModule].map(([id, widgets]) => ({
+      moduleId: id,
+      manifest: { id, widgets },
+    })) as unknown as InstalledManifest[];
+    const { defaultActive } = buildWidgetsFromManifests(mods, { client, sector: null });
+    expect(defaultActive).toHaveLength(MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
+    // Los 5 módulos con widgets (todos tienen algún default:true) están representados…
+    expect(new Set(defaultActive.map(moduleOf)).size).toBe(5);
+    // …y el primero de cada módulo va antes que el segundo de cualquiera.
+    const firstSeen = new Map<string, number>();
+    defaultActive.forEach((id, i) => {
+      if (!firstSeen.has(moduleOf(id))) firstSeen.set(moduleOf(id), i);
+    });
+    const lastFirst = Math.max(...firstSeen.values());
+    const secondOfAny = defaultActive.findIndex((id, i) => firstSeen.get(moduleOf(id)) !== i);
+    expect(secondOfAny === -1 || secondOfAny > lastFirst).toBe(true);
+    expect(defaultActive).toContain('sales.today');
+    expect(defaultActive).toContain('cash_register.current_session');
+  });
+
   it('CON sector: exactamente los `default:true` cuyo `sectors` incluye ese sector', () => {
     const { defaultActive } = buildWidgetsFromManifests(manifestWithMany(REAL_WIDGETS), {
       client,
