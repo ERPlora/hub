@@ -1,14 +1,17 @@
 <template>
   <AppPage :title="t('nav.apps')">
-    <div v-if="loading" class="flex justify-center py-10">
-      <ion-spinner name="crescent" />
-    </div>
-
     <!-- `.fill` fija el alto al área de ion-content para que cabecera/pager de la tabla queden
          fijos y el scroll viva solo en el cuerpo (mismo patrón que EmployeesPage/ModuleView). -->
     <!-- 100% de ancho; el padding lo aporta el `ion-content` de AppPage (un solo ion-padding,
          como todas las vistas). La vista por defecto es GRID (tarjetas) — se fija en onMounted. -->
-    <div v-else class="fill">
+    <!-- Aquí vivía un `v-if="loading"` con un spinner a pantalla completa que escondía las DOS
+         pestañas mientras el CATÁLOGO viajaba al Cloud (hub#1129). Escondía de más y escondía de
+         menos: de más, porque «Mis apps» sale del runtime local y ya estaba listo; y de menos,
+         porque `loadCatalog()` lo volvía a levantar en cada refresco —al recuperar el foco de la
+         ventana, al cambiar de idioma, tras cada instalación—, así que un alt-tab dejaba la
+         pantalla en blanco varios segundos. Cada tabla dice ahora su propio estado
+         (`installedEmptyMessage` / `catalogEmptyMessage`) y ninguna desaparece para decirlo. -->
+    <div class="fill">
       <ok-inline-feedback v-if="!isAdmin" tone="info" class="mb-3">
         {{ t('apps.adminOnly') }}
       </ok-inline-feedback>
@@ -62,7 +65,7 @@
         :actions="catalogActions"
         :labels="tableLabels"
         :search-placeholder="t('apps.searchCatalog')"
-        :empty-message="t('apps.emptyCatalog')"
+        :empty-message="catalogEmptyMessage"
         page-size="10"
         column-picker
       ></ok-data-table>
@@ -143,7 +146,7 @@ import { useI18n } from 'vue-i18n';
 import {
   IonToolbar,
   IonFooter, IonSegment, IonSegmentButton, IonLabel,
-  IonSpinner, IonToast,
+  IonToast,
   IonModal, IonHeader, IonTitle, IonButtons, IonButton, IonContent,
   IonList, IonItem, alertController,
 } from '@ionic/vue';
@@ -240,8 +243,21 @@ const installedState = ref<ListLoadState>('loading');
 // abrir la pantalla, no en bucle: el resolutor vive en el runtime (el mismo del arranque), así que
 // esto es solo lo que hay que enseñar. Vacío = no se ofrece nada (incluido «no se pudo preguntar»).
 const moduleUpdates = ref<ModuleUpdateInfo[]>([]);
-const loading = ref(true);
-const catalogError = ref(false);
+/**
+ * Qué sabe la pantalla de la última petición del CATÁLOGO — gemelo de `installedState` (hub#770).
+ *
+ * Nace en `loading` por el mismo motivo: el primer pintado ocurre antes de que ninguna respuesta
+ * haya vuelto, y nacer en `ready` es decir «no hay apps» en cada carga.
+ *
+ * Y sustituye al `loading` a pantalla completa que había (hub#1129): aquel no era un estado de la
+ * LISTA sino de la PÁGINA, así que cada refresco del catálogo —al recuperar el foco de la ventana
+ * (`recheckEntitlement`), al cambiar de idioma, tras cada instalación— desmontaba las dos tablas.
+ * Medido en el hub de producción `qa-pm149` el 2026-08-25: UN solo evento `focus` dejaba la
+ * pantalla sin tablas ~3 s. Eso es hub#1129 («no pinta nunca») y la mitad de hub#1122 («Mis apps»
+ * sin apps mientras el runtime tiene una).
+ */
+const catalogState = ref<ListLoadState>('loading');
+const catalogError = computed(() => catalogState.value === 'error');
 let catalogLoadId = 0;
 const toastOpen = ref(false);
 const toastMsg = ref('');
@@ -393,6 +409,22 @@ const installedEmptyMessage = computed(() =>
     : installedDisplay.value === 'error'
       ? t('apps.installedLoadError')
       : t('apps.emptyInstalled'),
+);
+
+/**
+ * Lo mismo para «Añadir apps» (hub#1129): esperar, fallar y no haber nada son TRES frases.
+ *
+ * La pestaña del catálogo solo sabía decir «no hay apps que coincidan con tu búsqueda», y la decía
+ * también mientras cargaba y —al lado del aviso de error— cuando el Cloud no había contestado. Es
+ * la misma mentira que hub#770 arregló en «Mis apps», en la superficie de al lado.
+ */
+const catalogDisplay = computed(() => listDisplay(catalogState.value, filteredModules.value.length));
+const catalogEmptyMessage = computed(() =>
+  catalogDisplay.value === 'loading'
+    ? t('apps.loadingCatalog')
+    : catalogDisplay.value === 'error'
+      ? t('apps.catalogLoadError')
+      : t('apps.emptyCatalog'),
 );
 
 // Instalados desde el runtime, como filas de la tabla. Se les cuelga la actualización pendiente
@@ -998,21 +1030,27 @@ function toViewModule(m: CloudMarketplaceModule): Mod {
   };
 }
 
-/** Recarga exclusivamente el catálogo real de SaaS. No existe fallback con módulos locales. */
+/**
+ * Recarga exclusivamente el catálogo real de SaaS. No existe fallback con módulos locales.
+ *
+ * NO toca la pantalla mientras trabaja (hub#1129): lo que hay pintado se queda, y lo que cambia es
+ * `catalogState`. Y un fallo NO vacía el catálogo (misma regla que `loadInstalled`, hub#770): las
+ * filas que ya estaban sobreviven y el fallo se DICE en el aviso de arriba, al lado de la lista y
+ * no en su lugar. Un `focus` con la red mala borraba las 25 apps de la pantalla.
+ */
 async function loadCatalog(): Promise<void> {
   const loadId = ++catalogLoadId;
-  loading.value = true;
-  catalogError.value = false;
+  // Solo se anuncia la espera cuando no hay nada mejor que enseñar; con un catálogo ya en pantalla,
+  // volver a decir «cargando» sería pisar datos buenos con un mensaje.
+  if (catalogState.value !== 'ready') catalogState.value = 'loading';
   try {
     const cloudMods = await cloudMarketplaceModules();
     if (loadId !== catalogLoadId) return;
     modules.value = cloudMods.map(toViewModule);
+    catalogState.value = 'ready';
   } catch {
     if (loadId !== catalogLoadId) return;
-    modules.value = [];
-    catalogError.value = true;
-  } finally {
-    if (loadId === catalogLoadId) loading.value = false;
+    catalogState.value = 'error';
   }
 }
 
@@ -1056,21 +1094,20 @@ function wireTable(el: HTMLElement | null, handler: (e: Event) => void): void {
   el.addEventListener('rowAction', handler);
 }
 
-// Cablear en CADA `loading`→false. Las tablas viven detrás de `v-else` (loading): cada vez que
-// `loadCatalog` re-togglea `loading` (al instalar, al cambiar de contexto…) el v-if(loading)/v-else
-// DESTRUYE y RECREA las tablas, y los elementos NUEVOS no conservan sus listeners. Con el guard
-// `once` anterior, tras el primer refresco toggle/uninstall/install quedaban MUERTOS hasta recargar
-// la página (bug reportado en el demo, 2026-07-12). `wireTable` es idempotente → re-cablear es seguro.
+// Cablear cada vez que APAREZCA un elemento de tabla nuevo. Un elemento nuevo no conserva los
+// listeners del anterior: con el guard `once` original, tras el primer refresco toggle/uninstall/
+// install quedaban MUERTOS hasta recargar la página (bug del demo, 2026-07-12). Esto colgaba de
+// `loading`→false porque el `v-if` destruía y recreaba las tablas en CADA carga; retirado ese
+// `v-if` (hub#1129) se vigila el ELEMENTO en sí — que es lo que de verdad importaba, y lo que
+// sigue valiendo el día que vuelva a haber un `v-if` de por medio.
+// `wireTable` es idempotente → re-cablear es seguro.
 watch(
-  loading,
-  (isLoading) => {
-    if (isLoading) return;
-    void nextTick(() => {
-      wireTable(mineTable.value, handleMineAction);
-      wireTable(catalogTable.value, handleCatalogAction);
-    });
+  [mineTable, catalogTable],
+  () => {
+    wireTable(mineTable.value, handleMineAction);
+    wireTable(catalogTable.value, handleCatalogAction);
   },
-  { immediate: true },
+  { immediate: true, flush: 'post' },
 );
 watch(locale, () => {
   wireTable(mineTable.value, handleMineAction);
@@ -1140,8 +1177,21 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* Fija el alto al área de ion-content (no min-height): las tablas en modo `fill` resuelven su
-   :host{height:100%} contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo. */
+   alto contra este contenedor → cabecera + pager fijos y scroll solo en el cuerpo.
+   Columna flex porque encima de la tabla puede haber avisos (`ok-inline-feedback`): con la tabla
+   a `height:100%` a secas, el aviso SUMA su alto y empuja el pager fuera de la pantalla — que es
+   justo lo que pasa en el estado de error, donde el aviso siempre está. */
 .fill {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+/* Gana a la regla de documento `ok-data-table[fill] { height: 100% }` (theme/polish.css) por
+   especificidad: aquí el alto lo reparte el flex, no un 100% del contenedor entero. */
+.fill > ok-data-table[fill] {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
 }
 </style>
