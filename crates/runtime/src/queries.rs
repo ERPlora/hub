@@ -260,19 +260,35 @@ pub(crate) fn accepted_params(
     out
 }
 
-/// Rechaza el primer parámetro que la query de lista no declara (hub#1173).
+/// Rechaza el primer parámetro FUERA del namespace `f_` que la query de lista no declara
+/// (hub#1173).
 ///
-/// El fallo que cierra es el «éxito silencioso»: un filtro que la query no tiene se ignoraba y la
-/// página respondía `200 ok` **con la lista entera**, indistinguible de un filtro que corrió y no
-/// casó nada. Se refuta en vez de avisar porque el barrido de los 27 repos de módulo
-/// (`origin/main`, 25/08/2026) encontró **dos** llamadas en el catálogo entero fuera del
-/// vocabulario de su query, y las dos eran este mismo fallo vivo: `payments.methods.list` con
-/// `active_only` (que solo existe en un COMENTARIO de su SQL — el cajero ve los métodos de pago
-/// desactivados) y `services.services.list` con `page_size` (el param que el propio SDK documenta
-/// como inexistente). No hay llamador legítimo al que romper.
+/// El fallo que cierra es el «éxito silencioso»: un parámetro que la query no tiene se ignoraba y
+/// la página respondía `200 ok` **con la lista entera**, indistinguible de un filtro que corrió y
+/// no casó nada. Es lo que hace el asistente, una integración o un flujo cuando escribe
+/// `{"status": "active"}` en vez de `{"f_status": "active"}` — y lo que hacía el QA que abrió la
+/// issue.
+///
+/// # Por qué RECHAZAR, y por qué solo fuera de `f_`
+///
+/// Barrido de los 27 repos de módulo (`origin/main`, 25/08/2026): **dos** llamadas en el catálogo
+/// entero mandaban un parámetro sin prefijo fuera de vocabulario, y las dos eran este mismo fallo
+/// vivo — `payments.methods.list` con `active_only` (que solo existe en un COMENTARIO de su SQL:
+/// el cajero veía los métodos de pago DESACTIVADOS) y `services.services.list` con `page_size` (el
+/// param que el propio SDK documenta como inexistente). Cero llamadores legítimos a los que romper.
+///
+/// `f_*` es distinto y por eso queda FUERA de esta puerta, de momento. Es el namespace del propio
+/// motor, y el SDK aplana `filters` a `f_<col>` diga lo que diga el manifest — así que una columna
+/// que la tabla de una pantalla declara `filterable` pero el manifest no declara como filtro llega
+/// aquí bien prefijada. Ese caso EXISTE: el mismo barrido encuentra 5 componentes así, entre ellos
+/// la tabla de productos de `inventory` (`name`/`sku` son `search`, no `filters`). Hoy ese filtro
+/// no filtra; rechazarlo cambiaría «el filtro no hace nada» por «la tabla revienta», que no es
+/// arreglarlo. Lo que lo arregla es declarar el filtro que falta en esos manifests — hub#1182, con
+/// la lista medida — y solo entonces esta puerta puede cubrir también `f_*`.
 ///
 /// Se rechaza UNO, el primero en orden estable: un error nombra el parámetro que hay que
-/// arreglar, no una lista que hay que leer entera.
+/// arreglar, no una lista que hay que leer entera. Mismo contrato que su gemelo
+/// [`RuntimeError::MissingRequiredParam`].
 pub(crate) fn reject_undeclared_params(
     query: &str,
     base_sql: &str,
@@ -284,6 +300,12 @@ pub(crate) fn reject_undeclared_params(
     let mut sent: Vec<&String> = params.keys().collect();
     sent.sort();
     for name in sent {
+        // `f_*` es el namespace del motor: un filtro que no casa con ninguno declarado se sigue
+        // descartando como siempre (ver la nota de arriba, hub#1182). Aquí se defiende el espacio
+        // SIN prefijo, que es donde el descuido de quien llama se vuelve «he filtrado» sin serlo.
+        if name.starts_with("f_") {
+            continue;
+        }
         if !accepted.iter().any(|a| a == name) {
             return Err(RuntimeError::UnknownFilter {
                 query: query.to_string(),

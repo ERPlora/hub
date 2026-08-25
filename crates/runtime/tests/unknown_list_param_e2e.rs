@@ -58,7 +58,9 @@ fn params(pairs: &[(&str, serde_json::Value)]) -> Params {
     p
 }
 
-/// The acceptance case: a param the query never declared no longer buys a full page.
+/// The acceptance case: a param the query never declared no longer buys a full page. This is the
+/// shape the assistant, a flow or an integration writes — `{"status": "active"}` instead of
+/// `{"f_status": "active"}` — and the one the QA of the issue sent by hand.
 #[tokio::test]
 async fn an_undeclared_param_is_refused_instead_of_ignored() {
     let rt = hub().await;
@@ -85,26 +87,34 @@ async fn an_undeclared_param_is_refused_instead_of_ignored() {
     }
 }
 
-/// The SDK's own door: `setFilter('price', …)` flattens to `f_price` whatever the manifest says,
-/// so an undeclared COLUMN arrives correctly prefixed and was ignored just the same. This is the
-/// half a naive "reject bare names" check would miss.
+/// The OTHER half, pinned as it stands today: `f_*` is the engine's own namespace, and an
+/// undeclared column inside it is still DROPPED, not refused.
+///
+/// Deliberate and measured, not an oversight. The SDK flattens `filters` to `f_<col>` whatever the
+/// manifest says, so a column a screen's table declares `filterable` while its manifest declares no
+/// filter for it arrives here correctly prefixed. That case EXISTS: the sweep of the 27 module
+/// repos (`origin/main`, 25/08/2026) finds 5 such components, `inventory`'s product table among
+/// them (`name`/`sku` are `search` columns, not `filters`). Refusing them here would turn "the
+/// filter does nothing" into "the table breaks", which is not fixing it — what fixes it is
+/// declaring the missing filter in those manifests (hub#1182 carries the measured list). Only then
+/// can this door cover `f_*` too.
 #[tokio::test]
-async fn an_undeclared_column_with_the_engine_prefix_is_refused_too() {
+async fn an_undeclared_column_inside_the_engine_prefix_is_still_dropped() {
     let rt = hub().await;
 
-    let err = rt
+    let page = rt
         .execute_query_page(
             "lbind.items.list",
             &params(&[("cart_id", json!("cart-a")), ("f_price", json!(5))]),
             &ctx(),
         )
         .await
-        .expect_err("`f_price` on a query with no `price` filter must not answer the whole list");
-
-    match err {
-        RuntimeError::UnknownFilter { param, .. } => assert_eq!(param, "f_price"),
-        other => panic!("expected the stable unknown-filter refusal, got {other:?}"),
-    }
+        .expect("`f_*` is the engine namespace: an unmatched filter is dropped, as it always was");
+    assert_eq!(
+        page.total, 3,
+        "the documented hole, pinned: the page is the unfiltered scope (hub#1182): {:?}",
+        page.rows
+    );
 }
 
 /// Positive control — without it the two tests above pass for the wrong reason (everything

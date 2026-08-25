@@ -205,8 +205,14 @@ pub enum RuntimeError {
     ///
     /// El vocabulario de una lista es lo que ella declara, ni más ni menos: los binds del propio
     /// motor (`limit`/`offset`/`search`/`sort`/`dir`), un `f_<col>` (o `f_<col>_from`/`_to`) por
-    /// cada filtro del bloque `list`, y cualquier bind que su SQL base referencia — que es donde
-    /// una lista declara sus params de contexto.
+    /// cada filtro del bloque `list`, cualquier bind que su SQL base referencia —que es donde una
+    /// lista declara sus params de contexto— y las `properties` de su JSON Schema si lo declara.
+    ///
+    /// **Solo se defiende el espacio SIN prefijo.** `f_*` es el namespace del propio motor y un
+    /// filtro no casado ahí se sigue descartando: hay 5 pantallas del catálogo cuya tabla declara
+    /// `filterable` una columna que su manifest no declara como filtro, y rechazarlas cambiaría
+    /// «el filtro no hace nada» por «la tabla revienta». Se cierra cuando esos manifests declaren
+    /// el filtro que les falta (hub#1182).
     #[error(
         "la query `{query}` no declara el parámetro `{param}`: se rehúsa a ignorarlo porque devolvería la lista ENTERA como si hubiera filtrado; acepta {accepted:?}"
     )]
