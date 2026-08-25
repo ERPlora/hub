@@ -26,8 +26,9 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { nextTick, ref } from 'vue';
 
+const routerPush = vi.fn();
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: (...a: unknown[]) => routerPush(...a), replace: vi.fn() }),
   useRoute: () => ({ hash: '' }),
 }));
 // `lib/icons` bakes its SVGs through `~icons/…?raw`, which this environment denies. `shallow`
@@ -85,7 +86,10 @@ vi.mock('../lib/runtime', () => ({
   listModuleUpdates: async () => [],
   listModuleVersions: async () => [],
 }));
-vi.mock('../lib/nav', () => ({ moduleNav: ref([]), refreshModuleNav: vi.fn() }));
+// `vi.hoisted`: the `vi.mock` factory is lifted above every `const` in this file, so a ref the
+// factory RETURNS (rather than closes over lazily) has to be created up there with it.
+const { moduleNav } = vi.hoisted(() => ({ moduleNav: { value: [] as Array<{ path: string }> } }));
+vi.mock('../lib/nav', () => ({ moduleNav, refreshModuleNav: vi.fn() }));
 vi.mock('../lib/session', () => ({ isAdmin: ref(true) }));
 vi.mock('../lib/entitlement', () => ({
   isModuleEntitled: () => true,
@@ -159,6 +163,8 @@ afterEach(() => {
 beforeEach(() => {
   catalogAnswers.length = 0;
   INSTALLED = [];
+  moduleNav.value = [];
+  routerPush.mockClear();
   cloudMarketplaceModules.mockClear();
   listInstalledModules.mockClear();
 });
@@ -270,5 +276,47 @@ describe('the catalogue says which of the three it is (hub#1129)', () => {
 
     expect(catalogTable(wrapper)?.getAttribute('empty-message')).toBe(esCatalogue.apps.loadingCatalog);
     expect(esCatalogue.apps.loadingCatalog).not.toBe(enCatalogue.apps.loadingCatalog);
+  });
+});
+
+// The buttons on every card live INSIDE the tables' shadow DOM and reach this screen as a single
+// `rowAction` event, wired imperatively (`wireTable`) because the event name is camelCase. That
+// wiring used to hang off the page-wide `loading` flag — the one hub#1129 removed. It now watches
+// the ELEMENT, and this is the guard that the swap kept the buttons alive: a wiring that silently
+// stops listening turns every card action inert without a single error (the demo bug of 2026-07-12).
+describe('the row actions stay wired after the loading flag is gone (hub#1129)', () => {
+  const rowAction = (el: TableEl, detail: Record<string, unknown>): void => {
+    el.dispatchEvent(new CustomEvent('rowAction', { detail }));
+  };
+
+  it('a press on «Open» still navigates to the app', async () => {
+    INSTALLED = [{ id: 'customers', name: 'Customers', version: '2.3.16', status: 'active' }];
+    moduleNav.value = [{ path: '/m/customers' }];
+    const { wrapper } = mountApps();
+    await settle();
+
+    rowAction(mineTable(wrapper)!, {
+      actionId: 'open',
+      row: { id: 'customers', name: 'Customers', status: 'active' },
+    });
+
+    expect(routerPush).toHaveBeenCalledWith('/m/customers');
+  });
+
+  it('and it is still wired after a refresh that would once have replaced the element', async () => {
+    INSTALLED = [{ id: 'customers', name: 'Customers', version: '2.3.16', status: 'active' }];
+    moduleNav.value = [{ path: '/m/customers' }];
+    const { wrapper } = mountApps();
+    await settle();
+
+    window.dispatchEvent(new Event('focus'));
+    await settle();
+
+    rowAction(mineTable(wrapper)!, {
+      actionId: 'open',
+      row: { id: 'customers', name: 'Customers', status: 'active' },
+    });
+
+    expect(routerPush).toHaveBeenCalledWith('/m/customers');
   });
 });
