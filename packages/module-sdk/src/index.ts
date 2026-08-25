@@ -1843,6 +1843,32 @@ export class ErploraClient {
     return Array.isArray(full?.rows) ? full.rows : rows;
   }
   /**
+   * The WHOLE set of a query owned by an **OPTIONAL** module (ADR-0127) — {@link queryAll}'s
+   * result with {@link queryOptional}'s tolerance, because until ERPlora/sales#186 there was no
+   * way to ask for both at once and the POS paid for it:
+   *
+   * · `queryAll` brings everything, but a hub without the owner module gets `module_not_installed`
+   *   in the face — so it cannot be used for an integration the hub may not have.
+   * · `queryOptional` survives that absence, but answers ONE PAGE: `/api/query` on a query with a
+   *   `list` block goes through `execute_query_page`, and with no `limit` the size is the
+   *   manifest's `page_size` — 50 by default. A hair salon with 60 services could only sell 50,
+   *   and nothing said so.
+   *
+   * So: `undefined` **only** when the module is absent (`module_not_installed`, or `module_inactive`
+   * — the ADR-0128 cascade leaves a disabled module just as unavailable). Everything else EXPLODES,
+   * exactly like {@link queryOptional}: a renamed query, a denied permission or a broken handler
+   * are broken contracts, not absences. And `[]` keeps meaning "installed, nothing to offer", which
+   * is a different answer from "not installed" and must stay tellable apart by the caller.
+   */
+  async queryAllOptional<T = unknown>(name: string, params: ListParams = {}): Promise<T[] | undefined> {
+    try {
+      return await this.queryAll<T>(name, params);
+    } catch (e) {
+      if (e instanceof ErploraError && (e.code === 'module_not_installed' || e.code === 'module_inactive')) return undefined;
+      throw e;
+    }
+  }
+  /**
    * Command dispatch, with the honest verdict of hub#906 on top of the transport:
    *
    * When the transport itself failed ({@link SERVER_UNAVAILABLE} — the hub died mid-request, the

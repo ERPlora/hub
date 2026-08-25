@@ -1107,6 +1107,79 @@ test('queryOptional también trata module_inactive como ausencia (cascada ADR-01
   assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
 });
 
+// ── queryAllOptional: the WHOLE set of an OPTIONAL module (ERPlora/sales#186) ────────────────
+//
+// The two halves this needs already existed, and neither one alone is what a POS asks for:
+//
+//  · `queryAll` brings the whole set (two trips at most) but EXPLODES when the owner module is not
+//    installed — so it cannot be used for an ADR-0127 integration.
+//  · `queryOptional` tolerates the absence but returns ONE PAGE: `/api/query` on a query with a
+//    `list` block answers `execute_query_page`, and with no `limit` the size is the manifest's
+//    `page_size` — 50. A hair salon with 60 services could only sell 50 of them, silently.
+//
+// `queryAllOptional` is the pair: the whole set, `undefined` when the module is absent. Anything
+// else still explodes — a renamed query, a denied permission or a broken handler are broken
+// contracts, not absences.
+
+test('queryAllOptional brings EVERY row, not the first page', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(137, calls));
+
+  const rows = await c.queryAllOptional<{ id: string }>('services.services.list');
+
+  assert.equal(rows?.length, 137, 'a salon with 137 services sells all 137');
+  assert.equal(rows?.[136].id, 'p136', 'the last row arrives too');
+  assert.equal(calls.length, 2, 'one page to learn the total + one to ask for it whole');
+  assert.equal(calls[1].limit, 137, 'asks for the EXACT total, no hardcoded cap');
+});
+
+test('queryAllOptional returns undefined when the owner module is not installed', async () => {
+  const c = new ErploraClient(transporteQueFalla('module_not_installed'));
+  assert.equal(await c.queryAllOptional('services.services.list'), undefined);
+});
+
+test('queryAllOptional also treats module_inactive as absence (ADR-0128 cascade)', async () => {
+  const c = new ErploraClient(transporteQueFalla('module_inactive'));
+  assert.equal(await c.queryAllOptional('services.services.list'), undefined);
+});
+
+test('queryAllOptional does NOT swallow a broken contract, a permission or a handler failure', async () => {
+  for (const code of ['not_found', 'permission_denied', 'invalid_payload', 'wasm', 'db']) {
+    const c = new ErploraClient(transporteQueFalla(code));
+    await assert.rejects(() => c.queryAllOptional('services.services.list'), (e) => {
+      assert.equal((e as ErploraError).code, code, 'a broken contract EXPLODES, it is not an absence');
+      return true;
+    });
+  }
+});
+
+test('queryAllOptional never sends `page_size` and keeps the caller filters', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(10, calls));
+
+  await c.queryAllOptional('services.categories.list', { sort: 'name', dir: 'asc' });
+
+  assert.equal(calls[0].page_size, undefined, 'the runtime would ignore `page_size`');
+  assert.equal(calls[0].sort, 'name');
+});
+
+test('queryAllOptional with an explicit `limit` respects THAT cap (the caller rules)', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1000, calls));
+
+  const rows = await c.queryAllOptional('customers.list', { limit: 20, search: 'ana' });
+
+  assert.equal(rows?.length, 20);
+  assert.equal(calls.length, 1, 'a single trip: nothing else was asked for');
+});
+
+test('queryAllOptional tells an EMPTY module apart from an ABSENT one', async () => {
+  // `[]` = installed with nothing to offer (the POS shows no service tab); `undefined` = not
+  // installed. Collapsing the two is how a caller stops being able to explain what it is seeing.
+  const c = new ErploraClient(transporteDeLista(0));
+  assert.deepEqual(await c.queryAllOptional('services.services.list'), []);
+});
+
 // ── hub#363: the approval dialog's TRANSPORT half ────────────────────────────
 //
 // The runtime has said `requires_elevation` since hub#360 and has minted approvals since hub#361,
