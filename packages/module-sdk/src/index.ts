@@ -150,11 +150,22 @@ export interface ListParams {
   search?: string;
   sort?: string;
   dir?: 'asc' | 'desc';
-  /** `col -> valor` (eq/like) o `col -> {from,to}` (range). Valores vacíos/null se omiten. */
+  /** `col -> valor` (eq/like) o `col -> {from,to}` (range). Valores vacíos/null se omiten.
+   *
+   *  ⚠️ **La columna tiene que estar declarada** en el bloque `list` de la query (hub#1173). Esto
+   *  se aplana a `f_<col>` diga lo que diga el manifest, así que una columna inventada llegaba
+   *  bien prefijada y el motor la descartaba EN SILENCIO: `200 ok` con la lista ENTERA, y quien
+   *  llamó creyéndose filtrado. Hoy el runtime la rechaza con `unknown_filter` (422) nombrando el
+   *  parámetro y los admitidos. Si la lista no tiene el filtro que necesitas, se añade a su
+   *  `list.filters` — no se manda y se espera que cuele. */
   filters?: Record<string, unknown>;
   /** Params de **contexto obligatorios** que la query base referencia con su nombre crudo
    *  (p.ej. una sub-lista de hijos: `{ params: { bom_id } }` → bindea `:bom_id`). Se pasan
-   *  verbatim al wire, sin prefijo `f_`. */
+   *  verbatim al wire, sin prefijo `f_`.
+   *
+   *  ⚠️ **Solo lo que el SQL base referencia de verdad** (hub#1173): un nombre que su SQL no
+   *  bindea no es contexto, es un parámetro inventado, y el runtime lo rechaza con
+   *  `unknown_filter` (422) en vez de ignorarlo. */
   params?: Record<string, unknown>;
 }
 
