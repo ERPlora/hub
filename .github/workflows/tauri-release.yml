@@ -56,7 +56,10 @@ on:
   # apps/tauri, apps/web o crates → ~123 min/run, 13 runs/10d ≈ 1.595 min. Pre-lanzamiento nadie
   # descarga `latest/` a diario, así que solo se construye al etiquetar una release o a mano.
   push:
-    tags: ['v*']
+    # SOLO la release final `vX.Y.Z`. Un tag `vX.Y.Z-rc.N` es el canal `canary` de la IMAGEN
+    # (build-hub.yml, hub#1170) y NO debe llegar a Microsoft Store / Google Play: ahí las versiones
+    # son monótonas e irreversibles, y una candidata puede no salir nunca.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       # Un dispatch servía para DOS cosas incompatibles: refrescar `latest/` a mano y probar que el
