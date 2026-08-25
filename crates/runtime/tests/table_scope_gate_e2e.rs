@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::Runtime;
+use erplora_runtime::{Runtime, RuntimeError};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -64,12 +64,15 @@ async fn a_command_writing_a_system_table_is_refused() {
     let err = rt
         .install_from_dir(&fixture("system_write"))
         .await
-        .expect_err("a command inserting into `_hub_fiscal_profile` must not install")
-        .to_string();
+        .expect_err("a command inserting into `_hub_fiscal_profile` must not install");
     // The refusal must come from the GATE (before any side effect), not from the SQL happening
     // to fail at dispatch time: it names the system table AND says why.
     assert!(
-        err.contains("_hub_fiscal_profile") && err.contains("system table"),
+        matches!(
+            &err,
+            RuntimeError::ManifestRejected { code, at, .. }
+                if code == "system_table_write" && at.contains("_hub_fiscal_profile")
+        ),
         "the gate's refusal names the system table and the reason, got: {err}"
     );
 }

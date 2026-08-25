@@ -216,6 +216,33 @@ pub enum RuntimeError {
     /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
     #[error("host.certificate: {0}")]
     Certificate(String),
+    /// A payload field the core refused, with the field and a STABLE reason a consumer can
+    /// assert on and the UI can translate (hub#1070, ADR-0398 §6): `name`/`role`/`pin`/`email`/
+    /// `badge` of a hub user, `role_key` of an activation, `language` of a profile. `detail` is
+    /// the human fallback (English source), never the contract — a test that reads it is a
+    /// test that breaks the day the text is translated (ADR-0055).
+    #[error("`{name}`: field `{field}` {reason}: {detail}")]
+    InvalidField {
+        name: String,
+        field: String,
+        reason: String,
+        detail: String,
+    },
+    /// The control plane declared one certificate type and served another (hub#470): not
+    /// installed, because the AEAT door is chosen by the TYPE and the wrong one rejects every
+    /// record, one by one.
+    #[error("el plano de control declara un certificado `{declared}` pero el contenedor que ha servido es `{served}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el equivocado la AEAT rechaza todos los registros, uno a uno")]
+    CertificateTypeMismatch { declared: String, served: String },
+    /// A manifest the installer REFUSED on a contract rule (not a parse error — that is
+    /// [`RuntimeError::Manifest`]): `code` names the rule (`role_grants_admin`,
+    /// `system_table_write`…), `at` the offending element, `detail` the English explanation.
+    #[error("manifest `{module}`: {at}: {detail}")]
+    ManifestRejected {
+        module: String,
+        at: String,
+        code: String,
+        detail: String,
+    },
     /// A read marked `required` (ADR-0069, hub#701) could not be resolved — the module that owns
     /// it is absent, inactive, or the query itself failed. Distinct from the GRACEFUL default
     /// (regla 3 de ADR-0069): a `required` read aborts the command instead of letting the handler

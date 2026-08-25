@@ -52,6 +52,15 @@ pub enum VerifactuError {
     /// lectura que rompe la recuperación de la cadena (hub#287).
     #[error("consulta AEAT: {0}")]
     Consult(String),
+    /// A field the AEAT requires is missing from what we were about to send; named by its XML
+    /// tag, never by prose (hub#1070) — it is cut here because the 4102 the AEAT would answer
+    /// arrives AFTER having talked to Hacienda.
+    #[error("falta el campo obligatorio `{0}`")]
+    MissingField(&'static str),
+    /// The XML violates an `xs:sequence` of the schema: `tag` appears out of order; `sequence` is
+    /// the order the schema expects (hub#1070: asserted by tag, not by the Spanish text).
+    #[error("`{tag}` va fuera de orden: la secuencia del esquema es {sequence}")]
+    OutOfOrder { tag: String, sequence: String },
 }
 
 impl From<VerifactuError> for RuntimeError {

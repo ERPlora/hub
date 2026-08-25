@@ -428,6 +428,7 @@ fn domain_detail(e: &erplora_runtime::RuntimeError) -> Option<String> {
     match e {
         erplora_runtime::RuntimeError::Domain { message, .. } => Some(message.clone()),
         erplora_runtime::RuntimeError::InvalidPayload { detail, .. } => Some(detail.clone()),
+        erplora_runtime::RuntimeError::InvalidField { detail, .. } => Some(detail.clone()),
         _ => None,
     }
 }

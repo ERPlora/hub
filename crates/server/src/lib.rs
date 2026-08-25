@@ -3435,6 +3435,11 @@ pub(crate) fn err_status_and_code(
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        E::InvalidField { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_field".into()),
+        E::CertificateTypeMismatch { .. } => {
+            (StatusCode::CONFLICT, "certificate_type_mismatch".into())
+        }
+        E::ManifestRejected { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, code.clone().into()),
         // hub#1088: `business_tax_id` refused with its own stable code per failure kind — the
         // same `422` as `invalid_payload` (what was sent does not validate) with the code the UI
         // translates (es/en), so "the control letter is wrong" and "this is no NIF at all" are
@@ -3517,6 +3522,15 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     // sentence, because that list is what the confirmation dialog enumerates.
     if let E::HasDependents { dependents, .. } = &e {
         error["dependents"] = json!(dependents);
+    }
+    // hub#1070: the field and the reason travel as data, so the UI translates by code and a
+    // client never has to read the prose.
+    if let E::InvalidField { field, reason, .. } = &e {
+        error["field"] = json!(field);
+        error["reason"] = json!(reason);
+    }
+    if let E::ManifestRejected { at, .. } = &e {
+        error["at"] = json!(at);
     }
     (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }
