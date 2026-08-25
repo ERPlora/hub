@@ -88,6 +88,14 @@ pub use registry::{
 // the test skips itself and still reports `ok`).
 pub use e2e_support::{modules_root, require_module_version, require_modules_workspace};
 
+/// One declared domain error code of an installed module (ADR-0398), as `/api/modules` exposes it.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ErrorInfo {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<String>,
+}
+
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ModuleInfo {
@@ -105,6 +113,9 @@ pub struct ModuleInfo {
     /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
     /// whoever is staring at a module that half works has to be able to ASK.
     pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
+    /// Domain error codes the module declares (ADR-0398), sorted by code. Empty when the module
+    /// has no `errors` catalog yet — consumers (hub tests, the UI) read this instead of prose.
+    pub errors: Vec<ErrorInfo>,
 }
 
 /// **What one event set off** (hub#666): the event itself, the flow runs it started and the events
@@ -687,6 +698,15 @@ impl Runtime {
                     .unwrap_or(&ModuleStatus::Inactive),
                 depends_on: m.depends_on.iter().map(|d| d.id.clone()).collect(),
                 manifest_warnings: m.warnings.clone(),
+                errors: m
+                    .errors
+                    .iter()
+                    .flatten()
+                    .map(|(code, decl)| ErrorInfo {
+                        code: code.clone(),
+                        deprecated: decl.deprecated.clone(),
+                    })
+                    .collect(),
             })
             .collect()
     }
