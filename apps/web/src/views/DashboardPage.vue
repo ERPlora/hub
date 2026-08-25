@@ -239,6 +239,8 @@ const client = getClient();
 type WidgetBoardEl = HTMLElement & {
   widgets: WidgetDef[];
   presets: WidgetPreset[];
+  /** Ids ACTIVOS y ordenados. Sin esto el board activa TODO el catálogo (hub#1100). */
+  value: string[];
   labels: Partial<OkWidgetBoardLabels>;
 };
 const board = ref<WidgetBoardEl | null>(null);
@@ -249,7 +251,18 @@ const loadingWidgets = ref<boolean>(true);
 // and everything the board knows travels by PROPERTY (`attribute: false` in OutfitKit), which no
 // fresh element inherits. Holding the catalogue here lets a remount be dressed again immediately,
 // without asking every installed module for its widgets a second time.
-const catalog = ref<{ widgets: WidgetDef[]; presets: WidgetPreset[] } | null>(null);
+const catalog = ref<{
+  widgets: WidgetDef[];
+  presets: WidgetPreset[];
+  /** Lo que se ve de salida, mientras el usuario no haya guardado su propio tablero (hub#1100). */
+  active: string[];
+} | null>(null);
+
+// A qué elemento ya se le entregó el conjunto activo. `ok-widget-board` deriva su estado inicial
+// UNA vez (localStorage → `value` → 1er preset → todos) y a partir de ahí el `value` es del
+// USUARIO: reescribirlo en cada re-apply (un cambio de idioma rehace el catálogo) le desharía la
+// personalización. Un board nuevo —cada vuelta de la pestaña Actividad— sí vuelve a sembrarse.
+let seededBoard: HTMLElement | null = null;
 
 // ── Widget CORE de export/import (ADR-0113 §4; decisión humano 2026-07-12) ──────────────────
 // Es un widget DEL BOARD como los de módulo: entra en el catálogo y en TODOS los presets (sin
@@ -280,6 +293,7 @@ async function loadWidgets(): Promise<void> {
   // degrada al catálogo mínimo con solo el core — nunca un board vacío).
   let widgets: WidgetDef[] = [coreBlueprintWidget()];
   let presets: WidgetPreset[] = [];
+  let active: string[] = [CORE_BLUEPRINT_ID];
   try {
     const collected = await collectDashboardWidgets({
       client,
@@ -292,10 +306,13 @@ async function loadWidgets(): Promise<void> {
     });
     widgets = [...widgets, ...collected.widgets];
     presets = collected.presets.map((p) => ({ ...p, widgets: [CORE_BLUEPRINT_ID, ...p.widgets] }));
+    // El widget core encabeza el tablero de salida; detrás, lo que ADR-0054 §4 marca como activo
+    // para este hub. Los `default:false` NO entran aquí: se activan a mano desde el ⋮ (hub#1100).
+    active = [...active, ...collected.defaultActive];
   } catch {
     /* degrada: solo el widget core */
   }
-  catalog.value = { widgets, presets };
+  catalog.value = { widgets, presets, active };
   if (board.value) applyBoard(board.value);
   loadingWidgets.value = false;
 }
@@ -321,6 +338,13 @@ function boardLabels(): Partial<OkWidgetBoardLabels> {
 /** Hands the element everything it cannot keep by itself. Idempotent and cheap on purpose. */
 function applyBoard(el: WidgetBoardEl): void {
   if (catalog.value) {
+    // El conjunto activo va ANTES que el catálogo: el board deriva su estado inicial en cuanto
+    // `widgets` deja de estar vacío, y para entonces su `value` ya tiene que estar puesto. Un
+    // tablero guardado por el usuario (localStorage) sigue mandando sobre esto, por contrato.
+    if (seededBoard !== el) {
+      el.value = catalog.value.active;
+      seededBoard = el;
+    }
     el.widgets = catalog.value.widgets;
     el.presets = catalog.value.presets;
   }
