@@ -384,6 +384,9 @@ pub async fn status(
         let Some(done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
+        // …and a module the dispatcher is going to refuse is not «configured», whatever its own
+        // settings say (hub#1119). See [`capabilities_granted`].
+        let done = done && capabilities_granted(db, registry, hub_id, &manifest.id).await;
         // A module item never reaches the third state: its screen is inside this hub, so there is
         // nothing outside that could make it impossible. Not evaluable ⇒ omitted (above); not
         // configured ⇒ pending.
@@ -773,6 +776,33 @@ fn done_or_pending(done: bool) -> &'static str {
     } else {
         STATE_PENDING
     }
+}
+
+/// **Has the owner granted every host capability this module declares?** (hub#1119)
+///
+/// A module's own `setup` query can only answer «are MY settings filled in». It cannot see the gate
+/// in front of its engine: `capabilities::enforce` (ADR-0079) is default-deny and refuses every
+/// native command of a module with an ungranted capability, before it runs. So a module can report
+/// itself perfectly configured and still be unable to do the single thing it was installed for —
+/// which is what `verifactu` did for a whole day in a production hub, invoicing and printing while
+/// the fiscal chain was dead and the checklist said the business was ready.
+///
+/// The switch is a real, named task with a screen behind it (Ajustes → Permisos), so «pending» is
+/// the honest state, not an invented chore. A module that declares no capability is untouched.
+///
+/// **Best-effort, like every other check here**: if the grants cannot be read we answer `true`
+/// rather than manufacturing a pending item — a false «you are missing X» sends the user to fix
+/// something that is already fine.
+async fn capabilities_granted(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    module_id: &str,
+) -> bool {
+    crate::capabilities::list_for_module(db, registry, hub_id, module_id)
+        .await
+        .map(|caps| caps.iter().all(|(_, granted)| *granted))
+        .unwrap_or(true)
 }
 
 /// Runs the module's own declarative check. `None` = the check could not be made ⇒ omit the item.
