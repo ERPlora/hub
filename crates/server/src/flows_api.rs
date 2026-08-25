@@ -227,10 +227,29 @@ pub(crate) async fn require_flows_capability(
     headers: &HeaderMap,
     rt: &erplora_runtime::Runtime,
 ) -> Result<(), Response> {
+    require_module_capability(headers, rt, CapabilityKind::ManageFlows).await
+}
+
+/// The same gate for **any** capability a core door hangs on (hub#1108): if the request NAMES a
+/// module, that module must have `kind` declared in its manifest and granted by the owner; a
+/// request that names none passes, because the shell, `curl` with an admin session and the QA agent
+/// are not modules.
+///
+/// One implementation, parameterised, rather than one copy per door: two copies of a default-deny
+/// check is how one of them ends up being the lenient one. The print queue's recovery gestures use
+/// it with [`CapabilityKind::Printer`] — the capability the owner already grants for "this module
+/// may reach the printer" — for the same reason flows use `manage_flows`: without it, a typed SDK
+/// surface would hand every installed module the power to bin another module's tickets the moment
+/// an admin happens to be logged in.
+pub(crate) async fn require_module_capability(
+    headers: &HeaderMap,
+    rt: &erplora_runtime::Runtime,
+    kind: CapabilityKind,
+) -> Result<(), Response> {
     let Some(module) = calling_module(headers) else {
         return Ok(());
     };
-    rt.require_module_capability(&module, CapabilityKind::ManageFlows)
+    rt.require_module_capability(&module, kind)
         .await
         .map_err(crate::err_response)
 }

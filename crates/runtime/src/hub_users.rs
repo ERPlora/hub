@@ -64,8 +64,26 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// `approvals.list` (hub#512) es la puerta de lectura del registro de aprobaciones por PIN
 /// (`_elevation_audit`, hub#362). Requiere `hub.administer` (nivel admin, no encargado): quién
 /// aprobó qué es información sobre el personal.
-const CORE_QUERIES: &[&str] =
-    &["users.list", "roles.list", "setup.status", "approvals.list", "fiscal.limits"];
+///
+/// `print.coverage` y `print.jobs` (hub#1107) son la lectura de la cola de impresión. El dato ya lo
+/// servía HTTP desde hub#341/hub#800, pero un módulo no puede pegar a las rutas del core, así que
+/// la pantalla de la cola no podía existir fuera del shell. Gate: el del namespace (sesión local),
+/// **no admin** — es la audiencia que hub#987 ya decidió para los mismos hechos: una cola que nadie
+/// drena necesita a quien está en el mostrador, no a quien administra el hub.
+const CORE_QUERIES: &[&str] = &[
+    "users.list",
+    "roles.list",
+    "setup.status",
+    "approvals.list",
+    "fiscal.limits",
+    "print.coverage",
+    "print.jobs",
+];
+
+/// Default page size of the print queue read through [`core_query`]. Same number the HTTP listing
+/// uses: a hub with more than this waiting has a printer problem, not a paging problem. A caller
+/// may ask for more, and [`crate::print_queue::list`] clamps the ask at 500.
+const PRINT_JOBS_LIMIT: i64 = 100;
 
 /// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
 /// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
@@ -1000,6 +1018,52 @@ pub async fn core_query(
         // attribution: who asked for the elevation and who approved it. The ids resolve to names
         // against `hub_user`, or the screen shows UUIDs and nobody uses it.
         "approvals.list" => list_approvals(db, hub_id, params).await,
+        // The print queue, readable by a MODULE at last (hub#1107). The runtime has known both
+        // facts since hub#341/hub#800 and served them over HTTP; what was missing was a door the
+        // contract WC → SDK → dispatcher allows. The core only packages here — the shapes are the
+        // runtime's own (`print_hosts::coverage_view`, `print_queue::status_view`), the SAME ones
+        // the HTTP layer serves, so the screen a module draws and the shell's own settings tab
+        // cannot disagree about what is stuck.
+        //
+        // `undrained` and `waitingSeconds` arrive already RESOLVED: a client that re-derived the
+        // threshold would be a second definition of "stuck" (`UNDRAINED_ALERT_SECONDS`), which is
+        // exactly what hub#987 collapsed into one.
+        "print.coverage" => Ok(whole(
+            crate::print_hosts::coverage(db, hub_id)
+                .await?
+                .iter()
+                .map(crate::print_hosts::coverage_view)
+                .collect(),
+        )),
+        // A STATUS view, never the document: the ticket travels to the print host that claims the
+        // job, past both of the drain's guards (hub#343), and not to whoever polls the queue.
+        //
+        // `role`/`status` filter and `limit` caps, all of them optional — `hub_id` is NOT among
+        // them and cannot be: it comes from the request context the deployment stamps (ADR-0201),
+        // so nothing in the payload can point this read at another tenant.
+        "print.jobs" => {
+            let text = |k: &str| {
+                params
+                    .get(k)
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string)
+            };
+            let role = text("role");
+            let status = text("status");
+            let limit = params
+                .get("limit")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(PRINT_JOBS_LIMIT);
+            Ok(whole(
+                crate::print_queue::list(db, hub_id, role.as_deref(), status.as_deref(), limit)
+                    .await?
+                    .iter()
+                    .map(crate::print_queue::status_view)
+                    .collect(),
+            ))
+        }
         "users.list" => Ok(whole(
             list(db, hub_id)
                 .await?
