@@ -4,14 +4,15 @@
 #
 # `test-hub.yml` corre `cargo test --workspace`, pero los e2e que instalan módulos
 # reales SE AUTO-OMITEN allí: `actions/checkout` trae solo este repo, el guard ve
-# `CI=true` y toma el skip legítimo (hub#253). Son **238 tests en 36 targets** —
+# `CI=true` y toma el skip legítimo (hub#253). Son **238 tests en 36 targets** de
+# `tests/`, más los guardados en `src/` (`installer::every_published_manifest_*`) —
 # toda la cadena fiscal, el TPV, la cocina y el inventario— y el gate local también
 # los salta por defecto (`HUB_GATE_WITH_MODULES`, hub#855). O sea que hasta este
 # workflow NO CORRÍAN EN NINGÚN SITIO automático: un test caducado por ADR-0405
 # estuvo un día entero en rojo con Actions en verde (hub#1215).
 #
-# Este workflow se trae los 13 repos de módulo por su estado PUBLICADO (`main`) y
-# corre solo esos 36 targets.
+# Este workflow se trae el catálogo de módulos (~27 repos) por su estado PUBLICADO (`main`) y
+# corre esos targets más el `--lib` del runtime.
 #
 # ── Por qué `schedule` y NO `pull_request` en general ────────────────────────
 # El rojo de hub#1215 lo causó una RELEASE DE MÓDULO (`invoice` v1.2.27, ADR-0405),
@@ -97,7 +98,7 @@ jobs:
       # llega como cadena VACÍA, no como error — el mismo modo de fallo que dejó
       # `CI_RUNNER_LABEL` vacía y mandó jobs a `ubuntu-latest` en verde. Por eso se
       # comprueba explícitamente antes de usarlo.
-      - name: Traer los 13 módulos por su estado PUBLICADO (main)
+      - name: Traer el catálogo de módulos por su estado PUBLICADO (main)
         env:
           MODULES_DEPLOY_KEYS: ${{ secrets.MODULES_DEPLOY_KEYS }}
         run: |
@@ -106,7 +107,7 @@ jobs:
             echo "::error::el secreto MODULES_DEPLOY_KEYS llegó VACÍO."
             echo "Tiene que ser secreto DEL REPO ERPlora/hub (los de organización no"
             echo "alcanzan a repos privados con la org en plan Free). Regenerarlo:"
-            echo "  ver hub#1216 — 13 deploy keys read-only, empaquetadas en tar+base64."
+            echo "  ver hub#1216 — una deploy key read-only por módulo, en tar+base64."
             exit 1
           fi
 
@@ -122,8 +123,25 @@ jobs:
           # Un módulo nuevo que faltase sin bajar de ese umbral no se habría probado, en silencio.
           MODS=$(cd "$KEYS" && ls)
           echo "módulos en el paquete de claves: $(printf '%s\n' "$MODS" | wc -l | tr -d ' ')"
-          DEST="$GITHUB_WORKSPACE/../modules-workspace/modules"
+
+          # 🔴 En `$RUNNER_TEMP`, que se vacía en cada job — NUNCA junto al checkout.
+          #
+          # La primera versión clonaba en `$GITHUB_WORKSPACE/../modules-workspace`, que PERSISTE
+          # entre jobs del runner, y eso rompió dos cosas a la vez:
+          #   1. su propio run siguiente — `git clone` sobre un directorio no vacío
+          #      («destination path ... already exists and is not an empty directory»);
+          #   2. `test-hub.yml` EN LA MISMA MÁQUINA (las dos ranuras de `ci-runner-1`), que resuelve
+          #      los módulos por la ruta relativa por defecto: encontró el catálogo a medias que
+          #      este job dejó, dejó de saltarse `installer::every_published_manifest_*` y falló
+          #      con «only 13 checked». Un job que ensucia el runner rompe al vecino, no a sí mismo,
+          #      y eso es carísimo de diagnosticar.
+          DEST="$RUNNER_TEMP/modules-workspace/modules"
+          rm -rf "$DEST"
           mkdir -p "$DEST"
+
+          # Y se limpia lo YA filtrado por la versión anterior en este runner, que si no se queda
+          # ahí envenenando a `test-hub.yml` para siempre.
+          rm -rf "$GITHUB_WORKSPACE/../modules-workspace"
 
           mkdir -p ~/.ssh
           ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
@@ -231,5 +249,18 @@ jobs:
           [ "$count" -ge 30 ] || { echo "::error::solo $count targets — el grep no está encontrando los e2e"; exit 1; }
           args=""
           for t in $targets; do args="$args --test $t"; done
+          # `--lib` además de los targets de integración: hay tests guardados en `src/` que un grep
+          # sobre `tests/` no ve — `installer::every_published_manifest_*` valida el catálogo entero
+          # y solo corre con módulos. Se colaron fuera de la cuenta inicial de «238 en 36 targets»,
+          # y son justo los que cazaron el catálogo incompleto.
           # shellcheck disable=SC2086
-          cargo test -p erplora-runtime $args --no-fail-fast
+          cargo test -p erplora-runtime --lib $args --no-fail-fast
+
+      # `always()`: si el job se cancela a media suite (`cancel-in-progress` lo hace a diario), el
+      # residuo se quedaría en el runner envenenando al vecino. La limpieza no puede depender de
+      # que el job termine bien.
+      - name: Limpiar los módulos del runner
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/modules-workspace" "$HOME/.erplora-module-keys" \
+                 "$GITHUB_WORKSPACE/../modules-workspace" || true

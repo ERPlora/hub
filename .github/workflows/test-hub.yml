@@ -9,9 +9,8 @@
 #
 # 🔴 Los e2e que instalan módulos reales SE AUTO-OMITEN aquí y este run sale VERDE sin
 # haberlos ejecutado: `actions/checkout@v4` trae solo este repo, `modules-workspace/`
-# (13 repos hermanos: appointments, cash_register, customers, inventory, invoice,
-# invoice_series, kitchen, sales, services, staff, tables, taxes, verifactu) no está, y
-# el guard ve `CI=true` y toma el skip legítimo (hub#253).
+# (~27 repos hermanos: el catálogo publicado entero) no está, y el guard ve `CI=true` y
+# toma el skip legítimo (hub#253).
 #
 # No son dos ficheros: son **238 tests repartidos en 36 targets** de `crates/runtime/tests/`
 # (medido el 2026-08-26). Toda la cadena fiscal, el TPV, la cocina y el inventario entran
@@ -23,7 +22,7 @@
 # sitio automático hasta hub#1216 — y por eso un test caducado por ADR-0405 aguantó un día
 # entero en rojo con este workflow en verde (hub#1215).
 #
-# ✅ **Los corre `test-hub-modules.yml`** (hub#1216): se trae los 13 repos por su estado
+# ✅ **Los corre `test-hub-modules.yml`** (hub#1216): se trae el catálogo por su estado
 # publicado y los ejecuta con `ERPLORA_E2E_REQUIRE_MODULES=1`, que hace FATAL la ausencia
 # de módulos para que ese job no pueda repetir este mismo verde vacío. Va por `schedule`
 # diario además de por push: el rojo de hub#1215 lo causó una release de MÓDULO, sin
