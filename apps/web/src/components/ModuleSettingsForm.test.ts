@@ -135,6 +135,18 @@ describe('hub#1094 · the generic settings screen speaks the hub language and sh
           fieldInvalid: 'Este valor no vale.',
         },
       },
+      // The re-labelling test switches the SAME instance to `en`: without an `en` bundle the
+      // locale type is inferred as the literal `'es'` and `vue-tsc` refuses the switch.
+      en: {
+        moduleSettings: {
+          save: 'Save',
+          loading: 'Loading',
+          loadError: 'Error',
+          saveError: 'Could not save settings.',
+          invalidFields: 'Check the fields marked below.',
+          fieldInvalid: 'This value is not accepted.',
+        },
+      },
     },
   });
 

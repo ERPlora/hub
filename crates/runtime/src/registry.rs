@@ -1221,7 +1221,10 @@ mod tests {
 
         let mut fields = invalid_payload_fields(&detail);
         fields.sort();
-        assert_eq!(fields, vec!["auto_bump_delay_seconds", "default_order_type"]);
+        assert_eq!(
+            fields,
+            vec!["auto_bump_delay_seconds", "default_order_type"]
+        );
     }
 
     /// A violation of the object ITSELF (a missing required key) has an empty instance path, so it
@@ -1259,6 +1262,17 @@ mod tests {
         assert_eq!(
             invalid_payload_fields("/lines/0/qty: null is not of type \"integer\"; /lines/1/qty: null is not of type \"integer\""),
             vec!["lines"],
+        );
+    }
+
+    /// RFC 6901: a property whose name carries `/` or `~` arrives escaped (`~1`, `~0`) in the
+    /// pointer. The screen keys its controls by the RAW property name, so the escape has to be
+    /// undone — and in the right order, or `a~1b` would come back as `a/b` twice removed.
+    #[test]
+    fn an_escaped_property_name_comes_back_unescaped() {
+        assert_eq!(
+            invalid_payload_fields("/rate~1kg: null is not of type \"number\"; /tilde~0x: bad"),
+            vec!["rate/kg", "tilde~x"],
         );
     }
 

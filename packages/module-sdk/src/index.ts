@@ -379,7 +379,9 @@ export class ErploraError extends Error {
      * The fields the payload schema refused, present only on `invalid_payload` (hub#1094): the
      * runtime splits them off the detail (`registry::invalid_payload_fields`) so the screen can
      * MARK those controls. Read the field, never parse the message — the message is prose and
-     * translatable, the list is not. `undefined` on every refusal that names no field.
+     * translatable, the list is not. `undefined` on every refusal that names no field. A typed
+     * `invalid_field` refusal of the core (one `field` + a stable `reason`, hub#1070) lands here
+     * too, as a one-element list.
      */
     public readonly fields?: readonly string[],
   ) {
@@ -513,7 +515,7 @@ export class UnknownOutcomeError extends ErploraError {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: { code: string; message: string; permission?: string; fields?: string[] };
+  error?: { code: string; message: string; permission?: string; fields?: string[]; field?: string };
 }
 
 function unwrap(env: Envelope): unknown {
@@ -525,7 +527,9 @@ function unwrap(env: Envelope): unknown {
       e?.permission,
       // hub#1094: absent stays absent. An empty array would read as «the runtime looked and found
       // no bad field», which is a different statement from «this refusal is not about fields».
-      e?.fields?.length ? e.fields : undefined,
+      // The core's typed refusals (`invalid_field`, hub#1070/#1185) name ONE field in the singular:
+      // it folds in here so there is a single reader for «which fields were refused».
+      e?.fields?.length ? e.fields : e?.field ? [e.field] : undefined,
     );
   }
   return env.data;
