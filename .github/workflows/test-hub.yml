@@ -19,9 +19,15 @@
 # hizo creer que el hueco era menor de lo que es.
 #
 # Y tampoco los cubre el gate local: `.githooks/pre-push` los salta POR DEFECTO desde
-# hub#855 y solo los corre con `HUB_GATE_WITH_MODULES=1`. O sea que hoy no corren en
-# ningún sitio automático — un test caducado por ADR-0405 estuvo rojo un día entero sin
-# que ningún verde lo desmintiera (hub#1215). Cerrarlo es hub#1216.
+# hub#855 y solo los corre con `HUB_GATE_WITH_MODULES=1`. Estuvieron sin correr en ningún
+# sitio automático hasta hub#1216 — y por eso un test caducado por ADR-0405 aguantó un día
+# entero en rojo con este workflow en verde (hub#1215).
+#
+# ✅ **Los corre `test-hub-modules.yml`** (hub#1216): se trae los 13 repos por su estado
+# publicado y los ejecuta con `ERPLORA_E2E_REQUIRE_MODULES=1`, que hace FATAL la ausencia
+# de módulos para que ese job no pueda repetir este mismo verde vacío. Va por `schedule`
+# diario además de por push: el rojo de hub#1215 lo causó una release de MÓDULO, sin
+# ningún commit del hub de por medio.
 # ==============================================================================
 
 name: Hub tests (Rust · Postgres)
