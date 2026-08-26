@@ -271,15 +271,27 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     assert_eq!(cents(&b["gross_total"]), 1000);
 }
 
+/// `sales.by_staff` under the published contract of `sales`: **nobody is left out of the day's
+/// breakdown**, and the date range still bounds it.
+///
+/// This test used to assert the opposite ("a sale without `staff_id` is excluded"). That premise
+/// died with `sales#196` ("who attended is decided by the SERVER"): `complete_sale` resolves the
+/// attribution as *payload `staff_id`* -> *session user* (`context.current_user_id`), so a counter
+/// sale that names nobody is attributed to the cashier instead of vanishing from the report. The
+/// old assertion was measuring a state the published module can no longer produce.
+///
+/// The `staff_id IS NOT NULL` filter still in `queries/by_staff.sql` is NOT covered here on
+/// purpose: with a session there is no command that can write a NULL attribution, so the only rows
+/// it can filter today are legacy ones written before `sales#196`. Fabricating one would mean
+/// writing the row behind `complete_sale`'s back, which proves nothing about the contract.
 #[tokio::test]
-async fn by_staff_respects_date_range_and_excludes_unattributed() {
+async fn by_staff_attributes_the_unnamed_sale_to_the_session_user_and_respects_the_date_range() {
     if !erplora_runtime::require_modules_workspace() { return; }
-    // Ventas sin staff_id NO aparecen en by_staff; el rango de fechas acota.
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
-    let ctx = admin();
-    // one sale WITHOUT staff (regular POS) + one WITH staff.
+    let ctx = admin(); // the session user is `u1`
     let pm = cash_method_id(&rt, &ctx).await;
+    // One counter sale that names NOBODY (the till does not ask) + one naming the professional.
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("sin-staff"), "payment_method_id": pm,
         "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000, "tax_rate": 21.0 }]
@@ -290,14 +302,19 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
         "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
 
-    // rango amplio: solo la atribuida.
+    // Wide range: one row per attribution — the named professional AND the session user.
     let rows = rt.execute_query("sales.by_staff", &params(json!({
         "date_from": "2026-01-01", "date_to": "2030-12-31"
     })), &ctx).await.unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["staff_id"], json!("staff-X"));
+    assert_eq!(rows.len(), 2, "cada venta se atribuye a alguien (sales#196): {rows:?}");
+    let named = rows.iter().find(|r| r["staff_id"] == json!("staff-X"))
+        .unwrap_or_else(|| panic!("falta la fila del profesional nombrado: {rows:?}"));
+    assert_eq!(named["sales_count"].as_i64().unwrap(), 1);
+    let session = rows.iter().find(|r| r["staff_id"] == json!("u1"))
+        .unwrap_or_else(|| panic!("la venta sin staff_id debe quedar atribuida al usuario de sesión: {rows:?}"));
+    assert_eq!(session["sales_count"].as_i64().unwrap(), 1);
 
-    // rango en el pasado: ninguna venta (las de hoy quedan fuera).
+    // Past range: no sale at all (today's fall outside).
     let none = rt.execute_query("sales.by_staff", &params(json!({
         "date_from": "2020-01-01", "date_to": "2020-12-31"
     })), &ctx).await.unwrap();
