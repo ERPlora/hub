@@ -115,8 +115,13 @@ jobs:
           printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
           chmod 600 "$KEYS"/*
 
-          MODS="appointments cash_register customers inventory invoice invoice_series \
-                kitchen sales services staff tables taxes verifactu"
+          # La lista de módulos SALE DEL PROPIO PAQUETE DE CLAVES, no de una lista escrita aquí:
+          # cada módulo necesita su deploy key de todas formas, así que el paquete es la única
+          # fuente que no puede quedarse corta. Una lista a mano sí: la primera versión traía 13 de
+          # los 27 y `module_manifest_contract` lo cazó — pero solo porque exige un MÍNIMO (≥20).
+          # Un módulo nuevo que faltase sin bajar de ese umbral no se habría probado, en silencio.
+          MODS=$(cd "$KEYS" && ls)
+          echo "módulos en el paquete de claves: $(printf '%s\n' "$MODS" | wc -l | tr -d ' ')"
           DEST="$GITHUB_WORKSPACE/../modules-workspace/modules"
           mkdir -p "$DEST"
 
@@ -139,6 +144,18 @@ jobs:
             [ -f "$DEST/$m/module.json" ] || { echo "::error::falta $m/module.json"; missing=1; }
           done
           [ "$missing" -eq 0 ] || exit 1
+
+          # El catálogo publicado son ~27 módulos. `module_manifest_contract` exige ≥20, así que
+          # por sí solo NO caza que falten unos pocos: la primera versión de este job clonaba 13 y
+          # habría pasado de haber sido 21. Este suelo es el que convierte «faltan módulos» en un
+          # fallo del job y no en una cobertura silenciosamente recortada.
+          n=$(find "$DEST" -mindepth 2 -maxdepth 2 -name module.json | wc -l | tr -d ' ')
+          echo "módulos clonados con manifiesto: $n"
+          if [ "$n" -lt 25 ]; then
+            echo "::error::solo $n módulos con module.json (esperados ~27). Si se publicó un módulo"
+            echo "nuevo, hay que añadir su deploy key al paquete MODULES_DEPLOY_KEYS (hub#1216)."
+            exit 1
+          fi
 
           rm -rf "$KEYS"
           echo "ERPLORA_MODULES_DIR=$(cd "$DEST" && pwd)" >> "$GITHUB_ENV"
