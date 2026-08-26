@@ -38,10 +38,15 @@ name: Hub tests (Rust · Postgres)
 # ya en `main`, donde el rojo lo paga el siguiente que mergee y no quien lo introdujo.
 # Es el mismo agujero que el SaaS cerró en saas#1020.
 #
-# El gate LOCAL de `.githooks/pre-push` no se retira: sigue abortando el push en rojo y
-# publicando el commit status `local-gate/hub-tests` para que `merge-pr.sh` vea un check
-# aunque Actions esté mudo (pm#58/#60). Cubren cosas distintas — el local, cada rama
-# antes de salir; éste, el árbol mergeado.
+# El gate LOCAL de `.githooks/pre-push` no se retira, pero desde hub#1207 ya NO corre esta
+# misma suite: corre solo los paquetes que toca el diff. Lo que se quitó es el DUPLICADO —
+# la copia cara, porque se ejecuta bajo un lock de máquina y con la flota ese lock era el
+# techo (~8-10 issues/día). Reparto: el local da feedback rápido en la rama; ESTE corre el
+# workspace entero y es el que manda para mergear.
+# Ojo al contrato de atestación: el local publica `local-gate/hub-tests` SOLO cuando de
+# verdad corrió el workspace; una pasada por alcance publica `local-gate/hub-tests-scoped`,
+# que `merge-pr.sh` no acepta como prueba de la suite completa — se apoya en el check
+# `cargo test --workspace` de este workflow, y si no está, se niega a mergear (pm#58/#60).
 # ── Push to develop: the POST-MERGE check (hub#572) ──────────────────────────
 # Two individually-green PRs can break develop when combined: the clash is
 # semantic, not textual (one PR widens a struct the other constructs literally
