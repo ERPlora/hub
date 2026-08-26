@@ -24,7 +24,7 @@
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::certificate::{self, CertificateKind, CertificateType};
 use erplora_runtime::native::DbHost;
-use erplora_runtime::Runtime;
+use erplora_runtime::{Runtime, RuntimeError};
 
 const HOLDER_DOOR: &str = "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
 const SEAL_DOOR: &str = "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
@@ -246,9 +246,15 @@ async fn a_contested_declaration_is_refused_and_the_hub_keeps_its_certificate() 
         Some("seal"),
     )
     .await
-    .unwrap_err()
-    .to_string();
-    assert!(err.contains("seal") && err.contains("representative"), "{err}");
+    .unwrap_err();
+    assert!(
+        matches!(
+            &err,
+            RuntimeError::CertificateTypeMismatch { declared, served }
+                if declared == "seal" && served == "representative"
+        ),
+        "{err}"
+    );
 
     assert_eq!(
         certificate::delegated_version(rt.db(), HUB).await.unwrap(),

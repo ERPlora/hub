@@ -1050,11 +1050,7 @@ pub fn build_consult_soap(
     // (verificado contra preproducción el 2026-08-02, ADR-0189). Se corta aquí porque el 4102
     // llega DESPUÉS de haber hablado con Hacienda.
     if periodo.trim().is_empty() {
-        return Err(VerifactuError::Payload(
-            "falta el Periodo (mes MM) de la consulta: la AEAT lo exige y sin él responde 4102; \
-             no existe el filtro «todo el ejercicio»"
-                .into(),
-        ));
+        return Err(VerifactuError::MissingField("Periodo"));
     }
     let periodo_xml = format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo));
     Ok(format!(

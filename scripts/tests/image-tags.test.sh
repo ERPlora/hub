@@ -66,6 +66,15 @@ run() { # $1=git ref ; stdout+stderr -> $tmp_dir/out ; sets $status
     status=$?
 }
 
+# Same, with the `git describe --tags --long` output the workflow passes (hub#1170 channels).
+run_channel() { # $1=git ref ; $2=git describe output ; extra env via caller
+    PUBLISHED="${PUBLISHED:-}" \
+    IMAGE_TAGS_PUBLISHED_CMD="$published_stub" \
+        "$script" --manifest "$tmp_dir/repo/Cargo.toml" --image ghcr.io/erplora/hub \
+                  --ref "$1" --sha abc1234def --describe "$2" > "$tmp_dir/out" 2>&1
+    status=$?
+}
+
 # ── A version tag publishes the three moving/immutable tags ──────────────────────────
 # La versión sale del TAG, no del manifest: el mismo tag dispara `tauri-release.yml`, así que el
 # número que va a las stores y el de la imagen tienen que ser EL MISMO, y solo hay un sitio donde
@@ -155,10 +164,11 @@ passed=$((passed + 1))
 # ── A branch other than main NEVER moves :latest (hub#872) ───────────────────────────
 # `workflow_dispatch` runs the workflow from ANY ref, and `:latest` is the tag every real
 # hub's service is registered with (Cloud/Dokploy provisioning). A manual build from
-# `develop` — or any work branch — must publish ONLY the immutable `:<sha>`, so a single
-# hub can be pointed at it without changing the code of the whole fleet.
+# `develop` — or any work branch — must never move it. (Since hub#1170 `develop` also gets
+# the moving `:dev` and a prerelease version from `git describe` — see the channel cases
+# below — so this case passes a describe; the assertions about `:latest` are unchanged.)
 make_manifest "2.5.0"
-PUBLISHED="" run "refs/heads/develop"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
 [ "$status" -eq 0 ] || fail "a dispatch from develop should be accepted (got $status): $(cat "$tmp_dir/out")"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
     && fail "a build from develop must NOT publish :latest — that moves the whole fleet (hub#872)"
@@ -169,7 +179,7 @@ passed=$((passed + 1))
 
 # ── …and neither does an arbitrary work branch ───────────────────────────────────────
 make_manifest "2.5.0"
-PUBLISHED="" run "refs/heads/fix/some-work-branch"
+PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-61-g60307487"
 [ "$status" -eq 0 ] || fail "a dispatch from a work branch should be accepted (got $status): $(cat "$tmp_dir/out")"
 grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" \
     && fail "a build from a work branch must NOT publish :latest (hub#872)"
@@ -226,6 +236,149 @@ IMAGE_TAGS_REGISTRY_BASE="http://127.0.0.1:1" IMAGE_TAGS_ALLOW_UNVERIFIED=1 \
               --ref "refs/tags/v1.4.0" --sha abc1234def > "$tmp_dir/out" 2>&1
 status=$?
 [ "$status" -eq 0 ] || fail "IMAGE_TAGS_ALLOW_UNVERIFIED=1 is the documented escape hatch and must work"
+passed=$((passed + 1))
+
+# ═════════════════════════════════════════════════════════════════════════════════════
+# Release channels (hub#1170): `dev` (develop → pre) · `canary` (rc tag) · `stable` (= latest).
+#
+# Why: a manual build of `develop` published `:<sha>` whose binary said `1.0.0` — the Cargo
+# placeholder — because the version was only stamped on `v*` tags. The canary in pre judged
+# capabilities BY VERSION and quarantined an image that had them all. Every channel now carries
+# an honest version: `develop` a prerelease derived from `git describe`, an rc tag its own
+# `X.Y.Z-rc.N`, and only a final `vX.Y.Z` moves `:latest`/`:stable`.
+# ═════════════════════════════════════════════════════════════════════════════════════
+
+# ── A push to `develop` publishes `:dev` + `:<sha>` with a PRERELEASE version ─────────
+# `X.Y.Z` is the last reachable `v*` tag; `<n>` commits since; `+g<sha>` build metadata.
+# The version is what `build-hub.yml` stamps into Cargo.toml, so `/readyz` and
+# `/api/hub/context` report it instead of the placeholder.
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
+[ "$status" -eq 0 ] || fail "a push to develop should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.7-dev.61+g60307487$" "$tmp_dir/out" \
+    || fail "develop must serve a prerelease derived from git describe — got: $(cat "$tmp_dir/out")"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" || fail "develop must publish the moving :dev tag (pre deploys it)"
+grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "develop must publish the immutable sha tag"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" && fail "develop must NOT move :latest (hub#872)"
+grep -qxF "ghcr.io/erplora/hub:canary" "$tmp_dir/out" && fail "develop must NOT move :canary"
+grep -qxF "ghcr.io/erplora/hub:stable" "$tmp_dir/out" && fail "develop must NOT move :stable"
+grep -q "^ghcr.io/erplora/hub:1\.1\.7" "$tmp_dir/out" && fail "develop must NOT mint a version tag"
+grep -q "^stamp=1$" "$tmp_dir/out" || fail "develop must ask the workflow to stamp Cargo.toml"
+passed=$((passed + 1))
+
+# ── …and a manual `workflow_dispatch` from develop is the SAME build ─────────────────
+# The ref decides, not the event: the dispatched build is what pre validates (hub#1170).
+make_manifest "1.0.0"
+GITHUB_EVENT_NAME=workflow_dispatch PUBLISHED="" run_channel "refs/heads/develop" "v1.1.7-61-g60307487"
+[ "$status" -eq 0 ] || fail "a dispatch from develop should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.7-dev.61+g60307487$" "$tmp_dir/out" || fail "a dispatch from develop must serve the same prerelease"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" || fail "a dispatch from develop must publish :dev"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" && fail "a dispatch from develop must NOT move :latest"
+passed=$((passed + 1))
+
+# ── A work branch gets the honest prerelease too, but never a moving tag ─────────────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/fix/some-work-branch" "v1.1.7-3-gdeadbeef"
+[ "$status" -eq 0 ] || fail "a work branch build should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.1.7-dev.3+gdeadbeef$" "$tmp_dir/out" || fail "a work branch must serve the prerelease, not the placeholder"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" && fail "a work branch must NOT move :dev — only develop feeds pre"
+grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "a work branch must still publish the sha tag"
+passed=$((passed + 1))
+
+# ── `develop` sitting exactly on a tag is still a prerelease of it (n=0) ─────────────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "v1.1.9-0-gf2354593"
+[ "$status" -eq 0 ] || fail "develop on a tag should be accepted (got $status)"
+grep -q "^version=1.1.9-dev.0+gf2354593$" "$tmp_dir/out" || fail "n=0 is still a dev prerelease — got: $(cat "$tmp_dir/out")"
+passed=$((passed + 1))
+
+# ── Without a usable `git describe`, develop is REFUSED — never the placeholder ──────
+# Serving `1.0.0` from a develop build is the exact bug of hub#1170. A shallow checkout
+# (no tags) must fail loudly here, not publish a lying image.
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" ""
+[ "$status" -ne 0 ] || fail "develop without git describe must be REFUSED, not served as Cargo's placeholder"
+grep -qi "describe" "$tmp_dir/out" || fail "the refusal should point at git describe (fetch-depth/tags)"
+passed=$((passed + 1))
+
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/heads/develop" "60307487"
+[ "$status" -ne 0 ] || fail "a describe output with no v* tag must be REFUSED"
+passed=$((passed + 1))
+
+# ── An rc tag publishes the CANARY: `:X.Y.Z-rc.N` + `:canary` + `:<sha>` ─────────────
+# It never moves `:latest`, `:stable`, `:X.Y` or `:X`: a candidate goes to a subset of prod
+# hubs, and a new hub must keep starting on the last final release.
+make_manifest "1.0.0"
+PUBLISHED="1.1.9" run_channel "refs/tags/v1.2.0-rc.1" "v1.2.0-rc.1-0-gcafe1234"
+[ "$status" -eq 0 ] || fail "an rc tag should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=1.2.0-rc.1$" "$tmp_dir/out" || fail "the rc version is the tag's — got: $(cat "$tmp_dir/out")"
+grep -qxF "ghcr.io/erplora/hub:1.2.0-rc.1" "$tmp_dir/out" || fail "an rc must publish its immutable :X.Y.Z-rc.N"
+grep -qxF "ghcr.io/erplora/hub:canary" "$tmp_dir/out" || fail "an rc must move :canary"
+grep -qxF "ghcr.io/erplora/hub:abc1234def" "$tmp_dir/out" || fail "an rc must publish the sha tag"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" && fail "an rc must NOT move :latest"
+grep -qxF "ghcr.io/erplora/hub:stable" "$tmp_dir/out" && fail "an rc must NOT move :stable"
+grep -qxF "ghcr.io/erplora/hub:1.2" "$tmp_dir/out" && fail "an rc must NOT move :X.Y"
+grep -qxF "ghcr.io/erplora/hub:1" "$tmp_dir/out" && fail "an rc must NOT move :X"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" && fail "an rc must NOT move :dev"
+grep -q "^stamp=1$" "$tmp_dir/out" || fail "an rc must ask the workflow to stamp Cargo.toml"
+passed=$((passed + 1))
+
+# ── An rc is immutable too: republishing the same rc is refused ───────────────────────
+make_manifest "1.0.0"
+PUBLISHED="1.1.9 1.2.0-rc.1" run_channel "refs/tags/v1.2.0-rc.1" "v1.2.0-rc.1-0-gcafe1234"
+[ "$status" -ne 0 ] || fail "an already-published rc must be REFUSED"
+passed=$((passed + 1))
+
+# ── …and an rc of a version that is ALREADY FINAL is refused ─────────────────────────
+make_manifest "1.0.0"
+PUBLISHED="1.2.0" run_channel "refs/tags/v1.2.0-rc.2" "v1.2.0-rc.2-0-gcafe1234"
+[ "$status" -ne 0 ] || fail "an rc of an already-released version must be REFUSED (1.2.0 is final)"
+passed=$((passed + 1))
+
+# ── …while rc.2 after rc.1 is fine, and so is the final after its rcs ────────────────
+make_manifest "1.0.0"
+PUBLISHED="1.1.9 1.2.0-rc.1" run_channel "refs/tags/v1.2.0-rc.2" "v1.2.0-rc.2-0-gcafe1234"
+[ "$status" -eq 0 ] || fail "rc.2 after rc.1 must pass (got $status): $(cat "$tmp_dir/out")"
+make_manifest "1.0.0"
+PUBLISHED="1.1.9 1.2.0-rc.1 1.2.0-rc.2" run_channel "refs/tags/v1.2.0" "v1.2.0-0-gcafe1234"
+[ "$status" -eq 0 ] || fail "the final after its rcs must pass (got $status): $(cat "$tmp_dir/out")"
+grep -qxF "ghcr.io/erplora/hub:1.2.0-rc.2" "$tmp_dir/out" && fail "a final must not re-tag the rc"
+passed=$((passed + 1))
+
+# ── A prerelease tag that is not `-rc.N` is refused: there is no channel for it ───────
+make_manifest "1.0.0"
+PUBLISHED="" run_channel "refs/tags/v1.2.0-beta.1" "v1.2.0-beta.1-0-gcafe1234"
+[ "$status" -ne 0 ] || fail "only -rc.N prereleases have a channel (canary); anything else is a typo"
+passed=$((passed + 1))
+
+# ── A final tag moves `:stable` as an alias of `:latest` (same digest) ───────────────
+make_manifest "1.0.0"
+PUBLISHED="1.1.9" run_channel "refs/tags/v1.2.0" "v1.2.0-0-gcafe1234"
+[ "$status" -eq 0 ] || fail "a final tag should be accepted (got $status): $(cat "$tmp_dir/out")"
+for expected in \
+    "ghcr.io/erplora/hub:1.2.0" \
+    "ghcr.io/erplora/hub:1.2" \
+    "ghcr.io/erplora/hub:1" \
+    "ghcr.io/erplora/hub:latest" \
+    "ghcr.io/erplora/hub:stable" \
+    "ghcr.io/erplora/hub:abc1234def"
+do
+    grep -qxF "$expected" "$tmp_dir/out" || fail "a final tag must publish $expected — got: $(cat "$tmp_dir/out")"
+done
+grep -qxF "ghcr.io/erplora/hub:canary" "$tmp_dir/out" && fail "a final must NOT move :canary — that is the rc's tag"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" && fail "a final must NOT move :dev"
+passed=$((passed + 1))
+
+# ── `main` stays as it is: `:latest` + `:<sha>`, version from Cargo.toml, no stamp ────
+make_manifest "2.5.0"
+PUBLISHED="" run_channel "refs/heads/main" "v1.1.8-0-gf2354593"
+[ "$status" -eq 0 ] || fail "main should be accepted (got $status): $(cat "$tmp_dir/out")"
+grep -q "^version=2.5.0$" "$tmp_dir/out" || fail "main keeps the Cargo.toml version"
+grep -qxF "ghcr.io/erplora/hub:latest" "$tmp_dir/out" || fail "main must publish :latest"
+grep -qxF "ghcr.io/erplora/hub:stable" "$tmp_dir/out" && fail "main must NOT move :stable — only a final tag does"
+grep -qxF "ghcr.io/erplora/hub:dev" "$tmp_dir/out" && fail "main must NOT move :dev"
+grep -q "^stamp=0$" "$tmp_dir/out" || fail "main does not stamp Cargo.toml"
 passed=$((passed + 1))
 
 printf 'PASS: %s image-tags contract cases\n' "$passed"

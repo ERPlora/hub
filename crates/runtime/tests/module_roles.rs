@@ -11,7 +11,7 @@
 //! is refused at this door.
 
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::Runtime;
+use erplora_runtime::{Runtime, RuntimeError};
 
 fn fixture(manifest: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("erplora-module-roles-{}", uuid::Uuid::new_v4()));
@@ -68,11 +68,14 @@ async fn install_rejects_a_role_that_would_administer_the_hub() {
     let error = runtime
         .install_from_dir(&dir)
         .await
-        .expect_err("a manifest never grants administration of the hub")
-        .to_string();
+        .expect_err("a manifest never grants administration of the hub");
 
     assert!(
-        error.contains("backdoor") && error.contains("administ"),
+        matches!(
+            &error,
+            RuntimeError::ManifestRejected { code, at, .. }
+                if code == "role_grants_admin" && at.contains("backdoor")
+        ),
         "the refusal must name the role and the reason: {error}"
     );
     std::fs::remove_dir_all(dir).unwrap();

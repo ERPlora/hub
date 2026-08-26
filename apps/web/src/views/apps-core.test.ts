@@ -66,8 +66,18 @@ describe('Apps destructive actions', () => {
   it('never falls back to a locally invented demo catalog', () => {
     expect(source).not.toContain('MODULES_DEMO');
     expect(source).not.toContain('config.demo ? MODULES_DEMO');
-    expect(source).toContain('modules.value = []');
-    expect(source).toContain('catalogError.value = true');
+    // The catalogue comes from the Cloud or it does not come: the only thing this file may put in
+    // `modules` is what `cloudMarketplaceModules()` returned.
+    expect(source).toContain('modules.value = cloudMods.map(toViewModule)');
+    expect(source.match(/modules\.value = /g) ?? []).toHaveLength(1);
+    // And the failure is SAID (hub#1129: `catalogError` now derives from `catalogState`, so the
+    // banner and the table's empty line can never disagree about whether the load failed).
+    expect(source).toContain("catalogState.value = 'error'");
+    // 🔴 What is NOT here any more, on purpose: `modules.value = []` inside the `catch`. It was the
+    // hub#770 defect on the other tab — a refresh that fails (and it refreshes on every window
+    // focus) wiped 25 apps off the screen to say «I could not ask». Rows already on screen stay on
+    // screen; the failure travels in the banner next to them.
+    expect(source).not.toContain('modules.value = [];');
   });
 });
 

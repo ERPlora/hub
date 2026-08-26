@@ -59,8 +59,31 @@ pub const FLOW_NOTIFY_EVENT: &str = "flow.reminder.due";
 /// many had come before it. A revoked authorisation is a different kind of no, and the column is
 /// what lets the queue, the screen and the retry all say so without parsing `last_error`.
 ///
-/// A non-empty value means: **do not retry, and do not offer to.**
+/// This one means: **do not retry, and do not offer to.** ⚠️ That is a property of THIS kind, not of
+/// the column: since hub#1171 `failure_kind` says *why*, and whether a why can be retried is decided
+/// by [`is_retryable`].
 pub const FAILURE_RELEASE_REVOKED: &str = "flow.release_revoked";
+
+/// **A listener the capability gate refused** (hub#1171). The module declares a host primitive
+/// (ADR-0079) that nobody has granted, so `capabilities::enforce` turned its command away before it
+/// ran — the case that left the fiscal chain dead while every screen said «Todo en orden».
+///
+/// Unlike [`FAILURE_RELEASE_REVOKED`] this one **is** retryable, and the distinction is the whole
+/// reason the column stopped meaning «do not retry» ([`is_retryable`]): a withdrawn authorisation is
+/// a decision that already happened, while an ungranted capability is a switch the owner has simply
+/// not flipped yet. Flipping it is the remedy, and the row has to be there waiting when they do.
+pub const FAILURE_CAPABILITY_DENIED: &str = "module.capability_denied";
+
+/// **Can [`retry`] do anything with a row stamped like this?**
+///
+/// `failure_kind` used to answer two questions at once — *why* a row is terminal and *whether* to
+/// offer the button — by being empty or not. That held while there was one kind, and stopped
+/// holding the moment a classified failure had a remedy (hub#1171): a capability refusal needs its
+/// code in the queue **and** its retry, so the two questions had to come apart. Retryability is now
+/// derived here, in the one place the screen, [`retry`] and [`retry_all`] all read.
+pub fn is_retryable(failure_kind: &str) -> bool {
+    failure_kind.is_empty() || failure_kind == FAILURE_CAPABILITY_DENIED
+}
 
 /// The key that replaces the recipient in the payload of a row that can never be delivered — the
 /// same word the run history already uses (`crate::flows::notify`), so an operator meets one
@@ -368,8 +391,11 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // the ONLY failure it had — a sibling listener that merely stumbled still deserves its ladder.
     let mut failures = 0usize;
     let mut permanent: Option<&'static str> = None;
-    // …or one that will not resolve within the ladder's minutes, yet may later (hub#971).
+    // …or one that will not resolve within the ladder's minutes, yet may later (hub#971, hub#1171).
+    // `dead_now_kind` is the classification stamped on the row when that happens: empty for a spent
+    // quota (nothing to say beyond the error), a code for a refusal with a name.
     let mut dead_now = false;
+    let mut dead_now_kind = "";
     for listener in &listeners {
         if delivery_exists(db, &ctx.hub_id, &id, listener).await? {
             continue; // ya entregado en un intento previo (idempotencia)
@@ -397,6 +423,18 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
             // Registras el fallo y SIGUES: los hermanos se entregan igual este ciclo. El difierido
             // de la fila (backoff/dead-letter) se hace una vez al final, con el primer error.
             failures += 1;
+            // **A capability nobody granted is not a stumble** (hub#1171). The gate in front of a
+            // native handler (ADR-0079) is default-deny and only a HUMAN can lift it, so the eighth
+            // attempt knows exactly what the first knew — and the four minutes the ladder spends
+            // finding that out are four minutes in which every surface of the hub (the dead-letter
+            // screen, the topbar badge) still says «Todo en orden» while the fiscal chain is dead.
+            // Same treatment as a spent quota (hub#971): terminal NOW, with its payload intact and
+            // still retryable — granting the capability is precisely the remedy, and the row has to
+            // be there waiting when the owner flips the switch.
+            if matches!(e, RuntimeError::CapabilityDenied { .. }) {
+                dead_now = true;
+                dead_now_kind = FAILURE_CAPABILITY_DENIED;
+            }
             if first_err.is_none() {
                 first_err = Some(format!("{listener}: {e}"));
             }
@@ -494,10 +532,12 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         if let (1, Some(kind)) = (failures, permanent) {
             return kill_permanently(db, &id, &err, kind, &payload).await;
         }
-        // Same rule for a spent quota (hub#971), minus the stamp: `failure_kind` stays empty and
-        // the payload untouched, so `retry` still offers it once the quota is back.
+        // Same rule for a spent quota (hub#971) and for a capability nobody granted (hub#1171):
+        // the payload is left untouched and the verdict stays retryable ([`is_retryable`]), so an
+        // operator still gets the row once the quota is back or the switch is on. A spent quota has
+        // nothing to add beyond its error and stamps nothing; a capability refusal names itself.
         if failures == 1 && dead_now {
-            return mark_dead(db, &id, &err).await;
+            return mark_dead_as(db, &id, &err, dead_now_kind).await;
         }
         return defer_or_dead(db, &id, attempts, &err).await;
     }
@@ -837,11 +877,25 @@ async fn mark_delivered(db: &dyn DatabaseAdapter, id: &str) -> Result<()> {
 }
 
 async fn mark_dead(db: &dyn DatabaseAdapter, id: &str, err: &str) -> Result<()> {
+    mark_dead_as(db, id, err, "").await
+}
+
+/// [`mark_dead`] with a reason attached — the row dies AND says why in a word a machine can read
+/// (hub#1171). It is not [`kill_permanently`]: nothing is scrubbed from the payload and the verdict
+/// does not have to be a dead end ([`is_retryable`]).
+async fn mark_dead_as(
+    db: &dyn DatabaseAdapter,
+    id: &str,
+    err: &str,
+    failure_kind: &str,
+) -> Result<()> {
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
     p.insert("err".into(), json!(err));
+    p.insert("kind".into(), json!(failure_kind));
     db.execute(
-        "UPDATE _event_outbox SET status = 'dead', last_error = :err, claim_expires_at = NULL WHERE id = :id",
+        "UPDATE _event_outbox SET status = 'dead', last_error = :err, failure_kind = :kind, \
+         claim_expires_at = NULL WHERE id = :id",
         &p,
     )
     .await?;
@@ -994,7 +1048,7 @@ fn dead_event(row: &Json) -> DeadEvent {
         attempts: n("attempts"),
         depth: n("depth"),
         created_at: s("created_at"),
-        retryable: failure_kind.is_empty(),
+        retryable: is_retryable(&failure_kind),
         failure_kind,
     }
 }
@@ -1141,16 +1195,17 @@ pub async fn retry(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<R
     else {
         return Ok(RetryOutcome::NotFound);
     };
-    if !failure_kind.is_empty() {
+    if !is_retryable(&failure_kind) {
         return Ok(RetryOutcome::NotRetryable { failure_kind });
     }
 
     p.insert("now".into(), json!(now_rfc3339()));
+    p.insert("kind".into(), json!(failure_kind));
     let res = db
         .execute(
             "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
-             last_error = '', claim_expires_at = NULL \
-             WHERE id = :id AND hub_id = :hub_id AND status = :status AND failure_kind = ''",
+             last_error = '', failure_kind = '', claim_expires_at = NULL \
+             WHERE id = :id AND hub_id = :hub_id AND status = :status AND failure_kind = :kind",
             &p,
         )
         .await?;
@@ -1237,23 +1292,55 @@ pub fn clamp_discard_reason(reason: &str) -> String {
 /// second call moves nothing (there are no `dead` rows left). If a row's cause is still there it
 /// dies again and reappears in [`list_dead`]; the queue is self-healing, not magic.
 ///
-/// Rows with a `failure_kind` are **skipped**, for the reason this gesture exists at all: it is for
-/// a cause that has since been fixed, and a withdrawn authorisation is not one (hub#827). Sweeping
-/// them along would be the one-by-one dead end multiplied by thirty.
+/// Rows whose `failure_kind` is a **dead end** are skipped ([`is_retryable`]), for the reason this
+/// gesture exists at all: it is for a cause that has since been fixed, and a withdrawn authorisation
+/// is not one (hub#827). Sweeping them along would be the one-by-one dead end multiplied by thirty.
+/// A capability refusal (hub#1171) is the opposite case and IS swept: granting the capability is
+/// exactly «the cause has since been fixed».
 pub async fn retry_all(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
+    requeue_dead(db, hub_id, &["", FAILURE_CAPABILITY_DENIED]).await
+}
+
+/// Puts back every dead-letter of this hub stamped with one of `kinds`, clearing the stamp so a row
+/// that dies again is classified afresh. The shared engine of [`retry_all`] and
+/// [`replay_capability_denied`] — two gestures, one `UPDATE`, so they can never drift on what
+/// «back in front of the relay» means.
+async fn requeue_dead(db: &dyn DatabaseAdapter, hub_id: &str, kinds: &[&str]) -> Result<u64> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(STATUS_DEAD));
     p.insert("now".into(), json!(now_rfc3339()));
+    let mut names = Vec::with_capacity(kinds.len());
+    for (i, kind) in kinds.iter().enumerate() {
+        let name = format!("kind{i}");
+        p.insert(name.clone(), json!(kind));
+        names.push(format!(":{name}"));
+    }
     let res = db
         .execute(
-            "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
-             last_error = '', claim_expires_at = NULL \
-             WHERE hub_id = :hub_id AND status = :status AND failure_kind = ''",
+            &format!(
+                "UPDATE _event_outbox SET status = 'pending', attempts = 0, next_attempt_at = :now, \
+                 last_error = '', failure_kind = '', claim_expires_at = NULL \
+                 WHERE hub_id = :hub_id AND status = :status AND failure_kind IN ({})",
+                names.join(", ")
+            ),
             &p,
         )
         .await?;
     Ok(res.affected)
+}
+
+/// **Puts back what an ungranted capability had refused** (hub#1171 — the recoverable half of
+/// hub#1119). Called when a capability is GRANTED: the events that died because the switch was off
+/// are, by construction, the ones the switch fixes, and the owner who just flipped it must not also
+/// have to find System → Events and press a button per row.
+///
+/// Deliberately not filtered by module: the stamp is on the event, and the refused module is not on
+/// the row (`module_id` is the EMITTER). Sweeping the hub's whole capability-denied set is both
+/// simpler and safe — a row whose own capability is still missing dies again on the very next pass,
+/// with its reason, instead of climbing a ladder.
+pub async fn replay_capability_denied(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<u64> {
+    requeue_dead(db, hub_id, &[FAILURE_CAPABILITY_DENIED]).await
 }
 
 /// How many dead-letters this hub has right now (hub#660). Cheap `SELECT COUNT(*)` — the listing
@@ -3300,5 +3387,222 @@ mod tests {
             one_text(&db, "SELECT last_error AS c FROM _event_outbox").await.contains("host.print"),
             "el error dice qué puerta lo rechazó"
         );
+    }
+
+    // ── hub#1171: a listener refused by a CAPABILITY gate ────────────────────────────────────
+    //
+    // The fiscal chain is the case that destapó esto: `invoice.created` →
+    // `verifactu.records.ingest_invoice`, a NATIVE handler whose module declares the `certificate`
+    // capability. On a fresh hub that capability is not granted (default-deny, ADR-0079), so the
+    // dispatcher refuses the command before the handler runs — and the business invoices, charges
+    // and prints believing it is sealing.
+
+    /// A first-party engine that does its job without complaint — so the ONLY thing that can stop
+    /// the listener in these tests is the capability gate in front of it.
+    #[derive(Debug)]
+    struct SealerEngine;
+
+    #[async_trait::async_trait]
+    impl crate::native::NativeHandler for SealerEngine {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn crate::native::NativeHost,
+        ) -> Result<erplora_wasm_host::Output> {
+            Ok(erplora_wasm_host::Output::default())
+        }
+    }
+
+    /// A hub with `invoice` (plain SQL, emits) and `sealer` (a native handler that demands the
+    /// `certificate` capability, which NOBODY has granted).
+    async fn hub_with_an_ungranted_capability() -> (PgAdapter, Registry) {
+        let db = fresh_db().await;
+        db.execute_batch("CREATE TABLE invoices (id TEXT);").await.unwrap();
+        system_schema(&db).await;
+
+        let mut reg = Registry::new();
+        reg.status.insert("invoice".into(), ModuleStatus::Active);
+        reg.status.insert("sealer".into(), ModuleStatus::Active);
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"sealer","name":"Sealer","version":"1.0.0",
+                    "capabilities":{"certificate":{"purpose":"fiscal-sign"}}}"#,
+            )
+            .unwrap(),
+        );
+        reg.commands.insert(
+            "invoice.create_from_sale".into(),
+            cmd(
+                "invoice",
+                "INSERT INTO invoices (id) VALUES (:new_id);",
+                vec!["invoice.created".into()],
+            ),
+        );
+        reg.native
+            .insert("sealer".into(), std::sync::Arc::new(SealerEngine));
+        let mut ingest = cmd("sealer", "", vec![]);
+        ingest.def.sql.clear();
+        ingest.sql.clear();
+        ingest.def.handler = Some(crate::manifest::HandlerRef {
+            kind: "native".into(),
+            file: None,
+            function: "ingest_invoice".into(),
+        });
+        reg.commands.insert("sealer.records.ingest_invoice".into(), ingest);
+        reg.listeners
+            .insert("invoice.created".into(), vec!["sealer.records.ingest_invoice".into()]);
+        (db, reg)
+    }
+
+    /// **The bug (hub#1171).** The listener is refused by the capability gate, and the relay has to
+    /// treat that like any other failure: the row is NOT delivered, it carries the reason, and it
+    /// ends in the dead-letter the «Eventos caídos» screen reads. Anything else turns a switch the
+    /// owner never flipped into an invisible fiscal breach.
+    #[tokio::test]
+    async fn a_listener_refused_by_a_capability_gate_is_not_swallowed() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .expect("invoicing does not depend on the sealer's capability");
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            0,
+            "a refused listener must never leave the event marked delivered"
+        );
+        assert!(
+            one_text(&db, "SELECT last_error AS c FROM _event_outbox").await.contains("certificate"),
+            "the row records WHICH capability refused it"
+        );
+    }
+
+    /// …and it gets there in ONE pass, not eight. A capability nobody granted is not a stumble: the
+    /// eighth attempt knows exactly what the first knew (hub#827's rule, applied to the gate that
+    /// destapó hub#1171). Climbing the ladder means four minutes of a live till sealing nothing
+    /// while the screen says «Todo en orden».
+    #[tokio::test]
+    async fn a_capability_refusal_dead_letters_at_once_instead_of_burning_eight_attempts() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        let dead = list_dead(&db, "h1", 50).await.unwrap();
+        assert_eq!(dead.len(), 1, "«Eventos caídos» has to SEE it: {dead:?}");
+        assert_eq!(dead[0].event_name, "invoice.created");
+        assert!(
+            dead[0].last_error.contains("certificate"),
+            "the operator reads which permission to grant: {}",
+            dead[0].last_error
+        );
+        assert_eq!(
+            dead[0].failure_kind, FAILURE_CAPABILITY_DENIED,
+            "the row carries a machine-readable reason, not English to be parsed"
+        );
+        assert!(
+            dead[0].retryable,
+            "granting the capability IS the remedy, so the retry button must work"
+        );
+    }
+
+    /// A retryable classification is not a contradiction: `failure_kind` says WHY the row is
+    /// terminal, and only some whys are dead ends. Retrying clears the stamp, so a row that dies
+    /// again is classified afresh rather than carrying a stale verdict.
+    #[tokio::test]
+    async fn retrying_a_capability_refusal_clears_its_classification() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        let dead = list_dead(&db, "h1", 50).await.unwrap();
+        assert!(
+            matches!(retry(&db, "h1", &dead[0].id).await.unwrap(), RetryOutcome::Requeued),
+            "the screen's retry button is not dead for this row"
+        );
+
+        assert_eq!(
+            one_text(&db, "SELECT failure_kind AS c FROM _event_outbox").await,
+            "",
+            "back on the relay with no verdict attached"
+        );
+    }
+
+    /// «Reintentar todo» is the gesture for *a cause that has since been fixed*, and a capability
+    /// the owner has just granted is the textbook one — so these rows must be swept along, unlike a
+    /// revoked release (hub#827), which is a dead end whatever anybody presses.
+    #[tokio::test]
+    async fn retry_all_sweeps_a_capability_refusal_along_with_the_ordinary_ones() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(retry_all(&db, "h1").await.unwrap(), 1, "the row goes back to the relay");
+    }
+
+    /// **The other half of hub#1119.** Making the failure visible is not the same as making it
+    /// recoverable: the owner flips the switch in Ajustes → Permisos and the invoices that could not
+    /// be sealed while it was off have to seal themselves. Asking them to also find System → Events
+    /// and press «reintentar» is asking them to know that the first minutes of their fiscal chain
+    /// are sitting in a queue.
+    #[tokio::test]
+    async fn granting_a_capability_replays_what_it_had_refused() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "dead while the switch is off");
+
+        crate::capabilities::set_grant(&db, &reg, "h1", "sealer", "certificate", true, "hub_user:admin")
+            .await
+            .unwrap();
+
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            0,
+            "flipping the switch put the refused events back in front of the relay"
+        );
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "and the relay delivered them"
+        );
+    }
+
+    /// Revoking is not granting: taking a permission away must not stir the queue. The rows that
+    /// died for it are exactly the ones that would die again, and resetting their attempts would
+    /// hide how long they have been stuck.
+    #[tokio::test]
+    async fn revoking_a_capability_leaves_the_dead_letters_where_they_are() {
+        let (db, reg) = hub_with_an_ungranted_capability().await;
+        let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
+
+        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        crate::capabilities::set_grant(&db, &reg, "h1", "sealer", "certificate", false, "hub_user:admin")
+            .await
+            .unwrap();
+
+        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "still dead, still visible");
     }
 }

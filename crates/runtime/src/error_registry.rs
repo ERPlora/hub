@@ -281,6 +281,10 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#1101: the dependents gate refusing an uninstall is the gate doing its job — the
         // shape of what the owner installed, not a bug of the Hub.
         | E::HasDependents { .. }
+        // hub#1070: a refused field and a manifest refused on a contract rule are both things the
+        // caller (a user, a module author) fixes — never a bug of the hub.
+        | E::InvalidField { .. }
+        | E::ManifestRejected { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -324,6 +328,9 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Wasm(_) => "wasm",
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
+        E::InvalidField { .. } => "invalid_field",
+        E::CertificateTypeMismatch { .. } => "certificate_type_mismatch",
+        E::ManifestRejected { code, .. } => code.as_str(),
         // hub#1086: its own stable code, so a caller can tell "you did not send what the
         // query needs" from "what you sent does not validate".
         E::MissingRequiredParam { .. } => "missing_required_param",

@@ -394,24 +394,26 @@ fn validate_table_scope(dir: &Path, manifest: &Manifest) -> Result<()> {
             if scope.allows(table) {
                 continue;
             }
-            let why = if crate::export::is_system_table(table) {
-                format!(
+            let (code, why) = if crate::export::is_system_table(table) {
+                ("system_table_write", format!(
                     "`{table}` is a system table of the hub: the fiscal profile, the certificate \
                      and the runtime's own bookkeeping are the identity of this installation, out \
                      of reach of every module (ADR-0273 D8)"
-                )
+                ))
             } else {
-                format!(
+                ("foreign_table_write", format!(
                     "`{table}` is outside the module's own prefix (`{id}`/`{id}_*`): a module \
                      only writes its own tables; another module's data is composed through its \
                      public queries/commands (ADR-0127), never by direct SQL",
                     id = manifest.id
-                )
+                ))
             };
-            return Err(RuntimeError::Other(format!(
-                "manifest `{}`: `{rel}` writes {why}",
-                manifest.id
-            )));
+            return Err(RuntimeError::ManifestRejected {
+                module: manifest.id.clone(),
+                at: format!("`{rel}` writes `{table}`"),
+                code: code.into(),
+                detail: why,
+            });
         }
     }
     Ok(())
@@ -589,6 +591,20 @@ fn sql_words(sql: &str) -> Vec<String> {
 /// Schema alone (hub#139): the error namespace must be the module's own, and the legacy gate
 /// (`min_affected_rows`) is mutually exclusive with the translatable one (`expect_rows`).
 fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
+    // ADR-0398 (hub#1177): the `errors` catalog, when present, is the list of codes this module
+    // may raise. Every entry must be a code of the module's own namespace, and every
+    // `expect_rows.error` below must be in it — a code that is emitted and not declared is
+    // exactly the silent surface the catalog exists to make visible.
+    if let Some(catalog) = &manifest.errors {
+        for code in catalog.keys() {
+            if !crate::errors::valid_domain_code(&manifest.id, code) {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: `errors` declares the invalid domain code `{code}`; expected `{}.<snake_case>`",
+                    manifest.id, manifest.id
+                )));
+            }
+        }
+    }
     for (name, command) in &manifest.commands {
         if command.min_affected_rows.is_some() && command.expect_rows.is_some() {
             return Err(RuntimeError::Other(format!(
@@ -601,6 +617,16 @@ fn validate_command_contracts(manifest: &Manifest) -> Result<()> {
                 return Err(RuntimeError::Other(format!(
                     "manifest `{}`: command `{name}` declares the invalid domain code `{}`; expected `{}.<snake_case>`",
                     manifest.id, expect.error, manifest.id
+                )));
+            }
+            if manifest
+                .errors
+                .as_ref()
+                .is_some_and(|catalog| !catalog.contains_key(&expect.error))
+            {
+                return Err(RuntimeError::Other(format!(
+                    "manifest `{}`: command `{name}` raises `{}` in `expect_rows`, which the `errors` catalog does not declare (ADR-0398)",
+                    manifest.id, expect.error
                 )));
             }
             if expect
@@ -869,39 +895,53 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
     let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for role in &manifest.roles {
         let key = role.key.as_str();
-        let reject = |detail: String| {
-            Err(RuntimeError::Other(format!(
-                "manifest `{}`: role `{key}` {detail}",
-                manifest.id
-            )))
+        // hub#1070: every refusal carries a stable code (`role_key_invalid`, `role_grants_admin`…)
+        // next to its English explanation, so a consumer asserts on the rule, not on the prose.
+        let reject = |code: &str, detail: String| {
+            Err(RuntimeError::ManifestRejected {
+                module: manifest.id.clone(),
+                at: format!("roles[{key}]"),
+                code: code.into(),
+                detail,
+            })
         };
 
         if !is_valid_role_key(key) {
-            return reject(format!(
+            return reject(
+                "role_key_invalid",
+                format!(
                 "has an invalid key: expected snake_case ASCII (`^[a-z][a-z0-9_]*$`, up to \
                  {MAX_ROLE_KEY_LEN} chars), because the key is what `role_permissions` grants \
                  against and what `hub_user.role` stores"
             ));
         }
         if crate::hub_users::is_base_role(key) {
-            return reject(format!(
+            return reject(
+                "role_shadows_base",
+                format!(
                 "collides with a base role of the hub ({}): a module EXTENDS the base catalogue, \
                  it never redefines an entry of it",
                 crate::hub_users::BASE_ROLES.join(", ")
             ));
         }
         if !seen.insert(key) {
-            return reject("is declared twice: a key names exactly one role".to_string());
+            return reject(
+                "role_duplicate",
+                "is declared twice: a key names exactly one role".to_string(),
+            );
         }
         if role.label.trim().is_empty() {
             return reject(
+                "role_label_required",
                 "needs a non-empty `label`: it is what the administrator reads when activating the \
                  role"
                     .to_string(),
             );
         }
         if crate::hub_users::is_admin_role(&role.extends) {
-            return reject(format!(
+            return reject(
+                "role_grants_admin",
+                format!(
                 "cannot extend `{}`: a module never grants administration of the hub (hub#347). \
                  That property comes from the hub itself (`HUB_OWNER_EMAIL`, ADR-0157) and from \
                  the floor the account role imposes at login, never from a manifest. Extend \
@@ -910,7 +950,9 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
             ));
         }
         if !crate::hub_users::is_extendable_base_role(&role.extends) {
-            return reject(format!(
+            return reject(
+                "role_extends_not_base",
+                format!(
                 "declares `extends: {}`, which is not a base role of the hub: expected one of {}",
                 role.extends,
                 extendable_base_roles().join(", ")
@@ -1460,6 +1502,58 @@ mod tests {
         assert_eq!(ids, vec![0, 1, 2]);
     }
 
+    /// ADR-0398 (hub#1177): with an `errors` catalog present, every `expect_rows.error` must be
+    /// in it, and every catalog entry must be a valid code of the module's own namespace. Without
+    /// the catalog the legacy check (namespace only) is all there is.
+    #[test]
+    fn errors_catalog_governs_expect_rows_codes() {
+        let manifest = |errors: serde_json::Value, code: &str| -> crate::manifest::Manifest {
+            let mut doc = serde_json::json!({
+                "id": "inventory", "name": "Inventory", "version": "1.0.0",
+                "commands": {
+                    "inventory.consume": {
+                        "permission": "inventory.consume",
+                        "expect_rows": { "op": "min", "n": 1, "error": code }
+                    }
+                }
+            });
+            if !errors.is_null() {
+                doc["errors"] = errors;
+            }
+            serde_json::from_value(doc).unwrap()
+        };
+
+        let undeclared = manifest(
+            serde_json::json!({ "inventory.other": {} }),
+            "inventory.insufficient_stock",
+        );
+        let err = super::validate_command_contracts(&undeclared)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("inventory.insufficient_stock") && err.contains("inventory.consume"),
+            "names command and code: {err}"
+        );
+
+        let declared = manifest(
+            serde_json::json!({ "inventory.insufficient_stock": {} }),
+            "inventory.insufficient_stock",
+        );
+        assert!(super::validate_command_contracts(&declared).is_ok());
+
+        let foreign_entry = manifest(
+            serde_json::json!({ "sales.oops": {}, "inventory.insufficient_stock": {} }),
+            "inventory.insufficient_stock",
+        );
+        assert!(
+            super::validate_command_contracts(&foreign_entry).is_err(),
+            "a catalog entry outside the module namespace is refused"
+        );
+
+        let no_catalog = manifest(serde_json::Value::Null, "inventory.insufficient_stock");
+        assert!(super::validate_command_contracts(&no_catalog).is_ok());
+    }
+
     /// hub#139: `expect_rows` is validated at INSTALL time — a foreign-namespace code or a
     /// command mixing the legacy and the translatable gate never reaches runtime.
     #[test]
@@ -1609,6 +1703,16 @@ mod tests {
             .to_string()
     }
 
+    /// The rejection as the STRUCTURED error (hub#1070): `(code, at)` of `ManifestRejected`.
+    fn role_rejection_code(roles: serde_json::Value) -> (String, String) {
+        match super::validate_role_declarations(&with_roles(roles))
+            .expect_err("the block must be rejected")
+        {
+            RuntimeError::ManifestRejected { code, at, .. } => (code, at),
+            other => panic!("a role rejection is a ManifestRejected, got {other:?}"),
+        }
+    }
+
     /// hub#351 (paso 2b): the happy path. A module hangs its own roles from a base role and the
     /// manifest is accepted — the base catalogue is EXTENDED, never rewritten.
     #[test]
@@ -1649,12 +1753,13 @@ mod tests {
     #[test]
     fn a_module_cannot_declare_a_role_that_administers_the_hub() {
         for forbidden in ["admin", "owner", "Admin", "OWNER"] {
-            let error = role_rejection(serde_json::json!([
+            let (code, at) = role_rejection_code(serde_json::json!([
                 { "key": "backdoor", "label": "Back door", "extends": forbidden }
             ]));
-            assert!(
-                error.contains("backdoor") && error.contains("administ"),
-                "the refusal must say WHICH role and WHY (`{forbidden}`): {error}"
+            assert_eq!(
+                (code.as_str(), at.as_str()),
+                ("role_grants_admin", "roles[backdoor]"),
+                "the refusal must say WHICH role and WHY, by code (`{forbidden}`)"
             );
         }
 

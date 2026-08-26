@@ -86,9 +86,14 @@ struct Declared {
     module_id: String,
 }
 
-fn invalid(detail: impl Into<String>) -> RuntimeError {
-    RuntimeError::InvalidPayload {
+/// A refused role key, by reason (hub#1070): `required`, `immutable` (a base role of the hub is
+/// always live), `unknown` (no installed module declares it) or `inactive` (declared, switched
+/// off in this hub). The prose is the fallback.
+fn invalid_key(reason: &str, detail: impl Into<String>) -> RuntimeError {
+    RuntimeError::InvalidField {
         name: "hub.roles".into(),
+        field: "role_key".into(),
+        reason: reason.into(),
         detail: detail.into(),
     }
 }
@@ -280,19 +285,25 @@ pub async fn set_active(
 ) -> Result<()> {
     let key = role_key.trim();
     if key.is_empty() {
-        return Err(invalid("the role key is required"));
+        return Err(invalid_key("required", "the role key is required"));
     }
     if is_base_role(key) {
-        return Err(invalid(format!(
-            "role `{key}` is a base role of the hub: base roles are always active and cannot be \
-             switched off"
-        )));
+        return Err(invalid_key(
+            "immutable",
+            format!(
+                "role `{key}` is a base role of the hub: base roles are always active and cannot \
+                 be switched off"
+            ),
+        ));
     }
     if !declared(registry).contains_key(key) {
-        return Err(invalid(format!(
-            "role `{key}` is not declared by any installed module: a hub activates the roles of \
-             its catalogue, it does not create new ones"
-        )));
+        return Err(invalid_key(
+            "unknown",
+            format!(
+                "role `{key}` is not declared by any installed module: a hub activates the roles \
+                 of its catalogue, it does not create new ones"
+            ),
+        ));
     }
 
     let mut p = Params::new();
@@ -372,7 +383,11 @@ pub async fn pre_activate(
         }
         match set_active(db, registry, hub_id, &key, true, BLUEPRINT_ACTOR).await {
             Ok(()) => out.activated.push(key),
-            Err(RuntimeError::InvalidPayload { .. }) => out.refused.push(key),
+            // hub#1070: a refused key is an `InvalidField` now; the legacy shape stays matched so
+            // nothing that still produces it turns into a hard failure of the whole import.
+            Err(RuntimeError::InvalidField { .. } | RuntimeError::InvalidPayload { .. }) => {
+                out.refused.push(key)
+            }
             Err(e) => return Err(e),
         }
     }
@@ -427,10 +442,13 @@ pub async fn ensure_assignable(
     if active_keys(db, hub_id).await?.contains(key) {
         return Ok(());
     }
-    Err(invalid(format!(
-        "role `{key}` is not active in this hub: activate it in the role catalogue before \
-         assigning it"
-    )))
+    Err(invalid_key(
+        "inactive",
+        format!(
+            "role `{key}` is not active in this hub: activate it in the role catalogue before \
+             assigning it"
+        ),
+    ))
 }
 
 /// The role keys a module declares in its manifest.
