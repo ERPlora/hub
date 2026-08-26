@@ -639,6 +639,9 @@ async fn preload_reads(
                 // catálogo vacío indistinguible de «no hay reglas» y degrada al porcentaje del
                 // payload — que es justo lo que no puede admitir adivinar (el impuesto).
                 if read.is_required() {
+                    // The cause never reaches the client (hub#1074 redacts it and the variant
+                    // does not carry it), so this line is the only place it is ever visible.
+                    eprintln!("⚠ reads: required `{name}` failed ({e}) → the command is aborted");
                     return Err(RuntimeError::ReadUnavailable {
                         query: name.to_string(),
                     });

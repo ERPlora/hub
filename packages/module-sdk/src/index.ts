@@ -571,7 +571,18 @@ const PLUMBING: Bilingual = {
  * different actions, and a screen that cannot tell them apart sends the owner to the wrong place.
  */
 const PLATFORM_FAILURES: Record<string, (app: string) => Bilingual> = {
-  read_unavailable: (app) => missingApp(app),
+  // A `required` read fails for MORE reasons than a missing app (broken SQL, a table that is not
+  // there, a database that timed out — commands.rs, rule 4), and the runtime does not say which.
+  // So this names the app whose data did not arrive and leaves the cause open: «install taxes»
+  // when taxes IS installed sends the owner after the wrong remedy.
+  read_unavailable: (app) => ({
+    en: app
+      ? `This action needs data from the app “${app}” that could not be retrieved. Check with an administrator that the app is installed and switched on, and try again.`
+      : 'This action needs data from an app that could not be retrieved. Check with an administrator that the app is installed and switched on, and try again.',
+    es: app
+      ? `Esta acción necesita datos de la app «${app}» que no se han podido obtener. Comprueba con un administrador que la app está instalada y activa, e inténtalo de nuevo.`
+      : 'Esta acción necesita datos de una app que no se han podido obtener. Comprueba con un administrador que la app está instalada y activa, e inténtalo de nuevo.',
+  }),
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
   module_inactive: (app) => ({
