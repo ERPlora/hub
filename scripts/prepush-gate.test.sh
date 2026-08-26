@@ -1197,6 +1197,103 @@ grep -qi 'out of sync' <<<"$out"                              || errs="$errs no-
     && ok "drift: a branch editing the gate warns instead of installing itself" \
     || bad "drift: a branch editing the gate warns instead of installing itself" "$errs"
 
+# ── 46. A worktree based on an OLDER develop must NOT downgrade the hook ──────
+#    The branch does not touch the gate, but its CHECKOUT carries the older
+#    committed copy. Installing that would revert the fleet's gate on day one
+#    (every in-flight branch is based on a pre-upgrade develop) — and a copy
+#    with no self-heal cannot resync itself back, so the downgrade would be
+#    sticky until a human reruns install-hooks.sh. The canonical source is the
+#    INTEGRATION ref's blob, never the checkout.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+printf '%s\n' '#!/usr/bin/env bash' '# ancient gate: no self-heal here' 'exit 0' > "$repo/.githooks/pre-push"
+chmod +x "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the OLD hook"
+old_base=$(git -C "$repo" rev-parse HEAD)
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "upgrade the gate"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+git -C "$repo" checkout -q "$old_base"
+git -C "$repo" checkout -qb feature
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/feature $sha refs/heads/feature $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+[ "$code" = 0 ]                              || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$HOOK"    || errs="$errs installed-hook-DOWNGRADED-by-an-older-checkout"
+[ -z "$errs" ] \
+    && ok "drift: a worktree based on an older develop cannot downgrade the installed hook" \
+    || bad "drift: a worktree based on an older develop cannot downgrade the installed hook" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# ── 47. An UNCOMMITTED edit to the gate is never installed machine-wide ───────
+#    It is in no diff, so a diff-based guard cannot see it. The resync must
+#    still fire (the installed copy IS stale) but from the integration ref's
+#    committed blob — never from the file someone is editing right now.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+echo "# stale installed copy" >> "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+echo "# WIP uncommitted edit" >> "$repo/.githooks/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+# The push itself is REFUSED — the dirty .githooks/pre-push trips the hub#855
+# clean-tree guard, which is the correct fail-closed answer for that worktree.
+# The property under test is the machine-wide one: the WIP edit never becomes
+# the installed hook.
+[ "$code" = 0 ] && errs="$errs dirty-tree-push-was-not-refused"
+grep -q 'WIP uncommitted edit' "$repo/installed/pre-push" && errs="$errs uncommitted-edit-installed-machine-wide"
+cmp -s "$repo/installed/pre-push" "$HOOK"              || errs="$errs installed-copy-is-not-the-committed-blob"
+[ -f "$repo/RAN" ]                                     && errs="$errs suite-ran-on-a-dirty-tree"
+[ -z "$errs" ] \
+    && ok "drift: an uncommitted edit to the gate is never installed — resync uses the committed blob" \
+    || bad "drift: an uncommitted edit to the gate is never installed — resync uses the committed blob" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# ── 48. Never install a copy that cannot heal itself (stale-fetch downgrade) ──
+#    If origin/develop itself is stale (a worktree that has not fetched since
+#    before the self-heal shipped), its blob has no resync. Installing it would
+#    strand the whole machine on a gate that can only warn — refuse instead.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+printf '%s\n' '#!/usr/bin/env bash' '# ancient gate: no self-heal here' 'exit 0' > "$repo/.githooks/pre-push"
+chmod +x "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the OLD hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+[ "$code" = 0 ]                           || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$HOOK" || errs="$errs installed-hook-replaced-by-a-copy-with-no-self-heal"
+[ -f "$repo/RAN" ]                        || errs="$errs suite-did-not-run"
+[ -z "$errs" ] \
+    && ok "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" \
+    || bad "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

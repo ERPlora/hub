@@ -206,40 +206,60 @@ hook_drift_check
 # copy from 2026-08-13 for two weeks, so every change to `.githooks/pre-push`
 # was a change to a file nothing executed — including the scoping below.
 #
-# So when the copy that runs is stale, it replaces itself with the repo's and
-# re-runs this push through it. Three guards keep that from being a foot-gun:
-#   · the branch being pushed must NOT touch `.githooks/pre-push` — otherwise
-#     "I am testing a change to the gate" would install that change on every
+# So when the copy that runs is stale, it replaces itself with the CANONICAL
+# copy and re-runs this push through it. Four guards keep that from being a
+# foot-gun:
+#   · the source is the INTEGRATION ref's blob (`git show origin/develop:…`),
+#     NEVER this worktree's checkout — a branch based on an older develop
+#     carries an older committed copy, and an uncommitted edit sits in no diff
+#     at all; sourcing the working tree would install either one on every
 #     worktree of the machine (they share core.hooksPath);
-#   · the diff must be KNOWN (no base resolved → no resync, just the warning);
+#   · a canonical copy that cannot heal itself (no HUB_GATE_RESYNCED in it —
+#     i.e. a pre-hub#1207 blob from a stale fetch) is refused: installing it
+#     would make the downgrade sticky, back to warn-only drift;
 #   · exactly one hop, tracked by HUB_GATE_RESYNCED, so a hook that somehow
-#     never matches cannot loop.
-# The copy is swapped by rename, never written in place: bash reads a script
-# incrementally and overwriting the running file corrupts it mid-execution.
+#     never matches cannot loop;
+#   · the copy is swapped by rename, never written in place: bash reads a
+#     script incrementally and overwriting the running file corrupts it.
 hook_self_heal() {
-    local versioned=".githooks/pre-push" self_abs versioned_abs tmp
+    local versioned=".githooks/pre-push" self_abs versioned_abs tmp ref canon_src="" canon_ref=""
     [ "${HUB_GATE_RESYNCED:-0}" = 1 ] && return 0
     [ "${HUB_GATE_NO_SELFHEAL:-0}" = 1 ] && return 0
-    [ -f "$versioned" ] || return 0
     self_abs="$(cd "$(dirname "$SELF")" 2>/dev/null && pwd -P)/$(basename "$SELF")"
-    versioned_abs="$(cd "$(dirname "$versioned")" && pwd -P)/pre-push"
-    [ "$self_abs" = "$versioned_abs" ] && return 0
-    cmp -s "$SELF" "$versioned" 2>/dev/null && return 0
-    [ "$changed_known" = 1 ] || return 0
-    diff_touches ".githooks/pre-push" && return 0
+    versioned_abs="$(cd "$(dirname "$versioned")" 2>/dev/null && pwd -P)/pre-push"
+    [ -n "$versioned_abs" ] && [ "$self_abs" = "$versioned_abs" ] && return 0
 
-    tmp="${self_abs}.resync.$$"
-    if ! install -m 0755 "$versioned" "$tmp" 2>/dev/null; then
-        echo "⚠️  pre-push: could not write next to $self_abs — resync by hand: bash scripts/install-hooks.sh" >&2
-        rm -f "$tmp" 2>/dev/null || true
+    canon_src="$(mktemp "${TMPDIR:-/tmp}/hub-gate-canon.XXXXXX" 2>/dev/null)" || return 0
+    for ref in $GATE_BASE_REFS; do
+        if git show "${ref}:.githooks/pre-push" >"$canon_src" 2>/dev/null; then
+            canon_ref="$ref"
+            break
+        fi
+    done
+    [ -n "$canon_ref" ] || { rm -f "$canon_src"; return 0; }
+    if ! grep -q 'HUB_GATE_RESYNCED' "$canon_src" 2>/dev/null; then
+        # A blob that cannot heal itself is a downgrade trap — keep the warning.
+        rm -f "$canon_src"
         return 0
     fi
+    if cmp -s "$SELF" "$canon_src" 2>/dev/null; then
+        rm -f "$canon_src"
+        return 0
+    fi
+
+    tmp="${self_abs}.resync.$$"
+    if ! install -m 0755 "$canon_src" "$tmp" 2>/dev/null; then
+        echo "⚠️  pre-push: could not write next to $self_abs — resync by hand: bash scripts/install-hooks.sh" >&2
+        rm -f "$tmp" "$canon_src" 2>/dev/null || true
+        return 0
+    fi
+    rm -f "$canon_src" 2>/dev/null || true
     if ! mv -f "$tmp" "$self_abs" 2>/dev/null; then
         echo "⚠️  pre-push: could not replace $self_abs — resync by hand: bash scripts/install-hooks.sh" >&2
         rm -f "$tmp" 2>/dev/null || true
         return 0
     fi
-    echo "🔄 pre-push: the installed hook was stale — RESYNCED from .githooks/pre-push and re-running this push through it." >&2
+    echo "🔄 pre-push: the installed hook was stale — RESYNCED from ${canon_ref}:.githooks/pre-push and re-running this push through it." >&2
     printf '%s\n' "$GATE_STDIN" | HUB_GATE_RESYNCED=1 bash "$self_abs"
     exit $?
 }
