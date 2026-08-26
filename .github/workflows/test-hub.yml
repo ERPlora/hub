@@ -150,6 +150,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 🔴 Este job resuelve los módulos por la ruta RELATIVA al checkout
+      # (`crates/runtime/../../../modules-workspace/modules`), que cae FUERA del workspace y
+      # PERSISTE entre jobs del runner. Cualquier cosa que otro job deje ahí cambia lo que este
+      # ejecuta: si aparece un catálogo, `installer::every_published_manifest_*` deja de saltarse
+      # y mide contra lo que haya.
+      #
+      # Ya pasó (hub#1216): la primera versión de `test-hub-modules.yml` clonó ahí 13 de los ~27
+      # módulos y los dejó, y `develop` y `main` se pusieron ROJOS con
+      # «expected the published catalogue (~25 modules), only 13 checked» — un fallo que no tenía
+      # NADA que ver con el diff de quien empujaba. Aquel job ya clona en `$RUNNER_TEMP`, pero esta
+      # defensa se queda: este job no puede depender de la higiene de sus vecinos, y sin ella el
+      # runner envenenado no se cura solo.
+      - name: Quitar restos de `modules-workspace` en el runner (hub#1216)
+        run: |
+          STRAY="$GITHUB_WORKSPACE/../modules-workspace"
+          if [ -e "$STRAY" ]; then
+            echo "::warning::restos de modules-workspace en el runner ($(find "$STRAY" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc -l | tr -d ' ') módulos) — se borran."
+            rm -rf "$STRAY"
+          fi
+
       # Libera ~25-30 GB de imágenes/toolchains preinstalados que no usamos, para que el link del
       # workspace no se quede sin disco (SIGBUS/ENOSPC en `ld` durante los binarios de test).
       - name: Free disk space
