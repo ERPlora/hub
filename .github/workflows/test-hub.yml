@@ -166,7 +166,11 @@ jobs:
         run: |
           STRAY="$GITHUB_WORKSPACE/../modules-workspace"
           if [ -e "$STRAY" ]; then
-            echo "::warning::restos de modules-workspace en el runner ($(find "$STRAY" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc -l | tr -d ' ') módulos) — se borran."
+            # `modules-workspace/modules/<mod>/module.json` → profundidad 3 desde $STRAY.
+            # La primera versión contaba a profundidad 2 y por eso dijo «0 módulos» borrando 13:
+            # un contador que no puede ver el positivo no sirve para diagnosticar nada.
+            n=$(find "$STRAY" -mindepth 3 -maxdepth 3 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+            echo "::warning::restos de modules-workspace en el runner (${n} módulos) — se borran."
             rm -rf "$STRAY"
           fi
 
