@@ -766,10 +766,17 @@ async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
     // El rechazo debe ser POR LA REJILLA. Un `is_err()` a secas se conformaba con cualquier fallo:
     // mientras al payload le faltó `idempotency_key` (hub#540) este test pasó en verde sin llegar
     // nunca a validar el incremento.
+    //
+    // ERPlora/sales#201: y se afirma sobre el CÓDIGO, no sobre la frase. Buscar `quantity_off_grid`
+    // dentro del mensaje solo funcionaba porque `sales` rechazaba con un `Err("<code>: <detalle>")`
+    // que el runtime envolvía en `RuntimeError::Wasm` — es decir, este test iba en verde JUSTO
+    // mientras el código no llegaba al cliente (`code: "error"` en la respuesta HTTP). Ahora el
+    // rechazo viaja por `Output.error`, sale como `RuntimeError::Domain { code }` y el mensaje es
+    // el detalle a secas. La forma es lo que se afirma (ADR-0398 §6).
     let err = r.expect_err("medio gramo no cae en la rejilla de gramos");
     assert!(
-        err.to_string().contains("quantity_off_grid"),
-        "el rechazo debe ser por la rejilla del incremento (ADR-0147 §2.2), no otro error: {err}"
+        matches!(&err, erplora_runtime::RuntimeError::Domain { code, .. } if code == "sales.quantity_off_grid"),
+        "el rechazo debe ser un error de DOMINIO por la rejilla del incremento (ADR-0147 §2.2), no otro error: {err:?}"
     );
 
     assert_eq!(rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap().len(), 0,
