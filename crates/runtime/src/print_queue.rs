@@ -265,6 +265,34 @@ pub async fn enqueue(
             document.len()
         )));
     }
+    // **The language of the paper is stamped HERE, once** (hub#1159).
+    //
+    // The device carries the catalogue for the labels it owns («COCINA»/«KITCHEN», «Mesa: »/
+    // «Table: ») and picks the column off `document.locale`. Leaving the stamp to each producer
+    // would mean every module has to remember it on every document, and the one that forgets
+    // pushes a Spanish chit out of an English kitchen's printer — which is the defect itself, not
+    // a milder version of it. One door, every producer, no module change.
+    //
+    // A producer that already named a language KEEPS it: a receipt handed to a foreign customer
+    // is a decision the producer is entitled to take, and a hub-wide setting must not overrule it.
+    //
+    // It runs AFTER the shape guards — an empty document is still refused, never turned into a
+    // printable `{"locale":"es"}` — and after the size cap ON PURPOSE: the cap is there to stop a
+    // producer queueing a huge blob, so it measures what the PRODUCER sent. Charging these ~16
+    // bytes to the producer's budget would refuse a document that fits, which is a regression paid
+    // by whoever sits exactly on the boundary.
+    let document = {
+        let mut stamped = job.document.clone();
+        if !stamped.get("locale").is_some_and(|v| v.is_string()) {
+            if let Some(obj) = stamped.as_object_mut() {
+                obj.insert(
+                    "locale".into(),
+                    json!(crate::settings::language_of(db, hub_id).await),
+                );
+            }
+        }
+        stamped.to_string()
+    };
     if job.format != FORMAT_RECEIPT && job.format != FORMAT_A4 {
         return Err(invalid(format!(
             "unknown paper format `{}` (expected `{FORMAT_RECEIPT}` or `{FORMAT_A4}`)",
@@ -738,6 +766,99 @@ mod tests {
             document: json!({ "total": 12.5 }),
             format: FORMAT_RECEIPT.into(),
         }
+    }
+
+    // ── hub#1159 · the paper comes out in the hub's language ───────────────────────────────────
+    //
+    // The device renders the labels it owns from its own catalogue («COCINA»/«KITCHEN», «Mesa: »/
+    // «Table: ») and picks the language off `document.locale` — `escpos::Locale`. Nobody was
+    // sending it, so the stamp happens HERE, once, for every producer: leaving it to each module
+    // means the one that forgets pushes a Spanish chit out of an English kitchen's printer, which
+    // is the bug itself and not a milder version of it.
+
+    /// The `locale` a queued job's document ended up carrying.
+    async fn queued_locale(db: &PgAdapter, hub_id: &str, job_id: &str) -> Option<String> {
+        all(db, hub_id)
+            .await
+            .into_iter()
+            .find(|j| j.job_id == job_id)
+            .expect("the job was queued")
+            .document
+            .get("locale")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    }
+
+    /// A hub set to English queues documents that say so — without a single module changing.
+    #[tokio::test]
+    async fn a_queued_document_carries_the_language_of_the_hub() {
+        let db = queue_db().await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("language".into(), json!("en"));
+        crate::settings::set_many(&db, "h1", &updates, "test", false)
+            .await
+            .expect("the hub speaks English now");
+
+        enqueue(&db, "h1", &job("j-en", "receipt", "T-1"))
+            .await
+            .expect("queued");
+
+        assert_eq!(
+            queued_locale(&db, "h1", "j-en").await.as_deref(),
+            Some("en"),
+            "the document goes to the printer in the hub's language",
+        );
+    }
+
+    /// A hub that never chose a language queues `es` — the default, and the paper the whole fleet
+    /// prints today.
+    #[tokio::test]
+    async fn a_hub_that_never_chose_a_language_queues_the_paper_of_today() {
+        let db = queue_db().await;
+        enqueue(&db, "h1", &job("j-default", "receipt", "T-1"))
+            .await
+            .expect("queued");
+        assert_eq!(
+            queued_locale(&db, "h1", "j-default").await.as_deref(),
+            Some("es"),
+            "the default is the paper of today, not an empty label",
+        );
+    }
+
+    /// A producer that names the language KEEPS it: a receipt handed to a foreign customer is the
+    /// producer's call, and the hub-wide setting must not overwrite a decision already taken.
+    #[tokio::test]
+    async fn a_producer_that_names_the_language_is_not_overruled() {
+        let db = queue_db().await;
+        let mut updates = serde_json::Map::new();
+        updates.insert("language".into(), json!("en"));
+        crate::settings::set_many(&db, "h1", &updates, "test", false)
+            .await
+            .expect("the hub speaks English");
+
+        let mut named = job("j-named", "receipt", "T-1");
+        named.document = json!({ "receipt_id": "T-1", "total": 12.5, "locale": "es" });
+        enqueue(&db, "h1", &named).await.expect("queued");
+
+        assert_eq!(
+            queued_locale(&db, "h1", "j-named").await.as_deref(),
+            Some("es"),
+            "the producer's locale survives the stamp",
+        );
+    }
+
+    /// The stamp is not a way past the guards: an empty document is still refused, rather than
+    /// becoming `{"locale":"es"}` and printing a blank ticket.
+    #[tokio::test]
+    async fn the_locale_stamp_does_not_turn_an_empty_document_into_a_printable_one() {
+        let db = queue_db().await;
+        let mut empty = job("j-empty", "receipt", "T-1");
+        empty.document = json!({});
+        let err = enqueue(&db, "h1", &empty).await.expect_err("refused");
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "an empty document is refused, stamp or no stamp: {err:?}",
+        );
     }
 
     /// The station a queued job really landed on.
@@ -1346,9 +1467,21 @@ mod tests {
             .await
             .unwrap()
             .expect("the host claims the ticket");
+        // Every field the PRODUCER sent arrives untouched, and nothing was rendered on the way:
+        // that is hub#501's guarantee. The queue adds exactly one field of its own — `locale`
+        // (hub#1159), the language the device picks its labels in — so this asserts the producer's
+        // document is a subset that survived intact rather than a blob compared by luck.
+        for (key, value) in document.as_object().expect("an object") {
+            assert_eq!(
+                claimed.document.get(key),
+                Some(value),
+                "the producer's `{key}` reaches the host unchanged"
+            );
+        }
         assert_eq!(
-            claimed.document, document,
-            "the host receives the document it can render, byte for byte the one queued"
+            claimed.document.as_object().map(|o| o.len()),
+            document.as_object().map(|o| o.len() + 1),
+            "and the queue added nothing but the language stamp"
         );
         assert_eq!(claimed.document_type, "receipt");
     }

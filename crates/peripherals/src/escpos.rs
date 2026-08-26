@@ -336,10 +336,194 @@ fn json_to_display(v: &serde_json::Value) -> String {
     }
 }
 
+// ─── The paper's language (hub#1159 · ADR-0055/0199) ─────────────────────────
+
+/// Which key of the catalogue below; the values live in [`Locale::label`].
+///
+/// An enum rather than free strings so the compiler, not a reviewer, is what guarantees every
+/// label has both columns filled in.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Label {
+    // Ticket / invoice.
+    VatNumber,
+    Phone,
+    Ticket,
+    Date,
+    Cashier,
+    Customer,
+    Subtotal,
+    Tax,
+    Discount,
+    Total,
+    Payment,
+    Tendered,
+    Change,
+    Thanks,
+    // The bill taken to the table.
+    BillTitle,
+    TableOrCustomer,
+    BillNotice,
+    // The kitchen chit.
+    KitchenTitle,
+    Table,
+    Waiter,
+    Round,
+    Time,
+    Rush,
+    // The delivery note.
+    DeliveryNoteTitle,
+    Number,
+    Address,
+    Signature,
+    // The cash-up report.
+    CashReportTitle,
+    Session,
+    Opening,
+    Closing,
+    Difference,
+    // Anything else.
+    GenericTitle,
+}
+
+/// **The language the paper is printed in** (hub#1159).
+///
+/// Every label of this file used to be wired in Spanish: the crate was ported from `printer.py`
+/// and never had a translator. A hub running in another language therefore painted a translated
+/// KDS on screen and pushed a *Spanish* chit out of the thermal printer — and the chit and the
+/// ticket are precisely the surface the CUSTOMER and the KITCHEN read, not an admin screen.
+///
+/// **The catalogue lives here, and the language travels in the document** (`locale`). The
+/// alternative considered in the issue — each producer sending its ~30 labels already translated
+/// inside `data` — spreads one catalogue over N module repos, turns adding a label into an N-repo
+/// change, and buys a half-Spanish ticket from every module that forgets one. Odoo does it this
+/// way too: the report gets a `lang` and the template's own catalogue resolves the strings.
+///
+/// 🔴 **English is the source and `es` is a translation** (ADR-0055/0199), but the FALLBACK is
+/// `es`: a document without `locale` — which is every `erplora-app` deployed today — must print
+/// the paper of today, byte for byte. The device contract grows; it never moves under a fleet
+/// that cannot be updated as fast as a module can.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Locale {
+    En,
+    Es,
+}
+
+impl Locale {
+    /// Reads `locale` off the document.
+    ///
+    /// A language this printer does not carry falls back to the paper of today rather than
+    /// refusing the job or printing an empty label: paper that does not come out loses a service,
+    /// and a chit in the wrong language still gets the burger cooked. The region is dropped —
+    /// `es-ES` and `en_GB` are the language before the separator.
+    fn from_document(data: &serde_json::Value) -> Self {
+        match data
+            .get("locale")
+            .and_then(|v| v.as_str())
+            .map(|s| {
+                s.split(['-', '_'])
+                    .next()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase()
+            })
+            .as_deref()
+        {
+            Some("en") => Locale::En,
+            _ => Locale::Es,
+        }
+    }
+
+    /// The catalogue, one `(en, es)` pair per key.
+    ///
+    /// The `es` column is, literal for literal, what this file printed before hub#1159 — the
+    /// characterisation test holds it there, because moving one of these strings moves the paper
+    /// in every kitchen of the fleet at once.
+    fn label(self, key: Label) -> &'static str {
+        let (en, es) = match key {
+            Label::VatNumber => ("VAT: ", "NIF: "),
+            Label::Phone => ("Tel: ", "Tel: "),
+            Label::Ticket => ("Ticket: ", "Ticket: "),
+            Label::Date => ("Date: ", "Fecha: "),
+            Label::Cashier => ("Cashier: ", "Cajero: "),
+            Label::Customer => ("Customer: ", "Cliente: "),
+            Label::Subtotal => ("Subtotal", "Subtotal"),
+            Label::Tax => ("VAT", "IVA"),
+            Label::Discount => ("Discount", "Descuento"),
+            Label::Total => ("TOTAL", "TOTAL"),
+            Label::Payment => ("Payment: ", "Pago: "),
+            Label::Tendered => ("Tendered", "Entregado"),
+            Label::Change => ("Change", "Cambio"),
+            Label::Thanks => ("Thank you for your purchase", "Gracias por su compra"),
+            Label::BillTitle => ("BILL", "CUENTA"),
+            Label::TableOrCustomer => ("Table/Customer: ", "Mesa/Cliente: "),
+            // The notice is what keeps this paper from passing for an invoice, so it has a
+            // default (a producer that forgets it must not print something that looks fiscal) —
+            // and the default has to be in the customer's language too.
+            Label::BillNotice => (
+                "Bill - not an invoice. The fiscal receipt is handed over on payment.",
+                "Cuenta - no es una factura. El tiquet fiscal se entrega al cobrar.",
+            ),
+            Label::KitchenTitle => ("KITCHEN", "COCINA"),
+            Label::Table => ("Table: ", "Mesa: "),
+            Label::Waiter => ("Waiter: ", "Camarero: "),
+            Label::Round => ("Round", "Ronda"),
+            Label::Time => ("Time: ", "Hora: "),
+            // «RUSH» is what an English-speaking kitchen has printed on its chits for decades;
+            // a literal «URGENT» is a translation of the word, not of the paper.
+            Label::Rush => ("!! RUSH !!", "!! URGENTE !!"),
+            Label::DeliveryNoteTitle => ("DELIVERY NOTE", "ALBARAN"),
+            Label::Number => ("No: ", "N: "),
+            Label::Address => ("Addr: ", "Dir: "),
+            Label::Signature => ("Signature: ___________", "Firma: _______________"),
+            Label::CashReportTitle => ("CASH REPORT", "CIERRE DE CAJA"),
+            Label::Session => ("Session: ", "Sesion: "),
+            Label::Opening => ("Opening", "Apertura"),
+            Label::Closing => ("Closing", "Cierre"),
+            Label::Difference => ("Difference", "Diferencia"),
+            Label::GenericTitle => ("Document", "Documento"),
+        };
+        match self {
+            Locale::En => en,
+            Locale::Es => es,
+        }
+    }
+}
+
+/// **The supplements of a line, as a LIST** (hub#1138).
+///
+/// `modifiers` arrives in two shapes and both have to reach the paper:
+///
+/// - the **string** `kitchen` composes today (`modifiers_for_display`, joined with «, »), which is
+///   what every module currently deployed sends;
+/// - the **array** this issue asks for — plain strings or rows shaped `{name}` — which is what
+///   buys one line per supplement instead of one line that wraps and loses its indent.
+///
+/// Before this, an array was *truthy* but was not a string, so `str_field` handed back `""` and
+/// the supplements vanished from the chit **without an error** — the silent drop sales#78 warns
+/// about, and the worst possible failure for paper nobody re-reads.
+///
+/// The joined string stays ONE entry on purpose: splitting it on the comma here would guess a
+/// boundary that belongs to the module, and an option name can perfectly well carry a comma.
+fn modifier_lines(item: &serde_json::Value) -> Vec<String> {
+    match item.get("modifiers") {
+        Some(serde_json::Value::Array(list)) => list
+            .iter()
+            .filter_map(|entry| match entry {
+                serde_json::Value::String(s) => Some(s.trim()),
+                other => other.get("name").and_then(|v| v.as_str()).map(str::trim),
+            })
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect(),
+        Some(serde_json::Value::String(s)) if !s.trim().is_empty() => vec![s.to_string()],
+        _ => Vec::new(),
+    }
+}
+
 // ─── Renderizadores de documento (porta `printer.py`) ────────────────────────
 
 /// Porta `_print_receipt`.
 fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
     let business_name = str_field(data, "business_name", "ERPlora");
     b.text(&format!("{business_name}\n"));
@@ -350,26 +534,26 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     }
 
     if is_truthy(data, "vat_number") {
-        b.text(&format!("NIF: {}\n", str_field(data, "vat_number", "")));
+        b.text(&format!("{}{}\n", t.label(Label::VatNumber), str_field(data, "vat_number", "")));
     }
 
     if is_truthy(data, "phone") {
-        b.text(&format!("Tel: {}\n", str_field(data, "phone", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Phone), str_field(data, "phone", "")));
     }
 
     b.text("================================\n");
 
     b.set(Align::Left, false, false, false);
     let receipt_id = str_field(data, "receipt_id", "");
-    b.text(&format!("Ticket: {receipt_id}\n"));
-    b.text(&format!("Fecha: {}\n", now_dmy_hm()));
+    b.text(&format!("{}{receipt_id}\n", t.label(Label::Ticket)));
+    b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
 
     if is_truthy(data, "cashier") {
-        b.text(&format!("Cajero: {}\n", str_field(data, "cashier", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Cashier), str_field(data, "cashier", "")));
     }
 
     if is_truthy(data, "customer_name") {
-        b.text(&format!("Cliente: {}\n", str_field(data, "customer_name", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Customer), str_field(data, "customer_name", "")));
     }
 
     b.text("--------------------------------\n");
@@ -424,39 +608,39 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.text("--------------------------------\n");
 
     if let Some(subtotal) = data.get("subtotal").and_then(|v| v.as_f64()) {
-        b.total_line("Subtotal", subtotal);
+        b.total_line(t.label(Label::Subtotal), subtotal);
     }
 
     if let Some(tax_amount) = data.get("tax_amount").and_then(|v| v.as_f64()) {
-        let tax_label = str_field(data, "tax_label", "IVA");
+        let tax_label = str_field(data, "tax_label", t.label(Label::Tax));
         b.total_line(tax_label, tax_amount);
     }
 
     if let Some(discount) = data.get("discount").and_then(|v| v.as_f64()) {
         if discount > 0.0 {
-            b.total_line("Descuento", -discount);
+            b.total_line(t.label(Label::Discount), -discount);
         }
     }
 
     b.text("================================\n");
     b.set(Align::Left, true, true, false);
     let total = data.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    b.total_line("TOTAL", total);
+    b.total_line(t.label(Label::Total), total);
     b.set(Align::Left, false, false, false);
     b.text("================================\n");
 
     if is_truthy(data, "payment_method") {
         b.set(Align::Left, false, false, false);
-        b.text(&format!("Pago: {}\n", str_field(data, "payment_method", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Payment), str_field(data, "payment_method", "")));
     }
 
     if let Some(paid) = data.get("paid").and_then(|v| v.as_f64()) {
-        b.total_line("Entregado", paid);
+        b.total_line(t.label(Label::Tendered), paid);
     }
 
     if let Some(change) = data.get("change").and_then(|v| v.as_f64()) {
         if change > 0.0 {
-            b.total_line("Cambio", change);
+            b.total_line(t.label(Label::Change), change);
         }
     }
 
@@ -497,7 +681,7 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
     }
 
     b.set(Align::Center, false, false, false);
-    b.text("\nGracias por su compra\n\n");
+    b.text(&format!("\n{}\n\n", t.label(Label::Thanks)));
 
     b.cut();
 }
@@ -521,10 +705,11 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
 /// is composed at the device, which has no translator, so what the producer wants said in the
 /// customer's language it sends — that is what `notice` is for.
 fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     // The title is the first thing anyone reads and the cheapest way to tell this paper from a
     // ticket at a glance — the same job `COCINA` does for the kitchen order.
     b.set(Align::Center, true, true, false);
-    b.text("CUENTA\n");
+    b.text(&format!("{}\n", t.label(Label::BillTitle)));
 
     b.set(Align::Center, true, false, false);
     b.text(&format!("{}\n", str_field(data, "business_name", "ERPlora")));
@@ -540,9 +725,9 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
     // What identifies a bill is the table, not a number: it is how the waiter knows which of the
     // six he is holding.
     if is_truthy(data, "customer_name") {
-        b.text(&format!("Mesa/Cliente: {}\n", str_field(data, "customer_name", "")));
+        b.text(&format!("{}{}\n", t.label(Label::TableOrCustomer), str_field(data, "customer_name", "")));
     }
-    b.text(&format!("Fecha: {}\n", now_dmy_hm()));
+    b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
     b.text("--------------------------------\n");
 
     if let Some(items) = data.get("items").and_then(|v| v.as_array()) {
@@ -588,20 +773,20 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.text("--------------------------------\n");
 
     if let Some(subtotal) = data.get("subtotal").and_then(|v| v.as_f64()) {
-        b.total_line("Subtotal", subtotal);
+        b.total_line(t.label(Label::Subtotal), subtotal);
     }
     if let Some(tax_amount) = data.get("tax_amount").and_then(|v| v.as_f64()) {
-        b.total_line(str_field(data, "tax_label", "IVA"), tax_amount);
+        b.total_line(str_field(data, "tax_label", t.label(Label::Tax)), tax_amount);
     }
     if let Some(discount) = data.get("discount").and_then(|v| v.as_f64()) {
         if discount > 0.0 {
-            b.total_line("Descuento", -discount);
+            b.total_line(t.label(Label::Discount), -discount);
         }
     }
 
     b.text("================================\n");
     b.set(Align::Left, true, true, false);
-    b.total_line("TOTAL", data.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0));
+    b.total_line(t.label(Label::Total), data.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0));
     b.set(Align::Left, false, false, false);
     b.text("================================\n\n");
 
@@ -610,7 +795,7 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
     b.set(Align::Center, false, false, false);
     let notice = match data.get("notice").and_then(|v| v.as_str()) {
         Some(text) if !text.trim().is_empty() => text,
-        _ => "Cuenta - no es una factura. El tiquet fiscal se entrega al cobrar.",
+        _ => t.label(Label::BillNotice),
     };
     for line in wrap_to_width(notice, LINE_WIDTH) {
         b.text(&format!("{line}\n"));
@@ -622,8 +807,9 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
 
 /// Porta `_print_kitchen_order`.
 fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     b.set(Align::Center, true, true, true);
-    b.text("COCINA\n");
+    b.text(&format!("{}\n", t.label(Label::KitchenTitle)));
 
     b.set(Align::Center, true, true, false);
     // order_number = data.get('receipt_id', data.get('order_number', ''))
@@ -661,12 +847,12 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
         b.text(&format!("{label}\n"));
     } else if is_truthy(data, "table") {
         b.set(Align::Left, true, true, false);
-        b.text(&format!("Mesa: {}\n", str_field(data, "table", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Table), str_field(data, "table", "")));
     }
 
     b.set(Align::Left, false, false, false);
     if is_truthy(data, "waiter") {
-        b.text(&format!("Camarero: {}\n", str_field(data, "waiter", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Waiter), str_field(data, "waiter", "")));
     }
 
     // La ronda distingue el segundo pase del primero en la misma mesa. Sólo a partir de la dos:
@@ -676,10 +862,14 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
         .and_then(|v| v.as_f64())
         .unwrap_or(1.0);
     if round > 1.0 {
-        b.text(&format!("Ronda {}\n", fmt_qty(data.get("round_number"), round)));
+        b.text(&format!(
+            "{} {}\n",
+            t.label(Label::Round),
+            fmt_qty(data.get("round_number"), round)
+        ));
     }
 
-    b.text(&format!("Hora: {}\n", now_hm()));
+    b.text(&format!("{}{}\n", t.label(Label::Time), now_hm()));
     b.text("--------------------------------\n");
 
     if let Some(items) = data.get("items").and_then(|v| v.as_array()) {
@@ -733,10 +923,13 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
             // modificador en rojo, Lightspeed tiene `print sub-items in red`, Revel igual: tres de
             // tres realzan el cambio. En una térmica sin cinta bicolor, el equivalente es la negrita.
             let sub = format!("{indent}   ");
-            if is_truthy(item, "modifiers") {
+            let supplements = modifier_lines(item);
+            if !supplements.is_empty() {
                 b.set(Align::Left, true, false, false);
-                for line in wrap_to_width(str_field(item, "modifiers", ""), LINE_WIDTH - sub.len()) {
-                    b.text(&format!("{sub}{line}\n"));
+                for supplement in &supplements {
+                    for line in wrap_to_width(supplement, LINE_WIDTH - sub.len()) {
+                        b.text(&format!("{sub}{line}\n"));
+                    }
                 }
             }
 
@@ -753,7 +946,7 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
     let priority = str_field(data, "priority", "NORMAL");
     if priority == "HIGH" {
         b.set(Align::Center, true, true, false);
-        b.text("!! URGENTE !!\n");
+        b.text(&format!("{}\n", t.label(Label::Rush)));
     }
 
     b.text("\n");
@@ -762,19 +955,20 @@ fn render_kitchen_order(b: &mut EscposBuilder, data: &serde_json::Value) {
 
 /// Porta `_print_delivery_note`.
 fn render_delivery_note(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
-    b.text("ALBARAN\n");
+    b.text(&format!("{}\n", t.label(Label::DeliveryNoteTitle)));
     b.text("================================\n");
 
     b.set(Align::Left, false, false, false);
-    b.text(&format!("N: {}\n", str_field(data, "receipt_id", "")));
-    b.text(&format!("Fecha: {}\n", now_dmy_hm()));
+    b.text(&format!("{}{}\n", t.label(Label::Number), str_field(data, "receipt_id", "")));
+    b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
 
     if is_truthy(data, "customer_name") {
-        b.text(&format!("Cliente: {}\n", str_field(data, "customer_name", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Customer), str_field(data, "customer_name", "")));
     }
     if is_truthy(data, "delivery_address") {
-        b.text(&format!("Dir: {}\n", str_field(data, "delivery_address", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Address), str_field(data, "delivery_address", "")));
     }
 
     b.text("--------------------------------\n");
@@ -788,7 +982,7 @@ fn render_delivery_note(b: &mut EscposBuilder, data: &serde_json::Value) {
     }
 
     b.text("================================\n");
-    b.text("\nFirma: _______________\n\n");
+    b.text(&format!("\n{}\n\n", t.label(Label::Signature)));
     b.cut();
 }
 
@@ -814,27 +1008,28 @@ fn render_barcode_label(b: &mut EscposBuilder, data: &serde_json::Value) {
 
 /// Porta `_print_cash_report`.
 fn render_cash_report(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
-    b.text("CIERRE DE CAJA\n");
+    b.text(&format!("{}\n", t.label(Label::CashReportTitle)));
     b.text("================================\n");
 
     b.set(Align::Left, false, false, false);
-    b.text(&format!("Sesion: {}\n", str_field(data, "receipt_id", "")));
-    b.text(&format!("Fecha: {}\n", now_dmy_hm()));
+    b.text(&format!("{}{}\n", t.label(Label::Session), str_field(data, "receipt_id", "")));
+    b.text(&format!("{}{}\n", t.label(Label::Date), now_dmy_hm()));
 
     if is_truthy(data, "cashier") {
-        b.text(&format!("Cajero: {}\n", str_field(data, "cashier", "")));
+        b.text(&format!("{}{}\n", t.label(Label::Cashier), str_field(data, "cashier", "")));
     }
 
     b.text("--------------------------------\n");
 
     let opening = data.get("opening_balance").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let closing = data.get("closing_balance").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    b.total_line("Apertura", opening);
-    b.total_line("Cierre", closing);
+    b.total_line(t.label(Label::Opening), opening);
+    b.total_line(t.label(Label::Closing), closing);
 
     let diff = closing - opening;
-    b.total_line("Diferencia", diff);
+    b.total_line(t.label(Label::Difference), diff);
 
     b.text("--------------------------------\n");
 
@@ -857,14 +1052,18 @@ fn render_cash_report(b: &mut EscposBuilder, data: &serde_json::Value) {
 
 /// Porta `_print_generic`.
 fn render_generic(b: &mut EscposBuilder, data: &serde_json::Value) {
+    let t = Locale::from_document(data);
     b.set(Align::Center, true, false, false);
-    b.text(&format!("{}\n", str_field(data, "title", "Documento")));
+    b.text(&format!("{}\n", str_field(data, "title", t.label(Label::GenericTitle))));
     b.text("================================\n");
 
     b.set(Align::Left, false, false, false);
     if let Some(obj) = data.as_object() {
         for (key, value) in obj {
-            if key == "title" || key == "receipt_id" {
+            // `locale` steers HOW the paper is printed (hub#1159); it is a field of the
+            // envelope, not a line of the document. Without this the generic renderer — which
+            // prints every key it does not know — would print «locale: en» on the paper.
+            if key == "title" || key == "receipt_id" || key == "locale" {
                 continue;
             }
             b.text(&format!("{key}: {}\n", json_to_display(value)));
@@ -1795,6 +1994,333 @@ mod tests {
         assert!(text.contains("Cuenta - no es una factura"), "the em dash prints as a dash: {text}");
         assert!(text.contains("\"Bar Manolo's\""), "quotes print as quotes: {text}");
         assert!(text.contains("..."), "the ellipsis prints as three dots: {text}");
+    }
+
+    // ── hub#1138 · the supplements arrive as a LIST, one line each ──────────────────────────────
+    //
+    // `kitchen` composes them today into a single string (`modifiers_for_display`, joined with
+    // «, ») because the renderer only ever read a string. An ARRAY in the same key is truthy but
+    // is not a string, so `str_field` hands back `""`: the supplements vanish from the paper
+    // WITHOUT an error — exactly the silent drop sales#78 warns about. Both shapes must print.
+
+    /// An array prints ONE indented line per supplement — the point of the issue.
+    #[test]
+    fn each_supplement_of_the_list_gets_its_own_line() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Hamburguesa", "quantity": 1,
+                "modifiers": ["Extra queso", "Sin cebolla"],
+            }],
+        }));
+        let dish = text.find("Hamburguesa").expect("the dish");
+        let first = text.find("Extra queso").expect("the first supplement reaches the paper");
+        let second = text.find("Sin cebolla").expect("the second supplement reaches the paper");
+        assert!(dish < first && first < second, "in order, under their dish:\n{text}");
+        for wanted in ["Extra queso", "Sin cebolla"] {
+            let line = text.lines().find(|l| l.contains(wanted)).expect("its own line");
+            assert_eq!(
+                line.trim(),
+                wanted,
+                "one supplement per line, nothing else on it:\n{text}"
+            );
+            assert!(line.starts_with("   "), "indented under its dish: {line:?}\n{text}");
+        }
+    }
+
+    /// Objects carry the same list: `sales` and `kitchen` hold rows, not bare strings, so
+    /// `[{name}]` must print like `["…"]` rather than silently print nothing.
+    #[test]
+    fn a_list_of_rows_prints_like_a_list_of_names() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Hamburguesa", "quantity": 1,
+                "modifiers": [{ "name": "Extra queso" }, { "name": "Sin cebolla" }],
+            }],
+        }));
+        assert!(text.contains("Extra queso"), "the row's name reaches the paper:\n{text}");
+        assert!(text.contains("Sin cebolla"), "and so does the second one:\n{text}");
+    }
+
+    /// A supplement is a CHANGE, so it keeps the emphasis hub#1156 gave it (ADR-0394): the list
+    /// must not quietly demote it to normal weight.
+    #[test]
+    fn a_listed_supplement_is_emphasised_like_a_joined_one() {
+        let bytes = render_document(
+            DocumentType::KitchenOrder,
+            &json!({
+                "items": [{ "name": "Hamburguesa", "quantity": 1, "modifiers": ["Extra queso"] }],
+            }),
+        )
+        .expect("a valid kitchen order");
+        let line = lines_with_modes(&bytes)
+            .into_iter()
+            .find(|(t, _, _)| t.contains("Extra queso"))
+            .expect("the supplement printed");
+        assert!(line.1, "the supplement prints in bold, like the joined one: {line:?}");
+    }
+
+    /// The string `kitchen` sends TODAY prints byte for byte as it does today: the fleet that has
+    /// not moved yet must not see its chits change.
+    #[test]
+    fn the_joined_string_still_prints_exactly_as_today() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Hamburguesa", "quantity": 1,
+                "modifiers": "Extra queso, Sin cebolla",
+            }],
+        }));
+        let line = text
+            .lines()
+            .find(|l| l.contains("Extra queso"))
+            .expect("the joined string still prints");
+        assert_eq!(
+            line.trim(),
+            "Extra queso, Sin cebolla",
+            "it stays ONE line: splitting on the comma here would guess a boundary that belongs \
+             to the module — an option name can carry a comma:\n{text}"
+        );
+    }
+
+    /// An empty list is the same as no list — byte for byte. Otherwise a hub whose module sends
+    /// `[]` gets a blank indented line under every dish.
+    #[test]
+    fn an_empty_list_of_supplements_prints_nothing_at_all() {
+        let without = json!({ "items": [{ "name": "Cafe", "quantity": 1 }] });
+        let empty = json!({ "items": [{ "name": "Cafe", "quantity": 1, "modifiers": [] }] });
+        let blanks = json!({ "items": [{ "name": "Cafe", "quantity": 1, "modifiers": ["", "  "] }] });
+        let a = render_document(DocumentType::KitchenOrder, &without).expect("valid");
+        for (label, doc) in [("an empty list", &empty), ("a list of blanks", &blanks)] {
+            let b2 = render_document(DocumentType::KitchenOrder, doc).expect("valid");
+            assert_eq!(a, b2, "{label} prints exactly like no list at all");
+        }
+    }
+
+    /// A long supplement of the list wraps keeping its indent, like the joined one already does:
+    /// cut by the printer at 32 columns, the continuation would start at the margin and read as
+    /// another dish.
+    #[test]
+    fn a_long_listed_supplement_wraps_keeping_its_indent() {
+        let text = paper(&json!({
+            "items": [{
+                "name": "Hamburguesa", "quantity": 1,
+                "modifiers": ["Sin cebolla y sin pepinillos y con la carne muy hecha por favor"],
+            }],
+        }));
+        let wrapped: Vec<&str> = text
+            .lines()
+            .skip_while(|l| !l.contains("Sin cebolla"))
+            .take_while(|l| !l.starts_with("===="))
+            .collect();
+        assert!(wrapped.len() > 1, "it wrapped somewhere:\n{text}");
+        for l in &wrapped {
+            assert!(l.starts_with("   "), "every piece keeps the indent: {l:?}\n{text}");
+            assert!(
+                l.chars().count() <= LINE_WIDTH,
+                "and fits the paper ({LINE_WIDTH} columns): {l:?}"
+            );
+        }
+    }
+
+    // ── hub#1159 · the paper speaks the language the document asks for ──────────────────────────
+    //
+    // Every label in this file was wired in Spanish, so a hub running in another language painted
+    // a translated KDS and pushed a Spanish chit out of the thermal printer. English is the source
+    // (ADR-0055/0199) and `es` reproduces, byte for byte, the paper the fleet prints today: a
+    // document WITHOUT `locale` — every deployed `erplora-app` — must not move a single column.
+
+    /// Renders any document and returns the paper without control bytes.
+    fn printed(doc: DocumentType, data: &serde_json::Value) -> String {
+        strip_escpos(&render_document(doc, data).expect("a valid document"))
+    }
+
+    /// The kitchen chit in English: the labels this printer owns are translated, the values the
+    /// producer sends are not touched.
+    #[test]
+    fn the_kitchen_chit_can_be_printed_in_english() {
+        let text = printed(
+            DocumentType::KitchenOrder,
+            &json!({
+                "locale": "en",
+                "table": "4", "waiter": "Ana", "round_number": 2, "priority": "HIGH",
+                "items": [{ "name": "Burger", "quantity": 1 }],
+            }),
+        );
+        for wanted in ["KITCHEN", "Table: 4", "Waiter: Ana", "Round 2", "Time: ", "!! RUSH !!"] {
+            assert!(text.contains(wanted), "the chit says {wanted:?}:\n{text}");
+        }
+        for spanish in ["COCINA", "Mesa:", "Camarero:", "Ronda", "Hora:", "URGENTE"] {
+            assert!(!text.contains(spanish), "and nothing is left in Spanish ({spanish:?}):\n{text}");
+        }
+    }
+
+    /// The customer's ticket in English — the surface the customer actually holds.
+    #[test]
+    fn the_ticket_can_be_printed_in_english() {
+        let text = printed(
+            DocumentType::Receipt,
+            &json!({
+                "locale": "en",
+                "receipt_id": "T-42", "cashier": "Ana", "customer_name": "Bob",
+                "vat_number": "B123", "phone": "600",
+                "items": [{ "name": "Coffee", "quantity": 1, "total": 1.8 }],
+                "subtotal": 1.5, "tax_amount": 0.3, "discount": 0.2,
+                "total": 1.8, "payment_method": "Card", "paid": 2.0, "change": 0.2,
+            }),
+        );
+        for wanted in [
+            "VAT: B123", "Ticket: T-42", "Date: ", "Cashier: Ana", "Customer: Bob",
+            "Subtotal", "VAT", "Discount", "TOTAL", "Payment: Card", "Tendered", "Change",
+            "Thank you for your purchase",
+        ] {
+            assert!(text.contains(wanted), "the ticket says {wanted:?}:\n{text}");
+        }
+        for spanish in ["NIF:", "Fecha:", "Cajero:", "Cliente:", "Descuento", "Pago:", "Entregado", "Cambio", "Gracias"] {
+            assert!(!text.contains(spanish), "and nothing is left in Spanish ({spanish:?}):\n{text}");
+        }
+    }
+
+    /// The bill in English, DEFAULT NOTICE INCLUDED: the notice is what keeps this paper from
+    /// passing for an invoice, so a producer that forgets to send it still gets it in the
+    /// customer's language rather than in Spanish.
+    #[test]
+    fn the_bill_and_its_default_notice_can_be_printed_in_english() {
+        let text = printed(
+            DocumentType::Prebill,
+            &json!({
+                "locale": "en",
+                "customer_name": "Table 4",
+                "items": [{ "name": "Coffee", "quantity": 1, "total": 1.8 }],
+                "total": 1.8,
+            }),
+        );
+        assert!(text.contains("BILL"), "the title:\n{text}");
+        assert!(text.contains("Table/Customer: Table 4"), "the table:\n{text}");
+        assert!(text.contains("not an invoice"), "the notice is in English too:\n{text}");
+        for spanish in ["CUENTA", "Mesa/Cliente:", "no es una factura"] {
+            assert!(!text.contains(spanish), "nothing left in Spanish ({spanish:?}):\n{text}");
+        }
+    }
+
+    /// The delivery note and the cash-up report are labels of this file too.
+    #[test]
+    fn the_delivery_note_and_the_cash_report_can_be_printed_in_english() {
+        let note = printed(
+            DocumentType::DeliveryNote,
+            &json!({
+                "locale": "en", "receipt_id": "A-1",
+                "customer_name": "Bob", "delivery_address": "Main St 1",
+                "items": [{ "name": "Coffee", "quantity": 1 }],
+            }),
+        );
+        for wanted in ["DELIVERY NOTE", "No: A-1", "Date: ", "Customer: Bob", "Addr: Main St 1", "Signature"] {
+            assert!(note.contains(wanted), "the delivery note says {wanted:?}:\n{note}");
+        }
+        let report = printed(
+            DocumentType::CashSessionReport,
+            &json!({ "locale": "en", "receipt_id": "S-1", "cashier": "Ana",
+                     "opening_balance": 100.0, "closing_balance": 150.0 }),
+        );
+        for wanted in ["CASH REPORT", "Session: S-1", "Cashier: Ana", "Opening", "Closing", "Difference"] {
+            assert!(report.contains(wanted), "the cash report says {wanted:?}:\n{report}");
+        }
+    }
+
+    /// 🔴 The compatibility guarantee: a document WITHOUT `locale` prints byte for byte what it
+    /// printed before this change, and `locale: "es"` prints the very same bytes. Every deployed
+    /// `erplora-app` sends no locale, so if this moves, every kitchen in the fleet notices.
+    #[test]
+    fn a_document_without_a_locale_prints_exactly_the_spanish_paper_of_today() {
+        let cases: Vec<(DocumentType, serde_json::Value, Vec<&str>)> = vec![
+            (
+                DocumentType::KitchenOrder,
+                json!({ "table": "4", "waiter": "Ana", "round_number": 2, "priority": "HIGH",
+                        "items": [{ "name": "Cafe", "quantity": 1 }] }),
+                vec!["COCINA", "Mesa: 4", "Camarero: Ana", "Ronda 2", "Hora: ", "!! URGENTE !!"],
+            ),
+            (
+                DocumentType::Receipt,
+                json!({ "receipt_id": "T-42", "cashier": "Ana", "customer_name": "Bob",
+                        "vat_number": "B1", "phone": "600", "discount": 0.2, "paid": 2.0,
+                        "change": 0.2, "payment_method": "Tarjeta", "subtotal": 1.5,
+                        "tax_amount": 0.3, "total": 1.8,
+                        "items": [{ "name": "Cafe", "quantity": 1, "total": 1.8 }] }),
+                vec!["NIF: B1", "Ticket: T-42", "Fecha: ", "Cajero: Ana", "Cliente: Bob",
+                     "IVA", "Descuento", "TOTAL", "Pago: Tarjeta", "Entregado", "Cambio",
+                     "Gracias por su compra"],
+            ),
+            (
+                DocumentType::Prebill,
+                json!({ "customer_name": "Mesa 4", "total": 1.8,
+                        "items": [{ "name": "Cafe", "quantity": 1, "total": 1.8 }] }),
+                // Asserted in pieces: the notice is wrapped to 32 columns, so the whole
+                // sentence never lives on one line.
+                vec!["CUENTA", "Mesa/Cliente: Mesa 4", "no es una factura", "tiquet fiscal"],
+            ),
+            (
+                DocumentType::DeliveryNote,
+                json!({ "receipt_id": "A-1", "customer_name": "Bob", "delivery_address": "Calle 1",
+                        "items": [{ "name": "Cafe", "quantity": 1 }] }),
+                vec!["ALBARAN", "N: A-1", "Cliente: Bob", "Dir: Calle 1", "Firma: _______________"],
+            ),
+            (
+                DocumentType::CashSessionReport,
+                json!({ "receipt_id": "S-1", "cashier": "Ana",
+                        "opening_balance": 100.0, "closing_balance": 150.0 }),
+                vec!["CIERRE DE CAJA", "Sesion: S-1", "Cajero: Ana", "Apertura", "Cierre",
+                     "Diferencia"],
+            ),
+        ];
+        for (doc, data, spanish) in cases {
+            let text = printed(doc, &data);
+            for wanted in &spanish {
+                assert!(text.contains(wanted), "{doc:?} still says {wanted:?}:\n{text}");
+            }
+            // …and asking for `es` explicitly is the same paper, byte for byte.
+            let mut with_es = data.clone();
+            with_es["locale"] = json!("es");
+            assert_eq!(
+                render_document(doc, &data).expect("valid"),
+                render_document(doc, &with_es).expect("valid"),
+                "{doc:?}: `locale: es` is the default paper, byte for byte",
+            );
+        }
+    }
+
+    /// A language this printer does not carry falls back to the paper of today instead of
+    /// printing an empty label or refusing the job: paper that does not come out loses a service.
+    #[test]
+    fn an_unknown_language_falls_back_to_the_paper_of_today() {
+        let base = json!({ "items": [{ "name": "Cafe", "quantity": 1 }], "waiter": "Ana" });
+        let today = render_document(DocumentType::KitchenOrder, &base).expect("valid");
+        for odd in [json!("fr"), json!("zz-ZZ"), json!(42), json!(null)] {
+            let mut data = base.clone();
+            data["locale"] = odd.clone();
+            assert_eq!(
+                render_document(DocumentType::KitchenOrder, &data).expect("valid"),
+                today,
+                "`locale: {odd}` prints the default paper",
+            );
+        }
+        // A region is not a language: `es-ES`/`en_GB` are the language before the separator.
+        let mut english = base.clone();
+        english["locale"] = json!("en-GB");
+        assert!(
+            strip_escpos(&render_document(DocumentType::KitchenOrder, &english).expect("valid"))
+                .contains("KITCHEN"),
+            "the region is dropped and the language honoured",
+        );
+    }
+
+    /// `locale` is a field of the ENVELOPE, not a line of the document: the generic renderer
+    /// prints every unknown key, so without this it would print «locale: en» on the paper.
+    #[test]
+    fn the_locale_is_never_printed_as_a_line_of_the_document() {
+        let text = printed(
+            DocumentType::Generic,
+            &json!({ "title": "Aviso", "locale": "en", "cosa": "valor" }),
+        );
+        assert!(text.contains("cosa: valor"), "the real fields still print:\n{text}");
+        assert!(!text.contains("locale"), "the envelope field is not a line:\n{text}");
     }
 }
 

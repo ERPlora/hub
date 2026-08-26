@@ -206,7 +206,9 @@ async fn a_ticket_queued_over_http_is_drained_and_confirmed_over_the_socket() {
     assert_eq!(job["type"], "job");
     assert_eq!(job["jobId"], "j1");
     assert_eq!(job["documentType"], "receipt");
-    assert_eq!(job["document"], json!({ "receipt_id": "j1" }));
+    // The document reaches the host structured, stamped with the language the device renders its
+    // labels in (hub#1159 — the queue adds `locale` to every job).
+    assert_eq!(job["document"], json!({ "receipt_id": "j1", "locale": "es" }));
 
     send(&mut socket, json!({ "type": "done", "jobId": "j1" })).await;
     let ack = recv(&mut socket).await;
