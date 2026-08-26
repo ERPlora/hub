@@ -74,6 +74,42 @@ async fn open_order_with(rt: &Runtime, ctx: &RequestContext, items: serde_json::
     res["new_ids"][0].as_str().unwrap().to_string()
 }
 
+/// Seeds a product in the REAL catalogue and returns its id.
+///
+/// Exists because a `product_id` can no longer be made up (sales#175): opening a check FREEZES the
+/// price of its lines from the trusted catalogue, so `sales.order.open` prices any line naming a
+/// `product_id` from `inventory.products.for_sale` and REJECTS an id that is not there with
+/// `sales.product_not_available`. A line with only `product_name` is a free-price/department line
+/// and the catalogue has nothing to say about it — which is why the tests that do not route a
+/// product to a station keep working without seeding anything.
+///
+/// So a test that needs the product->station routing has to seed the product for real. `price` is
+/// the CATALOGUE price and is what the check ends up frozen at; these tests assert routing and
+/// destination, never the amount.
+async fn catalog_product(rt: &Runtime, ctx: &RequestContext, name: &str, sku: &str, price: i64) -> String {
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({
+            "name": name, "sku": sku, "price": price, "cost": 0, "stock": 100_000_000,
+            "low_stock_threshold": 0, "product_type": "physical",
+            "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap_or_else(|e| panic!("sembrar `{name}` en el catálogo: {e:?}"));
+    let rows = rt
+        .execute_query("inventory.products.list", &Params::new(), ctx)
+        .await
+        .expect("inventory.products.list");
+    rows.iter()
+        .find(|r| r["name"] == json!(name))
+        .unwrap_or_else(|| panic!("`{name}` debe estar en el catálogo recién sembrado: {rows:?}"))["id"]
+        .as_str()
+        .expect("product id")
+        .to_string()
+}
+
 #[tokio::test]
 async fn la_comanda_nace_del_pedido_y_no_hace_falta_ninguna_venta() {
     if !erplora_runtime::require_modules_workspace() { return; }
@@ -197,7 +233,11 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         .expect("crear la estación de barra");
     let barra_id = barra["new_ids"][0].as_str().unwrap().to_string();
 
-    for (station_id, product_id) in [(&cocina_id, "prod-croquetas"), (&barra_id, "prod-canas")] {
+    // Routed products must EXIST in the catalogue (see `catalog_product`).
+    let croquetas_id = catalog_product(&rt, &ctx, "Croquetas", "CROQ", 350).await;
+    let canas_id = catalog_product(&rt, &ctx, "Cañas", "CANA", 250).await;
+
+    for (station_id, product_id) in [(&cocina_id, &croquetas_id), (&barra_id, &canas_id)] {
         rt.execute_command(
             "kitchen.stations.set_routing",
             &params(json!({ "station_id": station_id, "product_id": product_id })),
@@ -211,8 +251,8 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         &rt,
         &ctx,
         json!([
-            { "product_id": "prod-croquetas", "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 },
-            { "product_id": "prod-canas", "product_name": "Cañas", "price": 250, "quantity": 2_000_000 }
+            { "product_id": croquetas_id, "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 },
+            { "product_id": canas_id, "product_name": "Cañas", "price": 250, "quantity": 2_000_000 }
         ]),
     )
     .await;
@@ -326,9 +366,12 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
         .unwrap();
     let plancha_id = plancha["new_ids"][0].as_str().unwrap().to_string();
 
+    // Routed products must EXIST in the catalogue (see `catalog_product`).
+    let croquetas_id = catalog_product(&rt, &ctx, "Croquetas", "CROQ", 350).await;
+
     rt.execute_command(
         "kitchen.stations.set_routing",
-        &params(json!({ "station_id": plancha_id, "product_id": "prod-croquetas" })),
+        &params(json!({ "station_id": plancha_id, "product_id": croquetas_id })),
         &ctx,
     )
     .await
@@ -337,7 +380,7 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
     let oid = open_order_with(
         &rt,
         &ctx,
-        json!([{ "product_id": "prod-croquetas", "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 }]),
+        json!([{ "product_id": croquetas_id, "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 }]),
     )
     .await;
     rt.execute_command(

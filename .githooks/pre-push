@@ -2,16 +2,32 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # pre-push — LOCAL test gate for the Hub.
 #
-# Replaces the `pull_request` trigger of "Hub tests (Rust · Postgres)"
-# (.github/workflows/test-hub.yml), which was burning ~96% of the repo's Actions
-# minutes: 127 runs / 1.647 min in three days. The same suite runs here instead,
-# and nothing reaches the remote unless it is green.
+# It runs the packages THIS PUSH CAN BREAK — not the whole workspace (hub#1207).
 #
-# Parity with the workflow it replaces — same excludes, same Postgres:
-#   cargo test --workspace --no-fail-fast \
-#              --exclude erplora-tauri --exclude tauri-plugin-erplora-android
-# `--no-fail-fast` matters: without it cargo stops at the first failing binary
-# and the run reports one failure when there may be twenty.
+# History, because the header used to claim the opposite: this gate was born to
+# REPLACE the `pull_request` trigger of "Hub tests (Rust · Postgres)"
+# (.github/workflows/test-hub.yml), which was burning ~96% of the repo's Actions
+# minutes. That replacement ended with hub#873: since 2026-08-11 the jobs run on
+# the org's own runners, whose minutes are not billed, so `test-hub.yml` declares
+# `on: pull_request` again and the full suite runs there, for free, on every PR.
+#
+# What was left here was the same suite a second time — and the expensive copy,
+# because it holds a machine-wide lock for ~20-40 min. With the autonomous fleet
+# that lock IS the ceiling: ~8-10 issues/day regardless of how many workers push.
+#
+# So the division of labour is now explicit:
+#   · HERE  — fast feedback on the branch: the touched packages and everything
+#             that depends on them, `--no-fail-fast` (without it cargo stops at
+#             the first failing binary and reports one failure out of twenty).
+#   · ACTIONS — `cargo test --workspace` on the PR, and that is the one that
+#             decides the merge (`merge-pr.sh` still refuses on CI silence).
+# What this trades away, said plainly: a branch can leave this machine broken
+# OUTSIDE its scope. Actions catches it on the PR, before the merge. That is one
+# wasted CI round now and then instead of 40 serialized minutes on every push.
+#
+# The full workspace still runs here whenever the scope cannot be trusted —
+# Cargo.lock, the workspace manifest, the toolchain, `schemas/`, or any failure
+# to resolve the diff. See `resolve_scope` below.
 #
 # Two properties keep this survivable with the autonomous fleet (~19 worktrees
 # sharing this hook):
@@ -19,10 +35,15 @@
 #     push of an unchanged tree is instant;
 #   · a lock — suites run one at a time instead of melting the machine.
 #
-# On green it publishes a `local-gate/hub-tests` commit status on the pushed
-# sha, so `merge-pr.sh` still sees a check and keeps refusing to merge on
-# silence (pm#58/#60). The status is an ATTESTATION that the suite ran here —
-# it is not an independent verification. It posts only AFTER a background step
+# On green it publishes a commit status on the pushed sha, and the CONTEXT says
+# which run it was (hub#1207): `local-gate/hub-tests` only for a real full
+# workspace run, `local-gate/hub-tests-scoped` for a scoped one. That matters
+# because `merge-pr.sh` reads the first as proof the WORKSPACE suite ran; a
+# scoped run posting it would answer a question it never tested. With its own
+# context, merge-pr.sh sees the full-suite one as absent and falls through to
+# the `cargo test --workspace` check Actions really did run — and still refuses
+# to merge when neither exists (pm#58/#60). The status is an ATTESTATION that
+# the run happened here — it is not an independent verification. It posts only AFTER a background step
 # verifies the remote ref really advanced to (or past) the pushed sha
 # (hub#574): a pre-push runs before the transfer and cannot know whether the
 # push will land.
@@ -38,6 +59,11 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   HUB_GATE_METADATA_CMD · HUB_GATE_BASE_REFS · HUB_GATE_EXCLUDES ·
+#   HUB_GATE_RUST_DIRS · HUB_GATE_NO_SELFHEAL (hub#1207: the scope resolver and
+#   the self-resync, driven without cargo, without GitHub and without touching
+#   the machine's installed hook)
+#   HUB_GATE_SCOPE=workspace forces the old behaviour for one push.
 #   HUB_GATE_UNPROTECTED_LOCK_WAIT (hub#788: lock-wait cap while the SSH
 #   connection has no keepalive; the rule is keepalive margin > max lock wait)
 #   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY (hub#574: how long the
@@ -84,19 +110,65 @@ fi
 # A pure branch deletion carries no tree to test. The remote ref is kept for
 # hub#574: the publish step verifies that THIS ref really advanced before
 # attesting anything.
+#
+# stdin is BUFFERED rather than consumed line by line: since hub#1207 a stale
+# installed hook re-execs the repo's copy, and that copy needs the same refs on
+# its stdin — which git only ever sends once.
+GATE_STDIN="$(cat)"
 pushed_sha=""
 pushed_ref=""
-while read -r _local_ref local_sha remote_ref _remote_sha; do
+remote_sha=""
+while read -r _local_ref local_sha remote_ref line_remote_sha; do
     [ -n "${local_sha:-}" ] || continue
     [ "$local_sha" = "$ZERO" ] && continue
     pushed_sha="$local_sha"
     pushed_ref="$remote_ref"
-done
+    remote_sha="${line_remote_sha:-}"
+done <<< "$GATE_STDIN"
 if [ -z "$pushed_sha" ]; then
     exit 0
 fi
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# ── hub#1207: what does this push actually CHANGE? ───────────────────────────
+# Everything below — which packages to test, whether to resync the hook — hangs
+# off this diff, so failing to resolve it is never silent: the gate degrades to
+# the full workspace, which is what it always did.
+#
+# The base is the remote sha git handed us; for a NEW branch (the fleet's
+# normal shape, remote sha all-zeros) it is the merge-base with the integration
+# branch. `HUB_GATE_BASE_REFS` exists so the tests can point elsewhere.
+GATE_BASE_REFS="${HUB_GATE_BASE_REFS:-origin/develop origin/main}"
+base_sha=""
+changed_files=""
+changed_known=0
+resolve_base() {
+    local ref b
+    if [ -n "$remote_sha" ] && [ "$remote_sha" != "$ZERO" ] \
+        && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+        printf '%s' "$remote_sha"
+        return 0
+    fi
+    for ref in $GATE_BASE_REFS; do
+        git rev-parse --verify --quiet "${ref}^{commit}" >/dev/null 2>&1 || continue
+        b="$(git merge-base "$ref" "$pushed_sha" 2>/dev/null)" || continue
+        [ -n "$b" ] && { printf '%s' "$b"; return 0; }
+    done
+    return 1
+}
+base_sha="$(resolve_base || true)"
+if [ -n "$base_sha" ]; then
+    if changed_files="$(git diff --name-only "$base_sha" "$pushed_sha" 2>/dev/null)"; then
+        changed_known=1
+    else
+        changed_files=""
+    fi
+fi
+diff_touches() {   # $1 = exact path
+    [ "$changed_known" = 1 ] || return 1
+    printf '%s\n' "$changed_files" | grep -qxF "$1"
+}
 
 # ── hub#746: the copy that RUNS is whatever core.hooksPath points at ─────────
 # (on the fleet machine: ~/.erplora/hooks/hub) and nothing syncs it with the
@@ -128,6 +200,70 @@ hook_drift_check() {
     fi
 }
 hook_drift_check
+
+# ── hub#1207: warning was not enough — the installed copy RESYNCS ITSELF ─────
+# hub#746 made drift visible; it stayed visible and unfixed. The fleet ran a
+# copy from 2026-08-13 for two weeks, so every change to `.githooks/pre-push`
+# was a change to a file nothing executed — including the scoping below.
+#
+# So when the copy that runs is stale, it replaces itself with the CANONICAL
+# copy and re-runs this push through it. Four guards keep that from being a
+# foot-gun:
+#   · the source is the INTEGRATION ref's blob (`git show origin/develop:…`),
+#     NEVER this worktree's checkout — a branch based on an older develop
+#     carries an older committed copy, and an uncommitted edit sits in no diff
+#     at all; sourcing the working tree would install either one on every
+#     worktree of the machine (they share core.hooksPath);
+#   · a canonical copy that cannot heal itself (no HUB_GATE_RESYNCED in it —
+#     i.e. a pre-hub#1207 blob from a stale fetch) is refused: installing it
+#     would make the downgrade sticky, back to warn-only drift;
+#   · exactly one hop, tracked by HUB_GATE_RESYNCED, so a hook that somehow
+#     never matches cannot loop;
+#   · the copy is swapped by rename, never written in place: bash reads a
+#     script incrementally and overwriting the running file corrupts it.
+hook_self_heal() {
+    local versioned=".githooks/pre-push" self_abs versioned_abs tmp ref canon_src="" canon_ref=""
+    [ "${HUB_GATE_RESYNCED:-0}" = 1 ] && return 0
+    [ "${HUB_GATE_NO_SELFHEAL:-0}" = 1 ] && return 0
+    self_abs="$(cd "$(dirname "$SELF")" 2>/dev/null && pwd -P)/$(basename "$SELF")"
+    versioned_abs="$(cd "$(dirname "$versioned")" 2>/dev/null && pwd -P)/pre-push"
+    [ -n "$versioned_abs" ] && [ "$self_abs" = "$versioned_abs" ] && return 0
+
+    canon_src="$(mktemp "${TMPDIR:-/tmp}/hub-gate-canon.XXXXXX" 2>/dev/null)" || return 0
+    for ref in $GATE_BASE_REFS; do
+        if git show "${ref}:.githooks/pre-push" >"$canon_src" 2>/dev/null; then
+            canon_ref="$ref"
+            break
+        fi
+    done
+    [ -n "$canon_ref" ] || { rm -f "$canon_src"; return 0; }
+    if ! grep -q 'HUB_GATE_RESYNCED' "$canon_src" 2>/dev/null; then
+        # A blob that cannot heal itself is a downgrade trap — keep the warning.
+        rm -f "$canon_src"
+        return 0
+    fi
+    if cmp -s "$SELF" "$canon_src" 2>/dev/null; then
+        rm -f "$canon_src"
+        return 0
+    fi
+
+    tmp="${self_abs}.resync.$$"
+    if ! install -m 0755 "$canon_src" "$tmp" 2>/dev/null; then
+        echo "⚠️  pre-push: could not write next to $self_abs — resync by hand: bash scripts/install-hooks.sh" >&2
+        rm -f "$tmp" "$canon_src" 2>/dev/null || true
+        return 0
+    fi
+    rm -f "$canon_src" 2>/dev/null || true
+    if ! mv -f "$tmp" "$self_abs" 2>/dev/null; then
+        echo "⚠️  pre-push: could not replace $self_abs — resync by hand: bash scripts/install-hooks.sh" >&2
+        rm -f "$tmp" 2>/dev/null || true
+        return 0
+    fi
+    echo "🔄 pre-push: the installed hook was stale — RESYNCED from ${canon_ref}:.githooks/pre-push and re-running this push through it." >&2
+    printf '%s\n' "$GATE_STDIN" | HUB_GATE_RESYNCED=1 bash "$self_abs"
+    exit $?
+}
+hook_self_heal
 
 # ── hub#788: keepalive in the repo, and never wait longer than it protects ───
 # The keepalive can only be effective if it was configured BEFORE git opened
@@ -169,10 +305,199 @@ ensure_ssh_keepalive
 STATE_DIR="${HUB_GATE_STATE_DIR:-$(git rev-parse --git-common-dir)/hub-gate}"
 mkdir -p "$STATE_DIR"
 
+# ── hub#1207: the SCOPE — run the packages this diff can break, not all of them ─
+#
+# `cargo test --workspace` here is a minute-for-minute DUPLICATE of the suite
+# `test-hub.yml` runs on every `pull_request` over the org's own runners, whose
+# minutes are not billed. The duplicate is the expensive copy — it holds a
+# machine-wide lock for ~40 min — so it, and only it, is the fleet's ceiling:
+# ~8-10 issues/day no matter how many workers push. What it buys over Actions
+# is speed of feedback on the branch, and that is exactly what a scoped run
+# still gives.
+#
+# So the local gate becomes a fast smoke over what CHANGED, and the full suite
+# stays where it is free: Actions, on the PR, before the merge. Note what is
+# NOT touched — the LOCK stays (hub#526: two suites at once melt the machine).
+# What shrinks is how long it is held, and a lock held for minutes drains a
+# queue that a lock held for forty minutes does not.
+#
+# Ownership is asked of `cargo metadata`, never hand-mapped, and it is
+# deliberately conservative in three places:
+#   · DEPENDENTS come along — touching `erplora-db` runs whoever builds on it,
+#     because that is the breakage a scoped gate would otherwise wave through;
+#   · anything TRANSVERSAL (Cargo.lock, the workspace manifest, the toolchain,
+#     `schemas/` — read by runtime tests) falls back to the whole workspace;
+#   · so does any failure to resolve the diff, the metadata, or python3.
+# A diff with no Rust in it runs no Rust: the web has its own checks, and
+# queueing behind a Rust suite for a `.ts` file is pure waiting for nothing.
+GATE_METADATA_CMD="${HUB_GATE_METADATA_CMD:-cargo metadata --no-deps --format-version 1}"
+# Same two the workspace command always excluded: `test-shell.yml` runs them on
+# PRs, so demanding them here would be asking twice for the same proof.
+GATE_EXCLUDES="${HUB_GATE_EXCLUDES:-erplora-tauri tauri-plugin-erplora-android}"
+# Top-level directories that are Rust by construction: a file in one of them
+# that no package claims (a crate not yet in `members`, a shared fixture) is a
+# reason to widen, not to ignore.
+GATE_RUST_DIRS="${HUB_GATE_RUST_DIRS:-crates}"
+
+SCOPE_MODE=workspace
+SCOPE_PACKAGES=""
+SCOPE_REASON="the diff could not be resolved"
+
+scope_from_metadata() {
+    local meta out
+    meta="$STATE_DIR/metadata.$$.json"
+    if ! eval "$GATE_METADATA_CMD" >"$meta" 2>/dev/null; then
+        rm -f "$meta"
+        SCOPE_REASON="\`cargo metadata\` failed, so package ownership is unknown"
+        return 0
+    fi
+    out="$(printf '%s\n' "$changed_files" \
+        | HUB_GATE_RUST_DIRS="$GATE_RUST_DIRS" python3 -c '
+import json, os, sys
+
+meta = json.load(open(sys.argv[1]))
+excludes = set(sys.argv[2:])
+rust_dirs = set(d for d in os.environ.get("HUB_GATE_RUST_DIRS", "crates").split() if d)
+root = meta["workspace_root"]
+members = set(meta.get("workspace_members") or [])
+
+# name -> directory that owns it, relative to the workspace root
+pkgs = {}
+for p in meta["packages"]:
+    if members and p["id"] not in members:
+        continue
+    rel = os.path.relpath(os.path.dirname(p["manifest_path"]), root)
+    pkgs[p["name"]] = "" if rel == "." else rel
+names = set(pkgs)
+
+# Reverse edges, every kind (normal, dev, build): a dev-dependency breaks the
+# dependent`s TESTS, which is precisely what this gate runs.
+rdeps = {n: set() for n in names}
+for p in meta["packages"]:
+    if p["name"] not in names:
+        continue
+    for d in p["dependencies"]:
+        if d["name"] in names and d["name"] != p["name"]:
+            rdeps[d["name"]].add(p["name"])
+
+TRANSVERSAL = ("Cargo.lock", "Cargo.toml", "rust-toolchain.toml")
+PREFIXES = (".cargo/", "schemas/")
+
+def verdict(mode, reason, pkgs_out=()):
+    print(mode)
+    print(reason)
+    for n in sorted(pkgs_out):
+        print(n)
+    raise SystemExit(0)
+
+touched = set()
+for path in [l.strip() for l in sys.stdin.read().splitlines() if l.strip()]:
+    if path in TRANSVERSAL or path.startswith(PREFIXES):
+        verdict("workspace", "%s can change what every crate compiles" % path)
+    owner, best = None, -1
+    for name, rel in pkgs.items():
+        if rel and (path == rel or path.startswith(rel + "/")) and len(rel) > best:
+            owner, best = name, len(rel)
+    if owner is not None:
+        touched.add(owner)
+    elif path.split("/")[0] in rust_dirs:
+        verdict("workspace", "%s sits in Rust source that no package claims" % path)
+
+scope, stack = set(), list(touched)
+while stack:
+    n = stack.pop()
+    if n in scope:
+        continue
+    scope.add(n)
+    stack.extend(rdeps.get(n, ()))
+scope -= excludes
+testable = names - excludes
+
+if not scope:
+    verdict("none", "no Rust package is touched by this diff")
+if testable and scope >= testable:
+    verdict("workspace", "the diff reaches every testable package")
+verdict("packages", "%d of %d packages reachable from this diff" % (len(scope), len(testable)), scope)
+' "$meta" $GATE_EXCLUDES 2>/dev/null)" || {
+        rm -f "$meta"
+        SCOPE_REASON="the scope could not be computed from \`cargo metadata\`"
+        return 0
+    }
+    rm -f "$meta"
+    [ -n "$out" ] || { SCOPE_REASON="the scope resolver returned nothing"; return 0; }
+    SCOPE_MODE="$(printf '%s\n' "$out" | sed -n 1p)"
+    SCOPE_REASON="$(printf '%s\n' "$out" | sed -n 2p)"
+    SCOPE_PACKAGES="$(printf '%s\n' "$out" | sed -n '3,$p' | tr '\n' ' ' | sed 's/ *$//')"
+}
+
+resolve_scope() {
+    if [ "${HUB_GATE_SCOPE:-}" = workspace ]; then
+        SCOPE_REASON="HUB_GATE_SCOPE=workspace was set"
+        return 0
+    fi
+    if [ "$changed_known" != 1 ]; then
+        SCOPE_REASON="no base to diff against (tried: $GATE_BASE_REFS)"
+        return 0
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        SCOPE_REASON="python3 is not on PATH, so package ownership cannot be resolved"
+        return 0
+    fi
+    scope_from_metadata
+}
+resolve_scope
+
+case "$SCOPE_MODE" in
+    none)
+        echo "⏭️  pre-push: no Rust in this diff ($SCOPE_REASON) → the Hub suite has nothing to run." >&2
+        echo "    Non-Rust changes are covered by their own checks on the PR." >&2
+        exit 0
+        ;;
+    packages)
+        CONTEXT=local-gate/hub-tests-scoped
+        echo "🎯 pre-push: scoped run — $SCOPE_REASON: $SCOPE_PACKAGES" >&2
+        ;;
+    *)
+        SCOPE_MODE=workspace
+        echo "🌍 pre-push: full workspace run — $SCOPE_REASON." >&2
+        ;;
+esac
+export HUB_GATE_SCOPE_MODE="$SCOPE_MODE"
+export HUB_GATE_SCOPE_PACKAGES="$SCOPE_PACKAGES"
+
+# ── hub#1207 §4: the attestation names what REALLY ran ───────────────────────
+# `merge-pr.sh` reads `local-gate/hub-tests` as proof the WORKSPACE suite ran —
+# that is the question it asks ("did the thing that tests this run?"). A scoped
+# run publishing that context would answer yes to a question it did not test,
+# which is the same antipattern as a test asserting on prose. So a scoped run
+# gets its own context: merge-pr.sh then sees the full-suite one as ABSENT and
+# falls through to the `cargo test --workspace` check that Actions really did
+# run on the PR — and still refuses to merge if that check is missing or red.
+# The description says the packages out loud, so the PR page shows the scope.
+GATE_CMD_LABEL="cargo test --workspace"
+if [ "$SCOPE_MODE" = packages ]; then
+    GATE_CMD_LABEL="cargo test"
+    for _p in $SCOPE_PACKAGES; do GATE_CMD_LABEL="$GATE_CMD_LABEL -p $_p"; done
+fi
+GATE_DESC="$GATE_CMD_LABEL green on the pusher's machine (hook ${HOOK_ID:-unknown})"
+if [ "$SCOPE_MODE" = packages ]; then
+    GATE_DESC="$GATE_DESC — scoped to the diff, NOT the whole workspace"
+fi
+# GitHub truncates a status description at 140 chars; do it here so what gets
+# cut is the tail of the package list and never the "scoped" caveat.
+if [ "${#GATE_DESC}" -gt 140 ]; then
+    GATE_DESC="$(printf '%s' "$SCOPE_PACKAGES" | wc -w | tr -d ' ') packages scoped to the diff, NOT the whole workspace (hook ${HOOK_ID:-unknown}): $SCOPE_PACKAGES"
+    GATE_DESC="${GATE_DESC:0:137}..."
+fi
+
 # The cache key is the TREE, not the commit: a reworded commit or a rebase that
 # does not change a single byte of content must not pay for the suite twice.
 tree="$(git rev-parse "${pushed_sha}^{tree}" 2>/dev/null)" || exit 1
-green="$STATE_DIR/$tree.green"
+# …and by the SCOPE (hub#1207): the same tree pushed against a base that moved
+# resolves to a WIDER set of packages, and reusing the narrow green for it would
+# skip packages nothing ever ran.
+scope_key="$(printf '%s|%s' "$SCOPE_MODE" "$SCOPE_PACKAGES" | git hash-object --stdin 2>/dev/null)"
+green="$STATE_DIR/$tree.${scope_key:0:12}.green"
 
 PUBLISH_LOG="$STATE_DIR/publish-status.log"
 
@@ -289,7 +614,7 @@ publish_status() {
         if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
                 -f state=success \
                 -f context="$CONTEXT" \
-                -f description="cargo test --workspace green on the pusher's machine (hook ${HOOK_ID:-unknown})" \
+                -f description="$GATE_DESC" \
                 2>&1 >/dev/null)"; then
             report_async "gh refused to post the status to $repo" "$perr" "$sha"
             exit 0
@@ -556,10 +881,23 @@ else
         echo "❌ pre-push: 'cargo' is not on PATH." >&2
         exit 1
     }
-    test_cmd="cargo test --workspace --no-fail-fast --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+    if [ "$SCOPE_MODE" = packages ]; then
+        # `--no-fail-fast` for the same reason as the workspace run: without it
+        # cargo stops at the first failing binary and reports one failure when
+        # there may be twenty.
+        test_cmd="cargo test"
+        for _p in $SCOPE_PACKAGES; do test_cmd="$test_cmd -p $_p"; done
+        test_cmd="$test_cmd --no-fail-fast"
+    else
+        test_cmd="cargo test --workspace --no-fail-fast --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+    fi
 fi
 
-echo "🧪 pre-push: running the Hub suite locally (this replaces the CI gate)…" >&2
+if [ "$SCOPE_MODE" = packages ]; then
+    echo "🧪 pre-push: running $GATE_CMD_LABEL locally — the FULL suite runs on the PR (test-hub.yml)…" >&2
+else
+    echo "🧪 pre-push: running the whole Hub suite locally ($SCOPE_REASON)…" >&2
+fi
 if ! eval "$test_cmd"; then
     echo "" >&2
     echo "❌ pre-push: the Hub suite is RED → push ABORTED." >&2

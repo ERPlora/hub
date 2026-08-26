@@ -387,7 +387,34 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
                 .max(1) as usize;
             b.text(&format!("{line}{}{total_str}\n", " ".repeat(padding)));
 
-            if is_truthy(item, "notes") {
+            // hub#1165 / ADR-0396 — the MENU: `sales` (>= 2.16.10) sends `components: string[]`
+            // (labels already composed, supplement included) besides the one-line `notes`. One
+            // indented line per component, normal weight, NO amount — the header is the line that
+            // carries the money, so it is the components that step back (the opposite emphasis of
+            // the kitchen chit, ADR-0394, same indentation). While `sales` still joins the same
+            // components into `notes`, the list is preferred and the note is skipped: printing
+            // both would say everything twice. An item without the list prints exactly as today.
+            let components: Vec<String> = item
+                .get("components")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|c| c.as_str())
+                        .filter(|c| !c.trim().is_empty())
+                        .map(|c| c.to_string())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !components.is_empty() {
+                b.set(Align::Left, false, false, false);
+                for component in &components {
+                    // Wrapped by hand keeping the indent: cut at 32 columns by the printer, the
+                    // continuation would start at the margin and read as another item.
+                    for line in wrap_to_width(component, LINE_WIDTH - 2) {
+                        b.text(&format!("  {line}\n"));
+                    }
+                }
+            } else if is_truthy(item, "notes") {
                 b.set(Align::Left, false, false, false);
                 b.text(&format!("  > {}\n", str_field(item, "notes", "")));
             }
@@ -525,7 +552,34 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
             let total = item.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
             b.set(Align::Left, false, false, false);
             b.total_line(&format!("{}x {name}", fmt_qty(item.get("quantity"), qty)), total);
-            if is_truthy(item, "notes") {
+            // hub#1165 / ADR-0396 — the MENU: `sales` (>= 2.16.10) sends `components: string[]`
+            // (labels already composed, supplement included) besides the one-line `notes`. One
+            // indented line per component, normal weight, NO amount — the header is the line that
+            // carries the money, so it is the components that step back (the opposite emphasis of
+            // the kitchen chit, ADR-0394, same indentation). While `sales` still joins the same
+            // components into `notes`, the list is preferred and the note is skipped: printing
+            // both would say everything twice. An item without the list prints exactly as today.
+            let components: Vec<String> = item
+                .get("components")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|c| c.as_str())
+                        .filter(|c| !c.trim().is_empty())
+                        .map(|c| c.to_string())
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !components.is_empty() {
+                b.set(Align::Left, false, false, false);
+                for component in &components {
+                    // Wrapped by hand keeping the indent: cut at 32 columns by the printer, the
+                    // continuation would start at the margin and read as another item.
+                    for line in wrap_to_width(component, LINE_WIDTH - 2) {
+                        b.text(&format!("  {line}\n"));
+                    }
+                }
+            } else if is_truthy(item, "notes") {
                 b.text(&format!("  > {}\n", str_field(item, "notes", "")));
             }
         }
@@ -990,6 +1044,111 @@ mod tests {
         let plato = text.find("Entrecot").expect("el plato");
         let suplemento = text.find("Al punto").expect("el suplemento");
         assert!(suplemento > plato, "el suplemento va DEBAJO de su línea:\n{text}");
+    }
+
+    // ── hub#1165 · the MENU on the customer's ticket and on the bill (ADR-0396) ────────────────
+    //
+    // `sales` (>= 2.16.10) sends, besides `notes`, `components: string[]` on a menu item: labels
+    // already composed (name + supplement «(+3,00)»), in the order they were chosen. At 32 columns
+    // the one-line `notes` wraps and the continuation starts at the margin — it reads as another
+    // item. Same complaint hub#1156 fixed for the kitchen chit; here the header keeps its normal
+    // weight (it carries the money) and the components step back: indent, no amount, no bold.
+
+    /// One line per component, indented, WITHOUT an amount — under its item, before anything else.
+    #[test]
+    fn a_menu_item_prints_one_indented_line_per_component_on_the_ticket() {
+        let text = ticket(&json!({
+            "items": [{ "name": "Menu del dia", "quantity": 1, "total": 16.5,
+                        "components": ["Gazpacho", "Solomillo (+3,00)"] }],
+            "total": 16.5,
+        }));
+        let header = text.find("Menu del dia").expect("the menu line");
+        let first = text.find("  Gazpacho").expect("first component, indented");
+        let second = text.find("  Solomillo (+3,00)").expect("second component, indented");
+        assert!(header < first && first < second, "components in order, under their item:\n{text}");
+        // No amount of their own: the only money on a component is the supplement in its label.
+        let gazpacho_line = text.lines().find(|l| l.contains("Gazpacho")).unwrap();
+        assert!(!gazpacho_line.contains("16.5"), "a component never carries the item price:\n{text}");
+    }
+
+    /// With `components` present, `notes` is NOT printed: until `sales` separates them, `notes`
+    /// still carries the same components joined by « · » and printing both would say everything
+    /// twice (the issue's second acceptance criterion).
+    #[test]
+    fn components_and_notes_do_not_print_the_components_twice() {
+        let text = ticket(&json!({
+            "items": [{ "name": "Menu del dia", "quantity": 1, "total": 16.5,
+                        "components": ["Gazpacho", "Cerveza"],
+                        "notes": "Gazpacho · Cerveza" }],
+            "total": 16.5,
+        }));
+        assert_eq!(text.matches("Gazpacho").count(), 1, "the component prints ONCE:\n{text}");
+        assert!(!text.contains("  > "), "the one-line note is replaced by the list:\n{text}");
+    }
+
+    /// An item WITHOUT `components` prints byte-identical to today: the deployed fleet's tickets
+    /// must not move (sales#78 — unknown keys are ignored, known shapes are frozen).
+    #[test]
+    fn an_item_without_components_prints_exactly_as_today() {
+        let plain = json!({
+            "items": [{ "name": "Cafe solo", "quantity": 1, "total": 1.8, "notes": "sin sal" }],
+            "total": 1.8,
+        });
+        let text = ticket(&plain);
+        assert!(text.contains("  > sin sal"), "the note keeps its shape:\n{text}");
+        let with_empty = json!({
+            "items": [{ "name": "Cafe solo", "quantity": 1, "total": 1.8, "notes": "sin sal",
+                        "components": [] }],
+            "total": 1.8,
+        });
+        let a = render_document(DocumentType::Receipt, &plain).expect("valid");
+        let b2 = render_document(DocumentType::Receipt, &with_empty).expect("valid");
+        assert_eq!(a, b2, "an empty list is the same as no list — byte for byte");
+    }
+
+    /// A long component wraps keeping its indent: the continuation must not reach the margin, or
+    /// it reads as another item — the exact defect of the one-line note.
+    #[test]
+    fn a_long_component_wraps_and_keeps_its_indent() {
+        let text = ticket(&json!({
+            "items": [{ "name": "Menu", "quantity": 1, "total": 16.5,
+                        "components": ["Solomillo de ternera gallega a la brasa con pimientos (+3,00)"] }],
+            "total": 16.5,
+        }));
+        let cont: Vec<&str> = text
+            .lines()
+            .skip_while(|l| !l.contains("Solomillo"))
+            .skip(1)
+            .take_while(|l| !l.contains("TOTAL") && !l.starts_with("--"))
+            .collect();
+        assert!(!cont.is_empty(), "the component wrapped somewhere:\n{text}");
+        for l in cont {
+            assert!(l.starts_with("  "), "every continuation keeps the indent: {l:?}\n{text}");
+        }
+    }
+
+    /// The bill taken to the table says the same as the ticket (ADR-0396 §5: one composer, two
+    /// papers): components indented under the menu header, no note duplication.
+    #[test]
+    fn the_prebill_indents_the_menu_components_too() {
+        let data = json!({
+            "items": [{ "name": "Menu del dia", "quantity": 1, "total": 16.5,
+                        "components": ["Gazpacho", "Solomillo (+3,00)"],
+                        "notes": "Gazpacho · Solomillo (+3,00)" }],
+            "total": 16.5,
+            "notice": "Cuenta - no es una factura.",
+        });
+        let bytes = render_document(DocumentType::Prebill, &data).expect("valid bill");
+        let text = strip_escpos(&bytes);
+        assert!(text.contains("  Gazpacho"), "component indented on the bill:\n{text}");
+        assert_eq!(text.matches("Gazpacho").count(), 1, "and only once:\n{text}");
+        assert!(!text.contains("  > "), "no one-line note next to the list:\n{text}");
+    }
+
+    /// Ticket helper: same door as the kitchen `paper()` but for the customer's receipt.
+    fn ticket(data: &serde_json::Value) -> String {
+        let bytes = render_document(DocumentType::Receipt, data).expect("valid ticket");
+        strip_escpos(&bytes)
     }
 
     /// **El suplemento y la nota conviven, y el suplemento va primero.** Son dos cosas distintas:
