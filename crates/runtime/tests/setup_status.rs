@@ -163,6 +163,36 @@ fn certificate_module(id: &str) -> PathBuf {
     )
 }
 
+/// A module that asks for a host capability **and whose own check passes**: everything it can say
+/// about itself says "configured". The only thing left between it and doing its job is the switch in
+/// Ajustes → Permisos, which is exactly the state hub#1119 found in production.
+fn sealing_module(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } },
+            "permissions": [format!("{id}.configure")],
+            "queries": {
+                format!("{id}.config.get"): {
+                    "permission": format!("{id}.configure"),
+                    "sql": "queries/config_get.sql"
+                }
+            },
+            "setup": {
+                "query": format!("{id}.config.get"),
+                "configured_when": [{ "field": "ready", "truthy": true }],
+                "title": format!("Configure {id}"),
+                "route": format!("/m/{id}/settings"),
+                "permission": format!("{id}.configure"),
+                "order": 60
+            }
+        }),
+        &[("queries/config_get.sql", "SELECT 1 AS ready")],
+    )
+}
+
 /// Puts the business certificate in the hub, straight into the system table the gate reads
 /// (`_hub_certificate`, ADR-0081). Going through `set_business_certificate` would need the
 /// process-global `HUB_SECRETS_KEY`, and what both the gate and the checklist look at is the
@@ -1805,4 +1835,59 @@ async fn todo_item_lleva_origen_aunque_este_pendiente() {
     for it in items(&doc) {
         assert!(it["origin"].is_string(), "sin origen: {it}");
     }
+}
+
+
+// ── hub#1119 · a module the dispatcher will refuse is NOT «configured» ──────────────────────────
+//
+// The checklist's whole job is to answer «is anything left before this business can work». A module
+// whose declared capability (ADR-0079) is not granted cannot run its engine at all: the dispatcher
+// turns its native commands away before they start. Ticking its item because its own settings are
+// filled in is the false «done» this design keeps failing away from — and it is the one that let a
+// hub invoice, charge and print for a whole day believing it was sealing.
+
+#[tokio::test]
+async fn a_module_whose_capability_is_not_granted_is_still_pending() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["state"],
+        "pending",
+        "its own query says ready, but nobody granted the capability its engine needs"
+    );
+}
+
+#[tokio::test]
+async fn granting_the_capability_is_what_finishes_the_item() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    rt.set_module_capability("verifactu", "certificate", true, "hub_user:1")
+        .await
+        .expect("the owner grants it in Ajustes → Permisos");
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["state"],
+        "done",
+        "settings filled in AND the switch on: now there is genuinely nothing left"
+    );
+}
+
+#[tokio::test]
+async fn a_module_that_asks_for_nothing_is_unaffected() {
+    // The rule must not invent a task for the 20-odd modules that declare no capability at all.
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("pricing", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    assert_eq!(must(&doc, "pricing.setup")["state"], "done");
 }

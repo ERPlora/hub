@@ -1081,6 +1081,21 @@ async fn persist_handler_output(
                 cmd.module_id, error.code
             )));
         }
+        // ADR-0398 (hub#1177): with an `errors` catalog in the manifest the module is strict —
+        // a code it never declared is a broken guest contract, not a business rejection the UI
+        // would translate. Without the catalog (modules not migrated yet) nothing changes.
+        let undeclared = registry
+            .installed
+            .iter()
+            .find(|m| m.id == cmd.module_id)
+            .and_then(|m| m.errors.as_ref())
+            .is_some_and(|catalog| !catalog.contains_key(&error.code));
+        if undeclared {
+            return Err(RuntimeError::Wasm(format!(
+                "handler of module `{}` returned the domain error code `{}`, which its `errors` catalog does not declare (ADR-0398)",
+                cmd.module_id, error.code
+            )));
+        }
         return Err(RuntimeError::Domain {
             code: error.code.clone(),
             message: error.message.clone(),

@@ -633,6 +633,7 @@ export default {
     installedLoadError:
       'No hemos podido leer tus apps. No ha habido respuesta, o esta sesión ya no es válida — vuelve a entrar si sigue pasando.',
     emptyCatalog: 'No hay apps que coincidan con tu búsqueda.',
+    loadingCatalog: 'Cargando el catálogo…',
     catalogLoadError:
       'No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.',
     retryCatalog: 'Reintentar',

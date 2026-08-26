@@ -49,10 +49,17 @@ describe('core access and account pages', () => {
 
   it('shows a recoverable error instead of disguising a failed cloud catalog as empty', () => {
     const apps = source('AppsPage.vue');
-    expect(apps).toContain('catalogError.value = true');
+    // hub#1129: the failure is a state of the LIST (`catalogState`), and the banner derives from
+    // it — so the banner and the table's empty line can no longer disagree about what happened.
+    expect(apps).toContain("catalogState.value = 'error'");
+    expect(apps).toContain("const catalogError = computed(() => catalogState.value === 'error')");
     expect(apps).not.toContain('MODULES_DEMO');
     expect(apps).toContain("t('apps.catalogLoadError')");
     expect(apps).toContain('@click="loadCatalog"');
+    // And the empty line of the catalogue says which of the three it is, instead of «nothing
+    // matches your search» while it loads or after it failed.
+    expect(apps).toContain('const catalogEmptyMessage');
+    expect(apps).toContain("t('apps.loadingCatalog')");
   });
 
   it('does not claim that updates were checked when no updater is configured', () => {

@@ -13,22 +13,34 @@
 #
 # What it prints (and writes to $GITHUB_OUTPUT when set):
 #
-#   version=X.Y.Z
-#   <image>:X.Y.Z      ← immutable, RELEASE ONLY. What a rollback pins to.
-#   <image>:X.Y        ← moving: "the latest 1.2.*"
-#   <image>:X          ← moving: "the latest 1.*"
-#   <image>:latest     ← the tag the provisioning registers on every real hub.
-#                        ONLY from `main` or a `v*` tag (hub#872): a `workflow_dispatch`
-#                        from any other branch must not move the whole fleet's code.
-#   <image>:<sha>      ← immutable per commit
+#   version=…          ← what the workflow stamps into Cargo.toml before the build (stamp=1),
+#                        so `/readyz`, `/api/hub/context`, the heartbeat and `error_sink` all
+#                        report the number the image is called by.
+#   stamp=0|1          ← whether the workflow must rewrite Cargo.toml with `version`.
 #
-# On a push to `main` only `:latest` and `:<sha>` are published: `main` is an integration build,
-# not a release, and minting `:X.Y.Z` there would move an immutable tag on every merge.
-# On any other ref (a manual `workflow_dispatch` from `develop` or a work branch) only the
-# immutable `:<sha>` is published — usable to point ONE hub at a develop build for testing.
+# Release CHANNELS (hub#1170, decision of 2026-08-25). Every build also gets `:<sha>` (immutable):
+#
+#   final tag vX.Y.Z    → version X.Y.Z            tags :X.Y.Z :X.Y :X :latest :stable
+#                          `stable` is an ALIAS of `latest` (same digest): the tag every real hub's
+#                          service is registered with, and what a new hub starts on.
+#   rc tag vX.Y.Z-rc.N  → version X.Y.Z-rc.N       tags :X.Y.Z-rc.N :canary
+#                          The candidate promoted to a SUBSET of prod hubs. Never moves `:latest`,
+#                          `:X.Y` or `:X`: a new hub must keep starting on the last final release.
+#   push to develop     → version X.Y.Z-dev.<n>+g<sha>   tags :dev
+#                          (also a manual `workflow_dispatch` from develop — the REF decides, not
+#                          the event.) X.Y.Z is the last reachable `v*` tag and <n> the commits
+#                          since, both from `git describe --tags --long`. This is what pre deploys.
+#   push to main        → version from Cargo.toml   tags :latest         (unchanged: main = prod)
+#   any other branch    → version X.Y.Z-dev.<n>+g<sha>   tags (sha only) — point ONE hub at it.
+#
+# Why the prerelease version exists: a manual build of `develop` used to publish `:<sha>` whose
+# binary said `1.0.0` — the Cargo placeholder — because only `v*` tags were stamped. The canary in
+# pre judged capabilities BY VERSION and quarantined an image that had every one of them.
 #
 # NIEGA la publicación (exit 1) cuando:
-#   · la versión no es semver `X.Y.Z`, o sigue siendo el hueco `0.0.0`;
+#   · la versión no es semver `X.Y.Z` (o `X.Y.Z-rc.N` en un tag rc), o sigue siendo el hueco `0.0.0`;
+#   · en `develop`/una rama no hay `git describe` utilizable (checkout sin tags): servir el hueco
+#     del Cargo desde ahí es exactamente el bug de hub#1170;
 #   · esa versión YA está en el registro. Un tag inmutable que un segundo build puede mover
 #     convierte «vuelve a 1.2.3» en una promesa vacía — y es el tag del que depende el rollback;
 #   · la versión es MENOR O IGUAL que la última publicada. Retroceder no es un error que se corrija:
@@ -38,11 +50,14 @@
 #     Override consciente: `IMAGE_TAGS_ALLOW_UNVERIFIED=1`.
 #
 # Usage:
-#   scripts/image-tags.sh --image ghcr.io/erplora/hub --ref "$GITHUB_REF" --sha "$GITHUB_SHA"
+#   scripts/image-tags.sh --image ghcr.io/erplora/hub --ref "$GITHUB_REF" --sha "$GITHUB_SHA" \
+#                         [--describe "$(git describe --tags --long --match 'v*')"]
+#   Without `--describe` the script runs that `git describe` itself in the manifest's directory.
 #
 # Seam used by scripts/tests/image-tags.test.sh:
 #   IMAGE_TAGS_PUBLISHED_CMD  <cmd> → escribe en stdout las versiones ya publicadas, una por línea.
 #                                     Exit != 0 = no se pudo leer el registro.
+#   --describe <text>         → la salida de `git describe --tags --long --match 'v*'` (vacío = falló).
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -50,6 +65,8 @@ manifest=""
 image=""
 ref=""
 sha=""
+describe=""
+describe_given=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -57,6 +74,7 @@ while [ $# -gt 0 ]; do
         --image)    image="$2";    shift 2 ;;
         --ref)      ref="$2";      shift 2 ;;
         --sha)      sha="$2";      shift 2 ;;
+        --describe) describe="$2"; describe_given=1; shift 2 ;;
         *) echo "image-tags: argumento desconocido: $1" >&2; exit 2 ;;
     esac
 done
@@ -82,18 +100,49 @@ version_gt() {
     [ "$a_patch" -gt "$b_patch" ]
 }
 
-# ── ¿Es esto una release? ────────────────────────────────────────────────────
+# ── ¿Qué canal es esto? ──────────────────────────────────────────────────────
+#   release  → tag `vX.Y.Z` (final)          canal `stable` (= `latest`)
+#   rc       → tag `vX.Y.Z-rc.N`             canal `canary`
+#   main     → push a `main`                 `latest` (como siempre: main = prod)
+#   develop  → push/dispatch en `develop`    canal `dev` (lo que despliega pre)
+#   branch   → cualquier otra rama           solo `:<sha>`
 is_release=0
+channel="branch"
 case "$ref" in
-    refs/tags/v*) is_release=1 ;;
+    refs/tags/v*)
+        tag_version="${ref#refs/tags/v}"
+        case "$tag_version" in
+            *-*) channel="rc" ;;
+            *)   channel="release"; is_release=1 ;;
+        esac ;;
+    refs/heads/main)    channel="main" ;;
+    refs/heads/develop) channel="develop" ;;
 esac
 
 # ── La versión ───────────────────────────────────────────────────────────────
-# En una release sale del TAG. Fuera, del manifest (build de integración).
-if [ "$is_release" -eq 1 ]; then
-    version="${ref#refs/tags/v}"
+# release/rc: del TAG. main: del manifest (como siempre). develop/rama: prerelease derivada de
+# `git describe` — el Cargo del árbol es el hueco «en desarrollo» y servirlo es el bug de hub#1170.
+stamp=1
+if [ "$channel" = "release" ] || [ "$channel" = "rc" ]; then
+    version="$tag_version"
     source_of_version="el tag $ref"
+elif [ "$channel" = "develop" ] || [ "$channel" = "branch" ]; then
+    if [ "$describe_given" -eq 0 ]; then
+        describe=$(git -C "$(dirname -- "$manifest")" describe --tags --long --match 'v*' 2>/dev/null || true)
+    fi
+    # vX.Y.Z-<n>-g<sha>  →  X.Y.Z-dev.<n>+g<sha>   (semver 2.0: prerelease + build metadata)
+    if ! printf '%s' "$describe" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]+$'; then
+        echo "❌ image-tags: no hay un \`git describe --tags --long --match 'v*'\` utilizable para $ref" >&2
+        echo "   (salida: '${describe:-<vacía>}'). Sin él la imagen serviría el hueco del Cargo.toml —" >&2
+        echo "   exactamente el bug de hub#1170. ¿El checkout trae los tags? (fetch-depth: 0)" >&2
+        exit 1
+    fi
+    base="${describe#v}"; base="${base%%-*}"
+    rest="${describe#v*-}"; count="${rest%%-*}"; gsha="${rest#*-g}"
+    version="$base-dev.$count+g$gsha"
+    source_of_version="git describe ($describe)"
 else
+    stamp=0
     # Anclado a la sección: un `version = "…"` aparece también bajo cada `[dependencies.*]`, y
     # coger la primera coincidencia del fichero pillaría la dependencia que ordenase antes.
     version=$(awk '
@@ -111,9 +160,16 @@ if [ -z "$version" ]; then
     exit 1
 fi
 
-if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+# Núcleo X.Y.Z de la versión (sin prerelease ni metadatos): lo que se compara y lo que da `:X.Y`/`:X`.
+core="${version%%[-+]*}"
+if ! printf '%s' "$core" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     echo "❌ image-tags: '$version' no es semver X.Y.Z (viene de $source_of_version)." >&2
     echo "   El criterio de qué es MAJOR/MINOR/PATCH: architecture/hub/versioning.md" >&2
+    exit 1
+fi
+if [ "$channel" = "rc" ] && ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+    echo "❌ image-tags: '$version' no es una candidata \`X.Y.Z-rc.N\` (viene de $source_of_version)." >&2
+    echo "   Solo las \`-rc.N\` tienen canal (canary); cualquier otra prerelease en un tag es un error." >&2
     exit 1
 fi
 
@@ -122,8 +178,8 @@ if [ "$version" = "0.0.0" ]; then
     exit 1
 fi
 
-major="${version%%.*}"
-minor="${version%.*}"   # X.Y.Z → X.Y
+major="${core%%.*}"
+minor="${core%.*}"   # X.Y.Z → X.Y
 
 # Las etiquetas que el REGISTRO dice tener, una por línea. Devuelve ≠0 si no se puede leer: el
 # que llama decide, y decide negarse.
@@ -163,7 +219,8 @@ registry_tags() { # $1 = <owner>/<package>
 }
 
 # ── El tag no se cree a ciegas ───────────────────────────────────────────────
-if [ "$is_release" -eq 1 ]; then
+# Vale para la final Y la rc: las dos publican un tag inmutable (`:X.Y.Z` / `:X.Y.Z-rc.N`).
+if [ "$is_release" -eq 1 ] || [ "$channel" = "rc" ]; then
     published_cmd="${IMAGE_TAGS_PUBLISHED_CMD:-}"
     if [ -n "$published_cmd" ]; then
         published=$("$published_cmd") || published_failed=1
@@ -179,8 +236,10 @@ if [ "$is_release" -eq 1 ]; then
         exit 1
     fi
 
-    # Solo semver X.Y.Z: los tags móviles (`1.2`, `1`, `latest`) no son versiones.
-    published=$(printf '%s\n' "$published" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
+    # Finales `X.Y.Z` y candidatas `X.Y.Z-rc.N`: los tags móviles (`1.2`, `1`, `latest`, `canary`,
+    # `dev`) no son versiones.
+    published=$(printf '%s\n' "$published" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || true)
+    published_final=$(printf '%s\n' "$published" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
 
     if printf '%s\n' "$published" | grep -qxF "$version"; then
         echo "❌ image-tags: '$image:$version' YA está publicado." >&2
@@ -193,12 +252,14 @@ if [ "$is_release" -eq 1 ]; then
         exit 1
     fi
 
-    # Monótona: la más alta publicada tiene que quedarse por debajo.
+    # Monótona: la FINAL más alta publicada tiene que quedarse por debajo del núcleo X.Y.Z.
+    # Para una rc eso también dice «no hay candidata de una versión ya cerrada»: 1.2.0 publicada
+    # ⇒ v1.2.0-rc.2 se rechaza. Entre rcs de la misma versión manda la inmutabilidad de arriba.
     highest=""
-    for candidate in $published; do
+    for candidate in $published_final; do
         if [ -z "$highest" ] || version_gt "$candidate" "$highest"; then highest="$candidate"; fi
     done
-    if [ -n "$highest" ] && ! version_gt "$version" "$highest"; then
+    if [ -n "$highest" ] && ! version_gt "$core" "$highest"; then
         echo "❌ image-tags: '$version' no es mayor que la última publicada ('$highest')." >&2
         echo "   Retroceder no es un error que se corrija: el MISMO tag publica la app en Microsoft" >&2
         echo "   Store y Google Play, y ahí las versiones son monótonas e IRREVERSIBLES." >&2
@@ -212,30 +273,38 @@ fi
 # `workflow_dispatch` runs this from ANY ref: a manual build from `develop` or a work
 # branch publishes ONLY the immutable `:<sha>` — enough to point one specific hub at it
 # without changing the code of the whole fleet.
-publish_latest="$is_release"
-case "$ref" in
-    refs/heads/main) publish_latest=1 ;;
-esac
-
+# Channels (hub#1170): `stable` is an alias of `latest` (a final tag moves both, same digest),
+# `canary` follows the last rc tag, `dev` follows `develop`. A prerelease `X.Y.Z-dev.n+g…` is
+# NOT a docker tag (`+` is not allowed, and it is not immutable anyway): `:dev` + `:<sha>` only.
 tags=""
-if [ "$is_release" -eq 1 ]; then
-    tags="$image:$version
+case "$channel" in
+    release) tags="$image:$version
 $image:$minor
 $image:$major
-"
-fi
-if [ "$publish_latest" -eq 1 ]; then
-    tags="$tags$image:latest
-"
-fi
+$image:latest
+$image:stable
+" ;;
+    rc)      tags="$image:$version
+$image:canary
+" ;;
+    main)    tags="$image:latest
+" ;;
+    develop) tags="$image:dev
+" ;;
+    branch)  tags="" ;;
+esac
 tags="$tags$image:$sha"
 
 echo "version=$version"
+echo "channel=$channel"
+echo "stamp=$stamp"
 printf '%s\n' "$tags"
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
     {
         echo "version=$version"
+        echo "channel=$channel"
+        echo "stamp=$stamp"
         echo "image=$image"
         echo "is_release=$is_release"
         echo "tags<<TAGS_EOF"

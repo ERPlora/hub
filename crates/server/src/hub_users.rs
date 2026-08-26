@@ -46,10 +46,10 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// `400` de una barandilla de gestión. No es un fallo de payload —el cuerpo es válido— sino un
 /// estado que dejaría el hub inservible, así que no es un 422 del runtime.
-fn rejected(message: &str) -> Response {
+fn rejected(code: &str, message: &str) -> Response {
     (
         StatusCode::BAD_REQUEST,
-        Json(json!({ "ok": false, "error": { "code": "rejected", "message": message } })),
+        Json(json!({ "ok": false, "error": { "code": code, "message": message } })),
     )
         .into_response()
 }
@@ -302,7 +302,7 @@ async fn guard(
     };
     match guard_decision(&users, &actor.id, &actor.role, target_id, input) {
         Some(Guard::NotFound) => Some(not_found()),
-        Some(Guard::Rejected(message)) => Some(rejected(message)),
+        Some(Guard::Rejected { code, message }) => Some(rejected(code, message)),
         Some(Guard::Forbidden(message)) => Some(forbidden(ROLE_ABOVE_INVITER, message)),
         None => None,
     }
@@ -312,7 +312,13 @@ async fn guard(
 #[derive(Debug, PartialEq, Eq)]
 enum Guard {
     NotFound,
-    Rejected(&'static str),
+    /// «Esto dejaría el hub inservible». `code` es estable (`self_deactivation`,
+    /// `self_badge_enrollment`, `last_admin`) y es lo que viaja en `error.code` (hub#1070); el
+    /// mensaje es el texto de respaldo.
+    Rejected {
+        code: &'static str,
+        message: &'static str,
+    },
     /// Lo que se pide es legítimo, pero **no para quien lo pide** (hub#356). Sale como `403` con el
     /// código estable del core para que la UI lo traduzca, no como el `400 rejected` de las otras
     /// dos barandillas: aquellas dicen «esto dejaría el hub inservible», esta dice «tú no».
@@ -373,9 +379,10 @@ fn guard_decision(
     }
 
     if input.is_active == Some(false) && target_id == actor_id {
-        return Some(Guard::Rejected(
-            "no puedes darte de baja a ti mismo; pídeselo a otro administrador",
-        ));
+        return Some(Guard::Rejected {
+            code: "self_deactivation",
+            message: "no puedes darte de baja a ti mismo; pídeselo a otro administrador",
+        });
     }
 
     // **Cuatro ojos para la placa** (hub#658, el extra de Toast en la decisión de mercado): nadie
@@ -394,9 +401,10 @@ fn guard_decision(
             .as_deref()
             .is_some_and(|badge| !badge.trim().is_empty())
     {
-        return Some(Guard::Rejected(
-            "nadie da de alta su propia placa: pídeselo a otro administrador",
-        ));
+        return Some(Guard::Rejected {
+            code: "self_badge_enrollment",
+            message: "nadie da de alta su propia placa: pídeselo a otro administrador",
+        });
     }
 
     // ¿El cambio le quita a este usuario la condición de administrador activo?
@@ -409,9 +417,10 @@ fn guard_decision(
             .filter(|u| u.id != target_id && u.is_active && is_admin_role(&u.role))
             .count();
         if other_admins == 0 {
-            return Some(Guard::Rejected(
-                "el hub se quedaría sin ningún administrador activo: nombra antes a otro owner/admin",
-            ));
+            return Some(Guard::Rejected {
+                code: "last_admin",
+                message: "el hub se quedaría sin ningún administrador activo: nombra antes a otro owner/admin",
+            });
         }
     }
     None
@@ -467,7 +476,7 @@ mod tests {
         // Hay otro admin, así que lo único que lo bloquea es que sea uno mismo.
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &deactivate()),
-            Some(Guard::Rejected(msg)) if msg.contains("ti mismo")
+            Some(Guard::Rejected { code: "self_deactivation", .. })
         ));
         assert_eq!(
             guard_decision(&census, "owner", "admin", "admin", &deactivate()),
@@ -493,7 +502,7 @@ mod tests {
         let census = [user("owner", "owner", true), user("sofia", "manager", true)];
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &set_badge("0009171456")),
-            Some(Guard::Rejected(msg)) if msg.contains("su propia placa")
+            Some(Guard::Rejected { code: "self_badge_enrollment", .. })
         ));
         // …but enrolling somebody else's is exactly what an administrator is for.
         assert_eq!(
@@ -524,11 +533,11 @@ mod tests {
         let census = [user("owner", "owner", true), user("caja", "cashier", true)];
         assert!(matches!(
             guard_decision(&census, "caja", "cashier", "owner", &deactivate()),
-            Some(Guard::Rejected(msg)) if msg.contains("administrador")
+            Some(Guard::Rejected { code: "last_admin", .. })
         ));
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &set_role("employee")),
-            Some(Guard::Rejected(msg)) if msg.contains("administrador")
+            Some(Guard::Rejected { code: "last_admin", .. })
         ));
         // Un admin INACTIVO no cuenta como relevo.
         let census = [

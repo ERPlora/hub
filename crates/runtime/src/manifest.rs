@@ -186,6 +186,17 @@ pub struct Manifest {
     /// module can say "I need a newer terminal" and be believed.
     #[serde(default)]
     pub compatibility: Option<Compatibility>,
+    /// **Catalog of the domain error codes this module PROVIDES** (ADR-0398, hub#1177). Keyed by
+    /// code (`<module>.<snake_case>`, the ADR-0205 ABI); the value carries only the code's state.
+    ///
+    /// `None` = the module has not migrated yet: the runtime keeps the ADR-0205 behaviour (any
+    /// own-namespace code is a `Domain` error). `Some` = strict: an emitted code outside the
+    /// catalog is a broken guest contract, and the installer refuses an `expect_rows.error` the
+    /// catalog does not list. The human text is NOT here — it lives in `locales/<lang>.json`
+    /// (ADR-0055); the manifest declares existence and state, so retiring a code becomes a
+    /// visible diff instead of a silent one.
+    #[serde(default)]
+    pub errors: Option<BTreeMap<String, ErrorDecl>>,
     /// **Route guards this module declares over ANOTHER module's surface** (hub#775).
     ///
     /// A module that owns a precondition for an entire screen declares it here instead of patching
@@ -1006,6 +1017,15 @@ pub enum ExpectRowsOp {
 
 /// Gate of a declarative SQL command (hub#139) that turns an `UPDATE ... WHERE` matching fewer
 /// rows than expected into a stable business rejection instead of an ambiguous `200 ok`.
+/// State of one declared domain error code (ADR-0398). An empty object is the normal entry;
+/// `deprecated` names the version since which consumers are told to stop relying on it — the
+/// first of the two publications retiring a code needs (the second one deletes it).
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ErrorDecl {
+    #[serde(default)]
+    pub deprecated: Option<String>,
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ExpectRows {
     pub op: ExpectRowsOp,
@@ -1577,7 +1597,11 @@ const ROOT_FIELDS: &[&str] = &[
     "compatibility",
     "protects",
     "records",
+    "errors",
 ];
+
+/// ADR-0398: one entry of the `errors` catalog carries only the code's state.
+const ERROR_FIELDS: &[&str] = &["deprecated"];
 
 const COMMAND_FIELDS: &[&str] = &[
     "permission",
@@ -1686,6 +1710,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "static_files" => STATIC_FILES_FIELDS,
         "compatibility" => COMPATIBILITY_FIELDS,
         "records.*" => RECORD_FIELDS,
+        "errors.*" => ERROR_FIELDS,
         _ => return None,
     })
 }
@@ -1830,6 +1855,7 @@ impl Manifest {
             ("queries", "queries.*"),
             ("widgets", "widgets.*"),
             ("records", "records.*"),
+            ("errors", "errors.*"),
         ] {
             if let Some(entries) = root.get(block).and_then(|v| v.as_object()) {
                 for (name, entry) in entries {

@@ -640,6 +640,24 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
 - **Contrato marketplace intacto**: el SaaS descarga el zip + verifica SHA256; la ruta S3 y la
   integridad no cambian.
 
+### 13.1 Imagen del Hub: canales de release (hub#1170, decisión 2026-08-25)
+
+`build-hub.yml` publica `ghcr.io/erplora/hub` en **tres tags móviles**, siempre acompañados del
+`:<sha>` inmutable (pin/rollback). La lógica vive en `scripts/image-tags.sh` (tests de contrato en
+`scripts/tests/image-tags.test.sh`) y la **versión que sirve el binario** (`/readyz`,
+`/api/hub/context`, latido, `error_sink`) es la que el CI estampa en `Cargo.toml` antes de compilar:
+
+| Canal | Lo dispara | Versión horneada | Tags |
+|---|---|---|---|
+| **`dev`** | push/dispatch en `develop` — lo despliega **pre** | `X.Y.Z-dev.<n>+g<sha>` (`git describe --tags --long`: último tag `v*` alcanzable + commits desde) | `:dev` |
+| **`canary`** | tag `vX.Y.Z-rc.N` — candidata para un **subconjunto** de hubs de prod | `X.Y.Z-rc.N` | `:X.Y.Z-rc.N` `:canary` (NO mueve `:latest`, `:X.Y` ni `:X`) |
+| **`stable` = `latest`** | tag `vX.Y.Z` final — lo que estrena todo hub nuevo | `X.Y.Z` | `:X.Y.Z` `:X.Y` `:X` `:latest` `:stable` (alias, mismo digest) |
+
+`main` sigue como hasta ahora (`:latest` + `:<sha>`, versión del Cargo: main = prod). El guard
+rechaza un tag no semver, ya publicado, no monótono o una rc de una versión ya cerrada, y en
+`develop` se **niega** a publicar sin `git describe` antes que hornear el hueco `1.0.0`. Un tag
+`-rc.N` **no** dispara `tauri-release.yml` (las stores son irreversibles).
+
 ---
 
 ## 14. Riesgos, unknowns y decisiones

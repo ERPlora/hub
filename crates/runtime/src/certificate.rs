@@ -265,13 +265,11 @@ pub(crate) fn resolve_certificate_type(
     derived: Option<CertificateType>,
 ) -> Result<Option<CertificateType>> {
     match (declared, derived) {
-        (Some(d), Some(v)) if d != v => Err(RuntimeError::Certificate(format!(
-            "el plano de control declara un certificado `{}` pero el contenedor que ha servido es \
-             `{}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el \
-             equivocado la AEAT rechaza todos los registros, uno a uno",
-            d.as_str(),
-            v.as_str(),
-        ))),
+        // hub#470, asserted by shape since hub#1070: the two types travel as data.
+        (Some(d), Some(v)) if d != v => Err(RuntimeError::CertificateTypeMismatch {
+            declared: d.as_str().to_string(),
+            served: v.as_str().to_string(),
+        }),
         (Some(d), _) => Ok(Some(d)),
         (None, derived) => Ok(derived),
     }
@@ -2059,9 +2057,15 @@ mod tests {
         let (bad_b64, bad_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
         let err = set_delegated(&db, "hub-test", &bad_b64, &bad_pw, 5, Some("seal"))
             .await
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("seal") && err.contains("representative"), "{err}");
+            .unwrap_err();
+        assert!(
+            matches!(
+                &err,
+                RuntimeError::CertificateTypeMismatch { declared, served }
+                    if declared == "seal" && served == "representative"
+            ),
+            "{err}"
+        );
 
         assert_eq!(
             delegated_version(&db, "hub-test").await.unwrap(),
