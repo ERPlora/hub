@@ -49,6 +49,7 @@ pub mod devices;
 pub mod elevation;
 pub mod embed;
 pub mod entitlement;
+pub mod whatsapp_quota;
 pub mod error_sink;
 /// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
 /// outside the runtime's global lock. It lives here and not in the runtime because it needs
@@ -1091,6 +1092,27 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let (outcome, heartbeat_result) =
                     tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
+                // La cuota del canal de WhatsApp se refleja en el medidor del módulo (hub#1089).
+                // Se lee EN VIVO de `whatsapp/plan/` con esta MISMA credencial de máquina, no de
+                // un claim del token: ese endpoint devuelve tier + consumo, y el consumo es un
+                // contador que se mueve con cada mensaje. Si el Cloud no contesta no se escribe
+                // nada — el medidor conserva lo que ya medía, porque en este canal `0` significa
+                // «sin tope» y un fallo de red no es un plan. Un hub sin el módulo ni pregunta.
+                match whatsapp_quota::sync_once(
+                    &st.runtime,
+                    &st.http,
+                    &st.config.cloud_base_url,
+                    &auth,
+                )
+                .await
+                {
+                    whatsapp_quota::QuotaSync::Written(limit) => {
+                        tracing::debug!(monthly_limit = limit, "cuota de WhatsApp al día")
+                    }
+                    // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
+                    // en la flota que no compró el canal): aquí no se repite el ruido.
+                    other => tracing::trace!(?other, "sincronización de cuota de WhatsApp"),
+                }
                 match heartbeat_result {
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
@@ -2717,6 +2739,21 @@ async fn cloud_get_raw(
     headers: &HeaderMap,
     req: cloud_client::PreparedRequest,
 ) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
+    cloud_get_raw_full(st, headers, req)
+        .await
+        .map(|(status, _retry_after, body)| (status, body))
+}
+
+/// Como [`cloud_get_raw`] pero devolviendo además el `Retry-After` en segundos cuando el Cloud lo
+/// manda (hub#1167). Sólo lo necesita quien tiene que **dejar de llamar**: DRF pone esa cabecera
+/// en sus 429 y es el único que sabe cuánto le queda a la ventana de la hora — en producción se
+/// han visto 2828 s. Estimarla es peor que leerla, y seguir llamando durante ese rato mantiene
+/// vacío un cubo de tokens que comparte toda la flota (saas#1640).
+async fn cloud_get_raw_full(
+    st: &AppState,
+    headers: &HeaderMap,
+    req: cloud_client::PreparedRequest,
+) -> Result<(StatusCode, Option<i64>, axum::body::Bytes), CloudGetError> {
     let Some(auth) = auth::hub_scoped_auth(headers, st) else {
         return Err(CloudGetError::NoCredential);
     };
@@ -2732,11 +2769,19 @@ async fn cloud_get_raw(
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
     let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    // `Retry-After` admite segundos o una fecha HTTP; DRF manda siempre segundos. Una fecha o un
+    // valor ilegible se ignoran (=> `None`) y el llamador aplica su default acotado: preferimos
+    // una ventana nuestra a una interpretación inventada de la ajena.
+    let retry_after = resp
+        .headers()
+        .get(axum::http::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<i64>().ok());
     let body = resp
         .bytes()
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
-    Ok((status, body))
+    Ok((status, retry_after, body))
 }
 
 /// Respuesta HTTP para un [`CloudGetError`] (contrato previo de `proxy_cloud_get`, sin cambios).
@@ -2854,12 +2899,52 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
         .map(|g| g.revalidation_json(&installed, entitlement::now_unix()))
         .unwrap_or(Value::Null);
 
-    match cloud_get_raw(&st, &headers, cloud.entitlement(&placeholder)).await {
-        Ok((status, body)) => match serde_json::from_slice::<Value>(&body) {
+    let now = entitlement::now_unix();
+
+    // ¿Hace falta salir a la red? El shell pregunta una vez por `focus` de ventana y otra por cada
+    // vista de módulo que monta; sin este corte cada una de esas veces era una llamada al SaaS.
+    let decision = st
+        .entitlement_proxy
+        .read()
+        .map(|cache| cache.decide(now))
+        .unwrap_or(entitlement::Decision::Ask);
+    match decision {
+        entitlement::Decision::Serve(body) => {
+            return entitlement_response(StatusCode::OK, body, revalidation)
+        }
+        entitlement::Decision::RateLimited => return rate_limited_response(revalidation),
+        entitlement::Decision::Ask => {}
+    }
+
+    match cloud_get_raw_full(&st, &headers, cloud.entitlement(&placeholder)).await {
+        // El SaaS nos está limitando la tasa. Ni el status ni su prosa pueden llegar al navegador:
+        // el shell lee el error como «no hay módulos» y degrada pantallas de módulos ya comprados,
+        // y el `{"detail":"Request was throttled…"}` de DRF es inglés dentro de una UI en español.
+        Ok((StatusCode::TOO_MANY_REQUESTS, retry_after, _body)) => {
+            let served = match st.entitlement_proxy.write() {
+                Ok(mut cache) => {
+                    cache.open_backoff(retry_after, now);
+                    cache.last_good().cloned()
+                }
+                Err(_) => None,
+            };
+            report_cloud_rate_limited(retry_after, served.is_some());
+            match served {
+                Some(body) => entitlement_response(StatusCode::OK, body, revalidation),
+                None => rate_limited_response(revalidation),
+            }
+        }
+        Ok((status, _retry_after, body)) => match serde_json::from_slice::<Value>(&body) {
             // Body objeto JSON → se le inyecta la clave aditiva.
-            Ok(Value::Object(mut obj)) => {
-                obj.insert("revalidation".into(), revalidation);
-                (status, Json(Value::Object(obj))).into_response()
+            Ok(Value::Object(obj)) => {
+                // Sólo se guarda lo que el Cloud dio por bueno: cachear un 4xx/5xx lo convertiría
+                // en la verdad del hub durante toda la ventana de frescura.
+                if status.is_success() {
+                    if let Ok(mut cache) = st.entitlement_proxy.write() {
+                        cache.store_success(Value::Object(obj.clone()), now);
+                    }
+                }
+                entitlement_response(status, Value::Object(obj), revalidation)
             }
             // Body no-objeto (raro: HTML de error, vacío) → tal cual, como antes.
             _ => (
@@ -2876,6 +2961,64 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
             .into_response(),
         Err(e) => cloud_get_error_response(e),
     }
+}
+
+/// Respuesta del proxy de entitlement: el cuerpo del Cloud con el bloque aditivo `revalidation`,
+/// que SIEMPRE se recalcula (es estado local, y es justo lo que la UI necesita cuando el Cloud no
+/// contesta) y por eso nunca se guarda en la caché.
+fn entitlement_response(status: StatusCode, body: Value, revalidation: Value) -> Response {
+    match body {
+        Value::Object(mut obj) => {
+            obj.insert("revalidation".into(), revalidation);
+            (status, Json(Value::Object(obj))).into_response()
+        }
+        other => (status, Json(other)).into_response(),
+    }
+}
+
+/// El único caso en que el rate-limit del Cloud se le cuenta al shell: no había ningún entitlement
+/// bueno que servir. Viaja con **código estable** en el envelope de siempre
+/// (`{"ok":false,"error":{"code":…}}`) para que la UI lo traduzca por código (ADR-0055) en vez de
+/// pintar la frase inglesa que escribió DRF.
+fn rate_limited_response(revalidation: Value) -> Response {
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({
+            "ok": false,
+            "error": {
+                "code": entitlement::CLOUD_RATE_LIMITED,
+                "message": "the Cloud is rate-limiting this hub; the entitlement could not be refreshed",
+            },
+            "revalidation": revalidation,
+        })),
+    )
+        .into_response()
+}
+
+/// Deja el rate-limit VISIBLE. Un límite que falla en silencio es peor que uno que grita: sin esto
+/// la única huella era una línea roja en la consola del navegador del cajero, que nadie recoge.
+/// Va al log del runtime **y** al registro de errores, que es el canal que llega al Cloud.
+fn report_cloud_rate_limited(retry_after: Option<i64>, served_from_cache: bool) {
+    use erplora_runtime::error_registry::{ErrorEvent, ErrorRegistry};
+
+    tracing::warn!(
+        retry_after_secs = retry_after.unwrap_or(-1),
+        served_from_cache,
+        "el Cloud limita la tasa del entitlement (saas#1640)"
+    );
+    ErrorRegistry::global().report(
+        ErrorEvent::new(
+            erplora_runtime::error_registry::source::HUB,
+            entitlement::CLOUD_RATE_LIMITED,
+            "el Cloud respondió 429 al refrescar el entitlement",
+            erplora_runtime::error_registry::severity::UNEXPECTED,
+        )
+        .with_context(json!({
+            "retry_after_secs": retry_after,
+            // `cache` = el cajero no se enteró; `none` = se le contó el fallo, que es lo grave.
+            "outcome": if served_from_cache { "cache" } else { "none" },
+        })),
+    );
 }
 
 /// GET /api/marketplace/catalog — the real marketplace catalogue.
