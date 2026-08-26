@@ -3459,6 +3459,12 @@ pub(crate) fn err_status_and_code(
         E::MissingRequiredParam { .. } => {
             (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
         }
+        // hub#1173: the twin of the above at the same door — a param the LIST query does not
+        // declare. Same `422` (it is a payload-contract refusal, caught before any read) with its
+        // own stable code, so the caller can tell "that query has no such filter" from "you did
+        // not send what it needs" — and fix the call instead of trusting a page that quietly held
+        // the whole list.
+        E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
