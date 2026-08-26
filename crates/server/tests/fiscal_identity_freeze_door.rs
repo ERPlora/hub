@@ -60,7 +60,7 @@ fn config(tag: &str) -> HubConfig {
 
 /// Router + sesión de **admin** (el rol que configura la identidad fiscal), con el hub ya
 /// arrancado. `emitted` estampa el perfil fiscal como lo hace la salida a producción: este hub ya
-/// mandó su primer registro bajo `B12345678`.
+/// mandó su primer registro bajo `B12345674`.
 async fn fixture(tag: &str, emitted: bool) -> (axum::Router, String) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
@@ -72,7 +72,7 @@ async fn fixture(tag: &str, emitted: bool) -> (axum::Router, String) {
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
 
     let mut updates = serde_json::Map::new();
-    updates.insert("business_tax_id".into(), json!("B12345678"));
+    updates.insert("business_tax_id".into(), json!("B12345674"));
     updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
     rt.set_settings(&updates, "hub_user:seed").await.unwrap();
 
@@ -83,7 +83,7 @@ async fn fixture(tag: &str, emitted: bool) -> (axum::Router, String) {
             .execute(
                 "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
                    activated_at = '2026-08-08T09:00:00Z', \
-                   first_record_at = '2026-08-08T10:00:00Z', taxpayer_id = 'B12345678' \
+                   first_record_at = '2026-08-08T10:00:00Z', taxpayer_id = 'B12345674' \
                  WHERE hub_id = :hub_id",
                 &p,
             )
@@ -140,7 +140,7 @@ fn error_code(body: &Value) -> String {
 async fn a_hub_that_already_emitted_refuses_a_new_tax_id_over_http() {
     let (router, admin) = fixture("frozen", true).await;
 
-    let response = put(&router, &admin, json!({ "business_tax_id": "B99999999" })).await;
+    let response = put(&router, &admin, json!({ "business_tax_id": "B99999997" })).await;
 
     assert_eq!(response.status(), StatusCode::CONFLICT);
     let body = body_json(response).await;
@@ -153,7 +153,7 @@ async fn a_hub_that_already_emitted_refuses_a_new_tax_id_over_http() {
     let settings = get(&router, &admin).await;
     assert_eq!(
         settings["business_tax_id"],
-        json!("B12345678"),
+        json!("B12345674"),
         "el ancla de la cadena emitida no se movió: {settings}"
     );
 }
@@ -165,12 +165,12 @@ async fn a_hub_that_already_emitted_refuses_a_new_tax_id_over_http() {
 async fn a_hub_that_has_not_emitted_writes_its_tax_id_over_http_as_always() {
     let (router, admin) = fixture("editable", false).await;
 
-    let response = put(&router, &admin, json!({ "business_tax_id": "B99999999" })).await;
+    let response = put(&router, &admin, json!({ "business_tax_id": "B99999997" })).await;
 
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         body_json(response).await["business_tax_id"],
-        json!("B99999999")
+        json!("B99999997")
     );
 }
 
@@ -185,7 +185,7 @@ async fn the_business_form_still_saves_with_the_tax_id_unchanged() {
         &router,
         &admin,
         json!({
-            "business_tax_id": "B12345678",
+            "business_tax_id": "B12345674",
             "business_legal_name": "Bar Manolo SLU",
             "business_address": "Calle Nueva 1",
         }),
@@ -205,7 +205,7 @@ async fn the_business_form_still_saves_with_the_tax_id_unchanged() {
 async fn the_freeze_is_not_the_demo_lock() {
     let (router, admin) = fixture("codes", true).await;
     let code = error_code(
-        &body_json(put(&router, &admin, json!({ "business_tax_id": "B1" })).await).await,
+        &body_json(put(&router, &admin, json!({ "business_tax_id": "A58818501" })).await).await,
     );
 
     assert_eq!(code, "business_tax_id_frozen");

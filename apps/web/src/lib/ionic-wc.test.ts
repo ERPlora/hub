@@ -25,10 +25,12 @@ const source = readFileSync(new URL('./ionic-wc.ts', import.meta.url), 'utf8');
 // #754); ion-input/ion-select = formularios proyectados; ion-checkbox = selección + celdas
 // imperativas; ion-modal = diálogos; ion-card* = vista tarjetas; ion-toast/ion-alert/ion-action-sheet
 // = feedback; ion-icon = pictogramas; ion-searchbar = buscador.
+// ion-spinner = acción de fila en curso (ok-data-table) y celda «instalando…» de AppsPage, que lo
+// crea con `document.createElement` (hub#1129).
 const REQUIRED_DEPS = [
   'ionButton', 'ionIcon', 'ionInput', 'ionSearchbar', 'ionSelect', 'ionSelectOption',
   'ionModal', 'ionActionSheet', 'ionToast', 'ionAlert',
-  'ionCard', 'ionCardHeader', 'ionCardContent', 'ionCheckbox',
+  'ionCard', 'ionCardHeader', 'ionCardContent', 'ionCheckbox', 'ionSpinner',
 ];
 
 describe('registerOutfitkitIonicDeps — la cadena que hace clicables los botones de los módulos (#754)', () => {

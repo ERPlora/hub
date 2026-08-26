@@ -6,7 +6,7 @@
 // instalados y activos que reporta el runtime, no un set hardcodeado.
 // `refreshModuleNav()` recarga (p.ej. tras instalar/activar un módulo).
 import { ref } from 'vue';
-import { loadMenu } from './module-loader';
+import { invalidateManifestCache, loadMenu } from './module-loader';
 import type { ListLoadState } from './list-load-state';
 
 export interface ModuleNavItem {
@@ -60,6 +60,27 @@ export async function refreshModuleNav(): Promise<void> {
     // quien la pinta no confunda «no pude preguntar» con «este hub no tiene apps».
     moduleNavState.value = 'error';
   }
+}
+
+/**
+ * Lo mismo, pero para cuando ha cambiado el CONJUNTO instalado (hub#1099) — instalar un módulo
+ * desde /apps, desde el drawer del asistente, desde otro dispositivo o al importar un blueprint.
+ *
+ * Los `module.json` se leen UNA vez por sesión: con 25 módulos, releerlos en cada navegación
+ * costaba ~1,6 MB por montaje y dejaba el ritmo en reposo creciendo hasta ~75 req/s. El precio de
+ * esa caché es que alguien tiene que olvidarla cuando deja de ser verdad, y este es el único
+ * momento en que eso pasa sin recargar la página.
+ *
+ * Las dos mitades van JUNTAS a propósito: una nav nueva con los manifests viejos describe un hub
+ * que no existe —widgets (ADR-0054), slots (ADR-0043), `chrome` y `protects` del conjunto
+ * anterior—, y ese fallo no se ve en pantalla, exactamente como el de hub#935.
+ *
+ * ACTUALIZAR un módulo no pasa por aquí: `reloadForModuleUpdate()` recarga la página entera (un
+ * custom element solo se registra una vez) y la recarga se lleva esta caché por delante.
+ */
+export async function refreshModuleNavAfterInstall(): Promise<void> {
+  invalidateManifestCache();
+  await refreshModuleNav();
 }
 
 let localeWatchInstalled = false;

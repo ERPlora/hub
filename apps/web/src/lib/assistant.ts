@@ -6,6 +6,8 @@
 //   POST /api/assistant/chat/stream  {messages:[{role,content}]}
 //   -> SSE: líneas `data: {"type":"token","text":"…"}` … `data: {"type":"done"}`
 import { RUNTIME_URL, getClient, runtimeHeaders } from './runtime';
+import { auditTurn, type ExecutedTool, type TurnAudit } from './assistant-grounding';
+import { SETUP_STATUS_QUERY } from './setup-status';
 
 export type ChatRole = 'user' | 'assistant' | 'system';
 
@@ -37,6 +39,9 @@ export interface ChatMessage {
   /** Stable client-generated id (crypto.randomUUID), used to reference the message when
    *  reporting it (hub#946). Optional: history persisted before ids existed has none. */
   id?: string;
+  /** The runtime's grounding verdict on this answer (hub#1038, #1039). Present only when the
+   *  turn's receipts did NOT back what it claimed; the drawer renders it as a system notice. */
+  grounding?: TurnAudit;
 }
 
 /** Keep well under the Cloud's per-attachment cap (base64 grows ~1.33×). */
@@ -96,7 +101,7 @@ export function messageAttachments(content: ChatContent): { kind: 'image' | 'fil
 export type AssistantEvent =
   | { type: 'token'; text: string }
   | { type: 'done' }
-  | { type: 'error'; message?: string }
+  | { type: 'error'; message?: string; error?: string; limit?: number; used?: number; tier?: string; kind?: string; upgrade_required?: boolean }
   | { type: string; [k: string]: unknown };
 
 export interface StreamCallbacks {
@@ -112,7 +117,38 @@ export interface StreamCallbacks {
    * ejecutar, `false` para cancelar. Si no se provee, las escrituras se **cancelan** (seguro
    * por defecto: nunca se muta sin confirmación). Las LECTURAS (`query`) no la usan.
    */
-  onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>;
+  onConfirm?: (call: {
+    name: string;
+    arguments: string;
+    kind: string;
+    risk?: string;
+    moneyFields?: string[];
+  }) => Promise<boolean>;
+  /**
+   * The turn's grounding verdict, emitted once the answer is complete (hub#1038, #1039).
+   * The runtime holds the receipts — which tools ran and how they ended — so it, not the
+   * model, decides whether the answer is allowed to say a change happened. The drawer turns
+   * a flagged verdict into a SYSTEM notice; it is never text the model wrote.
+   */
+  onAudit?: (audit: TurnAudit) => void;
+  /** The hub's real navigation map, so a named screen can be checked (hub#1047, #1048). */
+  knownRoutes?: string[];
+}
+
+/**
+ * Por qué falló el turno, con lo que el SaaS ya sabía (saas#1540).
+ *
+ * La cuota agotada NO es una avería, y presentarla como tal convierte el único momento de
+ * conversión del tier gratuito en un fallo del producto: el dueño leía «No se pudo contactar con
+ * el asistente» y creía que estaba roto. El SaaS manda `{error, limit, used, tier, kind,
+ * upgrade_required}`; aquí se perdía entero — y hasta el texto, porque se leía `message` cuando la
+ * clave que viaja es `error`.
+ */
+export interface AssistantFailure {
+  message: string;
+  /** Presente SOLO si el turno murió por cuota. Un error de transporte no la lleva: pintar un
+   *  botón de pagar sobre una caída de red no arregla nada y encima cobra. */
+  quota?: { limit?: number; used?: number; tier?: string; kind?: string; upgradeRequired: boolean };
 }
 
 /** A tool call the model asked for (forwarded by the runtime from the Cloud). */
@@ -121,6 +157,11 @@ interface FunctionCall {
   call_id: string;
   arguments: string; // JSON string of the arguments
   kind?: string; // 'query' (read, auto) | 'command' (write, needs confirm), tagged by the runtime
+  /** How dangerous the module says this operation is (hub#1042). */
+  risk?: string;
+  /** Which arguments are money, resolved by the runtime from the command's schema (hub#1040).
+   *  The card formats ONLY these: guessing from a field name would invent an amount. */
+  money_fields?: string[];
 }
 
 /** OpenAI-style tool_call, as the Cloud expects it back on the assistant message. */
@@ -162,10 +203,24 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
     try {
       let convo: WireMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
+      // The receipts of THIS turn: what actually ran and how it ended. The audit at the end
+      // is built from these, never from what the answer says about itself (hub#1038).
+      const executed: ExecutedTool[] = [];
+      let spokenText = '';
+      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+      const userText = typeof lastUser?.content === 'string' ? lastUser.content : undefined;
+      const audit = (): void => {
+        cb.onAudit?.(
+          auditTurn({ text: spokenText, executed, userText, knownRoutes: cb.knownRoutes }),
+        );
+      };
+
       for (let iter = 0; ; iter++) {
         const round = await streamRound(convo, cb, ctrl.signal);
+        spokenText += round.text;
         if (round.errored) return; // streamRound ya llamó a onError
         if (round.functionCalls.length === 0) {
+          audit();
           cb.onDone?.();
           return;
         }
@@ -177,7 +232,9 @@ export function streamAssistant(messages: ChatMessage[], cb: StreamCallbacks): (
         // con la sesión del usuario y añade su resultado — el Cloud continúa el turno.
         // (El Cloud emite una tool call por ronda — parallel_tool_calls=False — así que no
         // hay confirmaciones concurrentes.)
-        const results = await Promise.all(round.functionCalls.map((fc) => runToolCall(fc, cb)));
+        const ran = await Promise.all(round.functionCalls.map((fc) => runToolCall(fc, cb)));
+        for (const r of ran) executed.push(r.executed);
+        const results = ran.map((r) => r.message);
         convo = [
           ...convo,
           {
@@ -279,7 +336,28 @@ async function streamRound(
       } else if (evt.type === 'done') {
         return { functionCalls, text, errored: false };
       } else if (evt.type === 'error') {
-        cb.onError?.(new Error((evt as { message?: string }).message ?? 'assistant error'));
+        // La clave del texto es `error`, no `message`: leyendo la equivocada se perdía hasta la
+        // frase que el SaaS había escrito. `message` se sigue aceptando por si algún emisor la usa.
+        const e = evt as {
+          message?: string;
+          error?: string;
+          limit?: number;
+          used?: number;
+          tier?: string;
+          kind?: string;
+          upgrade_required?: boolean;
+        };
+        const failure: AssistantFailure = { message: e.error ?? e.message ?? 'assistant error' };
+        if (e.upgrade_required) {
+          failure.quota = {
+            limit: e.limit,
+            used: e.used,
+            tier: e.tier,
+            kind: e.kind,
+            upgradeRequired: true,
+          };
+        }
+        cb.onError?.(failure);
         return { functionCalls, text, errored: true };
       }
     }
@@ -297,34 +375,56 @@ async function streamRound(
  *    una nota `cancelled` para que el modelo se lo diga al usuario (seguro por defecto).
  *
  *  Cualquier fallo degrada a una nota de error (nunca lanza): el turno sigue. */
-async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireMessage> {
+async function runToolCall(
+  fc: FunctionCall,
+  cb: StreamCallbacks,
+): Promise<{ message: WireMessage; executed: ExecutedTool }> {
   const params = safeParseArgs(fc.arguments);
+  const kind: ExecutedTool['kind'] = fc.kind === 'command' ? 'command' : 'query';
+  // The receipt the audit reads: a write only counts as done when the dispatcher answered
+  // without error AND the user approved the card. Cancelled and failed are both "no effect".
+  const receipt = (status: ExecutedTool['status'], result: unknown): ExecutedTool => ({
+    name: fc.name,
+    kind,
+    status,
+    result,
+  });
+  const done = (status: ExecutedTool['status'], payload: unknown) => ({
+    message: toolMessage(fc.call_id, payload),
+    executed: receipt(status, payload),
+  });
 
   if (fc.kind === 'command') {
     const approved = cb.onConfirm
-      ? await cb.onConfirm({ name: fc.name, arguments: fc.arguments, kind: 'command' })
+      ? await cb.onConfirm({
+          name: fc.name,
+          arguments: fc.arguments,
+          kind: 'command',
+          risk: fc.risk,
+          moneyFields: fc.money_fields,
+        })
       : false;
     if (!approved) {
-      return toolMessage(fc.call_id, { status: 'cancelled', message: 'Action was not confirmed.' });
+      return done('cancelled', { status: 'cancelled', message: 'Action was not confirmed.' });
     }
     try {
       // Host tool mutante (hub#631): instalar va por el MISMO endpoint que el botón de Apps
       // (`request-install`), que revalida admin server-side. Pasa por el confirm de arriba
       // como cualquier command — el modelo nunca instala sin el clic del usuario.
       if (fc.name === 'hub.modules.install') {
-        return toolMessage(fc.call_id, await hostInstall(params));
+        return done('ok', await hostInstall(params));
       }
       // Host tool mutante (hub#631, pasos 2-3): aplicar un blueprint va por el MISMO pipeline que
       // la hero card del dashboard. Semántica verificada ANTES de exponerla: el import es ADITIVO
       // (import_sql.rs solo admite INSERT con guardas NOT EXISTS; ADR-0304 añade las claves
       // naturales del destino — una fila existente se SALTA, nunca se funde ni se pisa).
       if (fc.name === 'hub.blueprints.apply') {
-        return toolMessage(fc.call_id, await hostBlueprintApply(params));
+        return done('ok', await hostBlueprintApply(params));
       }
       const data = await getClient().command(fc.name, params);
-      return toolMessage(fc.call_id, data ?? null);
+      return done('ok', data ?? null);
     } catch (err) {
-      return toolMessage(fc.call_id, { error: errMessage(err) });
+      return done('error', { error: errMessage(err) });
     }
   }
 
@@ -333,16 +433,16 @@ async function runToolCall(fc: FunctionCall, cb: StreamCallbacks): Promise<WireM
     // se sirve por su endpoint real y se recorta a lo que el modelo necesita (id, nombre,
     // descripción, versión, precio, instalado) para no quemar contexto.
     if (fc.name === 'hub.marketplace.search') {
-      return toolMessage(fc.call_id, await hostMarketplaceSearch(params));
+      return done('ok', await hostMarketplaceSearch(params));
     }
     // Host tool de lectura (hub#631): el catálogo de blueprints del SaaS, recortado a la ficha.
     if (fc.name === 'hub.blueprints.list') {
-      return toolMessage(fc.call_id, await hostBlueprintsList());
+      return done('ok', await hostBlueprintsList());
     }
     const data = await getClient().query(fc.name, params);
-    return toolMessage(fc.call_id, data ?? null);
+    return done('ok', data ?? null);
   } catch (err) {
-    return toolMessage(fc.call_id, { error: errMessage(err) });
+    return done('error', { error: errMessage(err) });
   }
 }
 
@@ -413,10 +513,39 @@ async function hostBlueprintApply(params: Record<string, unknown>): Promise<unkn
   const blob = await downloadBlueprint(slug);
   const inspection = await inspectBlueprint(blob);
   const report = await importBlueprint(inspection.upload_id, heroSelection(inspection.manifest));
-  return {
+
+  // Lo que la plantilla NO deja hecho, leído del hub (hub#1041).
+  //
+  // Aplicarla instala módulos y siembra catálogo, pero no toca la identidad fiscal ni la
+  // numeración — la descripción de esta misma tool ya lo dice: «it never imports people, fiscal
+  // identity or another business's invoice numbering». Aun así el asistente contestó «Serie F1
+  // activa · VeriFactu configurado · ya puedes emitir facturas», con 0 series y el runtime
+  // bloqueando, porque describió el resultado desde el folleto de la plantilla en vez de leer el
+  // hub. No había nada que leer: el resultado solo traía los módulos instalados.
+  //
+  // Ahora trae también lo que SIGUE bloqueando, así que no queda hueco que rellenar. Solo lo
+  // bloqueante y solo lo pendiente: una lista de todo se vuelve ruido y deja de leerse.
+  const result: Record<string, unknown> = {
     outcome: importOutcome(report),
     installed_modules: (report.installed_modules ?? []).map((m) => ({ id: m.id, status: m.status })),
   };
+  try {
+    // La query devuelve UNA fila con el documento entero (`architecture/hub/setup-status.md`),
+    // así que se tipa aquí en vez de confiar en el genérico del cliente.
+    type SetupRow = {
+      items?: { key: string; state: string; level: string; title: string; route: string }[];
+    };
+    const rows = (await getClient().query(SETUP_STATUS_QUERY, {})) as SetupRow[] | null;
+    const items = rows?.[0]?.items ?? [];
+    result.still_blocking = items
+      .filter((i) => i.state === 'pending' && (i.level === 'legal' || i.level === 'functional'))
+      .map((i) => ({ key: i.key, level: i.level, title: i.title, route: i.route }));
+  } catch {
+    // Callar sería PEOR que fallar: sin el campo, el modelo lee «no hay nada bloqueando» y vuelve
+    // a decir que ya se puede facturar. Se dice que no se sabe.
+    result.setup_status_unavailable = true;
+  }
+  return result;
 }
 
 // ── Voice input (hub#629): microphone → MediaRecorder → SaaS speech proxy → text ────────────────

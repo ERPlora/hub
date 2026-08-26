@@ -86,7 +86,15 @@ pub use registry::{
 // `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
 // diverges from the guard and reintroduces hub#253 (the guard says "run", every path is wrong,
 // the test skips itself and still reports `ok`).
-pub use e2e_support::{modules_root, require_modules_workspace};
+pub use e2e_support::{modules_root, require_module_version, require_modules_workspace};
+
+/// One declared domain error code of an installed module (ADR-0398), as `/api/modules` exposes it.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ErrorInfo {
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deprecated: Option<String>,
+}
 
 /// Descripción de un módulo instalado (para `/api/modules`).
 #[derive(Debug, Clone, serde::Serialize)]
@@ -105,6 +113,9 @@ pub struct ModuleInfo {
     /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
     /// whoever is staring at a module that half works has to be able to ASK.
     pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
+    /// Domain error codes the module declares (ADR-0398), sorted by code. Empty when the module
+    /// has no `errors` catalog yet — consumers (hub tests, the UI) read this instead of prose.
+    pub errors: Vec<ErrorInfo>,
 }
 
 /// **What one event set off** (hub#666): the event itself, the flow runs it started and the events
@@ -583,12 +594,35 @@ impl Runtime {
     ///
     /// hub#314: se rechaza mientras su motor deba trabajo a una autoridad externa — borrar la fila
     /// de `hub_module` con registros sin remitir los dejaba huérfanos (VeriFactu FAQ §5).
+    ///
+    /// hub#1101: y se rechaza si otros módulos instalados lo declaran en `depends_on`, nombrándolos
+    /// ([`Self::dependents_of`]). Para saltárselo hace falta [`Self::uninstall_forced`].
     pub async fn uninstall(&mut self, module_id: &str) -> Result<()> {
+        self.uninstall_with(module_id, false).await
+    }
+
+    /// [`Self::uninstall`] **saltándose el gate de dependientes** (hub#1101) — y solo ese.
+    ///
+    /// Es la respuesta a UNA pregunta: «otras apps necesitan esta, ¿la quito igualmente?». La
+    /// contesta el dueño, al que la pantalla le ha nombrado antes lo que se rompe (hub#773), o
+    /// soporte por API. Lo que NO abre es el lado fiscal: si el motor aún debe registros a una
+    /// autoridad, o si el módulo es el último proveedor fiscal del hub, esto sigue rechazando —
+    /// esas dos no son preguntas del dueño (ADR-0202 R2, ADR-0273 D5).
+    pub async fn uninstall_forced(&mut self, module_id: &str) -> Result<()> {
+        self.uninstall_with(module_id, true).await
+    }
+
+    async fn uninstall_with(&mut self, module_id: &str, force: bool) -> Result<()> {
         // ADR-0273 D5 (hub#553): antes que R2, y por la misma razón — con la cola vacía R2 deja
         // marchar al último proveedor, y desde ese momento el hub vende sin que nadie registre.
         self.ensure_fiscal_provider_remains(&[module_id.to_string()])
             .await?;
         self.ensure_module_can_go(module_id).await?;
+        // El último, y a propósito: es el ÚNICO forzable, así que va detrás de los candados que no
+        // lo son. Ponerlo delante haría que un `force` los saltara por el orden de las guardas.
+        if !force {
+            self.ensure_nobody_depends_on(module_id)?;
+        }
         installer::uninstall(
             self.db.as_ref(),
             &mut self.registry,
@@ -596,6 +630,56 @@ impl Runtime {
             module_id,
         )
         .await
+    }
+
+    /// Rechaza si algún módulo instalado depende de `module_id` (hub#1101).
+    ///
+    /// Un módulo que no está instalado no tiene nada que proteger: quien llama debe seguir viendo
+    /// su «módulo no instalado» de siempre, no un rechazo de dependencias.
+    fn ensure_nobody_depends_on(&self, module_id: &str) -> Result<()> {
+        if !self.registry.is_installed(module_id) {
+            return Ok(());
+        }
+        let dependents = self.dependents_of(module_id);
+        if dependents.is_empty() {
+            return Ok(());
+        }
+        Err(RuntimeError::HasDependents {
+            module: module_id.to_string(),
+            dependents,
+        })
+    }
+
+    /// Los módulos instalados que dejarían de funcionar si `module_id` se fuera — **transitivos y
+    /// sea cual sea su estado** (hub#1101).
+    ///
+    /// A propósito NO es el mismo conjunto que la cascada de desactivación
+    /// ([`Self::deactivation_cascade`]), que solo mira a los ACTIVOS porque apagar lo que ya está
+    /// apagado no cambia nada. Desinstalar se lleva el paquete: un dependiente apagado ya no se
+    /// podrá volver a encender nunca, así que cuenta igual. Es la misma regla que la pantalla ya
+    /// aplica al pintar el aviso (hub#773, `dependentsOf`).
+    ///
+    /// Recorrido en oleadas sobre lo ya caído, así que un manifest con un ciclo termina en vez de
+    /// colgar al que pregunta.
+    pub fn dependents_of(&self, module_id: &str) -> Vec<String> {
+        let mut fallen = vec![module_id.to_string()];
+        let mut out: Vec<String> = Vec::new();
+        loop {
+            let wave: Vec<String> = self
+                .registry
+                .installed
+                .iter()
+                .filter(|m| {
+                    !fallen.contains(&m.id) && m.depends_on.iter().any(|d| fallen.contains(&d.id))
+                })
+                .map(|m| m.id.clone())
+                .collect();
+            if wave.is_empty() {
+                return out;
+            }
+            fallen.extend(wave.iter().cloned());
+            out.extend(wave);
+        }
     }
 
     /// Lista de módulos instalados con su estado (para el dashboard / `/api/modules`).
@@ -614,6 +698,15 @@ impl Runtime {
                     .unwrap_or(&ModuleStatus::Inactive),
                 depends_on: m.depends_on.iter().map(|d| d.id.clone()).collect(),
                 manifest_warnings: m.warnings.clone(),
+                errors: m
+                    .errors
+                    .iter()
+                    .flatten()
+                    .map(|(code, decl)| ErrorInfo {
+                        code: code.clone(),
+                        deprecated: decl.deprecated.clone(),
+                    })
+                    .collect(),
             })
             .collect()
     }
@@ -989,6 +1082,25 @@ impl Runtime {
         limit: i64,
     ) -> Result<Vec<print_queue::PrintJob>> {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
+    }
+
+    /// **Puts a dead print job back in front of the hosts** (hub#1108), with its hand-outs reset.
+    /// Scoped to the deployment's `hub_id`, like every other read and write here: another tenant's
+    /// `jobId` is simply not a job as far as this hub is concerned.
+    pub async fn retry_print_job(&self, job_id: &str) -> Result<print_queue::RequeueOutcome> {
+        print_queue::requeue(self.db.as_ref(), &self.hub_id, job_id).await
+    }
+
+    /// **Retires a print job nobody is ever going to print** (hub#1108), stamping who, when and why.
+    /// Never a delete — see [`print_queue::discard`]. `discarded_by` is resolved by the caller from
+    /// the session, never taken from a request body.
+    pub async fn discard_print_job(
+        &self,
+        job_id: &str,
+        discarded_by: &str,
+        reason: &str,
+    ) -> Result<print_queue::DiscardOutcome> {
+        print_queue::discard(self.db.as_ref(), &self.hub_id, job_id, discarded_by, reason).await
     }
 
     // ── Print stations: the destinations themselves, as rows (hub#457) ─────────────────────────
@@ -2874,6 +2986,24 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         "has_certificate".into(),
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
     );
+    // LA ZONA HORARIA DEL NEGOCIO (hub#731, hub#1022), como nombre IANA ya RESUELTO
+    // (`settings::timezone_of`: la declarada o la deducida del país/región). Disponible como
+    // `:timezone` en TODO el SQL de queries y comandos — «mañana a las 09:00» son las 09:00 de la
+    // TIENDA. Degrada a `UTC` si el dispatcher no la llegó a resolver (mismo fallback que el boot
+    // del server), nunca a una cadena vacía que nadie podría interpretar.
+    p.insert(
+        "timezone".into(),
+        Json::String(ctx.timezone_name().to_string()),
+    );
+    // EL IDIOMA EFECTIVO DE QUIEN LLAMA (hub#1098), con la precedencia del shell
+    // (`bootHubLanguage`): override personal (`hub_user_pref.language`) → setting del hub
+    // (`hub_settings.language`) → default del core (`es`). Hasta aquí cada módulo que proyectaba
+    // texto traducido reimplementaba esto en SQL leyendo tablas del CORE (taxes#38) — y adivinaba
+    // el default, mal (taxes#40). Degrada a `es`, el default del core, nunca a vacío.
+    p.insert(
+        "caller_lang".into(),
+        Json::String(ctx.caller_lang().to_string()),
+    );
     // Who APPROVED this command, when it only ran because a manager stepped up (hub#361). Empty
     // for everything else, which is almost everything. It sits next to `:current_user_id` on
     // purpose: together they are the double attribution rule 3 asks for — `created_by` is the
@@ -2886,6 +3016,51 @@ pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         Json::String(ctx.approved_by.clone().unwrap_or_default()),
     );
     p
+}
+
+/// El idioma EFECTIVO de quien llama (hub#1098), con la MISMA precedencia que el shell
+/// (`apps/web/src/i18n → bootHubLanguage`) y que taxes#38 reimplementaba a mano en el SQL de cada
+/// módulo:
+///
+/// 1. el override personal (`hub_user_pref.language`, si no está vacío);
+/// 2. el setting del hub (`hub_settings.language`, cuyo default `es` YA aplica la capa de
+///    settings — `settings::get_all` lo mezcla);
+/// 3. `es`, el default del CORE (taxes#40: no `en`; ADR-0055 sigue mandando para la fuente y el
+///    fallback de una TRADUCCIÓN faltante, que es cosa del módulo, no de esta función).
+///
+/// Tolerante a propósito: sin fila de preferencia, sin tabla o sin settings legibles no hay error
+/// que el caller pueda arreglar — es el caso normal (casi nadie elige idioma) y se degrada al
+/// setting/default. `settings` es el mapa de [`settings::get_all`], que el dispatcher YA leyó para
+/// la identidad de negocio: no se vuelve a pagar ese viaje.
+pub(crate) async fn effective_caller_lang(
+    db: &dyn DatabaseAdapter,
+    settings: &Json,
+    hub_id: &str,
+    user_id: &str,
+) -> String {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("user_id".into(), json!(user_id));
+    if let Ok(rows) = db
+        .query(
+            "SELECT TRIM(language) AS language FROM hub_user_pref \
+             WHERE hub_id = :hub_id AND user_id = :user_id",
+            &p,
+        )
+        .await
+    {
+        if let Some(lang) = rows.rows.first().and_then(|r| r["language"].as_str()) {
+            if !lang.is_empty() {
+                return lang.to_string();
+            }
+        }
+    }
+    settings
+        .get("language")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("es")
+        .to_string()
 }
 
 #[cfg(test)]
@@ -2915,6 +3090,23 @@ mod tests {
             wasm: None,
             schema: None,
         }
+    }
+
+    /// hub#1022/hub#1098: `:timezone`/`:caller_lang` llegan SIEMPRE con un valor bindeable — el
+    /// resuelto por el dispatcher si pasó por ahí, y si no, los fallbacks DOCUMENTADOS (`UTC`, el
+    /// reloj que correrá de todos modos; `es`, el default del core que taxes#40 fijó como tal).
+    /// Una cadena vacía sería «no lo sé», y un bind vacío en SQL es un bug a las 3 de la mañana.
+    #[test]
+    fn system_params_timezone_and_caller_lang_never_arrive_empty() {
+        let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["timezone"], json!("UTC"));
+        assert_eq!(p["caller_lang"], json!("es"));
+
+        let ctx = ctx.with_timezone("Atlantic/Canary").with_caller_lang("en");
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["timezone"], json!("Atlantic/Canary"));
+        assert_eq!(p["caller_lang"], json!("en"));
     }
 
     /// hub#131/#145: [`Runtime::execute_command`] (la puerta PÚBLICA del embedder, la única que

@@ -63,8 +63,74 @@
                   {{ a.name }}
                 </span>
               </div>
-              <span v-if="messageText(m.content)">{{ messageText(m.content) }}</span>
+              <!-- El markdown se PINTA, no se enseña (hub#1043). Se parsea a estructura y lo
+                   renderiza Vue: sin `v-html`, así que el texto se escapa por definición y no hay
+                   nada que sanear. Las respuestas del asistente las escribe un LLM — no es el
+                   sitio para estrenar el primer `v-html` del web app.
+                   El mensaje del USUARIO va tal cual: lo que escribió es lo que ve. -->
+              <span v-if="m.role === 'user' && messageText(m.content)">{{ messageText(m.content) }}</span>
+              <div v-else-if="messageText(m.content)" class="chat-md">
+                <template v-for="(b, bi) in parseMarkdown(messageText(m.content))" :key="bi">
+                  <component :is="`h${Math.min(b.level + 2, 6)}`" v-if="b.type === 'heading'" class="md-h">
+                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                  </component>
+                  <component :is="b.ordered ? 'ol' : 'ul'" v-else-if="b.type === 'list'" class="md-list">
+                    <li v-for="(item, ii) in b.items" :key="ii">
+                      <span v-for="(s, si) in item" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                    </li>
+                  </component>
+                  <!-- La tabla scrollea DENTRO de su envoltorio: a 390 px el drawer no se mueve. -->
+                  <div v-else-if="b.type === 'table'" class="md-table-wrap">
+                    <table class="md-table">
+                      <thead>
+                        <tr>
+                          <th v-for="(cell, ci) in b.head" :key="ci">
+                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(row, ri) in b.rows" :key="ri">
+                          <td v-for="(cell, ci) in row" :key="ci">
+                            <span v-for="(s, si) in cell" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p v-else class="md-p">
+                    <span v-for="(s, si) in b.spans" :key="si" :class="spanClass(s)">{{ s.text }}</span>
+                  </p>
+                </template>
+              </div>
               <ion-spinner v-else-if="m.role === 'assistant'" name="dots" class="chat-typing" />
+            </div>
+            <!-- The grounding notice (hub#1038, #1039, #1048). Written by the RUNTIME from the
+                 turn's receipts, never by the model: the answer claimed a change no tool made,
+                 printed an id no tool returned, or pointed at a screen this hub does not serve.
+                 It sits OUTSIDE the bubble on purpose — it is chrome, not part of the reply. -->
+            <!-- El «ver planes» que la issue pedía y no existía (saas#1540): sin una salida, la
+                 frase de cuota agotada es un callejón, y el único momento de conversión del tier
+                 gratuito muere ahí. Solo en el mensaje que TRAE la cuota, no en todos. -->
+            <div v-if="assistantQuota && i === messages.length - 1" class="chat-quota-cta">
+              <ion-button size="small" :disabled="checkoutPending" @click="openPlans()">
+                <HubIcon slot="start" name="arrow-up-circle-outline" />
+                {{ t('assistant.quotaCta') }}
+              </ion-button>
+            </div>
+            <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
+              <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.claimedWithoutEffect') }}
+              </p>
+              <p v-if="m.grounding.unsourcedIds.length" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.unsourcedId') }}
+              </p>
+              <p v-if="m.grounding.unknownRoutes.length" class="chat-grounding-line">
+                <HubIcon name="alert-circle-outline" />
+                {{ t('assistant.unknownRoute') }}
+              </p>
             </div>
             <!-- Botones de navegación: si la respuesta del asistente menciona rutas internas del
                  shell (/m/…, /settings#…, /apps#…, …), se extraen y se ofrecen como CTAs clicables
@@ -72,7 +138,7 @@
                  exacta sin depender de markdown/links embebidos (las burbujas son texto plano). -->
             <div v-if="m.role === 'assistant' && messageText(m.content)" class="chat-actions">
               <ion-button
-                v-for="r in extractRoutes(messageText(m.content))"
+                v-for="r in extractRoutes(messageText(m.content), m.grounding)"
                 :key="r.url"
                 size="small"
                 fill="outline"
@@ -202,6 +268,13 @@ import { reportAssistantMessage } from '../lib/assistant-report';
 import { toastSuccess, toastError } from '../lib/toast';
 import { assistantMessages, saveAssistantHistory } from '../lib/assistant-history';
 import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-status';
+import { moduleNav } from '../lib/nav';
+import { describeToolCall } from '../lib/assistant-confirm';
+import { confirmationFor } from '../lib/assistant-danger';
+import { startAssistantCheckout } from '../lib/assistant-plan';
+import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
+import { elevationCatalogue } from '../lib/elevation-label';
+import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
 
@@ -215,14 +288,19 @@ const router = useRouter();
  */
 const ROUTE_RE = /(\/(?:m\/[\w-]+(?:\/[\w-]+)?|settings|apps|dashboard|system|billing|employees)(?:#[\w-]+)?)/g;
 interface ExtractedRoute { url: string; label: string }
-function extractRoutes(text: string): ExtractedRoute[] {
+function extractRoutes(text: string, grounding?: TurnAudit): ExtractedRoute[] {
   const matches = text.match(ROUTE_RE);
   if (!matches) return [];
+  // A route the audit could not find in this hub never becomes a button (hub#1048): offering
+  // «Go to» for an invented screen sends the user to /dashboard via the catch-all and leaves
+  // them sure their hub is broken.
+  const unknown = new Set((grounding?.unknownRoutes ?? []).map((r) => r.toLowerCase()));
   const seen = new Set<string>();
   const out: ExtractedRoute[] = [];
   for (const url of matches) {
     if (seen.has(url)) continue;
     seen.add(url);
+    if (unknown.has(url.toLowerCase().replace(/\/+$/, ''))) continue;
     // Etiqueta legible: "VeriFactu › Ajustes" para /m/verifactu/settings; el nombre del tab para los #hash.
     let label = url;
     const m = url.match(/^\/m\/([\w-]+)(?:\/([\w-]+))?/);
@@ -237,6 +315,27 @@ function extractRoutes(text: string): ExtractedRoute[] {
     out.push({ url, label });
   }
   return out.slice(0, 4); // máximo 4 CTAs por mensaje
+}
+
+/**
+ * The hub's REAL navigation map, for the grounding audit (hub#1047, hub#1048). Two authorities,
+ * no third list: the router for the shell's own screens, and `/api/navigation` (via `moduleNav`)
+ * for the modules actually installed. A route the model invents — `/settings/developers` was the
+ * one the QA pass caught — matches neither, and the router's catch-all would have redirected it
+ * to /dashboard in silence.
+ */
+function knownRoutes(): string[] {
+  const shell = router
+    .getRoutes()
+    .map((r) => r.path)
+    .filter((path) => !path.includes(':') && path !== '/');
+  const modules = moduleNav.value.map((m) => m.path);
+  return [...shell, ...modules];
+}
+
+/** La clase de un span en línea. `text` no lleva ninguna: es lo corriente. */
+function spanClass(span: Inline): string {
+  return span.kind === 'text' ? '' : `md-${span.kind}`;
 }
 
 /** Navega a una ruta interna del shell (router.push) y cierra el drawer para que vea la pantalla. */
@@ -271,6 +370,25 @@ function translatedItem(item: SetupItem, field: 'title' | 'description'): string
 // Hilo con alcance de SESIÓN (ADR-0149): vive en lib/assistant-history (sessionStorage),
 // sobrevive un reload y lo vacía logout(). El Cloud no guarda copia.
 const messages = assistantMessages;
+/** El plan y el consumo cuando el turno murió por cuota (saas#1540). */
+const assistantQuota = ref<{ tier?: string; used?: number; limit?: number } | null>(null);
+/** Evita abrir dos checkouts con un doble clic — el sitio del producto donde una segunda compra
+ *  accidental es más probable (saas#1541). */
+const checkoutPending = ref(false);
+
+/** Abre el checkout del plan. Si no llega url NO se navega: mejor no moverse que llevar a una
+ *  página vacía justo cuando el dueño está intentando pagar. */
+async function openPlans(): Promise<void> {
+  if (checkoutPending.value) return;
+  checkoutPending.value = true;
+  try {
+    const url = await startAssistantCheckout('basic');
+    if (url) window.location.assign(url);
+    else toastError(t('assistant.error'));
+  } finally {
+    checkoutPending.value = false;
+  }
+}
 const draft = ref('');
 const streaming = ref(false);
 const threadEl = ref<HTMLElement | null>(null);
@@ -423,18 +541,83 @@ async function send(): Promise<void> {
   }
 
   abort = streamAssistant(history, {
+    // The map the audit checks a named screen against (hub#1047, hub#1048).
+    knownRoutes: knownRoutes(),
+    /**
+     * The turn's grounding verdict (hub#1038, hub#1039). It is stamped on the MESSAGE, so the
+     * notice renders as chrome the runtime wrote — never as a sentence the model could have
+     * phrased away. A clean verdict leaves the bubble exactly as it was.
+     */
+    onAudit: (audit: TurnAudit) => {
+      const flagged =
+        audit.claimedWithoutEffect || audit.unsourcedIds.length > 0 || audit.unknownRoutes.length > 0;
+      if (flagged) assistantMsg.value.grounding = audit;
+    },
     // Confirm-card de ESCRITURAS (§9.2): sin este handler, streamAssistant cancela toda
     // mutación por default-deny — correcto como seguro, pero dejaba al asistente sin manos
     // (ni instalar un módulo ni ningún command de módulo). Un ion-alert nativo: el usuario ve
     // QUÉ tool y con QUÉ argumentos, y decide. Lo DESTRUCTIVO ni llega aquí: no se ofrece
     // como tool (regla de Ioan, test en assemble_tools).
-    onConfirm: async ({ name, arguments: args }) => {
-      let pretty = args;
-      try { pretty = JSON.stringify(JSON.parse(args || '{}'), null, 1); } catch { /* raw */ }
+    onConfirm: async ({ name, arguments: args, moneyFields, risk }) => {
+      // La tarjeta se lee en palabras del negocio (hub#1040). Antes enseñaba el nombre crudo de
+      // la tool y el `JSON.stringify` de los argumentos: el dueño aprobaba `price_cents: 1500`
+      // sin leer nunca «15,00 €», en el ÚNICO punto donde un humano puede cazar un ×100.
+      //
+      // El dinero lo marca el runtime desde el schema del command; aquí no se adivina por el
+      // nombre del campo, porque un porcentaje pintado como importe sería una mentira nueva.
+      let parsed: Record<string, unknown> = {};
+      try { parsed = JSON.parse(args || '{}') as Record<string, unknown>; } catch { /* sin args */ }
+      const described = describeToolCall({
+        command: name,
+        args: parsed,
+        moneyFields,
+        catalogue: elevationCatalogue.value,
+      });
+      const lines = described.fields.map((f) => `${f.key}: ${f.value}`).join('\n');
+
+      // Lo destructivo pide MÁS que un clic (hub#1042). El módulo declara cuánto daño hace
+      // (`ai.risk`); el core decide cuánta fricción pone, sin saber qué es una cita.
+      const gate = confirmationFor({ risk, args: parsed });
+      if (gate.kind === 'refuse') {
+        // Un masivo que no sabe cuántos caen no se ejecuta desde el chat: una tarjeta que no
+        // dice el número es la que se aprueba sin saber qué se aprueba.
+        const refusal = await alertController.create({
+          header: t('assistant.confirmTitle'),
+          subHeader: described.action || t('assistant.confirmUnnamedAction'),
+          message: t('assistant.confirmBulkUnknown'),
+          buttons: [{ text: t('assistant.confirmCancel'), role: 'cancel' }],
+        });
+        await refusal.present();
+        await refusal.onDidDismiss();
+        return false;
+      }
+      if (gate.kind === 'typed') {
+        const expected = gate.expected ?? t('assistant.confirmDestructiveWord');
+        const detail = gate.affected
+          ? `${t('assistant.confirmBulkAffected', { count: gate.affected })} ${t('assistant.confirmDestructive', { expected })}`
+          : t('assistant.confirmDestructive', { expected });
+        const typed = await alertController.create({
+          header: t('assistant.confirmTitle'),
+          subHeader: described.action || t('assistant.confirmUnnamedAction'),
+          message: `${lines}\n\n${detail}`,
+          inputs: [{ name: 'confirmation', type: 'text', placeholder: expected }],
+          buttons: [
+            { text: t('assistant.confirmCancel'), role: 'cancel' },
+            { text: t('assistant.confirmRun'), role: 'confirm' },
+          ],
+        });
+        await typed.present();
+        const { role, data } = await typed.onDidDismiss();
+        // Comparación exacta salvo espacios: si «4 » valiera, valdría cualquier cosa parecida.
+        return role === 'confirm' && String(data?.values?.confirmation ?? '').trim() === expected;
+      }
+
       const alert = await alertController.create({
         header: t('assistant.confirmTitle'),
-        subHeader: name,
-        message: pretty,
+        // La acción como la nombra el MÓDULO; si no sabe nombrarla se dice, nunca se rellena
+        // con el identificador interno (hub#363).
+        subHeader: described.action || t('assistant.confirmUnnamedAction'),
+        message: lines,
         buttons: [
           { text: t('assistant.confirmCancel'), role: 'cancel' },
           { text: t('assistant.confirmRun'), role: 'confirm' },
@@ -456,10 +639,24 @@ async function send(): Promise<void> {
       if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.noReply');
       saveAssistantHistory();
     },
-    onError: () => {
+    onError: (failure: unknown) => {
       streaming.value = false;
       abort = null;
-      if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.error');
+      // Quedarse sin mensajes NO es una avería (saas#1540): se dice el plan, el consumo y por
+      // dónde se amplía. «No se pudo contactar» ahí es una mentira que además pierde la venta.
+      const quota = (failure as { quota?: { tier?: string; used?: number; limit?: number } })?.quota;
+      if (quota) {
+        assistantQuota.value = quota;
+        if (!messageText(assistantMsg.value.content)) {
+          assistantMsg.value.content = `${t('assistant.quotaTitle')} ${t('assistant.quotaUsed', {
+            tier: quota.tier ?? '—',
+            used: quota.used ?? '—',
+            limit: quota.limit ?? '—',
+          })}`;
+        }
+      } else if (!messageText(assistantMsg.value.content)) {
+        assistantMsg.value.content = t('assistant.error');
+      }
       saveAssistantHistory();
     },
   });
@@ -711,6 +908,48 @@ onBeforeUnmount(() => {
 }
 .chat-report-btn:hover {
   --color: var(--ion-color-danger, #c00);
+}
+.chat-md :where(p, ul, ol, h3, h4, h5, h6) { margin: 0 0 6px; }
+.chat-md :where(p, ul, ol, h3, h4, h5, h6):last-child { margin-bottom: 0; }
+.md-bold { font-weight: 600; }
+.md-italic { font-style: italic; }
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--ok-surface-2, rgba(0, 0, 0, 0.06));
+}
+.md-list { padding-inline-start: 1.15em; }
+.md-h { font-size: 1em; font-weight: 600; }
+/* La tabla scrollea DENTRO de su envoltorio — a 390 px el drawer NO se mueve en horizontal.
+   Es el mismo patrón que ya usa ok-data-table. */
+.md-table-wrap { overflow-x: auto; max-width: 100%; }
+.md-table { border-collapse: collapse; font-size: 0.9em; }
+.md-table :where(th, td) {
+  border: 1px solid var(--ok-border, rgba(0, 0, 0, 0.12));
+  padding: 3px 6px;
+  text-align: start;
+  white-space: nowrap;
+}
+.md-table th { font-weight: 600; }
+
+.chat-quota-cta { margin-top: 6px; }
+.chat-grounding {
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-inline-start: 3px solid var(--ion-color-warning, #ffc409);
+  background: var(--ok-surface-2, rgba(255, 196, 9, 0.08));
+  border-radius: 6px;
+}
+.chat-grounding-line {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--ion-color-warning-shade, #b88a00);
 }
 .chat-bubble {
   padding: 0.6rem 0.85rem;

@@ -1,0 +1,22 @@
+{
+  "id": "ptype",
+  "name": "Param Type Freeze",
+  "version": "1.0.0",
+  "permissions": ["ptype.write"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "ptype.rules.create": {
+      "permission": "ptype.write",
+      "transaction": true,
+      "sql": ["commands/rule_create.sql"],
+      "schema": "schemas/rule_create.json",
+      "emit": []
+    }
+  },
+  "queries": {
+    "ptype.rules.all": {
+      "permission": "ptype.write",
+      "sql": "queries/rules_all.sql"
+    }
+  }
+}

@@ -214,3 +214,28 @@ fn the_gate_script_is_committed_and_executable() {
          the only other place they run is a tag"
     );
 }
+
+/// A tag that "published" but left the change waiting for a click published nothing (2026-08-19).
+///
+/// `changesNotSentForReview: true` uploads the AAB and stops: the release sits in Play Console's
+/// *Changes not yet submitted for review* until a human presses the button. That is not a
+/// theoretical risk — it is how the very first listing spent five days. On 2026-08-19 the console
+/// held **14 changes** saved since the 14th, `Submission activity` was empty, and the app was
+/// still `Draft` under the temporary name `com.erplora.app (unreviewed)`. Nobody had rejected
+/// anything; nobody had sent anything either.
+///
+/// A channel whose last step needs a human is not automated, and worse, it looks automated: the
+/// job goes green, the gate goes green, and the release is parked. So the flag has to stay
+/// `false` — and if someone ever needs the old behaviour back, this test is where they have to
+/// come and say why.
+#[test]
+fn the_play_upload_actually_sends_the_release_for_review() {
+    let code = workflow_code();
+    assert!(
+        code.contains("changesNotSentForReview: false"),
+        "the Google Play step must send the release for review. With \
+         `changesNotSentForReview: true` the AAB lands in the console as a pending change and \
+         waits for someone to notice — which is exactly how 14 changes sat unsubmitted for five \
+         days while every tag reported success"
+    );
+}

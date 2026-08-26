@@ -163,6 +163,36 @@ fn certificate_module(id: &str) -> PathBuf {
     )
 }
 
+/// A module that asks for a host capability **and whose own check passes**: everything it can say
+/// about itself says "configured". The only thing left between it and doing its job is the switch in
+/// Ajustes → Permisos, which is exactly the state hub#1119 found in production.
+fn sealing_module(id: &str) -> PathBuf {
+    module_fixture(
+        json!({
+            "id": id,
+            "name": id,
+            "version": "1.0.0",
+            "capabilities": { "certificate": { "purpose": "fiscal-sign" } },
+            "permissions": [format!("{id}.configure")],
+            "queries": {
+                format!("{id}.config.get"): {
+                    "permission": format!("{id}.configure"),
+                    "sql": "queries/config_get.sql"
+                }
+            },
+            "setup": {
+                "query": format!("{id}.config.get"),
+                "configured_when": [{ "field": "ready", "truthy": true }],
+                "title": format!("Configure {id}"),
+                "route": format!("/m/{id}/settings"),
+                "permission": format!("{id}.configure"),
+                "order": 60
+            }
+        }),
+        &[("queries/config_get.sql", "SELECT 1 AS ready")],
+    )
+}
+
 /// Puts the business certificate in the hub, straight into the system table the gate reads
 /// (`_hub_certificate`, ADR-0081). Going through `set_business_certificate` would need the
 /// process-global `HUB_SECRETS_KEY`, and what both the gate and the checklist look at is the
@@ -217,8 +247,26 @@ async fn catalogue_offered_hours_ago(rt: &Runtime, installable: u64, hours: i64)
 async fn set_business_identity(rt: &Runtime) {
     let mut updates = serde_json::Map::new();
     updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-    updates.insert("business_tax_id".into(), json!("B12345678"));
+    updates.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&updates, "u1").await.unwrap();
+}
+
+/// Puts the hub's fiscal profile in an explicit environment (ADR-0360, hub#1087): the
+/// certificate arm of ADR-0203 lives in PRODUCTION only — in `testing` there is nothing to
+/// authorize — so the tests that assert that ⛔ must say which side of the border they are on.
+async fn pin_fiscal_environment(rt: &Runtime, hub_id: &str, environment: &str) {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("environment".into(), json!(environment));
+    rt.db()
+        .execute(
+            "INSERT INTO _hub_fiscal_profile (hub_id, system_id, environment) \
+             VALUES (:hub_id, :hub_id, :environment) \
+             ON CONFLICT (hub_id) DO UPDATE SET environment = :environment",
+            &p,
+        )
+        .await
+        .unwrap();
 }
 
 /// A module with a Tier-0 command that STAMPS the business identity — the shape
@@ -393,7 +441,7 @@ async fn the_core_items_flip_to_done_when_the_hub_is_actually_set_up() {
     // the checklist can never promise a gate that the runtime does not enforce.
     let mut updates = serde_json::Map::new();
     updates.insert("business_legal_name".into(), json!("Bar Manolo SL"));
-    updates.insert("business_tax_id".into(), json!("B12345678"));
+    updates.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&updates, "u1").await.unwrap();
     assert_eq!(
         must(&status(&rt, &ctx).await, "business_identity")["state"],
@@ -435,12 +483,46 @@ async fn the_business_identity_item_needs_both_halves_like_the_fiscal_gate_does(
     );
 
     let mut with_id = serde_json::Map::new();
-    with_id.insert("business_tax_id".into(), json!("B12345678"));
+    with_id.insert("business_tax_id".into(), json!("B12345674"));
     rt.set_settings(&with_id, "u1").await.unwrap();
     assert_eq!(
         must(&status(&rt, &ctx).await, "business_identity")["state"],
         "done"
     );
+}
+
+#[tokio::test]
+async fn a_legacy_invalid_tax_id_does_not_tick_the_business_identity_item() {
+    // hub#1088: before the door validated the format, `ZZZ999` could be stored — and the setup
+    // notice ticked «your business details» on it. The door refuses it now, so the notice
+    // cannot keep vouching for a value the runtime itself would not accept any more: the item
+    // goes back to pending, which is what sends whoever reads it to the screen that fixes it.
+    // The value is written straight into `hub_settings` on purpose: that is exactly the shape
+    // of a hub configured before the validation existed (the door would refuse the write).
+    let rt = runtime("hub-setup").await;
+    let ctx = ctx("hub-setup", ADMIN_SESSION);
+    let mut up = serde_json::Map::new();
+    up.insert("business_legal_name".into(), json!("Bar Manolo SL"));
+    rt.set_settings(&up, "u1").await.unwrap();
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!("hub-setup"));
+    p.insert("value".into(), json!("ZZZ999"));
+    rt.db()
+        .execute(
+            "INSERT INTO hub_settings (hub_id, key, value, updated_at, updated_by) \
+             VALUES (:hub_id, 'business_tax_id', :value, '2026-01-01T00:00:00Z', 'legacy')",
+            &p,
+        )
+        .await
+        .unwrap();
+
+    let doc = status(&rt, &ctx).await;
+    assert_eq!(
+        must(&doc, "business_identity")["state"],
+        "pending",
+        "a legacy `ZZZ999` is not a business identity: the notice must not tick it done"
+    );
+    assert_eq!(doc["blocking_pending"], 1, "the ⛔ is the point: it blocks");
 }
 
 // ── The union: module items are the ADR-0063 `setup` block, not a second system ───────────────
@@ -1038,8 +1120,11 @@ async fn the_certificate_arm_of_the_gate_blocks_through_whoever_carries_the_capa
     // ADR-0203 has TWO arms, and the second one is not the core's to hold: while a module declaring
     // the `certificate` capability is installed, the gate also demands the loaded certificate. The
     // core decides the level (the module never does) but hangs it on the item that can clear it —
-    // otherwise the strip would be silent about a rejection that is going to happen.
+    // otherwise the strip would be silent about a rejection that is going to happen. Since
+    // ADR-0360 (hub#1087) this arm is the PRODUCTION one: the test pins the environment, because
+    // in `testing` there is nothing to authorize.
     let mut rt = runtime("hub-setup").await;
+    pin_fiscal_environment(&rt, "hub-setup", "production").await;
     let dir = certificate_module("verifactu");
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
@@ -1077,11 +1162,72 @@ async fn the_certificate_item_drops_to_functional_the_moment_the_certificate_is_
 }
 
 #[tokio::test]
+async fn in_the_testing_environment_there_is_no_certificate_wall_and_the_document_goes_out() {
+    // **hub#1087, end to end.** A brand-new hub — identity set, certificate-capable module
+    // installed, NO certificate — could not issue even one TEST invoice: the gate demanded the
+    // certificate without looking at the environment. ADR-0360 drew the border on the
+    // environment: in `testing` there is nothing to authorize. Both halves move together — the
+    // checklist stops painting the ⛔ that no longer blocks, and the dispatcher lets the
+    // identity-stamping command through. Nothing is simulated: the filing to AEAT-testing keeps
+    // its own flow, certificate or not.
+    let mut rt = runtime("hub-setup").await;
+    // The profile a brand-new hub carries: born `testing` (the DDL default the go-live raises
+    // to production, ADR-0273 D3).
+    pin_fiscal_environment(&rt, "hub-setup", "testing").await;
+    let dir = certificate_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    set_business_identity(&rt).await;
+    let issuer_dir = module_fixture(
+        json!({
+            "id": "billing",
+            "name": "billing",
+            "version": "1.0.0",
+            "permissions": ["billing.issue"],
+            "commands": {
+                "billing.issue": { "permission": "billing.issue", "sql": ["commands/issue.sql"] }
+            }
+        }),
+        &[(
+            "commands/issue.sql",
+            "INSERT INTO billing_doc (issuer_nif, issuer_name) \
+             VALUES (:business_tax_id, :business_legal_name)",
+        )],
+    );
+    rt.install_from_dir(&issuer_dir).await.unwrap();
+    std::fs::remove_dir_all(&issuer_dir).ok();
+    rt.db()
+        .execute_batch("CREATE TABLE billing_doc (issuer_nif TEXT, issuer_name TEXT);")
+        .await
+        .unwrap();
+
+    // The checklist: no ⛔ on the certificate module — the gate behind it does not reject.
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["level"],
+        "functional",
+        "in testing there is nothing to authorize (ADR-0360): the arm is gone, the item is \
+         still worth configuring"
+    );
+    assert_eq!(doc["blocking_pending"], 0);
+
+    // And the gate itself: the test document is issued with no certificate in the hub.
+    rt.execute_command(
+        "billing.issue",
+        &Params::new(),
+        &ctx("hub-setup", &[SESSION, "billing.issue"]),
+    )
+    .await
+    .expect("the TEST invoice goes out: in testing there is nothing to authorize");
+}
+
+#[tokio::test]
 async fn the_blocking_level_follows_the_capability_and_never_a_module_name() {
     // Same principle ADR-0203 applied to the gate: the condition names the CAPABILITY, not
     // `verifactu`. A runtime that hardcoded the id would block the wrong hub in every country that
     // is not Spain, and would miss the module that actually holds the certificate.
     let mut rt = runtime("hub-setup").await;
+    pin_fiscal_environment(&rt, "hub-setup", "production").await;
     for dir in [
         // Carries the capability under a different name → it carries the ⛔ too.
         certificate_module("fattura"),
@@ -1112,6 +1258,7 @@ async fn blocking_pending_counts_the_pending_legal_items_and_only_those() {
     // not of everything pending (the strip would never go away) and not of everything legal
     // (it would never appear once the hub is set up).
     let mut rt = runtime("hub-setup").await;
+    pin_fiscal_environment(&rt, "hub-setup", "production").await;
     let dir = certificate_module("verifactu");
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
@@ -1492,7 +1639,9 @@ async fn a_module_wall_reaches_the_session_that_cannot_clear_it_either() {
     // identity: the gate refuses everybody while it is missing. `verifactu` is exactly this shape
     // (its check needs `view`, its `setup` declares `configure`, and the employee role holds only
     // `view`), so before hub#435 the cashier lost that ⛔ to the module filter and got no strip.
+    // Production environment on purpose: since ADR-0360 the arm is the production one.
     let mut rt = runtime("hub-setup").await;
+    pin_fiscal_environment(&rt, "hub-setup", "production").await;
     set_business_identity(&rt).await;
     let dir = certificate_module_readable_by_all("fiscal");
     rt.install_from_dir(&dir).await.unwrap();
@@ -1686,4 +1835,59 @@ async fn todo_item_lleva_origen_aunque_este_pendiente() {
     for it in items(&doc) {
         assert!(it["origin"].is_string(), "sin origen: {it}");
     }
+}
+
+
+// ── hub#1119 · a module the dispatcher will refuse is NOT «configured» ──────────────────────────
+//
+// The checklist's whole job is to answer «is anything left before this business can work». A module
+// whose declared capability (ADR-0079) is not granted cannot run its engine at all: the dispatcher
+// turns its native commands away before they start. Ticking its item because its own settings are
+// filled in is the false «done» this design keeps failing away from — and it is the one that let a
+// hub invoice, charge and print for a whole day believing it was sealing.
+
+#[tokio::test]
+async fn a_module_whose_capability_is_not_granted_is_still_pending() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["state"],
+        "pending",
+        "its own query says ready, but nobody granted the capability its engine needs"
+    );
+}
+
+#[tokio::test]
+async fn granting_the_capability_is_what_finishes_the_item() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = sealing_module("verifactu");
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    rt.set_module_capability("verifactu", "certificate", true, "hub_user:1")
+        .await
+        .expect("the owner grants it in Ajustes → Permisos");
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    assert_eq!(
+        must(&doc, "verifactu.setup")["state"],
+        "done",
+        "settings filled in AND the switch on: now there is genuinely nothing left"
+    );
+}
+
+#[tokio::test]
+async fn a_module_that_asks_for_nothing_is_unaffected() {
+    // The rule must not invent a task for the 20-odd modules that declare no capability at all.
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("pricing", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    assert_eq!(must(&doc, "pricing.setup")["state"], "done");
 }

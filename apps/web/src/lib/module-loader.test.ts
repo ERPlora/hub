@@ -29,7 +29,7 @@ vi.mock('../i18n', () => ({ getLocale: () => 'es' }));
 const entitled = vi.fn<(moduleId: string) => boolean>(() => true);
 vi.mock('./entitlement', () => ({ isModuleEntitled: (id: string) => entitled(id) }));
 
-import { loadMenu } from './module-loader';
+import { invalidateManifestCache, loadMenu } from './module-loader';
 
 /** One `/api/navigation` entry, as the runtime serves it. */
 function navItem(moduleId: string) {
@@ -75,6 +75,9 @@ const inventoryManifest = { name: 'Inventory', ui: { entry: 'dist/inventory.esm.
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  // La caché de manifests es estado de SESIÓN (hub#1099): sin vaciarla, un caso heredaría el
+  // `module.json` que leyó el anterior y estaría midiendo otra cosa.
+  invalidateManifestCache();
   entitled.mockReset();
   entitled.mockReturnValue(true);
 });

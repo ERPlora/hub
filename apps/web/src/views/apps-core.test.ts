@@ -66,8 +66,18 @@ describe('Apps destructive actions', () => {
   it('never falls back to a locally invented demo catalog', () => {
     expect(source).not.toContain('MODULES_DEMO');
     expect(source).not.toContain('config.demo ? MODULES_DEMO');
-    expect(source).toContain('modules.value = []');
-    expect(source).toContain('catalogError.value = true');
+    // The catalogue comes from the Cloud or it does not come: the only thing this file may put in
+    // `modules` is what `cloudMarketplaceModules()` returned.
+    expect(source).toContain('modules.value = cloudMods.map(toViewModule)');
+    expect(source.match(/modules\.value = /g) ?? []).toHaveLength(1);
+    // And the failure is SAID (hub#1129: `catalogError` now derives from `catalogState`, so the
+    // banner and the table's empty line can never disagree about whether the load failed).
+    expect(source).toContain("catalogState.value = 'error'");
+    // 🔴 What is NOT here any more, on purpose: `modules.value = []` inside the `catch`. It was the
+    // hub#770 defect on the other tab — a refresh that fails (and it refreshes on every window
+    // focus) wiped 25 apps off the screen to say «I could not ask». Rows already on screen stay on
+    // screen; the failure travels in the banner next to them.
+    expect(source).not.toContain('modules.value = [];');
   });
 });
 
@@ -203,5 +213,31 @@ describe('Apps · what an installed app card offers', () => {
     expect(fn).toContain('dependentsOf(');
     expect(fn.indexOf('dependentsOf(')).toBeLessThan(fn.indexOf('uninstallModule('));
     expect(source).toContain('apps.uninstallBreaks');
+  });
+
+  // hub#1101: el runtime ya rechaza por su cuenta (409 `has_dependents`) — la pantalla es la que
+  // acaba de nombrar las apps y de recoger el «sí», así que es la única que puede contestar esa
+  // pregunta. Y solo la contesta cuando de verdad la ha hecho.
+  it('only forces the uninstall when it actually showed the list and got a yes', () => {
+    const fn = source.slice(
+      source.indexOf('async function removeModule'),
+      source.indexOf('function toViewModule'),
+    );
+    expect(fn).toContain('uninstallModule(m.id, { force: breaks.length > 0 })');
+    // El `force` va DESPUÉS de la confirmación, nunca antes: mandarlo al construir el diálogo
+    // sería saltarse el gate sin haber preguntado.
+    expect(fn.indexOf("result.role !== 'confirm'")).toBeLessThan(fn.indexOf('uninstallModule('));
+  });
+
+  it('translates the dependents refusal instead of showing the runtime sentence raw', () => {
+    const fn = source.slice(
+      source.indexOf('async function removeModule'),
+      source.indexOf('function toViewModule'),
+    );
+    // Si la lista con la que se pintó el diálogo se quedó vieja (otra pestaña instaló una
+    // dependiente), el rechazo llega igual. Enseñarle al dueño la frase EN INGLÉS del runtime es
+    // peor que no decir nada: se traduce y se nombran las apps que el runtime mandó.
+    expect(fn).toContain("'has_dependents'");
+    expect(fn).toContain('apps.uninstallBlocked');
   });
 });

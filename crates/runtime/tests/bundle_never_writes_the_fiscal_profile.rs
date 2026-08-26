@@ -44,7 +44,7 @@ async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) {
     p.insert("hub_id".into(), json!(hub_id));
     db.execute(
         "UPDATE _hub_fiscal_profile SET status = 'ACTIVE', environment = 'production', \
-           taxpayer_id = 'B12345678', activated_at = '2026-08-01T09:00:00Z', \
+           taxpayer_id = 'B12345674', activated_at = '2026-08-01T09:00:00Z', \
            first_record_at = '2026-08-01T09:05:00Z' WHERE hub_id = :hub_id",
         &p,
     )
@@ -157,7 +157,7 @@ async fn a_bundle_from_another_hub_never_touches_the_fiscal_profile() {
     // ── The profile did not move. Not one field. ─────────────────────────────
     let after = fiscal_profile::load(rt.db(), TARGET).await.unwrap().expect("the profile survives");
     assert_eq!(after, before, "no bundle writes the hub's fiscal profile");
-    assert_eq!(after.taxpayer_id, "B12345678", "the tax id the emitted chain is anchored to");
+    assert_eq!(after.taxpayer_id, "B12345674", "the tax id the emitted chain is anchored to");
     assert_eq!(after.system_id, TARGET, "NumeroInstalacion = hub_id (ADR-0202)");
     assert_eq!(after.status, FiscalStatus::Active);
 

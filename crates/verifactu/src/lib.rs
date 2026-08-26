@@ -52,6 +52,15 @@ pub enum VerifactuError {
     /// lectura que rompe la recuperación de la cadena (hub#287).
     #[error("consulta AEAT: {0}")]
     Consult(String),
+    /// A field the AEAT requires is missing from what we were about to send; named by its XML
+    /// tag, never by prose (hub#1070) — it is cut here because the 4102 the AEAT would answer
+    /// arrives AFTER having talked to Hacienda.
+    #[error("falta el campo obligatorio `{0}`")]
+    MissingField(&'static str),
+    /// The XML violates an `xs:sequence` of the schema: `tag` appears out of order; `sequence` is
+    /// the order the schema expects (hub#1070: asserted by tag, not by the Spanish text).
+    #[error("`{tag}` va fuera de orden: la secuencia del esquema es {sequence}")]
+    OutOfOrder { tag: String, sequence: String },
 }
 
 impl From<VerifactuError> for RuntimeError {
@@ -607,6 +616,12 @@ pub fn is_chainable_status(status: &str) -> bool {
 /// (**R5**). Degradarla a F2 declararía una venta donde hay una devolución.
 ///
 /// Se resuelve **antes** de encadenar porque el tipo entra en el cálculo de la huella.
+///
+/// ⚠️ **Degradar es correcto; hacerlo en silencio no** (hub#1104). Esta función decide el tipo y
+/// nada más — quien la llama compara el resultado con lo declarado y lleva la diferencia a
+/// [`RecordInput::downgraded_from`], que es lo que hace que el hecho se vea: un evento
+/// `invoice_type_downgraded` con severidad `warning` y, si la F2 fabricada rompiese el techo
+/// §15.8, un rechazo antes de gastar el número de cadena.
 fn resolve_invoice_type(declared: &str, recipient_nif: &str) -> String {
     if !recipient_nif.trim().is_empty() || !TYPES_REQUIRING_RECIPIENT.contains(&declared) {
         return declared.to_string();
@@ -615,6 +630,271 @@ fn resolve_invoice_type(declared: &str, recipient_nif: &str) -> String {
         "R1" | "R2" | "R3" | "R4" => "R5".to_string(),
         _ => "F2".to_string(),
     }
+}
+
+/// Tipos que **no admiten un total negativo**: F1, F2 y F3 documentan una venta. Lo negativo es
+/// una RECTIFICATIVA (R1…R5), que es el camino legal de una devolución y sí puede serlo.
+///
+/// Espejo exacto de `invoice.NON_NEGATIVE_TYPES` y de la restricción
+/// `ck_verifactu_record_ordinary_total_not_negative` del módulo. **De esta regla** —el signo— sí
+/// miden lo mismo las tres puertas; la de la cuota contra su tipo no puede (ver
+/// [`line_rate_tolerance_cents`]), y decir lo contrario fue el error que devolvió hub#1180 con
+/// cambios.
+const NON_NEGATIVE_TYPES: [&str; 3] = ["F1", "F2", "F3"];
+
+/// Tolerancia, en céntimos, al contrastar la cuota de una entrada del desglose contra su propio
+/// tipo — **en función de cuántas líneas de factura se agregaron en ella**.
+///
+/// # Why it CANNOT be a fixed number
+///
+/// ⚠️ **`invoice` no longer emits this.** Since ADR-0405 §Decisión 4 (`invoice` v1.2.27,
+/// `invoice#65`, now closed) `build_invoice` closes the quota **once per fiscal key**
+/// (`money::percent_of(Σbase, rate)`), so what it emits today *does* satisfy `cuota = base × tipo`
+/// and its own audit tolerance is **1 cent per key**. The old `e.quota += main_quota` — deliberate
+/// but undocumented — is exactly what that ADR removed.
+///
+/// This gate stays per-line permissive anyway, and not out of inertia: it reads rows it did not
+/// produce.
+///
+///   * **Invoices already sealed** before v1.2.27 carry the per-line breakdown and are chained
+///     into the AEAT fingerprint, so they cannot be reinterpreted (same reason `aeat::desglose`
+///     still reads both generations of `tax_breakdown`).
+///   * **The verbatim F3.** An F3 substituting an F2 copies the ticket's own figures, quota per
+///     line included — `invoice.audit` itself keeps `e.lines.max(1)` for `Closing::Verbatim`.
+///     Tightening here would reject a document `invoice` legitimately emits **today**.
+///   * **`sales`** still closes its header with `percent_of(Σbase)` in tax-included mode, up to one
+///     cent per key away from the document (ADR-0405 names this and leaves it).
+///
+/// Tightening this to a fixed cent would therefore not enforce ADR-0405 — it would only refuse a
+/// fiscal record for documents that are correct. The rule this gate exists to catch is the forged
+/// quota, and the second ceiling below is what catches it.
+///
+/// The historical measurement that set this shape: with a fixed 1,5-cent tolerance, four lines of
+/// 0,50 € at 21 % — `round_half_up(10,5) = 11` four times → `base 200 / cuota 44`, where 21 % of
+/// 200 is 42 — were left **with no fiscal record at all**. With twelve lines at 10 % it reached
+/// **one in three** tickets. Measured in the review of hub#1180; `invoice` stopped producing that
+/// shape in ADR-0405, but the rows it already produced are still out there.
+///
+/// # Por qué `+ 0.5`
+///
+/// `invoice.audit` compara contra `money::percent_of` (ya redondeado) y aquí se compara contra el
+/// valor **sin redondear**, que dista hasta medio céntimo de aquél. Con ese medio céntimo esta
+/// puerta **nunca es más estricta** que la de `invoice`: si `invoice` lo emitió, aquí pasa.
+///
+/// # El conteo
+///
+/// `lines` es el número de líneas de la **factura entera**, que es lo que se puede leer de una vez
+/// (`ingest_invoice`); `invoice.audit` usa el de **cada entrada**, que es menor o igual. Usar el
+/// total es por tanto igual de permisivo o más, nunca menos — que es el lado seguro. `None`
+/// (nadie sabe cuántas líneas hay: `records.create`, cuyo esquema ni siquiera admite desglose)
+/// cae a **una**, la factura de una sola línea.
+///
+/// # Y el segundo techo: el que también sabe medir la TABLA
+///
+/// El `CHECK` del módulo no puede contar líneas —la fila guarda el desglose, no el documento—, así
+/// que desde `015_quota_rate_check_needs_the_line_count.sql` mide otra cosa que sí es row-local:
+/// que la cuota no se aleje de lo que su tipo justifica **más que ese mismo importe, más un
+/// céntimo** (o sea, que no lo doble). Es demostrablemente inofensivo para el redondeo por línea
+/// —`|Σq − Σe| ≤ 0,5 × líneas ≤ |e| + 1` en las 420.000 combinaciones legítimas comprobadas— y
+/// caza igual el caso del QA (99,99 € donde el tipo justifica 1,14 €).
+///
+/// Se aplica **el menor de los dos**, y no por cinturón y tirantes: así este motor es siempre
+/// **igual o más estricto** que la tabla, y un registro no puede pasar por aquí para morir un
+/// `INSERT` después con un error crudo de Postgres — que es justo lo que hub#1103 vino a evitar.
+fn line_rate_tolerance_cents(lines: Option<i64>, expected_cents: f64) -> f64 {
+    let by_lines = lines.unwrap_or(1).max(1) as f64 + 0.5;
+    let by_magnitude = expected_cents.abs() + 1.0;
+    by_lines.min(by_magnitude)
+}
+
+/// Margen al comparar dos importes que son **enteros de céntimos** viajando en `f64`.
+const CENT_EPSILON: f64 = 0.5;
+
+/// Una línea del desglose reducida a lo único que la auditoría necesita. Importes en CÉNTIMOS.
+struct AuditLine {
+    rate: f64,
+    base: f64,
+    quota: f64,
+    surcharge_rate: f64,
+    surcharge_quota: f64,
+    has_surcharge: bool,
+}
+
+/// Lee el `tax_breakdown` en sus DOS generaciones (el mismo par que entiende `aeat::desglose`, y
+/// por el mismo motivo: las facturas ya emitidas están encadenadas en la huella y no se pueden
+/// reinterpretar). Un desglose ilegible devuelve la lista vacía — ahí no hay nada declarado que
+/// contrastar y juzga el `tax_rate` de la fila.
+fn audit_lines(tax_breakdown: &str) -> Vec<AuditLine> {
+    let mut lines = Vec::new();
+    match serde_json::from_str::<Json>(tax_breakdown) {
+        // Formato nuevo: una entrada por clave fiscal completa.
+        Ok(Json::Array(entries)) => {
+            for e in &entries {
+                if !e.is_object() {
+                    continue;
+                }
+                lines.push(AuditLine {
+                    rate: num_field(e, "rate", 0.0),
+                    base: num_field(e, "base", 0.0),
+                    quota: num_field(e, "quota", 0.0),
+                    surcharge_rate: num_field(e, "surcharge_rate", 0.0),
+                    surcharge_quota: num_field(e, "surcharge_quota", 0.0),
+                    has_surcharge: e.get("surcharge_rate").is_some()
+                        || e.get("surcharge_quota").is_some(),
+                });
+            }
+        }
+        // Formato viejo: clave = tipo, `{base, tax}`, todo venta nacional sujeta y no exenta.
+        Ok(Json::Object(map)) => {
+            for (rate, amounts) in map {
+                let Ok(rate) = rate.trim().parse::<f64>() else {
+                    continue;
+                };
+                lines.push(AuditLine {
+                    rate,
+                    base: num_field(&amounts, "base", 0.0),
+                    quota: num_field(&amounts, "tax", 0.0),
+                    surcharge_rate: 0.0,
+                    surcharge_quota: 0.0,
+                    has_surcharge: false,
+                });
+            }
+        }
+        _ => {}
+    }
+    lines
+}
+
+/// **Nada aritméticamente imposible se sella** (hub#1103).
+///
+/// Este motor es el último eslabón antes de Hacienda: calcula la huella SHA-256, gasta un número
+/// de secuencia, encadena y encola para la AEAT. Aceptaba los importes que le dieran. Una pasada
+/// de QA selló un registro que declaraba `rate 21.0` con una cuota de 99,99 € sobre una base de
+/// 5,45 €, y otro con base y cuota negativas en un alta ordinaria: los dos viajaron VERBATIM al
+/// `CuotaTotal` y al `ImporteTotal` que se remiten.
+///
+/// # Por qué aquí, si el módulo ya lo comprueba en la tabla
+///
+/// `013_arithmetic_integrity.sql` (verifactu#53) puso tres `CHECK` en `verifactu_record`, y esa es
+/// la guarda que ninguna puerta puede saltarse. Pero una violación de `CHECK` llega como un error
+/// crudo de Postgres: **sin código de dominio, sin motivo legible y después** de haber leído el
+/// ancla de la cadena. Este control se adelanta a ese punto y da el motivo con su código, que es
+/// lo que la issue pedía dejar «en `verifactu.events.list`». *(No puede ser una FILA de evento: el
+/// rechazo revierte su propia transacción y el evento se iría con ella. El motivo viaja en el
+/// error, que es lo que ve el llamante y lo que registra el runtime.)*
+///
+/// And there is one thing the table **cannot** check and this can: how many invoice lines were
+/// aggregated into each breakdown entry. Rows whose quota was rounded per line — everything sealed
+/// before `invoice` v1.2.27, and the verbatim F3 to this day — do not satisfy `cuota = base × tipo`
+/// exactly, so no fixed tolerance works on them: the 1,5-cent one behind `013` was rejecting
+/// legitimate multi-line tickets (verifactu#60). Since ADR-0405 `invoice` closes the key once and
+/// no longer BUILDS that shape, but this gate reads rows it did not build. The two gates measure
+/// **different things on purpose**, and this one is always the stricter of the two: see
+/// [`line_rate_tolerance_cents`].
+///
+/// # Qué se comprueba, y qué NO
+///
+///   * **la cuota contra SU tipo declarado** — sí, y es la única que caza el caso del QA:
+///     `base + cuota = total` cuadra igual (545 + 9999 = 10544 es internamente consistente). Con
+///     la tolerancia que impone el redondeo por línea de `invoice`, ni un céntimo menos
+///     ([`line_rate_tolerance_cents`]): una guarda que rechaza una mesa de doce no es una guarda,
+///     es una caja que no factura.
+///   * **la cuota contra `quantity × unit_price`** — NO, y no es un olvido: `sales` prorratea el
+///     descuento DENTRO de la línea y deja `unit_price` en el bruto. Esa comparación rechazaría
+///     toda venta con descuento y toda invitación (razonado en `invoice#50`).
+///   * **el desglose contra la cabecera** (`Σ bases`, `Σ cuotas`) y **`base + cuota = total`** —
+///     sí. Es exactamente el cruce que hace la AEAT, y es la mitad que la tabla dejó fuera a
+///     propósito porque en SQL no cabía sin una función.
+///   * **`total ≤ 0`** — NO: `< 0`. Un tique 100 % invitado suma 0,00 € honestamente y sigue
+///     siendo una venta que necesita su F2. El criterio de aceptación de hub#1103 pedía `≤ 0` y
+///     contradecía lo ya decidido en `invoice#50`; manda lo decidido.
+///
+/// Devuelve `Some(mensaje)` —con el código de dominio delante— cuando el registro no se puede
+/// sellar.
+fn audit_amounts(r: &RecordInput) -> Option<String> {
+    // Una anulación no lleva importes: no hay nada que cuadrar.
+    if r.record_type != "alta" {
+        return None;
+    }
+
+    let lines = audit_lines(&r.tax_breakdown);
+    let mut declared_base = 0.0;
+    let mut declared_quota = 0.0;
+
+    for line in &lines {
+        declared_base += line.base;
+        declared_quota += line.quota + line.surcharge_quota;
+
+        let expected = line.base * line.rate / 100.0;
+        let tolerance = line_rate_tolerance_cents(r.line_count, expected);
+        if (line.quota - expected).abs() > tolerance {
+            return Some(format!(
+                "quota_rate_mismatch: el desglose declara {} de cuota sobre una base de {} al {} %, \
+                 y ese tipo justifica {expected:.2} (tolerancia {tolerance} céntimos, el redondeo \
+                 por línea de una factura de {} línea(s)). Cobrar un importe y declarar otro es lo \
+                 que rompe el cruce de la AEAT",
+                line.quota, line.base, line.rate, r.line_count.unwrap_or(1)
+            ));
+        }
+        if line.has_surcharge {
+            let expected_surcharge = line.base * line.surcharge_rate / 100.0;
+            let tolerance = line_rate_tolerance_cents(r.line_count, expected_surcharge);
+            if (line.surcharge_quota - expected_surcharge).abs() > tolerance {
+                return Some(format!(
+                    "quota_rate_mismatch: el desglose declara {} de recargo de equivalencia sobre \
+                     una base de {} al {} %, y ese tipo justifica {expected_surcharge:.2} \
+                     (tolerancia {tolerance} céntimos)",
+                    line.surcharge_quota, line.base, line.surcharge_rate
+                ));
+            }
+        }
+    }
+
+    if lines.is_empty() {
+        // Sin desglose legible (facturas anteriores al campo, rectificativas que lo dejan vacío, o
+        // un `records.create` que no lo manda) solo queda el `tax_rate` de la fila. Tolerancia: un
+        // céntimo de redondeo más el error que introduce guardar el tipo EFECTIVO con dos
+        // decimales — sin ese margen una factura grande se rechazaría por la precisión de su
+        // propio tipo. Mismo margen que `ck_verifactu_record_quota_matches_row_rate`.
+        let expected = r.base_amount * r.tax_rate / 100.0;
+        let tolerance = 1.0 + (r.base_amount.abs() * 0.00005).ceil();
+        if (r.tax_amount - expected).abs() > tolerance {
+            return Some(format!(
+                "quota_rate_mismatch: la fila declara {} de cuota sobre una base de {} al {} %, y \
+                 ese tipo justifica {expected:.2} (tolerancia {tolerance} céntimos)",
+                r.tax_amount, r.base_amount, r.tax_rate
+            ));
+        }
+    } else if (declared_base - r.base_amount).abs() > CENT_EPSILON
+        || (declared_quota - r.tax_amount).abs() > CENT_EPSILON
+    {
+        return Some(format!(
+            "totals_mismatch: la cabecera declara base {} y cuota {}, y su propio desglose suma \
+             base {declared_base} y cuota {declared_quota}. `CuotaTotal` tiene que ser la suma de \
+             las cuotas declaradas",
+            r.base_amount, r.tax_amount
+        ));
+    }
+
+    if (r.base_amount + r.tax_amount - r.total_amount).abs() > CENT_EPSILON {
+        return Some(format!(
+            "totals_mismatch: la cabecera declara base {} + cuota {} y un total de {}, que es lo \
+             que viaja como `ImporteTotal`",
+            r.base_amount, r.tax_amount, r.total_amount
+        ));
+    }
+
+    if NON_NEGATIVE_TYPES.contains(&r.invoice_type.as_str())
+        && (r.total_amount < -CENT_EPSILON || r.base_amount + r.tax_amount < -CENT_EPSILON)
+    {
+        return Some(format!(
+            "negative_total: una factura de tipo {} no puede totalizar {}: un importe negativo es \
+             una rectificativa (R1…R5), no una ordinaria",
+            r.invoice_type, r.total_amount
+        ));
+    }
+
+    None
 }
 
 /// Recompone un registro **rechazado** sobre el último eslabón que la AEAT sí tiene.
@@ -721,6 +1001,13 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_number,
             invoice_date,
             invoice_type,
+            // El esquema de `records.create` (`additionalProperties: false`) no admite
+            // `tax_breakdown`, así que por esta puerta no llega desglose que contrastar y no hay
+            // líneas que contar: manda la regla del `tax_rate` de la fila.
+            line_count: None,
+            // El command público declara el tipo que quiere y no se le toca: aquí no hay
+            // degradación que anotar (la resuelve `ingest_invoice`, que sí conoce al destinatario).
+            downgraded_from: String::new(),
             description: str_field(&payload, "description"),
             base_amount: num_field(&payload, "base_amount", 0.0),
             tax_rate: num_field(&payload, "tax_rate", 21.0),
@@ -734,9 +1021,27 @@ async fn create_record(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             substitutes_number: str_field(&payload, "substitutes_number"),
             substitutes_date: str_field(&payload, "substitutes_date"),
             substitutes_nif: str_field(&payload, "substitutes_nif"),
+            // Rectificación (R1-R5, hub#1023). `rectification_type` vacío = lo deriva el XML de
+            // si vienen o no los importes rectificados; explícito (`S`/`I`) manda sobre él.
+            rectifies_number: str_field(&payload, "rectifies_number"),
+            rectifies_date: str_field(&payload, "rectifies_date"),
+            rectifies_nif: str_field(&payload, "rectifies_nif"),
+            rectification_type: str_field(&payload, "rectification_type"),
+            rectified_base_amount: optional_cents(&payload, "rectified_base_amount"),
+            rectified_tax_amount: optional_cents(&payload, "rectified_tax_amount"),
+            rectified_surcharge_amount: optional_cents(&payload, "rectified_surcharge_amount"),
         },
     )
     .await
+}
+
+/// Un importe **opcional** en céntimos, tal cual venga: `Json::Null` cuando nadie lo escribió.
+///
+/// No se normaliza a `0`: en el bloque `ImporteRectificacion` la diferencia entre «no hay importe»
+/// y «el importe es cero» es la diferencia entre no declarar el bloque y declarar a Hacienda que
+/// se rectifica una base de cero euros (hub#324). Quien decide es `aeat::importe_rectificacion`.
+fn optional_cents(payload: &Json, key: &str) -> Json {
+    payload.get(key).cloned().unwrap_or(Json::Null)
 }
 
 // ── ingest_invoice: alta automática desde el módulo invoice ───────────────────
@@ -772,10 +1077,22 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
         return Ok(Output::new()); // nada que ingerir
     }
 
-    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes). El
-    // LEFT JOIN a sí misma por `substitutes_invoice_id` trae, EN LA MISMA lectura (respeta la
-    // "única lectura acotada" de ADR-0058), los datos de la F2 sustituida cuando esta factura es
-    // una F3 — para el bloque XML FacturasSustituidas. NULL/'' si no es sustitución.
+    // Lectura acotada por id de la factura (snapshot fiscal: número oficial + importes). Los dos
+    // LEFT JOIN a sí misma traen, EN LA MISMA lectura (respeta la "única lectura acotada" de
+    // ADR-0058), la factura enlazada de cada caso:
+    //
+    // - `substitutes_invoice_id` → la F2 que una F3 sustituye (bloque XML `FacturasSustituidas`);
+    // - `rectifies_invoice_id`   → la factura que una R1-R5 rectifica (`FacturasRectificadas`,
+    //   hub#1023) — el camino normal de una devolución en TPV.
+    //
+    // NULL/'' cuando la factura no enlaza nada, que es el caso de toda venta corriente.
+    //
+    // And the line `COUNT` (hub#1180): a breakdown whose quota was rounded per line cannot be
+    // judged without knowing how many lines were aggregated — a fixed tolerance rejected legitimate
+    // multi-line tickets (see `line_rate_tolerance_cents`). `invoice` stopped producing that shape
+    // in ADR-0405, but the rows already sealed — and every verbatim F3 — still carry it. It goes as
+    // subconsulta de ESTA lectura, no como una segunda: un listener que abre dos lecturas por venta
+    // es una lectura de más en cada tique, y ADR-0058 acota la excepción a UNA.
     let rows = host
         .read(
             "SELECT i.invoice_type, i.number, i.issue_date, i.issuer_nif, i.issuer_name, \
@@ -783,10 +1100,17 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
              i.base_amount, i.tax_amount, i.total_amount, i.tax_breakdown, \
              COALESCE(sub.number, '') AS substitutes_number, \
              COALESCE(sub.issue_date, '') AS substitutes_date, \
-             COALESCE(sub.issuer_nif, '') AS substitutes_nif \
+             COALESCE(sub.issuer_nif, '') AS substitutes_nif, \
+             COALESCE(rec.number, '') AS rectifies_number, \
+             COALESCE(rec.issue_date, '') AS rectifies_date, \
+             COALESCE(rec.issuer_nif, '') AS rectifies_nif, \
+             (SELECT COUNT(*) FROM invoice_invoiceitem it \
+                WHERE it.invoice_id = i.id AND it.hub_id = i.hub_id) AS line_count \
              FROM invoice_invoice i \
              LEFT JOIN invoice_invoice sub \
                ON sub.id = i.substitutes_invoice_id AND sub.hub_id = i.hub_id AND sub.is_deleted = 0 \
+             LEFT JOIN invoice_invoice rec \
+               ON rec.id = i.rectifies_invoice_id AND rec.hub_id = i.hub_id AND rec.is_deleted = 0 \
              WHERE i.id = :invoice_id AND i.hub_id = :hub_id AND i.is_deleted = 0 LIMIT 1",
             &params(json!({ "invoice_id": invoice_id, "hub_id": ctx.hub_id })),
         )
@@ -814,17 +1138,25 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
 
     // Destinatario de la factura: decide el TIPO antes de encadenar nada.
     let recipient_nif = str_field(&inv, "customer_tax_id");
-    let invoice_type = {
+    let declared_type = {
         let t = str_field(&inv, "invoice_type");
-        let declared = if INVOICE_TYPES.contains(&t.as_str()) {
+        if INVOICE_TYPES.contains(&t.as_str()) {
             t
         } else {
             "F1".to_string()
-        };
-        // Sin NIF de cliente, una F1 sale sin `Destinatarios` y la AEAT la rechaza con 1189 —
-        // ya con el número de cadena gastado. El tipo entra en la huella, así que se resuelve
-        // AQUÍ, antes de calcularla (`resolve_invoice_type`).
-        resolve_invoice_type(&declared, &recipient_nif)
+        }
+    };
+    // Sin NIF de cliente, una F1 sale sin `Destinatarios` y la AEAT la rechaza con 1189 — ya con
+    // el número de cadena gastado. El tipo entra en la huella, así que se resuelve AQUÍ, antes de
+    // calcularla (`resolve_invoice_type`).
+    let invoice_type = resolve_invoice_type(&declared_type, &recipient_nif);
+    // hub#1104: y si degradó, se ANOTA. El documento que el cliente se llevó dice una cosa y el
+    // registro que se declara dice otra; que las dos verdades existan es inevitable, que nadie se
+    // entere no. `build_record_output` emite el hecho y comprueba el techo de la F2.
+    let downgraded_from = if invoice_type == declared_type {
+        String::new()
+    } else {
+        declared_type
     };
 
     // DescripcionOperacion: la AEAT la exige NO vacía (rechaza con código 1100). Usa la descripción
@@ -849,6 +1181,10 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             invoice_number: invoice_number.clone(),
             invoice_date: str_field(&inv, "issue_date"),
             invoice_type,
+            // Viene del `COUNT` de la MISMA lectura acotada: es lo que hace juzgable la cuota del
+            // desglose sin abrir una segunda consulta por cada venta.
+            line_count: Some(int_field(&inv, "line_count", 1)),
+            downgraded_from,
             description,
             // El módulo invoice guarda importes en CÉNTIMOS (ADR-0007), igual que `create_record`;
             // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
@@ -874,6 +1210,19 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             substitutes_number: str_field(&inv, "substitutes_number"),
             substitutes_date: str_field(&inv, "substitutes_date"),
             substitutes_nif: str_field(&inv, "substitutes_nif"),
+            // R1-R5 → FacturasRectificadas: datos de la factura rectificada (del LEFT JOIN).
+            rectifies_number: str_field(&inv, "rectifies_number"),
+            rectifies_date: str_field(&inv, "rectifies_date"),
+            rectifies_nif: str_field(&inv, "rectifies_nif"),
+            // `invoice.rectify` emite la rectificativa **negando** el original, así que los
+            // importes de esta factura SON el delta: es una rectificativa por diferencias, y el
+            // XML la deriva de que no haya importes rectificados (ver `aeat::rectification_type`).
+            // La sustitutiva (`S`) llega por `create_record`, que sí acepta los `rectified_*`;
+            // el módulo `invoice` todavía no tiene columna que distinga los dos (invoice#5).
+            rectification_type: String::new(),
+            rectified_base_amount: Json::Null,
+            rectified_tax_amount: Json::Null,
+            rectified_surcharge_amount: Json::Null,
         },
     )
     .await
@@ -888,6 +1237,20 @@ struct RecordInput {
     invoice_number: String,
     invoice_date: String,
     invoice_type: String,
+    /// Cuántas **líneas** tiene la factura de la que sale este registro, cuando se sabe.
+    ///
+    /// Es el dato que hace juzgable la cuota del desglose: `invoice` redondea por línea y suma, así
+    /// que la desviación admisible crece con el número de líneas (ver
+    /// [`line_rate_tolerance_cents`]). `None` = nadie lo sabe, y entonces se juzga como una factura
+    /// de una línea.
+    line_count: Option<i64>,
+    /// Tipo que **declaraba el documento** cuando `invoice_type` es el resultado de una
+    /// degradación (hub#1104), y vacío cuando nadie degradó nada.
+    ///
+    /// No es decorativo: es lo que convierte la degradación en un hecho observable. Con él,
+    /// [`build_record_output`] emite el evento `invoice_type_downgraded` y comprueba el techo
+    /// §15.8 ANTES de gastar un número de cadena.
+    downgraded_from: String,
     description: String,
     base_amount: f64,
     /// Tipo EFECTIVO (`cuota/base`). Ya NO es lo que se declara a la AEAT en factura mixta: el XML
@@ -911,6 +1274,24 @@ struct RecordInput {
     substitutes_number: String,
     substitutes_date: String,
     substitutes_nif: String,
+    /// Factura RECTIFICADA (R1-R5 → la original, hub#1023): nº+serie, fecha de expedición y NIF
+    /// del emisor de la factura que esta rectificativa corrige. Alimentan el bloque XML
+    /// `FacturasRectificadas` (XSD `IDFacturaARType`, el mismo shape que las sustituidas). Vacíos
+    /// si el registro no rectifica nada, o si la rectificativa no identifica el original (una R5
+    /// de un tique puede no hacerlo: el bloque es `minOccurs="0"`).
+    rectifies_number: String,
+    rectifies_date: String,
+    rectifies_nif: String,
+    /// `TipoRectificativa`: `S` sustitutiva · `I` por diferencias. **Vacío = lo deriva el XML**
+    /// de si vienen o no los importes rectificados (`aeat::rectification_type`), que es la única
+    /// lectura que admite el esquema. Un valor explícito manda sobre la derivación.
+    rectification_type: String,
+    /// `ImporteRectificacion` (solo en una `S`): base, cuota y —opcional— recargo **rectificados**,
+    /// en CÉNTIMOS. `Json::Null` cuando no vienen: ahí «no hay importe» y «el importe es cero» son
+    /// cosas distintas ante Hacienda, así que no se normalizan a `0` (hub#324).
+    rectified_base_amount: Json,
+    rectified_tax_amount: Json,
+    rectified_surcharge_amount: Json,
 }
 
 /// Chaining core: reads the `(hub_id, issuer_nif, environment)` anchor, computes the SHA-256
@@ -937,6 +1318,31 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
             ctx.hub_id
         )));
     }
+    // hub#1103: **nada aritméticamente imposible se sella**. Antes de leer el ancla y ANTES de
+    // gastar un número de secuencia — un registro rechazado más tarde deja el hueco igual.
+    if let Some(reason) = audit_amounts(&r) {
+        return Err(VerifactuError::Payload(reason).into());
+    }
+
+    // hub#1104: una F1 sin destinatario se degrada a F2 para no morir con el 1189… pero una F2
+    // por encima de 3.010,00 € muere con el §15.8, y esa la habríamos FABRICADO nosotros. El techo
+    // se comprueba aquí, no en `xsd::validate_registro`, porque allí llega con la cadena ya gastada.
+    if !r.downgraded_from.is_empty() && r.invoice_type == "F2" {
+        let declared = r.base_amount + r.tax_amount;
+        if declared > xsd::F2_CEILING_CENTS as f64 {
+            return Err(VerifactuError::Payload(format!(
+                "f2_limit_exceeded: la factura {} se declaró {} sin NIF de destinatario, y una \
+                 simplificada F2 no puede pasar de {:.2} € (§15.8) sumando base y cuota; suma \
+                 {:.2} €. Identifica al destinatario para poder emitirla como factura completa",
+                r.invoice_number,
+                r.downgraded_from,
+                xsd::F2_CEILING_CENTS as f64 / 100.0,
+                declared / 100.0,
+            ))
+            .into());
+        }
+    }
+
     // The record joins the chain of the hub's CURRENT config environment (guard R4). Read the
     // config BEFORE the anchor: the environment scopes every chain read below (and the QR host).
     let config = read_config(host, &ctx.hub_id).await?;
@@ -1011,6 +1417,15 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
     if ids.len() < 3 {
         return Err(RuntimeError::Native("context.new_ids insuficientes".into()));
     }
+    // `ids[0..6]` ya están repartidos (registro, evento, la ranura reservada de la vieja cola y los
+    // tres de la transmisión inline). El aviso de degradación estrena la séptima para no mover
+    // ninguna de las anteriores de sitio.
+    const DOWNGRADE_EVENT_ID_INDEX: usize = 6;
+    if !r.downgraded_from.is_empty() && ids.len() <= DOWNGRADE_EVENT_ID_INDEX {
+        return Err(RuntimeError::Native(
+            "context.new_ids insuficientes para anotar la degradación de tipo".into(),
+        ));
+    }
     let record_id = ids[0].clone();
 
     let mut output = Output::new()
@@ -1046,6 +1461,16 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_number": r.substitutes_number,
                 "substitutes_date": r.substitutes_date,
                 "substitutes_nif": r.substitutes_nif,
+                // R1-R5 → bloque rectificativo (hub#1023): mismo snapshot, mismo motivo. Un envío
+                // diferido (registro creado sin certificado y remitido a mano después) reconstruye
+                // el XML desde ESTA fila, así que lo que no esté aquí no llega a la AEAT.
+                "rectifies_number": r.rectifies_number,
+                "rectifies_date": r.rectifies_date,
+                "rectifies_nif": r.rectifies_nif,
+                "rectification_type": r.rectification_type,
+                "rectified_base_amount": r.rectified_base_amount,
+                "rectified_tax_amount": r.rectified_tax_amount,
+                "rectified_surcharge_amount": r.rectified_surcharge_amount,
             }),
         ))
         .with_operation(op(
@@ -1064,6 +1489,33 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "timestamp": ctx.now,
             }),
         ));
+
+    // hub#1104: **la degradación deja de ser muda.** Va como evento propio y no como un matiz del
+    // `record_created` porque es un hecho distinto y con severidad distinta: quien filtre por
+    // `warning` en la pantalla de eventos —o dispare un flujo con él— tiene que encontrarlo.
+    if !r.downgraded_from.is_empty() {
+        output = output.with_operation(op(
+            "verifactu._insert_event",
+            json!({
+                "event_id": ids[DOWNGRADE_EVENT_ID_INDEX],
+                "record_id": record_id,
+                "event_type": EVENT_TYPE_INVOICE_TYPE_DOWNGRADED,
+                "severity": "warning",
+                "message": format!(
+                    "La factura {} se declaró {} y se ha registrado como {}: sin NIF de \
+                     destinatario la AEAT rechaza el tipo declarado (error 1189)",
+                    r.invoice_number, r.downgraded_from, r.invoice_type
+                ),
+                "details": json!({
+                    "declared": r.downgraded_from,
+                    "effective": r.invoice_type,
+                    "reason": REASON_MISSING_RECIPIENT,
+                    "sequence_number": sequence_number,
+                }).to_string(),
+                "timestamp": ctx.now,
+            }),
+        ));
+    }
 
     // Module active = ALWAYS emit (ADR-0202 guard R3, verifactu#26): the `auto_transmit`
     // column was dropped in verifactu v1.5.2 — there is no deferred-transmission mode.
@@ -1102,6 +1554,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "substitutes_number": r.substitutes_number,
                 "substitutes_date": r.substitutes_date,
                 "substitutes_nif": r.substitutes_nif,
+                "rectifies_number": r.rectifies_number,
+                "rectifies_date": r.rectifies_date,
+                "rectifies_nif": r.rectifies_nif,
+                "rectification_type": r.rectification_type,
+                "rectified_base_amount": r.rectified_base_amount,
+                "rectified_tax_amount": r.rectified_tax_amount,
+                "rectified_surcharge_amount": r.rectified_surcharge_amount,
             });
             if let Ok((ops, events, _success)) =
                 transmit_one(
@@ -1172,6 +1631,31 @@ pub const REASON_ENVIRONMENT_UNKNOWN: &str = "record_environment_unknown";
 pub const REASON_RECORD_NOT_DECLARABLE: &str = "record_not_declarable";
 /// The XML does not meet the AEAT schema; refused locally rather than burning a chain number.
 pub const REASON_XSD_INVALID: &str = "xsd_invalid";
+
+// ── hub#1104 · la degradación de tipo deja de ser muda ────────────────────────
+
+/// `verifactu_event.event_type` of the row that records a **downgrade of the invoice type**
+/// (hub#1104).
+///
+/// The downgrade itself is right: an `F1` with no identified recipient travels without the
+/// `Destinatarios` block and the AEAT refuses it with **1189** — after the chain number has been
+/// spent. Doing it in silence is not: the document the customer took away says `F1` and the record
+/// filed with the tax agency says `F2`, and nothing on any screen tells the business the two
+/// disagree. ADR-0140 says fiscal state is derived, never mutated without a trace.
+pub const EVENT_TYPE_INVOICE_TYPE_DOWNGRADED: &str = "invoice_type_downgraded";
+
+/// Why the type was downgraded. Stable machine code so the screen and any automation agree, and
+/// so the UI can translate the sentence instead of parsing prose (ADR-0055).
+pub const REASON_MISSING_RECIPIENT: &str = "missing_recipient_aeat_1189";
+
+/// `details.scope` of the `chain_validated`/`chain_error` event (hub#1103).
+///
+/// `chain.validate` recomputes SHA-256 fingerprints and verifies the chaining — and **nothing
+/// else**. That is deliberate: a sealed record is immutable (RD 1007/2023), so re-auditing its
+/// amounts there would inform, not prevent. What WAS a defect is a verdict that read like a
+/// judgement on the amounts; the scope now travels as a stable field the UI can translate
+/// (the module's `ui.recChainScope`, `en` + `es`).
+pub const CHAIN_VALIDATION_SCOPE: &str = "hash_chain";
 
 /// The public payload of a failed outcome. **Closed set, and nothing fiscal in it**: it ends up in
 /// somebody's task list and in a message, so it carries what is needed to say «check invoice X»
@@ -2532,17 +3016,29 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     } else {
         ("error", "chain_error")
     };
+    // hub#1103: **el veredicto dice QUÉ verificó.** «Cadena íntegra: 27 registro(s) verificados»
+    // se leyó en un informe de QA como prueba de que 27 registros aritméticamente imposibles
+    // estaban bien, y ante Hacienda «íntegra» significa una cosa concreta. Lo que se comprueba
+    // aquí es el encadenado de HUELLAS, y eso es lo correcto: un registro ya sellado es inmutable
+    // (RD 1007/2023), así que re-auditar sus importes informaría sin evitar nada — la guarda que
+    // evita el daño es `audit_amounts`, antes de sellar. El alcance viaja además en
+    // `details.scope` para que la UI lo diga en el idioma del usuario (ADR-0055) en vez de
+    // parsear esta frase.
     let message = if valid {
-        format!("Cadena íntegra: {total} registro(s) verificados ({issuer_nif})")
+        format!(
+            "Cadena de huellas íntegra: {total} registro(s) con su encadenado SHA-256 verificado \
+             ({issuer_nif}). No se re-auditan los importes"
+        )
     } else {
         let seq = first_invalid.as_ref().map(|x| x.0).unwrap_or(0);
-        format!("Cadena ROTA en la secuencia {seq} ({issuer_nif})")
+        format!("Cadena de huellas ROTA en la secuencia {seq} ({issuer_nif})")
     };
     let details = json!({
         "valid": valid,
         "total": total,
         "issuer_nif": issuer_nif,
         "environment": environment,
+        "scope": CHAIN_VALIDATION_SCOPE,
         "first_invalid_seq": first_invalid.as_ref().map(|x| x.0),
         "first_invalid_id": first_invalid.as_ref().map(|x| x.1.clone()),
     });
@@ -3320,6 +3816,81 @@ mod ingest_tests {
             } else {
                 Ok(vec![])
             }
+        }
+    }
+
+    /// Host que devuelve una **rectificativa** (R5 de un tique) con los datos de la factura que
+    /// rectifica, tal y como los trae el `LEFT JOIN` por `rectifies_invoice_id`. Guarda el SQL
+    /// para poder comprobar que la lectura los pide.
+    struct RectifyingInvoiceHost {
+        reads: std::sync::Mutex<Vec<String>>,
+    }
+    impl RectifyingInvoiceHost {
+        fn new() -> Self {
+            Self { reads: std::sync::Mutex::new(Vec::new()) }
+        }
+    }
+    #[async_trait::async_trait]
+    impl NativeHost for RectifyingInvoiceHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.reads.lock().unwrap().push(sql.to_string());
+            if sql.contains("FROM invoice_invoice") {
+                return Ok(vec![json!({
+                    "invoice_type": "R5", "number": "RECT-2026-000001",
+                    "issue_date": "2026-08-20", "issuer_nif": "B27593136",
+                    "issuer_name": "ERPLORA CLOUD SL",
+                    "customer_tax_id": "", "customer_name": "",
+                    "description": "Devolución", "base_amount": -1000,
+                    "tax_amount": -210, "total_amount": -1210,
+                    "tax_breakdown": r#"{"21.00":{"base":-1000,"tax":-210}}"#,
+                    "substitutes_number": "", "substitutes_date": "", "substitutes_nif": "",
+                    "rectifies_number": "TICKET-2026-000001",
+                    "rectifies_date": "2026-08-02",
+                    "rectifies_nif": "B27593136"
+                })]);
+            }
+            Ok(vec![])
+        }
+    }
+
+    /// hub#1023: una rectificativa nacida de una devolución tiene que llegar al XML con el enlace
+    /// a la factura que rectifica. El dato viaja en la MISMA lectura acotada (ADR-0058), por el
+    /// `LEFT JOIN` a `rectifies_invoice_id` — igual que la F3 hace con `substitutes_invoice_id`.
+    #[tokio::test]
+    async fn ingest_invoice_carries_the_rectified_invoice() {
+        let host = RectifyingInvoiceHost::new();
+        let input = json!({
+            "payload": { "new_id": "inv-r1" },
+            "context": {
+                "hub_id": "3f2a1b4c-5d6e-4f70-8192-a3b4c5d6e7f8",
+                "now": "2026-08-20T10:00:00+02:00", "current_user_id": "u1",
+                "new_ids": ["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3"]
+            }
+        });
+        let out = ingest_invoice(&input, &host).await.expect("la R5 se ingesta");
+
+        let sql = host.reads.lock().unwrap().join("\n");
+        assert!(
+            sql.contains("rectifies_invoice_id"),
+            "la lectura de la factura tiene que traer la rectificada: {sql}"
+        );
+
+        let insert = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_record")
+            .expect("se inserta el registro");
+        for (field, expected) in [
+            ("invoice_type", json!("R5")),
+            ("rectifies_number", json!("TICKET-2026-000001")),
+            ("rectifies_date", json!("2026-08-02")),
+            ("rectifies_nif", json!("B27593136")),
+        ] {
+            assert_eq!(
+                insert.params.get(field),
+                Some(&expected),
+                "el registro tiene que llevar `{field}`"
+            );
         }
     }
 
@@ -4819,6 +5390,599 @@ mod contingency_queue_tests {
             *gate_host.reads.lock().unwrap(),
             *queue_host.reads.lock().unwrap(),
             "both answers must come from the SAME SQL — a second copy is a second truth"
+        );
+    }
+}
+
+#[cfg(test)]
+mod ingest_integrity_tests {
+    //! hub#1103 + hub#1104 — **la última puerta antes de Hacienda tiene que juzgar lo que sella**.
+    //!
+    //! Dos defectos distintos de la MISMA puerta (`build_record_output`, por donde pasan tanto el
+    //! command público `verifactu.records.create` como el listener `ingest_invoice`):
+    //!
+    //!  * **hub#1103** — la aritmética no se comprobaba. Un registro con `rate 21.0` y una cuota de
+    //!    99,99 € sobre una base de 5,45 € se selló, se encadenó y se remitió VERBATIM. El módulo
+    //!    cerró su mitad en la TABLA (`013_arithmetic_integrity.sql`, verifactu#53), pero una
+    //!    violación de `CHECK` llega como error crudo de Postgres: sin código de dominio, sin motivo
+    //!    legible y DESPUÉS de haber leído el ancla. Aquí se rechaza antes, con su código.
+    //!  * **hub#1104** — una F1 sin NIF de destinatario se degradaba a F2 **en silencio** (y una
+    //!    R1–R4 a R5, que es un cambio de naturaleza fiscal). La degradación es correcta —sin ella
+    //!    la AEAT responde 1189 con el número de cadena ya gastado—, pero muda no lo es.
+    use super::*;
+
+    const HUB: &str = "9c1d7b2f-4e2f-8a3b-9444-455566677788";
+    const NIF: &str = "B27593136";
+
+    /// Host mínimo: config de `testing`, cadena vacía y sin certificado (no se transmite nada, que
+    /// es lo que estos tests quieren observar — la puerta, no la red).
+    struct GateHost;
+    #[async_trait::async_trait]
+    impl NativeHost for GateHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            if sql.contains("FROM verifactu_config") {
+                return Ok(vec![json!({
+                    "hub_id": HUB, "environment": "testing",
+                    "issuer_nif": NIF, "issuer_name": "Test Business SL"
+                })]);
+            }
+            Ok(vec![])
+        }
+    }
+
+    /// Host que sirve UNA factura del módulo `invoice`, tal cual la lee `ingest_invoice`, con el
+    /// número de líneas que trae el `COUNT` de la misma lectura. Guarda el SQL que se le pide.
+    struct InvoiceHost {
+        invoice: Json,
+        line_count: i64,
+        reads: std::sync::Mutex<Vec<String>>,
+    }
+    impl InvoiceHost {
+        /// Una factura de UNA línea, que es el caso corriente del camino manual.
+        fn new(invoice: Json) -> Self {
+            Self::with_lines(invoice, 1)
+        }
+        fn with_lines(invoice: Json, line_count: i64) -> Self {
+            Self { invoice, line_count, reads: std::sync::Mutex::new(Vec::new()) }
+        }
+    }
+    #[async_trait::async_trait]
+    impl NativeHost for InvoiceHost {
+        async fn read(&self, sql: &str, _p: &Params) -> Result<Vec<Json>> {
+            self.reads.lock().unwrap().push(sql.to_string());
+            if sql.contains("FROM verifactu_config") {
+                return Ok(vec![json!({
+                    "hub_id": HUB, "environment": "testing",
+                    "issuer_nif": NIF, "issuer_name": "Test Business SL"
+                })]);
+            }
+            if sql.contains("FROM invoice_invoice") {
+                let mut row = self.invoice.clone();
+                if let Some(m) = row.as_object_mut() {
+                    m.insert("line_count".into(), json!(self.line_count));
+                }
+                return Ok(vec![row]);
+            }
+            Ok(vec![])
+        }
+    }
+
+    fn ids() -> Json {
+        json!([
+            "id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3", "id-warn", "id-x"
+        ])
+    }
+
+    fn context() -> Json {
+        json!({
+            "hub_id": HUB, "now": "2026-08-25T10:00:00+02:00", "current_user_id": "u1",
+            "new_ids": ids()
+        })
+    }
+
+    /// Payload de `verifactu.records.create` con los importes que se le pasen.
+    fn create_payload(
+        invoice_type: &str,
+        base: i64,
+        rate: f64,
+        tax: i64,
+        total: i64,
+        breakdown: &str,
+    ) -> Json {
+        json!({
+            "payload": {
+                "record_type": "alta", "issuer_nif": NIF, "issuer_name": "Test Business SL",
+                "invoice_number": "F-2026-000123", "invoice_date": "2026-08-25",
+                "invoice_type": invoice_type, "base_amount": base, "tax_rate": rate,
+                "tax_amount": tax, "total_amount": total, "tax_breakdown": breakdown
+            },
+            "context": context()
+        })
+    }
+
+    /// Factura de `invoice` con los importes y el destinatario que se le pasen.
+    fn invoice_row(invoice_type: &str, customer_tax_id: &str, base: i64, tax: i64, total: i64, breakdown: &str) -> Json {
+        json!({
+            "invoice_type": invoice_type, "number": "FACT-2026-000009",
+            "issue_date": "2026-08-25", "issuer_nif": NIF, "issuer_name": "Test Business SL",
+            "customer_tax_id": customer_tax_id, "customer_name": "Cliente",
+            "description": "Venta", "base_amount": base, "tax_amount": tax,
+            "total_amount": total, "tax_breakdown": breakdown,
+            "substitutes_number": "", "substitutes_date": "", "substitutes_nif": "",
+            "rectifies_number": "", "rectifies_date": "", "rectifies_nif": ""
+        })
+    }
+
+    fn ingest_input() -> Json {
+        json!({ "payload": { "invoice_id": "inv-1" }, "context": context() })
+    }
+
+    fn error_of(res: Result<Output>) -> String {
+        match res {
+            Ok(out) => panic!(
+                "esperaba un RECHAZO y el registro se selló: {:?}",
+                out.operations.iter().map(|o| o.command.clone()).collect::<Vec<_>>()
+            ),
+            Err(e) => e.to_string(),
+        }
+    }
+
+    fn event_of<'a>(out: &'a Output, event_type: &str) -> Option<&'a Operation> {
+        out.operations.iter().find(|o| {
+            o.command == "verifactu._insert_event"
+                && o.params.get("event_type") == Some(&json!(event_type))
+        })
+    }
+
+    // ── hub#1103 · la aritmética ────────────────────────────────────────────────────────────
+
+    /// El caso EXACTO del QA: 99,99 € de cuota sobre una base de 5,45 € declarando el 21 %.
+    /// `base + cuota = total` cuadra (545 + 9999 = 10544), así que solo la contrastación contra el
+    /// TIPO declarado lo caza.
+    #[tokio::test]
+    async fn a_quota_its_own_rate_cannot_justify_is_refused() {
+        let input = create_payload(
+            "F1",
+            545,
+            21.0,
+            9999,
+            10544,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// Sin desglose legible solo queda el `tax_rate` de la fila, y tiene que juzgarse igual.
+    #[tokio::test]
+    async fn without_a_breakdown_the_row_rate_still_has_to_explain_the_quota() {
+        let input = create_payload("F1", 545, 21.0, 9999, 10544, "");
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// `base + cuota ≠ total`: la cabecera se contradice a sí misma. Ninguna de las tres reglas de
+    /// la tabla lo mira (`013` lo dejó fuera a propósito), así que esta es la única puerta.
+    #[tokio::test]
+    async fn a_header_that_contradicts_itself_is_refused() {
+        let input = create_payload(
+            "F1",
+            545,
+            21.0,
+            114,
+            660,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":114}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("totals_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// El desglose tiene que sumar lo que dice la cabecera: es el cruce que hace la AEAT
+    /// (`CuotaTotal` = Σ cuotas declaradas).
+    #[tokio::test]
+    async fn a_breakdown_that_does_not_add_up_to_the_header_is_refused() {
+        let input = create_payload(
+            "F1",
+            10000,
+            21.0,
+            2100,
+            12100,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":5000,"quota":1050}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("totals_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// Una ordinaria no totaliza negativo: lo negativo es una RECTIFICATIVA.
+    #[tokio::test]
+    async fn an_ordinary_invoice_cannot_total_negative() {
+        let input = create_payload(
+            "F1",
+            -500,
+            21.0,
+            -105,
+            -605,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-500,"quota":-105}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("negative_total"), "código esperado, llegó: {err}");
+    }
+
+    /// 🔴 **La trampa de esta issue.** El criterio escrito pedía rechazar `total ≤ 0`, y eso
+    /// contradice lo decidido en `invoice#50`: un tique 100 % invitado suma 0,00 € honestamente y
+    /// sigue siendo una venta que necesita su F2. Se sella.
+    #[tokio::test]
+    async fn a_fully_comped_ticket_still_gets_its_record() {
+        let input = create_payload(
+            "F2",
+            0,
+            21.0,
+            0,
+            0,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":0,"quota":0}]"#,
+        );
+        let out = create_record(&input, &GateHost)
+            .await
+            .expect("un tique invitado se sella: 0,00 € cuadra");
+        assert!(
+            out.operations.iter().any(|o| o.command == "verifactu._insert_record"),
+            "el registro tiene que existir"
+        );
+    }
+
+    /// Una rectificativa SÍ lleva importes negativos: es el camino legal de una devolución.
+    #[tokio::test]
+    async fn a_corrective_invoice_may_be_negative() {
+        let input = create_payload(
+            "R5",
+            -1000,
+            21.0,
+            -210,
+            -1210,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-1000,"quota":-210}]"#,
+        );
+        create_record(&input, &GateHost)
+            .await
+            .expect("una R5 negativa es legítima");
+    }
+
+    /// El recargo de equivalencia va en su propio par y se contrasta contra SU tipo.
+    #[tokio::test]
+    async fn the_equivalence_surcharge_is_checked_against_its_own_rate() {
+        let input = create_payload(
+            "F1",
+            10000,
+            21.0,
+            2620,
+            12620,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100,
+                 "surcharge_rate":5.2,"surcharge_quota":999}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// Un ticket de bar legítimo (21 % + 10 %, con el céntimo de redondeo por línea) pasa: la
+    /// guarda no puede dejar sin facturar una venta real.
+    #[tokio::test]
+    async fn a_legitimate_mixed_rate_ticket_is_sealed() {
+        let input = create_payload(
+            "F2",
+            1001,
+            16.58,
+            166,
+            1167,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":601,"quota":126},
+                {"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":400,"quota":40}]"#,
+        );
+        create_record(&input, &GateHost)
+            .await
+            .expect("un ticket mixto con su redondeo se sella");
+    }
+
+    /// Y la MISMA guarda cubre el camino automático: el listener de `invoice.created`.
+    #[tokio::test]
+    async fn the_listener_refuses_the_same_amounts_the_public_command_refuses() {
+        let host = InvoiceHost::new(invoice_row(
+            "F1",
+            "87654321X",
+            545,
+            9999,
+            10544,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
+        ));
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// 🔴 **The counterexample that sent this PR back with CHANGES** — still a live requirement,
+    /// but no longer for the reason it was written.
+    ///
+    /// Four lines of 0,50 € at 21 %: rounding per line, `round_half_up(10,5) = 11` each → the
+    /// breakdown reads `base 200 / quota 44` where `200 × 21 % = 42`. With a fixed 1,5-cent
+    /// tolerance this gate rejected it and the ticket was left with no fiscal record; at 12 lines
+    /// and 10 % that reached ~1 in 3 legitimate tickets (hub#1180).
+    ///
+    /// ⚠️ **`invoice` stopped emitting this shape** in ADR-0405 §Decisión 4 (v1.2.27, `invoice#65`):
+    /// the key now closes once and the same ticket declares 42. What keeps this test necessary is
+    /// the other side of the gate — the rows it must keep ACCEPTING: invoices sealed before that
+    /// version and already chained into the AEAT fingerprint, and the verbatim F3, which copies a
+    /// ticket's per-line figures by design. See [`line_rate_tolerance_cents`].
+    #[tokio::test]
+    async fn a_ticket_of_several_lines_at_the_same_rate_is_sealed() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                200,
+                44,
+                244,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            ),
+            4,
+        );
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("4 líneas de 0,50 € al 21 % son un tique legítimo: se sella");
+    }
+
+    /// El segundo techo (el que también sabe medir la tabla, migración `015`): una cuota que DOBLA
+    /// lo que su tipo justifica no la explica ningún redondeo, por muchas líneas que declare la
+    /// factura. Sin él, este motor sería más permisivo que el `CHECK` y el registro moriría un
+    /// `INSERT` después con un error crudo de Postgres — lo que hub#1103 vino a evitar.
+    #[tokio::test]
+    async fn the_engine_is_never_laxer_than_the_table() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                20,
+                10,
+                30,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":20,"quota":10}]"#,
+            ),
+            // 20 líneas de 1 céntimo al 21 % redondean a cuota CERO, no a 10.
+            20,
+        );
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// The twelve-cover table of the counterexample: 12 lines of 0,55 € at 10 % rounded per line —
+    /// `round_half_up(5,5) = 6` each → `base 660 / quota 72`, where the rate justifies 66. As with
+    /// the four-line case above, `invoice` no longer BUILDS this (ADR-0405 closes the key once and
+    /// declares 66); the gate must still ACCEPT it for rows already chained and for the verbatim
+    /// F3. See [`line_rate_tolerance_cents`].
+    #[tokio::test]
+    async fn a_twelve_line_table_at_ten_percent_is_sealed() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                660,
+                72,
+                732,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":660,"quota":72}]"#,
+            ),
+            12,
+        );
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("una mesa de 12 líneas al 10 % se sella");
+    }
+
+    /// …y la tolerancia NO puede tragárselo todo: el caso del QA sigue muriendo aunque la factura
+    /// declare muchas líneas. 99,99 € de cuota sobre 5,45 € al 21 % no lo explica ningún redondeo.
+    #[tokio::test]
+    async fn the_line_count_does_not_excuse_an_impossible_quota() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F1",
+                "87654321X",
+                545,
+                9999,
+                10544,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
+            ),
+            40,
+        );
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+    }
+
+    /// La lectura del número de líneas viaja en la MISMA lectura acotada de la factura (ADR-0058),
+    /// no en una segunda consulta: un listener que abre dos lecturas por venta es una lectura de
+    /// más en cada tique.
+    #[tokio::test]
+    async fn the_line_count_travels_in_the_same_scoped_read() {
+        let host = InvoiceHost::with_lines(
+            invoice_row(
+                "F2",
+                "",
+                200,
+                44,
+                244,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            ),
+            4,
+        );
+        ingest_invoice(&ingest_input(), &host).await.expect("se ingesta");
+        let reads = host.reads.lock().unwrap();
+        let invoice_reads: Vec<&String> =
+            reads.iter().filter(|s| s.contains("invoice_invoice")).collect();
+        assert_eq!(
+            invoice_reads.len(),
+            1,
+            "una sola lectura de la factura, no dos: {invoice_reads:?}"
+        );
+        assert!(
+            invoice_reads[0].contains("invoice_invoiceitem"),
+            "el conteo de líneas va DENTRO de esa lectura: {}",
+            invoice_reads[0]
+        );
+    }
+
+    // ── hub#1104 · la degradación no puede ser muda ─────────────────────────────────────────
+
+    /// Una F1 sin NIF de destinatario se sigue degradando a F2 —sin eso la AEAT responde 1189 con
+    /// el número de cadena ya gastado— pero **deja constancia**: un evento propio, con severidad
+    /// `warning`, que nombra el tipo declarado, el efectivo y el motivo.
+    #[tokio::test]
+    async fn a_silent_downgrade_leaves_a_trace() {
+        let host = InvoiceHost::new(invoice_row(
+            "F1",
+            "",
+            10000,
+            2100,
+            12100,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100}]"#,
+        ));
+        let out = ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("la factura se ingesta: degradar es correcto, callarlo no");
+
+        let insert = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_record")
+            .expect("se inserta el registro");
+        assert_eq!(insert.params.get("invoice_type"), Some(&json!("F2")));
+
+        let warn = event_of(&out, EVENT_TYPE_INVOICE_TYPE_DOWNGRADED)
+            .expect("la degradación tiene que dejar su evento");
+        assert_eq!(warn.params.get("severity"), Some(&json!("warning")));
+        let details: Json = serde_json::from_str(
+            warn.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+        )
+        .expect("los detalles son JSON");
+        assert_eq!(details.get("declared"), Some(&json!("F1")));
+        assert_eq!(details.get("effective"), Some(&json!("F2")));
+        assert_eq!(details.get("reason"), Some(&json!(REASON_MISSING_RECIPIENT)));
+    }
+
+    /// No es solo F1→F2: una rectificativa CON destinatario degradada a R5 cambia de naturaleza
+    /// fiscal (por diferencias → de simplificada) y también tiene que verse.
+    #[tokio::test]
+    async fn a_corrective_downgraded_to_r5_leaves_the_same_trace() {
+        let host = InvoiceHost::new(invoice_row(
+            "R1",
+            "",
+            -1000,
+            -210,
+            -1210,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-1000,"quota":-210}]"#,
+        ));
+        let out = ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("la rectificativa se ingesta");
+        let insert = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_record")
+            .expect("se inserta el registro");
+        assert_eq!(insert.params.get("invoice_type"), Some(&json!("R5")));
+        let warn = event_of(&out, EVENT_TYPE_INVOICE_TYPE_DOWNGRADED)
+            .expect("la degradación R1→R5 tiene que dejar su evento");
+        let details: Json = serde_json::from_str(
+            warn.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+        )
+        .unwrap();
+        assert_eq!(details.get("declared"), Some(&json!("R1")));
+        assert_eq!(details.get("effective"), Some(&json!("R5")));
+    }
+
+    /// Con NIF no hay degradación, así que no hay evento que emitir: un aviso que sale siempre
+    /// deja de ser un aviso.
+    #[tokio::test]
+    async fn an_invoice_with_a_recipient_is_not_downgraded_and_warns_about_nothing() {
+        let host = InvoiceHost::new(invoice_row(
+            "F1",
+            "87654321X",
+            10000,
+            2100,
+            12100,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100}]"#,
+        ));
+        let out = ingest_invoice(&ingest_input(), &host).await.expect("se ingesta");
+        let insert = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_record")
+            .expect("se inserta el registro");
+        assert_eq!(insert.params.get("invoice_type"), Some(&json!("F1")));
+        assert!(
+            event_of(&out, EVENT_TYPE_INVOICE_TYPE_DOWNGRADED).is_none(),
+            "sin degradación no hay aviso"
+        );
+    }
+
+    /// 🔴 §15.8: una F2 no puede pasar de 3.000,00 € (+10,00 € de tolerancia). Degradar una F1 de
+    /// 4.000 € a F2 fabrica un registro que la AEAT rechaza — con el número de cadena gastado. Se
+    /// para ANTES de sellar.
+    #[tokio::test]
+    async fn a_downgrade_that_would_break_the_f2_ceiling_is_refused() {
+        let host = InvoiceHost::new(invoice_row(
+            "F1",
+            "",
+            400_000,
+            84_000,
+            484_000,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":400000,"quota":84000}]"#,
+        ));
+        let err = error_of(ingest_invoice(&ingest_input(), &host).await);
+        assert!(err.contains("f2_limit_exceeded"), "código esperado, llegó: {err}");
+    }
+
+    /// Y justo por debajo del techo (3.010,00 €) se sella: el margen de la AEAT es parte de la
+    /// regla, no un detalle.
+    #[tokio::test]
+    async fn a_downgrade_right_at_the_ceiling_is_sealed() {
+        let host = InvoiceHost::new(invoice_row(
+            "F1",
+            "",
+            301_000,
+            0,
+            301_000,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":0.0,"base":301000,"quota":0}]"#,
+        ));
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("3.010,00 € entra: es el techo inclusive");
+    }
+
+    // ── hub#1103 · lo que `chain.validate` AFIRMA ───────────────────────────────────────────
+
+    /// «Cadena íntegra» se leyó en el informe de QA como veredicto sobre los importes de 27
+    /// registros imposibles. El contrato criptográfico se mantiene —recalcular huellas y verificar
+    /// el encadenado es lo correcto sobre filas ya inmutables—, pero el texto tiene que decir QUÉ
+    /// verificó, y los detalles tienen que llevarlo en un campo que la UI pueda traducir.
+    #[tokio::test]
+    async fn the_chain_verdict_names_the_fingerprints_it_actually_checked() {
+        let input = json!({ "payload": { "issuer_nif": NIF }, "context": context() });
+        let out = validate_chain(&input, &GateHost).await.expect("valida");
+        let event = out
+            .operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("el veredicto se persiste como evento");
+        let message = event
+            .params
+            .get("message")
+            .and_then(Json::as_str)
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            message.to_lowercase().contains("huella"),
+            "el veredicto tiene que nombrar la HUELLA, no afirmar sobre los importes: {message}"
+        );
+        let details: Json = serde_json::from_str(
+            event.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+        )
+        .expect("los detalles son JSON");
+        assert_eq!(
+            details.get("scope"),
+            Some(&json!(CHAIN_VALIDATION_SCOPE)),
+            "la UI necesita el alcance en un campo estable para traducirlo (ADR-0055)"
         );
     }
 }

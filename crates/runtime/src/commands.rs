@@ -1,7 +1,7 @@
 //! Ejecución de commands declarativos (mutaciones) + emisión de eventos. ARQUITECTURA.md §4.
 //! Tier 0/1 (SQL declarativo), Tier 2 (handler WASM vía `erplora-wasm-host`, §5.3 / §9.2)
 //! y plugins **nativos first-party** (ADR-0009, `native.rs`).
-use erplora_db::{DatabaseAdapter, Params, TxGatedOutcome};
+use erplora_db::{DatabaseAdapter, Params, RowGate, TxGatedOutcome};
 use erplora_wasm_host::{Operation, Output};
 use serde_json::{json, Value as Json};
 
@@ -183,8 +183,11 @@ pub(crate) async fn execute_at(
         // taught the core start a fiscal chain. Both come from the core's own tables — never from
         // anything the caller sent. Degrading to `Unconfigured` with no triggers on a read error
         // keeps a failed query from inventing "nothing owed"; the gate below treats a missing mode
-        // as unresolved, never as permission.
-        let (fiscal_mode, fiscal_triggers, fiscal_providers) =
+        // as unresolved, never as permission. The environment travels with them for the same
+        // reason (ADR-0360, hub#1087): `enforce_fiscal_precondition` keys its certificate arm on
+        // WHICH AEAT this hub files to, and an unread profile must read as the conservative
+        // answer (empty → production's demand), never as permission.
+        let (fiscal_mode, fiscal_triggers, fiscal_providers, fiscal_environment) =
             match crate::fiscal_profile::ensure(db, &ctx.hub_id).await {
                 Ok(p) => (
                     crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
@@ -193,11 +196,13 @@ pub(crate) async fn execute_at(
                         .iter()
                         .map(|m| m.id.clone())
                         .collect(),
+                    p.environment.clone(),
                 ),
                 Err(_) => (
                     crate::fiscal_profile::FiscalMode::Unconfigured,
                     Vec::new(),
                     Vec::new(),
+                    String::new(),
                 ),
             };
         enriched_ctx = ctx
@@ -211,7 +216,25 @@ pub(crate) async fn execute_at(
             // que el SERVIDOR resuelve el impuesto contra el catálogo — sin ella, ninguna regla
             // casa y el handler se cree el % que le mande el cliente.
             .with_fiscal(get("country_code"), get("region_code"))
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): la MISMA resolución que usa el kernel de
+            // flujos (`settings::timezone_of` — la declarada o la deducida del país/región), para
+            // que `:timezone`/`context.timezone` y un trigger `cron` no puedan discrepar. Si la
+            // lectura falla, `timezone_name()` degrada a `UTC` (lo que el reloj hará de todos modos).
+            .with_timezone(
+                crate::settings::timezone_of(db, &ctx.hub_id)
+                    .await
+                    .map(|tz| tz.name().to_string())
+                    .unwrap_or_else(|_| "UTC".to_string()),
+            )
+            // EL IDIOMA DE QUIEN LLAMA (hub#1098): override personal → setting del hub → default
+            // del core. Aquí y solo aquí: mientras cada módulo lo resolviera en su propio SQL, el
+            // default era un duplicado que podía pudrirse (taxes#40 lo demostró).
+            .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
+            // Which AEAT this hub files to (ADR-0360, hub#1087): from the profile, next to the
+            // mode it feeds. The certificate arm of `enforce_fiscal_precondition` reads it —
+            // in `testing` there is nothing to authorize.
+            .with_fiscal_environment(fiscal_environment)
             // What this hub OWES right now (ADR-0273 D2, hub#550): resolved here, from the core's
             // own tables and the registry, next to the identity and the certificate — never from
             // anything the caller sent. Degrading to `Unconfigured` on a read error keeps this
@@ -377,6 +400,11 @@ pub(crate) async fn execute_at(
         validate_against(cmd, name, payload)?;
         let mut p = payload.clone();
         schema.apply_defaults(&mut p);
+        // hub#1092: el bind se tipa por lo que el schema DECLARA, no por el valor accidental —
+        // un `10` y un `10.5` de un mismo campo `number` deben llegar a la MISMA sentencia con
+        // el mismo tipo de cable, o la caché de sentencias preparadas congela el primero y
+        // corrompe el segundo (int8/float8 miden lo mismo: el servidor no ve el cambiazo).
+        schema.coerce_declared_number_shapes(&mut p);
         defaulted = p;
         &defaulted
     } else {
@@ -459,10 +487,31 @@ pub(crate) async fn execute_at(
     // semantics, but the failure surfaces as `RuntimeError::Domain` with the module-declared
     // namespaced code instead of the generic `MinAffectedRows` variant. The installer already
     // guaranteed the two fields do not coexist and that the code lives in the module namespace.
+    //
+    // hub#1091: `expect_rows.statement` optionally ANCHORS the gate to ONE statement of the
+    // command. Without it the batch SUM is the contract (documented semantics, kept: legitimate
+    // multi-statement gates like `customers.consent.grant` sum 3 rows from 3 statements, and
+    // `customers.anonymize` has steps that may rightly affect 0). With it, only the anchored
+    // statement counts — an unconditional sibling (a counter UPSERT, an audit INSERT) can no
+    // longer satisfy a guard the guarded statement failed, which answered `200 ok` with an
+    // event for something that never happened (online_booking#25).
     let expected = cmd.def.expect_rows.as_ref();
     let min = expected.map(|expect| expect.n).or(cmd.def.min_affected_rows);
-    match db.execute_tx_gated(&ops, sql_op_count, min).await? {
-        TxGatedOutcome::RolledBack { sql_counts } => {
+    let gates: Vec<RowGate> = match (min, expected.and_then(|e| e.statement.as_deref())) {
+        (Some(min), Some(anchor)) => vec![RowGate {
+            first: anchored_statement_index(cmd, name, anchor)?,
+            count: 1,
+            min,
+        }],
+        (Some(min), None) => {
+            // Un command declarativo ES un solo grupo: sus sentencias de mutación, sin el
+            // outbox. La forma de lista la trajo hub#1025 para el camino del handler.
+            vec![RowGate { first: 0, count: sql_op_count, min }]
+        }
+        (None, _) => Vec::new(),
+    };
+    match db.execute_tx_gated(&ops, &gates).await? {
+        TxGatedOutcome::RolledBack { sql_counts, .. } => {
             let min = min.expect("la gate sólo revierte con Some(min)");
             let affected: u64 = sql_counts.iter().sum();
             if let Some(expect) = expected {
@@ -509,6 +558,30 @@ pub(crate) async fn execute_at(
     Ok(json!({ "ok": true, "new_ids": [new_id] }))
 }
 
+/// Is this `read` within the command's SCOPE? (ERPlora/sales#25)
+///
+/// The decision itself, kept away from the database so it can be tested on its own. `allowed` is
+/// the module plus its `depends_on`; `required` is what the read declares (see
+/// [`crate::manifest::ReadDef`]).
+///
+/// * **`required`** — the read that ABORTS the command when it does not resolve (hub#701). Saying
+///   "this command cannot run without that module's answer" **is** declaring a hard dependency, so
+///   `depends_on` is demanded. Without that, a manifest could ask the host to guarantee a module
+///   nobody installs.
+/// * **graceful** (the string form, or `required: false`) — an **OPTIONAL capability** (ADR-0127)
+///   that declares itself: naming the query in the manifest IS the contract. It forces no install,
+///   it does not join the ADR-0128 cascade, and the toolkit writes it into `optional_queries` of
+///   `.erplora/contracts.json`, so the coupling is visible at publish time.
+///
+/// What does NOT change: the caller's tenant (`hub_id`) and the system context of rule 2.
+fn read_in_scope(allowed: &[&str], name: &str, required: bool) -> bool {
+    if !required {
+        return true;
+    }
+    let owner = name.split('.').next().unwrap_or("");
+    allowed.contains(&owner)
+}
+
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
 /// aplica todas las operaciones + el `emit` del command en una sola transacción.
 /// Ejecuta las **lecturas pre-cargadas** que el command declara (`reads`) y las devuelve como
@@ -524,9 +597,22 @@ pub(crate) async fn execute_at(
 ///
 /// # Las tres reglas (ADR-0069 §1) + la cuarta (hub#701)
 ///
-/// 1. **Alcance por DEPENDENCIA, no por permiso.** Solo queries del propio módulo o de los que
-///    declara en `depends_on`. Un módulo no puede leerle las tablas a otro con el que no tiene
-///    contrato — la lista de queries permitidas la fija el manifest, no el caller.
+/// 1. **Scope is what the MANIFEST DECLARES, not the caller's permission.** Queries of the module
+///    itself, of the modules it declares in `depends_on` (a HARD dependency), and of the ones it
+///    names in a GRACEFUL read — an OPTIONAL capability (ADR-0127). A module still cannot read the
+///    tables of one it never declared: the list is fixed by the manifest, never by the caller.
+///    See [`read_in_scope`].
+///
+///    ⚠️ **Why a graceful read counts as a declaration** (ERPlora/sales#25). Until that issue the
+///    scope was ONLY `depends_on`, which made it carry two jobs that have nothing to do with each
+///    other: *install this with me* and *I may read this*. The second one is what forced `sales` to
+///    hard-depend on `inventory` just to learn a price — a salon that only cuts hair had to install
+///    a warehouse. And it broke, **in silence**, the integrations that deliberately do not declare
+///    the dependency: `sales.complete_sale` declares `modifiers.options.all` and
+///    `combos.options.all` as graceful reads without either in `depends_on`, both were dropped
+///    here, and the handler — which fails CLOSED when a line carries supplements and its catalogue
+///    did not arrive — refused every sale with a supplement or a set menu. The warning went to
+///    stderr; the cashier got a rejection code.
 /// 2. **Contexto de SISTEMA.** No se re-gatea por el permiso del usuario: el permiso del *command*
 ///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
 ///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
@@ -566,12 +652,12 @@ async fn preload_reads(
     let mut out = serde_json::Map::new();
     for read in &cmd.def.reads {
         let name = read.query();
-        let owner = name.split('.').next().unwrap_or("");
-        if !allowed.contains(&owner) {
-            // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
-            // el módulo no puede leer lo que no declaró como dependencia.
+        if !read_in_scope(&allowed, name, read.is_required()) {
+            // Not a caller error: a badly declared manifest. Warn and omit — a read that ABORTS the
+            // command without declaring the dependency is not served.
+            let owner = name.split('.').next().unwrap_or("");
             eprintln!(
-                "⚠ reads: `{}` declara `{name}`, pero `{owner}` no está en su depends_on → omitida",
+                "⚠ reads: `{}` declara `{name}` como OBLIGATORIA, pero `{owner}` no está en su depends_on → omitida",
                 cmd.module_id
             );
             continue;
@@ -835,6 +921,9 @@ async fn execute_wasm(
             // el catálogo de confianza en vez de fiarse del payload (ADR-0085/0069).
             "country_code": ctx.country_code,
             "region_code": ctx.region_code,
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022): nombre IANA ya resuelto — «mañana a las
+            // 09:00» son las 09:00 de la TIENDA. Viaja también como `:timezone` en el payload.
+            "timezone": ctx.timezone_name(),
             "reads": reads,
         },
     });
@@ -968,6 +1057,9 @@ async fn execute_native(
             "current_user_id": ctx.user_id,
             "now": crate::registry::now_rfc3339(),
             "new_ids": new_ids.clone(),
+            // EL RELOJ DEL NEGOCIO (hub#731, hub#1022), mismo contrato que el camino WASM: el
+            // handler nativo agenda con el mismo IANA resuelto que un guest.
+            "timezone": ctx.timezone_name(),
         },
     });
 
@@ -1026,6 +1118,21 @@ async fn persist_handler_output(
                 cmd.module_id, error.code
             )));
         }
+        // ADR-0398 (hub#1177): with an `errors` catalog in the manifest the module is strict —
+        // a code it never declared is a broken guest contract, not a business rejection the UI
+        // would translate. Without the catalog (modules not migrated yet) nothing changes.
+        let undeclared = registry
+            .installed
+            .iter()
+            .find(|m| m.id == cmd.module_id)
+            .and_then(|m| m.errors.as_ref())
+            .is_some_and(|catalog| !catalog.contains_key(&error.code));
+        if undeclared {
+            return Err(RuntimeError::Wasm(format!(
+                "handler of module `{}` returned the domain error code `{}`, which its `errors` catalog does not declare (ADR-0398)",
+                cmd.module_id, error.code
+            )));
+        }
         return Err(RuntimeError::Domain {
             code: error.code.clone(),
             message: error.message.clone(),
@@ -1051,12 +1158,55 @@ async fn persist_handler_output(
     }
 
     // Valida + resuelve cada operación a su(s) SQL contra los commands del MISMO módulo.
+    //
+    // hub#1025: y cada operación se lleva SU PROPIA gate de filas. `expect_rows` solo se evaluaba
+    // en el camino declarativo, así que el mismo sub-command alcanzado por un handler se saltaba su
+    // contrato: en `customers.set_groups` un `group_id` de otro hub hace que el `INSERT … SELECT`
+    // no case ninguna fila, y el command entero respondía `{ok: true, operations: N}` — el usuario
+    // cree que asignó el grupo. Un mínimo GLOBAL no vale: el `_clear` de al lado afecta 1 fila y
+    // taparía al `_add` que afecta 0, que es justo el caso que hay que cazar.
     let mut tx_ops: Vec<(String, Params)> = Vec::new();
+    let mut gates: Vec<RowGate> = Vec::new();
+    // Alineado con `gates` — NO con `operations`, porque solo algunas llevan gate: de quién es
+    // cada una, para poder acuñar SU error y nombrar SU command, no uno genérico del raíz.
+    let mut gated_commands: Vec<(&str, &RegisteredCommand)> = Vec::new();
     for op in &output.operations {
         let sqls = validate_operation(registry, ctx, &cmd.module_id, op)?;
-        let bound = crate::system_params(&op.params, ctx);
+        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
+        let target = registry.commands.get(&op.command);
+        let mut op_params = op.params.clone();
+        // hub#1092, misma regla que el camino declarativo: si el command destino DECLARA su
+        // contrato en un schema, sus números se bindean con la forma declarada. El handler hoy
+        // entrega siempre `f64` (por eso este camino no estaba armado), pero la regla es una
+        // sola: si hay declaración, manda la declaración — un guest que devuelva `4` para un
+        // campo `number` no debe poder re-armar la caché que el declarativo acaba de desactivar.
+        if let Some(schema) = target.and_then(|t| t.schema.as_ref()) {
+            schema.coerce_declared_number_shapes(&mut op_params);
+        }
+        let bound = crate::system_params(&op_params, ctx);
+        let first = tx_ops.len();
+        let count = sqls.len();
         for sql in sqls {
             tx_ops.push((sql, bound.clone()));
+        }
+        // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
+        if let Some(target) = target {
+            let expected = target.def.expect_rows.as_ref();
+            let min = expected.map(|expect| expect.n).or(target.def.min_affected_rows);
+            if let Some(min) = min {
+                // hub#1091: an anchored gate counts ONLY the anchored statement of this op —
+                // same rule as the declarative path, so a handler cannot reach a sub-command
+                // whose contract reads differently depending on who called it.
+                let gate = match expected.and_then(|e| e.statement.as_deref()) {
+                    Some(anchor) => {
+                        let idx = anchored_statement_index(target, &op.command, anchor)?;
+                        RowGate { first: first + idx, count: 1, min }
+                    }
+                    None => RowGate { first, count, min },
+                };
+                gates.push(gate);
+                gated_commands.push((op.command.as_str(), target));
+            }
         }
     }
 
@@ -1124,7 +1274,31 @@ async fn persist_handler_output(
         ));
     }
     tx_ops.extend_from_slice(extra_ops);
-    db.execute_tx(&tx_ops).await?;
+    // Misma semántica de rollback que el camino declarativo (hub#139/#140): si una operación no
+    // alcanza su mínimo, revierte la transacción ENTERA — ni las otras operaciones ni el outbox —
+    // y el error que sale es el del sub-command que rompió su contrato, no uno del command raíz.
+    match db.execute_tx_gated(&tx_ops, &gates).await? {
+        TxGatedOutcome::RolledBack { gate, sql_counts } => {
+            let (command, target) = gated_commands[gate];
+            if let Some(expect) = &target.def.expect_rows {
+                return Err(RuntimeError::Domain {
+                    code: expect.error.clone(),
+                    message: expect.message.clone().unwrap_or_else(|| {
+                        "the operation could not be applied in the current state".to_string()
+                    }),
+                });
+            }
+            let required = target.def.min_affected_rows.unwrap_or_default();
+            let affected: u64 = sql_counts.iter().sum();
+            return Err(RuntimeError::MinAffectedRows {
+                command: command.to_string(),
+                required,
+                affected,
+                kind: crate::errors::affected_kind(affected, required),
+            });
+        }
+        TxGatedOutcome::Committed { .. } => {}
+    }
 
     // Notificación al WS (UI en vivo) tras commit; entrega durable a listeners = relay. Los
     // eventos del handler salen con el módulo del command (hub#529) — que es también el único
@@ -1380,6 +1554,26 @@ fn spend_approval(
 /// atender sería una denegación disfrazada de diálogo. Si un módulo necesita de verdad que su
 /// handler escriba por encima de su command, lo que cambia es el permiso declarado de la op —
 /// visible en el manifest y revisable— no este gate.
+/// Index (into the command's statements) of the statement `expect_rows.statement` anchors to
+/// (hub#1091). The anchor is declared as a `sql` PATH (what the manifest writes); the registry
+/// resolves those same paths, in the same order, into [`RegisteredCommand::sql`] — so the index
+/// found among the paths is the index of the statement that will run. The installer already
+/// refuses an anchor naming no statement of its command; this is the runtime's own defense in
+/// depth — silently degrading to the batch-sum gate would re-create exactly the "guard its
+/// author believes armed" hole this anchor exists to close.
+fn anchored_statement_index(
+    cmd: &RegisteredCommand,
+    name: &str,
+    anchor: &str,
+) -> Result<usize> {
+    cmd.def.sql.iter().position(|path| path == anchor).ok_or_else(|| {
+        RuntimeError::Other(format!(
+            "command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
+             which is not one of its sql statements"
+        ))
+    })
+}
+
 pub(crate) fn validate_operation(
     registry: &Registry,
     ctx: &RequestContext,
@@ -1478,7 +1672,15 @@ fn references_param(sql: &str, param: &str) -> bool {
 /// 1. `business_legal_name` ∧ `business_tax_id` set in `hub_settings` (ADR-0061 source);
 /// 2. the business certificate loaded, while any INSTALLED module declares the
 ///    `certificate` capability (today: verifactu) — installed even if inactive: emitting
-///    without it would strand documents outside the fiscal chain.
+///    without it would strand documents outside the fiscal chain. **In `testing` this arm is
+///    lifted** (ADR-0360, hub#1087): a transmission to the tax authority's preproduction
+///    discharges no obligation and leaves no legally-valuable record — «en pruebas no hay
+///    nada que autorizar». The border is the ENVIRONMENT (the profile's own
+///    `_hub_fiscal_profile.environment`), never the kind of hub: a demo passes because the
+///    environment is pinned to `testing`, not because it is skipped. In `production` — and
+///    in an UNRESOLVED environment, read as production — the gate is exactly as before.
+///    Nothing is simulated: the filing to AEAT-testing keeps its normal flow, certificate or
+///    not.
 ///
 /// Structural and default-deny: no manifest flag a module could forget, no hardcoded
 /// module ids — the trigger is the SQL using the injected identity itself, so the runtime
@@ -1502,7 +1704,12 @@ fn enforce_fiscal_precondition<'a>(
     if ctx.business_tax_id.trim().is_empty() {
         missing.push("business_tax_id");
     }
-    if !ctx.has_certificate
+    // ADR-0360 (hub#1087): the certificate is demanded by the PRODUCTION environment only.
+    // `testing` is the profile's own word (the dispatcher stamps it from
+    // `_hub_fiscal_profile.environment`); anything else — production, or empty because the
+    // profile could not be read — keeps demanding it: fail CLOSED, the conservative answer.
+    if ctx.fiscal_environment() != crate::fiscal_profile::ENV_TESTING
+        && !ctx.has_certificate
         && registry
             .installed
             .iter()
@@ -2124,6 +2331,40 @@ mod tests {
         validate_handler_event(&reg, "tasks", "tasks.task.created").unwrap();
         // `sale.*` no es de nadie (no hay módulo `sale` instalado) → tolerado.
         validate_handler_event(&reg, "tasks", "sale.completed").unwrap();
+    }
+
+    // ── ERPlora/sales#25 · the SCOPE of a `read` ──────────────────────────────────────────
+    //
+    // Until this issue the scope was ONLY `depends_on`, which made it carry two jobs that have
+    // nothing to do with each other: *install this with me* and *I may read this*. The second one
+    // forced `sales` to hard-depend on `inventory` just to learn a price — a salon that only cuts
+    // hair had to install a warehouse — and it broke, IN SILENCE, the integrations that
+    // deliberately do not declare the dependency: `sales.complete_sale` declares
+    // `modifiers.options.all` and `combos.options.all` as graceful reads without either in
+    // `depends_on`, both were dropped here, and the handler — which fails CLOSED when a line
+    // carries supplements and its catalogue did not arrive — refused every sale with a supplement
+    // or a set menu. The warning went to stderr; the cashier got a rejection code.
+
+    #[test]
+    fn a_graceful_read_declares_itself_and_needs_no_depends_on() {
+        // An OPTIONAL capability (ADR-0127): naming the query in the manifest IS the contract. It
+        // forces no install and does not join the ADR-0128 cascade, so declaring it drags nothing.
+        assert!(read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", false));
+        assert!(read_in_scope(&["sales", "taxes"], "modifiers.options.all", false));
+    }
+
+    #[test]
+    fn a_required_read_still_needs_its_owner_declared_as_a_dependency() {
+        // Saying "this command cannot run without that module's answer" IS declaring a hard
+        // dependency: without `depends_on` nobody guarantees the module is installed.
+        assert!(!read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", true));
+        assert!(read_in_scope(&["sales", "taxes"], "taxes.rules.list", true));
+    }
+
+    #[test]
+    fn a_module_always_reads_itself() {
+        assert!(read_in_scope(&["sales"], "sales.settings.get", true));
+        assert!(read_in_scope(&["sales"], "sales.order.lines", false));
     }
 
     /// Un nombre de evento vacío o con forma rara no se encola.
@@ -2806,8 +3047,7 @@ mod tests {
         async fn execute_tx_gated(
             &self,
             _ops: &[(String, Params)],
-            _sql_op_count: usize,
-            _min_affected_rows: Option<u64>,
+            _gates: &[erplora_db::RowGate],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
             panic!("DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes");
         }
@@ -2846,22 +3086,27 @@ mod tests {
         async fn execute_tx_gated(
             &self,
             ops: &[(String, Params)],
-            sql_op_count: usize,
-            min_affected_rows: Option<u64>,
+            gates: &[erplora_db::RowGate],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-            // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si el caller
-            // exige un mínimo y la suma de las `sql_op_count` primeras lo cubre, commitea; si no,
-            // revierte. Los tests de hub#140 construyen su propio doble cuando necesitan 0 filas.
+            // Por defecto cada op "muta" 1 fila: simula un INSERT/UPDATE que casa. Si algún gate
+            // exige más de lo que su grupo afecta, revierte. Los tests de hub#140 construyen su
+            // propio doble cuando necesitan 0 filas.
             let counts = vec![1u64; ops.len()];
-            let n = sql_op_count.min(counts.len());
-            let sql_counts: Vec<u64> = counts[..n].to_vec();
-            let affected: u64 = sql_counts.iter().sum();
-            let ok = min_affected_rows.map_or(true, |min| affected >= min);
-            if ok {
-                Ok(erplora_db::TxGatedOutcome::Committed { per_op: counts })
-            } else {
-                Ok(erplora_db::TxGatedOutcome::RolledBack { sql_counts })
+            let failed = gates.iter().position(|g| {
+                let end = g.first.saturating_add(g.count).min(counts.len());
+                let affected: u64 = counts[g.first.min(counts.len())..end].iter().sum();
+                affected < g.min
+            });
+            if let Some(i) = failed {
+                let g = gates[i];
+                let end = g.first.saturating_add(g.count).min(counts.len());
+                let sql_counts = counts[g.first.min(counts.len())..end].to_vec();
+                return Ok(erplora_db::TxGatedOutcome::RolledBack {
+                    gate: i,
+                    sql_counts,
+                });
             }
+            Ok(erplora_db::TxGatedOutcome::Committed { per_op: counts })
         }
         async fn query(
             &self,
@@ -3062,7 +3307,7 @@ mod tests {
     /// Sets the hub's business identity in `hub_settings` (the single source, ADR-0061).
     async fn set_business_identity(db: &dyn DatabaseAdapter, hub_id: &str) {
         let mut updates = serde_json::Map::new();
-        updates.insert("business_tax_id".into(), json!("B12345678"));
+        updates.insert("business_tax_id".into(), json!("B12345674"));
         updates.insert("business_legal_name".into(), json!("ACME SL"));
         crate::settings::set_many(db, hub_id, &updates, "hub_user:1", false)
             .await
@@ -3128,7 +3373,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows.rows.len(), 1);
-        assert_eq!(rows.rows[0]["issuer_nif"], json!("B12345678"));
+        assert_eq!(rows.rows[0]["issuer_nif"], json!("B12345674"));
         assert_eq!(rows.rows[0]["issuer_name"], json!("ACME SL"));
     }
 
@@ -3285,6 +3530,125 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(out["ok"], json!(true));
+    }
+
+    // ── In TESTS there is nothing to authorize (ADR-0360, hub#1087) ────────────────────────
+    //
+    // A new hub could not issue even ONE test invoice: `enforce_fiscal_precondition` demanded
+    // the certificate without looking at WHICH environment the records were going to. ADR-0360
+    // (2026-08-16) drew the border on the environment, not on the kind of hub: a transmission to
+    // preproduction discharges no obligation and leaves no record with legal value — there is no
+    // obligado to represent because there is no obligation. The certificate arm of the gate is
+    // lifted in `testing` ONLY; in `production` it stays exactly as it was. Nothing is simulated:
+    // the AEAT-testing filing keeps its own flow.
+
+    /// Registry with an installed module declaring the `certificate` capability (today:
+    /// verifactu) — the arm of the gate that refused a certificate-less hub even in TESTS.
+    fn registry_with_certificate_module() -> Registry {
+        let mut reg = Registry::new();
+        reg.installed.push(
+            serde_json::from_str(
+                r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0",
+                    "capabilities":{"certificate":{"purpose":"fiscal-sign"}}}"#,
+            )
+            .unwrap(),
+        );
+        reg
+    }
+
+    /// Context of a hub whose business identity IS set but which carries NO certificate, in the
+    /// named fiscal environment (the profile's own word — `_hub_fiscal_profile.environment`).
+    fn identity_ctx_without_certificate(environment: &str) -> RequestContext {
+        RequestContext::new("h1", "u1", ["*".to_string()])
+            .with_business("B12345674", "ACME SL", "")
+            .with_certificate(false)
+            .with_fiscal_environment(environment)
+    }
+
+    /// **The red test of hub#1087.** A hub in `testing`, identity set, certificate-capable
+    /// module installed, NO certificate: the gate passes — the test invoice goes out to the
+    /// AEAT sandbox through its normal flow, certificate-less, because there is nothing to
+    /// authorize (ADR-0360).
+    #[test]
+    fn testing_environment_issues_without_certificate() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("testing");
+        enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .expect("in testing there is nothing to authorize (ADR-0360): the gate must pass");
+    }
+
+    /// The SAME hub, same everything, in `production`: the gate refuses exactly as before —
+    /// `missing = [certificate]` and nothing else. ADR-0360 lifts nothing for the real AEAT.
+    #[test]
+    fn production_environment_without_certificate_is_refused_as_before() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("production");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if *missing == vec!["certificate"]),
+            "got {err:?}"
+        );
+    }
+
+    /// An UNRESOLVED environment (empty — the profile could not be read) fails CLOSED like
+    /// production: the exemption is keyed on the profile's own word, never on a caller's
+    /// silence. Same conservative default ADR-0360 gave `select_transmission_route`.
+    #[test]
+    fn unresolved_environment_fails_closed_like_production() {
+        let reg = registry_with_certificate_module();
+        let ctx = identity_ctx_without_certificate("");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if *missing == vec!["certificate"]),
+            "got {err:?}"
+        );
+    }
+
+    /// ADR-0360 lifts the CERTIFICATE, not the identity: in testing, a blank-issuer invoice is
+    /// still refused — the test record still needs an obligado to be filed under.
+    #[test]
+    fn testing_environment_still_requires_the_business_identity() {
+        let reg = registry_with_certificate_module();
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()])
+            .with_certificate(false)
+            .with_fiscal_environment("testing");
+        let err = enforce_fiscal_precondition(
+            &reg,
+            &ctx,
+            std::iter::once::<&str>(
+                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
+            ),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::FiscalPrecondition { missing }
+                if missing.contains(&"business_tax_id")
+                    && missing.contains(&"business_legal_name")
+                    && !missing.contains(&"certificate")),
+            "got {err:?}"
+        );
     }
 
     // ── Fiscal environment pin in a DEMO hub (ADR-0197 §4 · hub#376) ───────────────────────
@@ -3517,6 +3881,225 @@ mod tests {
                 }
             ),
             "got {err:?}"
+        );
+    }
+
+    // ── hub#1025: the row gate also covers the operations a handler resolves ────────────────
+
+    /// A `DatabaseAdapter` that answers with the affected counts the caller declares, so a test
+    /// can say "this statement matches nothing" without a Postgres. It also records whether the
+    /// transaction was ever handed over — the gate has to reject BEFORE anything is persisted, and
+    /// "returned the right error" is a weaker claim than "wrote nothing".
+    struct CountingDb {
+        /// Affected rows per SQL statement, keyed by the statement text.
+        counts: std::collections::HashMap<String, u64>,
+        committed: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl CountingDb {
+        fn new(counts: &[(&str, u64)]) -> Self {
+            Self {
+                counts: counts.iter().map(|(s, n)| ((*s).to_string(), *n)).collect(),
+                committed: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+        fn affected(&self, sql: &str) -> u64 {
+            // Default 1: an unlisted statement is an ordinary INSERT that matched.
+            self.counts.get(sql).copied().unwrap_or(1)
+        }
+        fn what_committed(&self) -> Vec<String> {
+            self.committed.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl DatabaseAdapter for CountingDb {
+        async fn execute(
+            &self,
+            sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            Ok(erplora_db::CommandResult::affected(self.affected(sql)))
+        }
+        async fn execute_tx(
+            &self,
+            ops: &[(String, Params)],
+        ) -> std::result::Result<erplora_db::CommandResult, erplora_db::DbError> {
+            let mut log = self.committed.lock().unwrap();
+            log.extend(ops.iter().map(|(sql, _)| sql.clone()));
+            Ok(erplora_db::CommandResult::affected(ops.len() as u64))
+        }
+        async fn execute_tx_gated(
+            &self,
+            ops: &[(String, Params)],
+            gates: &[erplora_db::RowGate],
+        ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
+            let per_op: Vec<u64> = ops.iter().map(|(sql, _)| self.affected(sql)).collect();
+            for (i, g) in gates.iter().enumerate() {
+                let end = g.first.saturating_add(g.count).min(per_op.len());
+                let slice = &per_op[g.first.min(per_op.len())..end];
+                if slice.iter().sum::<u64>() < g.min {
+                    return Ok(erplora_db::TxGatedOutcome::RolledBack {
+                        gate: i,
+                        sql_counts: slice.to_vec(),
+                    });
+                }
+            }
+            let mut log = self.committed.lock().unwrap();
+            log.extend(ops.iter().map(|(sql, _)| sql.clone()));
+            Ok(erplora_db::TxGatedOutcome::Committed { per_op })
+        }
+        async fn query(
+            &self,
+            _sql: &str,
+            _params: &Params,
+        ) -> std::result::Result<erplora_db::QueryResult, erplora_db::DbError> {
+            Ok(erplora_db::QueryResult::new(Vec::new()))
+        }
+        async fn execute_batch(&self, _sql: &str) -> std::result::Result<(), erplora_db::DbError> {
+            Ok(())
+        }
+    }
+
+    const CLEAR_SQL: &str = "DELETE FROM customer_group_member WHERE customer_id = :id;";
+    const ADD_SQL: &str = "INSERT INTO customer_group_member (customer_id, group_id) \
+                           SELECT :id, id FROM customer_group WHERE id = :group_id AND hub_id = :hub_id;";
+
+    /// The shape every module follows for hub-scoping (services#7 / pm#146): the sub-command
+    /// inserts `SELECT`ing from its own hub's parents, and `expect_rows` is what turns a foreign
+    /// id into a REJECTION instead of a silent no-op.
+    fn registry_with_gated_subcommand() -> Registry {
+        let mut reg = Registry::new();
+        reg.status.insert("customers".to_string(), ModuleStatus::Active);
+
+        let mut clear = cmd_def();
+        clear.sql = vec![CLEAR_SQL.to_string()];
+        reg.commands.insert(
+            "customers._group_clear".to_string(),
+            RegisteredCommand {
+                module_id: "customers".to_string(),
+                def: clear,
+                sql: vec![CLEAR_SQL.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+
+        let mut add = cmd_def();
+        add.sql = vec![ADD_SQL.to_string()];
+        add.expect_rows = Some(crate::manifest::ExpectRows {
+            op: crate::manifest::ExpectRowsOp::Min,
+            n: 1,
+            error: "customers.group_not_found".to_string(),
+            message: None,
+            statement: None,
+        });
+        reg.commands.insert(
+            "customers._group_add".to_string(),
+            RegisteredCommand {
+                module_id: "customers".to_string(),
+                def: add,
+                sql: vec![ADD_SQL.to_string()],
+                wasm: None,
+                schema: None,
+            },
+        );
+        reg
+    }
+
+    fn root_wasm_command() -> RegisteredCommand {
+        let mut def = cmd_def();
+        def.sql = Vec::new();
+        def.emit = vec!["customers.groups.changed".to_string()];
+        RegisteredCommand {
+            module_id: "customers".to_string(),
+            def,
+            sql: Vec::new(),
+            wasm: None,
+            schema: None,
+        }
+    }
+
+    /// hub#1025 — `expect_rows` was only evaluated on the DECLARATIVE path. The same sub-command
+    /// reached through a handler skipped its own gate, so a foreign `group_id` wrote nothing and
+    /// the command still answered `{ok: true}`: the user believes the group was assigned.
+    ///
+    /// The gate must reject and the transaction must leave NOTHING behind — not the sibling
+    /// operation that did match, and not the outbox event.
+    #[tokio::test]
+    async fn a_handler_operation_below_its_gate_rejects_and_persists_nothing() {
+        let reg = registry_with_gated_subcommand();
+        let root = root_wasm_command();
+        // The `add` matches no row: the `group_id` belongs to another hub.
+        let db = CountingDb::new(&[(ADD_SQL, 0)]);
+        let output = Output {
+            operations: vec![op("customers._group_clear"), op("customers._group_add")],
+            events: Vec::new(),
+            error: None,
+            result: None,
+        };
+
+        let err = persist_handler_output(
+            &db,
+            &reg,
+            &root,
+            &Params::new(),
+            &sys_ctx(),
+            0,
+            &[],
+            &output,
+            &[],
+        )
+        .await
+        .unwrap_err();
+
+        match err {
+            RuntimeError::Domain { code, .. } => assert_eq!(code, "customers.group_not_found"),
+            other => panic!("expected the sub-command's own Domain code, got {other:?}"),
+        }
+        assert!(
+            db.what_committed().is_empty(),
+            "nothing may be persisted — not the sibling operation, not the outbox: {:?}",
+            db.what_committed()
+        );
+    }
+
+    /// The other half of the same contract: when every gated operation DOES match, the command
+    /// commits exactly as before. A gate that also rejects the happy path is not a gate.
+    #[tokio::test]
+    async fn a_handler_operation_that_matches_its_gate_still_commits() {
+        let reg = registry_with_gated_subcommand();
+        let root = root_wasm_command();
+        let db = CountingDb::new(&[(ADD_SQL, 1)]);
+        let output = Output {
+            operations: vec![op("customers._group_clear"), op("customers._group_add")],
+            events: Vec::new(),
+            error: None,
+            result: None,
+        };
+
+        persist_handler_output(
+            &db,
+            &reg,
+            &root,
+            &Params::new(),
+            &sys_ctx(),
+            0,
+            &[],
+            &output,
+            &[],
+        )
+        .await
+        .expect("the happy path must be untouched");
+
+        let committed = db.what_committed();
+        assert!(
+            committed.iter().any(|s| s == ADD_SQL),
+            "the mutation must land: {committed:?}"
+        );
+        assert!(
+            committed.iter().any(|s| s.contains("_event_outbox")),
+            "and so must the declared event: {committed:?}"
         );
     }
 

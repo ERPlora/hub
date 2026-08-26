@@ -518,6 +518,36 @@ test('currency lee globalThis.__erploraCurrency cuando no hay getter (fallback d
   }
 });
 
+// ── ErploraClient: zona horaria del negocio (hub#731, hub#1022) ─────────────
+
+test('timezone usa el getter inyectado por el shell (SIN normalizar: IANA es case-sensitive)', () => {
+  const c = new ErploraClient({} as never, { timezone: () => 'Atlantic/Canary' });
+  assert.equal(c.timezone, 'Atlantic/Canary');
+});
+
+test('timezone degrada a UTC sin getter ni publicación global', () => {
+  const prev = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  delete (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.timezone, 'UTC');
+  } finally {
+    if (prev !== undefined) (globalThis as { __erploraTimezone?: string }).__erploraTimezone = prev;
+  }
+});
+
+test('timezone lee globalThis.__erploraTimezone cuando no hay getter (fallback del shell)', () => {
+  const prev = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+  (globalThis as { __erploraTimezone?: string }).__erploraTimezone = 'Europe/Lisbon';
+  try {
+    const c = new ErploraClient({} as never, {});
+    assert.equal(c.timezone, 'Europe/Lisbon');
+  } finally {
+    if (prev === undefined) delete (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
+    else (globalThis as { __erploraTimezone?: string }).__erploraTimezone = prev;
+  }
+});
+
 test('formatMoney convierte céntimos→unidades con la moneda del hub', () => {
   // Locale fijo para que el separador/símbolo sea determinista entre entornos.
   const c = new ErploraClient({} as never, { currency: () => 'USD' });
@@ -528,6 +558,19 @@ test('formatMoney convierte céntimos→unidades con la moneda del hub', () => {
 test('formatAmount formatea unidades; opts.currency sobreescribe la del hub', () => {
   const c = new ErploraClient({} as never, { currency: () => 'EUR' });
   assert.equal(c.formatAmount(1234.5, { locale: 'en-US', currency: 'USD' }), '$1,234.50');
+});
+
+// hub#1090: CLDR deja sin agrupar los 4 dígitos en español (minimumGroupingDigits=2), pero la
+// regla vinculante del CLAUDE.md raíz es la del sector (Odoo, Holded, glibc, Excel): agrupar
+// SIEMPRE desde 4. Este formateador es el que usan los módulos de dinero vía
+// `globalThis.erplora.formatMoney` — el que ejecuta el SHELL, así que arreglarlo aquí arregla
+// las pantallas de módulo sin republicar módulos.
+test('formatMoney agrupa los millares DESDE 4 dígitos también en es (hub#1090)', () => {
+  // CLDR es separa cifra y € con un espacio INSEPARABLE (U+00A0), no un espacio normal.
+  const c = new ErploraClient({} as never, { currency: () => 'EUR' });
+  assert.equal(c.formatMoney(123456, { locale: 'es-ES' }), '1.234,56 €');
+  assert.equal(c.formatMoney(1234567, { locale: 'es-ES' }), '12.345,67 €');
+  assert.equal(c.formatAmount(1234.5, { locale: 'es-ES' }), '1.234,50 €');
 });
 
 // ── ADR-0196 §3: el SDK ya NO lleva canal WS local de hardware ──────────────────────────
@@ -1062,6 +1105,79 @@ test('queryOptional también trata module_inactive como ausencia (cascada ADR-01
   // el obligatorio nunca llega a preguntar, porque la cascada lo apagó junto a su dependencia.
   const c = new ErploraClient(transporteQueFalla('module_inactive'));
   assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});
+
+// ── queryAllOptional: the WHOLE set of an OPTIONAL module (ERPlora/sales#186) ────────────────
+//
+// The two halves this needs already existed, and neither one alone is what a POS asks for:
+//
+//  · `queryAll` brings the whole set (two trips at most) but EXPLODES when the owner module is not
+//    installed — so it cannot be used for an ADR-0127 integration.
+//  · `queryOptional` tolerates the absence but returns ONE PAGE: `/api/query` on a query with a
+//    `list` block answers `execute_query_page`, and with no `limit` the size is the manifest's
+//    `page_size` — 50. A hair salon with 60 services could only sell 50 of them, silently.
+//
+// `queryAllOptional` is the pair: the whole set, `undefined` when the module is absent. Anything
+// else still explodes — a renamed query, a denied permission or a broken handler are broken
+// contracts, not absences.
+
+test('queryAllOptional brings EVERY row, not the first page', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(137, calls));
+
+  const rows = await c.queryAllOptional<{ id: string }>('services.services.list');
+
+  assert.equal(rows?.length, 137, 'a salon with 137 services sells all 137');
+  assert.equal(rows?.[136].id, 'p136', 'the last row arrives too');
+  assert.equal(calls.length, 2, 'one page to learn the total + one to ask for it whole');
+  assert.equal(calls[1].limit, 137, 'asks for the EXACT total, no hardcoded cap');
+});
+
+test('queryAllOptional returns undefined when the owner module is not installed', async () => {
+  const c = new ErploraClient(transporteQueFalla('module_not_installed'));
+  assert.equal(await c.queryAllOptional('services.services.list'), undefined);
+});
+
+test('queryAllOptional also treats module_inactive as absence (ADR-0128 cascade)', async () => {
+  const c = new ErploraClient(transporteQueFalla('module_inactive'));
+  assert.equal(await c.queryAllOptional('services.services.list'), undefined);
+});
+
+test('queryAllOptional does NOT swallow a broken contract, a permission or a handler failure', async () => {
+  for (const code of ['not_found', 'permission_denied', 'invalid_payload', 'wasm', 'db']) {
+    const c = new ErploraClient(transporteQueFalla(code));
+    await assert.rejects(() => c.queryAllOptional('services.services.list'), (e) => {
+      assert.equal((e as ErploraError).code, code, 'a broken contract EXPLODES, it is not an absence');
+      return true;
+    });
+  }
+});
+
+test('queryAllOptional never sends `page_size` and keeps the caller filters', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(10, calls));
+
+  await c.queryAllOptional('services.categories.list', { sort: 'name', dir: 'asc' });
+
+  assert.equal(calls[0].page_size, undefined, 'the runtime would ignore `page_size`');
+  assert.equal(calls[0].sort, 'name');
+});
+
+test('queryAllOptional with an explicit `limit` respects THAT cap (the caller rules)', async () => {
+  const calls: Record<string, unknown>[] = [];
+  const c = new ErploraClient(transporteDeLista(1000, calls));
+
+  const rows = await c.queryAllOptional('customers.list', { limit: 20, search: 'ana' });
+
+  assert.equal(rows?.length, 20);
+  assert.equal(calls.length, 1, 'a single trip: nothing else was asked for');
+});
+
+test('queryAllOptional tells an EMPTY module apart from an ABSENT one', async () => {
+  // `[]` = installed with nothing to offer (the POS shows no service tab); `undefined` = not
+  // installed. Collapsing the two is how a caller stops being able to explain what it is seeing.
+  const c = new ErploraClient(transporteDeLista(0));
+  assert.deepEqual(await c.queryAllOptional('services.services.list'), []);
 });
 
 // ── hub#363: the approval dialog's TRANSPORT half ────────────────────────────

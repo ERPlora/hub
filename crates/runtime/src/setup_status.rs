@@ -304,9 +304,16 @@ pub async fn status(
     //
     // It answers «own OR delegated» (ADR-0202 §2.1): a hub whose only certificate is the one
     // ERPlora handed down CAN invoice, so painting ⛔ on it would block a screen over a rejection
-    // that is not going to happen.
+    // that is not going to happen. In `testing` there is nothing to authorize (ADR-0360,
+    // hub#1087): the gate itself does not demand the certificate there, so the arm follows it —
+    // the profile's own word decides, and an unread profile (None/error) degrades to the
+    // production answer, the same fail-closed direction the gate takes.
     let certificate_present = crate::certificate::can_sign(db, hub_id).await.unwrap_or(false);
-    let certificate_arm = certificate_arm(registry, certificate_present);
+    let fiscal_environment = match crate::fiscal_profile::load(db, hub_id).await {
+        Ok(Some(p)) => p.environment,
+        _ => String::new(),
+    };
+    let certificate_arm = certificate_arm(registry, certificate_present, &fiscal_environment);
 
     let mut items: Vec<Json> = Vec::new();
     for core in CORE_ITEMS {
@@ -377,6 +384,9 @@ pub async fn status(
         let Some(done) = module_item_done(db, registry, def, ctx).await else {
             continue;
         };
+        // …and a module the dispatcher is going to refuse is not «configured», whatever its own
+        // settings say (hub#1119). See [`capabilities_granted`].
+        let done = done && capabilities_granted(db, registry, hub_id, &manifest.id).await;
         // A module item never reaches the third state: its screen is inside this hub, so there is
         // nothing outside that could make it impossible. Not evaluable ⇒ omitted (above); not
         // configured ⇒ pending.
@@ -573,8 +583,14 @@ fn item_key(module_id: &str) -> String {
 /// its own certificate or ERPlora's delegated one (ADR-0202 §2.1, hub#319). A hub running on the
 /// delegated certificate has nothing pending here: it invoices, so painting ⛔ would promise a
 /// rejection that is not going to happen.
-fn certificate_arm(registry: &Registry, certificate_present: bool) -> Vec<String> {
-    if certificate_present {
+///
+/// `environment` is the profile's own word (`testing` | `production` | `""` unresolved), because
+/// since ADR-0360 (hub#1087) the gate behind this arm demands the certificate in PRODUCTION only:
+/// in `testing` there is nothing to authorize, and a ⛔ that names a rejection the runtime will
+/// never make is the exact lie this arm exists not to tell. Anything that is not `testing`
+/// (production, unresolved) keeps the arm — the conservative answer, same as the gate.
+fn certificate_arm(registry: &Registry, certificate_present: bool, environment: &str) -> Vec<String> {
+    if certificate_present || environment == crate::fiscal_profile::ENV_TESTING {
         return Vec::new();
     }
     registry
@@ -729,9 +745,16 @@ async fn core_item_state(
         }
         // The SAME two settings the fiscal precondition reads (ADR-0203). Reading them from the
         // other side is what keeps "it blocks ⇔ the runtime rejects it" true instead of a colour.
-        // Half an identity is not an identity: both halves or nothing.
+        // Half an identity is not an identity: both halves or nothing — and since hub#1088 the
+        // tax id half must also be one the DOOR would accept. Emptiness stays its own question
+        // (the door accepts an empty field because the field is BORN empty; this item asks
+        // completeness): a value that predates the validation (legacy `ZZZ999`) is not a
+        // business identity either, and ticking «done» here would be the notice vouching for
+        // garbage the runtime would now refuse to re-save.
         ITEM_BUSINESS_IDENTITY => Some(done_or_pending(
-            !setting("business_legal_name").is_empty() && !setting("business_tax_id").is_empty(),
+            !setting("business_legal_name").is_empty()
+                && !setting("business_tax_id").is_empty()
+                && crate::settings::is_valid_tax_id(&setting("business_tax_id")),
         )),
         // At least one hub user besides the administrator. A solo business legitimately has one,
         // which is why this item is 🟡 recommended and never nags.
@@ -753,6 +776,33 @@ fn done_or_pending(done: bool) -> &'static str {
     } else {
         STATE_PENDING
     }
+}
+
+/// **Has the owner granted every host capability this module declares?** (hub#1119)
+///
+/// A module's own `setup` query can only answer «are MY settings filled in». It cannot see the gate
+/// in front of its engine: `capabilities::enforce` (ADR-0079) is default-deny and refuses every
+/// native command of a module with an ungranted capability, before it runs. So a module can report
+/// itself perfectly configured and still be unable to do the single thing it was installed for —
+/// which is what `verifactu` did for a whole day in a production hub, invoicing and printing while
+/// the fiscal chain was dead and the checklist said the business was ready.
+///
+/// The switch is a real, named task with a screen behind it (Ajustes → Permisos), so «pending» is
+/// the honest state, not an invented chore. A module that declares no capability is untouched.
+///
+/// **Best-effort, like every other check here**: if the grants cannot be read we answer `true`
+/// rather than manufacturing a pending item — a false «you are missing X» sends the user to fix
+/// something that is already fine.
+async fn capabilities_granted(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    module_id: &str,
+) -> bool {
+    crate::capabilities::list_for_module(db, registry, hub_id, module_id)
+        .await
+        .map(|caps| caps.iter().all(|(_, granted)| *granted))
+        .unwrap_or(true)
 }
 
 /// Runs the module's own declarative check. `None` = the check could not be made ⇒ omit the item.
@@ -1064,8 +1114,25 @@ mod tests {
         registry
             .installed
             .push(certificate_manifest("verifactu"));
-        assert_eq!(certificate_arm(&registry, false), vec!["verifactu.setup"]);
-        assert!(certificate_arm(&registry, true).is_empty());
+        assert_eq!(
+            certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION),
+            vec!["verifactu.setup"]
+        );
+        assert!(certificate_arm(&registry, true, crate::fiscal_profile::ENV_PRODUCTION).is_empty());
+    }
+
+    #[test]
+    fn the_certificate_arm_disappears_in_the_testing_environment() {
+        // ADR-0360 (hub#1087): in `testing` there is nothing to authorize — the runtime's own
+        // gate does not demand the certificate, so a ⛔ «you need this in order to invoice»
+        // would promise a rejection that is not going to happen. The arm and the gate must
+        // answer identically (hub#319); here that means the arm is empty while the module item
+        // stays 🔴/🟡 pending, which is honest: it is still worth configuring.
+        let mut registry = Registry::new();
+        registry
+            .installed
+            .push(certificate_manifest("verifactu"));
+        assert!(certificate_arm(&registry, false, crate::fiscal_profile::ENV_TESTING).is_empty());
     }
 
     #[test]
@@ -1074,7 +1141,10 @@ mod tests {
         let mut registry = Registry::new();
         registry.installed.push(certificate_manifest("fattura"));
         registry.installed.push(plain_manifest("verifactu"));
-        assert_eq!(certificate_arm(&registry, false), vec!["fattura.setup"]);
+        assert_eq!(
+            certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION),
+            vec!["fattura.setup"]
+        );
     }
 
     #[test]
@@ -1083,7 +1153,7 @@ mod tests {
         // Spain must not be told it is blocked by something nothing will ever ask it for.
         let mut registry = Registry::new();
         registry.installed.push(plain_manifest("inventory"));
-        assert!(certificate_arm(&registry, false).is_empty());
+        assert!(certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION).is_empty());
     }
 
     fn certificate_manifest(id: &str) -> crate::manifest::Manifest {

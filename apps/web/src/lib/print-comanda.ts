@@ -24,6 +24,15 @@ export interface ComandaItem {
   product_name?: string;
   quantity?: number;
   notes?: string;
+  /**
+   * Suplementos congelados en la fila (`kitchen_order_item.modifiers`, pm#93): «Sin cebolla»,
+   * «Al punto». Texto ya compuesto, no una lista: el módulo decide cómo se lee y el papel lo copia.
+   */
+  modifiers?: string | null;
+  /** kitchen#57 · el MENÚ del que esta línea es componente (ADR-0381); NULL a la carta. */
+  combo_ref?: string | null;
+  /** El nombre CONGELADO de ese menú. */
+  combo_name?: string | null;
   station_id?: string | null;
   station_name?: string | null;
   /** `display` | `printer` | `both` — de la ESTACIÓN, no de la comanda. */
@@ -32,9 +41,27 @@ export interface ComandaItem {
   printer_role?: string | null;
 }
 
+/**
+ * Una línea tal y como sale al papel.
+ *
+ * ⚠️ **Contrato de dispositivo.** `erplora-app` ya desplegada consume esto y lee `quantity`,
+ * `name` y `notes`. Los tres campos de hub#1156 se añaden **sólo cuando la fila los trae**: una
+ * app vieja ignora las claves que no conoce e imprime exactamente la misma hoja de siempre, que
+ * es el 99 % de las comandas. Poner `modifiers: ''` en todas cambiaría la forma para todo el
+ * mundo a cambio de nada.
+ */
+export interface ComandaLine {
+  name: string;
+  quantity: number;
+  notes?: string;
+  modifiers?: string;
+  combo_ref?: string;
+  combo_name?: string;
+}
+
 export interface ComandaGroup {
   role: string;
-  items: { name: string; quantity: number; notes?: string }[];
+  items: ComandaLine[];
 }
 
 /** Fallo de impresión de una hoja: lo que necesita la sala para avisar y reimprimir. */
@@ -72,12 +99,22 @@ export function buildComandaGroups(items: ComandaItem[]): ComandaGroup[] {
     const destination = item.destination ?? 'both';
     if (destination === 'display') continue;
     const role = item.printer_role || 'kitchen';
-    const line = {
+    // El menú se marca en la LÍNEA, no en la hoja: así la cabecera se repite sola en cada
+    // estación que reciba un componente (opción `11 - Send to Combo Parent Order Devices` de
+    // Simphony) sin que este lado tenga que saber cuántas hojas hay. Un cocinero de la plancha
+    // que no lee «MENÚ» no sabe que su entrecot va acoplado a un gazpacho, y lo saca cuando le
+    // viene bien.
+    const comboRef = str(item.combo_ref ?? '');
+    const line: ComandaLine = {
       name: item.product_name ?? '',
       // La fila trae la cantidad en punto fijo 10⁶ (ADR-0147; kitchen ≥ 2.3, migración 005):
       // el papel habla lógico. 500000 µ → «0.5», nunca «500000 × Gambas».
       quantity: num(item.quantity ?? QUANTITY_SCALE) / QUANTITY_SCALE,
       ...(item.notes ? { notes: item.notes } : {}),
+      // El suplemento es lo que hace que el plato VUELVA: se ve en el KDS y en la plancha, donde
+      // nadie mira una pantalla con las manos ocupadas, hasta ahora no salía por ningún sitio.
+      ...(item.modifiers ? { modifiers: str(item.modifiers) } : {}),
+      ...(comboRef ? { combo_ref: comboRef, combo_name: str(item.combo_name ?? '') } : {}),
     };
     const group = groups.get(role);
     if (group) group.push(line);

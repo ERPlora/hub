@@ -1,0 +1,66 @@
+{
+  "id": "gate",
+  "name": "Anchored Row Gate",
+  "version": "1.0.0",
+  "permissions": [
+    "gate.write",
+    "gate.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "commands": {
+    "gate.bookings.create": {
+      "permission": "gate.write",
+      "transaction": true,
+      "sql": [
+        "commands/_bump_reference.sql",
+        "commands/booking_create.sql"
+      ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "gate.outside_booking_window",
+        "message": "That date and time are outside the booking window this business allows.",
+        "statement": "commands/booking_create.sql"
+      },
+      "emit": [
+        "gate.booking.created"
+      ]
+    },
+    "gate.bookings.create_unanchored": {
+      "permission": "gate.write",
+      "transaction": true,
+      "sql": [
+        "commands/_bump_reference.sql",
+        "commands/booking_create.sql"
+      ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "gate.outside_booking_window",
+        "message": "That date and time are outside the booking window this business allows."
+      },
+      "emit": [
+        "gate.booking.created"
+      ]
+    }
+  },
+  "queries": {
+    "gate.bookings.count": {
+      "permission": "gate.read",
+      "sql": "queries/bookings_count.sql"
+    },
+    "gate.counter": {
+      "permission": "gate.read",
+      "sql": "queries/counter.sql"
+    }
+  },
+  "events": {
+    "emits": [
+      "gate.booking.created"
+    ]
+  }
+}

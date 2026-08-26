@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS contract1137_addon (
+  id TEXT PRIMARY KEY,
+  hub_id TEXT NOT NULL,
+  name TEXT NOT NULL
+);

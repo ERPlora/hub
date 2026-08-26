@@ -193,7 +193,7 @@ import ElevationDialog from './components/ElevationDialog.vue';
 import UserSwitchOverlay from './components/UserSwitchOverlay.vue';
 import SidebarAppUpdate from './components/SidebarAppUpdate.vue';
 import { user, isAuthed, logout } from './lib/session';
-import { refreshModuleNav } from './lib/nav';
+import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
 import { planUpgradeIsOfferable, upgradePlanUrl } from './lib/upgrade-plan-link';
@@ -340,7 +340,7 @@ async function gateAndRefresh(): Promise<void> {
       // en el snapshot viejo: refrescar solo la nav lo dejaba filtrado (visto en vivo).
       void (async () => {
         await resolveEntitlement();
-        await refreshModuleNav();
+        await refreshModuleNavAfterInstall();
         await refreshSetupStatus(getClient());
       })();
     });

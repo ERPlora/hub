@@ -112,15 +112,20 @@ impl BundlePurpose {
 /// Tablas que NO viajan en una **plantilla**, aunque su módulo entre con «datos» (hub#533).
 ///
 /// No son identidad ni secretos —eso ya lo cierra ADR-0195 §2/§4—: son **decisiones del negocio
-/// que importa la plantilla**, y venir hechas es peor que faltar. `invoice_series_series` fija el
-/// prefijo, el formato y cuál es la serie por defecto, o sea **cómo se numera cada documento que
-/// ese negocio emite ante Hacienda**; e `invoice_series_allocation` es el libro de números ya
-/// entregados que el RD 1007/2023 exige sin huecos ni duplicados — historial de OTRA instalación.
+/// que importa la plantilla**, y venir hechas es peor que faltar. Desde ADR-0369 la numeración que
+/// de verdad corre vive en `invoice` (el hub tiene UN secuenciador fiscal): `invoice_invoiceseries`
+/// fija el prefijo, el formato y cuál es la serie por defecto, o sea **cómo se numera cada documento
+/// que ese negocio emite ante Hacienda**; e `invoice_number_allocation` es el libro append-only de
+/// números ya entregados que el RD 1007/2023 exige sin huecos ni duplicados — historial de OTRA
+/// instalación. Las dos viejas (`invoice_series_series`, `invoice_series_allocation`) son la misma
+/// numeración por el módulo que se RETIRA (invoice_series#20) y siguen en la lista mientras exista
+/// un hub con ese módulo instalado: una plantilla nacida de él no puede sembrar numeración que ya
+/// no es la suya (hub#1033).
 ///
-/// Y hay un daño de segundo orden: al venir hechas, marcaban como «hecho» el ítem OBLIGATORIO
-/// `invoice_series.setup` de la checklist ([ADR-0222](../../architecture/00-overview/decision-log.md)),
-/// así que su dueño no lo revisaba nunca. Un falso «pendiente» se ve; un falso «hecho» esconde la
-/// tarea para siempre (hub#426).
+/// Y hay un daño de segundo orden: al venir hechas, marcaban como «hecho» el ítem OBLIGATORIO de
+/// numeración de la checklist (`invoice_series.setup` en su día, `invoice.setup` desde invoice#41 —
+/// [ADR-0222](../../architecture/00-overview/decision-log.md)), así que su dueño no lo revisaba
+/// nunca. Un falso «pendiente» se ve; un falso «hecho» esconde la tarea para siempre (hub#426).
 ///
 /// **Lista corta y del CORE, no un contrato en el manifest de módulo.** Lo que un módulo considere
 /// plantilla lo elige quien exporta, tabla a tabla (hub#534); esto es el suelo que esa elección no
@@ -130,7 +135,13 @@ impl BundlePurpose {
 /// Se descartó publicar la serie con el código `DEMO` y que el hub lo leyera como «sin configurar»:
 /// una serie llamada `DEMO` existe de verdad y numeraría una factura real (`DEMO-2026-00001`), y
 /// una cadena mágica la puede escribir un usuario — con lo que vuelve a ser una adivinanza.
-pub const TEMPLATE_EXCLUDED_TABLES: [&str; 2] = ["invoice_series_series", "invoice_series_allocation"];
+pub const TEMPLATE_EXCLUDED_TABLES: [&str; 4] = [
+    "invoice_invoiceseries",
+    "invoice_number_allocation",
+    // Las tablas del módulo retirado: la exclusión vive mientras él viva en hubs ya instalados.
+    "invoice_series_series",
+    "invoice_series_allocation",
+];
 
 /// The leading `_` that RESERVES the runtime's own namespace (ADR-0273 D8 — hub#560).
 ///

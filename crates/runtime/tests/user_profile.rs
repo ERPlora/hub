@@ -1,6 +1,6 @@
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::user_profile::{UpdateUserProfile, UserPreferences};
-use erplora_runtime::Runtime;
+use erplora_runtime::{Runtime, RuntimeError};
 
 async fn runtime(hub_id: &str) -> Runtime {
     let db = fresh_db().await;
@@ -86,5 +86,8 @@ async fn invalid_preferences_are_rejected() {
         )
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("language"));
+    assert!(
+        matches!(&err, RuntimeError::InvalidField { field, .. } if field == "language"),
+        "{err}"
+    );
 }

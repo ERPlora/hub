@@ -79,6 +79,71 @@ impl CompiledSchema {
         }
     }
 
+    /// Reescribe los números de `params` a la FORMA que su propiedad declara (hub#1092):
+    /// `"type": "number"` → siempre flotante; `"type": "integer"` → siempre entero.
+    ///
+    /// # Por qué existe
+    ///
+    /// El binder de `erplora-db` tipa cada bind **por el valor**: un JSON `10` sale como `int8` y
+    /// un `10.5` como `float8`. Para un campo declarado `"number"` esas son la MISMA ranura de la
+    /// MISMA sentencia con dos tipos de cable distintos — y la caché de sentencias preparadas de
+    /// sqlx (indexada por texto, sin re-Parse) congela el primero que la calentó. Como `int8` y
+    /// `float8` miden los dos 8 bytes, el servidor no puede detectar el cambiazo: lee los bytes
+    /// como el tipo que tenía guardado. Medido (services#55): `int8` con un `10.5` encima guarda
+    /// `4.6e18`; `float8` con un `10` encima guarda un denormal `5e-323` — o revienta con `22003`
+    /// en una columna `real` estrecha. Ruidoso **a veces**, corrupto **siempre**.
+    ///
+    /// La corrección no puede vivir en el binder (no conoce el schema): vive aquí, donde el
+    /// runtime SABE lo que el módulo declaró. Se llama tras [`Self::validate`] (y tras
+    /// [`Self::apply_defaults`], cuyos `default` llegan con la forma del JSON del módulo), antes
+    /// de bajar a SQL.
+    ///
+    /// # Reglas
+    ///
+    /// - Solo propiedades de PRIMER nivel con `"type"` `"number"`/`"integer"` (también como
+    ///   lista, p. ej. `["number", "null"]`): los payloads del motor son planos y bindean por
+    ///   nombre; lo demás queda como está.
+    /// - `number`: un entero en JSON (`10`) ES un number válido (el validador lo acepta) → se
+    ///   reescribe como `10.0`. Un entero > 2^53 pierde precisión al bajar a `f64`: es lo que el
+    ///   schema declaró (semántica JS de `number`), y hoy ninguna tasa ni precio la alcanza.
+    /// - `integer`: un flotante de valor integral (`4.0` ES un integer válido para JSON Schema)
+    ///   se reescribe como `4`. Un flotante NO integral no se toca: el validador ya lo rechazó en
+    ///   el camino declarativo, y en el camino de handler (sin validación de payload) tocarlo
+    ///   cambiaría el valor, no la forma.
+    /// - Strings, bools, `null` y ausentes: nunca se tocan.
+    pub fn coerce_declared_number_shapes(&self, params: &mut crate::Params) {
+        let Some(props) = self.raw.get("properties").and_then(|p| p.as_object()) else {
+            return;
+        };
+        for (key, prop) in props {
+            let declared = match declared_number_type(prop) {
+                Some(t) => t,
+                None => continue, // sin declaración de tipo numérico → el valor manda, como siempre
+            };
+            let Some(value) = params.get_mut(key) else { continue };
+            let serde_json::Value::Number(n) = value else { continue };
+            match declared {
+                DeclaredNumberType::Number => {
+                    if !n.is_f64() {
+                        if let Some(f) =
+                            serde_json::Number::from_f64(n.as_f64().unwrap_or(f64::NAN))
+                        {
+                            *value = serde_json::Value::Number(f);
+                        }
+                    }
+                }
+                DeclaredNumberType::Integer => {
+                    if let Some(f) = n.as_f64() {
+                        if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                            *value =
+                                serde_json::Value::Number(serde_json::Number::from(f as i64));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Valida `instance`; `Err` lleva el detalle legible de las violaciones (máx. 5).
     pub fn validate(&self, instance: &serde_json::Value) -> Result<(), String> {
         let errors: Vec<String> = self
@@ -99,6 +164,32 @@ impl CompiledSchema {
         } else {
             Err(errors.join("; "))
         }
+    }
+}
+
+/// El tipo numérico que una propiedad de schema declara (hub#1092). `None` = no declara
+/// `number`/`integer` (o declara otra cosa): el bind sigue tipado por el valor, como siempre.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeclaredNumberType {
+    Number,
+    Integer,
+}
+
+/// Lee el `"type"` de una propiedad como tipo numérico declarado. Acepta la forma string
+/// (`"number"`) y la forma lista (`["number", "null"]`, el idioma de «opcional/nullable»);
+/// en la lista manda el primer tipo numérico que aparezca.
+fn declared_number_type(prop: &serde_json::Value) -> Option<DeclaredNumberType> {
+    let pick = |s: &str| match s {
+        "number" => Some(DeclaredNumberType::Number),
+        "integer" => Some(DeclaredNumberType::Integer),
+        _ => None,
+    };
+    match prop.get("type")? {
+        serde_json::Value::String(s) => pick(s.as_str()),
+        serde_json::Value::Array(types) => {
+            types.iter().find_map(|t| t.as_str().and_then(pick))
+        }
+        _ => None,
     }
 }
 
@@ -742,6 +833,23 @@ pub struct RequestContext {
     /// Subdivisión ISO-3166-2 (`ES-CN`…) o vacío = todo el país. Una regla con región gana a la del
     /// país (Canarias/IGIC, Ceuta y Melilla/IPSI).
     pub region_code: String,
+    /// **La zona horaria del NEGOCIO** (hub#731, hub#1022), como nombre IANA (`Europe/Madrid`) y ya
+    /// RESUELTA: la `timezone` declarada en settings o, lo normal, la deducida de
+    /// `country_code`/`region_code` (`settings::timezone_of`). La inyecta el dispatcher junto a la
+    /// identidad de negocio; `system_params` la expone como `:timezone` y el contexto de los
+    /// handlers WASM/nativos como `context.timezone`, para que un módulo que agenda «mañana a las
+    /// 09:00» sepa en qué reloj son las 09:00 sin adivinarlo del país. Vacía hasta que el
+    /// dispatcher la resuelve — [`Self::timezone_name`] degrada a `UTC`, igual que el boot del
+    /// server.
+    pub timezone: String,
+    /// **El idioma EFECTIVO de quien llama** (hub#1098): su override personal
+    /// (`hub_user_pref.language`) → el setting del hub (`hub_settings.language`) → el default del
+    /// core (`es`). Es la MISMA precedencia que el shell (`bootHubLanguage`) y la que taxes#38
+    /// reimplementaba en el SQL de cada módulo — con el default adivinado, y mal (taxes#40: era
+    /// `en` y el core dice `es`). La inyecta el dispatcher; `system_params` la expone como
+    /// `:caller_lang` para que cualquier SELECT que proyecte texto traducido deje de leer las
+    /// tablas del core. Vacía hasta resolver — [`Self::caller_lang`] degrada a `es`.
+    pub caller_lang: String,
     /// **Who is behind this request**: a person, or a machine (hub#361). See [`Principal`].
     pub principal: Principal,
     /// Reference to a **step-up approval** this runtime is holding (hub#361), if the caller
@@ -769,6 +877,17 @@ pub struct RequestContext {
     /// D4/D6). Resolved by the dispatcher from the profile + the registry, so `CLOSED` can let a
     /// provider drain what it still owes **without the core naming a single module**.
     pub fiscal_providers: Vec<String>,
+    /// **Which AEAT this hub files to** (`testing` | `production`) — `_hub_fiscal_profile.environment`
+    /// (ADR-0273 D3: the go-live IS `testing → production`). Stamped by the dispatcher next to
+    /// [`Self::fiscal_mode`], from the core's own tables.
+    ///
+    /// Private with a `pub(crate)` setter for the same reason as [`Self::automation`]: this
+    /// struct crosses into `erplora-server`, where every context is built from something a
+    /// caller sent. The certificate arm of `commands::enforce_fiscal_precondition` is keyed on
+    /// this value (ADR-0360, hub#1087: in `testing` there is nothing to authorize), so a route
+    /// able to stamp it would hand a TPV the very requirement the ADR exists to enforce. Empty
+    /// means UNRESOLVED, and every gate that reads it fails CLOSED (production's answer).
+    fiscal_environment: String,
     /// `hub_user.id` of the manager whose approval let this command past the permission gate.
     /// Filled by the dispatcher **after** spending a grant, so it is a fact about what happened,
     /// not something a caller can assert. This is the seam hub#362 writes next to the cashier's
@@ -842,6 +961,8 @@ impl RequestContext {
             permissions: permissions.into_iter().collect(),
             country_code: String::new(),
             region_code: String::new(),
+            timezone: String::new(),
+            caller_lang: String::new(),
             business_tax_id: String::new(),
             business_legal_name: String::new(),
             business_address: String::new(),
@@ -849,6 +970,7 @@ impl RequestContext {
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
             fiscal_providers: Vec::new(),
+            fiscal_environment: String::new(),
             principal: Principal::Human,
             elevation_token: None,
             approved_by: None,
@@ -875,6 +997,21 @@ impl RequestContext {
     pub(crate) fn caused_by_event(mut self, event_id: impl Into<String>) -> Self {
         self.parent_event_id = event_id.into();
         self
+    }
+
+    /// Stamps which AEAT this hub files to (`testing` | `production`, hub#1087/ADR-0360). Only
+    /// the dispatcher calls it, from `_hub_fiscal_profile` — `pub(crate)` is the point: see
+    /// [`RequestContext::fiscal_environment`]. An empty value is UNRESOLVED and every gate that
+    /// reads it fails CLOSED.
+    pub(crate) fn with_fiscal_environment(mut self, environment: impl Into<String>) -> Self {
+        self.fiscal_environment = environment.into();
+        self
+    }
+
+    /// The fiscal environment the gate keys on (ADR-0360): `testing`, `production`, or `""` when
+    /// unresolved (read as production — the conservative answer).
+    pub fn fiscal_environment(&self) -> &str {
+        &self.fiscal_environment
     }
 
     /// The event that caused this request, or `""` when a person started it directly.
@@ -935,6 +1072,42 @@ impl RequestContext {
         self
     }
 
+    /// Fija la **zona horaria resuelta del negocio** (hub#731, hub#1022). La llama el dispatcher
+    /// tras `settings::timezone_of`. Builder para no romper los `new(...)`/tests existentes.
+    pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
+        self.timezone = timezone.into();
+        self
+    }
+
+    /// Fija el **idioma efectivo de quien llama** (hub#1098). La llama el dispatcher tras leer
+    /// `hub_user_pref`/`hub_settings` (ver `effective_caller_lang`). Builder para no romper los
+    /// `new(...)`/tests existentes.
+    pub fn with_caller_lang(mut self, lang: impl Into<String>) -> Self {
+        self.caller_lang = lang.into();
+        self
+    }
+
+    /// La zona horaria del negocio como nombre IANA, lista para bindear/exponer. `UTC` si el
+    /// dispatcher aún no la resolvió — el mismo fallback documentado del boot del server, nunca
+    /// una cadena vacía que un `context.timezone` del guest leería como «no lo sé».
+    pub fn timezone_name(&self) -> &str {
+        if self.timezone.is_empty() {
+            "UTC"
+        } else {
+            &self.timezone
+        }
+    }
+
+    /// El idioma efectivo de quien llama, listo para bindear. `es` (el default del core,
+    /// taxes#40) si el dispatcher aún no lo resolvió — nunca una cadena vacía.
+    pub fn caller_lang(&self) -> &str {
+        if self.caller_lang.is_empty() {
+            "es"
+        } else {
+            &self.caller_lang
+        }
+    }
+
     /// Copia con el flag de presencia del certificado fiscal del negocio (`_hub_certificate`, core).
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
@@ -972,6 +1145,99 @@ pub(crate) fn new_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#1092: coerce_declared_number_shapes ─────────────────────────────────────────────
+
+    fn compiled(schema: serde_json::Value) -> CompiledSchema {
+        CompiledSchema::compile(&schema).expect("schema compila")
+    }
+
+    fn shape_of(v: &serde_json::Value) -> &'static str {
+        // The WIRE form of a JSON number, which is what the binder keys on: serde_json keeps
+        // integers and floats in separate variants even when they are equal as reals.
+        let n = v.as_number().expect("es un número");
+        if n.is_u64() || n.is_i64() {
+            "int"
+        } else if n.is_f64() {
+            "float"
+        } else {
+            "???"
+        }
+    }
+
+    /// `"number"` declara FLOTANTE: un `10` en JSON (entero para serde_json) se reescribe como
+    /// `10.0` para que el bind salga siempre `float8`. Es la mitad que congela la sentencia.
+    #[test]
+    fn number_field_rewrites_integer_shaped_values_to_float() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "rate": { "type": "number" } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::json!(10));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["rate"]), "float", "10 debe salir como 10.0");
+        assert_eq!(p["rate"].as_f64(), Some(10.0), "mismo valor, otra forma");
+    }
+
+    /// `"integer"` declara ENTERO: un `4.0` (float que ES un integer válido para JSON Schema,
+    /// el validador lo acepta) se reescribe como `4` para que el bind salga siempre `int8`.
+    /// Un `4.5` no se toca: cambiarlo sería cambiar el VALOR, no la forma.
+    #[test]
+    fn integer_field_rewrites_integral_floats_and_leaves_fractions() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "qty": { "type": "integer" } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("qty".into(), serde_json::json!(4.0));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["qty"]), "int", "4.0 debe salir como 4");
+
+        let mut p = crate::Params::new();
+        p.insert("qty".into(), serde_json::json!(4.5));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["qty"]), "float", "4.5 no es integral: se queda como está");
+    }
+
+    /// La forma nullable (`["number", "null"]`) es la misma declaración; strings, bools, `null`
+    /// y claves sin declaración numérica nunca se tocan.
+    #[test]
+    fn nullable_number_form_coerces_but_non_numbers_are_untouched() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "rate": { "type": ["number", "null"] },
+                "note": { "type": "string" },
+                "qty": { "type": ["integer", "null"] },
+                "free": { "type": ["string", "null"] }
+            }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::json!(21));
+        p.insert("note".into(), serde_json::json!("21"));
+        p.insert("qty".into(), serde_json::json!(3.0));
+        p.insert("free".into(), serde_json::json!(7));
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(shape_of(&p["rate"]), "float", "['number','null'] declara number");
+        assert_eq!(p["note"], serde_json::json!("21"), "un string no se toca");
+        assert_eq!(shape_of(&p["qty"]), "int", "['integer','null'] declara integer");
+        assert_eq!(p["free"], serde_json::json!(7), "sin tipo numérico declarado, el valor manda");
+    }
+
+    /// Un `null` explícito sobre un campo `number` nullable sigue siendo `null`: se bindea como
+    /// `DynNull` (inferido por contexto), que es correcto y no congela ningún tipo.
+    #[test]
+    fn explicit_null_stays_null() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "rate": { "type": ["number", "null"] } }
+        }));
+        let mut p = crate::Params::new();
+        p.insert("rate".into(), serde_json::Value::Null);
+        schema.coerce_declared_number_shapes(&mut p);
+        assert_eq!(p["rate"], serde_json::Value::Null);
+    }
 
     fn cmd_def(expose_api: bool, internal: bool) -> CommandDef {
         CommandDef {

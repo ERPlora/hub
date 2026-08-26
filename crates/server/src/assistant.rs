@@ -36,6 +36,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     "query",
                     &q.module_id,
                     q.def.schema.as_deref(),
+                    ai.risk,
                 ));
             }
         }
@@ -58,6 +59,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     "command",
                     &c.module_id,
                     c.def.schema.as_deref(),
+                    ai.risk,
                 ));
             }
         }
@@ -116,7 +118,11 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
              verified so: it only inserts rows that do not exist yet — it never overwrites or \
              deletes what the hub already has (existing records are kept and the template's \
              duplicates are skipped), and it never imports people, fiscal identity or another \
-             business's invoice numbering. Mutating: the user confirms a card before it runs — \
+             business's invoice numbering. A template does NOT set up the fiscal side: the \
+             result carries `still_blocking` — what this hub STILL cannot do until somebody \
+             configures it. Relay those items as PENDING; never describe a template's contents \
+             as if they were done, and never say invoicing is ready while `still_blocking` names \
+             it. Mutating: the user confirms a card before it runs — \
              never claim it is applied until the result comes back. Use the slug exactly as \
              hub.blueprints.list returned it.",
             "command",
@@ -138,7 +144,9 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         if permits(permission) {
             // module_id "hub" marca tool del CORE: `filter_tools_by_modules` la preserva
             // explícitamente (el core no es un módulo y su ref_id nunca está en el índice).
-            tools.push(tool_def(name, description, kind, "hub", *schema));
+            // Las tools de core no son destructivas por diseño (lo destructivo del host no se
+            // ofrece jamás, y hay un barrido que lo garantiza), así que `normal` explícito.
+            tools.push(tool_def(name, description, kind, "hub", *schema, None));
         }
     }
 
@@ -155,7 +163,14 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 /// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
 /// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
 /// necesita (ya recibe `kind` de la misma forma).
-fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: Option<&str>) -> Value {
+fn tool_def(
+    name: &str,
+    description: &str,
+    kind: &str,
+    module_id: &str,
+    schema: Option<&str>,
+    risk: Option<erplora_runtime::manifest::AiRisk>,
+) -> Value {
     // The operation's input schema (a JSON-Schema string) becomes the tool's
     // `parameters`, so the model calls with valid arguments. The Cloud reads it
     // as `fn.parameters` (orchestrator `_tools_from_hub`). Absent or unparseable
@@ -169,6 +184,9 @@ fn tool_def(name: &str, description: &str, kind: &str, module_id: &str, schema: 
         "kind": kind,
         "module_id": module_id,
         "parameters": parameters,
+        // Siempre presente, incluso sin declarar: el cliente aplica una política y no puede
+        // depender de si alguien se acordó de escribir el campo.
+        "risk": risk.unwrap_or(erplora_runtime::manifest::AiRisk::Normal).as_str(),
     })
 }
 
@@ -195,8 +213,29 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          working inside their own Hub — their business's instance — which loads business modules \
          on demand from the ERPlora marketplace.\n\n\
          You are not a general-purpose chatbot. Every question is about THIS business and THIS \
-         hub unless the user plainly says otherwise.\n\n",
+         hub. If someone asks about something else — the weather, a film, general trivia — say in \
+         ONE SHORT SENTENCE that you only cover their business, and offer something you can \
+         actually do here. Do not lecture, do not apologise at length, and do not answer the \
+         question anyway: this assistant is metered, and a turn spent on trivia is one the owner \
+         paid for and cannot spend on their business.\n\n",
     );
+
+    // The two facts a model can NEVER supply itself, injected per request.
+    //
+    // The version was the one the QA pass of 2026-08-19 caught worst (hub#1044): asked «what
+    // version of ERPlora do I have?», with `v1.1.7` printed in the sidebar of the same screen,
+    // it answered that ERPlora HAS no single version and invented a per-module versioning
+    // architecture to justify it. There was no path to the answer — no block carried the number
+    // and no core tool reads it — and a model with no datum and no permission to say "I don't
+    // know" improvises. It comes from the one place that owns it (hub#515), the same number
+    // `/readyz` and the sidebar report, so the three cannot drift.
+    s.push_str(&format!(
+        "## This installation\n\nERPlora version running here: **v{}**. This is THE version of \
+         this installation — one number for the whole product, not one per module (installed \
+         modules have their own versions on top of it). If asked which version this is, answer \
+         with this number.\n\n",
+        crate::version::HUB_VERSION
+    ));
 
     // "Today" is the one fact a model can never supply itself — its clock froze at training
     // time — and in an ERP the date is load-bearing: today's sales, this quarter, due dates.
@@ -244,6 +283,55 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
         s.push('\n');
     }
 
+    // What this hub CORRECTS instead of editing (ADR-0331), straight from the manifests.
+    //
+    // Modules already declare it — `mutable: false` plus a CLOSED `reason` and the commands that
+    // correct the record — and the block's own documentation says the vocabulary is closed
+    // precisely «so the assistant can explain "an issued invoice is not edited: it is rectified
+    // with `invoice.rectify`"». It was wired into the dispatcher and never into the prompt, so
+    // the model never saw a single one of these rules. Asked what it could not do, it filled the
+    // gap with a policy of its own invention (hub#1042) — which is worse than having no rule,
+    // because the user believes it.
+    //
+    // Only the IMMUTABLE ones are listed: a mutable record needs no explanation, its update tool
+    // is already on the table, and a prompt that lists everything stops being read.
+    let mut immutable: Vec<(&str, &str, &erplora_runtime::manifest::RecordDef)> = Vec::new();
+    for m in registry.installed.iter().filter(|m| registry.is_active(&m.id)) {
+        for (record, def) in &m.records {
+            if !def.mutable {
+                immutable.push((m.id.as_str(), record.as_str(), def));
+            }
+        }
+    }
+    if !immutable.is_empty() {
+        // Deterministic order: a prompt that reshuffles between turns is a prompt whose cache
+        // never hits, and a diff nobody can read.
+        immutable.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        s.push_str(
+            "## What is corrected here, never edited
+
+These records cannot be edited after              they exist — the module says so itself. Do not offer an edit, do not look for a              tool that does it, and do not invent a reason: say what the record is, why it is              fixed, and name the command that CORRECTS it.
+
+",
+        );
+        for (module, record, def) in immutable {
+            let reason = def.reason.as_deref().unwrap_or("declared immutable");
+            if def.correct_with.is_empty() {
+                s.push_str(&format!("- `{module}` · **{record}** — {reason}. No correction tool.\n"));
+            } else {
+                s.push_str(&format!(
+                    "- `{module}` · **{record}** — {reason}. Correct it with: {}\n",
+                    def.correct_with
+                        .iter()
+                        .map(|c| format!("`{c}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+        s.push('\n');
+    }
+
     // ADR-0123. This is a hub-wide invariant, so it is stated ONCE here rather than in each
     // module's JSON Schema — those only say `{"type":"integer"}`, and `12` validates cleanly
     // while meaning 0.12 €. The failure is silent and it writes to the database, so the rule
@@ -254,10 +342,16 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          **integer number of cents**. Never send a decimal.\n\n\
          Whatever way the user writes or says it, convert before calling a tool:\n\
          `12.50` · `12,50` · `12,50 €` · `12 euros 50` · `12 euros con 50 céntimos` → **1250**.\n\
-         `8` · `8 €` · `8 euros` → **800**. `0,05` · `5 céntimos` → **5**.\n\n\
+         `8` · `8 €` · `8 euros` → **800**. `0,05` · `5 céntimos` → **5**.\n\
+         In Spanish (Spain) the currency subunit is «céntimos», never «centavos» — that spelling \
+         is Latin American and reads as foreign to this user.\n\n\
          Reading back, do the inverse: an amount of `1250` is presented to the user as 12,50 €. \
          If an amount is ambiguous, ask — a price written wrong by a factor of 100 is a real \
-         invoice at the wrong price, and the schema will not catch it.\n\n",
+         invoice at the wrong price, and the schema will not catch it.\n\
+         This conversion is yours and it applies ONLY when you call a tool. The app's own screens \
+         take amounts the way a person writes them: **never tell the user to type cents into a \
+         form**. Telling somebody to enter `1700` for 17 € turns a haircut into a 1.700 € one, \
+         and the field will accept it.\n\n",
     );
 
     // The update commands of this hub take no patch yet: most demand the whole editable object,
@@ -287,12 +381,22 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
          Before anything else, look at what is above: the modules this hub runs, their screens, \
          and the tools you were offered. That is the product the user is looking at.\n\n\
          - **How-to questions are about THIS app.** \"How do I change a price?\" is answered by \
-         naming the screen and the steps in it — e.g. the Products screen of the inventory \
-         module (`/m/inventory/products`), open the product and edit it. Never answer with how \
-         some other ERP does it.\n\
+         naming the SCREEN from the map above — e.g. the Products screen of the inventory module \
+         (`/m/inventory/products`). Never answer with how some other ERP does it.\n\
+         - **You know the screens, not the buttons.** The map above gives you routes; it does \
+         NOT tell you what controls, fields or wizards live inside a screen. So take the user to \
+         the screen and stop there. Do not invent a button, a field label, a numbering scheme or \
+         a step-by-step walkthrough of a form you have never seen — a confident recipe that ends \
+         at a control that does not exist is worse than «I can take you there, the rest is on \
+         screen».\n\
          - **Never answer from memory or from a generic idea of what ERP software does.** If it \
          is not in the map above and no tool covers it, say that this hub does not do it — that \
          is a useful answer; an invented menu is not.\n\
+         - **Secrets are not yours to reveal — nor to help extract.** Never explain how to \
+         obtain a credential, a token or an API key: not from the developer tools of the \
+         browser, not from the network panel, not from a config file. Refusing to say it and \
+         then giving the recipe is not a refusal. Say it is not available through you and name \
+         the screen where the business manages its own access, if there is one.\n\
          - **Web search is the last resort, never the first**, and only for facts that live \
          outside this hub (a tax rate that changed, a legal deadline). Never use it to describe \
          how ERPlora works. If you do use it, cite the source and its date.\n\n",
@@ -445,7 +549,10 @@ pub fn last_user_message(frontend: &Value) -> String {
 /// Devuelve `Some(frame)` con la línea SSE ya formateada (incluye `\n\n`), o `None` si la línea
 /// no aporta contenido (comentarios, keep-alives). El terminador `[DONE]` del Cloud se traduce a
 /// `{"type":"done"}`.
-pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, String>) -> Option<String> {
+pub fn translate_sse_line(
+    line: &str,
+    notes: &std::collections::HashMap<String, Value>,
+) -> Option<String> {
     let payload = line.strip_prefix("data:")?.trim();
     if payload.is_empty() {
         return None;
@@ -480,15 +587,70 @@ pub fn translate_sse_line(line: &str, kinds: &std::collections::HashMap<String, 
         Some("function_call") => {
             let mut out = ev;
             let name = out.get("name").and_then(Value::as_str).map(str::to_string);
-            if let Some(kind) = name.and_then(|n| kinds.get(&n)) {
+            // Todo lo que el catálogo resolvió sobre esta tool viaja CON la llamada: su `kind`
+            // (leer sola vs confirmar), su `risk` (hub#1042) y qué argumentos son dinero
+            // (hub#1040). El drawer no tiene catálogo propio donde consultarlo, y son hechos del
+            // manifest — no cosas que el modelo pueda decir de sí mismo.
+            if let Some(note) = name.and_then(|n| notes.get(&n)).and_then(Value::as_object) {
                 if let Some(obj) = out.as_object_mut() {
-                    obj.insert("kind".to_string(), json!(kind));
+                    for (k, v) in note {
+                        obj.insert(k.clone(), v.clone());
+                    }
                 }
             }
             Some(sse(&out))
         }
         _ => None,
     }
+}
+
+/// Qué argumentos de un command son DINERO, leído de su JSON Schema (hub#1040).
+///
+/// La tarjeta de confirmación es el último sitio donde un humano puede cazar un error de ×100, y
+/// era el único del producto donde el importe no salía en euros. Para pintarlo bien hay que saber
+/// QUÉ campo es dinero — y eso no se adivina por el nombre: el día que un porcentaje se pinte como
+/// importe, la tarjeta pasa de ilegible a mentirosa.
+///
+/// Quien lo sabe es el schema del propio command, que enuncia el contrato del dinero en la
+/// descripción del campo (ADR-0123: «Minor units of the hub currency», «Céntimos por hora»). El
+/// runtime lo resuelve una vez y manda la respuesta con la tool call.
+///
+/// **Conservador a propósito**: exige TIPO entero **y** marca explícita. No detectar un campo de
+/// dinero deja un entero crudo —lo que ya pasa hoy, solo poco útil—; detectar uno de más se
+/// inventa un importe.
+pub(crate) fn money_fields(schema: &str) -> Vec<String> {
+    /// Las formas en que un schema publicado dice «esto es dinero». Ambos idiomas: los manifests
+    /// se escriben en inglés, pero las descripciones viejas siguen en castellano.
+    const MARKERS: &[&str] = &["minor unit", "céntimo", "centimo", "adr-0123"];
+
+    let Ok(parsed) = serde_json::from_str::<Value>(schema) else {
+        return Vec::new();
+    };
+    let Some(props) = parsed.get("properties").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+
+    props
+        .iter()
+        .filter(|(_, def)| {
+            // El tipo puede ser `"integer"` o `["integer","null"]` (opcional en el manifest).
+            let is_integer = match def.get("type") {
+                Some(Value::String(t)) => t == "integer",
+                Some(Value::Array(ts)) => ts.iter().any(|t| t.as_str() == Some("integer")),
+                _ => false,
+            };
+            if !is_integer {
+                return false;
+            }
+            let desc = def
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_lowercase();
+            MARKERS.iter().any(|m| desc.contains(m))
+        })
+        .map(|(name, _)| name.clone())
+        .collect()
 }
 
 /// Formatea un valor JSON como un evento SSE `data: …\n\n`.
@@ -512,6 +674,13 @@ mod tests {
         serde_json::from_value(m).expect("fixture manifest must parse")
     }
 
+    /// Same, plus the `records` block a module uses to declare what is corrected and never
+    /// edited (ADR-0331). Deserialized like the rest, so it exercises the real parse.
+    fn manifest_with_records(id: &str, name: &str, records: Value) -> erplora_runtime::manifest::Manifest {
+        let m = json!({ "id": id, "name": name, "version": "1.0.0", "records": records });
+        serde_json::from_value(m).expect("fixture manifest must parse")
+    }
+
     /// A registry with `modules` installed; each entry is `(id, name, agent, active)`.
     fn registry_with(modules: &[(&str, &str, Option<&str>, bool)]) -> Registry {
         use erplora_runtime::registry::ModuleStatus;
@@ -528,6 +697,279 @@ mod tests {
             );
         }
         reg
+    }
+
+    /// ADR-0331 gave every module a way to say what of its data is CORRECTED and never edited,
+    /// with a CLOSED `reason` vocabulary. The block's own doc says why the vocabulary is closed:
+    /// «so the assistant can explain "an issued invoice is not edited: it is rectified with
+    /// `invoice.rectify`"». It was wired into the dispatcher and never into the assistant, so
+    /// the model never saw it — and when asked what it could not do, it INVENTED a policy
+    /// instead (hub#1042: «bulk_delete no existe, está deshabilitada intencionalmente», one turn
+    /// after listing it among its own tools).
+    ///
+    /// A model that is told the real rule does not have to make one up.
+    #[test]
+    fn instructions_carry_what_each_module_declares_immutable() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "invoice",
+            "Invoicing",
+            json!({ "invoice": { "mutable": false, "reason": "fiscal",
+                                 "correct_with": ["invoice.rectify"] } }),
+        ));
+        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        assert!(ins.contains("invoice.rectify"), "the correction door must be named: {ins}");
+        let lower = ins.to_lowercase();
+        assert!(lower.contains("fiscal"), "the closed reason must travel: {ins}");
+    }
+
+    /// A record the module declares MUTABLE says nothing worth a line in the prompt: the tools
+    /// already cover editing it. Only the refusals need explaining, and a prompt that lists
+    /// everything stops being read.
+    #[test]
+    fn a_mutable_record_does_not_crowd_the_prompt() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "sales",
+            "Sales",
+            json!({ "order": { "mutable": true, "update": "sales.order.update_line" } }),
+        ));
+        reg.status.insert("sales".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        // The SECTION itself must not appear: asserting on the update command's name would pass
+        // even while the record leaked in, because the rendering never prints that command. (It
+        // did exactly that until a deliberate sabotage — removing the `!def.mutable` filter —
+        // failed to turn this test red.)
+        assert!(
+            !ins.contains("corrected here, never edited"),
+            "with nothing immutable there is no section to write: {ins}"
+        );
+        assert!(
+            !ins.contains("**order**"),
+            "a mutable record needs no rule: the tool already covers it: {ins}"
+        );
+    }
+
+    /// An INACTIVE module's refusals are not this hub's refusals.
+    #[test]
+    fn an_inactive_module_declares_nothing_to_the_assistant() {
+        let mut reg = Registry::new();
+        reg.installed.push(manifest_with_records(
+            "invoice",
+            "Invoicing",
+            json!({ "invoice": { "mutable": false, "reason": "fiscal",
+                                 "correct_with": ["invoice.rectify"] } }),
+        ));
+        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Inactive);
+
+        let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
+
+        assert!(!ins.contains("invoice.rectify"), "an inactive module says nothing: {ins}");
+    }
+
+    /// Which arguments of a command are MONEY (hub#1040).
+    ///
+    /// The confirm card showed `{"price_cents": 1500}` and the owner approved it without ever
+    /// reading «15,00 €» — in the one place a human could have caught a ×100, and the only place
+    /// in the product where an amount was not shown in euros.
+    ///
+    /// The client must NOT guess this from field names: the day a percentage gets painted as an
+    /// amount, the card starts lying instead of just being unreadable. Who knows is the command's
+    /// JSON Schema, which states the money contract in the field's own description (ADR-0123:
+    /// «Minor units of the hub currency», «Céntimos por hora»). The runtime resolves it once and
+    /// sends the answer.
+    ///
+    /// Conservative on purpose: missing a money field shows a raw integer (what happens today,
+    /// merely unhelpful); a false positive invents an amount. So it demands BOTH an integer type
+    /// and an explicit marker.
+    #[test]
+    fn money_fields_are_read_from_the_schema_never_guessed_from_the_name() {
+        let schema = r#"{
+            "type": "object",
+            "properties": {
+                "price": { "type": ["integer","null"],
+                           "description": "Minor units of the hub currency (ADR-0007/0123): 1500 = 15,00 €" },
+                "hourly_rate": { "type": "integer", "description": "Céntimos por hora (dinero, ADR-0123)" },
+                "duration_minutes": { "type": "integer",
+                                      "description": "A service takes time: 0 or negative is not a duration." },
+                "commission_rate": { "type": "number", "description": "Porcentaje de comisión (ADR-0123 no aplica)" },
+                "name": { "type": "string" }
+            }
+        }"#;
+
+        let mut fields = money_fields(schema);
+        fields.sort();
+
+        assert_eq!(
+            fields,
+            vec!["hourly_rate".to_string(), "price".to_string()],
+            "solo los enteros que el schema MARCA como dinero"
+        );
+    }
+
+    /// A schema that is absent, empty or unparseable marks nothing. Falling back to «no money»
+    /// is the safe direction: the card shows raw integers, exactly as it does today.
+    #[test]
+    fn an_unreadable_schema_marks_nothing_as_money() {
+        assert!(money_fields("{not json").is_empty());
+        assert!(money_fields("{}").is_empty());
+    }
+
+    /// En España la subunidad son **céntimos**; «centavos» es LatAm. El prompt ya usa la palabra
+    /// correcta en sus ejemplos, pero el modelo derivó a «centavos enteros» en una respuesta real
+    /// (hub#1043). Basta con decirlo, porque es una preferencia de vocabulario y no un contrato —
+    /// pero hay que decirlo, o se vuelve a derivar.
+    #[test]
+    fn instructions_name_the_currency_subunit_as_spain_says_it() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(lower.contains("céntimo"), "la palabra correcta tiene que estar: {ins}");
+        assert!(
+            lower.contains("never «centavos»") || lower.contains("not «centavos»"),
+            "y hay que decir explícitamente cuál NO es, o el modelo vuelve a derivar: {ins}"
+        );
+    }
+
+    /// Aplicar una plantilla NO configura lo fiscal, y decirlo por escrito importa porque el
+    /// modelo lo afirmó con el banner rojo «Todavía no puedes facturar» visible en la misma
+    /// pantalla (hub#1041). El resultado de la tool ya trae lo que sigue bloqueando; esto es la
+    /// otra mitad: que sepa qué hacer con ese campo en vez de adornarlo.
+    #[test]
+    fn the_blueprint_tool_says_it_does_not_configure_the_fiscal_side() {
+        // Va en la DESCRIPCIÓN de la tool, no en el prompt general: es donde el modelo la lee
+        // justo antes de usarla, y donde ya vive el resto del contrato de esta acción.
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let apply = tools
+            .iter()
+            .find(|t| t["name"] == json!("hub.blueprints.apply"))
+            .expect("la tool de blueprints se ofrece");
+        let desc = apply["description"].as_str().unwrap_or("").to_lowercase();
+
+        assert!(
+            desc.contains("still_blocking"),
+            "el campo que trae la verdad tiene que nombrarse: {desc}"
+        );
+        // Nombrar el campo no basta: hay que decir QUÉ hacer con él. Sin estas dos, la
+        // descripción podía perder la regla entera y el test seguía en verde — comprobado
+        // saboteándolo (`fiscal` ya aparecía antes en «fiscal identity», así que era vacuo).
+        assert!(
+            desc.contains("does not set up the fiscal side"),
+            "tiene que decir que la plantilla NO deja lo fiscal hecho: {desc}"
+        );
+        assert!(
+            desc.contains("as pending") && desc.contains("never say invoicing is ready"),
+            "y que esos ítems se transmiten como PENDIENTES, sin declarar que ya se puede \
+             facturar: {desc}"
+        );
+    }
+
+    /// El prompt PEDÍA lo que el modelo no puede saber: «naming the screen **and the steps in
+    /// it**». El asistente no tiene mapa de los botones ni de los campos de una pantalla —solo de
+    /// las RUTAS— así que esa frase le encargaba inventar, y lo hizo: un recorrido completo para
+    /// la factura rectificativa con un botón «Rectificar» que no existe, tres tipos de
+    /// rectificación, un sufijo `-R1` y un icono 🔄 (hub#1047). Y en hub#1045, «haz clic en el
+    /// nombre del servicio» sobre una lista que no abre ninguna ficha así.
+    ///
+    /// La frontera honesta es la que el hub puede sostener: sé en qué PANTALLA se hace, no qué
+    /// botón hay dentro.
+    #[test]
+    fn instructions_do_not_ask_for_steps_the_assistant_cannot_know() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            !lower.contains("and the steps in it"),
+            "el prompt no puede encargar los pasos de dentro de una pantalla: {ins}"
+        );
+        assert!(
+            lower.contains("you know the screens, not the buttons"),
+            "y tiene que decir dónde está la frontera: {ins}"
+        );
+    }
+
+    /// El contrato de céntimos es de los ARGUMENTOS DE TOOL, no de los formularios. El modelo lo
+    /// generalizó y mandó teclear «1700 — no 17.00 ni 1700,00» en la pantalla, con el énfasis
+    /// puesto justo para vencer la duda que habría salvado al usuario (hub#1045). Un corte de
+    /// pelo de 17 € quedaría a 1.700 €.
+    #[test]
+    fn the_cents_contract_is_scoped_to_tool_arguments() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("only when you call a tool"),
+            "hay que acotar la regla a las tools: {ins}"
+        );
+        assert!(
+            lower.contains("never tell the user to type cents"),
+            "y prohibir explícitamente mandarlo teclear en pantalla: {ins}"
+        );
+    }
+
+    /// No filtró credenciales —bien— pero enseñó a EXTRAERLAS: F12 → Network → cabeceras, paso a
+    /// paso (hub#1048). Una negativa que se anula a sí misma: cualquiera que consiga que el dueño
+    /// siga esos pasos obtiene el secreto sin que el asistente lo haya revelado. Y encima la
+    /// receta era falsa (el `X-Hub-Token` nunca llega al navegador, ADR-0003), así que el usuario
+    /// se queda convencido de que algo va mal en su hub.
+    #[test]
+    fn instructions_forbid_teaching_how_to_extract_a_credential() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("never explain how to obtain") && lower.contains("credential"),
+            "no basta con no revelarlas: hay que prohibir explicar cómo sacarlas: {ins}"
+        );
+        assert!(
+            lower.contains("developer tools") || lower.contains("devtools"),
+            "y nombrar la vía concreta que usó, o la regla se lee como abstracta: {ins}"
+        );
+    }
+
+    /// El alcance lo decidió el MERCADO (skill `market-decision`, 8 referencias en hub#1046), y
+    /// coincide sin fisuras: BC lo dice verbatim —«Chat is designed for enterprise use and
+    /// answering questions that relate to Business Central and the business data it contains»—,
+    /// Odoo «operates exclusively within business data context», Sidekick vive dentro del admin
+    /// de Shopify, y Fin trata la AUSENCIA de guardarraíles de alcance como su modo de fallo
+    /// conocido.
+    ///
+    /// Aquí la puerta la abría la propia coletilla del prompt: «unless the user plainly says
+    /// otherwise». Pedir una película *es* decir otra cosa, así que no había barrera ninguna — y
+    /// una respuesta así gasta uno de los 30 mensajes/mes del plan gratuito (~23k tokens) del
+    /// cliente, en conocimiento del modelo que nadie ha verificado.
+    #[test]
+    fn the_scope_is_the_business_and_the_loophole_is_closed() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+
+        assert!(
+            !lower.contains("unless the user plainly says otherwise"),
+            "esa coletilla es la puerta por la que se cuela todo: {ins}"
+        );
+        assert!(
+            lower.contains("not a general-purpose"),
+            "el alcance tiene que seguir enunciado: {ins}"
+        );
+    }
+
+    /// Y cómo se dice importa tanto como el límite. El mercado no cierra en seco: Fin ESCALA en
+    /// vez de dejar que el bot «intente y rechace», y Copilot Studio tiene un `fallback topic`
+    /// para lo de fuera. Una negativa seca en un producto que el cliente paga se lee como avería.
+    #[test]
+    fn out_of_scope_is_redirected_briefly_not_lectured() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("one short sentence"),
+            "hay que acotar la longitud, o el redirect se vuelve un sermón: {ins}"
+        );
+        assert!(
+            lower.contains("do not lecture") || lower.contains("without lecturing"),
+            "y decir explícitamente que no se sermonea: {ins}"
+        );
     }
 
     /// The keystone: the turn reaching the Cloud must carry a system prompt that says WHAT
@@ -711,6 +1153,79 @@ mod tests {
     }
 
 
+    /// The sweep above runs over `Registry::new()` — EMPTY — so it only ever constrained the
+    /// five core tools. Every destructive command of every MODULE walked straight past it: the
+    /// QA pass of 2026-08-19 counted 26 of them offered to the assistant, `bulk_delete` among
+    /// them (hub#1042, appointments#62). Nothing was deleted that day, but by the model's
+    /// judgement, not by a lock — and the same session had it claim, falsely, that a lock
+    /// existed.
+    ///
+    /// A test that cannot fail is not a guarantee. This one runs over a LOADED registry and pins
+    /// the channel that makes a lock possible at all: a module DECLARES how dangerous an
+    /// operation is (`ai.risk`), and the core carries that declaration to the client instead of
+    /// guessing from a name it does not parse.
+    ///
+    /// The core deliberately does NOT infer risk from the name. `delete` in a name means nothing
+    /// portable — `sales.void` is destructive and says neither — and a core that guessed would be
+    /// deciding for the module what its own data is worth. The module knows; it declares.
+    #[test]
+    fn a_destructive_module_tool_must_declare_its_risk() {
+        let mut reg = Registry::new();
+        let m: erplora_runtime::manifest::Manifest = serde_json::from_value(json!({
+            "id": "appointments", "name": "Appointments", "version": "1.0.0",
+            "commands": {
+                "appointments.appointments.create": {
+                    "permission": "appointments.add_appointment",
+                    "ai": { "description": "Books an appointment." }
+                },
+                "appointments.appointments.bulk_delete": {
+                    "permission": "appointments.delete_appointment",
+                    "ai": { "description": "Permanently deletes multiple appointments in bulk.",
+                            "risk": "bulk_destructive" }
+                }
+            }
+        }))
+        .expect("fixture manifest must parse");
+        reg.installed.push(m.clone());
+        for (name, def) in &m.commands {
+            reg.commands.insert(
+                name.clone(),
+                erplora_runtime::registry::RegisteredCommand {
+                    module_id: "appointments".to_string(),
+                    def: def.clone(),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+        }
+        reg.status
+            .insert("appointments".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&reg, &ctx);
+
+        let destructive = tools
+            .iter()
+            .find(|t| t["name"] == json!("appointments.appointments.bulk_delete"))
+            .expect("the tool is offered — that is the point");
+        assert_eq!(
+            destructive["risk"],
+            json!("bulk_destructive"),
+            "a destructive tool must carry its declared risk to the client: {destructive}"
+        );
+
+        let ordinary = tools
+            .iter()
+            .find(|t| t["name"] == json!("appointments.appointments.create"))
+            .expect("the create tool is offered");
+        assert_eq!(
+            ordinary["risk"],
+            json!("normal"),
+            "an ordinary tool is `normal`, stated rather than absent: {ordinary}"
+        );
+    }
+
     /// The policy line itself travels in the prompt: the model must know destructive actions are
     /// off the table BY DESIGN — so it explains honestly («eso lo haces tú desde la pantalla»)
     /// instead of inventing a security policy, which is exactly the failure this session caught.
@@ -729,6 +1244,35 @@ mod tests {
     /// user writes the price however they speak it ("12,50", "12.50", "12 euros 50"); converting
     /// that to cents is the assistant's job, and it has to be told so.
     #[test]
+    /// «What version of ERPlora do I have?» is one of the most basic identity questions an ERP
+    /// gets, and the assistant had NO path to it: no block of the prompt carried the number and
+    /// none of the five core tools reads it. So the model improvised — and improvised an
+    /// ARCHITECTURE: «ERPlora has no single global version», while `v1.1.7` was printed in the
+    /// sidebar of the very same screen (hub#1044).
+    ///
+    /// The number is not a fact a model can hold: it changes with every release. It is injected,
+    /// like the date, from the one place that owns it (`crate::version::HUB_VERSION`, hub#515).
+    #[test]
+    fn instructions_state_the_version_this_hub_is_running() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        assert!(
+            ins.contains(crate::version::HUB_VERSION),
+            "the running version must be in the prompt, from the single source (hub#515): {ins}"
+        );
+    }
+
+    /// Knowing the number is half of it. The model also has to be told the number is THE hub's,
+    /// so it stops answering the question with a lecture about per-module versioning.
+    #[test]
+    fn the_version_is_presented_as_this_hub_s_own() {
+        let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
+        let lower = ins.to_lowercase();
+        assert!(
+            lower.contains("version"),
+            "the version has to be named as such, not left as a bare number: {ins}"
+        );
+    }
+
     fn instructions_state_the_money_contract_in_cents() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
@@ -994,7 +1538,7 @@ mod tests {
         // The web app auto-runs reads (query) but must CONFIRM writes (command); the
         // runtime tags each function_call with its kind from the assembled catalog.
         let mut kinds = std::collections::HashMap::new();
-        kinds.insert("pos.sale.create".to_string(), "command".to_string());
+        kinds.insert("pos.sale.create".to_string(), json!({ "kind": "command" }));
         let line = r#"data: {"type":"function_call","name":"pos.sale.create","call_id":"c9","arguments":"{}"}"#;
         let out = translate_sse_line(line, &kinds).expect("forwarded");
         assert!(out.contains("\"kind\":\"command\""));
@@ -1004,12 +1548,32 @@ mod tests {
         assert!(!out2.contains("\"kind\""));
     }
 
+    /// The confirm card needs two things the model cannot be trusted to supply: how DANGEROUS the
+    /// operation is (hub#1042) and which of its arguments are MONEY (hub#1040). Both are facts of
+    /// the manifest, resolved once when the catalogue is assembled, and they have to travel WITH
+    /// the tool call — the drawer has no catalogue of its own to look them up in.
+    #[test]
+    fn translate_annotates_risk_and_money_fields() {
+        let mut notes = std::collections::HashMap::new();
+        notes.insert(
+            "services.services.create".to_string(),
+            json!({ "kind": "command", "risk": "normal", "money_fields": ["price_cents"] }),
+        );
+        let line = r#"data: {"type":"function_call","name":"services.services.create","call_id":"c1","arguments":"{}"}"#;
+
+        let out = translate_sse_line(line, &notes).expect("forwarded");
+
+        assert!(out.contains("\"kind\":\"command\""), "{out}");
+        assert!(out.contains("\"risk\":\"normal\""), "{out}");
+        assert!(out.contains("price_cents"), "the money marking must reach the card: {out}");
+    }
+
     #[test]
     fn tool_def_carries_params_schema() {
         // The op's input schema becomes the tool's `parameters` so the model calls
         // with valid arguments (the Cloud reads `fn.parameters`).
         let schema = r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
-        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema));
+        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema), None);
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
     }
@@ -1036,6 +1600,7 @@ mod tests {
                 ai: Some(AiTool {
                     description: "Revierte el efecto en caja de una venta anulada".to_string(),
                     name: None,
+                    risk: None,
                 }),
                 expose_api: false,
                 internal,
@@ -1084,11 +1649,11 @@ mod tests {
 
     #[test]
     fn tool_def_defaults_params_when_no_schema() {
-        let t = tool_def("x.y", "d", "query", "x", None);
+        let t = tool_def("x.y", "d", "query", "x", None, None);
         assert_eq!(t["parameters"]["type"], "object");
         assert_eq!(t["parameters"]["properties"], json!({}));
         // An unparseable schema also degrades to the empty object (never panics).
-        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"));
+        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"), None);
         assert_eq!(bad["parameters"]["properties"], json!({}));
     }
 }

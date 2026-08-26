@@ -56,15 +56,58 @@ async fn fresh() -> (Runtime, Arc<Sink>) {
 
 /// Abre un pedido con una línea y devuelve su id.
 async fn open_order(rt: &Runtime, ctx: &RequestContext, product: &str) -> String {
+    open_order_with(rt, ctx, json!([{ "product_name": product, "price": 350, "quantity": 2_000_000 }]))
+        .await
+}
+
+/// Abre un pedido con las líneas EXACTAS que se le pidan.
+///
+/// Existe porque `sales.order.fire` dejó de fiarse de `payload.items` (kitchen#54): las líneas que
+/// bajan a cocina salen de la read declarada sobre `sales_order_item`, o sea de filas reales. Un
+/// test que quiera dos líneas, media ración o un `product_id` enrutado tiene que **sembrarlo aquí**;
+/// mandarlo en el disparo ya no hace nada.
+async fn open_order_with(rt: &Runtime, ctx: &RequestContext, items: serde_json::Value) -> String {
     let res = rt
-        .execute_command(
-            "sales.order.open",
-            &params(json!({ "items": [{ "product_name": product, "price": 350, "quantity": 2_000_000 }] })),
-            ctx,
-        )
+        .execute_command("sales.order.open", &params(json!({ "items": items })), ctx)
         .await
         .unwrap();
     res["new_ids"][0].as_str().unwrap().to_string()
+}
+
+/// Seeds a product in the REAL catalogue and returns its id.
+///
+/// Exists because a `product_id` can no longer be made up (sales#175): opening a check FREEZES the
+/// price of its lines from the trusted catalogue, so `sales.order.open` prices any line naming a
+/// `product_id` from `inventory.products.for_sale` and REJECTS an id that is not there with
+/// `sales.product_not_available`. A line with only `product_name` is a free-price/department line
+/// and the catalogue has nothing to say about it — which is why the tests that do not route a
+/// product to a station keep working without seeding anything.
+///
+/// So a test that needs the product->station routing has to seed the product for real. `price` is
+/// the CATALOGUE price and is what the check ends up frozen at; these tests assert routing and
+/// destination, never the amount.
+async fn catalog_product(rt: &Runtime, ctx: &RequestContext, name: &str, sku: &str, price: i64) -> String {
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({
+            "name": name, "sku": sku, "price": price, "cost": 0, "stock": 100_000_000,
+            "low_stock_threshold": 0, "product_type": "physical",
+            "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap_or_else(|e| panic!("sembrar `{name}` en el catálogo: {e:?}"));
+    let rows = rt
+        .execute_query("inventory.products.list", &Params::new(), ctx)
+        .await
+        .expect("inventory.products.list");
+    rows.iter()
+        .find(|r| r["name"] == json!(name))
+        .unwrap_or_else(|| panic!("`{name}` debe estar en el catálogo recién sembrado: {rows:?}"))["id"]
+        .as_str()
+        .expect("product id")
+        .to_string()
 }
 
 #[tokio::test]
@@ -190,7 +233,11 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         .expect("crear la estación de barra");
     let barra_id = barra["new_ids"][0].as_str().unwrap().to_string();
 
-    for (station_id, product_id) in [(&cocina_id, "prod-croquetas"), (&barra_id, "prod-canas")] {
+    // Routed products must EXIST in the catalogue (see `catalog_product`).
+    let croquetas_id = catalog_product(&rt, &ctx, "Croquetas", "CROQ", 350).await;
+    let canas_id = catalog_product(&rt, &ctx, "Cañas", "CANA", 250).await;
+
+    for (station_id, product_id) in [(&cocina_id, &croquetas_id), (&barra_id, &canas_id)] {
         rt.execute_command(
             "kitchen.stations.set_routing",
             &params(json!({ "station_id": station_id, "product_id": product_id })),
@@ -200,16 +247,18 @@ async fn cada_estacion_dice_a_donde_sale_su_comanda() {
         .expect("enrutar el producto a su estación");
     }
 
-    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([
+            { "product_id": croquetas_id, "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 },
+            { "product_id": canas_id, "product_name": "Cañas", "price": 250, "quantity": 2_000_000 }
+        ]),
+    )
+    .await;
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [
-                { "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 },
-                { "product_id": "prod-canas", "product_name": "Cañas", "quantity": 2_000_000, "unit_price": 250 }
-            ]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
@@ -256,14 +305,16 @@ async fn media_racion_llega_a_cocina_como_media_racion() {
     // en cada disparo, para siempre.
     let (rt, _) = fresh().await;
     let ctx = admin();
-    let oid = open_order(&rt, &ctx, "Gambas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([{ "product_name": "Gambas", "price": 2400, "quantity": 500_000 }]),
+    )
+    .await;
 
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_name": "Gambas", "quantity": 500_000, "unit_price": 2400 }]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
@@ -315,21 +366,26 @@ async fn una_ronda_vieja_se_reimprime_por_donde_salio_de_verdad() {
         .unwrap();
     let plancha_id = plancha["new_ids"][0].as_str().unwrap().to_string();
 
+    // Routed products must EXIST in the catalogue (see `catalog_product`).
+    let croquetas_id = catalog_product(&rt, &ctx, "Croquetas", "CROQ", 350).await;
+
     rt.execute_command(
         "kitchen.stations.set_routing",
-        &params(json!({ "station_id": plancha_id, "product_id": "prod-croquetas" })),
+        &params(json!({ "station_id": plancha_id, "product_id": croquetas_id })),
         &ctx,
     )
     .await
     .unwrap();
 
-    let oid = open_order(&rt, &ctx, "Croquetas").await;
+    let oid = open_order_with(
+        &rt,
+        &ctx,
+        json!([{ "product_id": croquetas_id, "product_name": "Croquetas", "price": 350, "quantity": 2_000_000 }]),
+    )
+    .await;
     rt.execute_command(
         "sales.order.fire",
-        &params(json!({
-            "order_id": oid, "label": "Mesa 4", "channel": "dine_in",
-            "items": [{ "product_id": "prod-croquetas", "product_name": "Croquetas", "quantity": 2_000_000, "unit_price": 350 }]
-        })),
+        &params(json!({ "order_id": oid, "label": "Mesa 4", "channel": "dine_in" })),
         &ctx,
     )
     .await
@@ -465,4 +521,177 @@ async fn una_ronda_sin_etiqueta_hereda_la_del_pedido() {
     for c in &comandas {
         assert_eq!(c["label"], json!("Mesa 4"), "toda ronda del pedido va a la misma mesa: {c:?}");
     }
+}
+
+/// La versión de `kitchen` que trae la expansión del combo (ADR-0381). Los dos tests de abajo
+/// aseguran cosas que NO existen por debajo de ella, y el checkout de módulos es compartido.
+const COMBO_SINCE: &str = "2.3.27";
+
+/// kitchen#57 · **cada componente del menú llega a SU estación, y siguen siendo un menú**
+/// (ADR-0381).
+///
+/// El fallo estrella del sector no es de modelo, es de ENRUTADO, y está documentado en dos
+/// productos maduros: en TouchBistro el componente hereda la impresora del PLATO PRINCIPAL —la
+/// ensalada del menú sale por la parrilla— y en Square el combo imprime como un PÁRRAFO CORRIDO,
+/// con un moderador confirmando que no hay forma de sacarlo como lista.
+///
+/// Este test entra por la puerta del listener (`kitchen.orders.create_from_order`) en vez de por
+/// `sales.order.fire` **a propósito**: la expansión del combo en `sales` es `ERPlora/sales#152` y
+/// aún no existe, pero el contrato de entrada de cocina sí, y lo que hay que probar aquí es que el
+/// WASM compilado de verdad, el binder del runtime y `_insert_item.sql` se entienden — que es lo
+/// que ni los tests del handler ni la batería de Postgres del módulo pueden decir por separado.
+#[tokio::test]
+async fn cada_componente_del_menu_llega_a_su_estacion_y_siguen_siendo_un_menu() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    // La expansión del combo llegó en kitchen 2.3.27. El checkout de módulos lo comparte la flota
+    // y casi siempre va por detrás: sin este guard, este test pone en rojo el gate pre-push de
+    // TODO el que empuje después, y no el de quien lo escribió.
+    if !erplora_runtime::require_module_version("kitchen", COMBO_SINCE) { return; }
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    // Tres estaciones de un restaurante de verdad: fríos, plancha y barra.
+    let mut stations = Vec::new();
+    for (name, product) in [("Fríos", "p-gazpacho"), ("Plancha", "p-entrecot"), ("Barra", "p-tinto")] {
+        let st = rt
+            .execute_command(
+                "kitchen.stations.create",
+                &params(json!({ "name": name, "destination": "both", "printer_role": "kitchen" })),
+                &ctx,
+            )
+            .await
+            .expect("crear la estación");
+        let id = st["new_ids"][0].as_str().unwrap().to_string();
+        rt.execute_command(
+            "kitchen.stations.set_routing",
+            &params(json!({ "station_id": id, "product_id": product })),
+            &ctx,
+        )
+        .await
+        .expect("enrutar el producto a su estación");
+        stations.push((name.to_string(), id));
+    }
+
+    // El menú del día tal y como lo entrega ADR-0381 con `supply_kind = 'service'`: UNA línea de
+    // venta a precio cerrado, con sus componentes en el snapshot.
+    rt.execute_command(
+        "kitchen.orders.create_from_order",
+        &params(json!({
+            "order_id": "ord-menu-1",
+            "label": "Mesa 7",
+            "channel": "dine_in",
+            "items": [{
+                "order_item_id": "li-1",
+                "product_id": "combo-menu",
+                "product_name": "Menú del día",
+                "quantity": 1_000_000,
+                "unit_price": 1350,
+                "combo_group_ref": "cg-1",
+                "combo_name": "Menú del día",
+                "combo_kitchen_name": "MENÚ",
+                "combo_components": [
+                    { "product_id": "p-gazpacho", "product_name": "Gazpacho", "kitchen_name": "GAZPACHO", "quantity": 1_000_000 },
+                    { "product_id": "p-entrecot", "product_name": "Entrecot", "kitchen_name": "ENTRECOT", "quantity": 1_000_000,
+                      "modifiers": [{ "option_id": "o1", "name": "Sin cebolla", "kitchen_name": "SIN CEBOLLA" }] },
+                    { "product_id": "p-tinto", "product_name": "Vino tinto", "quantity": 1_000_000 }
+                ]
+            }]
+        })),
+        &ctx,
+    )
+    .await
+    .expect("materializar la comanda del menú");
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert_eq!(comandas.len(), 1, "un menú es UNA comanda: {comandas:?}");
+    let comanda_id = comandas[0]["id"].as_str().unwrap().to_string();
+    // El precio cerrado se cuenta UNA vez: ni una línea padre a 0 € (el fallo de Odoo) ni el
+    // precio repetido en cada componente, que sería el mismo embuste con el signo cambiado.
+    assert_eq!(comandas[0]["total"], json!(1350), "el precio cerrado, una sola vez");
+
+    let lineas = rt
+        .execute_query("kitchen.orders.items", &params(json!({ "order_id": comanda_id })), &ctx)
+        .await
+        .unwrap();
+    assert_eq!(lineas.len(), 3, "tres componentes, TRES líneas de comanda: {lineas:?}");
+
+    // 🔴 Tres estaciones DISTINTAS, cada una la del artículo de su componente.
+    let destinos: Vec<&str> =
+        lineas.iter().map(|l| l["station_name"].as_str().unwrap_or("")).collect();
+    assert_eq!(
+        destinos,
+        vec!["Fríos", "Plancha", "Barra"],
+        "cada componente llega a la estación de SU artículo, nunca a la del plato de al lado \
+         (el fallo de TouchBistro: la ensalada acaba en la parrilla)"
+    );
+
+    // …y siguen siendo un menú: mismo grupo, mismo nombre congelado, en el orden de elección.
+    for l in &lineas {
+        assert_eq!(l["combo_ref"], json!("cg-1"), "el grupo se pierde: {l:?}");
+        assert_eq!(l["combo_name"], json!("MENÚ"), "manda el nombre de cocina: {l:?}");
+    }
+    let nombres: Vec<&str> = lineas.iter().map(|l| l["product_name"].as_str().unwrap_or("")).collect();
+    assert_eq!(nombres, vec!["GAZPACHO", "ENTRECOT", "Vino tinto"]);
+    let orden: Vec<i64> = lineas.iter().map(|l| l["line_seq"].as_i64().unwrap_or(0)).collect();
+    assert_eq!(orden, vec![1, 2, 3], "el orden de ELECCIÓN, no el que devuelva el planificador");
+
+    // El suplemento cuelga de SU componente: «el segundo, sin cebolla» no le quita la cebolla al
+    // gazpacho.
+    assert_eq!(lineas[1]["modifiers"], json!("SIN CEBOLLA"));
+    assert_eq!(lineas[0]["modifiers"], json!(""));
+    assert_eq!(lineas[2]["modifiers"], json!(""));
+
+    // Y el feed del KDS lo ve: sin esto el WC no puede pintar cabecera + lista.
+    let feed = rt.execute_query("kitchen.orders.display", &Params::new(), &ctx).await.unwrap();
+    let del_menu: Vec<_> = feed.iter().filter(|r| r["combo_ref"] == json!("cg-1")).collect();
+    assert_eq!(del_menu.len(), 3, "el KDS no puede agrupar lo que la query no proyecta: {feed:?}");
+}
+
+/// Un menú disparado SIN nada elegido no abre comanda: rechazo de dominio, ruidoso y sin escribir.
+///
+/// La puerta autoritativa del `min_choices` es de `sales` —es quien lee `combos.*`—, pero cocina no
+/// puede depender de que TODO el que emita `order.fired` venga bien (un flujo, el asistente, una
+/// integración de terceros). Mismo razonamiento y misma puerta que kitchen#54.
+#[tokio::test]
+async fn un_menu_sin_nada_elegido_no_abre_comanda() {
+    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_module_version("kitchen", COMBO_SINCE) { return; }
+    if !wasm_present() {
+        eprintln!("SKIP: falta handler.wasm");
+        return;
+    }
+    let (rt, _) = fresh().await;
+    let ctx = admin();
+
+    let res = rt
+        .execute_command(
+            "kitchen.orders.create_from_order",
+            &params(json!({
+                "order_id": "ord-menu-2",
+                "label": "Mesa 3",
+                "channel": "dine_in",
+                "items": [{
+                    "order_item_id": "li-1", "product_id": "combo-menu", "product_name": "Menú del día",
+                    "quantity": 1_000_000, "unit_price": 1350,
+                    "combo_group_ref": "cg-2", "combo_name": "Menú del día",
+                    "combo_components": []
+                }]
+            })),
+            &ctx,
+        )
+        .await;
+
+    let err = res.expect_err("un menú vacío tiene que rechazarse, no crear una tarjeta en blanco");
+    let texto = format!("{err:?}");
+    assert!(
+        texto.contains("kitchen.combo_without_components"),
+        "el rechazo tiene que decir POR QUÉ, con su código: {texto}"
+    );
+
+    let comandas = rt.execute_query("kitchen.orders.list", &Params::new(), &ctx).await.unwrap();
+    assert!(comandas.is_empty(), "no se escribe nada: {comandas:?}");
 }

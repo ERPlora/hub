@@ -568,6 +568,36 @@ impl CloudClient {
         }
     }
 
+    /// **El plan del asistente de ESTE hub** (saas#1540): tier, uso del mes y planes de pago
+    /// disponibles. `GET /api/v1/hub/device/assistant/config/`.
+    ///
+    /// Existe porque el hub solo descubría su plan cuando ya lo había AGOTADO: no leía este
+    /// endpoint, así que no conocía ni su tier, ni su consumo, ni qué se podía contratar. Con eso,
+    /// quedarse sin mensajes solo podía presentarse como una avería.
+    pub fn assistant_config(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "GET",
+            url: format!("{}/api/v1/hub/device/assistant/config/", self.base_url),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **Abrir el checkout del plan del asistente** (saas#1540, ADR-0033).
+    /// `POST /api/v1/hub/device/assistant/subscription/checkout/` → `{"checkout_url": …}`.
+    ///
+    /// Sin este camino, un «ver planes» no lleva a ninguna parte y el único momento de conversión
+    /// del tier gratuito muere en una frase.
+    pub fn assistant_checkout(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!(
+                "{}/api/v1/hub/device/assistant/subscription/checkout/",
+                self.base_url
+            ),
+            headers: auth.headers(),
+        }
+    }
+
     /// **Embeddings vía el proxy del Cloud** (§9.3/§9.4/§9.6 — el Hub nunca llama a un proveedor
     /// de embeddings directamente; va por el Cloud, que mide el coste en `AssistantUsage`).
     /// `POST /api/v1/hub/device/assistant/embeddings/` (verificado contra
@@ -1005,6 +1035,34 @@ impl DelegatedCertificate {
 
 #[cfg(test)]
 mod tests {
+
+    /// El hub tiene que poder saber SU PLAN sin agotarlo antes (saas#1540).
+    ///
+    /// El asistente solo descubría su tier cuando ya no quedaban mensajes: el hub nunca leía
+    /// `assistant/config/`, así que no conocía ni su plan, ni su consumo, ni los planes de pago
+    /// disponibles. Y sin un camino al checkout, el «ver planes» no llevaba a ninguna parte:
+    /// el único momento de conversión del tier gratuito moría en una frase.
+    #[test]
+    fn assistant_config_and_checkout_are_hub_scoped_endpoints() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken { hub_id: "h1".into(), token: "t".into() };
+
+        let cfg = c.assistant_config(&auth);
+        assert_eq!(cfg.method, "GET", "leer el plan no muta nada");
+        assert!(
+            cfg.url.ends_with("/api/v1/hub/device/assistant/config/"),
+            "la ruta real del SaaS: {}",
+            cfg.url
+        );
+
+        let checkout = c.assistant_checkout(&auth);
+        assert_eq!(checkout.method, "POST");
+        assert!(
+            checkout.url.ends_with("/api/v1/hub/device/assistant/subscription/checkout/"),
+            "la ruta real del SaaS: {}",
+            checkout.url
+        );
+    }
     use super::*;
 
     #[test]

@@ -1070,6 +1070,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 // Cloud tiene que observar para poder apagarlo.
                 let pending_activity = st.activity.pending();
                 usage.last_user_activity_at = pending_activity.map(activity::to_iso8601);
+                // hub#975: la telemetría de recursos viaja en el MISMO latido, del sampler único
+                // de `system_metrics` (fuera del lock de arriba: el muestreo de CPU duerme 100 ms).
+                // Best-effort: fuera de contenedor los campos viajan ausentes, nunca un 0 falso.
+                daily_usage::sample_resource_metrics()
+                    .await
+                    .apply_to(&mut usage);
                 let entitlement_request = entitlement::fetch_verified_claims(
                     &st.http,
                     &st.config.cloud_base_url,
@@ -1315,6 +1321,10 @@ pub fn app(state: AppState) -> Router {
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
+        // Un hub no se indexa (ver `with_noindex`). Va en el router de API, ANTES del
+        // fallback SPA: sin esta ruta, `/robots.txt` devolvía `index.html` con un 200, que
+        // un rastreador lee como «este sitio no tiene reglas».
+        .route("/robots.txt", get(robots_txt))
         // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
         // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
         // segundo, que es el que Swarm mira para decidir si revierte.
@@ -1505,6 +1515,13 @@ pub fn app(state: AppState) -> Router {
             "/api/print/jobs",
             get(print::list_jobs).post(print::enqueue_job),
         )
+        // Sacar del atasco UN trabajo (hub#1108): devolverlo a la cola o retirarlo. Sesión
+        // **admin** (+ capability `printer` si quien llama es un módulo): leer la cola es
+        // cualquier sesión —quien está al lado de la impresora—, pero tirar un tique a la basura o
+        // volver a lanzarlo es el gesto del dueño, con el precedente del CRUD de estaciones.
+        // Descartar NUNCA borra: la fila queda sellada con quién, cuándo y por qué.
+        .route("/api/print/jobs/:job_id/retry", post(print::retry_job))
+        .route("/api/print/jobs/:job_id/discard", post(print::discard_job))
         // ── Registro de HOSTS de impresión (ADR-0196 §6, hub#342) ────────────────────────────
         // Quién drena cada rol. Un dispositivo se registra/late/se retira A SÍ MISMO (el sujeto es
         // su `X-Device-Id`, no hay parámetro para nombrar otro) → basta sesión de usuario: la app
@@ -1673,6 +1690,11 @@ pub fn app(state: AppState) -> Router {
         // Report of inappropriate AI-generated content (Microsoft Store policy 11.16, hub#946):
         // any signed-in hub user; funneled into the global error registry (ADR-0052) → Cloud.
         .route("/api/assistant/report", post(assistant_report::report))
+        // El plan del asistente y su checkout, por el runtime (saas#1540). Van AQUÍ y no desde el
+        // navegador porque la credencial hub-scoped es secreto del runtime (ADR-0003): el web app
+        // no tiene —ni debe tener— con qué firmar estas llamadas.
+        .route("/api/assistant/config", get(assistant_config))
+        .route("/api/assistant/checkout", post(assistant_checkout))
         // The EVENT channel (hub#504): needs an API key of this hub that may read. See
         // `event_stream` — the credential travels in the header, in the first frame (`/ws`) or as
         // a single-use ticket (`/api/events`), never as a long-lived secret in the URL.
@@ -1900,6 +1922,45 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
+/// `X-Robots-Tag: noindex` en TODAS las respuestas del hub + `/robots.txt`.
+///
+/// Un hub es la caja de un cliente: **nunca** se indexa. No es una preferencia de SEO —
+/// `{slug}.erplora.com` dice quién es el cliente, la portada dice qué módulos tiene instalados, y
+/// detrás hay un login de un TPV real. Y no hay nada que ganar en el otro platillo: ninguna página
+/// de un hub es un resultado de búsqueda que queramos.
+///
+/// Dos capas porque tapan agujeros distintos: el `robots.txt` es para el rastreador que pregunta,
+/// y la cabecera para el que no —y para la URL que un `robots.txt` no sabe describir, como un
+/// enlace profundo que alguien pegó en una issue pública—. `noarchive` va porque una copia
+/// cacheada de una pantalla de caja no debe sobrevivir a la pantalla.
+///
+/// La tercera capa vive en `apps/web/index.html` (meta `robots`), que es la copia del documento
+/// que esta capa NO cubre: la que va empaquetada dentro de la app instalada. Contrato completo en
+/// `crates/server/tests/never_indexed.rs`.
+const ROBOTS_TAG: &str = "noindex, nofollow, noarchive";
+
+/// Cuerpo del `robots.txt` de un hub: sin `Allow`, sin `Sitemap`, sin excepciones.
+const HUB_ROBOTS_TXT: &str = "User-agent: *\nDisallow: /\n";
+
+async fn robots_txt() -> impl axum::response::IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        HUB_ROBOTS_TXT,
+    )
+}
+
+/// Añade la cabecera a lo que salga del router — incluidos los 404 y el fallback SPA, que son
+/// justo las respuestas que una capa montada «por ruta» se dejaría fuera.
+pub fn with_noindex(router: Router) -> Router {
+    router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+        axum::http::HeaderName::from_static("x-robots-tag"),
+        HeaderValue::from_static(ROBOTS_TAG),
+    ))
+}
+
 /// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
 /// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
 /// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
@@ -1929,7 +1990,7 @@ pub fn with_csp(router: Router, csp: &str) -> Router {
 /// la composición REAL sin bindear un puerto. Que la cabecera no dependa de una rama `if let` es el
 /// contrato que fija `crates/server/tests/cloud_csp.rs`.
 pub fn build_serving_router(state: AppState, web_dir: Option<&str>, csp: &str) -> Router {
-    with_csp(build_router(state, web_dir), csp)
+    with_noindex(with_csp(build_router(state, web_dir), csp))
 }
 
 /// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO
@@ -2027,6 +2088,11 @@ async fn hub_context(State(st): State<AppState>) -> Response {
         "machine_registered": machine_registered,
         "registration_required": !demo && !machine_registered,
         "public_key_loaded": st.config.jwt_public_key.is_some(),
+        // Which Cloud this hub belongs to (hub#1164): the same `HUB_CLOUD_API_URL` the CSP
+        // `connect-src` is built from. The web app resolves its Cloud base URL from here at boot
+        // instead of a build-time constant, so one image serves pre and prod alike. Empty when no
+        // Cloud is configured (dev binary): the shell then keeps its build-time fallback.
+        "cloud_base_url": st.config.cloud_base_url,
         "business_type": sector,
         "sector": sector,
         // Settings de arranque (tabla `hub_settings` ∪ defaults). El SPA los usa para formato de
@@ -3147,6 +3213,61 @@ fn bad_gateway(reason: String) -> Response {
 /// POST /api/assistant/chat/stream — proxy SSE hacia el Cloud (ARQUITECTURA.md §9.3).
 /// Reenvía el `Authorization: Bearer` + `X-Hub-Id` entrantes; ensambla las tools permitidas
 /// (§9.2) y traduce el stream del Cloud al contrato del frontend (`token`/`done`).
+/// **Qué plan tiene este hub** (saas#1540): tier, consumo del mes y planes contratables.
+///
+/// El hub solo descubría su plan cuando ya lo había AGOTADO, así que quedarse sin mensajes solo
+/// podía presentarse como una avería. Va por el runtime y no desde el navegador porque la
+/// credencial hub-scoped es **secreto del runtime** (ADR-0003): el web app no tiene —ni debe
+/// tener— con qué firmar esta llamada.
+///
+/// Reutiliza `proxy_cloud_get`, que ya devuelve el JSON del Cloud sin reinterpretar: un 402/429
+/// del SaaS es información que el llamador necesita, y traducirlo a un genérico es exactamente el
+/// fallo que esta issue documenta.
+async fn assistant_config(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: String::new(),
+        token: String::new(),
+    };
+    proxy_cloud_get(&st, &headers, cloud.assistant_config(&placeholder)).await
+}
+
+/// **Abrir el checkout del plan del asistente** (saas#1540, ADR-0033) → `{"checkout_url": …}`.
+///
+/// Sin este camino, un «ver planes» no lleva a ninguna parte: el único momento de conversión del
+/// tier gratuito moría en una frase.
+async fn assistant_checkout(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial" })),
+        )
+            .into_response();
+    };
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let req = cloud.assistant_checkout(&auth);
+    let mut r = st.http.post(&req.url);
+    for (k, v) in auth.headers() {
+        r = r.header(k, v);
+    }
+    match r.json(&body).send().await {
+        Ok(resp) => {
+            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let bytes = resp.bytes().await.unwrap_or_default();
+            cloud_json_passthrough(status, bytes)
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "ok": false, "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
 async fn assistant_chat_stream(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -3209,15 +3330,37 @@ async fn assistant_chat_stream(
         None => all_tools,
     };
 
-    // Mapa name→kind (query/command) del catálogo ofrecido, para anotar los eventos
-    // `function_call` que reenviamos: el web app auto-ejecuta las LECTURAS (query) y pide
-    // confirmación antes de una ESCRITURA (command). §9.2.
-    let tool_kinds: std::collections::HashMap<String, String> = tools
+    // Lo que el catálogo YA resolvió sobre cada tool, para anotar los eventos `function_call`
+    // que reenviamos. El drawer no tiene catálogo propio donde consultarlo, y ninguna de estas
+    // tres cosas puede venir del modelo — son hechos del manifest:
+    //
+    //   · `kind`         — el web app auto-ejecuta las LECTURAS y confirma las ESCRITURAS (§9.2).
+    //   · `risk`         — cuánto daño hace la operación (hub#1042).
+    //   · `money_fields` — qué argumentos son dinero, para que la tarjeta enseñe «15,00 €» y no
+    //                      `price_cents: 1500` (hub#1040): el único punto donde un humano puede
+    //                      cazar un ×100, y el único del producto donde no salía en euros.
+    let tool_notes: std::collections::HashMap<String, serde_json::Value> = tools
         .iter()
         .filter_map(|t| {
             let name = t.get("name").and_then(|v| v.as_str())?;
-            let kind = t.get("kind").and_then(|v| v.as_str())?;
-            Some((name.to_string(), kind.to_string()))
+            let mut note = serde_json::Map::new();
+            if let Some(kind) = t.get("kind").and_then(|v| v.as_str()) {
+                note.insert("kind".to_string(), serde_json::json!(kind));
+            }
+            if let Some(risk) = t.get("risk").and_then(|v| v.as_str()) {
+                note.insert("risk".to_string(), serde_json::json!(risk));
+            }
+            let money = t
+                .get("parameters")
+                .map(|p| assistant::money_fields(&p.to_string()))
+                .unwrap_or_default();
+            if !money.is_empty() {
+                note.insert("money_fields".to_string(), serde_json::json!(money));
+            }
+            if note.is_empty() {
+                return None;
+            }
+            Some((name.to_string(), serde_json::Value::Object(note)))
         })
         .collect();
 
@@ -3252,7 +3395,7 @@ async fn assistant_chat_stream(
             if let Some(idx) = buf.find('\n') {
                 let line: String = buf.drain(..=idx).collect();
                 let line = line.trim_end_matches(['\r', '\n']);
-                if let Some(frame) = assistant::translate_sse_line(line, &tool_kinds) {
+                if let Some(frame) = assistant::translate_sse_line(line, &tool_notes) {
                     return Poll::Ready(Some(Ok::<_, std::io::Error>(bytes_from(frame))));
                 }
                 continue;
@@ -3270,7 +3413,7 @@ async fn assistant_chat_stream(
                     // Fin del stream del Cloud: procesa cualquier resto + cierra.
                     if !buf.is_empty() {
                         let rest = std::mem::take(&mut buf);
-                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_kinds) {
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_notes) {
                             return Poll::Ready(Some(Ok(bytes_from(frame))));
                         }
                     }
@@ -3342,6 +3485,29 @@ pub(crate) fn err_status_and_code(
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        E::InvalidField { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_field".into()),
+        E::CertificateTypeMismatch { .. } => {
+            (StatusCode::CONFLICT, "certificate_type_mismatch".into())
+        }
+        E::ManifestRejected { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, code.clone().into()),
+        // hub#1088: `business_tax_id` refused with its own stable code per failure kind — the
+        // same `422` as `invalid_payload` (what was sent does not validate) with the code the UI
+        // translates (es/en), so "the control letter is wrong" and "this is no NIF at all" are
+        // two different answers instead of one generic refusal.
+        E::InvalidTaxId { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, (*code).into()),
+        // hub#1086: the payload does not carry a bind the query's own SQL references. `422`
+        // like `invalid_payload` (it IS a payload-contract refusal, caught before any read),
+        // with its own stable code so the caller can tell "you did not send what the query
+        // needs" from "what you sent does not validate".
+        E::MissingRequiredParam { .. } => {
+            (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
+        }
+        // hub#1173: the twin of the above at the same door — a param the LIST query does not
+        // declare. Same `422` (it is a payload-contract refusal, caught before any read) with its
+        // own stable code, so the caller can tell "that query has no such filter" from "you did
+        // not send what it needs" — and fix the call instead of trusting a page that quietly held
+        // the whole list.
+        E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
@@ -3386,6 +3552,13 @@ pub(crate) fn err_status_and_code(
         // precondition and the demo locks. Its own code, never `permission_denied`: the action
         // that resolves it is "open the drawer", not "ask the manager".
         E::ProtectsGuard { .. } => (StatusCode::CONFLICT, "protects_guard".into()),
+        // hub#1101: other installed modules declare this one in `depends_on`. `409` for the same
+        // reason as its neighbours above — the request is well-formed and the caller is allowed,
+        // it conflicts with the SHAPE of what this hub has installed. Its own stable code, never
+        // the generic `400 {code:"error"}` bucket: the screen does not merely report this one, it
+        // ACTS on it (lists the dependants and offers «remove it anyway»), and it cannot do that
+        // against an error it cannot tell apart.
+        E::HasDependents { .. } => (StatusCode::CONFLICT, "has_dependents".into()),
         E::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, "not_implemented".into()),
         _ => (StatusCode::BAD_REQUEST, "error".into()),
     }
@@ -3400,6 +3573,20 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     // refusal must not look like an offer to elevate.
     if let E::RequiresElevation { permission } = &e {
         error["permission"] = json!(permission);
+    }
+    // hub#1101: same rule — the apps that would break travel as a FIELD, never parsed out of the
+    // sentence, because that list is what the confirmation dialog enumerates.
+    if let E::HasDependents { dependents, .. } = &e {
+        error["dependents"] = json!(dependents);
+    }
+    // hub#1070: the field and the reason travel as data, so the UI translates by code and a
+    // client never has to read the prose.
+    if let E::InvalidField { field, reason, .. } = &e {
+        error["field"] = json!(field);
+        error["reason"] = json!(reason);
+    }
+    if let E::ManifestRejected { at, .. } = &e {
+        error["at"] = json!(at);
     }
     (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }
@@ -3467,13 +3654,28 @@ async fn navigation(
 ) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
     let rt = st.runtime.lock().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
-    }
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => return unauthorized(e),
+    };
     let reg = rt.registry();
     let items: Vec<Value> = rt
         .navigation()
         .iter()
+        // hub#1052: una pestaña con `permission` solo se sirve a quien la tiene. Antes no había
+        // dónde declararlo, así que el módulo la pintaba para todos y el usuario descubría el
+        // límite estrellándose contra un 403 — `flows` lo dice en su propio código: mandar al
+        // cajero a revisar sus permisos «lo mandaría a un sitio al que no puede ir».
+        //
+        // El predicado es el MISMO que el de la puerta real (`permissions::has`), así que el menú
+        // y el command no pueden discrepar sobre qué significa un permiso. Sin `permission` la
+        // entrada es visible, como en todos los manifests publicados hasta hoy.
+        .filter(|n| {
+            n.nav
+                .permission
+                .as_deref()
+                .is_none_or(|p| erplora_runtime::permissions::has(&ctx, p))
+        })
         .map(|n| {
             let entry = reg.installed.iter().find(|m| m.id == n.module_id);
             let mod_fallback = entry
@@ -3640,16 +3842,35 @@ async fn deactivate_module(
     }
 }
 
+/// Body of `POST /api/modules/:id/uninstall` (hub#1101). Optional in full: the historical call
+/// sends nothing at all, and «nothing» has to keep meaning the SAFE answer.
+#[derive(serde::Deserialize, Default)]
+struct UninstallReq {
+    /// «Other apps need this one — remove it anyway». Only the caller that was shown the list
+    /// (the confirmation dialog of hub#773, or support driving the API on purpose) sends it.
+    /// It opens the dependants gate and NOTHING else: the fiscal locks are not the owner's
+    /// question and stay shut (ADR-0202 R2, ADR-0273 D5).
+    #[serde(default)]
+    force: bool,
+}
+
 async fn uninstall_module(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+    body: Option<Json<UninstallReq>>,
 ) -> Response {
+    let force = body.map(|Json(b)| b.force).unwrap_or_default();
     let mut rt = st.runtime.lock().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
-    match rt.uninstall(&id).await {
+    let outcome = if force {
+        rt.uninstall_forced(&id).await
+    } else {
+        rt.uninstall(&id).await
+    };
+    match outcome {
         Ok(()) => {
             drop(rt);
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.

@@ -102,7 +102,10 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // services
     ("services_service", &["price", "min_price", "max_price", "cost"]),
     ("services_variant", &["price_adjustment"]),
-    ("services_addon", &["price"]),
+    // `services_addon` estuvo aquí y se ha ido: `services/migrations/postgres/009` la retira
+    // (services#67, ADR-0376) y el guard la aparta a `_deprecated_services_addon`, así que
+    // `declared_type` no volverá a encontrarla. Tampoco había nada que convertir: el módulo nunca
+    // tuvo un command que escribiera una fila ahí.
     ("services_package", &["fixed_price"]),
     // staff
     ("staff_member", &["hourly_rate"]),

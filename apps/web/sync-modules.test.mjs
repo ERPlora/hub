@@ -146,4 +146,19 @@ describe('the dev list of modules', () => {
   it('names every module exactly once', () => {
     expect(new Set(MODULES).size).toBe(MODULES.length);
   });
+
+  it('does NOT carry `invoice_series`: the module is RETIRED and `invoice` owns numbering', () => {
+    // ADR-0369 gave fiscal numbering a single owner, `invoice`, and retired `invoice_series`
+    // (invoice_series#20). The marketplace already stopped offering it (saas#1538 unpublished it,
+    // saas#1585 made the blueprint gate reject a retired module, pm#57 republished the 4 official
+    // templates without it). This list is the LAST place in the repo that still wires the retired
+    // module in BY NAME, and it is the dev bench: while it stays here, a local hub keeps showing
+    // the duplicated «Tu numeración de facturas» setup step — the same title, icon and `order: 50`
+    // as `invoice`'s — which is exactly the symptom the retirement exists to remove.
+    //
+    // Retiring closes the OFFER, not the SUPPLY: the 5 hubs that already have it installed keep
+    // working, because in production the runtime serves the modules downloaded from the
+    // marketplace and never reads this list (see the header of sync-modules.mjs).
+    expect(MODULES).not.toContain('invoice_series');
+  });
 });

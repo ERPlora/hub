@@ -160,6 +160,27 @@ pub fn is_undrained(coverage: &RoleCoverage) -> bool {
         && coverage.waiting_seconds >= UNDRAINED_ALERT_SECONDS
 }
 
+/// **One station's coverage over the wire**: the facts, plus the runtime's own verdict.
+///
+/// One definition, two doors (hub#1107). `GET /api/print/hosts` and `GET /api/print/undrained`
+/// serve this shape from the server crate; the core query `hub.print.coverage` serves it from the
+/// dispatcher. `undrained` is resolved HERE by [`is_undrained`] and never re-derived by a client —
+/// same reason the threshold is a constant: a badge and a row that disagree about "stuck" are
+/// worse than either answer alone.
+///
+/// Facts, not a sentence: the phrasing the owner reads ("nothing is printing the kitchen's
+/// tickets") belongs to the UI, which is the layer that can translate it. The runtime does not bake
+/// visible strings.
+pub fn coverage_view(c: &RoleCoverage) -> serde_json::Value {
+    serde_json::json!({
+        "role": c.role,
+        "waiting": c.waiting,
+        "liveHosts": c.live_hosts,
+        "waitingSeconds": c.waiting_seconds,
+        "undrained": is_undrained(c),
+    })
+}
+
 /// Stored columns every read of the registry returns, in the order [`row_to_host`] expects.
 const HOST_FIELDS: &str =
     "device_id, role, station_id, label, registered_at, registered_by, last_seen_at";

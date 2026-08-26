@@ -101,6 +101,11 @@ export default {
     close: 'Close',
     noReply: '(no reply)',
     error: 'Could not reach the assistant.',
+    // saas#1540 — running out of messages is a PLAN state, not an outage. Saying «could not
+    // reach» turns the one conversion moment of the free tier into a product failure.
+    quotaTitle: 'You have used all your assistant messages',
+    quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
+    quotaCta: 'See plans',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -118,6 +123,23 @@ export default {
     reportConfirm: 'Report',
     reportSent: 'Thank you, we received your report.',
     reportError: 'The report could not be sent. Please try again.',
+    // hub#1038/#1039/#1048 — said by the RUNTIME, never by the model: the turn's receipts did
+    // not back what the answer claimed. Shown as a notice on the message itself.
+    claimedWithoutEffect:
+      'The assistant said it made a change, but no action was carried out. Nothing has been modified.',
+    unsourcedId:
+      'This answer shows an identifier the assistant did not actually read. Do not rely on it.',
+    unknownRoute: 'This answer points at a screen that does not exist here.',
+    // hub#1040 — when the app cannot name its own action we say so, rather than filling the
+    // gap with the internal command name (hub#363: that is our vocabulary, not the counter's).
+    confirmUnnamedAction: 'An action this app cannot name',
+    // hub#1042 — destructive actions ask for more than a click. Typing the COUNT is what
+    // forces reading the sentence that says how many are about to go.
+    confirmDestructive: 'This cannot be undone from the screen. Type {expected} to confirm.',
+    confirmDestructiveWord: 'DELETE',
+    confirmBulkAffected: 'You are about to delete {count} records.',
+    confirmBulkUnknown:
+      'I cannot tell how many records this would delete, so I will not do it from here. Open the screen, where you can see them.',
   },
   // What the user is told after pressing «download», wherever they pressed it (hub#480). Inside the
   // installed app there is no download shelf and no notification, so if we say nothing, nothing is
@@ -495,6 +517,13 @@ export default {
         'The tax id can no longer be changed: this business has already issued under it.',
       hub_country_frozen:
         'The country can no longer be changed: this business already files under its tax rules. Get in touch with us if the business really did move.',
+      // hub#1088: one per refusal reason — a mistyped control character is retyped; "this is
+      // no official shape at all" is a different conversation.
+      invalid_tax_id_type: 'The tax id must be text.',
+      tax_id_too_long:
+        'The tax id is too long: the tax authority’s own limit is 20 characters.',
+      invalid_tax_id_format: 'That is not shaped like a tax id: DNI (12345678Z), NIE (X1234567L), CIF (B12345674), or a foreign identifier with its country prefix (FR123456789).',
+      invalid_tax_id_control: 'The tax id’s control letter or digit is not the right one: check it and type it again.',
     },
     timezone: 'Timezone',
     timezoneDesc: 'Timezone for dates and times',
@@ -650,6 +679,10 @@ export default {
     installedLoadError:
       'We could not read your apps. There was no answer, or this session is no longer valid — sign in again if it keeps happening.',
     emptyCatalog: 'No apps match your search.',
+    // hub#1129: and the catalogue gets the same three sentences as the installed list above.
+    // «Nothing matches your search» was also being said while it loaded and after it failed — on
+    // the one screen whose whole job is to let a brand-new business install its first app.
+    loadingCatalog: 'Loading the catalog…',
     catalogLoadError:
       'The catalog could not be loaded. Check the connection or this device registration.',
     retryCatalog: 'Retry',
@@ -737,6 +770,10 @@ export default {
     toggleError: 'Could not change the status of {name}.',
     uninstalled: '{name} uninstalled.',
     uninstallError: 'Could not uninstall {name}.',
+    // hub#1101: the runtime refused because other installed apps declare this one. Only reachable
+    // when the list the dialog was drawn with had gone stale (another tab, another admin), so it
+    // names the apps the RUNTIME sent, not the ones we happened to have loaded.
+    uninstallBlocked: '{name} was not uninstalled: these apps need it — {apps}. Uninstall them first.',
     moduleInstalledNamed: '{name} installed.',
     moduleInstalled: 'App installed.',
     consentTitle: 'Requested permissions',

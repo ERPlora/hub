@@ -15,13 +15,13 @@ import type { InjectionKey } from 'vue';
 import { ref } from 'vue';
 import { ErploraClient, HttpWsTransport } from '@erplora/module-sdk';
 import { toast, type ToastColor } from './toast';
-import { config } from './config';
+import { config, markCloudApiUrlPending, resolveCloudApiUrl } from './config';
 import { getAccessToken } from './cloud';
 import { makeBridgeTransport } from './bridge-transport';
 import { getHubSession, logout, user } from './session';
 import { beginRequest, endRequest } from './shell';
 import { getLocale, bootHubLanguage } from '../i18n';
-import { hubSettings } from './hub-settings';
+import { hubSettings, hubTimezone, publishHubTimezone } from './hub-settings';
 import { hubCurrency, publishHubCurrency } from './money';
 import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
@@ -61,7 +61,7 @@ export interface HubContext {
   /** Usuarios activos con PIN del hub (los que pueden hacer login local). */
   pin_users?: PinUser[];
   /**
-   * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`general`). Lo usa
+   * Sector / tipo de negocio del hub (`hosteleria`|`retail`|`gestoria`|`rrhh`|`belleza`|`general`). Lo usa
    * el dashboard para derivar el preset "Recomendado" de widgets (ADR-0054). Opcional: el runtime
    * lo expondrá cuando se cablee el setting del hub; hasta entonces llega ausente y el preset
    * queda vacío (el board sigue funcionando). Acepta `sector` o `business_type` (alias).
@@ -78,6 +78,19 @@ export interface HubContext {
    * en el boot (i18n → bootHubLanguage). Ausente → degrada a 'es'.
    */
   language?: string | null;
+  /**
+   * Zona horaria IANA del NEGOCIO, ya RESUELTA (hub#731, hub#1022): la declarada o la deducida
+   * del país — nunca `null` cuando el runtime la envía. La publica `publishHubTimezone` para que
+   * módulos y shell lean el mismo reloj que el runtime da a los handlers (`context.timezone`).
+   * Ausente → degrada a UTC.
+   */
+  timezone?: string | null;
+  /**
+   * Which Cloud this hub belongs to (`HUB_CLOUD_API_URL`, the same value its CSP `connect-src`
+   * allows — hub#1164). Non-empty → becomes `config.cloudApiUrl`; empty/absent → build-time
+   * fallback (`VITE_CLOUD_API_URL`, dev/local only).
+   */
+  cloud_base_url?: string | null;
 }
 
 /**
@@ -324,6 +337,10 @@ export function getClient(): ErploraClient {
           return new Set(user.value?.permissions ?? []);
         },
         currency: hubCurrency,
+        // La zona horaria RESUELTA del negocio (hub#1022): misma fuente que el resto del shell
+        // (`hubTimezone()` ← `/api/hub/context`), para que un módulo que agende lea el MISMO
+        // reloj que el runtime le entrega a un handler (`context.timezone`).
+        timezone: hubTimezone,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
@@ -507,27 +524,53 @@ export async function listInstalledModules(): Promise<InstalledModule[]> {
 export class ModuleActionError extends Error {
   readonly code?: string;
 
-  constructor(message: string, code?: string) {
+  /**
+   * Las apps que dejarían de funcionar, cuando el rechazo es `has_dependents` (hub#1101).
+   *
+   * Viaja como CAMPO, igual que el `permission` de `requires_elevation`: la pantalla la ENUMERA,
+   * y sacarla a fuerza de parsear una frase es exactamente lo que hace que un día deje de
+   * funcionar en silencio.
+   */
+  readonly dependents?: readonly string[];
+
+  constructor(message: string, code?: string, dependents?: readonly string[]) {
     super(message);
     this.name = 'ModuleActionError';
     this.code = code;
+    this.dependents = dependents;
   }
 }
 
-/** Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla. */
-async function moduleAction(id: string, action: 'activate' | 'deactivate' | 'uninstall'): Promise<void> {
+/**
+ * Activa / desactiva / desinstala un módulo en el runtime (hot-plug). Lanza si el runtime falla.
+ *
+ * `force` (solo en `uninstall`, hub#1101) es la respuesta del dueño a «otras apps necesitan esta,
+ * ¿la quito igualmente?», después de que la pantalla se las haya nombrado. Sin él el runtime
+ * rechaza con `409 has_dependents`, que es lo que tiene que pasarle a quien nunca vio esa lista:
+ * un script, el asistente, un flujo o un `curl`. Por eso el cuerpo **no se manda** cuando no hay
+ * nada que confirmar — «sin cuerpo» tiene que seguir significando la respuesta segura.
+ */
+async function moduleAction(
+  id: string,
+  action: 'activate' | 'deactivate' | 'uninstall',
+  opts: { force?: boolean } = {},
+): Promise<void> {
   const res = await runtimeFetch(`${RUNTIME_URL}/api/modules/${encodeURIComponent(id)}/${action}`, {
     method: 'POST',
-    headers: runtimeHeaders(),
+    headers: opts.force
+      ? { ...runtimeHeaders(), 'Content-Type': 'application/json' }
+      : runtimeHeaders(),
+    ...(opts.force ? { body: JSON.stringify({ force: true }) } : {}),
   });
   const env = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; dependents?: string[] };
   };
   if (!res.ok || env.ok === false) {
     throw new ModuleActionError(
       env.error?.message ?? `${action} ${id} → ${res.status}`,
       env.error?.code,
+      env.error?.dependents,
     );
   }
 }
@@ -630,7 +673,8 @@ export async function listModuleVersions(moduleId: string): Promise<ModuleVersio
 
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');
 export const deactivateModule = (id: string): Promise<void> => moduleAction(id, 'deactivate');
-export const uninstallModule = (id: string): Promise<void> => moduleAction(id, 'uninstall');
+export const uninstallModule = (id: string, opts: { force?: boolean } = {}): Promise<void> =>
+  moduleAction(id, 'uninstall', opts);
 
 /**
  * Una capability (permiso) que declara un módulo. El runtime es la autoridad (default-deny):
@@ -1414,12 +1458,17 @@ function seedHubSettingsFromContext(ctx: HubContext): void {
  * (VITE_HUB_ID) que ya trae `config`. No lanza: el boot del shell no debe romperse aquí.
  */
 export async function bootHubContext(): Promise<HubContext | null> {
+  // Cloud callers wait for this answer (hub#1164): a login that raced ahead would hit the
+  // build-time URL and be blocked by the hub's own CSP.
+  markCloudApiUrlPending();
+  let cloudBaseUrl: string | null = null;
   try {
     const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
     const ctx = (await res.json()) as HubContext;
+    cloudBaseUrl = typeof ctx.cloud_base_url === 'string' ? ctx.cloud_base_url : null;
     hubContextReady.value = true;
     machineRegistered.value = Boolean(ctx.machine_registered);
     machineRegistrationRequired.value = Boolean(ctx.registration_required);
@@ -1444,9 +1493,17 @@ export async function bootHubContext(): Promise<HubContext | null> {
     // (i18n → bootHubLanguage), sin esperar a un GET /api/settings explícito.
     seedHubSettingsFromContext(ctx);
     bootHubLanguage(typeof ctx.language === 'string' ? ctx.language : null);
+    // Zona horaria RESUELTA del negocio (hub#731, hub#1022): se publica para módulos y shell
+    // (`erplora.timezone` / `hubTimezone()`), el mismo IANA que el runtime bindea como
+    // `:timezone` y entrega a los handlers como `context.timezone`. El context la trae SIEMPRE
+    // resuelta (nunca `null`); ausente/imposible → UTC, que es lo que el reloj hará de todos modos.
+    publishHubTimezone(ctx.timezone ?? null);
     return ctx;
   } catch {
     return null;
+  } finally {
+    // Always opens the gate: with the runtime's Cloud when it answered, with the fallback otherwise.
+    resolveCloudApiUrl(cloudBaseUrl);
   }
 }
 

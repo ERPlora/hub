@@ -122,13 +122,29 @@ async fn complete_sale_creates_header_and_lines() {
             { "product_name": "Agua", "price": 110, "quantity": 1_000_000, "tax_rate": 10.0 }
         ]
     })), &ctx).await.expect("complete_sale WASM");
-    assert_eq!(res["operations"], json!(4)); // counter + sale + 2 líneas
+    // ADR-0386 (sales#158): + la fila del cobro. Toda venta registra su tender, también la de un
+    // solo medio — si no, `sales_sale_payment` nacería vacía para todo lo cobrado hasta que llegue
+    // la pantalla de cobro mixto (sales#159).
+    assert_eq!(res["operations"], json!(5)); // counter + sale + 2 líneas + 1 cobro
 
     let sales = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
     assert_eq!(sales.len(), 1);
     let sale = &sales[0];
     assert!(sale["sale_number"].as_str().unwrap().ends_with("-0001"));
     assert_eq!(sale["total"].as_i64().unwrap(), 352); // 242 + 110 céntimos = 3.52€
+
+    // ADR-0386 — el desglose del cobro es una tabla hija, y se lee por su propia puerta. Una venta
+    // de un solo medio es una lista de UNA pata que cubre el total entero; el cambio (20,00 €
+    // entregados sobre 3,52 €) se imputa a la pata de EFECTIVO, que es de donde sale.
+    let payments = rt
+        .execute_query("sales.payments", &params(json!({"sale_id": sale["id"]})), &ctx)
+        .await
+        .expect("sales.payments");
+    assert_eq!(payments.len(), 1, "una venta mono-pago sigue teniendo su fila de cobro");
+    assert_eq!(payments[0]["amount"].as_i64().unwrap(), 352);
+    assert_eq!(payments[0]["payment_method_type"], json!("cash"));
+    assert_eq!(payments[0]["amount_tendered"].as_i64().unwrap(), 2000);
+    assert_eq!(payments[0]["change_due"].as_i64().unwrap(), 1648);
 
     let lines = rt.execute_query("sales.lines", &params(json!({"sale_id": sale["id"]})), &ctx).await.unwrap();
     assert_eq!(lines.len(), 2);
@@ -255,15 +271,27 @@ async fn sale_persists_staff_id_and_breaks_down_by_staff() {
     assert_eq!(cents(&b["gross_total"]), 1000);
 }
 
+/// `sales.by_staff` under the published contract of `sales`: **nobody is left out of the day's
+/// breakdown**, and the date range still bounds it.
+///
+/// This test used to assert the opposite ("a sale without `staff_id` is excluded"). That premise
+/// died with `sales#196` ("who attended is decided by the SERVER"): `complete_sale` resolves the
+/// attribution as *payload `staff_id`* -> *session user* (`context.current_user_id`), so a counter
+/// sale that names nobody is attributed to the cashier instead of vanishing from the report. The
+/// old assertion was measuring a state the published module can no longer produce.
+///
+/// The `staff_id IS NOT NULL` filter still in `queries/by_staff.sql` is NOT covered here on
+/// purpose: with a session there is no command that can write a NULL attribution, so the only rows
+/// it can filter today are legacy ones written before `sales#196`. Fabricating one would mean
+/// writing the row behind `complete_sale`'s back, which proves nothing about the contract.
 #[tokio::test]
-async fn by_staff_respects_date_range_and_excludes_unattributed() {
+async fn by_staff_attributes_the_unnamed_sale_to_the_session_user_and_respects_the_date_range() {
     if !erplora_runtime::require_modules_workspace() { return; }
-    // Ventas sin staff_id NO aparecen en by_staff; el rango de fechas acota.
     if !wasm_present() { eprintln!("SKIP"); return; }
     let (rt, _) = fresh().await;
-    let ctx = admin();
-    // one sale WITHOUT staff (regular POS) + one WITH staff.
+    let ctx = admin(); // the session user is `u1`
     let pm = cash_method_id(&rt, &ctx).await;
+    // One counter sale that names NOBODY (the till does not ask) + one naming the professional.
     rt.execute_command("sales.complete_sale", &params(json!({
         "idempotency_key": key("sin-staff"), "payment_method_id": pm,
         "items": [{ "product_name": "Café", "price": 121, "quantity": 1_000_000, "tax_rate": 21.0 }]
@@ -274,14 +302,19 @@ async fn by_staff_respects_date_range_and_excludes_unattributed() {
         "items": [{ "product_name": "Corte", "price": 2000, "quantity": 1_000_000, "tax_rate": 21.0 }]
     })), &ctx).await.unwrap();
 
-    // rango amplio: solo la atribuida.
+    // Wide range: one row per attribution — the named professional AND the session user.
     let rows = rt.execute_query("sales.by_staff", &params(json!({
         "date_from": "2026-01-01", "date_to": "2030-12-31"
     })), &ctx).await.unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["staff_id"], json!("staff-X"));
+    assert_eq!(rows.len(), 2, "cada venta se atribuye a alguien (sales#196): {rows:?}");
+    let named = rows.iter().find(|r| r["staff_id"] == json!("staff-X"))
+        .unwrap_or_else(|| panic!("falta la fila del profesional nombrado: {rows:?}"));
+    assert_eq!(named["sales_count"].as_i64().unwrap(), 1);
+    let session = rows.iter().find(|r| r["staff_id"] == json!("u1"))
+        .unwrap_or_else(|| panic!("la venta sin staff_id debe quedar atribuida al usuario de sesión: {rows:?}"));
+    assert_eq!(session["sales_count"].as_i64().unwrap(), 1);
 
-    // rango en el pasado: ninguna venta (las de hoy quedan fuera).
+    // Past range: no sale at all (today's fall outside).
     let none = rt.execute_query("sales.by_staff", &params(json!({
         "date_from": "2020-01-01", "date_to": "2020-12-31"
     })), &ctx).await.unwrap();
@@ -750,10 +783,17 @@ async fn una_cantidad_fuera_de_la_rejilla_no_crea_venta_ni_toca_stock() {
     // El rechazo debe ser POR LA REJILLA. Un `is_err()` a secas se conformaba con cualquier fallo:
     // mientras al payload le faltó `idempotency_key` (hub#540) este test pasó en verde sin llegar
     // nunca a validar el incremento.
+    //
+    // ERPlora/sales#201: y se afirma sobre el CÓDIGO, no sobre la frase. Buscar `quantity_off_grid`
+    // dentro del mensaje solo funcionaba porque `sales` rechazaba con un `Err("<code>: <detalle>")`
+    // que el runtime envolvía en `RuntimeError::Wasm` — es decir, este test iba en verde JUSTO
+    // mientras el código no llegaba al cliente (`code: "error"` en la respuesta HTTP). Ahora el
+    // rechazo viaja por `Output.error`, sale como `RuntimeError::Domain { code }` y el mensaje es
+    // el detalle a secas. La forma es lo que se afirma (ADR-0398 §6).
     let err = r.expect_err("medio gramo no cae en la rejilla de gramos");
     assert!(
-        err.to_string().contains("quantity_off_grid"),
-        "el rechazo debe ser por la rejilla del incremento (ADR-0147 §2.2), no otro error: {err}"
+        matches!(&err, erplora_runtime::RuntimeError::Domain { code, .. } if code == "sales.quantity_off_grid"),
+        "el rechazo debe ser un error de DOMINIO por la rejilla del incremento (ADR-0147 §2.2), no otro error: {err:?}"
     );
 
     assert_eq!(rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap().len(), 0,

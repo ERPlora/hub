@@ -100,7 +100,7 @@ describe('it says WHAT is missing and where to fix it', () => {
     const view = blockingView(
       status([
         item('business_identity', { level: 'legal', order: 40 }),
-        item('invoice_series.setup', { level: 'functional', order: 50 }),
+        item('invoice.setup', { level: 'functional', order: 50 }),
         item('verifactu.setup', { level: 'legal', order: 60 }),
       ]),
     );
@@ -229,7 +229,7 @@ describe('not twice on the same screen', () => {
       item('taxes.setup', { order: 20 }),
       item('inventory.setup', { order: 30 }),
       item('business_identity', { level: 'legal', order: 40 }),
-      item('invoice_series.setup', { order: 50 }),
+      item('invoice.setup', { order: 50 }),
       item('verifactu.setup', { level: 'legal', order: 60 }),
       item('printing.setup', { level: 'recommended', order: 70 }),
       item('team', { level: 'recommended', order: 80 }),

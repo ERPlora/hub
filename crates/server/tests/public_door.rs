@@ -221,7 +221,7 @@ async fn a_stranger_with_the_locator_gets_the_form_and_can_redeem_it() {
         .clone()
         .oneshot(anonymous_post(
             &format!("/p/{locator}"),
-            "customer_tax_id=B12345678&customer_name=ACME+SL",
+            "customer_tax_id=B12345674&customer_name=ACME+SL",
         ))
         .await
         .unwrap();
@@ -236,7 +236,7 @@ async fn a_stranger_with_the_locator_gets_the_form_and_can_redeem_it() {
 async fn redeeming_twice_issues_exactly_one_document() {
     let app = make_app().await;
     let locator = mint(&app, "ticket-2").await;
-    let form = "customer_tax_id=B12345678&customer_name=ACME+SL";
+    let form = "customer_tax_id=B12345674&customer_name=ACME+SL";
 
     let first = app
         .clone()

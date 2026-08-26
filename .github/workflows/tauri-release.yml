@@ -56,7 +56,10 @@ on:
   # apps/tauri, apps/web o crates → ~123 min/run, 13 runs/10d ≈ 1.595 min. Pre-lanzamiento nadie
   # descarga `latest/` a diario, así que solo se construye al etiquetar una release o a mano.
   push:
-    tags: ['v*']
+    # SOLO la release final `vX.Y.Z`. Un tag `vX.Y.Z-rc.N` es el canal `canary` de la IMAGEN
+    # (build-hub.yml, hub#1170) y NO debe llegar a Microsoft Store / Google Play: ahí las versiones
+    # son monótonas e irreversibles, y una candidata puede no salir nunca.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       # Un dispatch servía para DOS cosas incompatibles: refrescar `latest/` a mano y probar que el
@@ -261,12 +264,19 @@ jobs:
           copy_one '*.dmg'       erplora-app.dmg
           echo "--- dist/ ---"; ls -la dist/
 
+      # `retention-days` NO es cosmética: sin ella el artefacto vive el máximo del repo (90 días) y
+      # el release de `v1.1.8` murió por eso — «Artifact storage quota has been hit», con Windows
+      # subido y Android/Linux fuera, o sea media release publicada y `latest.json` sin actualizar.
+      # Estos bundles son intermedios: su único consumidor es `upload-s3`, en ESTE mismo run. Su
+      # sitio permanente es Object Storage, no la cuota de Actions. 3 días deja margen para bajar
+      # uno a mano y depurar sin volver a acumular 8 GB (app-linux solo eran 5,5 GB en 54 copias).
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-${{ matrix.label }}
           path: dist/*
           if-no-files-found: error
+          retention-days: 3
 
       # ------------------------------------------------------------------------------
       # Canal Microsoft Store (ADR-0136): MSIX SIN FIRMAR (la Store re-firma tras la
@@ -301,6 +311,7 @@ jobs:
           name: app-msix
           path: dist-msix/erplora-app.msix
           if-no-files-found: error
+          retention-days: 3
 
   # Publica el MSIX en Microsoft Store vía msstore CLI (solo productos GRATUITOS, que es
   # nuestro caso: app gratis + suscripción/módulos en erplora.com). Requisitos previos
@@ -530,6 +541,7 @@ jobs:
           name: app-android
           path: dist/*
           if-no-files-found: error
+          retention-days: 3
 
   # Publica el AAB en Google Play (hub#308). Gemelo de `publish-store`: consume el artefacto que
   # `build-android` acaba de subir — **no reconstruye nada** — y solo corre en tag `v*`.
@@ -543,9 +555,21 @@ jobs:
   # paquete que aún no existe en la consola.
   #
   # `PLAY_TRACK` decide la pista y su default es `internal` a propósito — la promoción a producción
-  # se hace a mano en la consola mientras no haya confianza. `changesNotSentForReview: true` porque
-  # una release en pista interna se revisa sola; mandarla a revisión desde aquí sería decidir por el
-  # humano algo que el runbook deja en su mano.
+  # se hace a mano en la consola mientras no haya confianza. Y hay una razón dura además de esa:
+  # este paso sube con `status: completed`, o sea **rollout al 100% de golpe**. Poner
+  # `PLAY_TRACK=production` creyendo que se remata la automatización mandaría cada tag, sin probar,
+  # a TODAS las cajas a la vez — en un TPV eso no es un despliegue, es un incidente. Automatizar la
+  # promoción exige antes un rollout escalonado (`status: inProgress` + `userFraction`), y mientras
+  # ese cableado no exista la Variable se queda como está.
+  #
+  # 🔴 `changesNotSentForReview: false` desde el 2026-08-19, y esto es lo contrario de lo que decía
+  # aquí antes. El argumento viejo era que mandar a revisión «decide por el humano»; lo que decide
+  # de verdad `true` es NO mandar: el AAB se sube y el cambio se queda en «Changes not yet
+  # submitted for review» esperando un clic que nadie sabe que tiene pendiente. Pasó con la primera
+  # ficha: 14 cambios guardados el 14/08 seguían sin enviarse el 19/08, `Submission activity` vacío
+  # y la app en `Draft` como `com.erplora.app (unreviewed)`, mientras cada tag salía verde. Un
+  # canal cuyo último paso es humano no está automatizado; y el peor de los dos fallos es el que
+  # PARECE que publicó. Guardado por `release_gate.rs`.
   #
   # La service account NO necesita roles IAM en GCP: los permisos se conceden invitándola en Play
   # Console sobre esta app, con «Release to testing tracks» y nada más.
@@ -584,7 +608,7 @@ jobs:
           releaseFiles: artifacts/erplora-app.aab
           track: ${{ vars.PLAY_TRACK || 'internal' }}
           status: completed
-          changesNotSentForReview: true
+          changesNotSentForReview: false
 
   upload-s3:
     name: Upload to Object Storage

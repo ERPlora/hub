@@ -284,6 +284,10 @@
             "pattern": "^[a-z][a-z0-9]*-[a-z0-9-]+$",
             "description": "Nombre del custom element (Web Component) a montar."
           },
+          "permission": {
+            "type": "string",
+            "description": "Permiso que ABRE esta pestaña: `/api/navigation` no sirve la entrada a quien no lo tiene (hub#1052). Mismo contrato que `actions[].permission` un escalón más arriba — el manifest declara a quién le sirve la pestaña y el runtime revalida SIEMPRE la query/command real detrás: esto no es la puerta, es no enseñar una puerta cerrada. Ausente = visible para todos, que es como se comportan todos los manifests publicados hasta hoy. Sin este campo un módulo no tenía dónde escribir «esta pestaña es de admin», así que la pintaba para todo el mundo y el usuario descubría el límite estrellándose contra un 403."
+          },
           "chrome": {
             "type": "array",
             "default": [],
@@ -351,13 +355,28 @@
           "deprecated": true,
           "description": "DEPRECATED (ADR-0154): el Hub es Postgres-only; el runtime ignora este dialecto. Usa migrations/postgres. Se mantiene opcional solo por compatibilidad con manifests antiguos.",
           "items": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/migrationEntry"
+              }
+            ]
           }
         },
         "postgres": {
           "type": "array",
+          "description": "Cada entrada admite las dos formas de `MigrationEntry` (hub#542), igual que el runtime: la ruta pelada (`\"migrations/postgres/001_init.sql\"`, que se lee `expand` y es la forma de todo el catálogo publicado) o el objeto `{ file, kind, since }` — la ÚNICA manera de declarar un `contract`, y por tanto de retirar una columna (hub#1093).",
           "items": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/migrationEntry"
+              }
+            ]
           }
         }
       }
@@ -501,7 +520,7 @@
           "min_affected_rows": {
             "type": "integer",
             "minimum": 0,
-            "description": "Contrato de mutación (hub#140): mínimo de filas que las sentencias `sql` del command DEBEN afectar (en total) para que el command se considere exitoso y se emitan sus `emit`. Si el recuento real queda por debajo, la transacción se revierte ENTERA y NO se escribe ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió. Es OPT-IN: ausente = comportamiento de siempre (emite haya o no mutado), para no romper los módulos publicados ni los commands genuinamente idempotentes. `1` es el caso habitual de un command de transición (confirmar/anular/cerrar) que NO debe emitir si el `WHERE` no casa; `0` declararía explícitamente un no-op idempotente permitido que sí emite. El error estable distingue `not_found` (0 filas) de `conflict` (>0 pero por debajo del mínimo)."
+            "description": "Contrato de mutación (hub#140): mínimo de filas que las sentencias `sql` del command DEBEN afectar (en total) para que el command se considere exitoso y se emitan sus `emit`. Si el recuento real queda por debajo, la transacción se revierte ENTERA y NO se escribe ningún evento en el outbox (ni notificación al WS) — porque el hecho declarado nunca ocurrió. Es OPT-IN: ausente = comportamiento de siempre (emite haya o no mutado), para no romper los módulos publicados ni los commands genuinamente idempotentes. `1` es el caso habitual de un command de transición (confirmar/anular/cerrar) que NO debe emitir si el `WHERE` no casa; `0` declararía explícitamente un no-op idempotente permitido que sí emite. El error estable distingue `not_found` (0 filas) de `conflict` (>0 pero por debajo del mínimo). Solo se admite sobre UNA sentencia (hub#1091): al ser un entero no tiene dónde nombrar la sentencia vigilada, así que con varias una incondicional al lado (un UPSERT de contador) satisfaría el mínimo con la fila que NO era la vigilada. El installer RECHAZA `min_affected_rows` con más de una sentencia `sql`; para una guarda sobre una sentencia concreta de un lote, declara `expect_rows` con `expect_rows.statement`."
           },
           "expect_rows": {
             "type": "object",
@@ -520,14 +539,33 @@
                 "type": "string",
                 "maxLength": 500,
                 "description": "Fallback humano opcional (inglés fuente); no debe contener datos internos. Si se omite, el runtime genera uno genérico."
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Ancla la guarda a UNA sentencia del command (hub#1091): la ruta del fichero SQL, tal cual aparece en `commands.<name>.sql`. Ausente = la suma del lote entero (la semántica documentada de siempre). Con el ancla, SOLO esa sentencia cuenta: una sentencia incondicional hermana (un UPSERT de contador) ya no puede satisfacer el mínimo por la vigilada — `200 ok` sin escribir y con evento falso era el agujero (online_booking#25). El installer rechaza un ancla que no nombre una sentencia del command: un ancla que degrada en silencio al default neutralizado es justo lo que esto cierra."
               }
             },
-            "description": "Gate traducible de filas afectadas (hub#139): la versión con código de dominio estable de `min_affected_rows` (no combinables en un mismo command). Si la mutación afecta menos de `n` filas, rollback ENTERO (mutación + outbox) y el caller recibe HTTP 409 con `{code: error, message}` — nunca un `200 ok` con 0 filas ni un evento falso."
+            "description": "Gate traducible de filas afectadas (hub#139): la versión con código de dominio estable de `min_affected_rows` (no combinables en un mismo command). Si la mutación afecta menos de `n` filas, rollback ENTERO (mutación + outbox) y el caller recibe HTTP 409 con `{code: error, message}` — nunca un `200 ok` con 0 filas ni un evento falso. Por defecto el recuento es del LOTE; con varias sentencias donde una es incondicional, esa promesa solo se cumple declarando `statement` (hub#1091)."
           },
           "ai": {
             "$ref": "#/$defs/aiTool"
           }
-        }
+        },
+        "allOf": [
+          {
+            "$comment": "hub#1091: `min_affected_rows` cuenta el LOTE y, siendo un entero, no tiene dónde nombrar la sentencia vigilada. Con más de una sentencia queda NEUTRALIZABLE sin cura: una sentencia incondicional hermana satisface el mínimo por la que falló, y el caller recibe `200 ok` con evento de un hecho que no ocurrió. Quien necesite la guarda sobre una sentencia concreta declara `expect_rows` con `expect_rows.statement`. El installer lo rechaza igual (defensa en profundidad). `sql` va en `required` a proposito: `properties` solo restringe las claves PRESENTES, asi que sin el un command de HANDLER (que no declara `sql`) casaria el antecedente en vacio y quedaria rechazado aqui mientras el installer lo acepta \u2014 el schema no puede ser mas estricto que la puerta que instala.",
+            "if": {
+              "required": ["min_affected_rows", "sql"],
+              "properties": { "sql": { "type": "array", "minItems": 2 } }
+            },
+            "then": {
+              "properties": {
+                "min_affected_rows": false
+              }
+            }
+          }
+        ]
       }
     },
     "events": {
@@ -1008,6 +1046,21 @@
         }
       }
     },
+    "errors": {
+      "type": "object",
+      "description": "Catálogo de los códigos de error de dominio que este módulo PROVEE (ADR-0398, hub#1177). La clave es el code con la forma de ADR-0205 (`<module>.<snake_case>`); el valor es su ESTADO, no su texto: el mensaje vive en `locales/<lang>.json → errors.<code>` (ADR-0055). Ausente = módulo sin migrar (el runtime acepta cualquier code del namespace propio, como hasta ahora). Presente = estricto: un code emitido por el handler o por `expect_rows.error` que no esté aquí es contrato roto (install rechazado / `unexpected` en runtime), y retirar un code sin marcarlo `deprecated` en una publicación anterior rompe el gate del módulo. Añadir es libre.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deprecated": {
+            "type": "string",
+            "description": "Versión del módulo desde la que se avisa a los consumidores de que el code va a desaparecer. Primera de las DOS publicaciones que exige retirarlo (la segunda lo borra)."
+          }
+        }
+      },
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$" }
+    },
     "protects": {
       "type": "array",
       "description": "Guardias de RUTA que este módulo declara sobre la superficie de OTRO módulo (hub#775). El caso canónico es `cash_register`: mientras `enable_cash_register` está on y la ruta de `protected_pos_url` (servida por `sales`) está en juego, ninguna venta puede completarse si `cash_register.current_session` no devuelve ninguna fila (la caja está cerrada). El runtime PARSEA este bloque y lo aplica de forma AUTORITATIVA en el dispatcher de commands (la mitad en la que el shell no se puede confiar): un cliente manipulado, un flow o un `POST /api/command` directo no pueden saltarse el guard. El shell además renderiza `component` (p. ej. `erp-cashregister-open`) en vez de montar el módulo en esa ruta. Cross-módulo a propósito: el módulo que declara el guard no necesita `depends_on` del que protege — protege una RUTA, y el dispatcher saca el módulo protegido de `route_setting`.",
@@ -1161,6 +1214,7 @@
               "retail",
               "gestoria",
               "rrhh",
+              "belleza",
               "general"
             ]
           },
@@ -1291,7 +1345,17 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "description": {
+                "risk": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "destructive",
+            "bulk_destructive"
+          ],
+          "default": "normal",
+          "description": "Cuánto daño hace esta operación si la ejecuta el asistente (hub#1042). Vocabulario CERRADO, como el `reason` de ADR-0331, para que el core aplique una política SIN conocer el dominio. `destructive` = borra o anula UN registro de forma que el usuario no puede deshacer solo. `bulk_destructive` = alcanza a un CONJUNTO cuyo tamaño el usuario no ve al confirmar. Lo declara el MÓDULO y no se infiere del nombre a propósito: `delete` en un nombre no significa nada portable (`sales.void` es destructivo y no lo dice), y un core que lo adivinara decidiría por el módulo cuánto vale su propio dato. Ausente = `normal`."
+        },
+"description": {
           "type": "string",
           "description": "Qué hace la operación, en lenguaje natural, para que el LLM sepa cuándo invocarla. SIEMPRE en INGLÉS (texto canónico orientado al LLM; el usuario nunca lo ve — la IA responde en el idioma del usuario vía el locale del system prompt, no traduciendo esto)."
         },
@@ -1335,7 +1399,35 @@
             "skip"
           ],
           "default": "collapse",
-          "description": "Comportamiento tras un apagado: `collapse` ejecuta UNA sola vez el backlog vencido al arrancar; `skip` no ejecuta nada vencido durante el apagado y solo reprograma."
+          "description": "Comportamiento tras un apagón: `collapse` ejecuta UNA sola vez el backlog vencido al arrancar; `skip` no ejecuta nada vencido durante el apagado y solo reprograma."
+        }
+      }
+    },
+    "migrationEntry": {
+      "type": "object",
+      "description": "Una migración DECLARADA (hub#542): además de la ruta, qué dice el módulo que hace el fichero — el guard (`migration_guard.rs`) comprueba que el SQL coincide. Es la ÚNICA manera de declarar un `contract`, o sea la única forma legítima de escribir un `DROP`: el runtime lo traduce a `RENAME … TO _deprecated_…` en vez de destruir. `kind` y `since` son opcionales exactamente como en el runtime (`MigrationEntry`): sin `kind`, la entrada se lee `expand`, igual que la ruta pelada.",
+      "required": [
+        "file"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Ruta del `.sql` relativa al paquete — la misma ruta que llevaría la forma string."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "expand",
+            "backfill",
+            "contract"
+          ],
+          "default": "expand",
+          "description": "Qué hace la migración (vocabulario CERRADO de `migration_guard::Kind`): `expand` = aditiva, el 95% de los casos; `backfill` = DML idempotente sobre tablas propias; `contract` = lo destructivo, único sitio donde se admite `DROP`."
+        },
+        "since": {
+          "type": "string",
+          "description": "Versión del módulo que dejó de usar lo que este `contract` retira. El runtime aún no lo consume (la ventana del contract es la segunda iteración de hub#542), pero viaja en el manifest desde ya para no tener que republicar cuando lo haga."
         }
       }
     }

@@ -99,6 +99,11 @@ export default {
     close: 'Cerrar',
     noReply: '(sin respuesta)',
     error: 'No se pudo contactar con el asistente.',
+    // saas#1540 — quedarse sin mensajes es un estado del PLAN, no una avería. Decir «no se
+    // pudo contactar» convierte el único momento de conversión del tier gratuito en un fallo.
+    quotaTitle: 'Has usado todos tus mensajes del asistente',
+    quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
+    quotaCta: 'Ver planes',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -116,6 +121,23 @@ export default {
     reportConfirm: 'Denunciar',
     reportSent: 'Gracias, hemos recibido tu denuncia.',
     reportError: 'No se pudo enviar la denuncia. Inténtalo de nuevo.',
+    // hub#1038/#1039/#1048 — lo dice el RUNTIME, nunca el modelo: los recibos del turno no
+    // respaldan lo que afirmó la respuesta. Se muestra como aviso sobre el propio mensaje.
+    claimedWithoutEffect:
+      'El asistente ha dicho que hizo un cambio, pero no se ejecutó ninguna acción. No se ha modificado nada.',
+    unsourcedId:
+      'Esta respuesta muestra un identificador que el asistente no ha leído de verdad. No te fíes de él.',
+    unknownRoute: 'Esta respuesta señala una pantalla que no existe aquí.',
+    // hub#1040 — cuando la app no sabe nombrar su propia acción se dice, en vez de rellenar el
+    // hueco con el nombre interno del command (hub#363: ese vocabulario es nuestro, no del mostrador).
+    confirmUnnamedAction: 'Una acción que esta app no sabe nombrar',
+    // hub#1042 — lo destructivo pide más que un clic. Escribir el NÚMERO es lo que obliga a
+    // leer la frase que dice cuántos van a caer.
+    confirmDestructive: 'Esto no se puede deshacer desde la pantalla. Escribe {expected} para confirmar.',
+    confirmDestructiveWord: 'BORRAR',
+    confirmBulkAffected: 'Vas a borrar {count} registros.',
+    confirmBulkUnknown:
+      'No puedo saber cuántos registros borraría esto, así que no lo hago desde aquí. Abre la pantalla, donde puedes verlos.',
   },
   // hub#988 — la placa leída por el lector NFC del propio aparato. Solo dos frases, porque solo
   // estas dos merecen interrumpir: un aparato sin lector no dice nada (el lector USB sigue
@@ -462,6 +484,13 @@ export default {
         'El NIF ya no se puede cambiar: este negocio ya ha emitido con él.',
       hub_country_frozen:
         'El país ya no se puede cambiar: este negocio ya declara con sus normas fiscales. Escríbenos si el negocio se ha mudado de verdad.',
+      // hub#1088: una por cada motivo de rechazo del NIF — la letra/dígito de control que no
+      // cuadra se reescribe; «esto no tiene forma de NIF» es otra conversación.
+      invalid_tax_id_type: 'El NIF debe ser un texto.',
+      tax_id_too_long:
+        'El NIF es demasiado largo: el límite de la AEAT es de 20 caracteres.',
+      invalid_tax_id_format: 'Eso no tiene forma de NIF: DNI (12345678Z), NIE (X1234567L), CIF (B12345674) o identificador extranjero con prefijo de país (FR123456789).',
+      invalid_tax_id_control: 'La letra o dígito de control del NIF no es el que corresponde: revísalo y vuelve a escribirlo.',
     },
     timezone: 'Zona horaria',
     timezoneDesc: 'Zona horaria para fechas y horarios',
@@ -603,6 +632,7 @@ export default {
     installedLoadError:
       'No hemos podido leer tus apps. No ha habido respuesta, o esta sesión ya no es válida — vuelve a entrar si sigue pasando.',
     emptyCatalog: 'No hay apps que coincidan con tu búsqueda.',
+    loadingCatalog: 'Cargando el catálogo…',
     catalogLoadError:
       'No se pudo cargar el catálogo. Revisa la conexión o el registro de este dispositivo.',
     retryCatalog: 'Reintentar',
@@ -676,6 +706,7 @@ export default {
     uninstallConfirm: 'Desinstalar',
     uninstalled: '{name} desinstalado.',
     uninstallError: 'No se pudo desinstalar {name}.',
+    uninstallBlocked: '{name} no se ha desinstalado: estas apps lo necesitan — {apps}. Desinstálalas antes.',
     moduleInstalledNamed: '{name} instalado.',
     moduleInstalled: 'App instalada.',
     consentTitle: 'Permisos solicitados',

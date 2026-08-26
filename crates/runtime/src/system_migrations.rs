@@ -1723,6 +1723,26 @@ CREATE INDEX IF NOT EXISTS ix_flow_wait_event \
 CREATE INDEX IF NOT EXISTS ix_flow_wait_run ON _flow_run_waits (hub_id, run_id);",
     },
 
+    // hub#1108 — el sello del DESCARTE de un trabajo de impresión. `discarded` es un estado más de
+    // `_print_queue.status` (no hace falta DDL para eso), pero quién lo cerró, cuándo y por qué sí
+    // son columnas: descartar **nunca** borra la fila —es la única prueba de que el tique existió—
+    // y una fila cerrada sin autor ni motivo convertiría en invisible justo lo que pasó. Mismas
+    // tres columnas y mismos tipos que hub#660/hub#955 pusieron en `_event_outbox`, porque es el
+    // mismo gesto sobre la otra cola durable del runtime.
+    //
+    // 🔴 El número es el SIGUIENTE POR ENCIMA del máximo del catálogo (53), nunca un hueco: `apply`
+    // compara contra el máximo aplicado y una versión por debajo se salta EN SILENCIO — el hub
+    // arrancaría creyendo estar al día, sin las columnas y sin un solo log.
+    SystemMigration {
+        version: 54,
+        name: "print_queue_discard",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_at TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL DEFAULT '';",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3581,6 +3601,13 @@ mod kind_contract_tests {
         // v53 cuando hub#1000 se llevó la v51 y hub#1001 la v52), que es justo por qué se
         // recomprueba en el rebase y no al escribir. El hueco de la v52 es de hub#1001 y tiene que
         // entrar ANTES: rellenar un hueco por DEBAJO del máximo ya aplicado aborta el arranque.
-        assert_eq!(MIGRATIONS.len(), 50, "el catálogo cambió de tamaño");
+        // + `print_queue_discard` (v54, hub#1108): las tres columnas del SELLO de un descarte
+        // (`discarded_at`/`discarded_by`/`discard_reason`) en `_print_queue`. Solo `ALTER … ADD
+        // COLUMN IF NOT EXISTS`, re-ejecutable: retirar un tique que nadie va a imprimir **nunca**
+        // borra la fila —es la única prueba de que existió— y una fila cerrada sin autor ni motivo
+        // haría invisible justo lo que pasó. Mismas columnas y mismos tipos que hub#660/hub#955
+        // pusieron en `_event_outbox`, porque es el mismo gesto sobre la otra cola durable. Al
+        // escribirla el máximo era la v53 en `origin/develop` y en TODAS las ramas remotas.
+        assert_eq!(MIGRATIONS.len(), 51, "el catálogo cambió de tamaño");
     }
 }

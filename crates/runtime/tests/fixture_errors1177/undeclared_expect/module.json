@@ -1,0 +1,21 @@
+{
+  "id": "e1177",
+  "name": "Errors catalog fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "errors": { "e1177.refused": {} },
+  "commands": {
+    "e1177.reject": {
+      "permission": "",
+      "transaction": true,
+      "handler": { "type": "native", "function": "reject" }
+    },
+    "e1177.close": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["sql/close.sql"],
+      "expect_rows": { "op": "min", "n": 1, "error": "e1177.missing" }
+    }
+  }
+}

@@ -186,6 +186,17 @@ pub struct Manifest {
     /// module can say "I need a newer terminal" and be believed.
     #[serde(default)]
     pub compatibility: Option<Compatibility>,
+    /// **Catalog of the domain error codes this module PROVIDES** (ADR-0398, hub#1177). Keyed by
+    /// code (`<module>.<snake_case>`, the ADR-0205 ABI); the value carries only the code's state.
+    ///
+    /// `None` = the module has not migrated yet: the runtime keeps the ADR-0205 behaviour (any
+    /// own-namespace code is a `Domain` error). `Some` = strict: an emitted code outside the
+    /// catalog is a broken guest contract, and the installer refuses an `expect_rows.error` the
+    /// catalog does not list. The human text is NOT here — it lives in `locales/<lang>.json`
+    /// (ADR-0055); the manifest declares existence and state, so retiring a code becomes a
+    /// visible diff instead of a silent one.
+    #[serde(default)]
+    pub errors: Option<BTreeMap<String, ErrorDecl>>,
     /// **Route guards this module declares over ANOTHER module's surface** (hub#775).
     ///
     /// A module that owns a precondition for an entire screen declares it here instead of patching
@@ -1006,6 +1017,15 @@ pub enum ExpectRowsOp {
 
 /// Gate of a declarative SQL command (hub#139) that turns an `UPDATE ... WHERE` matching fewer
 /// rows than expected into a stable business rejection instead of an ambiguous `200 ok`.
+/// State of one declared domain error code (ADR-0398). An empty object is the normal entry;
+/// `deprecated` names the version since which consumers are told to stop relying on it — the
+/// first of the two publications retiring a code needs (the second one deletes it).
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ErrorDecl {
+    #[serde(default)]
+    pub deprecated: Option<String>,
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ExpectRows {
     pub op: ExpectRowsOp,
@@ -1015,6 +1035,31 @@ pub struct ExpectRows {
     /// Optional human fallback. When omitted, the runtime generates one without internal data.
     #[serde(default)]
     pub message: Option<String>,
+    /// **Ancla la guarda a UNA sentencia** del command (hub#1091): la ruta del fichero SQL, tal
+    /// cual aparece en `commands.<name>.sql`. Ausente = el comportamiento de siempre: la suma
+    /// del lote entero.
+    ///
+    /// # Por qué existe
+    ///
+    /// La suma del lote es la semántica DOCUMENTADA de `expect_rows`/`min_affected_rows`, pero un
+    /// command con una sentencia incondicional al lado de la que lleva la guarda queda
+    /// NEUTRALIZADO sin señal alguna: en `online_booking.bookings.create` (online_booking#25)
+    /// el INSERT de la reserva no casa (fuera de ventana), el UPSERT del contador afecta 1, el
+    /// `min: 1` se cumple con la fila que NO era la vigilada — `200 ok`, reserva sin guardar y
+    /// evento de una reserva inexistente. Mismo patrón en `appointments.*` (historia) y
+    /// `tables.tables.hold` (upsert idempotente).
+    ///
+    /// No se cambia el DEFAULT a propósito: hay commands legítimos de varias sentencias cuya
+    /// suma ES el contrato (`customers.consent.grant` exige 3 filas de 3 sentencias que afectan
+    /// 1 cada una) y otros con pasos que legítimamente afectan 0 (`customers.anonymize`:
+    /// «sin notas que borrar» no es un fallo). Sólo el módulo sabe cuál sentencia porta la
+    /// guarda — y esta campo es cómo lo declara.
+    ///
+    /// El installer rechaza una ruta que no esté en la lista `sql` del command (un ancla que no
+    /// apunta a nada se leería como protegido y no lo estaría, que es justo el fallo que
+    /// hub#1091 cierra).
+    #[serde(default)]
+    pub statement: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -1073,6 +1118,14 @@ pub struct Nav {
     /// el comportamiento vive en el componente del módulo.
     #[serde(default)]
     pub actions: Vec<NavAction>,
+    /// Permiso que ABRE esta pestaña. Sin él, `/api/navigation` no la sirve (hub#1052).
+    ///
+    /// Mismo contrato que [`NavAction::permission`] un escalón más arriba: el manifest declara a
+    /// quién le sirve la pestaña, y el runtime revalida siempre la query/command real detrás — esto
+    /// no es la puerta, es no enseñar una puerta cerrada. `None` = visible para todos, que es como
+    /// se comportan los manifests publicados hasta hoy.
+    #[serde(default)]
+    pub permission: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1116,7 +1169,7 @@ pub struct WidgetDef {
     /// Permiso para ver el widget (se filtra en cliente; la `query` lo revalida server-side).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission: Option<String>,
-    /// Tipos de negocio a los que aplica (`hosteleria`/`retail`/`gestoria`/`rrhh`/`general`).
+    /// Tipos de negocio a los que aplica (`hosteleria`/`retail`/`gestoria`/`rrhh`/`belleza`/`general`).
     /// Ausente/vacío = todos.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sectors: Vec<String>,
@@ -1261,6 +1314,78 @@ pub struct AiTool {
     /// Nombre opcional que ve el LLM (por defecto, el nombre de la operación).
     #[serde(default)]
     pub name: Option<String>,
+    /// **Cuánto daño hace esta operación** si el asistente la ejecuta (hub#1042).
+    ///
+    /// Lo DECLARA el módulo, y no se infiere del nombre a propósito: `delete` en un nombre no
+    /// significa nada portable —`sales.void` es destructivo y no lo dice— y un core que lo
+    /// adivinara estaría decidiendo por el módulo cuánto vale su propio dato. El módulo lo sabe.
+    ///
+    /// Ausente = `normal`: el bloque es opcional.
+    ///
+    /// Se lee con [`deserialize_risk`] y no con el `Deserialize` derivado, para que un valor
+    /// fuera del vocabulario NO impida instalar el módulo.
+    #[serde(default, deserialize_with = "deserialize_risk")]
+    pub risk: Option<AiRisk>,
+}
+
+/// Vocabulario CERRADO de peligrosidad (hub#1042), como el `reason` de ADR-0331: cerrado para
+/// que el core pueda aplicar una política sin conocer el dominio, y para que sea traducible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiRisk {
+    /// Lo corriente: la tarjeta de confirmación de siempre.
+    Normal,
+    /// Borra o anula UN registro de forma que el usuario no puede deshacer solo.
+    Destructive,
+    /// Alcanza a un CONJUNTO cuyo tamaño el usuario no ve al confirmar.
+    BulkDestructive,
+    /// Un valor que este core no conoce — **nunca lo escribe un manifest**: lo produce la
+    /// degradación de [`deserialize_risk`] cuando llega algo fuera del vocabulario.
+    ///
+    /// Se comporta como `destructive` en toda política: un riesgo que no entendemos no se trata
+    /// como inofensivo.
+    #[serde(skip)]
+    Unknown,
+}
+
+/// Lee `ai.risk` SIN poder tumbar la instalación del módulo (hub#1042).
+///
+/// `erplora validate` comprueba las CLAVES del manifest, no los valores de un enum: un módulo con
+/// `risk: "catastrophic"` pasa la puerta del autor y se publica. Si aquí se usara el
+/// `Deserialize` derivado, ese valor haría fallar el parseo del manifest ENTERO y el módulo
+/// dejaría de instalarse — con el fallo apareciendo en el hub de un cliente, no en el CI de quien
+/// lo escribió. Es el modo de fallo que `module-toolkit/src/manifest-schema.mjs` documenta como
+/// el peor de los dos.
+///
+/// Así que se degrada, y hacia el lado SEGURO: lo que no se entiende se trata como destructivo.
+fn deserialize_risk<'de, D>(d: D) -> std::result::Result<Option<AiRisk>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize as _;
+    let raw = <Option<String> as serde::Deserialize>::deserialize(d)?;
+    Ok(raw.map(|value| match value.as_str() {
+        "normal" => AiRisk::Normal,
+        "destructive" => AiRisk::Destructive,
+        "bulk_destructive" => AiRisk::BulkDestructive,
+        _ => AiRisk::Unknown,
+    }))
+}
+
+impl AiRisk {
+    /// El nombre que viaja al cliente. `Normal` se envía explícito, no ausente: «no lo declaró»
+    /// y «lo declaró normal» tienen que verse igual desde fuera, o la política se vuelve
+    /// dependiente de si alguien se acordó de escribirlo.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiRisk::Normal => "normal",
+            AiRisk::Destructive => "destructive",
+            AiRisk::BulkDestructive => "bulk_destructive",
+            // Hacia fuera se presenta como destructivo: el cliente aplica la política estricta
+            // sin tener que conocer una cuarta palabra.
+            AiRisk::Unknown => "destructive",
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1307,6 +1432,13 @@ pub struct CommandDef {
     ///   transición: "confirmar" / "anular" / "cerrar" que NO debe emitir su evento si el `WHERE`
     ///   no casa (recurso inexistente o ya en el estado destino). `Some(0)` declararía
     ///   explícitamente un no-op idempotente permitido que igual emite.
+    ///
+    /// **Solo sobre UNA sentencia** (hub#1091). Siendo un entero no tiene dónde nombrar la
+    /// sentencia que porta la guarda, así que sobre un lote queda neutralizable sin cura: una
+    /// sentencia incondicional hermana satisface el mínimo por la que falló y el caller recibe
+    /// `200 ok` con un evento de un hecho que no ocurrió. El installer rechaza el manifest que lo
+    /// declare con más de una `sql`; la guarda sobre una sentencia de un lote se declara con
+    /// [`ExpectRows::statement`].
     ///
     /// Ver [`crate::commands`] para el gate y
     /// [`crate::errors::RuntimeError::MinAffectedRows`].
@@ -1472,7 +1604,11 @@ const ROOT_FIELDS: &[&str] = &[
     "compatibility",
     "protects",
     "records",
+    "errors",
 ];
+
+/// ADR-0398: one entry of the `errors` catalog carries only the code's state.
+const ERROR_FIELDS: &[&str] = &["deprecated"];
 
 const COMMAND_FIELDS: &[&str] = &[
     "permission",
@@ -1502,7 +1638,15 @@ const CAPABILITY_FIELDS: &[&str] = &[
 const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];
-const NAV_FIELDS: &[&str] = &["id", "label", "icon", "component", "chrome", "actions"];
+const NAV_FIELDS: &[&str] = &[
+    "id",
+    "label",
+    "icon",
+    "component",
+    "chrome",
+    "actions",
+    "permission",
+];
 const PROTECTS_FIELDS: &[&str] = &[
     "settings_query",
     "enabled_setting",
@@ -1573,6 +1717,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
         "static_files" => STATIC_FILES_FIELDS,
         "compatibility" => COMPATIBILITY_FIELDS,
         "records.*" => RECORD_FIELDS,
+        "errors.*" => ERROR_FIELDS,
         _ => return None,
     })
 }
@@ -1717,6 +1862,7 @@ impl Manifest {
             ("queries", "queries.*"),
             ("widgets", "widgets.*"),
             ("records", "records.*"),
+            ("errors", "errors.*"),
         ] {
             if let Some(entries) = root.get(block).and_then(|v| v.as_object()) {
                 for (name, entry) in entries {
@@ -1939,6 +2085,59 @@ pub struct NavLocale {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    /// Un `risk` fuera del vocabulario NO puede impedir que el módulo se instale (hub#1042).
+    ///
+    /// `erplora validate` comprueba las CLAVES del manifest, no los valores del enum: un módulo
+    /// con `risk: "catastrophic"` pasa la puerta del autor y se publica. Si el runtime se negara a
+    /// parsearlo, el módulo entero dejaría de instalarse —y el fallo aparecería en el hub de un
+    /// cliente, no en el CI de quien lo escribió. Es exactamente el modo de fallo que el toolkit
+    /// documenta como el peor de los dos.
+    ///
+    /// Así que se degrada, y se degrada HACIA EL LADO SEGURO: un riesgo que no entendemos se
+    /// trata como destructivo, no como normal. Y se deja dicho en `warnings`, que es el canal que
+    /// el manifest ya tiene para «esto no lo entendí y seguí».
+    #[test]
+    fn an_unknown_risk_degrades_to_destructive_instead_of_bricking_the_install() {
+        let raw = r#"{"id":"x","name":"X","version":"1.0.0",
+          "commands":{"x.wipe":{"permission":"x.d","ai":{"description":"d","risk":"catastrophic"}}}}"#;
+
+        let manifest: Manifest = serde_json::from_str(raw).expect("el módulo TIENE que instalarse");
+
+        let ai = manifest.commands["x.wipe"].ai.as_ref().expect("bloque ai");
+        assert_eq!(
+            ai.risk.map(AiRisk::as_str),
+            Some("destructive"),
+            "un riesgo desconocido se trata como destructivo: fallar hacia el lado seguro"
+        );
+    }
+
+    /// El vocabulario conocido sigue leyéndose tal cual.
+    #[test]
+    fn the_declared_vocabulary_is_read_as_declared() {
+        for (raw, expected) in [
+            ("normal", AiRisk::Normal),
+            ("destructive", AiRisk::Destructive),
+            ("bulk_destructive", AiRisk::BulkDestructive),
+        ] {
+            let json = format!(
+                r#"{{"id":"x","name":"X","version":"1.0.0",
+                   "commands":{{"x.op":{{"permission":"p","ai":{{"description":"d","risk":"{raw}"}}}}}}}}"#
+            );
+            let m: Manifest = serde_json::from_str(&json).expect("parsea");
+            assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, Some(expected), "{raw}");
+        }
+    }
+
+    /// Sin declarar sigue siendo «sin declarar», que el ensamblado traduce a `normal`.
+    #[test]
+    fn an_undeclared_risk_stays_undeclared() {
+        let raw = r#"{"id":"x","name":"X","version":"1.0.0",
+          "commands":{"x.op":{"permission":"p","ai":{"description":"d"}}}}"#;
+        let m: Manifest = serde_json::from_str(raw).expect("parsea");
+        assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, None);
+    }
     use super::*;
 
     /// hub#380 — «my data belongs to the installation that produced it» is something the MODULE

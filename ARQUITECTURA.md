@@ -66,9 +66,13 @@ contrato S3 + SHA256, auth, asistente AI con RAG).
    `[✓ verificado: query/command ejecutan SQL real con scoping hub_id]`
 
 3. **`hub_id` inyectado por despliegue (1 contenedor = 1 hub)** — el server lee `HUB_ID` del entorno
-   y lo expone en **`GET /api/hub/context` → `{hub_id, user}`**; `apps/web` lo resuelve al arrancar
-   (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay selector de hub.** Liga
-   con la tenancy de §2.5. `[✓ verificado]`
+   y lo expone en **`GET /api/hub/context` → `{hub_id, user, cloud_base_url, …}`**; `apps/web` lo
+   resuelve al arrancar (`bootHubContext`) y lo envía como **`X-Hub-Id`** en toda llamada. **No hay
+   selector de hub.** Liga con la tenancy de §2.5. `[✓ verificado]`
+   La misma respuesta trae **`cloud_base_url`** (= `HUB_CLOUD_API_URL`, el valor que ya alimenta la
+   CSP `connect-src`): `config.cloudApiUrl` se fija en runtime desde ahí y `VITE_CLOUD_API_URL` es
+   solo fallback dev/local; toda llamada al Cloud espera `cloudApiUrlReady()` (hub#1164, una misma
+   imagen sirve pre y prod).
 
 4. **Login de usuario real contra el SaaS** — `POST /api/v1/auth/login/` + `GET /api/v1/auth/me/`;
    tokens en `localStorage` (`erplora.access`/`erplora.refresh`); **interceptor refresh-en-401** con
@@ -635,6 +639,24 @@ Queda implementar los handlers Tier 2 WASM + la reubicación del Bridge (§13).
   clasificación vive en el SaaS, no en el `module.json` (§2.4).
 - **Contrato marketplace intacto**: el SaaS descarga el zip + verifica SHA256; la ruta S3 y la
   integridad no cambian.
+
+### 13.1 Imagen del Hub: canales de release (hub#1170, decisión 2026-08-25)
+
+`build-hub.yml` publica `ghcr.io/erplora/hub` en **tres tags móviles**, siempre acompañados del
+`:<sha>` inmutable (pin/rollback). La lógica vive en `scripts/image-tags.sh` (tests de contrato en
+`scripts/tests/image-tags.test.sh`) y la **versión que sirve el binario** (`/readyz`,
+`/api/hub/context`, latido, `error_sink`) es la que el CI estampa en `Cargo.toml` antes de compilar:
+
+| Canal | Lo dispara | Versión horneada | Tags |
+|---|---|---|---|
+| **`dev`** | push/dispatch en `develop` — lo despliega **pre** | `X.Y.Z-dev.<n>+g<sha>` (`git describe --tags --long`: último tag `v*` alcanzable + commits desde) | `:dev` |
+| **`canary`** | tag `vX.Y.Z-rc.N` — candidata para un **subconjunto** de hubs de prod | `X.Y.Z-rc.N` | `:X.Y.Z-rc.N` `:canary` (NO mueve `:latest`, `:X.Y` ni `:X`) |
+| **`stable` = `latest`** | tag `vX.Y.Z` final — lo que estrena todo hub nuevo | `X.Y.Z` | `:X.Y.Z` `:X.Y` `:X` `:latest` `:stable` (alias, mismo digest) |
+
+`main` sigue como hasta ahora (`:latest` + `:<sha>`, versión del Cargo: main = prod). El guard
+rechaza un tag no semver, ya publicado, no monótono o una rc de una versión ya cerrada, y en
+`develop` se **niega** a publicar sin `git describe` antes que hornear el hueco `1.0.0`. Un tag
+`-rc.N` **no** dispara `tauri-release.yml` (las stores son irreversibles).
 
 ---
 

@@ -77,9 +77,31 @@ pub enum TxGatedOutcome {
     /// The gate passed; the tx committed with these per-statement affected counts (SQL mutation +
     /// outbox inserts + `extra_ops`, in the order they were passed).
     Committed { per_op: Vec<u64> },
-    /// The gate failed; the tx **rolled back** (no mutation, no outbox). `sql_counts` holds the
-    /// affected counts of just the mutation statements, so the runtime can report the real number.
-    RolledBack { sql_counts: Vec<u64> },
+    /// A gate failed; the tx **rolled back** (no mutation, no outbox). `gate` is the index into
+    /// the `gates` slice of the one that failed — with more than one gate in flight, "it did not
+    /// commit" is not enough: the caller has to name the sub-command whose contract was broken, and
+    /// mint ITS error code. `sql_counts` holds the affected counts of that gate's statements, so
+    /// the runtime can report the real number.
+    RolledBack { gate: usize, sql_counts: Vec<u64> },
+}
+
+/// One row-count gate over a **contiguous group** of ops inside a transaction (hub#140/#139,
+/// generalised by hub#1025).
+///
+/// It started as a single `(sql_op_count, min)` pair because only the DECLARATIVE path was gated,
+/// and there the whole command is one group. But a command resolved by a WASM/native handler emits
+/// **several** operations, each one a different sub-command with its own contract — and a single
+/// total is not the same question: in `customers.set_groups` the `_clear` affects 1 row and the
+/// `_add` affects 0, so a summed minimum of 1 would pass while the row the user asked for was never
+/// written. Each group has to be asked its own question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RowGate {
+    /// Index of the group's first op inside `ops`.
+    pub first: usize,
+    /// How many consecutive ops the group spans.
+    pub count: usize,
+    /// Required TOTAL affected rows across the group.
+    pub min: u64,
 }
 
 /// Common contract for the backend. The runtime only knows this trait; it does not know the
@@ -105,25 +127,24 @@ pub trait DatabaseAdapter: Send + Sync {
     /// **inside** the tx to stay atomic: running the SQL, seeing 0 rows, and *then* trying to skip
     /// the outbox would already have committed the outbox inserts in the same batch.
     ///
-    /// - `sql_op_count`: the leading ops are the command's mutation statements; the rest are outbox
-    ///   inserts (and `extra_ops`). The gate runs over the per-op counts of the FIRST
-    ///   `sql_op_count` ops only — outbox INSERTs always affect exactly 1 and must not feed the gate
-    ///   (otherwise a "confirm" over a missing appointment would mutate 0 rows but still pass once
-    ///   its outbox INSERT is counted).
-    /// - `min_affected_rows`: the required total across those `sql_op_count` statements. `None`
-    ///   disables the gate (legacy behavior — commit unconditionally, like [`execute_tx`]).
+    /// - `gates`: the groups to check, each a [`RowGate`]. A group NEVER covers the outbox INSERTs
+    ///   (which always affect exactly 1 and would make the gate vacuous: a "confirm" over a missing
+    ///   appointment mutates 0 rows but would still pass once its event INSERT is counted). An
+    ///   empty slice disables gating entirely — legacy behaviour, commit unconditionally, like
+    ///   [`execute_tx`].
+    /// - Gates are evaluated **in order**, and the FIRST failure decides: it is the one whose
+    ///   sub-command the caller will name in the error.
     ///
-    /// On commit returns [`TxGatedOutcome::Committed`] with every per-op count (diagnostics);
-    /// on a gate failure returns [`TxGatedOutcome::RolledBack`] with the SQL counts so the runtime
-    /// can build the stable `MinAffectedRows` error. A real DB error propagates as `Err` (the tx
+    /// On commit returns [`TxGatedOutcome::Committed`] with every per-op count (diagnostics); on a
+    /// gate failure returns [`TxGatedOutcome::RolledBack`] naming the failed gate, so the runtime
+    /// can build the stable error of THAT sub-command. A real DB error propagates as `Err` (the tx
     /// has already rolled back). `execute_tx` stays as the total-only path for callers that don't
     /// care (reset, migrations, user_profile): changing its return type would be a wider blast
     /// radius for no gain.
     async fn execute_tx_gated(
         &self,
         ops: &[(String, Params)],
-        sql_op_count: usize,
-        min_affected_rows: Option<u64>,
+        gates: &[RowGate],
     ) -> Result<TxGatedOutcome, DbError>;
 
     /// Runs a query and returns the rows as JSON objects.
@@ -341,8 +362,7 @@ impl DatabaseAdapter for PgAdapter {
     async fn execute_tx_gated(
         &self,
         ops: &[(String, Params)],
-        sql_op_count: usize,
-        min_affected_rows: Option<u64>,
+        gates: &[RowGate],
     ) -> Result<TxGatedOutcome, DbError> {
         let mut tx = self.pool.begin().await?;
         let mut per_op = Vec::with_capacity(ops.len());
@@ -351,19 +371,23 @@ impl DatabaseAdapter for PgAdapter {
             let q = build_query!(tsql, names, params);
             per_op.push(q.execute(&mut *tx).await?.rows_affected());
         }
-        // La gate se evalúa SOLO sobre las sentencias de mutación (las primeras `sql_op_count`):
-        // los INSERT del outbox siempre afectan 1 y NO deben entrar en el recuento (un "confirmar"
-        // sobre una cita inexistente muta 0 filas, aunque luego inserte un evento — si el evento
-        // contara, la gate pasaría siempre y el bug del issue seguiría vivo).
-        if let Some(min) = min_affected_rows {
-            let n = sql_op_count.min(per_op.len());
-            let affected: u64 = per_op[..n].iter().sum();
-            if affected < min {
+        // Cada gate se evalúa SOLO sobre las sentencias de SU grupo: los INSERT del outbox siempre
+        // afectan 1 y no entran en ningún grupo (un "confirmar" sobre una cita inexistente muta 0
+        // filas, aunque luego inserte un evento — si el evento contara, la gate pasaría siempre).
+        // Y los grupos se cuentan por separado (hub#1025): sumarlos dejaría que una operación que
+        // sí casó tapase a la que no, que es exactamente el id ajeno que la gate existe para cazar.
+        for (i, gate) in gates.iter().enumerate() {
+            let end = gate.first.saturating_add(gate.count).min(per_op.len());
+            let slice = &per_op[gate.first.min(per_op.len())..end];
+            let affected: u64 = slice.iter().sum();
+            if affected < gate.min {
                 // Rollback explícito: el default-drop de sqlx haría lo mismo al caer del scope,
                 // pero dejarlo tácito es justo el tipo de "OK silencioso" que hub#140 elimina.
                 tx.rollback().await?;
-                let sql_counts = per_op[..n].to_vec();
-                return Ok(TxGatedOutcome::RolledBack { sql_counts });
+                return Ok(TxGatedOutcome::RolledBack {
+                    gate: i,
+                    sql_counts: slice.to_vec(),
+                });
             }
         }
         tx.commit().await?;
@@ -556,6 +580,30 @@ fn shim_functions(sql: &str) -> String {
             in_string = true;
             out.push(c);
             i += 1;
+            continue;
+        }
+        // Comentarios `-- …` (línea) y `/* … */` (bloque), fuera de string: se emiten VERBATIM y
+        // NO tocan el estado de cadena — igual que hace `translate` con sus `:name` (hub#1026).
+        // Sin esto, un apóstrofo en prosa (`-- the slot's capacity`) abría un literal fantasma y
+        // dejaba TODAS las funciones-puente posteriores sin reescribir → Postgres `function
+        // erp_datediff_days(text, text) does not exist`. Se copia por slice para preservar el
+        // UTF-8 del comentario.
+        if c == b'-' && bytes.get(i + 1) == Some(&b'-') {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            out.extend_from_slice(&bytes[start..i]);
+            continue;
+        }
+        if c == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len()); // consume el `*/` de cierre
+            out.extend_from_slice(&bytes[start..i]);
             continue;
         }
         // Sólo arranca un nombre del set si el carácter previo NO es parte de un identificador
@@ -786,6 +834,28 @@ pub fn shim_ddl_types(sql: &str) -> String {
             in_string = true;
             out.push(b'\'');
             i += 1;
+            continue;
+        }
+        // Comentarios verbatim, sin tocar el estado de cadena — misma regla que `translate` y que
+        // `shim_functions` (hub#1026). Aquí el precio de no hacerlo es más caro: un apóstrofo en
+        // prosa dejaba los tipos portables posteriores SIN normalizar, y `BLOB` no existe en
+        // Postgres (la migración revienta) mientras `INTEGER` no es `BIGINT` (queda de 4 bytes).
+        if c == b'-' && bytes.get(i + 1) == Some(&b'-') {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            out.extend_from_slice(&bytes[start..i]);
+            continue;
+        }
+        if c == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            let start = i;
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+            out.extend_from_slice(&bytes[start..i]);
             continue;
         }
         // Sólo reescribe tipos como palabra completa.
@@ -1312,6 +1382,42 @@ mod tests {
         // `xerp_pad` no es la función-puente: se deja intacto.
         let (sql, _) = translate("SELECT xerp_pad");
         assert_eq!(sql, "SELECT xerp_pad");
+    }
+
+    #[test]
+    fn shim_skips_line_comments_so_an_apostrophe_does_not_swallow_the_rest() {
+        // hub#1026: an apostrophe inside a `--` comment used to open a phantom string literal,
+        // leaving EVERY bridge function after it unrewritten — Postgres then failed with
+        // `function erp_now() does not exist`. The comment is copied verbatim and never touches
+        // the string state, exactly like `translate` already does for its `:name` binds.
+        let (sql, _) = translate("-- the slot's capacity\nSELECT erp_now()");
+        assert_eq!(sql, "-- the slot's capacity\nSELECT now()");
+    }
+
+    #[test]
+    fn shim_skips_block_comments_so_an_apostrophe_does_not_swallow_the_rest() {
+        let (sql, _) = translate("/* it's here */ SELECT erp_now()");
+        assert_eq!(sql, "/* it's here */ SELECT now()");
+    }
+
+    #[test]
+    fn shim_leaves_a_bridge_call_inside_a_comment_verbatim() {
+        // A call documented in a comment is prose, not code: it must not be rewritten.
+        let (sql, _) = translate("-- use erp_now() here\nSELECT 1");
+        assert_eq!(sql, "-- use erp_now() here\nSELECT 1");
+    }
+
+    #[test]
+    fn ddl_shim_skips_comments_so_an_apostrophe_does_not_swallow_the_types() {
+        // hub#1026, same root cause one function over: a `'` in a `--` comment left the rest of a
+        // MIGRATION "inside a string", so the portable types after it were never normalised —
+        // `BLOB` does not exist in Postgres and `INTEGER` is not `BIGINT`. Worse than the bridge
+        // case: it lands in the schema.
+        let out = shim_ddl_types("-- the slot's capacity\nCREATE TABLE t (n INTEGER, b BLOB);");
+        assert_eq!(
+            out,
+            "-- the slot's capacity\nCREATE TABLE t (n BIGINT, b BYTEA);"
+        );
     }
 
     #[test]

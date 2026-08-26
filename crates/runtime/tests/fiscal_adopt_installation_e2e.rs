@@ -67,7 +67,7 @@ async fn hub_restored_elsewhere() -> Runtime {
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), HUB);
     rt.ensure_system_tables().await.unwrap();
     set_setting(&rt, "country_code", "ES").await;
-    set_setting(&rt, "business_tax_id", "B12345678").await;
+    set_setting(&rt, "business_tax_id", "B12345674").await;
     set_setting(&rt, "business_legal_name", "Bar Pepe SL").await;
     rt.install_from_dir(&fixture("fsale")).await.expect("install fsale");
     rt.install_from_dir(&fixture("fprov")).await.expect("install fprov");
@@ -81,7 +81,7 @@ async fn hub_restored_elsewhere() -> Runtime {
     rt.db()
         .execute(
             "UPDATE _hub_fiscal_profile \
-             SET status = 'ACTIVE', environment = 'production', taxpayer_id = 'B12345678', \
+             SET status = 'ACTIVE', environment = 'production', taxpayer_id = 'B12345674', \
                  activated_at = '2026-08-01T09:00:00Z', system_id = :origin \
              WHERE hub_id = :hub_id",
             &p,

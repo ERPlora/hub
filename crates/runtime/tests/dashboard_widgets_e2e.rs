@@ -164,9 +164,30 @@ async fn staff_headcount_kpi_counts_active_members() {
         }))
     };
     // 2 activos + 1 terminado (excluido del headcount).
+    //
+    // El alta ya NO puede nacer `terminated` (staff 36c0bd2): el enum de `member_create` es
+    // `active|inactive|on_leave` y la baja es una PUERTA propia — `staff.members.delete`, con su
+    // fecha y su motivo. Se termina por ahí, que además es lo que ejerce el camino real.
     rt.execute_command("staff.members.create", &create("Ana", "active"), &ctx).await.unwrap();
     rt.execute_command("staff.members.create", &create("Beto", "active"), &ctx).await.unwrap();
-    rt.execute_command("staff.members.create", &create("Caro", "terminated"), &ctx).await.unwrap();
+    rt.execute_command("staff.members.create", &create("Caro", "active"), &ctx).await.unwrap();
+    let caro = rt
+        .execute_query("staff.members.list", &Params::new(), &ctx)
+        .await
+        .unwrap()
+        .iter()
+        .find(|r| r["first_name"].as_str() == Some("Caro"))
+        .expect("Caro debe estar en la lista")["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    rt.execute_command(
+        "staff.members.delete",
+        &params(json!({ "staff_id": caro, "termination_date": "2026-08-19", "reason": "e2e" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
 
     let stats = kpi_row(&rt, "staff.members.stats", &ctx).await;
     assert_eq!(i64_of(&stats["active_members"]), 2, "el KPI cuenta SOLO los activos reales");
@@ -249,10 +270,17 @@ async fn verifactu_pending_kpi_counts_real_records() {
         "verifactu._insert_record",
         &params(json!({
             "record_id": "rec-1", "record_type": "alta", "sequence_number": 1, "invoice_id": null,
-            "issuer_nif": "B12345678", "issuer_name": "Bar Manolo SL",
+            "issuer_nif": "B12345674", "issuer_name": "Bar Manolo SL",
             "invoice_number": "F-0001", "invoice_date": "2026-07-17", "invoice_type": "F1",
             "description": "",
-            "base_amount": 1000, "tax_rate": 21, "tax_breakdown": "", "tax_amount": 210, "total_amount": 1210,
+            // hub#1132 — `tax_breakdown` NO puede ser cadena vacía: la columna es TEXT pero
+            // `verifactu` la lee como JSON (`JSON_EXISTS`), y `''` revienta el cast con
+            // `22P02 invalid input syntax for type json` ANTES de llegar a ninguna guarda.
+            // Se siembra el desglose real de esta fila (1000 al 21 % = 210), que además es lo
+            // que escribe una factura de verdad. El default de la columna es `'{}'`.
+            "base_amount": 1000, "tax_rate": 21,
+            "tax_breakdown": "[{\"base\": 1000, \"rate\": 21.0, \"quota\": 210}]",
+            "tax_amount": 210, "total_amount": 1210,
             "previous_hash": "", "record_hash": "seed-hash", "is_first_record": 1,
             "generation_timestamp": "2026-07-17T10:00:00Z", "qr_url": ""
         })),

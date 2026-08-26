@@ -87,7 +87,7 @@ async fn fiscal_chain() -> Runtime {
     // also the `IDEmisorFactura`/`ObligadoEmision` of the record. Country ES is what makes the
     // seeded rules resolve at all (ADR-0085: no country → no rule → the browser picks the VAT).
     let mut up = serde_json::Map::new();
-    up.insert("business_tax_id".into(), json!("B12345678"));
+    up.insert("business_tax_id".into(), json!("B12345674"));
     up.insert("business_legal_name".into(), json!("Bar Paco SL"));
     up.insert("country_code".into(), json!("ES"));
     rt.set_settings(&up, "u1").await.expect("set business identity");
@@ -564,12 +564,32 @@ async fn an_exempt_service_and_a_zero_rated_sale_never_share_a_breakdown_line() 
     assert_xml_reconciles(&xml);
 }
 
-/// VAT is computed and rounded PER LINE (ADR-0187), HALF_UP (ADR-0123), and only then aggregated
-/// into the breakdown entry. Two coffees at 2,50 € make it visible: 52,5 cents each → 53 + 53 =
-/// **1,06 €**, while rounding the aggregated base (5,00 € × 21 % = 105,0) would give 1,05 €. One
-/// cent, and it is the cent that has to match the till and `CuotaTotal`.
+/// The quota is closed ONCE per fiscal key, never by summing per-line rounded quotas
+/// (**ADR-0405 §Decisión 4**). Two coffees at 2,50 € make the difference visible: the key
+/// aggregates to a base of 5,00 € and `percent_of(500, 21 %)` is **1,05 €**, where rounding each
+/// line first (52,5 cents → 53, HALF_UP) and adding would declare 1,06 €.
+///
+/// # Why this test asserted the opposite until 2026-08-26 (hub#1215)
+///
+/// It was written for **ADR-0187**, and that citation was wrong from the start: ADR-0187 is the
+/// SaaS’s own billing (`saas/apps/dashboard/fiscal/desglose.py`, `InvoiceItem`, the Stripe paths),
+/// where the line carries a VAT-INCLUSIVE gross and its quota comes out **by subtraction**. It has
+/// never governed the hub’s `invoice` module. What it described happened to match what
+/// `build_invoice` did at the time — an undocumented `e.quota += main_quota` that ADR-0405 later
+/// names as the root cause it removed — so the assertion passed and nobody noticed the borrowed
+/// citation.
+///
+/// Per-line accumulation is exactly what ADR-0405 came to delete: four lines of 0,50 € at 21 %
+/// declared 44 over a base of 200, which no rate justifies, and the downstream gates (verifactu#60
+/// `013`, hub#1180) were killing ~33 % of long tickets over it. Since `invoice` v1.2.27 the key
+/// closes with `money::percent_of(Σbase, rate)` and its audit tolerance is **1 cent per key**
+/// (`Closing::PerKey`); only a verbatim F3 copy keeps the old per-line margin.
+///
+/// `invoice.create` here carries **no `tax_included`**, so this is ADR-0405’s second branch:
+/// `cuota = percent_of(Σbase, tipo)`. The till still reconciles — 6,05 € is what `ImporteTotal`,
+/// `CuotaTotal` and the breakdown all say.
 #[tokio::test]
-async fn the_quota_is_rounded_per_line_before_it_is_aggregated() {
+async fn the_quota_closes_once_per_fiscal_key_not_per_line() {
     if !erplora_runtime::require_modules_workspace() {
         return;
     }
@@ -591,16 +611,16 @@ async fn the_quota_is_rounded_per_line_before_it_is_aggregated() {
     assert_eq!(entries.len(), 1, "same fiscal key → one entry: {entries:#?}");
     assert_eq!(
         (entries[0].base, entries[0].quota),
-        (500, 106),
-        "53 + 53, not round(500 × 21 %) = 105: the quota is rounded per LINE (ADR-0187)"
+        (500, 105),
+        "round(500 × 21 %) = 105, not 53 + 53: the key closes ONCE (ADR-0405 §Decisión 4)"
     );
-    assert_eq!(inv["tax_amount"].as_i64().unwrap(), 106);
+    assert_eq!(inv["tax_amount"].as_i64().unwrap(), 105);
 
     let xml = aeat_xml(&rt, inv["id"].as_str().unwrap()).await;
     let block = &detalles(&xml)[0];
-    assert_eq!(tag(block, "CuotaRepercutida").as_deref(), Some("1.06"), "{xml}");
-    assert_eq!(tag(&xml, "CuotaTotal").as_deref(), Some("1.06"), "{xml}");
-    assert_eq!(tag(&xml, "ImporteTotal").as_deref(), Some("6.06"), "{xml}");
+    assert_eq!(tag(block, "CuotaRepercutida").as_deref(), Some("1.05"), "{xml}");
+    assert_eq!(tag(&xml, "CuotaTotal").as_deref(), Some("1.05"), "{xml}");
+    assert_eq!(tag(&xml, "ImporteTotal").as_deref(), Some("6.05"), "{xml}");
     assert_xml_reconciles(&xml);
 }
 

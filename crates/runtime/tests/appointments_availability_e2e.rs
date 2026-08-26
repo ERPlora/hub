@@ -107,6 +107,112 @@ async fn set_overlap(rt: &Runtime, ctx: &RequestContext, allow_overlapping: bool
     .expect("settings.upsert");
 }
 
+/// The links a booking needs, created for real (hub#1053).
+///
+/// `appointments` stopped believing the browser: `create` RESOLVES customer, service and staff
+/// against the hub and refuses what it cannot find (appointments#11, handler `4ceed7e`). This
+/// test used to send `cust-1`/`svc-1`/`P1` — three ids nobody ever created — and passed only
+/// because the handler took the payload's word for it. That was the very bug appointments#11
+/// closed, so the module is right and the fixture was the thing left behind.
+///
+/// The tax key is READ from `taxes` rather than hardcoded: a seed that renames its categories
+/// should not silently turn this into a red test about something else.
+struct Links {
+    customer_id: String,
+    service_id: String,
+    staff_id: String,
+    /// A second bookable professional: "the other one is free at that hour" is only a real
+    /// assertion if that professional exists.
+    other_staff_id: String,
+}
+
+/// The id of the row whose `field` equals `value`. Never `.last()`: these list queries are
+/// ordered by the module (alphabetically, in `staff`'s case), so "the one I just created" and
+/// "the last row" are different rows — and the test that trusted them agreed only by luck.
+fn id_where(rows: &[serde_json::Value], field: &str, value: &str) -> String {
+    rows.iter()
+        .find(|r| r[field].as_str() == Some(value))
+        .unwrap_or_else(|| panic!("no row with {field}={value:?} — got {rows:?}"))["id"]
+        .as_str()
+        .expect("id")
+        .to_string()
+}
+
+async fn seed_links(rt: &Runtime, ctx: &RequestContext) -> Links {
+    let categories = rt
+        .execute_query("taxes.categories.list", &Params::new(), ctx)
+        .await
+        .expect("taxes.categories.list");
+    let tax_key = categories
+        .first()
+        .and_then(|c| c["key"].as_str())
+        .expect("taxes must seed at least one category")
+        .to_string();
+
+    rt.execute_command(
+        "customers.create",
+        &params(json!({ "name": "Cliente 1" })),
+        ctx,
+    )
+    .await
+    .expect("customers.create");
+    let customer_id = id_where(
+        &rt.execute_query("customers.list", &Params::new(), ctx)
+            .await
+            .expect("customers.list"),
+        "name",
+        "Cliente 1",
+    );
+
+    rt.execute_command(
+        "services.services.create",
+        &params(json!({
+            "name": "Peinado/Lavado", "tax_category_key": tax_key,
+            "duration_minutes": 30, "is_bookable": 1
+        })),
+        ctx,
+    )
+    .await
+    .expect("services.services.create");
+    let service_id = id_where(
+        &rt.execute_query("services.services.list", &Params::new(), ctx)
+            .await
+            .expect("services.services.list"),
+        "name",
+        "Peinado/Lavado",
+    );
+
+    rt.execute_command(
+        "staff.members.create",
+        &params(json!({ "first_name": "Pro", "last_name": "Uno", "is_bookable": 1 })),
+        ctx,
+    )
+    .await
+    .expect("staff.members.create");
+    let staff_id = id_where(
+        &rt.execute_query("staff.members.list", &Params::new(), ctx)
+            .await
+            .expect("staff.members.list"),
+        "last_name",
+        "Uno",
+    );
+
+    rt.execute_command(
+        "staff.members.create",
+        &params(json!({ "first_name": "Pro", "last_name": "Dos", "is_bookable": 1 })),
+        ctx,
+    )
+    .await
+    .expect("staff.members.create (2)");
+    let members = rt
+        .execute_query("staff.members.list", &Params::new(), ctx)
+        .await
+        .expect("staff.members.list");
+    let other_staff_id = id_where(&members, "last_name", "Dos");
+
+    Links { customer_id, service_id, staff_id, other_staff_id }
+}
+
 /// Crea un horario de trabajo (lun–vie, 09:00–18:00) con tramos en cada día laborable.
 async fn seed_weekday_schedule(rt: &Runtime, ctx: &RequestContext) {
     rt.execute_command(
@@ -139,7 +245,7 @@ async fn seed_weekday_schedule(rt: &Runtime, ctx: &RequestContext) {
 /// Inserta una cita "viva" de un profesional vía el command público de create (handler WASM
 /// si está compilado) o, si el .wasm no está, directamente con el sub-command SQL para no
 /// depender del guest. Devuelve sin asumir el número de cita.
-async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, dur: i64) {
+async fn book(rt: &Runtime, ctx: &RequestContext, links: &Links, staff_id: &str, start: &str, dur: i64) {
     // El handler WASM calcula end = start+dur; aquí lo precomputamos para el insert directo.
     let wasm = mdir("appointments").join("dist/handler.wasm").exists();
     if wasm {
@@ -149,8 +255,8 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
                 // La cita se reserva contra registros REALES (appointments#21): cliente, servicio
                 // y profesional son ENLACES (`*_id`), y el nombre/precio denormalizado viaja CON
                 // ellos como snapshot histórico. Un nombre suelto ya no se acepta.
-                "customer_id": "cust-1", "customer_name": "Cliente",
-                "service_id": "svc-1", "service_name": "Peinado/Lavado",
+                "customer_id": links.customer_id, "customer_name": "Cliente",
+                "service_id": links.service_id, "service_name": "Peinado/Lavado",
                 "staff_id": staff_id, "staff_name": staff_id,
                 "start_datetime": start, "duration_minutes": dur
             })),
@@ -178,7 +284,7 @@ async fn book(rt: &Runtime, ctx: &RequestContext, staff_id: &str, start: &str, d
             "appointments._insert_appointment",
             &params(json!({
                 "appointment_id": null, "day": "20990101",
-                "customer_id": null, "customer_name": "Cliente",
+                "customer_id": links.customer_id, "customer_name": "Cliente",
                 "customer_phone": "", "customer_email": "",
                 "staff_id": staff_id, "staff_name": staff_id,
                 "service_id": null, "service_name": "Peinado/Lavado", "service_price": 0,
@@ -221,31 +327,33 @@ async fn overlap_same_staff_rejected_distinct_staff_ok() {
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, false).await; // OFF: solo si la profesional está libre
+    let links = seed_links(&rt, &ctx).await;
+    let p1 = links.staff_id.clone();
     let day = next_wednesday();
     let p1_start = format!("{day}T12:00:00+00:00");
     let dur = 30; // peinado/lavado
 
     // Peluquera1 @ 12:00 (30 min) → P1 ocupada 12:00–12:30.
-    book(&rt, &ctx, "P1", &p1_start, dur).await;
+    book(&rt, &ctx, &links, &p1, &p1_start, dur).await;
 
     // 2ª cita de P1 dentro de la ventana → RECHAZADA por solape.
     let inside = format!("{day}T12:15:00+00:00");
-    let (avail_p1, reason_p1) = check(&rt, &ctx, &inside, dur, Some("P1")).await;
+    let (avail_p1, reason_p1) = check(&rt, &ctx, &inside, dur, Some(&p1)).await;
     assert_eq!(avail_p1, 0, "2ª cita de P1 en su ventana debe rechazarse");
     assert_eq!(reason_p1, "overlap", "el motivo debe ser solape");
 
     // Misma franja exacta de P1 también solapa.
-    let (avail_p1_exact, _) = check(&rt, &ctx, &p1_start, dur, Some("P1")).await;
+    let (avail_p1_exact, _) = check(&rt, &ctx, &p1_start, dur, Some(&p1)).await;
     assert_eq!(avail_p1_exact, 0, "misma hora exacta de P1 también solapa");
 
     // Peluquera2 @ 12:00 → ACEPTADA (capacidad = nº de empleados, comprobado por staff_id).
-    let (avail_p2, reason_p2) = check(&rt, &ctx, &p1_start, dur, Some("P2")).await;
+    let (avail_p2, reason_p2) = check(&rt, &ctx, &p1_start, dur, Some(&links.other_staff_id)).await;
     assert_eq!(avail_p2, 1, "P2 a la misma hora debe aceptarse (otra profesional)");
     assert_eq!(reason_p2, "", "P2 no tiene motivo de rechazo");
 
     // Después de la ventana de P1 (12:30) P1 vuelve a estar libre.
     let after = format!("{day}T12:30:00+00:00");
-    let (avail_after, _) = check(&rt, &ctx, &after, dur, Some("P1")).await;
+    let (avail_after, _) = check(&rt, &ctx, &after, dur, Some(&p1)).await;
     assert_eq!(avail_after, 1, "a las 12:30 P1 ya está libre (ventana [12:00,12:30) cerrada)");
 }
 
@@ -261,14 +369,16 @@ async fn toggle_allow_overlapping_permits_double_booking() {
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, true).await; // ON: permite varias citas a la misma hora
+    let links = seed_links(&rt, &ctx).await;
+    let staff = links.staff_id.clone();
     let day = next_wednesday();
     let start = format!("{day}T12:00:00+00:00");
     let dur = 30;
 
-    book(&rt, &ctx, "P1", &start, dur).await;
+    book(&rt, &ctx, &links, &staff, &start, dur).await;
 
     // Con el toggle ON, una 2ª cita de P1 a la misma hora se ACEPTA (no se comprueba solape).
-    let (avail, reason) = check(&rt, &ctx, &start, dur, Some("P1")).await;
+    let (avail, reason) = check(&rt, &ctx, &start, dur, Some(&links.staff_id)).await;
     assert_eq!(avail, 1, "con allow_overlapping=true la doble reserva se permite");
     assert_eq!(reason, "", "sin motivo de rechazo cuando el solape está permitido");
 }
@@ -317,6 +427,7 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
     let rt = rt_appts().await;
     let ctx = admin();
     set_overlap(&rt, &ctx, false).await; // allow_overlapping=false
+    let links = seed_links(&rt, &ctx).await;
     let day = next_wednesday();
     let start = format!("{day}T12:00:00+00:00");
     let dur = 30;
@@ -325,10 +436,11 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
     rt.execute_command(
         "appointments.appointments.create",
         &params(json!({
-            // Alta ligada (appointments#21): customer_id/service_id/staff_id son obligatorios.
-            "customer_id": "cust-1", "customer_name": "Cliente 1",
-            "service_id": "svc-1", "service_name": "Peinado/Lavado",
-            "staff_id": "P1", "staff_name": "P1",
+            // Alta ligada (appointments#21): customer_id/service_id/staff_id son obligatorios,
+            // y desde appointments#11 se RESUELVEN contra el hub — han de existir de verdad.
+            "customer_id": links.customer_id, "customer_name": "Cliente 1",
+            "service_id": links.service_id, "service_name": "Peinado/Lavado",
+            "staff_id": links.staff_id, "staff_name": "Pro Uno",
             "start_datetime": start, "duration_minutes": dur
         })),
         &ctx,
@@ -349,7 +461,7 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
         .await
         .expect("appointments.list no debe romper tras crear (hub#110)");
     assert_eq!(rows.len(), 1, "tras 1 cita creada, el listado debe devolver 1 fila");
-    assert_eq!(rows[0]["staff_name"].as_str(), Some("P1"));
+    assert_eq!(rows[0]["staff_name"].as_str(), Some("Pro Uno"));
 
     // Bug (a) de #110: 2ª cita SOLAPADA (12:15, misma P1) → el command create debe RECHAZARLA.
     // El runtime precarga `appointments.appointments.conflicting` (reads) y el handler lo detecta.
@@ -358,20 +470,30 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
         .execute_command(
             "appointments.appointments.create",
             &params(json!({
-                "customer_id": "cust-2", "customer_name": "Cliente 2",
-                "service_id": "svc-1", "service_name": "Peinado/Lavado",
-                "staff_id": "P1", "staff_name": "P1",
+                // Enlaces REALES a propósito: con ids inventados el rechazo llegaría por
+                // `customer_not_found` y este test daría por bueno el solape sin haberlo probado.
+                "customer_id": links.customer_id, "customer_name": "Cliente 2",
+                "service_id": links.service_id, "service_name": "Peinado/Lavado",
+                "staff_id": links.staff_id, "staff_name": "Pro Uno",
                 "start_datetime": overlap_start, "duration_minutes": dur
             })),
             &ctx,
         )
         .await
         .expect_err("2ª cita solapada del mismo staff debe rechazarse (hub#110)");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("overlap"),
-        "el rechazo debe ser por solape, no otro error. llegó: {msg}"
-    );
+    // El rechazo se identifica por su CÓDIGO estable, no por el texto. `appointments` dejó de
+    // devolver `Err("overlap: …")` y pasó a un `DomainError` con código
+    // (`appointments.overlapping_appointment`, appointments#70/#71) precisamente para que nadie
+    // tenga que olfatear un prefijo — y este e2e seguía olfateándolo, así que se rompía en cuanto
+    // el módulo escribió el mensaje en lenguaje de negocio. El mensaje es texto humano y además
+    // traducible (ADR-0055): afirmar sobre él es afirmar sobre la traducción.
+    match &err {
+        erplora_runtime::RuntimeError::Domain { code, .. } => assert_eq!(
+            code, "appointments.overlapping_appointment",
+            "el rechazo debe ser por solape, no otro error"
+        ),
+        other => panic!("se esperaba un rechazo de negocio por solape, llegó: {other:?}"),
+    }
 
     // El listado sigue intacto (la cita rechazada no se materializó).
     let rows_after = rt

@@ -237,6 +237,12 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
     use RuntimeError as E;
     match err {
         E::InvalidPayload { .. }
+        // hub#1086: a payload missing a bind the query's SQL references is the caller's
+        // mistake, same family as an invalid payload — never a Hub bug.
+        | E::MissingRequiredParam { .. }
+        // hub#1173: a param the list query does not declare is the caller's mistake at the
+        // same door — expected, never a Hub bug.
+        | E::UnknownFilter { .. }
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
@@ -250,6 +256,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // hub#328: the fiscal precondition is expected state of a hub that has not finished its
         // setup (missing business identity/certificate) — never a Hub bug worth an issue.
         | E::FiscalPrecondition { .. }
+        // hub#1088: a tax id that is not shaped like an official one is the caller's mistake at
+        // the settings door — expected, user-severity, never a Hub bug.
+        | E::InvalidTaxId { .. }
         // hub#376: a demo hub refusing to leave its sandbox is the deployment marker doing its
         // job (ADR-0197 §4) — expected, and never a Hub bug worth an issue.
         | E::DemoLocked { .. }
@@ -272,6 +281,13 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // doing its job — the state of the hub (no open session), not a bug of the Hub. Same
         // severity as the other business-state refusals above.
         | E::ProtectsGuard { .. }
+        // hub#1101: the dependents gate refusing an uninstall is the gate doing its job — the
+        // shape of what the owner installed, not a bug of the Hub.
+        | E::HasDependents { .. }
+        // hub#1070: a refused field and a manifest refused on a contract rule are both things the
+        // caller (a user, a module author) fixes — never a bug of the hub.
+        | E::InvalidField { .. }
+        | E::ManifestRejected { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -315,6 +331,16 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Wasm(_) => "wasm",
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
+        E::InvalidField { .. } => "invalid_field",
+        E::CertificateTypeMismatch { .. } => "certificate_type_mismatch",
+        E::ManifestRejected { code, .. } => code.as_str(),
+        // hub#1086: its own stable code, so a caller can tell "you did not send what the
+        // query needs" from "what you sent does not validate".
+        E::MissingRequiredParam { .. } => "missing_required_param",
+        // hub#1173: its own stable code, so a caller can tell "the query does not have that
+        // filter" from "you did not send what it needs" — and fix the call instead of trusting
+        // a page that quietly held the whole list.
+        E::UnknownFilter { .. } => "unknown_filter",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero
@@ -327,6 +353,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // from a generic error and surface it with the query that faltó.
         E::ReadUnavailable { .. } => "read_unavailable",
         E::FiscalPrecondition { .. } => "fiscal_precondition_failed",
+        // hub#1088: the SUBJECT is the stable code, one per failure kind — the screen has to be
+        // able to say "the control letter does not check out" instead of a flat "invalid", and
+        // each of the four has its own translation (es/en).
+        E::InvalidTaxId { code, .. } => code,
         // hub#376: the SUBJECT is the stable code, one per demo lock — a client that only sees
         // `demo_locked` could not tell which of the three doors refused.
         E::DemoLocked { lock } => lock.as_str(),
@@ -348,6 +378,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // different door from RBAC (it is a module's precondition over another module's surface),
         // and the screen that explains it has to say "open the drawer", not "ask the manager".
         E::ProtectsGuard { .. } => "protects_guard",
+        // hub#1101: the inverse of `missing_dependency`, and its own code. The screen does not just
+        // report it, it ACTS on it — it lists `dependents` and offers «remove it anyway» — so it
+        // must be distinguishable from every other refusal of an uninstall.
+        E::HasDependents { .. } => "has_dependents",
         E::Other(_) => "other",
     })
 }
@@ -596,7 +630,7 @@ mod tests {
     #[test]
     fn a_frozen_tax_id_carries_its_own_stable_code() {
         let err = RuntimeError::BusinessTaxIdFrozen {
-            frozen_to: "B12345678".into(),
+            frozen_to: "B12345674".into(),
             since: "2026-08-08T10:00:00Z".into(),
         };
         assert_eq!(error_code_of(&err), "business_tax_id_frozen");
@@ -606,17 +640,54 @@ mod tests {
         assert_ne!(error_code_of(&err), DemoLock::FiscalIdentity.as_str());
     }
 
+    /// hub#1088: the refusal of an invalid tax id carries its own code PER FAILURE KIND — the
+    /// SUBJECT travels, exactly like the demo locks, because «the letter does not check out» and
+    /// «this is no official shape» are two different conversations on the screen.
+    #[test]
+    fn an_invalid_tax_id_carries_the_code_of_its_failure_kind() {
+        for (code, err) in [
+            (
+                crate::settings::INVALID_TAX_ID_TYPE,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_TYPE, message: String::new() },
+            ),
+            (
+                crate::settings::TAX_ID_TOO_LONG,
+                RuntimeError::InvalidTaxId { code: crate::settings::TAX_ID_TOO_LONG, message: String::new() },
+            ),
+            (
+                crate::settings::INVALID_TAX_ID_FORMAT,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_FORMAT, message: String::new() },
+            ),
+            (
+                crate::settings::INVALID_TAX_ID_CONTROL,
+                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_CONTROL, message: String::new() },
+            ),
+        ] {
+            assert_eq!(error_code_of(&err), code, "the code IS the subject");
+            assert_eq!(severity_of(&err), severity::USER);
+        }
+        // And none of them collapses into the payload refusal: a shape problem at the settings
+        // door is not a broken request.
+        assert_ne!(
+            error_code_of(&RuntimeError::InvalidTaxId {
+                code: crate::settings::INVALID_TAX_ID_FORMAT,
+                message: String::new(),
+            }),
+            "invalid_payload"
+        );
+    }
+
     /// El mensaje dice **con qué identificador** está anclada la cadena y **desde cuándo**. Sin
     /// eso, el que se topa con el 409 no sabe si el que sobra es el NIF que acaba de teclear o el
     /// que el hub lleva dentro.
     #[test]
     fn a_frozen_tax_id_names_the_anchor_and_the_moment() {
         let message = RuntimeError::BusinessTaxIdFrozen {
-            frozen_to: "B12345678".into(),
+            frozen_to: "B12345674".into(),
             since: "2026-08-08T10:00:00Z".into(),
         }
         .to_string();
-        assert!(message.contains("B12345678"), "`{message}`");
+        assert!(message.contains("B12345674"), "`{message}`");
         assert!(message.contains("2026-08-08T10:00:00Z"), "`{message}`");
     }
 

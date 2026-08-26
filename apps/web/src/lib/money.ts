@@ -77,6 +77,14 @@ function intl(opts?: FormatMoneyOptions): Intl.NumberFormat {
   return new Intl.NumberFormat(opts?.locale ?? getLocale(), {
     style: 'currency',
     currency: opts?.currency ?? hubCurrency(),
+    // hub#1090: CLDR deja SIN agrupar los importes de 4 dígitos en español
+    // (`minimumGroupingDigits=2` → «1234,56 €»), pero la regla vinculante del CLAUDE.md raíz es la
+    // del sector (Odoo, Dynamics, Shopify, Holded, glibc, Excel y el comercio español): agrupar
+    // SIEMPRE desde 4 dígitos («1.234,56 €»), porque en una columna de dinero alineada a la
+    // derecha 1234,56 y 12.345,60 no alinean sus separadores. `true` es la forma booleana del
+    // `'always'` de MDN — fuerza el grupo aunque el locale prefiera lo contrario — y la única que
+    // tipa contra la lib ES2022 de este proyecto (la unión de strings llega con ES2023).
+    useGrouping: true,
     ...(opts?.maximumFractionDigits != null
       ? { maximumFractionDigits: opts.maximumFractionDigits }
       : {}),

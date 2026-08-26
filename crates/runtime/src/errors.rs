@@ -116,6 +116,29 @@ pub enum RuntimeError {
     CapabilityDenied { module: String, capability: String },
     #[error("dependencia no satisfecha: el módulo `{module}` requiere `{dep}`")]
     MissingDependency { module: String, dep: String },
+    /// The inverse of [`RuntimeError::MissingDependency`] (hub#1101): the module is on its way OUT
+    /// and other INSTALLED modules declare it in `depends_on`.
+    ///
+    /// Installing resolves dependencies forward (ADR-0060) and uninstalling resolved nothing at
+    /// all: removing `taxes` answered `ok: true`, the till kept its «Charge» button enabled, and
+    /// the cashier discovered it when `sales.complete_sale` aborted mid-charge on a read whose
+    /// owner had gone. The refusal has to happen at the door and has to NAME who needs it —
+    /// «this cannot be removed» is not something an owner can act on.
+    ///
+    /// `dependents` is the TRANSITIVE closure and ignores status: uninstalling takes the package
+    /// away, so a dependant that is merely switched off can never be switched back on either. It
+    /// travels as a **field**, never parsed out of the sentence, because it is what the dialog
+    /// lists.
+    #[error(
+        "`{module}` cannot be uninstalled: {} installed app(s) need it — {}. Uninstall those first, \
+         or confirm you want to remove it anyway",
+        dependents.len(),
+        dependents.join(", ")
+    )]
+    HasDependents {
+        module: String,
+        dependents: Vec<String>,
+    },
     /// The dependency is installed but OLDER than the declared floor (hub#681): each module is
     /// correct in isolation and the combination does not work, so the refusal names all four
     /// facts the operator needs.
@@ -163,6 +186,41 @@ pub enum RuntimeError {
     /// El JSON Schema declarado por una query/command no compila (se detecta al instalar).
     #[error("schema inválido en `{name}`: {detail}")]
     Schema { name: String, detail: String },
+    /// Un bind que el SQL base de una query de LISTA referencia quedó AUSENTE (o a null) en los
+    /// params (hub#1086). Ligarlo como NULL convierte `col = :param` en un filtro que no casa
+    /// NADA, y la página responde `total: 0` con credibility plena: el listado miente sin
+    /// levantar sospechas (el movimiento de caja ESTABA escrito; la query decía que no había
+    /// nada). Es la mitad ruidosa del contrato: lo que el SQL referencia FUERA de un
+    /// `COALESCE(:p, …)` no puede ser opcional — un bind COALESCE-guardado es un default
+    /// declarado por el propio módulo y sigue llegando como NULL a propósito.
+    #[error("la query `{query}` requiere el parámetro `:{param}` (su SQL lo referencia) y llegó ausente o null: se rehúsa a ligarlo como NULL porque respondería una página vacía como si no existiera nada")]
+    MissingRequiredParam { query: String, param: String },
+    /// Un parámetro que la query de LISTA no declara llegó en los params (hub#1173). Antes se
+    /// ignoraba en silencio y la página respondía `200 ok` **con la lista entera**: quien llamó
+    /// —un módulo, el asistente, una integración, un flujo— se cree que ha filtrado y trabaja
+    /// sobre 280 filas pensando que tiene 12, sin nada que lo distinga de un filtro que sí corrió
+    /// y no encontró coincidencias. Es el gemelo mudo de [`Self::MissingRequiredParam`], y cierra
+    /// la asimetría que señala la issue: el payload de un command se valida estricto
+    /// (`invalid_payload`) y el de una query no se validaba en absoluto.
+    ///
+    /// El vocabulario de una lista es lo que ella declara, ni más ni menos: los binds del propio
+    /// motor (`limit`/`offset`/`search`/`sort`/`dir`), un `f_<col>` (o `f_<col>_from`/`_to`) por
+    /// cada filtro del bloque `list`, cualquier bind que su SQL base referencia —que es donde una
+    /// lista declara sus params de contexto— y las `properties` de su JSON Schema si lo declara.
+    ///
+    /// **Solo se defiende el espacio SIN prefijo.** `f_*` es el namespace del propio motor y un
+    /// filtro no casado ahí se sigue descartando: hay 5 pantallas del catálogo cuya tabla declara
+    /// `filterable` una columna que su manifest no declara como filtro, y rechazarlas cambiaría
+    /// «el filtro no hace nada» por «la tabla revienta». Se cierra cuando esos manifests declaren
+    /// el filtro que les falta (hub#1182).
+    #[error(
+        "la query `{query}` no declara el parámetro `{param}`: se rehúsa a ignorarlo porque devolvería la lista ENTERA como si hubiera filtrado; acepta {accepted:?}"
+    )]
+    UnknownFilter {
+        query: String,
+        param: String,
+        accepted: Vec<String>,
+    },
     /// Fallo de la capacidad de host `host.notify` (ADR-0012): el transporte de un canal
     /// (email/sms/whatsapp) no pudo entregar. El relay del outbox lo trata como un listener
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
@@ -184,6 +242,33 @@ pub enum RuntimeError {
     /// del core: el módulo (verifactu, B2B…) solo PIDE la operación, no ve el `.p12`.
     #[error("host.certificate: {0}")]
     Certificate(String),
+    /// A payload field the core refused, with the field and a STABLE reason a consumer can
+    /// assert on and the UI can translate (hub#1070, ADR-0398 §6): `name`/`role`/`pin`/`email`/
+    /// `badge` of a hub user, `role_key` of an activation, `language` of a profile. `detail` is
+    /// the human fallback (English source), never the contract — a test that reads it is a
+    /// test that breaks the day the text is translated (ADR-0055).
+    #[error("`{name}`: field `{field}` {reason}: {detail}")]
+    InvalidField {
+        name: String,
+        field: String,
+        reason: String,
+        detail: String,
+    },
+    /// The control plane declared one certificate type and served another (hub#470): not
+    /// installed, because the AEAT door is chosen by the TYPE and the wrong one rejects every
+    /// record, one by one.
+    #[error("el plano de control declara un certificado `{declared}` pero el contenedor que ha servido es `{served}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el equivocado la AEAT rechaza todos los registros, uno a uno")]
+    CertificateTypeMismatch { declared: String, served: String },
+    /// A manifest the installer REFUSED on a contract rule (not a parse error — that is
+    /// [`RuntimeError::Manifest`]): `code` names the rule (`role_grants_admin`,
+    /// `system_table_write`…), `at` the offending element, `detail` the English explanation.
+    #[error("manifest `{module}`: {at}: {detail}")]
+    ManifestRejected {
+        module: String,
+        at: String,
+        code: String,
+        detail: String,
+    },
     /// A read marked `required` (ADR-0069, hub#701) could not be resolved — the module that owns
     /// it is absent, inactive, or the query itself failed. Distinct from the GRACEFUL default
     /// (regla 3 de ADR-0069): a `required` read aborts the command instead of letting the handler
@@ -221,6 +306,19 @@ pub enum RuntimeError {
     /// (the latter only while an installed module declares the `certificate` capability).
     #[error("fiscal precondition failed: configure {} before issuing fiscal documents", missing.join(", "))]
     FiscalPrecondition { missing: Vec<&'static str> },
+    /// `business_tax_id` refused at the door (hub#1088): the tax id is not free text — it is the
+    /// obligado the AEAT validates in every record and the issuer stamped on every invoice, and
+    /// until here anything shaped like `ZZZ999` was stored and became the emitter of the whole
+    /// VeriFactu registry.
+    ///
+    /// `code` is one of the four stable refusals of `settings::validate_tax_id`
+    /// (`invalid_tax_id_type` / `tax_id_too_long` / `invalid_tax_id_format` /
+    /// `invalid_tax_id_control`) and the UI translates by it (es/en), exactly like
+    /// [`Self::BusinessTaxIdFrozen`]: one flat «invalid» would not say WHICH half is wrong, and a
+    /// mistyped control letter is retyped while a non-shape is a different conversation.
+    /// `message` is the English fallback for the log.
+    #[error("{message}")]
+    InvalidTaxId { code: &'static str, message: String },
     /// `business_tax_id` is FROZEN: this hub already emitted its first fiscal record (ADR-0273,
     /// hub#554 — the ADR's own consequence: "`business_tax_id` stops being able to fork a live
     /// chain").
