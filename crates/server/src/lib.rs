@@ -1321,6 +1321,10 @@ pub fn app(state: AppState) -> Router {
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
+        // Un hub no se indexa (ver `with_noindex`). Va en el router de API, ANTES del
+        // fallback SPA: sin esta ruta, `/robots.txt` devolvía `index.html` con un 200, que
+        // un rastreador lee como «este sitio no tiene reglas».
+        .route("/robots.txt", get(robots_txt))
         // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
         // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
         // segundo, que es el que Swarm mira para decidir si revierte.
@@ -1918,6 +1922,45 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
+/// `X-Robots-Tag: noindex` en TODAS las respuestas del hub + `/robots.txt`.
+///
+/// Un hub es la caja de un cliente: **nunca** se indexa. No es una preferencia de SEO —
+/// `{slug}.erplora.com` dice quién es el cliente, la portada dice qué módulos tiene instalados, y
+/// detrás hay un login de un TPV real. Y no hay nada que ganar en el otro platillo: ninguna página
+/// de un hub es un resultado de búsqueda que queramos.
+///
+/// Dos capas porque tapan agujeros distintos: el `robots.txt` es para el rastreador que pregunta,
+/// y la cabecera para el que no —y para la URL que un `robots.txt` no sabe describir, como un
+/// enlace profundo que alguien pegó en una issue pública—. `noarchive` va porque una copia
+/// cacheada de una pantalla de caja no debe sobrevivir a la pantalla.
+///
+/// La tercera capa vive en `apps/web/index.html` (meta `robots`), que es la copia del documento
+/// que esta capa NO cubre: la que va empaquetada dentro de la app instalada. Contrato completo en
+/// `crates/server/tests/never_indexed.rs`.
+const ROBOTS_TAG: &str = "noindex, nofollow, noarchive";
+
+/// Cuerpo del `robots.txt` de un hub: sin `Allow`, sin `Sitemap`, sin excepciones.
+const HUB_ROBOTS_TXT: &str = "User-agent: *\nDisallow: /\n";
+
+async fn robots_txt() -> impl axum::response::IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        HUB_ROBOTS_TXT,
+    )
+}
+
+/// Añade la cabecera a lo que salga del router — incluidos los 404 y el fallback SPA, que son
+/// justo las respuestas que una capa montada «por ruta» se dejaría fuera.
+pub fn with_noindex(router: Router) -> Router {
+    router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
+        axum::http::HeaderName::from_static("x-robots-tag"),
+        HeaderValue::from_static(ROBOTS_TAG),
+    ))
+}
+
 /// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
 /// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
 /// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
@@ -1947,7 +1990,7 @@ pub fn with_csp(router: Router, csp: &str) -> Router {
 /// la composición REAL sin bindear un puerto. Que la cabecera no dependa de una rama `if let` es el
 /// contrato que fija `crates/server/tests/cloud_csp.rs`.
 pub fn build_serving_router(state: AppState, web_dir: Option<&str>, csp: &str) -> Router {
-    with_csp(build_router(state, web_dir), csp)
+    with_noindex(with_csp(build_router(state, web_dir), csp))
 }
 
 /// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO
@@ -3459,6 +3502,12 @@ pub(crate) fn err_status_and_code(
         E::MissingRequiredParam { .. } => {
             (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
         }
+        // hub#1173: the twin of the above at the same door — a param the LIST query does not
+        // declare. Same `422` (it is a payload-contract refusal, caught before any read) with its
+        // own stable code, so the caller can tell "that query has no such filter" from "you did
+        // not send what it needs" — and fix the call instead of trusting a page that quietly held
+        // the whole list.
+        E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.

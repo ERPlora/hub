@@ -8,8 +8,12 @@
 # used to sync it with `.githooks/pre-push`. Drift is silent in both
 # directions: a stale copy re-reds already-fixed tests (false red) or skips
 # checks the repo added while still publishing the attestation (false green).
-# This script is the one sanctioned resync path; the hook itself detects drift
-# on every run and points here.
+# This script is the one sanctioned resync path for a FIRST install. Since
+# hub#1207 the hook also resyncs ITSELF when it finds it is stale — warning was
+# demonstrably not enough: the fleet ran a copy from 2026-08-13 for two weeks,
+# so every change to `.githooks/pre-push` was a change to a file nothing
+# executed. That self-heal lives in the INSTALLED copy, though, so a machine
+# whose installed hook predates hub#1207 still needs this script exactly once.
 #
 #   bash scripts/install-hooks.sh
 #

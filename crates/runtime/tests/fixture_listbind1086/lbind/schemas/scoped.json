@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lbind.items.scoped params",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "cart_id"
+  ],
+  "properties": {
+    "cart_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_tag": {
+      "type": "string",
+      "description": "Declarado por el m\u00f3dulo en su schema: ni filtro ni bind del SQL, pero DECLARADO."
+    }
+  }
+}
