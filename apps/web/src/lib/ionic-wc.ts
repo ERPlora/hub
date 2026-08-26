@@ -21,11 +21,18 @@ import { defineCustomElement as ionCardContent } from '@ionic/core/components/io
 // (checkbox «módulo» + «datos» por fila): hay que garantizar el custom element definido aunque
 // ninguna SFC lo haya montado aún vía @ionic/vue.
 import { defineCustomElement as ionCheckbox } from '@ionic/core/components/ion-checkbox.js';
+// ok-data-table pinta un `<ion-spinner name="dots">` en lugar del icono cuando una acción de fila
+// está en curso, y AppsPage crea otro IMPERATIVAMENTE en la celda de estado del catálogo («Añadir
+// apps»: descargando / verificando / instalando…). Hasta hub#1129 ninguno de los dos lo registraba:
+// se apoyaban en que alguna SFC del shell tuviera un `<ion-spinner>` montado en ese momento, que es
+// una dependencia invisible — al quitar el spinner de carga de AppsPage, su propio indicador de
+// instalación se habría quedado en un elemento desconocido, sin dibujo y sin error.
+import { defineCustomElement as ionSpinner } from '@ionic/core/components/ion-spinner.js';
 
 export function registerOutfitkitIonicDeps(): void {
   [
     ionButton, ionIcon, ionInput, ionSearchbar, ionSelect, ionSelectOption,
     ionModal, ionActionSheet, ionToast, ionAlert,
-    ionCard, ionCardHeader, ionCardContent, ionCheckbox,
+    ionCard, ionCardHeader, ionCardContent, ionCheckbox, ionSpinner,
   ].forEach((def) => def());
 }

@@ -16,7 +16,10 @@ vi.mock('./module-loader', () => ({
   loadModuleComponent: vi.fn(),
 }));
 
-import { buildWidgetsFromManifests } from './dashboard-widgets';
+import {
+  buildWidgetsFromManifests,
+  MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR,
+} from './dashboard-widgets';
 import type { InstalledManifest } from './module-loader';
 import type { ErploraClient } from '@erplora/module-sdk';
 import type { WidgetManifestDef } from '@erplora/module-types';
@@ -535,19 +538,24 @@ describe('i18n de títulos de widget (T5, ADR-0055)', () => {
     expect(widgets[0]!.title).toBe('Sales today');
   });
 
+  // Se comprueba sobre un `stat` a propósito: desde hub#1105 el `kpi` ya no pinta `options.label`
+  // (era una segunda cabecera dentro del marco), así que el único kind que lo muestra —y por tanto
+  // donde su traducción se puede observar— es `stat`. El contrato traducido es el mismo.
   it('traduce también el `label` (options.label) del widget desde el locale', async () => {
     const def: WidgetManifestDef = {
-      title: 'Sales today',
-      kind: 'kpi',
-      query: 'sales.today',
+      title: 'Products in stock',
+      kind: 'stat',
+      query: 'inventory.products.stats',
       map: { value: 'value' },
-      options: { format: 'number', label: 'Today' },
+      options: { format: 'number', label: 'Products with stock' },
     };
     const mods = [
       {
-        id: 'sales',
-        manifest: { id: 'sales', widgets: { 'sales.today': def } },
-        locale: { widgets: { 'sales.today': { title: 'Ventas hoy', label: 'Hoy' } } },
+        id: 'inventory',
+        manifest: { id: 'inventory', widgets: { 'inventory.in_stock': def } },
+        locale: {
+          widgets: { 'inventory.in_stock': { title: 'Con existencias', label: 'Productos con stock' } },
+        },
       },
     ] as unknown as InstalledManifest[];
     const { widgets } = buildWidgetsFromManifests(mods, {
@@ -558,8 +566,8 @@ describe('i18n de títulos de widget (T5, ADR-0055)', () => {
     document.body.appendChild(cell);
     widgets[0]!.render(cell);
     await new Promise((r) => setTimeout(r, 0));
-    const kpi = cell.querySelector('ok-kpi') as (HTMLElement & { label?: string }) | null;
-    expect(kpi?.label).toBe('Hoy');
+    const stat = cell.querySelector('ok-stat') as (HTMLElement & { label?: string }) | null;
+    expect(stat?.label).toBe('Productos con stock');
     document.body.replaceChildren();
   });
 
@@ -598,5 +606,245 @@ describe('validación de def — bloque real', () => {
       sector: null,
     });
     expect(out.map((w) => w.id)).toEqual(['valido']);
+  });
+});
+
+// ── hub#1100 · Qué arranca ACTIVO en el tablero (ADR-0054 §4) ──────────────────────────────────
+//
+// 🔴 El agujero: la recolección devolvía el CATÁLOGO (todos los widgets) y un preset "Recomendado"
+// que sólo existía si el hub tenía sector. Sin sector el preset salía vacío y `ok-widget-board`
+// caía a su último recurso documentado —«sin value y sin presets ⇒ activa TODOS»—, así que un hub
+// con 25 módulos abría con los 20 widgets encendidos, los 9 marcados `default:false` incluidos.
+// El paso que faltaba es decir explícitamente QUÉ está activo de salida (`defaultActive`), en vez
+// de dejar que la librería lo adivine.
+describe('hub#1100 — qué arranca ACTIVO (defaultActive), no el catálogo entero', () => {
+  const client = clientWith(async () => [{ total: 1 }]);
+  const base: WidgetManifestDef = {
+    title: 'W',
+    kind: 'kpi',
+    query: 'sales.today',
+    map: { value: 'total' },
+  };
+
+  /** Los 19 widgets reales de los 5 módulos con widgets (2026-08-25), con su default/sectors. */
+  const REAL_WIDGETS: Record<string, WidgetManifestDef> = Object.fromEntries(
+    (
+      [
+        ['cash_register.current_session', true, ['retail', 'hosteleria']],
+        ['cash_register.recent_sessions', false, ['retail', 'hosteleria']],
+        ['inventory.low_stock_count', true, ['retail', 'hosteleria']],
+        ['inventory.value', true, ['retail', 'hosteleria']],
+        ['inventory.in_stock', false, ['retail', 'hosteleria']],
+        ['inventory.low_stock_products', true, ['retail', 'hosteleria']],
+        ['sales.today', true, ['hosteleria', 'retail', 'belleza']],
+        ['sales.tickets_today', true, ['hosteleria', 'retail', 'belleza']],
+        ['sales.last_7_days', false, ['hosteleria', 'retail', 'belleza']],
+        ['sales.recent_activity', false, ['hosteleria', 'retail', 'belleza']],
+        ['staff.headcount', true, ['rrhh', 'hosteleria', 'retail', 'general', 'belleza']],
+        ['staff.on_leave_today', true, ['rrhh', 'hosteleria', 'retail', 'general', 'belleza']],
+        ['staff.pending_time_off', false, ['rrhh', 'hosteleria', 'retail', 'general', 'belleza']],
+        ['staff.time_off_today', true, ['rrhh', 'hosteleria', 'retail', 'general', 'belleza']],
+        ['staff.by_role', false, ['rrhh', 'hosteleria', 'retail', 'general', 'belleza']],
+        ['verifactu.pending', true, ['hosteleria', 'retail', 'gestoria', 'general']],
+        ['verifactu.contingency', false, ['hosteleria', 'retail', 'gestoria', 'general']],
+        ['verifactu.by_status', false, ['hosteleria', 'retail', 'gestoria', 'general']],
+        ['verifactu.events', false, ['hosteleria', 'retail', 'gestoria', 'general']],
+      ] as Array<[string, boolean, string[]]>
+    ).map(([id, def, sectors]) => [
+      id,
+      { ...base, default: def, sectors: sectors as WidgetManifestDef['sectors'] },
+    ]),
+  );
+
+  const OPT_IN = Object.entries(REAL_WIDGETS)
+    .filter(([, d]) => d.default !== true)
+    .map(([id]) => id);
+
+  it('🔴 SIN sector: un `default:false` NUNCA arranca activo (hoy arrancaban los 20)', () => {
+    const { widgets, defaultActive } = buildWidgetsFromManifests(
+      manifestWithMany(REAL_WIDGETS),
+      { client, sector: null },
+    );
+    expect(widgets).toHaveLength(19); // el catálogo SIGUE completo: se ofrecen todos en el ⋮
+    for (const id of OPT_IN) expect(defaultActive).not.toContain(id);
+  });
+
+  it('🔴 SIN sector: arranca con un puñado legible, no con el catálogo entero', () => {
+    const { defaultActive } = buildWidgetsFromManifests(manifestWithMany(REAL_WIDGETS), {
+      client,
+      sector: null,
+    });
+    expect(defaultActive.length).toBeGreaterThan(0);
+    expect(defaultActive.length).toBeLessThanOrEqual(MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
+  });
+
+  it('SIN sector: el recorte reparte entre módulos — un `default:true` de CADA módulo antes que el segundo de ninguno', () => {
+    // Revisión de la PR #1194: con `suggested.slice(0, 6)` el corte seguía el orden de instalación,
+    // y en el banco real (inventory y staff antes que sales y cash_register) el Inicio arrancaba con
+    // 3 de inventario + 3 de personal y SIN «Ventas hoy» ni «Caja» — los dos KPI que todo TPV pone
+    // primero. Un puñado legible tiene que ser un puñado REPRESENTATIVO: round-robin por módulo.
+    const moduleOf = (id: string): string => id.split('.')[0]!;
+    // Cada módulo con SU manifest, en el orden en que los devolvió el hub del banco.
+    const byModule = new Map<string, Record<string, WidgetManifestDef>>();
+    for (const m of ['inventory', 'staff', 'sales', 'cash_register', 'verifactu']) byModule.set(m, {});
+    for (const [id, def] of Object.entries(REAL_WIDGETS)) byModule.get(moduleOf(id))![id] = def;
+    const mods = [...byModule].map(([id, widgets]) => ({
+      moduleId: id,
+      manifest: { id, widgets },
+    })) as unknown as InstalledManifest[];
+    const { defaultActive } = buildWidgetsFromManifests(mods, { client, sector: null });
+    expect(defaultActive).toHaveLength(MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
+    // Los 5 módulos con widgets (todos tienen algún default:true) están representados…
+    expect(new Set(defaultActive.map(moduleOf)).size).toBe(5);
+    // …y el primero de cada módulo va antes que el segundo de cualquiera.
+    const firstSeen = new Map<string, number>();
+    defaultActive.forEach((id, i) => {
+      if (!firstSeen.has(moduleOf(id))) firstSeen.set(moduleOf(id), i);
+    });
+    const lastFirst = Math.max(...firstSeen.values());
+    const secondOfAny = defaultActive.findIndex((id, i) => firstSeen.get(moduleOf(id)) !== i);
+    expect(secondOfAny === -1 || secondOfAny > lastFirst).toBe(true);
+    expect(defaultActive).toContain('sales.today');
+    expect(defaultActive).toContain('cash_register.current_session');
+  });
+
+  it('CON sector: exactamente los `default:true` cuyo `sectors` incluye ese sector', () => {
+    const { defaultActive } = buildWidgetsFromManifests(manifestWithMany(REAL_WIDGETS), {
+      client,
+      sector: 'gestoria',
+    });
+    expect(defaultActive).toEqual(['verifactu.pending']);
+  });
+
+  it('CON sector: `default:true` sin `sectors` aplica a cualquier sector', () => {
+    const widgets = {
+      todos: { ...base, default: true },
+      solo_retail: { ...base, default: true, sectors: ['retail'] as WidgetManifestDef['sectors'] },
+    };
+    const { defaultActive } = buildWidgetsFromManifests(manifestWithMany(widgets), {
+      client,
+      sector: 'hosteleria',
+    });
+    expect(defaultActive).toEqual(['todos']);
+  });
+
+  it('un widget filtrado por permiso tampoco arranca activo', () => {
+    const widgets = {
+      visible: { ...base, default: true },
+      denegado: { ...base, default: true, permission: 'sales.read' },
+    };
+    const { defaultActive } = buildWidgetsFromManifests(manifestWithMany(widgets), {
+      client,
+      sector: 'retail',
+      hasPermission: (p: string) => p !== 'sales.read',
+    });
+    expect(defaultActive).toEqual(['visible']);
+  });
+});
+
+// ── hub#1105 · Una sola cabecera por tarjeta ───────────────────────────────────────────────────
+//
+// 🔴 El agujero: `createCard` ya pinta la cabecera del widget (título + icono) y el renderer de
+// `kpi` volvía a pintar `options.label` + `options.icon` dentro del `ok-kpi`, cuya `.label` es
+// otra cabecera (uppercase, bold, icono a la derecha). Dos cabeceras por tarjeta y, en 4 de los 6
+// KPIs reales, el MISMO icono dos veces. El marco es el dueño de la cabecera: el kind sólo pinta
+// el valor. `stat` ya se comportaba así (su `.label` es un subtítulo, no una cabecera) y no cambia.
+describe('hub#1105 — el marco es el dueño de la cabecera: el kpi no la repite', () => {
+  /** La cabecera de la card: el `<span>` del título y el `ion-icon` de su derecha (si lo hay). */
+  function cardHeader(cell: HTMLElement): { title: string | null; icon: string | null } {
+    const card = cell.querySelector('[role="group"]') as HTMLElement | null;
+    const head = card?.firstElementChild as HTMLElement | undefined;
+    return {
+      title: head?.querySelector('span')?.textContent ?? null,
+      icon: head?.querySelector('ion-icon')?.getAttribute('name') ?? null,
+    };
+  }
+
+  it('🔴 kpi: el ok-kpi NO lleva label ni icono propios (la cabecera de la card ya los pinta)', async () => {
+    // `sales.today` tal cual lo declara su module.json: título + icono en el marco, y OTRO
+    // label + OTRO icono en options → dos cabeceras apiladas.
+    const def: WidgetManifestDef = {
+      title: "Today's sales",
+      icon: 'trending-up-outline',
+      kind: 'kpi',
+      query: 'sales.metrics.today',
+      map: { value: 'total' },
+      options: { label: 'Today', icon: 'cash-outline', format: 'currency', currency: 'EUR' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ total: 12345 }]));
+    const kpi = cell.querySelector('ok-kpi') as
+      | (HTMLElement & { label?: string; icon?: string; value?: string })
+      | null;
+    expect(kpi?.value).toContain('123,45'); // el valor sigue ahí
+    expect(kpi?.label ?? undefined).toBeUndefined();
+    expect(kpi?.icon ?? undefined).toBeUndefined();
+    expect(cardHeader(cell)).toEqual({ title: "Today's sales", icon: 'trending-up-outline' });
+  });
+
+  it('🔴 kpi: con el MISMO icono arriba y abajo, sólo queda el del marco', async () => {
+    // `inventory.value`, `staff.headcount`, `sales.tickets_today` y `verifactu.pending`: el icono
+    // del widget y el de options son literalmente el mismo.
+    const def: WidgetManifestDef = {
+      title: 'Inventory value',
+      icon: 'cash-outline',
+      kind: 'kpi',
+      query: 'inventory.stats',
+      map: { value: 'total' },
+      options: { label: 'Stock value (at cost)', icon: 'cash-outline', format: 'number' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ total: 7 }]));
+    const kpi = cell.querySelector('ok-kpi') as (HTMLElement & { icon?: string }) | null;
+    expect(kpi?.icon ?? undefined).toBeUndefined(); // el de abajo se va…
+    expect(cardHeader(cell).icon).toBe('cash-outline'); // …y queda el del marco
+  });
+
+  it('🔴 kpi: si el icono SÓLO viene en options, no se pierde — lo pinta el marco', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Pending',
+      kind: 'kpi',
+      query: 'q',
+      map: { value: 'total' },
+      options: { icon: 'shield-checkmark-outline', format: 'number' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ total: 2 }]));
+    expect(cardHeader(cell).icon).toBe('shield-checkmark-outline');
+    const kpi = cell.querySelector('ok-kpi') as (HTMLElement & { icon?: string }) | null;
+    expect(kpi?.icon ?? undefined).toBeUndefined();
+  });
+
+  it('🔴 sparkline: mismo contrato (también monta un ok-kpi dentro del marco)', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Trend',
+      icon: 'trending-up-outline',
+      kind: 'sparkline',
+      query: 'sales.spark',
+      map: { series: 'amount', value: 'total' },
+      options: { label: 'Sales', icon: 'trending-up-outline', sparkType: 'line' },
+    };
+    const cell = await renderOne(
+      def,
+      clientWith(async () => [
+        { amount: 1, total: 10 },
+        { amount: 3, total: 30 },
+      ]),
+    );
+    const kpi = cell.querySelector('ok-kpi') as (HTMLElement & { label?: string; icon?: string }) | null;
+    expect(kpi?.label ?? undefined).toBeUndefined();
+    expect(kpi?.icon ?? undefined).toBeUndefined();
+    expect(cardHeader(cell).icon).toBe('trending-up-outline');
+  });
+
+  it('REGRESIÓN: `stat` no cambia — su label sigue siendo el subtítulo que ya era', async () => {
+    const def: WidgetManifestDef = {
+      title: 'Contingency queue',
+      icon: 'warning-outline',
+      kind: 'stat',
+      query: 'verifactu.stats',
+      map: { value: 'queued' },
+      options: { label: 'In contingency queue', format: 'number' },
+    };
+    const cell = await renderOne(def, clientWith(async () => [{ queued: 4 }]));
+    const stat = cell.querySelector('ok-stat') as (HTMLElement & { label?: string }) | null;
+    expect(stat?.label).toBe('In contingency queue');
   });
 });

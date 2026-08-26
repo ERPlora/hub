@@ -394,24 +394,26 @@ fn validate_table_scope(dir: &Path, manifest: &Manifest) -> Result<()> {
             if scope.allows(table) {
                 continue;
             }
-            let why = if crate::export::is_system_table(table) {
-                format!(
+            let (code, why) = if crate::export::is_system_table(table) {
+                ("system_table_write", format!(
                     "`{table}` is a system table of the hub: the fiscal profile, the certificate \
                      and the runtime's own bookkeeping are the identity of this installation, out \
                      of reach of every module (ADR-0273 D8)"
-                )
+                ))
             } else {
-                format!(
+                ("foreign_table_write", format!(
                     "`{table}` is outside the module's own prefix (`{id}`/`{id}_*`): a module \
                      only writes its own tables; another module's data is composed through its \
                      public queries/commands (ADR-0127), never by direct SQL",
                     id = manifest.id
-                )
+                ))
             };
-            return Err(RuntimeError::Other(format!(
-                "manifest `{}`: `{rel}` writes {why}",
-                manifest.id
-            )));
+            return Err(RuntimeError::ManifestRejected {
+                module: manifest.id.clone(),
+                at: format!("`{rel}` writes `{table}`"),
+                code: code.into(),
+                detail: why,
+            });
         }
     }
     Ok(())
@@ -913,39 +915,53 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
     let mut seen: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
     for role in &manifest.roles {
         let key = role.key.as_str();
-        let reject = |detail: String| {
-            Err(RuntimeError::Other(format!(
-                "manifest `{}`: role `{key}` {detail}",
-                manifest.id
-            )))
+        // hub#1070: every refusal carries a stable code (`role_key_invalid`, `role_grants_admin`…)
+        // next to its English explanation, so a consumer asserts on the rule, not on the prose.
+        let reject = |code: &str, detail: String| {
+            Err(RuntimeError::ManifestRejected {
+                module: manifest.id.clone(),
+                at: format!("roles[{key}]"),
+                code: code.into(),
+                detail,
+            })
         };
 
         if !is_valid_role_key(key) {
-            return reject(format!(
+            return reject(
+                "role_key_invalid",
+                format!(
                 "has an invalid key: expected snake_case ASCII (`^[a-z][a-z0-9_]*$`, up to \
                  {MAX_ROLE_KEY_LEN} chars), because the key is what `role_permissions` grants \
                  against and what `hub_user.role` stores"
             ));
         }
         if crate::hub_users::is_base_role(key) {
-            return reject(format!(
+            return reject(
+                "role_shadows_base",
+                format!(
                 "collides with a base role of the hub ({}): a module EXTENDS the base catalogue, \
                  it never redefines an entry of it",
                 crate::hub_users::BASE_ROLES.join(", ")
             ));
         }
         if !seen.insert(key) {
-            return reject("is declared twice: a key names exactly one role".to_string());
+            return reject(
+                "role_duplicate",
+                "is declared twice: a key names exactly one role".to_string(),
+            );
         }
         if role.label.trim().is_empty() {
             return reject(
+                "role_label_required",
                 "needs a non-empty `label`: it is what the administrator reads when activating the \
                  role"
                     .to_string(),
             );
         }
         if crate::hub_users::is_admin_role(&role.extends) {
-            return reject(format!(
+            return reject(
+                "role_grants_admin",
+                format!(
                 "cannot extend `{}`: a module never grants administration of the hub (hub#347). \
                  That property comes from the hub itself (`HUB_OWNER_EMAIL`, ADR-0157) and from \
                  the floor the account role imposes at login, never from a manifest. Extend \
@@ -954,7 +970,9 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
             ));
         }
         if !crate::hub_users::is_extendable_base_role(&role.extends) {
-            return reject(format!(
+            return reject(
+                "role_extends_not_base",
+                format!(
                 "declares `extends: {}`, which is not a base role of the hub: expected one of {}",
                 role.extends,
                 extendable_base_roles().join(", ")
@@ -1705,6 +1723,16 @@ mod tests {
             .to_string()
     }
 
+    /// The rejection as the STRUCTURED error (hub#1070): `(code, at)` of `ManifestRejected`.
+    fn role_rejection_code(roles: serde_json::Value) -> (String, String) {
+        match super::validate_role_declarations(&with_roles(roles))
+            .expect_err("the block must be rejected")
+        {
+            RuntimeError::ManifestRejected { code, at, .. } => (code, at),
+            other => panic!("a role rejection is a ManifestRejected, got {other:?}"),
+        }
+    }
+
     /// hub#351 (paso 2b): the happy path. A module hangs its own roles from a base role and the
     /// manifest is accepted — the base catalogue is EXTENDED, never rewritten.
     #[test]
@@ -1745,12 +1773,13 @@ mod tests {
     #[test]
     fn a_module_cannot_declare_a_role_that_administers_the_hub() {
         for forbidden in ["admin", "owner", "Admin", "OWNER"] {
-            let error = role_rejection(serde_json::json!([
+            let (code, at) = role_rejection_code(serde_json::json!([
                 { "key": "backdoor", "label": "Back door", "extends": forbidden }
             ]));
-            assert!(
-                error.contains("backdoor") && error.contains("administ"),
-                "the refusal must say WHICH role and WHY (`{forbidden}`): {error}"
+            assert_eq!(
+                (code.as_str(), at.as_str()),
+                ("role_grants_admin", "roles[backdoor]"),
+                "the refusal must say WHICH role and WHY, by code (`{forbidden}`)"
             );
         }
 

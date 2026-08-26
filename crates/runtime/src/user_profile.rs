@@ -74,9 +74,11 @@ fn validate_optional(value: &Option<String>, allowed: &[&str], field: &str) -> R
     if allowed.contains(&normalized.as_str()) {
         Ok(normalized)
     } else {
-        Err(RuntimeError::InvalidPayload {
+        Err(RuntimeError::InvalidField {
             name: "user.profile.update".into(),
-            detail: format!("{field} no válido"),
+            field: field.into(),
+            reason: "unknown".into(),
+            detail: format!("`{raw}` is not an accepted {field}: expected one of {allowed:?}"),
         })
     }
 }

@@ -64,8 +64,26 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// `approvals.list` (hub#512) es la puerta de lectura del registro de aprobaciones por PIN
 /// (`_elevation_audit`, hub#362). Requiere `hub.administer` (nivel admin, no encargado): quién
 /// aprobó qué es información sobre el personal.
-const CORE_QUERIES: &[&str] =
-    &["users.list", "roles.list", "setup.status", "approvals.list", "fiscal.limits"];
+///
+/// `print.coverage` y `print.jobs` (hub#1107) son la lectura de la cola de impresión. El dato ya lo
+/// servía HTTP desde hub#341/hub#800, pero un módulo no puede pegar a las rutas del core, así que
+/// la pantalla de la cola no podía existir fuera del shell. Gate: el del namespace (sesión local),
+/// **no admin** — es la audiencia que hub#987 ya decidió para los mismos hechos: una cola que nadie
+/// drena necesita a quien está en el mostrador, no a quien administra el hub.
+const CORE_QUERIES: &[&str] = &[
+    "users.list",
+    "roles.list",
+    "setup.status",
+    "approvals.list",
+    "fiscal.limits",
+    "print.coverage",
+    "print.jobs",
+];
+
+/// Default page size of the print queue read through [`core_query`]. Same number the HTTP listing
+/// uses: a hub with more than this waiting has a printer problem, not a paging problem. A caller
+/// may ask for more, and [`crate::print_queue::list`] clamps the ask at 500.
+const PRINT_JOBS_LIMIT: i64 = 100;
 
 /// Rol más alto del plano de **NEGOCIO**: administra el hub (identidad fiscal, plan, instalar
 /// módulos, reset) y es lo que se siembra al crear el hub ([`identity::seed_owner`]) y el techo del
@@ -254,6 +272,17 @@ fn invalid(detail: impl Into<String>) -> RuntimeError {
     }
 }
 
+/// A refused field of a hub user, named by field and reason (hub#1070): what a test asserts on
+/// and what the UI translates; `detail` is the English fallback only.
+fn invalid_field(field: &str, reason: &str, detail: impl Into<String>) -> RuntimeError {
+    RuntimeError::InvalidField {
+        name: "hub.users".into(),
+        field: field.into(),
+        reason: reason.into(),
+        detail: detail.into(),
+    }
+}
+
 /// A **stable** rejection of the alta/edit of a hub user (hub#139 `Domain`, HTTP 409): `code` is
 /// what the shell programs and translates against, the message is only the English fallback.
 ///
@@ -273,10 +302,10 @@ fn reject(code: &str, message: impl Into<String>) -> RuntimeError {
 fn clean_name(value: &str) -> Result<String> {
     let name = value.trim();
     if name.is_empty() {
-        return Err(invalid("el nombre es obligatorio"));
+        return Err(invalid_field("name", "required", "the name is required"));
     }
     if name.chars().count() > 150 {
-        return Err(invalid("el nombre supera 150 caracteres"));
+        return Err(invalid_field("name", "too_long", "the name exceeds 150 characters"));
     }
     Ok(name.to_string())
 }
@@ -291,10 +320,10 @@ fn clean_name(value: &str) -> Result<String> {
 fn clean_role(value: &str) -> Result<String> {
     let role = value.trim();
     if role.is_empty() {
-        return Err(invalid("el rol es obligatorio"));
+        return Err(invalid_field("role", "required", "the role is required"));
     }
     if role.chars().count() > 50 {
-        return Err(invalid("el rol supera 50 caracteres"));
+        return Err(invalid_field("role", "too_long", "the role exceeds 50 characters"));
     }
     Ok(role.to_string())
 }
@@ -314,7 +343,7 @@ pub(crate) fn clean_pin(value: &str, length: i64) -> Result<String> {
         return Ok(String::new());
     }
     if !pin.chars().all(|c| c.is_ascii_digit()) || pin.chars().count() as i64 != length {
-        return Err(invalid(&format!("el PIN debe tener {length} dígitos")));
+        return Err(invalid_field("pin", "format", format!("the PIN must be {length} digits")));
     }
     if is_guessable_pin(pin) {
         return Err(reject(
@@ -360,7 +389,7 @@ fn clean_badge(value: &str) -> Result<String> {
         return Ok(String::new());
     }
     if !BADGE_LEN.contains(&badge.chars().count()) {
-        return Err(invalid("la placa debe tener entre 4 y 64 caracteres"));
+        return Err(invalid_field("badge", "length", "the badge must be between 4 and 64 characters"));
     }
     if !badge
         .chars()
@@ -384,7 +413,7 @@ fn clean_email(value: &str) -> Result<String> {
         || email.starts_with('@')
         || email.ends_with('@')
     {
-        return Err(invalid("email no válido"));
+        return Err(invalid_field("email", "format", "invalid email"));
     }
     Ok(email.to_string())
 }
@@ -1000,6 +1029,52 @@ pub async fn core_query(
         // attribution: who asked for the elevation and who approved it. The ids resolve to names
         // against `hub_user`, or the screen shows UUIDs and nobody uses it.
         "approvals.list" => list_approvals(db, hub_id, params).await,
+        // The print queue, readable by a MODULE at last (hub#1107). The runtime has known both
+        // facts since hub#341/hub#800 and served them over HTTP; what was missing was a door the
+        // contract WC → SDK → dispatcher allows. The core only packages here — the shapes are the
+        // runtime's own (`print_hosts::coverage_view`, `print_queue::status_view`), the SAME ones
+        // the HTTP layer serves, so the screen a module draws and the shell's own settings tab
+        // cannot disagree about what is stuck.
+        //
+        // `undrained` and `waitingSeconds` arrive already RESOLVED: a client that re-derived the
+        // threshold would be a second definition of "stuck" (`UNDRAINED_ALERT_SECONDS`), which is
+        // exactly what hub#987 collapsed into one.
+        "print.coverage" => Ok(whole(
+            crate::print_hosts::coverage(db, hub_id)
+                .await?
+                .iter()
+                .map(crate::print_hosts::coverage_view)
+                .collect(),
+        )),
+        // A STATUS view, never the document: the ticket travels to the print host that claims the
+        // job, past both of the drain's guards (hub#343), and not to whoever polls the queue.
+        //
+        // `role`/`status` filter and `limit` caps, all of them optional — `hub_id` is NOT among
+        // them and cannot be: it comes from the request context the deployment stamps (ADR-0201),
+        // so nothing in the payload can point this read at another tenant.
+        "print.jobs" => {
+            let text = |k: &str| {
+                params
+                    .get(k)
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string)
+            };
+            let role = text("role");
+            let status = text("status");
+            let limit = params
+                .get("limit")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(PRINT_JOBS_LIMIT);
+            Ok(whole(
+                crate::print_queue::list(db, hub_id, role.as_deref(), status.as_deref(), limit)
+                    .await?
+                    .iter()
+                    .map(crate::print_queue::status_view)
+                    .collect(),
+            ))
+        }
         "users.list" => Ok(whole(
             list(db, hub_id)
                 .await?

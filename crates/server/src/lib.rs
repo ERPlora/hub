@@ -1511,6 +1511,13 @@ pub fn app(state: AppState) -> Router {
             "/api/print/jobs",
             get(print::list_jobs).post(print::enqueue_job),
         )
+        // Sacar del atasco UN trabajo (hub#1108): devolverlo a la cola o retirarlo. Sesión
+        // **admin** (+ capability `printer` si quien llama es un módulo): leer la cola es
+        // cualquier sesión —quien está al lado de la impresora—, pero tirar un tique a la basura o
+        // volver a lanzarlo es el gesto del dueño, con el precedente del CRUD de estaciones.
+        // Descartar NUNCA borra: la fila queda sellada con quién, cuándo y por qué.
+        .route("/api/print/jobs/:job_id/retry", post(print::retry_job))
+        .route("/api/print/jobs/:job_id/discard", post(print::discard_job))
         // ── Registro de HOSTS de impresión (ADR-0196 §6, hub#342) ────────────────────────────
         // Quién drena cada rol. Un dispositivo se registra/late/se retira A SÍ MISMO (el sujeto es
         // su `X-Device-Id`, no hay parámetro para nombrar otro) → basta sesión de usuario: la app
@@ -3435,6 +3442,11 @@ pub(crate) fn err_status_and_code(
         E::ModuleNotInstalled { .. } => (StatusCode::NOT_FOUND, "module_not_installed".into()),
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
+        E::InvalidField { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_field".into()),
+        E::CertificateTypeMismatch { .. } => {
+            (StatusCode::CONFLICT, "certificate_type_mismatch".into())
+        }
+        E::ManifestRejected { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, code.clone().into()),
         // hub#1088: `business_tax_id` refused with its own stable code per failure kind — the
         // same `422` as `invalid_payload` (what was sent does not validate) with the code the UI
         // translates (es/en), so "the control letter is wrong" and "this is no NIF at all" are
@@ -3523,6 +3535,15 @@ pub(crate) fn err_response(e: erplora_runtime::RuntimeError) -> Response {
     // sentence, because that list is what the confirmation dialog enumerates.
     if let E::HasDependents { dependents, .. } = &e {
         error["dependents"] = json!(dependents);
+    }
+    // hub#1070: the field and the reason travel as data, so the UI translates by code and a
+    // client never has to read the prose.
+    if let E::InvalidField { field, reason, .. } = &e {
+        error["field"] = json!(field);
+        error["reason"] = json!(reason);
+    }
+    if let E::ManifestRejected { at, .. } = &e {
+        error["at"] = json!(at);
     }
     (status, Json(json!({ "ok": false, "error": error }))).into_response()
 }

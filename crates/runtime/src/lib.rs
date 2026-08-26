@@ -1084,6 +1084,25 @@ impl Runtime {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
     }
 
+    /// **Puts a dead print job back in front of the hosts** (hub#1108), with its hand-outs reset.
+    /// Scoped to the deployment's `hub_id`, like every other read and write here: another tenant's
+    /// `jobId` is simply not a job as far as this hub is concerned.
+    pub async fn retry_print_job(&self, job_id: &str) -> Result<print_queue::RequeueOutcome> {
+        print_queue::requeue(self.db.as_ref(), &self.hub_id, job_id).await
+    }
+
+    /// **Retires a print job nobody is ever going to print** (hub#1108), stamping who, when and why.
+    /// Never a delete — see [`print_queue::discard`]. `discarded_by` is resolved by the caller from
+    /// the session, never taken from a request body.
+    pub async fn discard_print_job(
+        &self,
+        job_id: &str,
+        discarded_by: &str,
+        reason: &str,
+    ) -> Result<print_queue::DiscardOutcome> {
+        print_queue::discard(self.db.as_ref(), &self.hub_id, job_id, discarded_by, reason).await
+    }
+
     // ── Print stations: the destinations themselves, as rows (hub#457) ─────────────────────────
 
     /// Every printing destination of this hub, by key. This is what a selector shows and what the

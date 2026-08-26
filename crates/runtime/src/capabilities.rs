@@ -259,6 +259,30 @@ pub async fn set_grant(
         &p,
     )
     .await?;
+    if granted {
+        // **Flipping the switch is the remedy, so it has to BE the remedy** (hub#1171, hub#1119).
+        // Everything this module was refused while the capability was off died in the dead-letter
+        // with `module.capability_denied` on it; those are precisely the rows this grant fixes, so
+        // they go back in front of the relay here instead of waiting for somebody to discover
+        // System → Eventos caídos. A row whose own capability is still missing dies again on the
+        // next pass, with its reason — the queue stays self-healing, not magic.
+        //
+        // Best-effort **out loud**: the grant itself already succeeded, so a replay that cannot run
+        // (an early-boot restore where the outbox tables are not up yet, a database blip) must not
+        // turn the owner's gesture into an error. Nothing is lost either — the rows stay `dead` and
+        // the operator can still replay them from Sistema → Eventos caídos — but a silent skip here
+        // would be the same shape of failure this whole change exists to remove, so it is logged.
+        if let Err(e) = crate::outbox::replay_capability_denied(db, hub_id).await {
+            // `eprintln!` and not `tracing`: this crate has no logging facility of its own by
+            // design (see `retention.rs`) — the host in `crates/server` is the one that has one,
+            // and the relay next door already reports its own stumbles this way.
+            eprintln!(
+                "capabilities: `{capability}` granted to `{module_id}` in hub `{hub_id}`, but the \
+                 events it had refused could not be replayed ({e}): they stay in the dead-letter \
+                 for a manual retry"
+            );
+        }
+    }
     Ok(())
 }
 

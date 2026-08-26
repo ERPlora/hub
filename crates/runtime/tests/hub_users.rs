@@ -7,7 +7,7 @@
 //! activa), y los inactivos, marcados como tales.
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::hub_users::{NewHubUser, UpdateHubUser};
-use erplora_runtime::{RequestContext, Runtime};
+use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 
 async fn runtime(hub_id: &str) -> Runtime {
     let db = fresh_db().await;
@@ -184,7 +184,10 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
         })
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("nombre"), "{err}");
+    assert!(
+        matches!(&err, RuntimeError::InvalidField { field, .. } if field == "name"),
+        "{err}"
+    );
 
     let err = rt
         .create_hub_user(&NewHubUser {
@@ -197,7 +200,10 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
         })
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("PIN"), "{err}");
+    assert!(
+        matches!(&err, RuntimeError::InvalidField { field, .. } if field == "pin"),
+        "{err}"
+    );
 
     let err = rt
         .create_hub_user(&NewHubUser {
@@ -210,7 +216,10 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
         })
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("email"), "{err}");
+    assert!(
+        matches!(&err, RuntimeError::InvalidField { field, .. } if field == "email"),
+        "{err}"
+    );
 
     let err = rt
         .create_hub_user(&NewHubUser {
@@ -223,7 +232,10 @@ async fn rejects_an_empty_name_a_bad_pin_and_a_bad_email() {
         })
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("rol"), "{err}");
+    assert!(
+        matches!(&err, RuntimeError::InvalidField { field, .. } if field == "role"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -424,7 +436,7 @@ async fn the_hub_namespace_is_reserved_for_the_core() {
         .await
         .unwrap_err();
     assert!(err.to_string().contains("hub.nope.list"), "{err}");
-    assert!(!err.to_string().contains("no instalado"), "{err}");
+    assert!(matches!(err, RuntimeError::QueryNotFound(_)), "{err}");
 }
 
 #[tokio::test]
@@ -482,10 +494,12 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
             .set_pin(&id, bad)
             .await
             .expect_err(&format!("`{bad}` must be refused at the self-service door"));
-        let msg = format!("{err}");
+        // Shape errors (length, non-digits) and policy errors (guessable) are two doors with two
+        // stable shapes; both name the field, neither is asserted by its prose (hub#1070).
         assert!(
-            msg.contains("PIN") || msg.contains("pin"),
-            "the refusal names the PIN: {msg}"
+            matches!(&err, RuntimeError::InvalidField { field, .. } if field == "pin")
+                || matches!(&err, RuntimeError::Domain { code, .. } if code.starts_with("hub.users.pin_")),
+            "the refusal names the PIN field: {err}"
         );
         assert!(!row(&rt, &id).await.has_pin, "`{bad}` must not have been stored");
     }

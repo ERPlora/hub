@@ -211,6 +211,12 @@ const MAX_F2_CENTS: i64 = 3_000 * 100;
 /// 3.010,00 € **inclusive**: 3.010,00 passes, 3.010,01 does not.
 const F2_TOLERANCE_CENTS: i64 = 10 * 100;
 
+/// The §15.8 ceiling as ONE number, so the ingest gate (hub#1104) and this validator cannot
+/// drift apart. `validate_limite_f2` refuses an over-the-ceiling `F2` at transmission time —
+/// which is already too late when the `F2` was *manufactured* by downgrading an `F1` with no
+/// recipient: by then the chain number is spent. The engine asks here BEFORE sealing.
+pub(crate) const F2_CEILING_CENTS: i64 = MAX_F2_CENTS + F2_TOLERANCE_CENTS;
+
 /// Only this value of `FacturaSinIdentifDestinatarioArt61d` exempts. The enumeration also has
 /// `"N"`, which is a plain F2 and keeps the ceiling.
 const ART_61D_EXEMPT: &str = "S";
@@ -416,10 +422,10 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     let mut esperado = order.iter();
     for tag in &emitidos {
         if !esperado.any(|e| e == tag) {
-            return Err(err(format!(
-                "`{tag}` va fuera de orden: la secuencia del esquema es {}",
-                order.join(" → ")
-            )));
+            return Err(VerifactuError::OutOfOrder {
+                tag: tag.to_string(),
+                sequence: order.join(" → "),
+            });
         }
     }
 
@@ -607,10 +613,10 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         let mut esperado = ORDER_DETALLE.iter();
         for (tag, _) in g {
             if !esperado.any(|e| e == tag) {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: `{tag}` va fuera de orden; la secuencia del esquema es {}",
-                    ORDER_DETALLE.join(" → ")
-                )));
+                return Err(VerifactuError::OutOfOrder {
+                    tag: tag.to_string(),
+                    sequence: format!("DetalleDesglose #{n}: {}", ORDER_DETALLE.join(" → ")),
+                });
             }
         }
 
@@ -844,7 +850,7 @@ fn validate_limite_f2(
         })
         .sum();
 
-    let techo = MAX_F2_CENTS + F2_TOLERANCE_CENTS;
+    let techo = F2_CEILING_CENTS;
     if total > techo {
         return Err(err(format!(
             "una factura simplificada F2 no puede pasar de 3.000,00 € (más los 10,00 € de \
