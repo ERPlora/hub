@@ -199,3 +199,71 @@ describe('the board follows the language the user picks (hub#768)', () => {
     expect(boardOf(wrapper).labels?.empty).toBe('Panel vacío. Pulsa ⋮ para añadir widgets.');
   });
 });
+
+// ── hub#1100 · El shell dice QUÉ arranca activo; la librería no lo adivina ─────────────────────
+//
+// 🔴 `ok-widget-board` documenta su último recurso: «sin `value` y sin presets ⇒ activa TODOS».
+// El shell nunca le pasaba `value`, así que un hub sin sector (el caso normal desde ADR-0087:
+// `HUB_SECTOR` ya no lo inyecta el provisioning) abría con los 20 widgets encendidos. El arreglo
+// es dejar de depender de ese último recurso: el catálogo va completo, pero el conjunto ACTIVO
+// se le entrega explícitamente.
+describe('hub#1100 — el board arranca sólo con lo que el shell marca como activo', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    collectDashboardWidgets.mockResolvedValue({
+      widgets: [
+        { id: 'sales.today', title: 'Ventas de hoy', size: 'sm', render: () => {} },
+        { id: 'sales.last_7_days', title: 'Últimos 7 días', size: 'md', render: () => {} },
+        { id: 'verifactu.events', title: 'Eventos AEAT', size: 'md', render: () => {} },
+      ],
+      presets: [],
+      defaultActive: ['sales.today'],
+    });
+  });
+
+  it('🔴 recibe `value` = widget core + los activos por defecto, NO el catálogo entero', async () => {
+    const { wrapper } = mountDashboard();
+    await flushPromises();
+    const board = boardOf(wrapper) as BoardEl & { value?: string[] };
+    expect(board.widgets?.length).toBe(4); // catálogo completo: core + 3 de módulo
+    expect(board.value).toEqual(['core.blueprint', 'sales.today']);
+  });
+
+  it('🔴 sin nada recomendado, el board arranca sólo con el widget core (no con todo)', async () => {
+    collectDashboardWidgets.mockResolvedValue({
+      widgets: [
+        { id: 'sales.today', title: 'Ventas de hoy', size: 'sm', render: () => {} },
+        { id: 'verifactu.events', title: 'Eventos AEAT', size: 'md', render: () => {} },
+      ],
+      presets: [],
+      defaultActive: [],
+    });
+    const { wrapper } = mountDashboard();
+    await flushPromises();
+    const board = boardOf(wrapper) as BoardEl & { value?: string[] };
+    expect(board.value).toEqual(['core.blueprint']);
+  });
+
+  it('🔴 NO pisa lo que el usuario ya activó: al cambiar de idioma el `value` se respeta', async () => {
+    const { wrapper, i18n } = mountDashboard('es');
+    await flushPromises();
+    const board = boardOf(wrapper) as BoardEl & { value?: string[] };
+    // Lo que hace el usuario en el ⋮: el propio board reescribe su `value` (y lo persiste).
+    board.value = ['verifactu.events'];
+
+    i18n.global.locale.value = 'en';
+    await nextTick();
+    await flushPromises();
+
+    expect(boardOf(wrapper).labels?.customize).toBe('Customize panel'); // el re-apply SÍ ocurrió
+    expect((boardOf(wrapper) as BoardEl & { value?: string[] }).value).toEqual(['verifactu.events']);
+  });
+
+  it('un board recién montado tras el round trip vuelve a recibir su conjunto activo', async () => {
+    const { wrapper } = mountDashboard();
+    await flushPromises();
+    await roundTripThroughActivity(wrapper);
+    const board = boardOf(wrapper) as BoardEl & { value?: string[] };
+    expect(board.value).toEqual(['core.blueprint', 'sales.today']);
+  });
+});
