@@ -589,12 +589,22 @@ fn render_receipt(b: &mut EscposBuilder, data: &serde_json::Value) {
                         .collect()
                 })
                 .unwrap_or_default();
-            if !components.is_empty() {
+            // hub#1138 — the SUPPLEMENTS of the line, structured. `components` says what the MENU
+            // is made of; `modifiers` says what the customer CHANGED. They are different axes, so
+            // both print, components first and the change after — the same order the kitchen chit
+            // uses. Chained into `notes` they wrapped at 32 columns and the continuation started at
+            // the margin, reading as another article; one line each, indented, fixes exactly that.
+            //
+            // No amount of their own: in ERPlora the delta already lives inside the line's
+            // `unit_price` (`authoritative_modifiers`), so the printed `line_total` includes it and
+            // a second number in that column would not add up with the rest (sales#148).
+            let supplements = modifier_lines(item);
+            if !components.is_empty() || !supplements.is_empty() {
                 b.set(Align::Left, false, false, false);
-                for component in &components {
+                for entry in components.iter().chain(supplements.iter()) {
                     // Wrapped by hand keeping the indent: cut at 32 columns by the printer, the
                     // continuation would start at the margin and read as another item.
-                    for line in wrap_to_width(component, LINE_WIDTH - 2) {
+                    for line in wrap_to_width(entry, LINE_WIDTH - 2) {
                         b.text(&format!("  {line}\n"));
                     }
                 }
@@ -755,12 +765,22 @@ fn render_prebill(b: &mut EscposBuilder, data: &serde_json::Value) {
                         .collect()
                 })
                 .unwrap_or_default();
-            if !components.is_empty() {
+            // hub#1138 — the SUPPLEMENTS of the line, structured. `components` says what the MENU
+            // is made of; `modifiers` says what the customer CHANGED. They are different axes, so
+            // both print, components first and the change after — the same order the kitchen chit
+            // uses. Chained into `notes` they wrapped at 32 columns and the continuation started at
+            // the margin, reading as another article; one line each, indented, fixes exactly that.
+            //
+            // No amount of their own: in ERPlora the delta already lives inside the line's
+            // `unit_price` (`authoritative_modifiers`), so the printed `line_total` includes it and
+            // a second number in that column would not add up with the rest (sales#148).
+            let supplements = modifier_lines(item);
+            if !components.is_empty() || !supplements.is_empty() {
                 b.set(Align::Left, false, false, false);
-                for component in &components {
+                for entry in components.iter().chain(supplements.iter()) {
                     // Wrapped by hand keeping the indent: cut at 32 columns by the printer, the
                     // continuation would start at the margin and read as another item.
-                    for line in wrap_to_width(component, LINE_WIDTH - 2) {
+                    for line in wrap_to_width(entry, LINE_WIDTH - 2) {
                         b.text(&format!("  {line}\n"));
                     }
                 }
@@ -2309,6 +2329,164 @@ mod tests {
                 .contains("KITCHEN"),
             "the region is dropped and the language honoured",
         );
+    }
+
+
+    // ── hub#1138 · the SUPPLEMENT on the customer's ticket and on the bill ───────────────────────
+    //
+    // The chit already prints supplements one per line (hub#1156). The ticket and the bill still
+    // read only `notes`, where `sales` chains them with « · » — so with two or three the line wraps
+    // at 32 columns and the continuation starts at the margin, reading as another article. Same
+    // complaint hub#1165 fixed for the menu's `components`, and it is fixed the same way: the
+    // structured list wins and the joined note steps aside, so nothing is said twice.
+
+    /// One indented line per supplement, and NO amount of its own: in ERPlora the delta is already
+    /// inside the line's `unit_price` (`authoritative_modifiers`), so a second number in that
+    /// column would not add up with the rest — the Odoo bug the issue cites.
+    #[test]
+    fn a_supplement_reaches_the_customers_ticket_on_its_own_line() {
+        let text = printed(
+            DocumentType::Receipt,
+            &json!({
+                "items": [{ "name": "Hamburguesa", "quantity": 1, "total": 10.0,
+                            "modifiers": ["Extra queso", "Sin cebolla"] }],
+                "total": 10.0,
+            }),
+        );
+        let dish = text.find("Hamburguesa").expect("the dish");
+        let first = text.find("  Extra queso").expect("the first supplement, indented");
+        let second = text.find("  Sin cebolla").expect("the second supplement, indented");
+        assert!(dish < first && first < second, "in order, under their dish:\n{text}");
+        let line = text.lines().find(|l| l.contains("Extra queso")).unwrap();
+        assert_eq!(line.trim(), "Extra queso", "nothing else on the line:\n{text}");
+        assert!(!line.contains("10.0"), "a supplement carries no amount of its own:\n{text}");
+    }
+
+    /// The bill taken to the table gets exactly the same treatment — it is the paper the waiter
+    /// hands over, and it comes out more often than the ticket.
+    #[test]
+    fn a_supplement_reaches_the_bill_on_its_own_line() {
+        let text = printed(
+            DocumentType::Prebill,
+            &json!({
+                "items": [{ "name": "Hamburguesa", "quantity": 1, "total": 10.0,
+                            "modifiers": ["Extra queso", "Sin cebolla"] }],
+                "total": 10.0,
+            }),
+        );
+        assert!(text.contains("  Extra queso"), "the supplement, indented:\n{text}");
+        assert!(text.contains("  Sin cebolla"), "and the second one:\n{text}");
+    }
+
+    /// With `modifiers` present the joined `notes` is NOT printed: until `sales` separates them,
+    /// the note still carries the same supplements chained with « · », and printing both would say
+    /// everything twice — the precedence the issue asks to decide.
+    #[test]
+    fn a_structured_supplement_replaces_the_joined_note() {
+        for doc in [DocumentType::Receipt, DocumentType::Prebill] {
+            let text = printed(
+                doc,
+                &json!({
+                    "items": [{ "name": "Hamburguesa", "quantity": 1, "total": 10.0,
+                                "modifiers": ["Extra queso", "Sin cebolla"],
+                                "notes": "Extra queso · Sin cebolla" }],
+                    "total": 10.0,
+                }),
+            );
+            assert_eq!(
+                text.matches("Extra queso").count(),
+                1,
+                "{doc:?}: the supplement prints ONCE:\n{text}"
+            );
+            assert!(!text.contains("  > "), "{doc:?}: the joined note steps aside:\n{text}");
+        }
+    }
+
+    /// A MENU with a supplement carries BOTH lists: `components` says what the menu is made of and
+    /// `modifiers` says what was changed. They are different axes, so both print — components
+    /// first, the change after — and the joined note steps aside for both.
+    #[test]
+    fn a_menu_prints_its_components_and_its_supplements_both() {
+        let text = printed(
+            DocumentType::Receipt,
+            &json!({
+                "items": [{ "name": "Menu del dia", "quantity": 1, "total": 16.5,
+                            "components": ["Gazpacho", "Solomillo"],
+                            "modifiers": ["Sin sal"],
+                            "notes": "Gazpacho · Solomillo · Sin sal" }],
+                "total": 16.5,
+            }),
+        );
+        let gazpacho = text.find("  Gazpacho").expect("the component");
+        let solomillo = text.find("  Solomillo").expect("the second component");
+        let sin_sal = text.find("  Sin sal").expect("the supplement");
+        assert!(
+            gazpacho < solomillo && solomillo < sin_sal,
+            "components first, then what was changed:\n{text}"
+        );
+        assert!(!text.contains("  > "), "the joined note is not repeated on top:\n{text}");
+    }
+
+    /// A free note with NO structured list still prints as it always did — that is the whole
+    /// deployed fleet, and `notes` is still where a waiter's text arrives.
+    #[test]
+    fn a_free_note_without_any_list_prints_exactly_as_today() {
+        for doc in [DocumentType::Receipt, DocumentType::Prebill] {
+            let text = printed(
+                doc,
+                &json!({
+                    "items": [{ "name": "Cafe", "quantity": 1, "total": 1.8, "notes": "sin sal" }],
+                    "total": 1.8,
+                }),
+            );
+            assert!(text.contains("  > sin sal"), "{doc:?}: the note keeps its shape:\n{text}");
+        }
+    }
+
+    /// An empty list is the same as no list, byte for byte: a module that sends `[]` must not add
+    /// a blank indented line under every article.
+    #[test]
+    fn an_empty_supplement_list_leaves_the_ticket_untouched() {
+        let plain = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.8, "notes": "sin sal" }],
+            "total": 1.8,
+        });
+        let empty = json!({
+            "items": [{ "name": "Cafe", "quantity": 1, "total": 1.8, "notes": "sin sal",
+                        "modifiers": [] }],
+            "total": 1.8,
+        });
+        for doc in [DocumentType::Receipt, DocumentType::Prebill] {
+            assert_eq!(
+                render_document(doc, &plain).expect("valid"),
+                render_document(doc, &empty).expect("valid"),
+                "{doc:?}: an empty list is the same as no list",
+            );
+        }
+    }
+
+    /// A long supplement wraps keeping its indent on the ticket too: cut at 32 columns by the
+    /// printer, the continuation would start at the margin and read as another article.
+    #[test]
+    fn a_long_supplement_on_the_ticket_keeps_its_indent_when_it_wraps() {
+        let text = printed(
+            DocumentType::Receipt,
+            &json!({
+                "items": [{ "name": "Hamburguesa", "quantity": 1, "total": 10.0,
+                            "modifiers": ["Sin cebolla y sin pepinillos y con la carne muy hecha"] }],
+                "total": 10.0,
+            }),
+        );
+        let wrapped: Vec<&str> = text
+            .lines()
+            .skip_while(|l| !l.contains("Sin cebolla"))
+            .take_while(|l| !l.starts_with("--"))
+            .collect();
+        assert!(wrapped.len() > 1, "it wrapped somewhere:\n{text}");
+        for l in &wrapped {
+            assert!(l.starts_with("  "), "every piece keeps the indent: {l:?}\n{text}");
+            assert!(l.chars().count() <= LINE_WIDTH, "and fits the paper: {l:?}");
+        }
     }
 
     /// `locale` is a field of the ENVELOPE, not a line of the document: the generic renderer
