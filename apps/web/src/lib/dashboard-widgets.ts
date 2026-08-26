@@ -66,8 +66,45 @@ export interface CollectWidgetsDeps {
 
 /** Resultado de la recolección: catálogo de widgets + presets para <ok-widget-board>. */
 export interface CollectedWidgets {
+  /** CATÁLOGO completo: todo lo que el ⋮ ofrece activar. No es lo que se pinta de salida. */
   widgets: WidgetDef[];
   presets: WidgetPreset[];
+  /**
+   * Ids que arrancan ACTIVOS cuando el usuario aún no ha guardado un tablero propio (hub#1100).
+   * Se entrega al board por `value`: sin esto, `ok-widget-board` cae a su último recurso
+   * documentado —«sin `value` y sin presets ⇒ activa TODOS»— y un hub con 25 módulos abre con los
+   * 20 widgets encendidos, los `default:false` incluidos. Contrato de ADR-0054 §4.
+   */
+  defaultActive: string[];
+}
+
+/**
+ * Tope de widgets ACTIVOS de salida cuando el hub no tiene sector (hub#1100).
+ *
+ * Desde ADR-0087 el provisioning ya no inyecta `HUB_SECTOR`, así que «sin sector» dejó de ser el
+ * caso raro para ser el normal: aplicar ahí la letra de ADR-0054 §4 («preset vacío») dejaría a
+ * todos los hubs con un Inicio en blanco, que es justo lo que hub#367 vino a arreglar. Sin sector
+ * no se puede saber QUÉ es relevante, así que se honra el `default` del autor del módulo y se
+ * corta en un puñado legible: un Inicio que se lee de una ojeada, con el resto a un toque del ⋮.
+ * Es lo que hacen Square, Shopify y Business Central — un puñado fijo y «Personalizar» al lado—;
+ * ninguno pinta la unión de todo lo instalado.
+ */
+export const MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR = 6;
+
+/** Toma hasta `limit` elementos alternando entre grupos (1º de cada grupo, luego 2º de cada…). */
+function roundRobin(groups: string[][], limit: number): string[] {
+  const out: string[] = [];
+  for (let round = 0; out.length < limit; round++) {
+    let took = false;
+    for (const g of groups) {
+      if (round < g.length && out.length < limit) {
+        out.push(g[round]!);
+        took = true;
+      }
+    }
+    if (!took) break;
+  }
+  return out;
 }
 
 // ── Normalización del resultado de una query ─────────────────────────────────────────────────────
@@ -293,9 +330,15 @@ function renderKpi(
     label?: string; value?: string; delta?: string; trend?: string; icon?: string;
   };
   flattenCardSurface(el); // no doblar el marco de createCard (P2)
-  // La cabecera de la card ya muestra el título; solo añadimos label si aporta info distinta.
-  el.label = captionLabel(str(opts, 'label'), title);
-  el.icon = str(opts, 'icon');
+  // hub#1105: la `.label` de `ok-kpi` es otra CABECERA (uppercase, bold, con hueco de icono a su
+  // derecha), no un subtítulo como la de `ok-stat`. Dentro del marco, que ya pinta título e icono,
+  // eso son dos cabeceras apiladas — y en 4 de los 6 KPIs reales, el mismo icono dos veces. El
+  // marco es el dueño de la cabecera: aquí sólo va el valor. Fuera del marco (sin `title`) el
+  // componente conserva su cabecera propia.
+  if (!title) {
+    el.label = str(opts, 'label');
+    el.icon = str(opts, 'icon');
+  }
   el.value = formatValue(rawValue, format, currency, locale);
   const delta = mapped(row, map, 'delta');
   if (delta != null) {
@@ -370,8 +413,11 @@ function renderSparkline(
       label?: string; value?: string; delta?: string; trend?: string; icon?: string;
     };
     flattenCardSurface(kpi); // no doblar el marco de createCard (P2)
-    kpi.label = captionLabel(str(opts, 'label'), title);
-    kpi.icon = str(opts, 'icon');
+    // Misma regla que `renderKpi` (hub#1105): dentro del marco, la cabecera ya está pintada.
+    if (!title) {
+      kpi.label = str(opts, 'label');
+      kpi.icon = str(opts, 'icon');
+    }
     kpi.value = formatValue(last?.[valueCol], format, currency, undefined);
     const deltaCol = map?.delta;
     if (deltaCol != null && last?.[deltaCol] != null) {
@@ -504,9 +550,17 @@ type KindRenderer = (
   title?: string,
 ) => boolean;
 
-/** Devuelve la etiqueta a usar dentro de un ok-kpi/ok-stat, omitiéndola si coincide con el título de la card. */
+/** Devuelve la etiqueta a usar dentro de un ok-stat, omitiéndola si coincide con el título de la card. */
 function captionLabel(label: string | undefined, title: string | undefined): string | undefined {
   return label && label !== title ? label : undefined;
+}
+
+/**
+ * Icono de la cabecera de la card: el del widget y, en su defecto, el de `options` (hub#1105).
+ * Desde que el kind dejó de pintar `options.icon`, este es el único sitio donde puede salir.
+ */
+function headerIcon(def: WidgetManifestDef): string | undefined {
+  return def.icon ?? str(def.options ?? {}, 'icon');
 }
 
 const KIND_RENDERERS: Record<string, KindRenderer> = {
@@ -578,7 +632,9 @@ function buildKindRender(
 
     // Cada widget vive DENTRO de su card (contenedor visible); el cuerpo aloja
     // spinner/contenido/estado vacío, así la card se ve aunque la query no devuelva datos.
-    const card = createCard(def.title, def.icon, align);
+    // El icono de la cabecera: el del widget y, si no lo declara, el de `options` — que hasta
+    // hub#1105 pintaba el propio kind. Así el marco es la ÚNICA cabecera sin perder el icono.
+    const card = createCard(def.title, headerIcon(def), align);
     cell.replaceChildren(card.root);
     const query = def.query;
     const renderer = KIND_RENDERERS[def.kind ?? ''];
@@ -659,7 +715,7 @@ function buildComponentRender(
   const tag = def.component as string;
   return (cell: HTMLElement): void => {
     // El WC del módulo también vive dentro de una card con la cabecera del widget (uniformidad).
-    const card = createCard(def.title, def.icon, 'start');
+    const card = createCard(def.title, headerIcon(def), 'start');
     cell.replaceChildren(card.root);
     showSpinner(card.body);
     loadModuleComponent(mod, tag)
@@ -713,6 +769,9 @@ export function buildWidgetsFromManifests(
 
   const widgets: WidgetDef[] = [];
   const recommended: string[] = [];
+  // `default:true` sin mirar el sector, AGRUPADOS por módulo: el respaldo de un hub que aún no
+  // tiene sector (hub#1100). Se agrupan para que el recorte reparta entre módulos (ver abajo).
+  const suggestedByModule = new Map<string, string[]>();
 
   for (const mod of mods) {
     const map = (mod.manifest as ModuleManifest).widgets;
@@ -748,10 +807,15 @@ export function buildWidgetsFromManifests(
 
       // Preset "Recomendado": widgets con default===true cuyo sectors incluye el sector del hub
       // (o sin sectors = todos). Sin sector conocido → no se recomienda nada (preset vacío).
-      if (def.default && sector) {
-        const sectors = def.sectors;
-        const applies = !sectors || sectors.length === 0 || sectors.includes(sector as never);
-        if (applies) recommended.push(id);
+      if (def.default) {
+        const bucket = suggestedByModule.get(mod.moduleId) ?? [];
+        bucket.push(id);
+        suggestedByModule.set(mod.moduleId, bucket);
+        if (sector) {
+          const sectors = def.sectors;
+          const applies = !sectors || sectors.length === 0 || sectors.includes(sector as never);
+          if (applies) recommended.push(id);
+        }
       }
     }
   }
@@ -761,5 +825,17 @@ export function buildWidgetsFromManifests(
       ? [{ id: 'recommended', label: 'Recomendado', widgets: recommended }]
       : [];
 
-  return { widgets, presets };
+  // Qué arranca ACTIVO (hub#1100). Con sector manda la elección informada del autor del módulo
+  // (`default` ∩ `sectors`), sin tope. Sin sector no hay nada contra lo que casar `sectors`, así
+  // que se cae a los `default:true` recortados a un puñado legible. Un `default:false` NUNCA entra
+  // por ninguna de las dos vías: eso lo activa el usuario desde el ⋮.
+  //
+  // El recorte va en ROUND-ROBIN por módulo (el primer `default:true` de cada módulo antes que el
+  // segundo de ninguno): un corte por orden de instalación dejaba, en el banco real, 3 de inventario
+  // + 3 de personal y fuera «Ventas hoy» y «Caja» — un puñado legible tiene que ser representativo.
+  const defaultActive = sector
+    ? recommended
+    : roundRobin([...suggestedByModule.values()], MAX_DEFAULT_ACTIVE_WITHOUT_SECTOR);
+
+  return { widgets, presets, defaultActive };
 }
