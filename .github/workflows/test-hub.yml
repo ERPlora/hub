@@ -7,9 +7,21 @@
 # usan el helper `erplora_db::testutil` (feature `test-util`), que crea un ESQUEMA
 # efímero por test sobre `DATABASE_URL` para aislar los tests en paralelo.
 #
-# Los e2e que instalan módulos reales (`postgres_install_e2e`, `sector_packs_pg_e2e`)
-# se auto-omiten si `modules-workspace/` (repos hermanos) no está presente — como en
-# este runner aislado — y corren en local, donde los módulos están al lado del hub.
+# 🔴 Los e2e que instalan módulos reales SE AUTO-OMITEN aquí y este run sale VERDE sin
+# haberlos ejecutado: `actions/checkout@v4` trae solo este repo, `modules-workspace/`
+# (13 repos hermanos: appointments, cash_register, customers, inventory, invoice,
+# invoice_series, kitchen, sales, services, staff, tables, taxes, verifactu) no está, y
+# el guard ve `CI=true` y toma el skip legítimo (hub#253).
+#
+# No son dos ficheros: son **238 tests repartidos en 36 targets** de `crates/runtime/tests/`
+# (medido el 2026-08-26). Toda la cadena fiscal, el TPV, la cocina y el inventario entran
+# ahí. Este comentario decía «`postgres_install_e2e`, `sector_packs_pg_e2e`» y esa cifra
+# hizo creer que el hueco era menor de lo que es.
+#
+# Y tampoco los cubre el gate local: `.githooks/pre-push` los salta POR DEFECTO desde
+# hub#855 y solo los corre con `HUB_GATE_WITH_MODULES=1`. O sea que hoy no corren en
+# ningún sitio automático — un test caducado por ADR-0405 estuvo rojo un día entero sin
+# que ningún verde lo desmintiera (hub#1215). Cerrarlo es hub#1216.
 # ==============================================================================
 
 name: Hub tests (Rust · Postgres)
