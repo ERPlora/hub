@@ -31,8 +31,8 @@
 //!
 //!   * **Con `ERPLORA_E2E_REQUIRE_MODULES=1`** (hub#1216): los módulos son **obligatorios** en este
 //!     entorno y su ausencia es **fatal**, gane quien gane — ni `CI=true` ni
-//!     `ERPLORA_E2E_ALLOW_SKIP` abren el skip. Lo pone el job de CI que sí clona los 13 repos de
-//!     módulo. Sin esto, un fallo al traerlos dejaría los 238 e2e saltándose solos y el job
+//!     `ERPLORA_E2E_ALLOW_SKIP` abren el skip. Lo pone el job de CI que sí clona el catálogo de
+//!     módulos. Sin esto, un fallo al traerlos dejaría los 238 e2e saltándose solos y el job
 //!     saldría **verde sin haber probado nada** — el agujero exacto que ese job cierra, y el mismo
 //!     modo de fallo que este fichero describe arriba, solo que en CI.
 //!
@@ -187,7 +187,7 @@ pub fn require_modules_workspace() -> bool {
              OBLIGATORIOS, así que esto NO es un skip legítimo: es el fallo del propio job.\n\
              Aquí `ERPLORA_E2E_ALLOW_SKIP` NO abre el skip, a propósito.\n\
              \n\
-             En CI la causa habitual es que el paso que clona los 13 repos de módulo falló o quedó\n\
+             En CI la causa habitual es que el paso que clona el catálogo de módulos falló o quedó\n\
              a medias (token caducado o sin acceso, repo renombrado, red). Revisa ese paso: si\n\
              siguiera adelante, los 238 e2e se saltarían solos y el job saldría VERDE sin haber\n\
              probado nada — que es exactamente el agujero que hub#1216 cierra.",
