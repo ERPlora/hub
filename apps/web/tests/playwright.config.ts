@@ -91,8 +91,8 @@ export default defineConfig({
         // Token de máquina (X-Hub-Token): en prod lo inyecta el provisioning; sin él la sesión por
         // PIN no tiene credencial hub-scoped y el proxy del asistente contesta 401.
         HUB_CLOUD_API_TOKEN: 'e2e-machine-token',
-        // Seed de dev: usuario Demo (PIN 0000) + `demo-trusted-device`. Sin él el device-trust
-        // (armado por defecto desde hub#330) rechaza el login por PIN de todos los specs.
+        // Seed de dev: usuario Demo (PIN 0000). Sin él no hay a quién autenticar y el login por
+        // PIN de todos los specs falla antes del primer caso.
         HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),
         HUB_MODULES_DIR: EMPTY_MODULES_DIR,
       },

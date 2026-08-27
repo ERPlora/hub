@@ -39,10 +39,14 @@ test.describe('contrato visual del shell', () => {
       // `snapshotPath` resuelve la MISMA ruta que usará `toHaveScreenshot`, con su sufijo de
       // plataforma incluido: preguntar por ella es lo único que no se desincroniza del framework.
       const baseline = testInfo.snapshotPath(snapshot);
-      test.skip(
-        !UPDATING_BASELINES && !existsSync(baseline),
-        `falta la baseline ${baseline} — genérala donde corre el test (workflow_dispatch → update_baselines: true)`,
-      );
+      if (!UPDATING_BASELINES && !existsSync(baseline)) {
+        const reason = `falta la baseline ${baseline} — genérala donde corre el test (workflow_dispatch → update_baselines: true)`;
+        // El reporter `list` pinta un guion por caso saltado y el MOTIVO no lo pinta nadie: sin esta
+        // línea, el salto solo se descubre leyendo el log entero. En CI va además como anotación de
+        // Actions (`::warning::`), que sale en el resumen del run y en la pestaña de checks de la PR.
+        console.log(process.env.CI ? `::warning file=${testInfo.file}::${reason}` : `SKIP: ${reason}`);
+        test.skip(true, reason);
+      }
 
       await page.setViewportSize({ width, height });
       await page.goto('/login');
