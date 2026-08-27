@@ -138,6 +138,25 @@ if len(alert) == 1:
         ":" not in ALERT_TITLE,
         ALERT_TITLE,
     )
+    # Review of hub#1245: `gh issue list --search` reads GitHub's SEARCH index, which lags
+    # behind reality (it returned zero with open issues on 2026-08-16). Two failures minutes
+    # apart — push develop then push main, two module releases — would open two issues, which
+    # is the opposite of idempotent. The lookup must list the open issues and match the title
+    # locally.
+    code = "\n".join(l for l in run.splitlines() if not l.lstrip().startswith("#"))
+    check(
+        "the alert looks the open issue up by LISTING and filtering locally, never `--search`",
+        "--search" not in code and "--json number,title" in code and "select(.title ==" in code,
+        "GitHub's search index lags: two failures minutes apart would open two issues",
+    )
+    # Review of hub#1245: the tests step can die BEFORE `tee` creates the log (the `>= 30
+    # targets` guard, the grep pipeline). awk on an absent file exits 2, `set -euo pipefail`
+    # kills the alert step, and the issue never opens — the mute red this step abolishes.
+    check(
+        "the alert survives a missing cargo log (the tests step can die before `tee`)",
+        '[ -s "$RUNNER_TEMP/module-e2e.log" ]' in run,
+        "guard the log with `[ -s ... ]` so the fallback text is used instead of dying",
+    )
     check(
         "the alert names the FAILING TARGETS, not just the run",
         "FAILING_TARGETS" in run,

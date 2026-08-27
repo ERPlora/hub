@@ -360,11 +360,18 @@ jobs:
 
           # Qué targets fallaron, sacados del log: cargo imprime `Running tests/<x>.rs (…)` antes
           # de cada binario y `test <nombre> ... FAILED` por cada caso, así que se van asociando.
-          FAILING_TARGETS=$(awk '
-            /^ *Running / { t=$0; sub(/^ *Running /, "", t); sub(/ \(target.*/, "", t); cur=t }
-            / \.\.\. FAILED$/ { if (cur != "") n[cur]++ }
-            END { for (k in n) printf "- `%s` — %d test(s)\n", k, n[k] }
-          ' "$RUNNER_TEMP/module-e2e.log" 2>/dev/null | sort)
+          #
+          # `[ -s ]` first: the tests step can die BEFORE `tee` creates the log (the `>= 30 targets`
+          # guard, the grep pipeline). awk on an absent file exits 2 and, under `set -e`, that
+          # would kill THIS step before the issue opens — the mute red it exists to abolish.
+          FAILING_TARGETS=""
+          if [ -s "$RUNNER_TEMP/module-e2e.log" ]; then
+            FAILING_TARGETS=$(awk '
+              /^ *Running / { t=$0; sub(/^ *Running /, "", t); sub(/ \(target.*/, "", t); cur=t }
+              / \.\.\. FAILED$/ { if (cur != "") n[cur]++ }
+              END { for (k in n) printf "- `%s` — %d test(s)\n", k, n[k] }
+            ' "$RUNNER_TEMP/module-e2e.log" | sort)
+          fi
           if [ -z "$FAILING_TARGETS" ]; then
             # Compiló mal, o murió antes de ejecutar un solo caso: se dice, no se calla.
             FAILING_TARGETS="- (ningún test individual marcado \`FAILED\`: la suite murió antes de ejecutarlos — mira el log del run)"
@@ -375,8 +382,7 @@ jobs:
             origin="la publicación de \`${MODULE}\` v${MODULE_VERSION:-?}"
           fi
 
-          # Frase de búsqueda SIN dos puntos (los dos puntos son sintaxis de búsqueda de GitHub) y
-          # estable: es lo que hace idempotente la alerta.
+          # The title is the idempotency key: stable, matched EXACTLY, and colon-free.
           title="Los módulos publicados ROMPEN contra develop"
           body="Detectado por \`test-hub-modules.yml\` — ${origin} (hub#1239).
 
@@ -393,9 +399,13 @@ jobs:
 
           Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando el catálogo vuelva a verde."
 
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"Los módulos publicados ROMPEN contra develop" in:title' \
-            --json number --jq '.[0].number // empty')
+          # List and match locally, never `--search`: that reads GitHub's search index, which
+          # lags behind reality (it returned ZERO with open issues on 2026-08-16). Two failures
+          # minutes apart — push develop then push main, two module releases — would open two
+          # issues. The REST list is consistent; `gh` runs the jq filter itself.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
+            --json number,title \
+            --jq '[.[] | select(.title == "Los módulos publicados ROMPEN contra develop")][0].number // empty')
           if [ -n "$existing" ]; then
             echo "Refrescando la issue de alerta abierta #$existing"
             gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
