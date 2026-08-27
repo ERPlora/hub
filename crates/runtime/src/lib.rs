@@ -39,6 +39,7 @@ pub mod import_sql;
 pub mod installer;
 pub mod loader;
 pub mod manifest;
+pub mod manifest_warning_grandfather;
 pub mod migration_guard;
 pub mod migrations;
 pub mod module_package;
@@ -108,10 +109,15 @@ pub struct ModuleInfo {
     pub depends_on: Vec<String>,
     /// What this core did not understand of the module's manifest and installed anyway (hub#521).
     ///
-    /// Empty for every module that fits the contract, which is all 24 published ones bar the two
-    /// carrying a retired `validates`. It travels here — and not only to a log — because "the hub
-    /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
-    /// whoever is staring at a module that half works has to be able to ASK.
+    /// Empty for every module that fits the contract. What the published catalogue is still
+    /// allowed to warn about is enumerated, pair by pair, in
+    /// [`crate::manifest_warning_grandfather::GRANDFATHERED_MANIFEST_WARNINGS`], and two tests in
+    /// `installer` pin the catalogue to exactly that list so it can only shrink (hub#1243) — the
+    /// count used to live in this comment and went stale twice.
+    ///
+    /// It travels here — and not only to a log — because "the hub ignores it in silence" is not
+    /// fixed by writing the silence down somewhere nobody looks: whoever is staring at a module
+    /// that half works has to be able to ASK.
     pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
     /// Domain error codes the module declares (ADR-0398), sorted by code. Empty when the module
     /// has no `errors` catalog yet — consumers (hub tests, the UI) read this instead of prose.

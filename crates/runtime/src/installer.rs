@@ -2007,4 +2007,95 @@ mod tests {
              exercised by the catalogue"
         );
     }
+
+    // ── hub#1243: what the published catalogue warns about is watched, not just printed ────────
+
+    /// Sweeps the published catalogue and returns every `(module_id, warning path)` pair the
+    /// manifests produce today, sorted so two runs can be diffed.
+    ///
+    /// Shared by the two guards below so they can never disagree about what "the catalogue warns"
+    /// means: one asserts the set is inside the grandfather list, the other asserts the
+    /// grandfather list is inside the set. Together they pin it to exactly the list.
+    fn published_manifest_warnings() -> std::collections::BTreeSet<(String, String)> {
+        let root = crate::e2e_support::modules_root();
+        let mut found = std::collections::BTreeSet::new();
+        let mut parsed = 0;
+        for entry in std::fs::read_dir(&root).expect("modules root is readable").flatten() {
+            let dir = entry.path();
+            if !dir.join("module.json").is_file() {
+                continue;
+            }
+            let module = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
+                continue; // A manifest that does not parse is another test's business.
+            };
+            for warning in &manifest.warnings {
+                found.insert((module.clone(), warning.path.clone()));
+            }
+            parsed += 1;
+        }
+        assert!(
+            parsed >= 20,
+            "expected the published catalogue (~27 modules), only {parsed} parsed in {}",
+            root.display()
+        );
+        found
+    }
+
+    /// **hub#1243** — a published module either warns about NOTHING, or about a path that is on
+    /// the grandfather list with an issue behind it.
+    ///
+    /// ADR-0286 made "this core does not read that field" a warning instead of a refusal, and the
+    /// warning travels in `GET /api/modules` — but nobody was watching the TOTAL, so the catalogue
+    /// could grow a new silent hole at any time and every test would stay green. "The hub ignores
+    /// it in silence" is not fixed by writing the silence into a log nobody reads.
+    ///
+    /// Skips (loudly) where `modules-workspace` is not checked out, like every other catalogue
+    /// sweep. Runs for real in `test-hub-modules.yml`, which checks the 27 repos out.
+    #[test]
+    fn every_published_manifest_has_no_unexpected_warnings_hub1243() {
+        if !crate::require_modules_workspace() {
+            return;
+        }
+        let unexpected: Vec<String> = published_manifest_warnings()
+            .into_iter()
+            .filter(|(module, path)| {
+                !crate::manifest_warning_grandfather::is_grandfathered(module, path)
+            })
+            .map(|(module, path)| format!("`{module}` warns about `{path}`"))
+            .collect();
+        assert!(
+            unexpected.is_empty(),
+            "the published catalogue grew {} manifest warning(s) nobody owns:\n  {}\n\
+             Fix the manifest — the grandfather list is closed and may only shrink.",
+            unexpected.len(),
+            unexpected.join("\n  ")
+        );
+    }
+
+    /// **hub#1243** — the grandfather list may only SHRINK: every pair on it must still be a
+    /// warning the catalogue actually produces.
+    ///
+    /// A `len() <=` ceiling would let an entry rot there for good after the module was fixed, and
+    /// a rotten entry is cover for the next module that starts declaring the same field. Pinning
+    /// each pair to a live warning means fixing a manifest goes red until the line is deleted.
+    #[test]
+    fn every_grandfathered_manifest_warning_still_warns_hub1243() {
+        if !crate::require_modules_workspace() {
+            return;
+        }
+        let live = published_manifest_warnings();
+        let stale: Vec<String> = crate::manifest_warning_grandfather::GRANDFATHERED_MANIFEST_WARNINGS
+            .iter()
+            .filter(|(module, path)| !live.contains(&((*module).to_string(), (*path).to_string())))
+            .map(|(module, path)| format!("(\"{module}\", \"{path}\")"))
+            .collect();
+        assert!(
+            stale.is_empty(),
+            "{} grandfather entr(y/ies) no longer match a real warning:\n  {}\n\
+             The module was fixed: delete the line so the list keeps shrinking.",
+            stale.len(),
+            stale.join("\n  ")
+        );
+    }
 }
