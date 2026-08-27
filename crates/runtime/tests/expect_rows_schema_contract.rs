@@ -108,3 +108,74 @@ fn an_empty_anchor_is_refused_by_the_schema_before_the_runtime_sees_it() {
     let parsed: ExpectRows = serde_json::from_value(gate).unwrap();
     assert_eq!(parsed.statement.as_deref(), Some(""), "serde is tolerant by design (hub#521); the refusal is positional");
 }
+
+// ── PARIDAD del gate legado `min_affected_rows` (hub#1091, revisión) ─────────────────────────
+//
+// El schema no puede ser MÁS estricto que el runtime: un manifest que `erplora validate` rechaza y
+// el hub instala (o al revés) es la deriva que este fichero existe para cazar. Y aquí hubo una: el
+// `if` se escribió como
+//
+//     "if": { "required": ["min_affected_rows"], "properties": { "sql": { "minItems": 2 } } }
+//
+// y `properties` en JSON Schema **solo restringe las claves PRESENTES**. Un command de HANDLER no
+// declara `sql`, así que la rama `sql` pasaba en vacío, el `if` casaba igual y el `then` prohibía
+// `min_affected_rows` — mientras el installer (`command.sql.len() > 1` → `0 > 1`, falso) y el
+// `checkRowGates` del toolkit lo aceptaban tan campantes.
+//
+// El arreglo es declarar que el antecedente necesita LAS DOS claves: `"required": ["min_affected_rows", "sql"]`.
+
+fn manifest_with_command(command: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "id": "demo", "name": "Demo", "version": "1.0.0",
+        "commands": { "demo.op": command }
+    })
+}
+
+/// El caso que la revisión encontró: sin `sql` no hay lote que neutralizar, así que la guarda no
+/// aplica — y el schema tiene que decir lo mismo que el installer.
+#[test]
+fn a_handler_command_with_no_sql_may_declare_min_affected_rows() {
+    let schema = schema();
+    let handler_command = serde_json::json!({
+        "permission": "demo.write",
+        "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "run" },
+        "min_affected_rows": 1
+    });
+    assert!(
+        schema.is_valid(&manifest_with_command(handler_command)),
+        "un command de handler no tiene `sql`: no hay lote, la guarda no puede quedar neutralizada, \
+         y el installer (`command.sql.len() > 1`) lo acepta — el schema no puede ser más estricto"
+    );
+}
+
+/// La otra mitad de la paridad, para que el arreglo no se pase de frenada: lo que el installer SÍ
+/// rechaza, el schema lo sigue rechazando.
+#[test]
+fn the_multi_statement_legacy_gate_is_still_refused_by_both_doors() {
+    let schema = schema();
+    let batched = serde_json::json!({
+        "permission": "demo.write",
+        "sql": ["commands/_bump.sql", "commands/create.sql"],
+        "min_affected_rows": 1
+    });
+    assert!(
+        !schema.is_valid(&manifest_with_command(batched)),
+        "dos sentencias y un entero que no puede anclarse: es la forma neutralizable de hub#1091"
+    );
+}
+
+/// Y el caso legítimo del catálogo publicado (`flows.drafts.resolve`) sigue validando: una
+/// sentencia ES el lote.
+#[test]
+fn the_single_statement_legacy_gate_stays_valid() {
+    let schema = schema();
+    let single = serde_json::json!({
+        "permission": "demo.write",
+        "sql": ["commands/resolve.sql"],
+        "min_affected_rows": 1
+    });
+    assert!(
+        schema.is_valid(&manifest_with_command(single)),
+        "`flows.drafts.resolve` es exactamente esta forma y es la única del catálogo"
+    );
+}

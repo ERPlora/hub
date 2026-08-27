@@ -29,10 +29,17 @@
 //!   * **En CI** (`CI=true`, lo que GitHub Actions inyecta): el skip es legítimo y se imprime con
 //!     un mensaje **visible** (no un `eprintln!` enterrado que se confunde con `ok`).
 //!
+//!   * **Con `ERPLORA_E2E_REQUIRE_MODULES=1`** (hub#1216): los módulos son **obligatorios** en este
+//!     entorno y su ausencia es **fatal**, gane quien gane — ni `CI=true` ni
+//!     `ERPLORA_E2E_ALLOW_SKIP` abren el skip. Lo pone el job de CI que sí clona el catálogo de
+//!     módulos. Sin esto, un fallo al traerlos dejaría los 238 e2e saltándose solos y el job
+//!     saldría **verde sin haber probado nada** — el agujero exacto que ese job cierra, y el mismo
+//!     modo de fallo que este fichero describe arriba, solo que en CI.
+//!
 //! Override explícito: `ERPLORA_E2E_ALLOW_SKIP=1` permite el skip silencioso-legítimo en cualquier
-//! entorno (p.ej. un worktree temporal donde uno sabe que no va a correr e2e), y
-//! `ERPLORA_MODULES_DIR` apunta la raíz de módulos manualmente para que un worktree fuera del
-//! monorepo pueda resolverlos sin tocar el código.
+//! entorno (p.ej. un worktree temporal donde uno sabe que no va a correr e2e) **salvo donde los
+//! módulos se hayan declarado obligatorios**, y `ERPLORA_MODULES_DIR` apunta la raíz de módulos
+//! manualmente para que un worktree fuera del monorepo pueda resolverlos sin tocar el código.
 
 use std::path::PathBuf;
 
@@ -86,6 +93,17 @@ fn allow_skip_override() -> bool {
         .unwrap_or(false)
 }
 
+/// ¿Se ha declarado que en ESTE entorno los módulos son OBLIGATORIOS
+/// (`ERPLORA_E2E_REQUIRE_MODULES=1`)?
+///
+/// Lo pone el job de CI que sí se los trae (hub#1216). Ahí «no encuentro los módulos» no es un skip
+/// legítimo: es el job entero fallando en su única razón de existir.
+fn require_modules_override() -> bool {
+    std::env::var_os("ERPLORA_E2E_REQUIRE_MODULES")
+        .map(|v| v == "1" || v == "true" || v == "TRUE")
+        .unwrap_or(false)
+}
+
 /// Decisión pura del guard (sin tocar el FS ni el entorno) — factorizada para que la política sea
 /// testable de forma determinista, sin carreras entre tests que muten variables de entorno.
 ///
@@ -103,9 +121,19 @@ pub enum GuardDecision {
 }
 
 #[doc(hidden)]
-pub fn decide(modules_present: bool, in_ci: bool, allow_skip: bool) -> GuardDecision {
+pub fn decide(
+    modules_present: bool,
+    in_ci: bool,
+    allow_skip: bool,
+    require_modules: bool,
+) -> GuardDecision {
     if modules_present {
         GuardDecision::Run
+    } else if require_modules {
+        // hub#1216: quien declara los módulos OBLIGATORIOS en su entorno (el job de CI que se los
+        // trae) no admite skip, ni por `CI=true` ni por `ERPLORA_E2E_ALLOW_SKIP`. Si aquí faltan,
+        // el job saldría verde sin ejecutar los 238 e2e — el agujero que vino a cerrar.
+        GuardDecision::FailLoud
     } else if in_ci || allow_skip {
         GuardDecision::LegitSkip
     } else {
@@ -136,7 +164,7 @@ pub fn decide(modules_present: bool, in_ci: bool, allow_skip: bool) -> GuardDeci
 pub fn require_modules_workspace() -> bool {
     let root = modules_root();
     let present = root.is_dir();
-    match decide(present, running_in_ci(), allow_skip_override()) {
+    match decide(present, running_in_ci(), allow_skip_override(), require_modules_override()) {
         GuardDecision::Run => true,
         GuardDecision::LegitSkip => {
             // Aviso VISIBLE: el resumen de `cargo test` no menciona los skips, así que destacamos
@@ -149,6 +177,22 @@ pub fn require_modules_workspace() -> bool {
             );
             false
         }
+        // Con los módulos declarados OBLIGATORIOS (hub#1216) el diagnóstico es OTRO: no es un
+        // worktree mal montado, es el job de CI que no consiguió traerse los módulos. Y el consejo
+        // de `ERPLORA_E2E_ALLOW_SKIP` de abajo sería falso aquí — ya no abre el skip.
+        GuardDecision::FailLoud if require_modules_override() => panic!(
+            "modules-workspace NO encontrado en {}\n\
+             \n\
+             ERPLORA_E2E_REQUIRE_MODULES=1 declara que en este entorno los módulos son\n\
+             OBLIGATORIOS, así que esto NO es un skip legítimo: es el fallo del propio job.\n\
+             Aquí `ERPLORA_E2E_ALLOW_SKIP` NO abre el skip, a propósito.\n\
+             \n\
+             En CI la causa habitual es que el paso que clona el catálogo de módulos falló o quedó\n\
+             a medias (token caducado o sin acceso, repo renombrado, red). Revisa ese paso: si\n\
+             siguiera adelante, los 238 e2e se saltarían solos y el job saldría VERDE sin haber\n\
+             probado nada — que es exactamente el agujero que hub#1216 cierra.",
+            root.display()
+        ),
         // Fuera de CI, los módulos DEBERÍAN estar al lado del hub. Si faltan es casi seguro un
         // worktree fuera del árbol del monorepo (el caso exacto del issue): FAIL LOUD en vez de
         // verde vacío. La pista del `0.00s` era la única señal y pasaba desapercibida.
@@ -289,33 +333,56 @@ mod tests {
     #[test]
     fn decide_run_cuando_los_modulos_existen() {
         // Presente manda sobre todo lo demás: el test corre siempre que haya módulos.
-        assert_eq!(decide(true, false, false), GuardDecision::Run);
-        assert_eq!(decide(true, true, false), GuardDecision::Run);
-        assert_eq!(decide(true, false, true), GuardDecision::Run);
+        assert_eq!(decide(true, false, false, false), GuardDecision::Run);
+        assert_eq!(decide(true, true, false, false), GuardDecision::Run);
+        assert_eq!(decide(true, false, true, false), GuardDecision::Run);
     }
 
     #[test]
     fn decide_fail_loud_cuando_faltan_en_local() {
         // El corazón del issue: worktree fuera del monorepo, sin CI, sin override → FAIL LOUD.
-        assert_eq!(decide(false, false, false), GuardDecision::FailLoud);
+        assert_eq!(decide(false, false, false, false), GuardDecision::FailLoud);
     }
 
     #[test]
     fn decide_skip_legitimo_en_ci() {
         // CI no tiene los repos hermanos (test-hub.yml): el skip es legítimo y explícito.
-        assert_eq!(decide(false, true, false), GuardDecision::LegitSkip);
+        assert_eq!(decide(false, true, false, false), GuardDecision::LegitSkip);
     }
 
     #[test]
     fn decide_skip_legitimo_con_override_explicito() {
         // ERPLORA_E2E_ALLOW_SKIP=1: el dev declara que hoy no quiere e2e. Skip explícito.
-        assert_eq!(decide(false, false, true), GuardDecision::LegitSkip);
+        assert_eq!(decide(false, false, true, false), GuardDecision::LegitSkip);
     }
 
     #[test]
     fn decide_ci_y_override_son_equivalentes_para_el_skip() {
         // Ambos canales llevan al mismo LegitSkip: no hay jerarquía entre ellos.
-        assert_eq!(decide(false, true, true), GuardDecision::LegitSkip);
+        assert_eq!(decide(false, true, true, false), GuardDecision::LegitSkip);
+    }
+
+    /// 🔴 El job de CI que SÍ se trae los módulos (hub#1216) no puede aceptar el skip: si ahí
+    /// faltan, el job saldría VERDE sin haber ejecutado ninguno de los 238 e2e — que es exactamente
+    /// el agujero que ese job viene a cerrar. `ERPLORA_E2E_REQUIRE_MODULES=1` lo hace fatal.
+    #[test]
+    fn require_modules_gana_al_skip_de_ci() {
+        assert_eq!(decide(false, true, false, true), GuardDecision::FailLoud);
+    }
+
+    /// Y gana también al override manual: quien declara que los módulos son obligatorios lo hace
+    /// para este entorno concreto, y un `ERPLORA_E2E_ALLOW_SKIP` heredado del shell no puede
+    /// devolver el verde vacío por la puerta de atrás.
+    #[test]
+    fn require_modules_gana_tambien_al_allow_skip() {
+        assert_eq!(decide(false, false, true, true), GuardDecision::FailLoud);
+        assert_eq!(decide(false, true, true, true), GuardDecision::FailLoud);
+    }
+
+    /// Pero si los módulos ESTÁN, `require` no cambia nada: el test corre, como siempre.
+    #[test]
+    fn require_modules_no_altera_el_caso_feliz() {
+        assert_eq!(decide(true, true, true, true), GuardDecision::Run);
     }
 
     // ── Integración del guard real (sin mutar entorno de forma racy) ──────────────────────

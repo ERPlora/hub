@@ -558,6 +558,30 @@ pub(crate) async fn execute_at(
     Ok(json!({ "ok": true, "new_ids": [new_id] }))
 }
 
+/// Is this `read` within the command's SCOPE? (ERPlora/sales#25)
+///
+/// The decision itself, kept away from the database so it can be tested on its own. `allowed` is
+/// the module plus its `depends_on`; `required` is what the read declares (see
+/// [`crate::manifest::ReadDef`]).
+///
+/// * **`required`** — the read that ABORTS the command when it does not resolve (hub#701). Saying
+///   "this command cannot run without that module's answer" **is** declaring a hard dependency, so
+///   `depends_on` is demanded. Without that, a manifest could ask the host to guarantee a module
+///   nobody installs.
+/// * **graceful** (the string form, or `required: false`) — an **OPTIONAL capability** (ADR-0127)
+///   that declares itself: naming the query in the manifest IS the contract. It forces no install,
+///   it does not join the ADR-0128 cascade, and the toolkit writes it into `optional_queries` of
+///   `.erplora/contracts.json`, so the coupling is visible at publish time.
+///
+/// What does NOT change: the caller's tenant (`hub_id`) and the system context of rule 2.
+fn read_in_scope(allowed: &[&str], name: &str, required: bool) -> bool {
+    if !required {
+        return true;
+    }
+    let owner = name.split('.').next().unwrap_or("");
+    allowed.contains(&owner)
+}
+
 /// Ejecuta un command Tier 2: invoca el handler WASM, valida cada intención y
 /// aplica todas las operaciones + el `emit` del command en una sola transacción.
 /// Ejecuta las **lecturas pre-cargadas** que el command declara (`reads`) y las devuelve como
@@ -573,9 +597,22 @@ pub(crate) async fn execute_at(
 ///
 /// # Las tres reglas (ADR-0069 §1) + la cuarta (hub#701)
 ///
-/// 1. **Alcance por DEPENDENCIA, no por permiso.** Solo queries del propio módulo o de los que
-///    declara en `depends_on`. Un módulo no puede leerle las tablas a otro con el que no tiene
-///    contrato — la lista de queries permitidas la fija el manifest, no el caller.
+/// 1. **Scope is what the MANIFEST DECLARES, not the caller's permission.** Queries of the module
+///    itself, of the modules it declares in `depends_on` (a HARD dependency), and of the ones it
+///    names in a GRACEFUL read — an OPTIONAL capability (ADR-0127). A module still cannot read the
+///    tables of one it never declared: the list is fixed by the manifest, never by the caller.
+///    See [`read_in_scope`].
+///
+///    ⚠️ **Why a graceful read counts as a declaration** (ERPlora/sales#25). Until that issue the
+///    scope was ONLY `depends_on`, which made it carry two jobs that have nothing to do with each
+///    other: *install this with me* and *I may read this*. The second one is what forced `sales` to
+///    hard-depend on `inventory` just to learn a price — a salon that only cuts hair had to install
+///    a warehouse. And it broke, **in silence**, the integrations that deliberately do not declare
+///    the dependency: `sales.complete_sale` declares `modifiers.options.all` and
+///    `combos.options.all` as graceful reads without either in `depends_on`, both were dropped
+///    here, and the handler — which fails CLOSED when a line carries supplements and its catalogue
+///    did not arrive — refused every sale with a supplement or a set menu. The warning went to
+///    stderr; the cashier got a rejection code.
 /// 2. **Contexto de SISTEMA.** No se re-gatea por el permiso del usuario: el permiso del *command*
 ///    ya se comprobó, y las reads son contrato vouched por el autor del módulo. Un empleado de POS
 ///    sin `taxes.view_tax` igual necesita los tipos para poder cobrar. Se conserva el `hub_id` del
@@ -615,12 +652,12 @@ async fn preload_reads(
     let mut out = serde_json::Map::new();
     for read in &cmd.def.reads {
         let name = read.query();
-        let owner = name.split('.').next().unwrap_or("");
-        if !allowed.contains(&owner) {
-            // No es un error del caller: es un manifest mal declarado. Se avisa y se omite —
-            // el módulo no puede leer lo que no declaró como dependencia.
+        if !read_in_scope(&allowed, name, read.is_required()) {
+            // Not a caller error: a badly declared manifest. Warn and omit — a read that ABORTS the
+            // command without declaring the dependency is not served.
+            let owner = name.split('.').next().unwrap_or("");
             eprintln!(
-                "⚠ reads: `{}` declara `{name}`, pero `{owner}` no está en su depends_on → omitida",
+                "⚠ reads: `{}` declara `{name}` como OBLIGATORIA, pero `{owner}` no está en su depends_on → omitida",
                 cmd.module_id
             );
             continue;
@@ -2297,6 +2334,40 @@ mod tests {
         validate_handler_event(&reg, "tasks", "tasks.task.created").unwrap();
         // `sale.*` no es de nadie (no hay módulo `sale` instalado) → tolerado.
         validate_handler_event(&reg, "tasks", "sale.completed").unwrap();
+    }
+
+    // ── ERPlora/sales#25 · the SCOPE of a `read` ──────────────────────────────────────────
+    //
+    // Until this issue the scope was ONLY `depends_on`, which made it carry two jobs that have
+    // nothing to do with each other: *install this with me* and *I may read this*. The second one
+    // forced `sales` to hard-depend on `inventory` just to learn a price — a salon that only cuts
+    // hair had to install a warehouse — and it broke, IN SILENCE, the integrations that
+    // deliberately do not declare the dependency: `sales.complete_sale` declares
+    // `modifiers.options.all` and `combos.options.all` as graceful reads without either in
+    // `depends_on`, both were dropped here, and the handler — which fails CLOSED when a line
+    // carries supplements and its catalogue did not arrive — refused every sale with a supplement
+    // or a set menu. The warning went to stderr; the cashier got a rejection code.
+
+    #[test]
+    fn a_graceful_read_declares_itself_and_needs_no_depends_on() {
+        // An OPTIONAL capability (ADR-0127): naming the query in the manifest IS the contract. It
+        // forces no install and does not join the ADR-0128 cascade, so declaring it drags nothing.
+        assert!(read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", false));
+        assert!(read_in_scope(&["sales", "taxes"], "modifiers.options.all", false));
+    }
+
+    #[test]
+    fn a_required_read_still_needs_its_owner_declared_as_a_dependency() {
+        // Saying "this command cannot run without that module's answer" IS declaring a hard
+        // dependency: without `depends_on` nobody guarantees the module is installed.
+        assert!(!read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", true));
+        assert!(read_in_scope(&["sales", "taxes"], "taxes.rules.list", true));
+    }
+
+    #[test]
+    fn a_module_always_reads_itself() {
+        assert!(read_in_scope(&["sales"], "sales.settings.get", true));
+        assert!(read_in_scope(&["sales"], "sales.order.lines", false));
     }
 
     /// Un nombre de evento vacío o con forma rara no se encola.

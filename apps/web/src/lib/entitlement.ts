@@ -52,9 +52,18 @@ export function resetEntitlement(): void {
 
 /**
  * Resuelve el entitlement del hub activo contra el endpoint del Cloud. Idempotente: se puede
- * llamar en boot y tras login. Si falla (p. ej. hub_id aún sin resolver), queda PERMISIVO — el
- * hub es online y no tiene sentido bloquearlo por un fallo transitorio de red. Un 410
- * `hub_not_found` lo maneja la capa de fetch del Cloud (`triggerHubGone`), no este gate.
+ * llamar en boot y tras login. Un 410 `hub_not_found` lo maneja la capa de fetch del Cloud
+ * (`triggerHubGone`), no este gate.
+ *
+ * **Un fallo no borra lo que ya sabíamos** (hub#1167). Antes cualquier tropiezo —y el rate-limit
+ * del SaaS es el más frecuente: cada `focus` de ventana recomprueba el entitlement— devolvía el
+ * gate a «sin resolver». Eso no bloquea nada (sin resolver es permisivo), pero sí hace que la UI
+ * lea un `modules=[]` transitorio como una verdad: es la mitad que faltaba del «Mis apps» vacío
+ * con el runtime teniendo apps (hub#1193). Si ya había un snapshot resuelto se CONSERVA y solo se
+ * marca `offline`, que es lo que distingue «no pude preguntar» de «no hay nada».
+ *
+ * Sin snapshot previo (arranque, hub_id aún sin resolver) se sigue quedando PERMISIVO: el hub es
+ * online y no tiene sentido dejar al cajero sin pantallas por un fallo de red.
  */
 export async function resolveEntitlement(): Promise<void> {
   const token = getAccessToken();
@@ -70,7 +79,10 @@ export async function resolveEntitlement(): Promise<void> {
     _offline.value = false;
     _reason.value = '';
   } catch {
-    // Permisivo: no bloquear el shell web por un fallo transitorio (hub_id aún no listo, etc.).
+    // El fallo queda VISIBLE (`offline`) en los dos casos: un límite que falla en silencio es
+    // peor que uno que grita.
+    _offline.value = true;
+    if (_ids.value !== null) return; // había snapshot: se conserva tal cual (módulos y bloqueos).
     _ids.value = null;
     _status.value = 'unknown';
   }

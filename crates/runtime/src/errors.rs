@@ -195,6 +195,32 @@ pub enum RuntimeError {
     /// declarado por el propio módulo y sigue llegando como NULL a propósito.
     #[error("la query `{query}` requiere el parámetro `:{param}` (su SQL lo referencia) y llegó ausente o null: se rehúsa a ligarlo como NULL porque respondería una página vacía como si no existiera nada")]
     MissingRequiredParam { query: String, param: String },
+    /// Un parámetro que la query de LISTA no declara llegó en los params (hub#1173). Antes se
+    /// ignoraba en silencio y la página respondía `200 ok` **con la lista entera**: quien llamó
+    /// —un módulo, el asistente, una integración, un flujo— se cree que ha filtrado y trabaja
+    /// sobre 280 filas pensando que tiene 12, sin nada que lo distinga de un filtro que sí corrió
+    /// y no encontró coincidencias. Es el gemelo mudo de [`Self::MissingRequiredParam`], y cierra
+    /// la asimetría que señala la issue: el payload de un command se valida estricto
+    /// (`invalid_payload`) y el de una query no se validaba en absoluto.
+    ///
+    /// El vocabulario de una lista es lo que ella declara, ni más ni menos: los binds del propio
+    /// motor (`limit`/`offset`/`search`/`sort`/`dir`), un `f_<col>` (o `f_<col>_from`/`_to`) por
+    /// cada filtro del bloque `list`, cualquier bind que su SQL base referencia —que es donde una
+    /// lista declara sus params de contexto— y las `properties` de su JSON Schema si lo declara.
+    ///
+    /// **Solo se defiende el espacio SIN prefijo.** `f_*` es el namespace del propio motor y un
+    /// filtro no casado ahí se sigue descartando: hay 5 pantallas del catálogo cuya tabla declara
+    /// `filterable` una columna que su manifest no declara como filtro, y rechazarlas cambiaría
+    /// «el filtro no hace nada» por «la tabla revienta». Se cierra cuando esos manifests declaren
+    /// el filtro que les falta (hub#1182).
+    #[error(
+        "la query `{query}` no declara el parámetro `{param}`: se rehúsa a ignorarlo porque devolvería la lista ENTERA como si hubiera filtrado; acepta {accepted:?}"
+    )]
+    UnknownFilter {
+        query: String,
+        param: String,
+        accepted: Vec<String>,
+    },
     /// Fallo de la capacidad de host `host.notify` (ADR-0012): el transporte de un canal
     /// (email/sms/whatsapp) no pudo entregar. El relay del outbox lo trata como un listener
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.

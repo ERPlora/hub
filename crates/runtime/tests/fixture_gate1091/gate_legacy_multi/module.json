@@ -1,0 +1,16 @@
+{
+  "id": "gate_legacy_multi",
+  "name": "Legacy Row Gate, Two Statements",
+  "version": "1.0.0",
+  "permissions": ["gate_legacy_multi.write"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "gate_legacy_multi.create": {
+      "permission": "gate_legacy_multi.write",
+      "transaction": true,
+      "sql": ["commands/_bump.sql", "commands/create.sql"],
+      "min_affected_rows": 1,
+      "emit": []
+    }
+  }
+}

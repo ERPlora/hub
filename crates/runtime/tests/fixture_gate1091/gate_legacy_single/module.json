@@ -1,0 +1,16 @@
+{
+  "id": "gate_legacy_single",
+  "name": "Legacy Row Gate, One Statement",
+  "version": "1.0.0",
+  "permissions": ["gate_legacy_single.write"],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "commands": {
+    "gate_legacy_single.resolve": {
+      "permission": "gate_legacy_single.write",
+      "transaction": true,
+      "sql": ["commands/resolve.sql"],
+      "min_affected_rows": 1,
+      "emit": []
+    }
+  }
+}
