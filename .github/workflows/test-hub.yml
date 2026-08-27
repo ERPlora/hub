@@ -9,9 +9,8 @@
 #
 # 🔴 Los e2e que instalan módulos reales SE AUTO-OMITEN aquí y este run sale VERDE sin
 # haberlos ejecutado: `actions/checkout@v4` trae solo este repo, `modules-workspace/`
-# (13 repos hermanos: appointments, cash_register, customers, inventory, invoice,
-# invoice_series, kitchen, sales, services, staff, tables, taxes, verifactu) no está, y
-# el guard ve `CI=true` y toma el skip legítimo (hub#253).
+# (~27 repos hermanos: el catálogo publicado entero) no está, y el guard ve `CI=true` y
+# toma el skip legítimo (hub#253).
 #
 # No son dos ficheros: son **238 tests repartidos en 36 targets** de `crates/runtime/tests/`
 # (medido el 2026-08-26). Toda la cadena fiscal, el TPV, la cocina y el inventario entran
@@ -19,9 +18,15 @@
 # hizo creer que el hueco era menor de lo que es.
 #
 # Y tampoco los cubre el gate local: `.githooks/pre-push` los salta POR DEFECTO desde
-# hub#855 y solo los corre con `HUB_GATE_WITH_MODULES=1`. O sea que hoy no corren en
-# ningún sitio automático — un test caducado por ADR-0405 estuvo rojo un día entero sin
-# que ningún verde lo desmintiera (hub#1215). Cerrarlo es hub#1216.
+# hub#855 y solo los corre con `HUB_GATE_WITH_MODULES=1`. Estuvieron sin correr en ningún
+# sitio automático hasta hub#1216 — y por eso un test caducado por ADR-0405 aguantó un día
+# entero en rojo con este workflow en verde (hub#1215).
+#
+# ✅ **Los corre `test-hub-modules.yml`** (hub#1216): se trae el catálogo por su estado
+# publicado y los ejecuta con `ERPLORA_E2E_REQUIRE_MODULES=1`, que hace FATAL la ausencia
+# de módulos para que ese job no pueda repetir este mismo verde vacío. Va por `schedule`
+# diario además de por push: el rojo de hub#1215 lo causó una release de MÓDULO, sin
+# ningún commit del hub de por medio.
 # ==============================================================================
 
 name: Hub tests (Rust · Postgres)
@@ -144,6 +149,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # 🔴 Este job resuelve los módulos por la ruta RELATIVA al checkout
+      # (`crates/runtime/../../../modules-workspace/modules`), que cae FUERA del workspace y
+      # PERSISTE entre jobs del runner. Cualquier cosa que otro job deje ahí cambia lo que este
+      # ejecuta: si aparece un catálogo, `installer::every_published_manifest_*` deja de saltarse
+      # y mide contra lo que haya.
+      #
+      # Ya pasó (hub#1216): la primera versión de `test-hub-modules.yml` clonó ahí 13 de los ~27
+      # módulos y los dejó, y `develop` y `main` se pusieron ROJOS con
+      # «expected the published catalogue (~25 modules), only 13 checked» — un fallo que no tenía
+      # NADA que ver con el diff de quien empujaba. Aquel job ya clona en `$RUNNER_TEMP`, pero esta
+      # defensa se queda: este job no puede depender de la higiene de sus vecinos, y sin ella el
+      # runner envenenado no se cura solo.
+      - name: Quitar restos de `modules-workspace` en el runner (hub#1216)
+        run: |
+          STRAY="$GITHUB_WORKSPACE/../modules-workspace"
+          if [ -e "$STRAY" ]; then
+            # `modules-workspace/modules/<mod>/module.json` → profundidad 3 desde $STRAY.
+            # La primera versión contaba a profundidad 2 y por eso dijo «0 módulos» borrando 13:
+            # un contador que no puede ver el positivo no sirve para diagnosticar nada.
+            n=$(find "$STRAY" -mindepth 3 -maxdepth 3 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+            echo "::warning::restos de modules-workspace en el runner (${n} módulos) — se borran."
+            rm -rf "$STRAY"
+          fi
 
       # Libera ~25-30 GB de imágenes/toolchains preinstalados que no usamos, para que el link del
       # workspace no se quede sin disco (SIGBUS/ENOSPC en `ld` durante los binarios de test).
