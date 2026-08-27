@@ -864,6 +864,436 @@ errs=""
     && ok "ref moved past the sha: still counts as landed (ancestor check), status posts" \
     || bad "ref moved past the sha: still counts as landed (ancestor check), status posts" "$errs"
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 36–44 — SCOPE (hub#1207): the gate runs the packages the diff touches
+#
+# `cargo test --workspace` here duplicates, minute for minute, the suite
+# `test-hub.yml` already runs on every `pull_request` over the org's own
+# runners (unbilled minutes). The expensive copy is the one holding a
+# machine-wide lock, so it — and only it — is the fleet's ceiling: ~8-10
+# issues/day no matter how many workers push.
+#
+# So the local gate stops being a second full suite and becomes a fast
+# smoke over what CHANGED. The lock STAYS (hub#526: two suites in parallel
+# melt the machine); what shrinks is how long it is held.
+#
+# The property under test is the one that makes this safe to ship: the scope
+# derived from a diff CONTAINS the touched package (and its dependents) and
+# is NOT "everything" — plus the attestation naming exactly what ran, because
+# a status that still says `--workspace` after a scoped run is a test that
+# does not prove what it claims.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# A toy cargo workspace: toy-a ← toy-b (dependent), toy-c standalone, plus a
+# non-Rust file. Real `cargo metadata` runs against it — no network, no build.
+# `origin/develop` is planted so the hook can resolve a base for a new branch,
+# which is how the fleet always pushes.
+make_cargo_repo() {
+    local dir
+    dir=$(mktemp -d)
+    git -C "$dir" init -q
+    git -C "$dir" config user.email gate@test
+    git -C "$dir" config user.name gate
+    printf '%s\n' .out .state RAN SCOPE POSTARGS POSTED ghbin target installed > "$dir/.gitignore"
+    cat > "$dir/Cargo.toml" <<'TOML'
+[workspace]
+resolver = "2"
+members = ["crates/a", "crates/b", "crates/c"]
+TOML
+    mkdir -p "$dir/crates/a/src" "$dir/crates/b/src" "$dir/crates/c/src" "$dir/web"
+    cat > "$dir/crates/a/Cargo.toml" <<'TOML'
+[package]
+name = "toy-a"
+version = "0.1.0"
+edition = "2021"
+TOML
+    cat > "$dir/crates/b/Cargo.toml" <<'TOML'
+[package]
+name = "toy-b"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+toy-a = { path = "../a" }
+TOML
+    cat > "$dir/crates/c/Cargo.toml" <<'TOML'
+[package]
+name = "toy-c"
+version = "0.1.0"
+edition = "2021"
+TOML
+    for c in a b c; do echo "pub fn f() {}" > "$dir/crates/$c/src/lib.rs"; done
+    echo "export const x = 1" > "$dir/web/app.ts"
+    ( cd "$dir" && cargo metadata --no-deps --format-version 1 >/dev/null 2>&1 )
+    git -C "$dir" add -A
+    git -C "$dir" commit -qm base
+    git -C "$dir" update-ref refs/remotes/origin/develop HEAD
+    echo "$dir"
+}
+
+# Commit a change to $2 inside $1 and echo the new sha.
+touch_and_commit() {
+    local dir=$1 path=$2
+    mkdir -p "$dir/$(dirname "$path")"
+    echo "// changed $(date +%s%N)" >> "$dir/$path"
+    git -C "$dir" add -A
+    git -C "$dir" commit -qm "touch $path"
+    git -C "$dir" rev-parse HEAD
+}
+
+# Run the hook over a new branch (remote sha ZERO — the fleet's shape) and
+# capture the scope the hook resolved, via the injected test command.
+run_scoped() {
+    local repo=$1 sha=$2
+    shift 2
+    rm -f "$repo/SCOPE"
+    run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        HUB_GATE_TEST_CMD='printf "%s|%s\n" "$HUB_GATE_SCOPE_MODE" "$HUB_GATE_SCOPE_PACKAGES" > '"$repo/SCOPE" \
+        "$@"
+}
+
+# ── 36. A diff touching one leaf crate scopes to that crate ───────────────────
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_scoped "$repo" "$sha")
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 400)"
+grep -q '^packages|' <<<"$scope"         || errs="$errs mode-is-not-packages"
+grep -q 'toy-c' <<<"$scope"              || errs="$errs missing-touched-package"
+grep -q 'toy-a' <<<"$scope"              && errs="$errs scoped-run-includes-untouched-toy-a"
+grep -q 'toy-b' <<<"$scope"              && errs="$errs scoped-run-includes-untouched-toy-b"
+[ -z "$errs" ] \
+    && ok "scope: a diff in one leaf crate runs that crate, not the workspace" \
+    || bad "scope: a diff in one leaf crate runs that crate, not the workspace" "$errs scope='$scope'"
+
+# ── 37. Dependents come along: touching a library tests whoever uses it ───────
+#    Skipping them is how a scoped gate turns into a rubber stamp — toy-b
+#    constructs toy-a's API and breaks without a single line of its own changing.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+code=$(run_scoped "$repo" "$sha")
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                      || errs="$errs exit=$code(want 0)"
+grep -q 'toy-a' <<<"$scope"          || errs="$errs missing-touched-package"
+grep -q 'toy-b' <<<"$scope"          || errs="$errs missing-DEPENDENT-toy-b"
+grep -q 'toy-c' <<<"$scope"          && errs="$errs unrelated-toy-c-included"
+[ -z "$errs" ] \
+    && ok "scope: a touched library drags its dependents in (toy-a → toy-b)" \
+    || bad "scope: a touched library drags its dependents in (toy-a → toy-b)" "$errs scope='$scope'"
+
+# ── 38. Transversal files fall back to the whole workspace, and say so ────────
+#    Cargo.lock / the workspace manifest can change what EVERY crate compiles.
+#    Pretending a scope exists there would be the dishonest half of this change.
+for transversal in Cargo.lock Cargo.toml; do
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(touch_and_commit "$repo" "$transversal")
+    code=$(run_scoped "$repo" "$sha")
+    scope=$(cat "$repo/SCOPE" 2>/dev/null)
+    errs=""
+    [ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+    grep -q '^workspace|' <<<"$scope" || errs="$errs mode-is-not-workspace"
+    [ -z "$errs" ] \
+        && ok "scope: a diff touching $transversal falls back to the full workspace" \
+        || bad "scope: a diff touching $transversal falls back to the full workspace" "$errs scope='$scope'"
+done
+
+# ── 39. A diff with no Rust in it runs no Rust at all ─────────────────────────
+#    And it must not take the lock either: a web-only push waiting behind a
+#    Rust suite is pure queue for nothing.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" web/app.ts)
+code=$(run_scoped "$repo" "$sha")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                     || errs="$errs exit=$code(want 0)"
+[ ! -f "$repo/SCOPE" ]              || errs="$errs suite-ran-for-a-web-only-diff scope=$(cat "$repo/SCOPE")"
+[ ! -d "$repo/.state/lock" ]        || errs="$errs lock-left-behind"
+grep -qi 'no rust' <<<"$out"        || errs="$errs does-not-say-why-it-skipped"
+[ -z "$errs" ] \
+    && ok "scope: a non-Rust diff runs no Rust suite and says why" \
+    || bad "scope: a non-Rust diff runs no Rust suite and says why" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
+# ── 40. The attestation NAMES what ran — a scoped run is not `--workspace` ────
+#    hub#1207's hard requirement: `merge-pr.sh` reads `local-gate/hub-tests` as
+#    proof the workspace suite ran. A scoped run publishing THAT context would
+#    let a partial run stand in for the full one. It gets its own context, so
+#    merge-pr.sh sees the full-suite one as absent and falls through to the
+#    Actions check — which really did run everything.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                    || errs="$errs exit=$code(want 0)"
+[ -f "$repo/POSTARGS" ]                            || errs="$errs nothing-posted"
+grep -q 'context=local-gate/hub-tests-scoped' <<<"$args" || errs="$errs scoped-run-did-not-use-its-own-context"
+grep -q 'context=local-gate/hub-tests ' <<<"$args " && errs="$errs scoped-run-claimed-the-full-suite-context"
+grep -q -- '--workspace' <<<"$args"                && errs="$errs description-claims-workspace"
+grep -q 'toy-c' <<<"$args"                         || errs="$errs description-does-not-name-the-packages"
+[ -z "$errs" ] \
+    && ok "attestation: a scoped run posts its OWN context and names the packages" \
+    || bad "attestation: a scoped run posts its OWN context and names the packages" "$errs args='$args'"
+
+# ── 41. A real full-workspace run keeps the full-suite context and wording ────
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" Cargo.lock)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    HUB_GATE_TEST_CMD="true")
+sleep 2
+args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                     || errs="$errs exit=$code(want 0)"
+grep -q 'context=local-gate/hub-tests ' <<<"$args " || errs="$errs full-run-lost-the-full-suite-context"
+grep -q -- '--workspace' <<<"$args"                 || errs="$errs full-run-stopped-claiming-workspace"
+[ -z "$errs" ] \
+    && ok "attestation: a real workspace run keeps local-gate/hub-tests and its wording" \
+    || bad "attestation: a real workspace run keeps local-gate/hub-tests and its wording" "$errs args='$args'"
+
+# ── 42. The LOCK STAYS on a scoped run (hub#526 is not repealed) ──────────────
+#    The win is holding it for minutes instead of forty. Two suites at once
+#    still melt the machine, so a scoped run must serialize like any other.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="[ -d '$repo/.state/lock' ] && touch $repo/RAN")
+errs=""
+[ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
+[ -f "$repo/RAN" ]        || errs="$errs scoped-run-did-NOT-hold-the-lock"
+[ ! -d "$repo/.state/lock" ] || errs="$errs lock-not-released"
+[ -z "$errs" ] \
+    && ok "lock: a scoped run still takes it, and releases it" \
+    || bad "lock: a scoped run still takes it, and releases it" "$errs"
+
+# ── 43. The green cache is keyed by SCOPE, not by tree alone ──────────────────
+#    The same commit can be pushed against different bases — a rebase onto a
+#    develop that moved, a re-push after the integration branch advanced — and
+#    the WIDER diff resolves to a WIDER scope. Reusing the narrow green there
+#    would mark packages green that nothing ever ran.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+first_commit=$(git -C "$repo" rev-parse HEAD)
+touch_and_commit "$repo" crates/a/src/lib.rs >/dev/null
+mid=$(git -C "$repo" rev-parse HEAD)
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+# Base = the commit just before: only crates/c is new → the narrow scope.
+git -C "$repo" update-ref refs/remotes/origin/develop "$mid"
+run_scoped "$repo" "$sha" >/dev/null
+first=$(cat "$repo/SCOPE" 2>/dev/null)
+# Same sha, same tree, base rewound: crates/a is in the diff too → wider scope.
+git -C "$repo" update-ref refs/remotes/origin/develop "$first_commit"
+rm -f "$repo/SCOPE"
+code=$(run_scoped "$repo" "$sha")
+second=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                    || errs="$errs exit=$code(want 0)"
+grep -q 'toy-c' <<<"$first"        || errs="$errs first-run-scope-unexpected"
+grep -q 'toy-a' <<<"$first"        && errs="$errs first-run-was-not-narrow"
+[ -f "$repo/SCOPE" ]               || errs="$errs the-wider-scope-reused-the-narrow-cached-green"
+# Widened means either toy-a joined the list or the diff now reaches every
+# testable package, which this toy workspace does with two crates out of three.
+case "$second" in
+    workspace*|*toy-a*) ;;
+    *) errs="$errs second-run-did-not-widen" ;;
+esac
+[ -z "$errs" ] \
+    && ok "cache: a green recorded for one scope is not reused for a wider one" \
+    || bad "cache: a green recorded for one scope is not reused for a wider one" "$errs first='$first' second='$second'"
+
+# ── 44. The installed hook RESYNCS ITSELF (hub#746 → hub#1207) ────────────────
+#    Warning about drift was not enough: the fleet ran a 13/08 copy for two
+#    weeks, so a change to `.githooks/pre-push` changed nothing in practice.
+#    When the diff being pushed does NOT touch the hook, the stale installed
+#    copy is replaced by the repo's and re-executed — once (HUB_GATE_RESYNCED).
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+echo "# stale installed copy" >> "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                              || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$repo/.githooks/pre-push" || errs="$errs installed-copy-was-NOT-resynced"
+[ -f "$repo/RAN" ]                                           || errs="$errs suite-did-not-run-after-resync"
+grep -qi 'resync' <<<"$out"                                  || errs="$errs silent-resync"
+[ -z "$errs" ] \
+    && ok "drift: a stale installed hook resyncs itself and re-runs the push" \
+    || bad "drift: a stale installed hook resyncs itself and re-runs the push" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
+# ── 45. A branch that EDITS the hook is never auto-installed fleet-wide ───────
+#    Self-healing must not turn "I am testing a change to the gate" into
+#    "every worktree on this machine now runs my branch's gate".
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+echo "# a change to the gate itself" >> "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "edit the gate"
+sha=$(git -C "$repo" rev-parse HEAD)
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                               || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$repo/.githooks/pre-push"  && errs="$errs branch-hook-got-installed-machine-wide"
+grep -qi 'out of sync' <<<"$out"                              || errs="$errs no-drift-warning"
+[ -z "$errs" ] \
+    && ok "drift: a branch editing the gate warns instead of installing itself" \
+    || bad "drift: a branch editing the gate warns instead of installing itself" "$errs"
+
+# ── 46. A worktree based on an OLDER develop must NOT downgrade the hook ──────
+#    The branch does not touch the gate, but its CHECKOUT carries the older
+#    committed copy. Installing that would revert the fleet's gate on day one
+#    (every in-flight branch is based on a pre-upgrade develop) — and a copy
+#    with no self-heal cannot resync itself back, so the downgrade would be
+#    sticky until a human reruns install-hooks.sh. The canonical source is the
+#    INTEGRATION ref's blob, never the checkout.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+printf '%s\n' '#!/usr/bin/env bash' '# ancient gate: no self-heal here' 'exit 0' > "$repo/.githooks/pre-push"
+chmod +x "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the OLD hook"
+old_base=$(git -C "$repo" rev-parse HEAD)
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "upgrade the gate"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+git -C "$repo" checkout -q "$old_base"
+git -C "$repo" checkout -qb feature
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/feature $sha refs/heads/feature $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+[ "$code" = 0 ]                              || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$HOOK"    || errs="$errs installed-hook-DOWNGRADED-by-an-older-checkout"
+[ -z "$errs" ] \
+    && ok "drift: a worktree based on an older develop cannot downgrade the installed hook" \
+    || bad "drift: a worktree based on an older develop cannot downgrade the installed hook" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# ── 47. An UNCOMMITTED edit to the gate is never installed machine-wide ───────
+#    It is in no diff, so a diff-based guard cannot see it. The resync must
+#    still fire (the installed copy IS stale) but from the integration ref's
+#    committed blob — never from the file someone is editing right now.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+echo "# stale installed copy" >> "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+echo "# WIP uncommitted edit" >> "$repo/.githooks/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+# The push itself is REFUSED — the dirty .githooks/pre-push trips the hub#855
+# clean-tree guard, which is the correct fail-closed answer for that worktree.
+# The property under test is the machine-wide one: the WIP edit never becomes
+# the installed hook.
+[ "$code" = 0 ] && errs="$errs dirty-tree-push-was-not-refused"
+grep -q 'WIP uncommitted edit' "$repo/installed/pre-push" && errs="$errs uncommitted-edit-installed-machine-wide"
+cmp -s "$repo/installed/pre-push" "$HOOK"              || errs="$errs installed-copy-is-not-the-committed-blob"
+[ -f "$repo/RAN" ]                                     && errs="$errs suite-ran-on-a-dirty-tree"
+[ -z "$errs" ] \
+    && ok "drift: an uncommitted edit to the gate is never installed — resync uses the committed blob" \
+    || bad "drift: an uncommitted edit to the gate is never installed — resync uses the committed blob" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# ── 48. Never install a copy that cannot heal itself (stale-fetch downgrade) ──
+#    If origin/develop itself is stale (a worktree that has not fetched since
+#    before the self-heal shipped), its blob has no resync. Installing it would
+#    strand the whole machine on a gate that can only warn — refuse instead.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+printf '%s\n' '#!/usr/bin/env bash' '# ancient gate: no self-heal here' 'exit 0' > "$repo/.githooks/pre-push"
+chmod +x "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the OLD hook"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+errs=""
+[ "$code" = 0 ]                           || errs="$errs exit=$code(want 0)"
+cmp -s "$repo/installed/pre-push" "$HOOK" || errs="$errs installed-hook-replaced-by-a-copy-with-no-self-heal"
+[ -f "$repo/RAN" ]                        || errs="$errs suite-did-not-run"
+[ -z "$errs" ] \
+    && ok "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" \
+    || bad "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

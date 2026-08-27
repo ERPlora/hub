@@ -2,18 +2,33 @@
   "id": "lbind",
   "name": "List Bind Guard",
   "version": "1.0.0",
-  "permissions": ["lbind.read"],
-  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "permissions": [
+    "lbind.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
   "queries": {
     "lbind.items.list": {
       "permission": "lbind.read",
       "sql": "queries/items_list.sql",
       "list": {
-        "search": ["name"],
-        "sort": ["id", "name"],
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name"
+        ],
         "default_sort": "id",
         "default_dir": "asc",
-        "filters": { "name": { "op": "like" } },
+        "filters": {
+          "name": {
+            "op": "like"
+          }
+        },
         "page_size": 50
       }
     },
@@ -21,11 +36,38 @@
       "permission": "lbind.read",
       "sql": "queries/carts_list.sql",
       "list": {
-        "search": ["name"],
-        "sort": ["id", "name"],
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name"
+        ],
         "default_sort": "id",
         "default_dir": "asc",
         "filters": {},
+        "page_size": 50
+      }
+    },
+    "lbind.items.scoped": {
+      "permission": "lbind.read",
+      "sql": "queries/items_list.sql",
+      "schema": "schemas/scoped.json",
+      "list": {
+        "search": [
+          "name"
+        ],
+        "sort": [
+          "id",
+          "name"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "like"
+          }
+        },
         "page_size": 50
       }
     }

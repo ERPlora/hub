@@ -364,7 +364,9 @@ const columns = computed<DataTableColumn[]>(() => [
   { key: 'rateLimitText', header: t('apiKeys.colRateLimit'), format: (r) => String(r.rateLimitText ?? '') },
   // Acciones por fila en columna propia (no en `:actions`, que es global) para poder ocultar
   // Rotar/Revocar en keys revocadas (ADR-0057). Alineada a la derecha, sin selector de columna.
-  { key: '_actions', header: t('apiKeys.colActions'), align: 'right', render: actionsCell, width: '8rem' },
+  // `pinned: 'end'` (outfitkit 0.1.52, hub#1204): with six+ columns the grid overflows and a
+  // plain cell scrolls off-screen; this keeps Rotate/Revoke reachable like the built-in column.
+  { key: '_actions', header: t('apiKeys.colActions'), align: 'right', render: actionsCell, width: '8rem', pinned: 'end' },
 ]);
 
 // Filas para la tabla: precomputa los textos derivados (scope/fechas) y conserva el original.

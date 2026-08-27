@@ -247,6 +247,230 @@ pub fn now_unix() -> i64 {
         .unwrap_or(0)
 }
 
+/// Código estable con el que el hub cuenta que el Cloud le está limitando la tasa. La UI traduce
+/// por CÓDIGO (ADR-0055): la frase de DRF (`"Request was throttled. Expected available in 2828
+/// seconds."`) es inglesa, la escribe otro sistema y llegó a pintarse tal cual dentro de una
+/// pantalla en español (hub#1167).
+pub const CLOUD_RATE_LIMITED: &str = "cloud_rate_limited";
+
+/// Ventana de frescura del proxy `GET /api/entitlement`.
+///
+/// El shell pregunta por el entitlement una vez por `focus` de ventana y otra por cada vista de
+/// módulo que monta, así que un minuto de uso normal son muchas preguntas y **cero** cambios de
+/// plan. La verdad de fondo se mueve en días —el job de revalidación firmado corre cada 24 h
+/// ([`DEFAULT_REVALIDATE_SECS`])—, así que 60 s es holgadamente conservador y aun así convierte
+/// una ráfaga entera en UNA llamada. No se sube más porque una compra hecha en otra pestaña tiene
+/// que verse pronto; ese caso además tiene su propio botón, que consulta otra ruta.
+pub const PROXY_TTL_SECS: i64 = 60;
+
+/// Backoff que se aplica ante un 429 **sin** `Retry-After` utilizable. Con cabecera se respeta la
+/// que mande el SaaS: es él quien sabe cuánto le queda a su ventana (en prod se han visto 2828 s).
+pub const RATE_LIMIT_FALLBACK_BACKOFF_SECS: i64 = 300;
+
+/// Tope del backoff que aceptamos de la cabecera. Un `Retry-After` disparatado (o corrupto) no
+/// puede dejar al hub sin volver a preguntar por su entitlement durante horas: pasado este tope
+/// se reintenta igual, y como mucho se come otro 429 —barato— en lugar de quedarse ciego.
+pub const RATE_LIMIT_MAX_BACKOFF_SECS: i64 = 3_600;
+
+/// Caché del proxy `GET /api/entitlement` (hub#1167).
+///
+/// Tiene DOS trabajos, y conviene no confundirlos:
+///
+///  - **No amplificar**: dentro de [`PROXY_TTL_SECS`] se contesta con el cuerpo guardado y no se
+///    sale a la red. El 429 de fondo lo causa el SaaS (saas#1640: `AnonRateThrottle` 100/h keyed
+///    por IP, compartido por toda la flota), pero el shell lo dispara pidiendo N veces lo mismo.
+///  - **Amortiguar**: cuando el Cloud dice 429, se sirve el ÚLTIMO cuerpo bueno aunque esté
+///    caducado y se abre una ventana de backoff. Degradar a «sin módulos» apagaría módulos ya
+///    comprados por un problema de tasa, que es exactamente el fallo que no puede ocurrir.
+#[derive(Debug, Default)]
+pub struct ProxyCache {
+    /// Último cuerpo BUENO del Cloud (objeto JSON tal cual, sin el bloque aditivo `revalidation`,
+    /// que se recalcula en cada respuesta porque es estado local y siempre es fresco).
+    body: Option<Value>,
+    /// Unix-ts en que se guardó `body`.
+    fetched_at: Option<i64>,
+    /// Unix-ts hasta el que NO se vuelve a salir a la red (ventana pedida por el SaaS).
+    backoff_until: Option<i64>,
+}
+
+/// Celda compartida de la caché (handlers concurrentes), como [`SharedRevalidation`].
+pub type SharedProxyCache = Arc<RwLock<ProxyCache>>;
+
+/// Crea la celda compartida vacía (sin nada cacheado, sin backoff).
+pub fn new_shared_proxy_cache() -> SharedProxyCache {
+    Arc::new(RwLock::new(ProxyCache::default()))
+}
+
+/// Qué hacer con una pregunta del shell, decidido sin red y sin reloj propio (el `now` lo pasa el
+/// llamador, como el resto de este módulo, para que sea testeable).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Decision {
+    /// Contestar con este cuerpo guardado: o está fresco, o el SaaS nos pidió no llamar y esto es
+    /// lo último bueno que sabemos.
+    Serve(Value),
+    /// El SaaS nos está limitando y NO hay nada bueno guardado que servir. Es el único caso en que
+    /// el shell se entera del rate-limit, y se entera por un código, no por la prosa del SaaS.
+    RateLimited,
+    /// Toca salir a la red.
+    Ask,
+}
+
+impl ProxyCache {
+    /// Decide sin salir a la red. El orden importa: el backoff manda sobre la frescura, porque
+    /// mientras el SaaS diga «no me llames» servir algo viejo es mejor que otra llamada que ya
+    /// sabemos que va a volver en 429 — y esa llamada la paga toda la flota (saas#1640).
+    pub fn decide(&self, now: i64) -> Decision {
+        if self.backoff_until.is_some_and(|until| now < until) {
+            return match &self.body {
+                Some(body) => Decision::Serve(body.clone()),
+                None => Decision::RateLimited,
+            };
+        }
+        match &self.body {
+            Some(body) if self.is_fresh(now) => Decision::Serve(body.clone()),
+            _ => Decision::Ask,
+        }
+    }
+
+    /// ¿El cuerpo guardado sigue dentro de la ventana de frescura?
+    pub fn is_fresh(&self, now: i64) -> bool {
+        match (&self.body, self.fetched_at) {
+            (Some(_), Some(at)) => now.saturating_sub(at) < PROXY_TTL_SECS,
+            _ => false,
+        }
+    }
+
+    /// El último cuerpo bueno, **sin mirar la edad**: es lo que se sirve cuando el Cloud limita.
+    /// Un entitlement de hace unos minutos es infinitamente mejor que un error, y el gate real
+    /// vive en el servidor de todos modos (el proxy es UX + defensa en profundidad).
+    pub fn last_good(&self) -> Option<&Value> {
+        self.body.as_ref()
+    }
+
+    /// Guarda una respuesta buena del Cloud y cierra cualquier backoff abierto.
+    pub fn store_success(&mut self, body: Value, now: i64) {
+        self.body = Some(body);
+        self.fetched_at = Some(now);
+        self.backoff_until = None;
+    }
+
+    /// Abre la ventana de backoff tras un 429. `retry_after_secs` es lo que dijo la cabecera
+    /// `Retry-After`; si no vino, no era un número o es disparatada, se aplica el default acotado.
+    pub fn open_backoff(&mut self, retry_after_secs: Option<i64>, now: i64) {
+        let window = retry_after_secs
+            .filter(|s| *s > 0)
+            .map(|s| s.min(RATE_LIMIT_MAX_BACKOFF_SECS))
+            .unwrap_or(RATE_LIMIT_FALLBACK_BACKOFF_SECS);
+        self.backoff_until = Some(now.saturating_add(window));
+    }
+
+    /// Marca lo guardado como caducado **sin tirarlo**: la siguiente pregunta vuelve a salir a la
+    /// red, pero si el Cloud limita seguimos teniendo el último cuerpo bueno que servir. Es el
+    /// gesto de «ha pasado algo que hace vieja la respuesta» (y el que usan los tests para
+    /// simular el paso del tiempo sin un reloj falso).
+    pub fn invalidate(&mut self) {
+        self.fetched_at = None;
+        self.backoff_until = None;
+    }
+}
+
+#[cfg(test)]
+mod proxy_cache_tests {
+    use super::*;
+
+    fn body() -> Value {
+        serde_json::json!({ "modules": [] })
+    }
+
+    /// Dentro de la ventana de frescura no se sale a la red: es lo que convierte la ráfaga de
+    /// `focus` del shell en UNA sola llamada al SaaS.
+    #[test]
+    fn un_cuerpo_fresco_se_sirve_sin_preguntar_al_cloud() {
+        let mut cache = ProxyCache::default();
+        cache.store_success(body(), 1_000);
+
+        assert_eq!(cache.decide(1_000), Decision::Serve(body()));
+        assert_eq!(cache.decide(1_000 + PROXY_TTL_SECS - 1), Decision::Serve(body()));
+        assert_eq!(cache.decide(1_000 + PROXY_TTL_SECS), Decision::Ask);
+    }
+
+    /// El backoff manda sobre la frescura: con la ventana abierta se sirve lo último bueno aunque
+    /// esté caducado, porque la alternativa es una llamada que ya sabemos que vuelve en 429.
+    #[test]
+    fn con_backoff_abierto_se_sirve_lo_ultimo_bueno_aunque_este_caducado() {
+        let mut cache = ProxyCache::default();
+        cache.store_success(body(), 0);
+        cache.open_backoff(Some(600), 1_000);
+
+        assert!(!cache.is_fresh(1_001), "el cuerpo ya está caducado");
+        assert_eq!(cache.decide(1_001), Decision::Serve(body()));
+        assert_eq!(cache.decide(1_600), Decision::Ask, "cerrada la ventana, se vuelve a preguntar");
+    }
+
+    /// Sin nada bueno guardado, el rate-limit sí se le cuenta al shell — pero como decisión
+    /// explícita, no como un error del Cloud reenviado tal cual.
+    #[test]
+    fn sin_cuerpo_guardado_el_backoff_responde_rate_limited() {
+        let mut cache = ProxyCache::default();
+        cache.open_backoff(Some(600), 1_000);
+
+        assert_eq!(cache.decide(1_500), Decision::RateLimited);
+    }
+
+    /// Un `Retry-After` disparatado (o corrupto) no puede dejar al hub sin volver a preguntar
+    /// durante horas: se acota. Y si no viene, se aplica el default — nunca cero, que sería seguir
+    /// golpeando la puerta que acaba de decirnos que no.
+    #[test]
+    fn el_retry_after_se_acota_y_los_valores_invalidos_caen_al_default() {
+        let cases = [
+            (Some(600_i64), 600_i64),
+            (Some(999_999), RATE_LIMIT_MAX_BACKOFF_SECS),
+            (None, RATE_LIMIT_FALLBACK_BACKOFF_SECS),
+            (Some(0), RATE_LIMIT_FALLBACK_BACKOFF_SECS),
+            (Some(-5), RATE_LIMIT_FALLBACK_BACKOFF_SECS),
+        ];
+        for (header, expected_window) in cases {
+            let mut cache = ProxyCache::default();
+            cache.open_backoff(header, 1_000);
+            // La ventana sigue cerrada un instante antes de expirar y abierta justo al expirar.
+            assert_eq!(
+                cache.decide(1_000 + expected_window - 1),
+                Decision::RateLimited,
+                "Retry-After {header:?} tenía que dar una ventana de {expected_window}s"
+            );
+            assert_eq!(
+                cache.decide(1_000 + expected_window),
+                Decision::Ask,
+                "Retry-After {header:?}: pasada la ventana se vuelve a preguntar"
+            );
+        }
+    }
+
+    /// Un refresco bueno cierra el backoff: el SaaS ya nos habla otra vez.
+    #[test]
+    fn una_respuesta_buena_cierra_la_ventana_de_backoff() {
+        let mut cache = ProxyCache::default();
+        cache.open_backoff(Some(3_000), 1_000);
+        assert_eq!(cache.decide(1_500), Decision::RateLimited);
+
+        cache.store_success(body(), 1_500);
+        assert_eq!(cache.decide(1_501), Decision::Serve(body()));
+    }
+
+    /// `invalidate()` fuerza el siguiente viaje a la red pero NO tira lo guardado: si ese viaje se
+    /// come un 429, seguimos teniendo un entitlement bueno que servir en vez de apagar módulos.
+    #[test]
+    fn invalidate_caduca_pero_no_tira_el_ultimo_cuerpo_bueno() {
+        let mut cache = ProxyCache::default();
+        cache.store_success(body(), 1_000);
+
+        cache.invalidate();
+
+        assert_eq!(cache.decide(1_000), Decision::Ask);
+        assert_eq!(cache.last_good(), Some(&body()));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
