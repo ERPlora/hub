@@ -5,8 +5,9 @@
 # WORKDIR /app
 # COPY . .
 # RUN corepack enable pnpm && pnpm install --frozen-lockfile \
-#     && pnpm -F @erplora/module-cli build:inventory \
 #     && pnpm -F @erplora/web build
+# (el hub no compila módulos: sus `dist/` los produce `@erplora/module-toolkit` y los copia
+#  `apps/web/sync-modules.mjs`)
 
 # FROM rust:1 AS builder
 # WORKDIR /app
