@@ -2957,7 +2957,12 @@ impl Runtime {
 /// Inyecta los parámetros del sistema en el payload del llamador: `hub_id`, `current_user_id`,
 /// `now` y `new_id`. Siempre disponibles para el SQL del módulo y no falsificables desde la UI
 /// (ARQUITECTURA.md §2.5, §2.9).
-pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
+///
+/// `pub` porque **es contrato del kernel** (hub#1235): los nombres que devuelve son los `:name`
+/// contra los que está escrito el SQL de los 27 módulos publicados, y
+/// `tests/kernel_contract_engine.rs` los congela llamando a esta misma función — nunca a una copia
+/// de su lista, que es como se desincronizaría.
+pub fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     let mut p = base.clone();
     p.insert("hub_id".into(), Json::String(ctx.hub_id.clone()));
     p.insert("current_user_id".into(), Json::String(ctx.user_id.clone()));

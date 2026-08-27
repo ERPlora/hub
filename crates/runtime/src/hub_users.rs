@@ -70,7 +70,9 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// la pantalla de la cola no podía existir fuera del shell. Gate: el del namespace (sesión local),
 /// **no admin** — es la audiencia que hub#987 ya decidió para los mismos hechos: una cola que nadie
 /// drena necesita a quien está en el mostrador, no a quien administra el hub.
-const CORE_QUERIES: &[&str] = &[
+/// `pub` porque **es contrato del kernel** (hub#1235): el namespace reservado `hub.*` que el core
+/// contesta sin que ningún módulo lo declare, congelado en `contracts/kernel/engine.snapshot`.
+pub const CORE_QUERIES: &[&str] = &[
     "users.list",
     "roles.list",
     "setup.status",
