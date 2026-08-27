@@ -4,7 +4,7 @@
 // exportar el hub). DECISIÓN del humano (2026-07-12): es un widget DEL BOARD, igual que los de
 // módulo — entra en el catálogo de <ok-widget-board> y en todos los presets (activo por defecto
 // sin estado guardado), y el picker permite ocultarlo como a cualquier otro. Sus CTAs llevan a
-// la pestaña «Datos» de Ajustes (/settings?tab=data), donde viven importar y exportar juntos.
+// la pestaña «Datos» de Ajustes (/settings#data), donde viven importar y exportar juntos.
 //
 // CONTRATO (2026-07-12, retirada de /first-run): un hub VACÍO entra DIRECTO al dashboard. Ya no
 // hay guard que desvíe a una pantalla de primer arranque — la puesta en marcha vive en core
@@ -72,7 +72,9 @@ test.describe('widget core de export/import en la home', () => {
 
     // El CTA → pestaña Datos de Ajustes, que aterriza en la sección de importar.
     await board.getByTestId('dashboard-blueprint-cta').click();
-    await expect(page).toHaveURL(/\/settings\?tab=data$/);
+    // La pestaña se selecciona por HASH (`SettingsPage.vue` lee `route.hash` y reescribe la
+    // URL): el `?tab=data` de antes ya no abría nada, y este spec llevaba rojo sin correr.
+    await expect(page).toHaveURL(/\/settings#data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
   });
 });

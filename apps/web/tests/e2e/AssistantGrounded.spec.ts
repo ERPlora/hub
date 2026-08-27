@@ -63,6 +63,12 @@ function startFixtureCloud(): Promise<number> {
 }
 
 test.beforeAll(async () => {
+  // El hook hereda el timeout de test (30 s) y más abajo espera al runtime hasta 60 s: esa
+  // espera NO podía completarse nunca — el hook moría antes, y el síntoma era un `undefined`
+  // en `expect(r?.ok())` que parece un runtime roto en vez de un reloj mal puesto. Con una BD
+  // recién creada (migraciones + seed) el arranque pasa de 30 s con facilidad, así que en CI
+  // esto era un rojo esperando su turno.
+  test.setTimeout(120_000);
   const cloudPort = await startFixtureCloud();
 
   // Runtime REAL (binario ya compilado por la suite), hub vacío, seed demo (PIN 0000 + device
@@ -74,6 +80,9 @@ test.beforeAll(async () => {
       HUB_BIND: `127.0.0.1:${RUNTIME_PORT}`,
       HUB_AUTH: 'dev',
       HUB_DEV_MODE: '1',
+      // Trust-on-first-use de un hub de demo (ADR-0197): sin esto el login por PIN de abajo recibe
+      // 403 `device_untrusted` desde hub#630, que borró la fila `demo-trusted-device` del seed.
+      HUB_DEMO: '1',
       HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),
       HUB_WEB_DIR: join(HUB_ROOT, 'apps', 'web', 'dist'),
       HUB_CLOUD_API_URL: `http://127.0.0.1:${cloudPort}`,

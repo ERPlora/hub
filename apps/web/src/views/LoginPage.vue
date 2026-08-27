@@ -16,7 +16,7 @@
       </ion-button>
 
       <div class="login-wrap">
-        <div class="login-box">
+        <div class="login-box" data-testid="login-box">
 
           <!-- Logo / cabecera -->
           <div class="logo-area">

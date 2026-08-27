@@ -26,7 +26,7 @@ ver más abajo):
   **roles y permisos** (pestaña `#permisos` de empleados) y el **asistente AI**
   (`components/AssistantDrawer.vue`, panel paralelo en escritorio/tablet y superpuesto en
   móvil). Tema claro/oscuro. CSP estricta validada históricamente (§14); hoy los gates vivos
-  son vitest + 4 specs Playwright (`apps/web/tests/e2e/`).
+  son vitest + 6 specs Playwright (`apps/web/tests/e2e/`, `pnpm -F @erplora/web test:e2e`).
 - **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) + `src/lib/session.ts`):
   email (1er login) → dispositivo de confianza (enforce, sin bypass — hub#330) → PIN con
   rate-limit (hub#329); fallback demo SOLO bajo `VITE_DEMO=1`
@@ -116,9 +116,24 @@ Atajos para arrancar solo una mitad: `pnpm dev:web` (Vite) · `pnpm dev:runtime`
 
 ```sh
 pnpm -F @erplora/web test                       # vitest (unit/componentes)
-pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts   # 4 specs e2e
+pnpm -F @erplora/web test:e2e                   # 6 specs e2e (arranca runtime + Vite solo)
 pnpm -F @erplora/web typecheck                  # TS estricto
 ```
+
+Los e2e levantan ELLOS el banco (`webServer` de `tests/playwright.config.ts`: runtime Axum +
+Vite), así que no hace falta un `pnpm dev` al lado — si ya lo tienes, lo reutilizan. Lo único
+que piden es una BD que exista:
+
+```sh
+docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_web'
+docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_assistant'
+export E2E_DATABASE_URL=postgres://postgres:test@localhost:5433/hub_e2e_assistant
+```
+
+Las capturas de `toHaveScreenshot` **se generan donde corren** (el runner Linux de
+`test-web.yml`: Run workflow → `update_baselines: true` → artefacto `playwright-baselines`).
+Las de un Mac no casan jamás con las de Linux y están en el `.gitignore`; mientras no exista
+la baseline de tu plataforma, el caso visual se salta diciéndolo.
 
 ## Decisiones fijadas (ver §14–15 del doc)
 
