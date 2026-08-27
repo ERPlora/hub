@@ -50,12 +50,17 @@ UPDATE_KERNEL_CONTRACT=1 pnpm -F @erplora/module-sdk contract:check
 
 - **`routes.snapshot`** — `MÉTODO RUTA auth:<clase>`. La clase se **deriva**, no se declara: es la
   primitiva de `crate::auth` a la que llega el handler a través de sus propios helpers y macros
-  (`admin`, `session`, `api-key`, `any-credential`, `hub-token`, `capability`). Varias clases se
-  unen con `+` cuando el handler pasa por más de una puerta (`admin+capability`).
-  `auth:none` significa literalmente **ninguna primitiva en ese camino**, y es correcto para las
-  15 puertas que no piden credencial: el login (`/api/auth/*`), las sondas (`/healthz`, `/readyz`,
-  `/robots.txt`), los assets de módulo (`/modules/**`), el modo del dispositivo que lee la pantalla
-  de login, y `/p/:locator`, cuya autorización **es el localizador** (hub#963).
+  (`admin`, `session`, `api-key`, `any-credential`, `capability`). Varias clases se unen con `+`
+  cuando el handler pasa por más de una puerta (`admin+capability`). Una sesión resuelta **a mano**
+  (`auth::session_token` + `resolve_session`, como `/api/auth/set-pin`) cuenta como `session`.
+  El token de máquina del hub (`hub_scoped_auth`/`machine_auth`) **no es una clase**: autentica al
+  hub ante el Cloud, no al que llama al hub — listarlo pintaba de «puerta» rutas abiertas.
+  `auth:none` significa literalmente **ninguna primitiva en ese camino**. Hoy son 17: el login
+  (`/api/auth/*` salvo `set-pin`), las sondas (`/healthz`, `/readyz`, `/robots.txt`), los assets de
+  módulo (`/modules/**`), el modo del dispositivo que lee la pantalla de login, `/api/hub/context`,
+  `/api/error-report`, `/p/:locator` —cuya autorización **es el localizador** (hub#963)— y dos que
+  el fichero deja a la vista a propósito: `GET /api/assistant/config` y `POST /api/assistant/checkout`
+  (hub#1254). Que una ruta abierta salga como `none` es la función del fichero, no un defecto suyo.
   Si aparece una forma nueva de gatear una ruta hay que añadirla a la tabla `PRIMITIVES` del test,
   o todas las rutas que gatee saldrán como `none`.
 - **`engine.snapshot`** — por secciones. `[system_params]` sale de una llamada REAL a

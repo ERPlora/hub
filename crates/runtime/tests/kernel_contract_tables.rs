@@ -32,6 +32,39 @@ async fn tables_snapshot_matches_the_booted_system_schema_hub1235() {
     kernel_snapshot::assert_snapshot("tables.snapshot", &generate().await);
 }
 
+/// The file is ordered by BYTES, whatever order Postgres hands the rows back in: `ORDER BY` on
+/// text follows the collation of the database it runs on (`en_US` and `C` disagree on where `_`
+/// goes), and a snapshot that moved lines between two machines would fail naming nothing
+/// (review of hub#1252).
+#[test]
+fn the_file_is_sorted_by_bytes_whatever_order_postgres_returns_hub1235() {
+    let column = |table: &str| {
+        (
+            table.to_string(),
+            "id".to_string(),
+            "text".to_string(),
+            "NOT NULL".to_string(),
+        )
+    };
+    let sorted = vec![
+        column("_flow_run_steps"),
+        column("_flow_runs"),
+        column("hub_user"),
+    ];
+    let mut scrambled = sorted.clone();
+    scrambled.reverse();
+    assert_eq!(render(&sorted), render(&scrambled));
+    let text = render(&scrambled);
+    assert!(
+        text.find("_flow_run_steps.") < text.find("_flow_runs."),
+        "`_` tiene que ordenar antes que `s` (orden de bytes), y no lo hace:\n{text}"
+    );
+    assert!(
+        text.find("_flow_runs.") < text.find("hub_user."),
+        "`_*` tiene que ir antes que `hub_*` (orden de bytes), y no lo hace:\n{text}"
+    );
+}
+
 async fn generate() -> String {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-contract");
@@ -54,41 +87,60 @@ async fn generate() -> String {
         .expect("reflejar information_schema")
         .rows;
 
+    let mut columns: Vec<(String, String, String, String)> = rows
+        .iter()
+        .filter(|row| is_system_table(row["table_name"].as_str().expect("table_name")))
+        .map(|row| {
+            let null = if row["is_nullable"].as_str() == Some("YES") {
+                "NULL"
+            } else {
+                "NOT NULL"
+            };
+            (
+                row["table_name"].as_str().expect("table_name").to_string(),
+                row["column_name"]
+                    .as_str()
+                    .expect("column_name")
+                    .to_string(),
+                row["data_type"].as_str().expect("data_type").to_string(),
+                null.to_string(),
+            )
+        })
+        .collect();
+    assert!(
+        columns.len() > 50,
+        "solo se han reflejado {} columnas de sistema: eso no es un esquema que encogió, \
+         es un arranque que no llegó a migrar",
+        columns.len()
+    );
+    // Byte order, decided HERE and not by the `ORDER BY`: the collation of the database the rows
+    // come from must not be able to move a line of this file.
+    columns.sort();
+    render(&columns)
+}
+
+/// One line per column `(table, column, type, nullability)`, tables separated by a blank line.
+///
+/// Byte-sorted before writing, whatever order the caller hands the columns in. The table goes IN
+/// FRONT of every line so each line is unique in the file and a failure can name the exact column
+/// that is missing or new: grouped by section, `label text NOT NULL` of two different tables would
+/// be the SAME line and losing one of them would not show in a set difference.
+fn render(columns: &[(String, String, String, String)]) -> String {
+    let mut sorted: Vec<&(String, String, String, String)> = columns.iter().collect();
+    sorted.sort();
     let mut out = String::from(
         "# Tablas de SISTEMA del hub (`hub_*`, `_*`) — reflejadas de un hub recién arrancado,\n\
          # NO editar a mano. Es el namespace RESERVADO: ninguna migración de módulo puede tocarlo.\n\
          # `UPDATE_KERNEL_CONTRACT=1 cargo test -p erplora-runtime --test kernel_contract_tables`\n\
          # Contrato del kernel: ADR «El Hub se CIERRA como KERNEL».\n",
     );
-    // Una línea por COLUMNA, con la tabla delante: así cada línea es única en el fichero y el
-    // fallo puede nombrar exactamente la columna que sobra o falta. Agrupar por secciones haría
-    // que `label text NOT NULL` de dos tablas distintas fuese la MISMA línea, y perder una de las
-    // dos no se vería en el diff de conjuntos.
-    let mut current = String::new();
-    let mut columns = 0usize;
-    for row in &rows {
-        let table = row["table_name"].as_str().expect("table_name");
-        if !is_system_table(table) {
-            continue;
-        }
+    let mut current = "";
+    for (table, column, kind, null) in sorted {
         if table != current {
             out.push('\n');
-            current = table.to_string();
+            current = table;
         }
-        let column = row["column_name"].as_str().expect("column_name");
-        let kind = row["data_type"].as_str().expect("data_type");
-        let null = if row["is_nullable"].as_str() == Some("YES") {
-            "NULL"
-        } else {
-            "NOT NULL"
-        };
         out.push_str(&format!("{table}.{column} {kind} {null}\n"));
-        columns += 1;
     }
-    assert!(
-        columns > 50,
-        "solo se han reflejado {columns} columnas de sistema: eso no es un esquema que encogió, \
-         es un arranque que no llegó a migrar"
-    );
     out
 }

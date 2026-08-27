@@ -16,7 +16,10 @@
 //! `auth:` is **derived, never declared**: the classes are the authentication primitives of
 //! `crate::auth` reached from the handler through its own helpers and macros (see
 //! [`PRIMITIVES`]). `none` means literally "no primitive on that path" — the login doors, the
-//! liveness probes, the module assets and `/p/:locator`, whose authorisation IS the locator.
+//! liveness probes, the module assets, `/p/:locator` (whose authorisation IS the locator) and
+//! whatever else the code leaves open, which is exactly what a reviewer of this file looks for.
+//! The hub's outbound machine token is not a class: it authenticates the hub to the Cloud, not
+//! the caller to the hub.
 //!
 //! Update: `UPDATE_KERNEL_CONTRACT=1 cargo test -p erplora-server --test kernel_contract_routes`,
 //! and the resulting diff belongs in a `kind:contract` pull request (ADR «El Hub se CIERRA como
@@ -39,7 +42,7 @@ use rust_source::{blank_noise, block_end, called_names, crate_sources, item_bodi
 const PRIMITIVES: &[(&str, &str)] = &[
     // A hub user whose local role administers the hub (`owner`/`admin`).
     ("auth::require_admin_session", "admin"),
-    // Any signed-in hub user.
+    // Any signed-in hub user. A session resolved BY HAND is the same gate: see [`SESSION_BY_HAND`].
     ("auth::require_user_session", "session"),
     // A hub API key (`erpl_live_…`), the credential of the public per-module API.
     ("auth::api_key_principal", "api-key"),
@@ -47,12 +50,19 @@ const PRIMITIVES: &[(&str, &str)] = &[
     ("auth::api_key_token", "api-key"),
     // Session OR API key: the dispatcher doors, which serve both planes.
     ("auth::authenticate", "any-credential"),
-    // The hub's own machine credential, held by the runtime and never by the browser (ADR-0003).
-    ("auth::hub_scoped_auth", "hub-token"),
-    ("auth::machine_auth", "hub-token"),
     // Second gate on top of the session: the calling module needs the capability granted.
     ("require_module_capability", "capability"),
+    // NOT here on purpose: `auth::hub_scoped_auth` / `auth::machine_auth`. They hand the runtime
+    // its OWN credential to call the Cloud (ADR-0003) and never look at who is calling — an
+    // outbound token is not a gate, and listing it painted open routes as `auth:hub-token`.
 ];
+
+/// A session gate written by hand: the body READS the session credential AND RESOLVES it
+/// (`/api/auth/set-pin`, the profile helper). Both halves, on purpose — `auth_logout` reads the
+/// token to delete it and answers the same with or without one, so reading alone is not a gate;
+/// and `require_*_session` inside `auth.rs` resolve without the qualified read, so this rule does
+/// not leak `session` into every route through the call graph.
+const SESSION_BY_HAND: (&str, &str) = ("auth::session_token(", ".resolve_session(");
 
 /// How far a gate may sit from the handler. Six is past the fixed point measured on `develop`
 /// (handler → local helper → macro → `auth::…` closes at four), so it is a guard against a cycle,
@@ -84,6 +94,47 @@ fn the_router_is_readable_and_not_empty_hub1235() {
             );
         }
     }
+}
+
+/// `/api/auth/set-pin` resolves its session by hand (`auth::session_token` +
+/// `Runtime::resolve_session`) instead of through `require_user_session`. It is a session gate all
+/// the same — and it read `none` until this test existed (review of hub#1252).
+#[test]
+fn a_session_resolved_by_hand_is_a_session_gate_hub1235() {
+    let body = "{ let Some(token) = auth::session_token(&headers) else { return unauthorized(); }; \
+                let user = match rt.resolve_session(&token).await { Ok(Some(u)) => u, _ => return unauthorized() }; }";
+    assert_eq!(classes_of(body), BTreeSet::from(["session".to_string()]));
+    // `auth_logout`: reads the token to delete it, answers the same without one — not a gate.
+    let logout = "{ if let Some(token) = auth::session_token(&headers) { let _ = rt.delete_session(&token).await; } ok() }";
+    assert!(
+        classes_of(logout).is_empty(),
+        "leer el token sin resolverlo no es una puerta: {:?}",
+        classes_of(logout)
+    );
+}
+
+/// `auth::hub_scoped_auth` / `auth::machine_auth` hand the runtime ITS OWN credential to talk to
+/// the Cloud (ADR-0003). They never check who is calling: a handler that only uses them is open to
+/// anybody who reaches the hub, and the snapshot has to say `none` rather than mint a gate out of
+/// an outbound token (review of hub#1252: `/api/assistant/checkout` read `auth:hub-token`).
+#[test]
+fn the_hub_machine_token_is_an_outbound_credential_not_a_gate_hub1235() {
+    let body =
+        "{ let Some(auth) = auth::hub_scoped_auth(&headers, &st) else { return unauthorized(); }; \
+                let machine = auth::machine_auth(&st); cloud.call(&machine, &auth) }";
+    let classes = classes_of(body);
+    assert!(
+        classes.is_empty(),
+        "un token de salida se ha leído como puerta: {classes:?}"
+    );
+}
+
+/// Classes of one synthetic handler body, through the same fixed point the snapshot uses.
+fn classes_of(body: &str) -> BTreeSet<String> {
+    let key = ("lib".to_string(), "handler".to_string());
+    let mut bodies = BTreeMap::new();
+    bodies.insert(key.clone(), body.to_string());
+    class_map(&bodies).remove(&key).unwrap_or_default()
 }
 
 fn generate() -> String {
@@ -229,6 +280,9 @@ fn class_map(
             if body.contains(marker) {
                 direct.insert((*class).to_string());
             }
+        }
+        if body.contains(SESSION_BY_HAND.0) && body.contains(SESSION_BY_HAND.1) {
+            direct.insert("session".to_string());
         }
         classes.insert(key.clone(), direct);
         let callees = called_names(body)
