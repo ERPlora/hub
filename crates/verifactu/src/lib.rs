@@ -645,18 +645,35 @@ const NON_NEGATIVE_TYPES: [&str; 3] = ["F1", "F2", "F3"];
 /// Tolerancia, en céntimos, al contrastar la cuota de una entrada del desglose contra su propio
 /// tipo — **en función de cuántas líneas de factura se agregaron en ella**.
 ///
-/// # Por qué NO puede ser un número fijo
+/// # Why it CANNOT be a fixed number
 ///
-/// `invoice.build_invoice` acumula en el desglose la cuota **redondeada POR LÍNEA**
-/// (`e.quota += main_quota`; es deliberado y está comentado allí — ADR-0123 §4 pendiente de
-/// aplicar en `invoice`, issue `invoice#65`). El desglose que emite, por tanto, **no cumple
-/// `cuota = base × tipo`**: se desvía hasta medio céntimo por línea, y las desviaciones **suman**.
-/// Por eso `invoice.audit` tolera **un céntimo por línea agregada** (`e.lines.max(1)`).
+/// ⚠️ **`invoice` no longer emits this.** Since ADR-0405 §Decisión 4 (`invoice` v1.2.27,
+/// `invoice#65`, now closed) `build_invoice` closes the quota **once per fiscal key**
+/// (`money::percent_of(Σbase, rate)`), so what it emits today *does* satisfy `cuota = base × tipo`
+/// and its own audit tolerance is **1 cent per key**. The old `e.quota += main_quota` — deliberate
+/// but undocumented — is exactly what that ADR removed.
 ///
-/// Con una tolerancia fija de 1,5 céntimos, cuatro líneas de 0,50 € al 21 % —un tique
-/// perfectamente legítimo: `round_half_up(10,5) = 11` cuatro veces → `base 200 / cuota 44`, y el
-/// 21 % de 200 son 42— se quedaban **sin registro fiscal**. Con doce líneas al 10 % le pasaba a
-/// **uno de cada tres** tiques. Medido en la revisión de hub#1180.
+/// This gate stays per-line permissive anyway, and not out of inertia: it reads rows it did not
+/// produce.
+///
+///   * **Invoices already sealed** before v1.2.27 carry the per-line breakdown and are chained
+///     into the AEAT fingerprint, so they cannot be reinterpreted (same reason `aeat::desglose`
+///     still reads both generations of `tax_breakdown`).
+///   * **The verbatim F3.** An F3 substituting an F2 copies the ticket's own figures, quota per
+///     line included — `invoice.audit` itself keeps `e.lines.max(1)` for `Closing::Verbatim`.
+///     Tightening here would reject a document `invoice` legitimately emits **today**.
+///   * **`sales`** still closes its header with `percent_of(Σbase)` in tax-included mode, up to one
+///     cent per key away from the document (ADR-0405 names this and leaves it).
+///
+/// Tightening this to a fixed cent would therefore not enforce ADR-0405 — it would only refuse a
+/// fiscal record for documents that are correct. The rule this gate exists to catch is the forged
+/// quota, and the second ceiling below is what catches it.
+///
+/// The historical measurement that set this shape: with a fixed 1,5-cent tolerance, four lines of
+/// 0,50 € at 21 % — `round_half_up(10,5) = 11` four times → `base 200 / cuota 44`, where 21 % of
+/// 200 is 42 — were left **with no fiscal record at all**. With twelve lines at 10 % it reached
+/// **one in three** tickets. Measured in the review of hub#1180; `invoice` stopped producing that
+/// shape in ADR-0405, but the rows it already produced are still out there.
 ///
 /// # Por qué `+ 0.5`
 ///
@@ -766,11 +783,13 @@ fn audit_lines(tax_breakdown: &str) -> Vec<AuditLine> {
 /// rechazo revierte su propia transacción y el evento se iría con ella. El motivo viaja en el
 /// error, que es lo que ve el llamante y lo que registra el runtime.)*
 ///
-/// Y hay una cosa que la tabla **no puede** comprobar y aquí sí: cuántas líneas de factura se
-/// agregaron en cada entrada del desglose. `invoice` redondea la cuota por línea y suma, así que
-/// sin ese dato ninguna tolerancia fija sirve — la de 1,5 céntimos de `013` rechazaba tiques
-/// legítimos de varias líneas (verifactu#60). Las dos puertas miden **cosas distintas a
-/// propósito**, y esta es siempre la más estricta de las dos: ver
+/// And there is one thing the table **cannot** check and this can: how many invoice lines were
+/// aggregated into each breakdown entry. Rows whose quota was rounded per line — everything sealed
+/// before `invoice` v1.2.27, and the verbatim F3 to this day — do not satisfy `cuota = base × tipo`
+/// exactly, so no fixed tolerance works on them: the 1,5-cent one behind `013` was rejecting
+/// legitimate multi-line tickets (verifactu#60). Since ADR-0405 `invoice` closes the key once and
+/// no longer BUILDS that shape, but this gate reads rows it did not build. The two gates measure
+/// **different things on purpose**, and this one is always the stricter of the two: see
 /// [`line_rate_tolerance_cents`].
 ///
 /// # Qué se comprueba, y qué NO
@@ -1068,9 +1087,10 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
     //
     // NULL/'' cuando la factura no enlaza nada, que es el caso de toda venta corriente.
     //
-    // Y el `COUNT` de líneas (hub#1180): `invoice` redondea la cuota POR LÍNEA y suma, así que sin
-    // saber cuántas se agregaron no se puede juzgar si el desglose cuadra — con una tolerancia fija
-    // se rechazaban tiques legítimos de varias líneas (ver `line_rate_tolerance_cents`). Va como
+    // And the line `COUNT` (hub#1180): a breakdown whose quota was rounded per line cannot be
+    // judged without knowing how many lines were aggregated — a fixed tolerance rejected legitimate
+    // multi-line tickets (see `line_rate_tolerance_cents`). `invoice` stopped producing that shape
+    // in ADR-0405, but the rows already sealed — and every verbatim F3 — still carry it. It goes as
     // subconsulta de ESTA lectura, no como una segunda: un listener que abre dos lecturas por venta
     // es una lectura de más en cada tique, y ADR-0058 acota la excepción a UNA.
     let rows = host
@@ -5675,17 +5695,19 @@ mod ingest_integrity_tests {
         assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
     }
 
-    /// 🔴 **El contraejemplo que devolvió esta PR con CAMBIOS.**
+    /// 🔴 **The counterexample that sent this PR back with CHANGES** — still a live requirement,
+    /// but no longer for the reason it was written.
     ///
-    /// `invoice.build_invoice` acumula en el desglose la cuota **redondeada POR LÍNEA**
-    /// (`e.quota += main_quota`, deliberado y comentado allí — ADR-0123 seguimiento, `invoice#65`),
-    /// así que el desglose que emite **no** cumple `cuota = base × tipo` salvo por tolerancia. Por
-    /// eso `invoice.audit` tolera **un céntimo por línea agregada** (`e.lines.max(1)`).
+    /// Four lines of 0,50 € at 21 %: rounding per line, `round_half_up(10,5) = 11` each → the
+    /// breakdown reads `base 200 / quota 44` where `200 × 21 % = 42`. With a fixed 1,5-cent
+    /// tolerance this gate rejected it and the ticket was left with no fiscal record; at 12 lines
+    /// and 10 % that reached ~1 in 3 legitimate tickets (hub#1180).
     ///
-    /// Cuatro líneas de 0,50 € al 21 %: `round_half_up(10,5) = 11` por línea → el desglose sale
-    /// `base 200 / quota 44` cuando `200 × 21 % = 42`. `invoice` lo emite (tolerancia 4); con una
-    /// tolerancia fija de 1,5 céntimos este gate lo rechazaba — y el tique se quedaba sin registro
-    /// fiscal. Con 12 líneas al 10 % eso alcanzaba a ~1 de cada 3 tiques legítimos.
+    /// ⚠️ **`invoice` stopped emitting this shape** in ADR-0405 §Decisión 4 (v1.2.27, `invoice#65`):
+    /// the key now closes once and the same ticket declares 42. What keeps this test necessary is
+    /// the other side of the gate — the rows it must keep ACCEPTING: invoices sealed before that
+    /// version and already chained into the AEAT fingerprint, and the verbatim F3, which copies a
+    /// ticket's per-line figures by design. See [`line_rate_tolerance_cents`].
     #[tokio::test]
     async fn a_ticket_of_several_lines_at_the_same_rate_is_sealed() {
         let host = InvoiceHost::with_lines(
@@ -5726,8 +5748,11 @@ mod ingest_integrity_tests {
         assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
     }
 
-    /// La mesa de doce del contraejemplo: 12 líneas de 0,55 € al 10 % → `round_half_up(5,5) = 6`
-    /// por línea → `base 660 / quota 72`, y el tipo justifica 66.
+    /// The twelve-cover table of the counterexample: 12 lines of 0,55 € at 10 % rounded per line —
+    /// `round_half_up(5,5) = 6` each → `base 660 / quota 72`, where the rate justifies 66. As with
+    /// the four-line case above, `invoice` no longer BUILDS this (ADR-0405 closes the key once and
+    /// declares 66); the gate must still ACCEPT it for rows already chained and for the verbatim
+    /// F3. See [`line_rate_tolerance_cents`].
     #[tokio::test]
     async fn a_twelve_line_table_at_ten_percent_is_sealed() {
         let host = InvoiceHost::with_lines(

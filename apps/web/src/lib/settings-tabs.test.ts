@@ -65,9 +65,24 @@ describe('navegación de Ajustes', () => {
   });
 
   it('does not show local-only Hub controls that pretend to save', () => {
-    expect(settingsSource).not.toContain('hubTimezone');
     expect(settingsSource).not.toContain('showModulesInSidebar');
     expect(settingsSource).not.toContain('saveHubSettings');
     expect(settingsSource).toContain('country_code: value');
+  });
+
+  // Esta guarda vigilaba la zona horaria PROHIBIENDO la palabra `hubTimezone`, porque el control
+  // que había era `const hubTimezone = ref<string>('madrid')` atado a un `v-model` y a nada más:
+  // ni el valor era IANA ni cambiarlo salía del navegador. Prohibir el nombre servía mientras la
+  // fila no existía; ahora existe y guarda de verdad (hub#1154), así que la guarda pasa a afirmar
+  // lo que de verdad importaba — que PERSISTE — en vez de un nombre. Prohibir la palabra habría
+  // bloqueado el arreglo; borrar la guarda habría dejado volver al control de mentira.
+  it('el selector de zona horaria GUARDA de verdad, no es un ref local que finge', () => {
+    // El valor de mentira original. `'madrid'` no es un nombre IANA: no lo aceptaría ni el runtime.
+    expect(settingsSource).not.toMatch(/ref<string>\(\s*'madrid'\s*\)/);
+    // La fila existe…
+    expect(settingsSource).toContain("t('settings.timezone')");
+    // …y su cambio va por el MISMO persistidor que el resto de ajustes del hub, con la clave
+    // `timezone`. Un `v-model` suelto vuelve a dejar esto en rojo.
+    expect(settingsSource).toMatch(/function onTimezoneChange[\s\S]{0,800}persistHubSettings\(\{\s*timezone:/);
   });
 });

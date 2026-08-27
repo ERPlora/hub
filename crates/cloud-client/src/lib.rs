@@ -705,6 +705,24 @@ impl CloudClient {
         }
     }
 
+    /// **El plan del canal de WhatsApp y su consumo del mes** (hub#1089).
+    ///
+    /// `GET /api/v1/hub/device/whatsapp/plan/` con la credencial de **máquina** — el llamador es
+    /// el tick de 24 h del runtime y ahí no hay ningún usuario logueado (ADR-0003). Sus dos
+    /// hermanos de arriba ya funcionan así.
+    ///
+    /// Respuesta (contrato leído de `saas/apps/whatsapp_inbox/api/views.py`):
+    /// `{"tier": {"slug", "max_billable_messages", "max_conversations", …} | null,
+    ///   "usage": {"billable_messages", "month", …}, "available_tiers": [...]}`.
+    ///
+    /// **Se lee EN VIVO y no de un claim firmado a propósito.** `usage` es un contador que se
+    /// mueve con cada mensaje: un claim de 24 h llegaría rancio. El tope del plan viaja con él
+    /// porque los dos salen de la misma resolución de tier en el SaaS, y tener el número en dos
+    /// sitios es como acaban divergiendo.
+    pub fn whatsapp_plan(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/plan/", auth)
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -1848,6 +1866,27 @@ mod tests {
             "https://erplora.com/api/v1/hub/device/whatsapp/inbox/\
              ?after=2026-08-09T10%3A00%3A00%2B00%3A00"
         );
+    }
+
+    /// The channel's plan + live usage (hub#1089). MACHINE credential, like its two siblings
+    /// above: the caller is the 24 h tick of the Rust runtime, where nobody is logged in. The
+    /// SaaS half moved this endpoint from `IsHubMember` to `IsHubMachine` for exactly that.
+    #[test]
+    fn whatsapp_plan_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_plan(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/whatsapp/plan/");
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+        // Never the user JWT: a background tick has no session to borrow one from.
+        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
     }
 
     /// The ack is what ENDS the redelivery loop. Same machine credential; the body

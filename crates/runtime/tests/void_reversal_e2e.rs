@@ -37,7 +37,9 @@ async fn full_stack() -> Runtime {
 
 async fn open_cash_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> String {
     rt.execute_command("cash_register.session.open", &params(json!({
-        "register_id": null, "session_number": "VR-260625-1000",
+        // Sin `session_number`: está DEPRECADO e ignorado desde cash_register#49 (lo acuña el
+        // servidor, `S-YYMMDD-NNNN`). Mandarlo hacía creer que la sesión se llamaba así.
+        "register_id": null,
         "opening_balance": opening, "opening_notes": ""
     })), ctx).await.unwrap();
     rt.execute_query("cash_register.sessions.list", &Params::new(), ctx).await.unwrap()
@@ -66,7 +68,13 @@ async fn arqueo(rt: &Runtime, ctx: &RequestContext, sid: &str) -> i64 {
     rt.execute_command("cash_register.session.close", &params(json!({
         "session_id": sid, "closing_balance": 0, "closing_notes": ""
     })), ctx).await.unwrap();
-    rt.execute_query("cash_register.sessions.list", &params(json!({"session_number": "VR-260625-1000"}), ), ctx)
+    // hub#1173: aquí iba un `{"session_number": "VR-260625-1000"}` que NO filtraba nada — dos veces
+    // muerto. El motor de listas lo descartaba en silencio (el filtro declarado se lee del cable
+    // como `f_session_number`) y, aunque hubiera llegado, no habría casado: desde cash_register#49
+    // el número de turno lo acuña el servidor y el que manda el llamante se IGNORA, así que la
+    // sesión de este test nunca se llamó `VR-260625-1000`. Lo que de verdad identificaba la fila
+    // era —y sigue siendo— el `.find()` por `id` de abajo, sobre la lista sin filtrar.
+    rt.execute_query("cash_register.sessions.list", &Params::new(), ctx)
         .await.unwrap().iter().find(|s| s["id"] == json!(sid)).unwrap()
         ["expected_balance"].as_i64().unwrap()
 }
