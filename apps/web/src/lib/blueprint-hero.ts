@@ -97,6 +97,13 @@ export interface HeroInput {
   run: HeroRun | null;
   /** The outcome has been read and closed. */
   dismissed: boolean;
+  /**
+   * The card has ALREADY been on screen in this session (hub#1120).
+   *
+   * Latched by the card the first time it legitimately came up. It is what keeps the offer from
+   * being pulled out from under the pointer — see [`heroVisible`].
+   */
+  shown: boolean;
 }
 
 /**
@@ -111,11 +118,21 @@ export interface HeroInput {
  * A run in flight or unread keeps the card up **even though the business has stopped being empty**:
  * the import installs apps, which ticks the very item this card reads, so the card that started the
  * job would otherwise vanish half-way and take its own report with it.
+ *
+ * **And once it is up it does not close on its own** (`shown`, hub#1120). A FREE hub arrives with
+ * `customers` already installed, so the `apps` item ticks `done` on a business that has configured
+ * nothing — and the panel re-reads `hub.setup.status` while the owner is still reading the card.
+ * Without the latch the card is pulled out of the DOM mid-reading and the press aimed at «Use this»
+ * lands on empty space: no spinner, no error, no request, which is exactly how a live button gets
+ * reported as dead. The offer now leaves for one of the two reasons the owner can see: they used a
+ * template, or they closed it. The protection is untouched, because `shown` only latches AFTER the
+ * business legitimately counted as empty — a hub that already had apps never sees the card at all.
  */
 export function heroVisible(input: HeroInput): boolean {
   if (!input.canAdminister || input.dismissed) return false;
   if (input.run) return true;
-  return hubIsEmpty(input.status) && input.offers.length > 0;
+  if (input.offers.length === 0) return false;
+  return input.shown || hubIsEmpty(input.status);
 }
 
 /**

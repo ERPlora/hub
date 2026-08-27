@@ -212,6 +212,43 @@ describe('when the card asks the cloud anything at all', () => {
     expect(fetchBlueprintCatalog).toHaveBeenCalledTimes(1);
   });
 
+  // 🔴 hub#1120 — the offer must not be pulled out from under the pointer.
+  //
+  // A FREE hub is provisioned with `customers` already installed, so `hub.setup.status` ticks the
+  // `apps` item `done` on a business that has configured nothing — and the panel re-reads that
+  // document while the owner is reading the card. The card used to leave with it, so a press aimed
+  // at «Use this» landed on empty space: no spinner, no error, no request. That is exactly how a
+  // live button gets reported as dead, and it left the one-click onboarding with no door at all.
+  it('does not disappear under the owner when the checklist ticks `apps` (hub#1120)', async () => {
+    const w = mountCard();
+    await flushPromises();
+    expect(w.find('[data-testid="hero-use"]').exists()).toBe(true);
+
+    await w.setProps({ status: emptyBusiness('done') });
+    await flushPromises();
+
+    expect(w.find('[data-testid="hero-card"]').exists()).toBe(true);
+    expect(w.find('[data-testid="hero-use"]').exists()).toBe(true);
+  });
+
+  // 🔴 Revisión de hub#1120 — el pestillo necesita una salida VISIBLE.
+  //
+  // Mantener la oferta hasta que el dueño «la cierre» solo es cierto si hay algo que cerrar: en el
+  // estado de oferta no había ningún control (el «Continuar» solo existe sobre el resultado), y con
+  // `IonRouterOutlet` el Dashboard sigue vivo entre navegaciones — quien instalase sus apps a mano
+  // seguiría viendo la oferta hasta recargar la página. Es lo que hacen Shopify, Odoo y Square: la
+  // guía de puesta en marcha se puede descartar desde la propia guía.
+  it('se puede cerrar desde la propia oferta, y entonces se va', async () => {
+    const w = mountCard();
+    await flushPromises();
+    expect(w.find('[data-testid="hero-dismiss"]').exists()).toBe(true);
+
+    await w.find('[data-testid="hero-dismiss"]').trigger('click');
+    await flushPromises();
+
+    expect(w.find('[data-testid="hero-card"]').exists()).toBe(false);
+  });
+
   it('stays quiet when the cloud has nothing (or cannot answer): no empty hero', async () => {
     fetchBlueprintCatalog.mockResolvedValue([]);
     const w = mountCard();
