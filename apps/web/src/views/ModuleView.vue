@@ -28,6 +28,7 @@
       v-else-if="status === 'ready' && isGenericSettingsTab && settings"
       :module-id="params().moduleId"
       :settings="settings"
+      :page-title="moduleName"
     />
     <!-- Módulo de pago BLOQUEADO por la revalidación híbrida (ADR-0114 §6): el dispatcher del
          runtime rechaza sus queries/commands (402) — la UI lo cuenta y dice dónde se arregla. Los
