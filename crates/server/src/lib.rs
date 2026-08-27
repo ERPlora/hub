@@ -3793,6 +3793,12 @@ fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         | E::CertificateTypeMismatch { .. }
         | E::ManifestRejected { .. }
         | E::MissingRequiredParam { .. }
+        // hub#1173: un filtro que la lista no declara es el descuido de QUIEN LLAMA, en la misma
+        // puerta que `MissingRequiredParam` — y `severity_of` ya los clasifica juntos. La frase la
+        // escribimos nosotros y es justo la que arregla el fallo: nombra la query, el parámetro
+        // rechazado y los aceptados. Redactarla dejaría a quien integra con un 400 y sin saber
+        // qué parámetro escribió mal, que es peor que el bug que el error previene.
+        | E::UnknownFilter { .. }
         | E::Notify(_)
         | E::Print(_)
         | E::Storage(_)

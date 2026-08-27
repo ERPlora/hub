@@ -139,3 +139,33 @@ async fn a_missing_command_still_names_what_was_asked_for() {
         "{body}"
     );
 }
+
+/// The same reasoning on the READ door (hub#1173): a param the list does not declare is the
+/// caller's own typo, in the same family as a missing required param, and the sentence naming it
+/// is the one thing that lets them fix it. Redacting this one would answer a `400` that says
+/// nothing about WHICH param was wrong — worse than the bug the error exists to prevent.
+///
+/// This test is why the arm cannot be flipped by accident: `may_reach_the_client` is exhaustive on
+/// purpose so a new variant must declare its side of the door, but "exhaustive" only forces
+/// SOMEBODY to choose — it does not remember which side was chosen or why.
+#[tokio::test]
+async fn an_undeclared_list_param_names_itself_instead_of_being_redacted() {
+    // A LIST query on purpose: the vocabulary check is the list engine's (`reject_undeclared_params`
+    // only runs on the `Some(spec)` branch), because it is there that ignoring a param silently
+    // returns the WHOLE list as though it had filtered. A plain query keeps ignoring extras.
+    let body = call(
+        "/api/query",
+        json!({ "name": "dberr.notes.paged", "params": { "nosuchfilter": "x" } }),
+    )
+    .await;
+
+    assert_eq!(body["ok"], json!(false), "{body}");
+    assert_eq!(body["error"]["code"], json!("unknown_filter"), "{body}");
+    let message = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("nosuchfilter"),
+        "the rejected param has to be named or the caller cannot find their typo: {body}"
+    );
+    // The net underneath stays in place: travelling whole is not a licence to leak plumbing.
+    assert_redacted(&body);
+}
