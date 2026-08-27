@@ -53,6 +53,20 @@ const MONEY_UNIT_CENTS: &str = "cents";
 ///
 /// Cada entrada: `(tabla, &[columnas de dinero])`. Si la tabla no existe en la BD (módulo no
 /// instalado), se ignora silenciosamente.
+///
+/// 🔴 **«Autoritativo» aquí es una afirmación comprobada, no una promesa.** Esa misma frase
+/// convivió durante meses con seis entradas cuyas tablas no existían: como `declared_type()`
+/// devuelve `None` para lo que la BD no tiene, una entrada muerta se salta **en silencio** y nada
+/// la delata. Quien la leía no podía saber cuáles de las 32 eran reales, y retirar una tabla en un
+/// módulo obligaba a venir a leer este fichero para demostrar que no había un consumidor vivo
+/// (services#67, services#69). Lo que sostiene la palabra es `tests/money_columns_inventory.rs`:
+/// pone en rojo una tabla que un `contract` publicado ya retiró, una que ningún módulo crea, una
+/// columna repetida (se convertiría dos veces: ×10 000) y un reordenado de la lista.
+///
+/// ⚠️ **El ORDEN es significativo.** [`seed_marker_if_cents`] y [`run`] deciden el veredicto del
+/// hub entero con la **primera** columna de dinero que exista, y salen en cuanto la encuentran:
+/// reordenar «para agrupar» mueve el criterio que decide si el dinero de un cliente se multiplica
+/// por 100. El test lo fija.
 pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // appointments
     ("appointments_appointment", &["service_price"]),
@@ -78,13 +92,18 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // kitchen
     ("kitchen_order", &["subtotal", "tax", "discount", "total"]),
     ("kitchen_order_item", &["unit_price", "total"]),
-    ("kitchen_order_modifier", &["price"]),
-    // kitchen_orders
-    ("kitchen_orders_order", &["subtotal", "tax", "discount", "total"]),
-    ("kitchen_orders_order_item", &["unit_price", "total"]),
-    ("kitchen_orders_order_modifier", &["price"]),
-    // orders
-    ("orders_order", &["total"]),
+    // `kitchen_order_modifier` estuvo aquí y se ha ido: la retira `kitchen/migrations/postgres/007`
+    // (kitchen#55) y el guard la aparta a `_deprecated_kitchen_order_modifier`, así que
+    // `declared_type` no volverá a encontrarla. El suplemento con precio vive en `modifiers`
+    // (ADR-0376) y su dinero lo lleva la línea de venta, no esta tabla.
+    //
+    // `kitchen_orders_order`, `kitchen_orders_order_item` y `kitchen_orders_order_modifier`
+    // estuvieron aquí y se han ido con ellas: el módulo `kitchen_orders` se fusionó dentro de
+    // `kitchen` (ADR-0014) y está archivado, así que ningún hub crea esas tablas. Sus columnas de
+    // dinero son las de `kitchen_order*`, justo encima.
+    //
+    // `orders_order` estuvo aquí y se ha ido: el módulo `orders` no existe — nunca se publicó. La
+    // entrada venía del inventario del plan de migración a céntimos, que lo daba por futuro.
     // payment_gateways
     ("payment_gateways_transaction", &["amount"]),
     ("payment_gateways_refund", &["amount_refunded"]),
@@ -101,7 +120,10 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     ("sales_sale_item", &["unit_price", "net_amount", "tax_amount", "line_total"]),
     // services
     ("services_service", &["price", "min_price", "max_price", "cost"]),
-    ("services_variant", &["price_adjustment"]),
+    // `services_variant` estuvo aquí y se ha ido: `services/migrations/postgres/010` la retira
+    // (services#69) y el guard la aparta a `_deprecated_services_variant`. Como con `services_addon`,
+    // no había nada que convertir: la tabla nunca tuvo puerta — ningún command escribía una fila.
+    //
     // `services_addon` estuvo aquí y se ha ido: `services/migrations/postgres/009` la retira
     // (services#67, ADR-0376) y el guard la aparta a `_deprecated_services_addon`, así que
     // `declared_type` no volverá a encontrarla. Tampoco había nada que convertir: el módulo nunca

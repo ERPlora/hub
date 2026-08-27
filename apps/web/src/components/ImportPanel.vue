@@ -1,22 +1,25 @@
 <template>
   <section>
     <p class="page-lead" data-testid="import-lead">{{ t('importPage.lead') }}</p>
-    <p v-if="!isAdmin" class="page-lead admin-note">{{ t('importPage.adminOnly') }}</p>
+    <p v-if="!mayAdminister" class="page-lead admin-note">{{ t('importPage.adminOnly') }}</p>
 
     <!-- ── Paso 1: elegir fuente — catálogo visible con tarjetas por defecto ──
          `ok-data-table` aporta búsqueda, tabla y tarjetas sin duplicar otro selector. Subir un
          archivo sigue siendo una acción distinta: no fingimos que un fichero local es una fila. -->
     <template v-if="step === 'pick'">
       <div class="source-heading">
-        <ion-label class="page-lead-block">
+        <!-- Encabezado, no control (hub#1120). Era un `ion-label`, que fuera de un `ion-item`
+             hereda el aspecto de la etiqueta de un formulario: «Elige qué cargar» se leía como un
+             botón que no responde al pulsarlo. Es un título; se pinta como un título. -->
+        <div class="page-lead-block">
           <h2>{{ t('importPage.pickTitle') }}</h2>
           <p>{{ t('importPage.pickDesc') }}</p>
-        </ion-label>
+        </div>
 
         <ion-button
           fill="outline"
           size="small"
-          :disabled="!isAdmin || inspecting"
+          :disabled="!mayAdminister || inspecting"
           data-testid="import-upload-local"
           @click="triggerFilePicker"
         >
@@ -65,6 +68,24 @@
         :empty-message="catalogEmptyMessage"
         page-size="24"
       ></ok-data-table>
+
+      <!-- La salida de un catálogo que NO se pudo leer (hub#1120). Reproducido en un hub real: el
+           SaaS estrangula `GET /api/blueprints/catalog` con un 429 de ~19 min y el panel degradaba
+           a lista vacía **para siempre** —se pide una vez al montar y la pestaña vive entre
+           navegaciones—, así que un negocio nuevo se quedaba sin plantillas hasta recargar. Solo
+           aparece cuando el catálogo FALLÓ: un catálogo vacío de verdad no tiene nada que
+           reintentar. -->
+      <ion-button
+        v-if="catalogState === 'unavailable' && !loadingCatalog"
+        class="catalog-retry"
+        fill="clear"
+        size="small"
+        data-testid="import-catalog-retry"
+        @click="loadCatalog"
+      >
+        <HubIcon slot="start" name="refresh-outline" />
+        {{ t('importPage.catalogRetry') }}
+      </ion-button>
 
       <ion-note v-if="error" data-testid="import-error" color="danger" class="error-note">
         {{ t('importPage.inspectErrorTitle') }}: {{ error }}
@@ -196,7 +217,7 @@
         data-testid="import-submit"
         class="mt-3"
         expand="block"
-        :disabled="!isAdmin"
+        :disabled="!mayAdminister"
         @click="doImport"
       >
         <HubIcon slot="start" name="cloud-upload-outline" />
@@ -268,7 +289,7 @@
         class="mt-3"
         expand="block"
         data-testid="import-report-retry"
-        :disabled="!isAdmin || !retryInfo.canRetry"
+        :disabled="!mayAdminister || !retryInfo.canRetry"
         @click="doRetry"
       >
         <HubIcon slot="start" name="refresh-outline" />
@@ -330,7 +351,8 @@ import {
 } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { isAdmin } from '../lib/session';
+import { hasPermission } from '../lib/session';
+import { ADMINISTER_PERMISSION } from '../lib/management-link';
 import { refreshModuleNav } from '../lib/nav';
 import {
   inspectBlueprint,
@@ -356,6 +378,23 @@ import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
 
 const { t, locale } = useI18n();
 const router = useRouter();
+
+/**
+ * ¿Puede esta sesión administrar el hub? (`hub.administer`, ADR-0248.)
+ *
+ * Es la MISMA puerta que abren el hero del dashboard (`lib/blueprint-hero.ts`), el enlace de
+ * gestión y el actualizador — una sola definición del símbolo, que es lo que cerró hub#506.
+ *
+ * 🔴 hub#1120: antes se preguntaba por `isAdmin`, que compara `user.role` con «owner»/«admin». Ese
+ * campo es OPCIONAL por contrato (`SessionUser.role`: las sesiones legacy y el fallback demo no lo
+ * traen), y el runtime concede `hub.administer` a esos mismos roles
+ * (`identity::session_permissions`). Cuando las dos respuestas discrepan, el hero ofrece cuatro
+ * plantillas y esta pantalla se queda vacía sin llegar a PEDIR el catálogo: sin filas, sin error y
+ * sin petición de red, que es justo lo que no deja diagnosticarlo desde fuera.
+ *
+ * Es un filtro de UI: el runtime revalida el permiso en cada endpoint de import/export.
+ */
+const mayAdminister = computed<boolean>(() => hasPermission(ADMINISTER_PERMISSION));
 
 type Step = 'pick' | 'review' | 'importing' | 'report';
 const step = ref<Step>('pick');
@@ -493,7 +532,7 @@ const blueprintActions = computed<DataTableAction[]>(() => [
     id: 'use',
     label: t('importPage.useTemplate'),
     color: 'primary',
-    disabled: () => !isAdmin.value || inspecting.value,
+    disabled: () => !mayAdminister.value || inspecting.value,
     loading: (row) => inspecting.value && activeSource.value === String(row.slug),
   },
 ]);
@@ -617,7 +656,7 @@ async function loadCatalog(): Promise<void> {
 }
 
 onMounted(() => {
-  if (isAdmin.value) {
+  if (mayAdminister.value) {
     void loadCatalog();
     // hub#763 — recupera el último informe de importación persistido. El Dashboard anuncia
     // «ver el detalle en Ajustes › Datos» tras un import parcial, y esta pantalla lo perdía al
@@ -697,7 +736,7 @@ function dismissRecovered(): void {
 const retryInfo = computed(() => (recoveredReport.value ? retryAvailability(recoveredReport.value.report) : null));
 
 async function doRetry(): Promise<void> {
-  if (!isAdmin.value || !recoveredReport.value) return;
+  if (!mayAdminister.value || !recoveredReport.value) return;
   error.value = '';
   step.value = 'importing';
   try {
@@ -816,7 +855,7 @@ function resetToPick(): void {
 const report = ref<ImportReport | null>(null);
 
 async function doImport(): Promise<void> {
-  if (!isAdmin.value) return; // defensa: el botón ya está disabled
+  if (!mayAdminister.value) return; // defensa: el botón ya está disabled
   error.value = '';
   step.value = 'importing';
   try {
@@ -1067,6 +1106,10 @@ ion-checkbox::part(label) {
 }
 ok-data-table {
   display: block;
+}
+.catalog-retry {
+  margin-top: 0.35rem;
+  text-transform: none;
 }
 .cloud-loading {
   display: flex;

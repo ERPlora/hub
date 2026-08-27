@@ -233,6 +233,10 @@ export default {
       body: 'Pick the closest one and we set up its apps and its catalogue in one go. You will still have to add your own details afterwards.',
       use: 'Use this one',
       more: 'See all templates',
+      // The way out of the offer (hub#1120). The card outlives the business being empty, so
+      // it has to be closable from the offer itself — «not now», never «no thanks»: the
+      // catalogue is still one tap away in Settings › Data.
+      dismiss: 'Not now',
       working: 'Setting up «{name}»…',
       readyTitle: 'Your apps and your catalogue are in',
       readyBody: 'What is left is what only you can answer: the details of your business. You have them on the list below.',
@@ -1389,6 +1393,9 @@ export default {
     catalogEmpty: 'No templates published for your business yet.',
     catalogForbidden: 'Only an administrator can browse and import templates.',
     catalogUnavailable: 'Templates could not be loaded right now. You can still import a file.',
+    // hub#1120 — the way back from a catalogue that could not be read (a 429 from the SaaS lasts
+    // minutes; this screen used to last longer, because it only ever asked once).
+    catalogRetry: 'Try again',
     inspecting: 'Reading the file…',
     inspectErrorTitle: 'Could not read the file',
     manifestName: 'Name',
@@ -1521,6 +1528,8 @@ export default {
     saveError: 'Could not save settings.',
     adminOnly: 'Only an administrator can change these settings.',
     textPlaceholder: 'Type here…',
+    invalidFields: 'Check the fields marked below and save again.',
+    fieldInvalid: 'This value is not accepted.',
   },
   modulePlan: {
     tab: 'Plan',
