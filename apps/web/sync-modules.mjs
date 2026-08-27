@@ -101,7 +101,7 @@ export function syncModules({ modulesSrc, dst = PUBLIC_DST, modules = MODULES } 
     const entry = manifest.ui?.entry; // e.g. dist/inventory.esm.js
     const bundlePath = join(src, entry ?? '');
     if (!entry || !existsSync(bundlePath)) {
-      console.warn(`! module ${id}: missing bundle ${entry}. Run: pnpm -F @erplora/module-cli build:inventory`);
+      console.warn(`! module ${id}: missing bundle ${entry}. Run: erplora build ${id} (@erplora/module-toolkit)`);
       continue;
     }
 

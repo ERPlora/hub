@@ -33,10 +33,11 @@ ver más abajo):
   (`apps/web/src/lib/config.ts`).
 - **Piezas propias mínimas**: logo (imagen inline con fallback al logo local de ERPlora) y el
   PIN vía `ok-pinpad` (OutfitKit) — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
-- **CLI de módulos**: el CLI vivo es **`@erplora/module-toolkit`** (`erplora
+- **CLI de módulos**: el único CLI es **`@erplora/module-toolkit`** (`erplora
   build/dev/validate/pack/sign/publish`), desarrollado en `module-toolkit/` en la raíz del
-  monorepo. El antiguo [packages/module-cli](packages/module-cli) está **deprecado**
-  (ver su `DEPRECATED.md`).
+  monorepo. El hub **no compila módulos**: `apps/web/sync-modules.mjs` solo copia sus `dist/`.
+  (El antiguo `packages/module-cli` se borró en hub#1244 — llevaba deprecado desde que los
+  módulos salieron del workspace y sus tests no los corría nadie.)
 - **Contrato** ([schemas/](schemas)): `module.schema.json` + `envelope.schema.json`.
 
 - **Runtime Rust** ([crates/runtime](crates/runtime) + [crates/db](crates/db)): host genérico
@@ -57,7 +58,6 @@ apps/
                  web + hardware por invoke in-process (ADR-0196/0180)                [real]
   bridge/        Bridge standalone (red-only): hardware POS por localhost HTTP/WS     [en retirada, ADR-0196]
 packages/
-  module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
   module-sdk/    SDK TS frontend (HttpWsTransport contra el runtime Axum)            [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
 modules/         módulos instalados en runtime (vacío de source; el source vive en
