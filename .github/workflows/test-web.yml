@@ -51,6 +51,15 @@
 # `alert-develop` copia su patrón: notificar por Actions no notifica a nadie
 # (image-freshness.yml, hub#652, lo demostró), una issue sí.
 #
+# ── Por qué `crates/**` NO está en los `paths` ───────────────────────────────
+# El job `e2e` compila el runtime, así que la tentación es disparar el workflow
+# también cuando cambia Rust. No se hace: `crates/**` es lo que más se toca en
+# este repo y el techo de la flota es el GATE, no los workers — meter ~20 min de
+# e2e en CADA PR de Rust (que ya paga `test-hub.yml` entero) compra poco y cuesta
+# mucho. El precio de no hacerlo: una regresión del runtime que rompa el shell no
+# sale hasta la siguiente PR del web. Si algún día eso pasa de verdad, la palanca
+# es añadir `crates/**` aquí — no antes.
+#
 # Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
 # como un paso del job `verify` (un test de la guarda que no corre en ningún
 # sitio es la lista de la compra, no una guarda).
@@ -67,9 +76,6 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
-      - "crates/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
   pull_request:
@@ -79,9 +85,6 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
-      - "crates/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
   workflow_dispatch:
