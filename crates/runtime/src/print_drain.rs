@@ -495,10 +495,12 @@ mod tests {
             .unwrap()
             .expect("the registered host is handed the ticket");
         assert_eq!(job.job_id, "j1");
+        // The structured document travels to the host — plus the language the queue stamps on
+        // every job (hub#1159), which is what the device picks its labels in.
         assert_eq!(
             job.document,
-            serde_json::json!({ "receipt_id": "j1" }),
-            "the structured document travels to the host"
+            serde_json::json!({ "receipt_id": "j1", "locale": "es" }),
+            "the structured document travels to the host, stamped with the hub's language"
         );
 
         assert!(confirm(&db, "h1", "till-1", "j1").await.unwrap());
