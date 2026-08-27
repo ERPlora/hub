@@ -523,6 +523,12 @@ pub struct AppState {
     /// periódico de `serve()` y lo leen el gate de `query`/`command` y el proxy `/api/entitlement`.
     /// Estado inicial = fail-open (nada bloqueado). Ver `crate::entitlement`.
     pub entitlement: crate::entitlement::SharedRevalidation,
+    /// Caché del proxy `GET /api/entitlement` (hub#1167). El shell pregunta por el entitlement una
+    /// vez por `focus` de ventana y otra por cada vista de módulo que monta; sin esta celda cada
+    /// una de esas veces era una llamada al SaaS, y el cubo de tasa del SaaS lo comparte toda la
+    /// flota (saas#1640). Guarda además el último cuerpo BUENO para poder servirlo cuando el Cloud
+    /// responde 429, en vez de degradar a «sin módulos». Ver `crate::entitlement::ProxyCache`.
+    pub entitlement_proxy: crate::entitlement::SharedProxyCache,
     /// Marca de **actividad de usuario**: la toca cada petición autenticada (middleware del router)
     /// y viaja al Cloud en el heartbeat de `daily_usage`. Es el reloj con el que el Cloud apaga
     /// (60d) y acaba borrando (120d) los hubs free en los que nadie entra. Ver `crate::activity`.
@@ -604,6 +610,7 @@ impl AppState {
             tenants: None,
             vector: None,
             entitlement: crate::entitlement::new_shared(),
+            entitlement_proxy: crate::entitlement::new_shared_proxy_cache(),
             activity: Arc::new(crate::activity::ActivityState::new()),
             login_throttle: Arc::new(crate::login_throttle::LoginThrottle::new()),
             stream_tickets: Arc::new(crate::event_stream::StreamTickets::default()),
