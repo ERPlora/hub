@@ -1,0 +1,80 @@
+# ==============================================================================
+# ERPlora Hub — Tests del GATE local (`.githooks/pre-push` + `install-hooks.sh`)
+# ==============================================================================
+#
+# El gate local decide qué se ejecuta antes de cada push de la flota, y desde
+# hub#1207 decide además QUÉ PAQUETES se ejecutan. Sus tests (`scripts/*.test.sh`)
+# existían desde hub#574 pero NO los corría nadie: `test-shell.yml` solo lanza
+# `release-gate.test.sh`. Un test que no corre en ningún sitio es una lista de la
+# compra, no una guarda — y la regla de cero regresiones pide guarda.
+#
+# Se queda en un workflow propio, filtrado por rutas, en vez de colgarse de
+# `test-shell.yml` (30 min de stack Tauri) o de `test-hub.yml` (19 min de suite):
+# tarda ~2 min y solo se dispara cuando se toca el gate.
+# ==============================================================================
+
+name: Gate scripts (pre-push · install-hooks)
+
+on:
+  push:
+    branches: [main, develop]
+    # Sin anclas YAML a propósito: el parser de Actions no las resuelve, así que
+    # la lista se repite igual que en `test-shell.yml`.
+    paths:
+      - ".githooks/**"
+      - "scripts/prepush-gate.test.sh"
+      - "scripts/install-hooks.sh"
+      - "scripts/install-hooks.test.sh"
+      - ".github/workflows/test-gate.yml"
+  pull_request:
+    paths:
+      - ".githooks/**"
+      - "scripts/prepush-gate.test.sh"
+      - "scripts/install-hooks.sh"
+      - "scripts/install-hooks.test.sh"
+      - ".github/workflows/test-gate.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: test-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: scripts/prepush-gate.test.sh + install-hooks.test.sh
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # El resolutor de alcance de hub#1207 pide `cargo metadata` (workspace de
+      # juguete, sin compilar nada) y `python3`. Los dos están de serie en la
+      # imagen de GitHub; en `ci-runner-1` son un fichero más que algo puede
+      # borrar, así que se comprueban EN VOZ ALTA: sin ellos el hook degrada al
+      # workspace entero y los tests de alcance saldrían rojos por el entorno,
+      # que es el rojo más caro de diagnosticar.
+      - name: Herramientas que el gate necesita
+        run: |
+          set -euo pipefail
+          missing=""
+          for b in bash git python3 cargo; do
+            command -v "$b" >/dev/null 2>&1 || missing="$missing $b"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::este runner no tiene:$missing — el gate no se puede probar aquí"
+            exit 1
+          fi
+          bash --version | head -1
+          python3 --version
+          cargo --version
+
+      - name: Reglas del gate local (scripts/prepush-gate.test.sh)
+        run: bash ./scripts/prepush-gate.test.sh
+
+      - name: Instalador del hook (scripts/install-hooks.test.sh)
+        run: bash ./scripts/install-hooks.test.sh

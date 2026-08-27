@@ -3,6 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Un hub es la caja de un cliente: nunca se indexa. El servidor manda `X-Robots-Tag` en
+         todas las respuestas (`with_noindex`), pero esta copia del documento viaja DENTRO de la
+         app instalada, donde no hay cabecera que valga. Contrato: crates/server/tests/never_indexed.rs -->
+    <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>ERPlora · Hub</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />

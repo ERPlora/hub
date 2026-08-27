@@ -27,6 +27,35 @@
                 </ion-select>
                 <ion-note v-else slot="end">{{ hubCountry }}</ion-note>
               </ion-item>
+
+              <!-- Zona horaria del NEGOCIO (hub#1154). El país no basta: España tiene dos husos y
+                   Portugal tres, así que un hub en Canarias con `country_code = ES` se deduce a
+                   Europe/Madrid y va una hora mal para siempre. `auto` (= `null` en el servidor) es
+                   el default y tiene que poder recuperarse. Cada opción lleva SU HORA AHORA porque
+                   es lo único que un dueño puede auditar: el nombre IANA no le dice nada, un reloj
+                   que coincide con el de la pared sí. -->
+              <ion-item lines="none">
+                <HubIcon slot="start" name="time-outline" />
+                <ion-label>
+                  <h2>{{ t('settings.timezone') }}</h2>
+                  <p>{{ t('settings.timezoneDesc') }}</p>
+                </ion-label>
+                <ion-select
+                  v-if="isAdmin"
+                  class="hub-timezone"
+                  v-model="hubTimezoneSetting"
+                  interface="popover"
+                  :aria-label="t('settings.timezone')"
+                  slot="end"
+                  @ion-change="onTimezoneChange($event.detail.value as string)"
+                >
+                  <ion-select-option value="auto">{{ autoZoneLabel }}</ion-select-option>
+                  <ion-select-option v-for="z in timezoneChoices" :key="z.zone" :value="z.zone">
+                    {{ z.label }}
+                  </ion-select-option>
+                </ion-select>
+                <ion-note v-else slot="end">{{ readOnlyZoneLabel }}</ion-note>
+              </ion-item>
             </ion-list>
           </ion-card-content>
         </ion-card>
@@ -526,7 +555,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { isTauri } from '../lib/device';
 // hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
@@ -566,7 +595,13 @@ import { apiDocsEnabled } from '../lib/api-docs';
 import { isAdmin } from '../lib/session';
 import { resolveSettingsTab, type SettingsTab } from '../lib/settings-tabs';
 import { autostartState, setAutostart, type AutostartState } from '../lib/autostart';
-import { hubSettings, getHubSettings, updateHubSettings, type HubSettings } from '../lib/hub-settings';
+import {
+  hubSettings,
+  hubTimezone,
+  getHubSettings,
+  updateHubSettings,
+  type HubSettings,
+} from '../lib/hub-settings';
 import { publishHubCurrency } from '../lib/money';
 import { toastSuccess, toastError } from '../lib/toast';
 import { coverageRows, fetchPrintHosts, type PrintRoleRow } from '../lib/print-coverage';
@@ -581,9 +616,11 @@ import {
   publishFiscalIdentity,
   putBusinessCertificate,
   deleteBusinessCertificate,
+  refreshHubTimezone,
   type ModuleCapability,
   type BusinessCertificate,
 } from '../lib/runtime';
+import { zoneClock, zoneOptions } from '../lib/timezone';
 
 const { t, te } = useI18n();
 
@@ -646,12 +683,54 @@ const hubLanguage = ref<Locale>(hubSettings.value?.language ?? 'es');
 // Paleta GLOBAL del hub (ADR-0138): la default para usuarios sin override local.
 const hubPalette = ref<string>(hubSettings.value?.theme_palette ?? 'erplora');
 const hubCountry = ref<string>(hubSettings.value?.country_code ?? 'ES');
+// Zona horaria del negocio (hub#1154). `'auto'` es el sentinel de PANTALLA para el `null` del
+// servidor («dedúcela del país»): un `ion-select` no puede llevar `null` como valor de opción, y
+// mandar la cadena `"auto"` al PUT sería una zona IANA inválida — la traducción la hace
+// `onTimezoneChange`, en un solo sitio.
+const hubTimezoneSetting = ref<string>(hubSettings.value?.timezone ?? 'auto');
 // Doc de la API: deriva del setting server-side (lib/api-docs → hubSettings.api_docs_enabled).
 const showApiDocs = apiDocsEnabled;
 
 /** Nombre legible del idioma DEFAULT del hub (para la vista solo-lectura de no-admin). */
 const hubLanguageName = computed<string>(
   () => availableLocales.find((l) => l.code === hubLanguage.value)?.name ?? hubLanguage.value,
+);
+
+// ── Zona horaria del negocio (hub#1154) ──
+// El «ahora» con el que se pintan los relojes de las opciones. Avanza solo, porque una fila que
+// dice 21:04 durante media hora deja de ser la prueba que el dueño estaba usando para decidir.
+const zoneNow = ref<Date>(new Date());
+let zoneNowTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Zona ya RESUELTA por el runtime — la que de verdad rige, esté declarada o deducida. */
+const resolvedZone = computed<string>(() => hubTimezone());
+
+/** `Europe/Madrid · 23:30`, o el nombre pelado si esta tzdb no conoce la zona. */
+function zoneLabel(zone: string): string {
+  const clock = zoneClock(zone, zoneNow.value);
+  return clock ? t('settings.timezoneOptionNow', { zone, time: clock.time }) : zone;
+}
+
+/** Las zonas que ofrece el selector, cada una con su hora actual. */
+const timezoneChoices = computed<{ zone: string; label: string }[]>(() =>
+  zoneOptions(hubCountry.value, hubSettings.value?.timezone ?? null).map((zone) => ({
+    zone,
+    label: zoneLabel(zone),
+  })),
+);
+
+/** La opción «Automática» dice a QUÉ resuelve: sin eso, elegirla es firmar en blanco. */
+const autoZoneLabel = computed<string>(() => {
+  const zone = resolvedZone.value;
+  const clock = zoneClock(zone, zoneNow.value);
+  return clock
+    ? t('settings.timezoneAutoNow', { zone, time: clock.time })
+    : t('settings.timezoneAuto');
+});
+
+/** Lo que ve quien no es admin: la zona en vigor, declarada o deducida. */
+const readOnlyZoneLabel = computed<string>(() =>
+  zoneLabel(hubSettings.value?.timezone ?? resolvedZone.value),
 );
 
 // Mantiene los refs locales en sync si la cache de settings cambia (p.ej. carga post-login en App).
@@ -661,9 +740,22 @@ watch(hubSettings, (s) => {
   hubLanguage.value = s.language;
   hubPalette.value = s.theme_palette;
   hubCountry.value = s.country_code;
+  hubTimezoneSetting.value = s.timezone ?? 'auto';
   businessTaxId.value = s.business_tax_id;
   businessLegalName.value = s.business_legal_name;
   businessAddress.value = s.business_address;
+});
+
+// El reloj de las opciones de zona horaria avanza mientras Ajustes está abierta (hub#1154), y se
+// para al salir: un intervalo que sobrevive a la pantalla es una fuga que nadie vuelve a mirar.
+onMounted(() => {
+  zoneNowTimer = setInterval(() => {
+    zoneNow.value = new Date();
+  }, 30_000);
+});
+onUnmounted(() => {
+  if (zoneNowTimer) clearInterval(zoneNowTimer);
+  zoneNowTimer = null;
 });
 
 // Refresca los settings del hub al abrir Ajustes (best-effort; degrada a la cache sembrada).
@@ -736,7 +828,7 @@ function onHubPaletteChange(e: Event): void {
 async function persistHubSettings(
   partial: Partial<HubSettings>,
   revert: () => void,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await updateHubSettings(partial);
     // hub#900 — the ⛔ strip is a READ of `hub.setup.status`, and this screen is the one that
@@ -754,9 +846,13 @@ async function persistHubSettings(
     // when she reads that it saved.
     await refreshSetupStatus(getClient());
     await toastSuccess(t('settings.saved'));
+    return true;
   } catch (e) {
     revert();
     await toastError(refusalMessage(e));
+    // El verdicto viaja al llamador (hub#1154): republicar el reloj del negocio tras un guardado
+    // que NO ocurrió publicaría la zona vieja como si fuera la nueva.
+    return false;
   }
 }
 
@@ -807,6 +903,28 @@ function onCountryChange(value: string): void {
   hubCountry.value = value;
   void persistHubSettings({ country_code: value }, () => {
     hubCountry.value = prev;
+  }).then((saved) => {
+    // El país es de donde SALE la zona cuando nadie la declara (hub#1154), así que cambiarlo mueve
+    // el reloj del negocio sin tocar la fila de al lado. Se vuelve a preguntar por el mismo motivo
+    // que en `onTimezoneChange`: quien deduce es el runtime.
+    if (saved && !hubSettings.value?.timezone) void refreshHubTimezone();
+  });
+}
+
+// Zona horaria del NEGOCIO (hub#1154). `'auto'` es el sentinel de pantalla; lo que viaja al PUT es
+// `null`, que es como el runtime escribe «dedúcela del país» — mandar `"auto"` sería un nombre IANA
+// inválido y el servidor lo rechazaría.
+function onTimezoneChange(value: string): void {
+  const prev = hubSettings.value?.timezone ?? 'auto';
+  if (value === prev) return; // evita re-disparo al re-sincronizar el v-model desde la cache
+  hubTimezoneSetting.value = value;
+  void persistHubSettings({ timezone: value === 'auto' ? null : value }, () => {
+    hubTimezoneSetting.value = prev;
+  }).then((saved) => {
+    // Solo si de verdad se guardó: republicar tras un rechazo dejaría a los módulos con una zona
+    // que el hub no tiene. Y se PREGUNTA en vez de calcular porque con `auto` el valor efectivo lo
+    // decide la tabla de husos del runtime, que es la única autoridad sobre esto.
+    if (saved) void refreshHubTimezone();
   });
 }
 
