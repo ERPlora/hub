@@ -24,7 +24,12 @@
 //!
 //! No es un parser de SQL, y no pretende serlo: es un **lint** sobre el texto de la migración. La
 //! validación fina —índices sin `CONCURRENTLY`, `NOT NULL` sin default, defaults volátiles— es
-//! trabajo de [Squawk](https://squawkhq.com/), que va en su propia iteración. Estas dos reglas son
+//! trabajo de [Squawk](https://squawkhq.com/), que va en su propia iteración.
+//!
+//! Y de ahí sale la regla de hub#1149: **lo que este lint no puede leer, no entra**. El cuerpo de
+//! un `DO`/`CREATE FUNCTION` es opaco —dentro cabe un `EXECUTE` que arma la sentencia en tiempo de
+//! ejecución— así que el guard no finge entenderlo: lo rechaza y dice por dónde se pasa. Medido
+//! antes de escribirlo: cero de las 155 migraciones publicadas usa un cuerpo procedimental. Estas dos reglas son
 //! las que Squawk **no** puede conocer, porque son nuestras.
 
 use std::collections::HashSet;
@@ -59,6 +64,9 @@ pub enum GuardError {
     RowDestruction { verb: &'static str },
     /// Un `DROP` que nombra varias cosas en una sentencia. La traducción es 1:1 o no es (hub#1145).
     DropsMoreThanOne { what: &'static str, statement: String },
+    /// Un cuerpo procedimental (`DO`, `CREATE FUNCTION`/`PROCEDURE`). El guard es un lint sobre el
+    /// TEXTO y ahí dentro no hay texto que leer: no se inspecciona, no entra (hub#1149).
+    NotInspectable { construct: &'static str },
 }
 
 impl std::fmt::Display for GuardError {
@@ -85,6 +93,13 @@ impl std::fmt::Display for GuardError {
                  `_deprecated_*`; de las filas no hay nada que apartar. Si de verdad hay que \
                  limpiarlas, va en una migración `backfill`, que es donde el DML tiene su sitio y \
                  donde se ve que no admite vuelta atrás."
+            ),
+            GuardError::NotInspectable { construct } => write!(
+                f,
+                "la migración contiene un `{construct}`, y el cuerpo de un bloque procedimental es \
+                 opaco para esta puerta: dentro cabe un `EXECUTE` que arma la sentencia en tiempo \
+                 de ejecución, así que no se puede afirmar ni qué tablas toca ni si destruye filas. \
+                 Escribe la migración como sentencias SQL sueltas, que es lo que sí se puede leer."
             ),
             GuardError::DropsMoreThanOne { what, statement } => write!(
                 f,
@@ -134,8 +149,9 @@ pub enum Plan {
     ///
     /// 🔴 Esto NO es una optimización, es una regla de seguridad: partir por `;` y recomponer
     /// **corrompe SQL válido**. El primer intento lo hacía y reventó cinco e2e con
-    /// `syntax error at or near "flags"` — el splitter no entiende dollar-quoting (`$$…$$`), y
-    /// recomponer lo que no se ha entendido del todo destroza la migración.
+    /// `syntax error at or near "flags"`, porque recomponer lo que no se ha entendido del todo
+    /// destroza la migración. Desde hub#1149 el splitter sí entiende dollar-quoting, pero la regla
+    /// no cambia: se entiende para **decidir**, no para reescribir.
     ///
     /// Inspeccionar puede ser imperfecto (se escapa algo, y el peor caso es no cazarlo).
     /// **Reescribir no puede**: el peor caso es romper un módulo que estaba bien.
@@ -195,6 +211,14 @@ pub fn check(
 
     let mut out = Vec::with_capacity(statements.len());
     for statement in statements {
+        // 🔴 Lo que no se puede LEER, no entra (hub#1149). Esto es un lint sobre el texto y el
+        // cuerpo de un bloque procedimental es opaco: dentro cabe `EXECUTE format('DROP TABLE
+        // %I', …)`, donde ni el verbo ni la tabla son tokens. Va lo PRIMERO a propósito — si no,
+        // el error que ve el autor sería un `KindMismatch` sobre un `DELETE` que el guard cree
+        // haber entendido, y lo que hay que decirle es que ahí no se puede afirmar nada.
+        if let Some(construct) = procedural_construct(&statement) {
+            return Err(GuardError::NotInspectable { construct });
+        }
         for table in tables_touched(&statement) {
             if table.starts_with("hub_") || table.starts_with('_') {
                 return Err(GuardError::ReservedNamespace { table });
@@ -467,6 +491,63 @@ fn strip_comments(sql: &str) -> String {
     out
 }
 
+/// La construcción procedimental que la sentencia abre, si abre alguna (hub#1149).
+///
+/// Solo `DO` y `CREATE [OR REPLACE] FUNCTION`/`PROCEDURE`: las tres formas que meten un cuerpo
+/// que esta puerta no puede leer. Un `$…$` suelto **no** cuenta — `VALUES ($$hola$$)` es un
+/// literal perfectamente legible, y rechazarlo sería un falso positivo, que aquí significa dejar
+/// un módulo sin instalar.
+///
+/// Se mira sobre el SQL **sin comentarios** y por tokens enteros: una columna `do_not_ship` o un
+/// comentario que diga «function» no abren nada.
+fn procedural_construct(statement: &str) -> Option<&'static str> {
+    let cleaned = strip_comments(statement).to_uppercase();
+    let tokens: Vec<&str> = cleaned.split_whitespace().map(bare_token).collect();
+
+    if tokens.first() == Some(&"DO") {
+        return Some("DO");
+    }
+    if tokens.first() == Some(&"CREATE") {
+        let mut j = 1;
+        while matches!(tokens.get(j), Some(&"OR") | Some(&"REPLACE")) {
+            j += 1;
+        }
+        match tokens.get(j) {
+            Some(&"FUNCTION") => return Some("CREATE FUNCTION"),
+            Some(&"PROCEDURE") => return Some("CREATE PROCEDURE"),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Longitud del delimitador `$…$` que empieza en `at`, si de verdad lo es (hub#1149).
+///
+/// Un tag de Postgres es `$`, un identificador opcional (letra o `_` primero; después también
+/// dígitos) y otro `$`. Comprobarlo es lo que separa `$$`/`$body$` —que abren un cuerpo— de un
+/// `$1` o de un `$` suelto en un texto, que no abren nada.
+fn dollar_tag_len(chars: &[char], at: usize) -> Option<usize> {
+    if chars.get(at) != Some(&'$') {
+        return None;
+    }
+    let mut j = at + 1;
+    while let Some(&c) = chars.get(j) {
+        if c == '$' {
+            return Some(j + 1 - at);
+        }
+        let is_first = j == at + 1;
+        if !(c.is_alphabetic() || c == '_' || (!is_first && c.is_ascii_digit())) {
+            return None;
+        }
+        j += 1;
+    }
+    None
+}
+
+fn starts_with_tag(chars: &[char], at: usize, tag: &[char]) -> bool {
+    chars.len() >= at + tag.len() && chars[at..at + tag.len()] == *tag
+}
+
 fn tables_touched(statement: &str) -> Vec<String> {
     let statement = &strip_comments(statement);
     let mut found = Vec::new();
@@ -495,6 +576,15 @@ fn tables_touched(statement: &str) -> Vec<String> {
                 j += 1;
                 continue;
             }
+            // 🔑 `SET` tras un ancla NUNCA es una tabla (hub#1109). En `UPDATE <tabla> SET …` el
+            // token siguiente es la tabla y el ancla acierta; en `ON CONFLICT … DO UPDATE SET …`
+            // no hay tabla que anclar —va `SET`, palabra reservada— y esto concluía que el módulo
+            // tocaba una tabla llamada `set`. Rechazaba así el upsert al INSTALAR, que es la forma
+            // canónica de sembrar datos de referencia idempotentes. Mismo criterio que las otras
+            // dos puertas: `validate-sql.mjs` y el espejo del toolkit (module-toolkit#72).
+            if next_upper == "SET" {
+                break;
+            }
             let name = next
                 .trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
                 .to_lowercase();
@@ -513,55 +603,98 @@ fn tables_touched(statement: &str) -> Vec<String> {
 /// mitad de comentario, el trozo perdía su `--`, y «table is» se leía como una tabla `is` que
 /// «no pertenece a printing» — un módulo publicado y correcto que no se instalaba.
 ///
+/// Y respeta el **dollar-quoting** (`$$ … $$`, `$tag$ … $tag$`) desde hub#1149: sin eso el `;`
+/// de dentro de un cuerpo lo partía y los inspectores decidían sobre trozos de algo que ya no era
+/// la sentencia que Postgres iba a ejecutar. Un `$` que no abre un tag válido —`$1`, un precio—
+/// sigue siendo texto corriente.
+///
 /// El comentario se conserva en la sentencia (se copia tal cual): quitarlo es cosa de
 /// [`strip_comments`], en el momento de inspeccionar.
 fn split_statements(sql: &str) -> Vec<String> {
+    let chars: Vec<char> = sql.chars().collect();
     let mut out = Vec::new();
     let mut current = String::new();
-    let mut in_string = false;
-    let mut chars = sql.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if in_string {
-            current.push(ch);
-            if ch == '\'' {
-                in_string = false;
-            }
-            continue;
-        }
+    let mut i = 0;
+
+    while i < chars.len() {
+        let ch = chars[i];
         match ch {
             '\'' => {
-                in_string = true;
                 current.push(ch);
-            }
-            '-' if chars.peek() == Some(&'-') => {
-                current.push(ch);
-                for next in chars.by_ref() {
-                    current.push(next);
-                    if next == '\n' {
+                i += 1;
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if c == '\'' {
                         break;
                     }
                 }
             }
-            '/' if chars.peek() == Some(&'*') => {
-                current.push(ch);
+            '-' if chars.get(i + 1) == Some(&'-') => {
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if c == '\n' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.get(i + 1) == Some(&'*') => {
+                current.push('/');
+                current.push('*');
+                i += 2;
                 let mut prev = ' ';
-                for next in chars.by_ref() {
-                    current.push(next);
-                    if prev == '*' && next == '/' {
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if prev == '*' && c == '/' {
                         break;
                     }
-                    prev = next;
+                    prev = c;
                 }
             }
+            // 🔑 Dollar-quoting (hub#1149). Sin esto, el `;` de dentro de un `DO $$ … $$` partía
+            // el bloque y los inspectores miraban trozos de algo que ya no era la sentencia que
+            // Postgres iba a ejecutar. El cuerpo se copia **verbatim**, tal cual: aquí no se
+            // reescribe nada, solo se decide dónde acaba la sentencia.
+            '$' => match dollar_tag_len(&chars, i) {
+                Some(len) => {
+                    let tag: Vec<char> = chars[i..i + len].to_vec();
+                    current.extend(tag.iter());
+                    i += len;
+                    while i < chars.len() {
+                        if starts_with_tag(&chars, i, &tag) {
+                            current.extend(tag.iter());
+                            i += tag.len();
+                            break;
+                        }
+                        current.push(chars[i]);
+                        i += 1;
+                    }
+                }
+                // Un `$` que no abre un tag es texto: `$1`, un precio, un nombre raro.
+                None => {
+                    current.push(ch);
+                    i += 1;
+                }
+            },
             ';' => {
                 if !current.trim().is_empty() {
                     out.push(current.trim().to_string());
                 }
                 current.clear();
+                i += 1;
             }
-            _ => current.push(ch),
+            _ => {
+                current.push(ch);
+                i += 1;
+            }
         }
     }
+
     if !current.trim().is_empty() {
         out.push(current.trim().to_string());
     }
@@ -1039,5 +1172,126 @@ mod tests {
             matches!(refused, Err(GuardError::KindMismatch { .. })),
             "el pase es por FICHERO, no por módulo: {refused:?}"
         );
+    }
+
+    // ── Un upsert sobre tabla propia se INSTALA (hub#1109) ───────────────────────────
+
+    /// 🔴 `tables_touched` anclaba **todo** `UPDATE`. En un `UPDATE <tabla> SET …` el token que
+    /// sigue es la tabla y acierta; en `ON CONFLICT … DO UPDATE SET …` no hay tabla detrás del
+    /// `UPDATE` —va `SET`, palabra reservada— y el guard concluía que el módulo tocaba una tabla
+    /// llamada `set`, que no es suya. La puerta de INSTALACIÓN rechazaba así el upsert, que es la
+    /// forma canónica de sembrar datos de referencia idempotentes.
+    ///
+    /// Importaba porque el espejo del toolkit ya no marcaba el falso positivo (module-toolkit#72):
+    /// el gate daba VERDE a un upsert que ningún hub instalaba — módulo publicado verde, módulo
+    /// que no instala, y el cliente quien lo descubre.
+    #[test]
+    fn an_upsert_on_its_own_table_installs() {
+        let sql = "INSERT INTO taxes_category_label (key, lang, label, description) \
+                   VALUES ('food', 'es', 'Alimentacion', 'Tipo reducido') \
+                   ON CONFLICT (key, lang) DO UPDATE \
+                   SET label = EXCLUDED.label, description = EXCLUDED.description";
+
+        for kind in [Kind::Expand, Kind::Backfill] {
+            let plan = check("taxes", "migrations/postgres/005_category_labels.sql", sql, kind)
+                .unwrap_or_else(|e| panic!("un upsert sobre la tabla del propio módulo instala ({kind:?}): {e}"));
+            assert_eq!(plan, Plan::AsWritten, "y se aplica tal cual ({kind:?})");
+        }
+    }
+
+    /// 🔴 **El ancla sigue cazando el positivo.** Arreglar el falso positivo no puede abrir la
+    /// puerta: un `UPDATE` de verdad sobre la tabla de otro módulo se rechaza igual.
+    #[test]
+    fn an_update_on_another_modules_table_is_still_refused() {
+        let refused = check("taxes", "migrations/postgres/006_x.sql", "UPDATE sales_sale SET total = 0", Kind::Backfill)
+            .expect_err("la tabla de otro modulo no se toca");
+
+        assert!(
+            matches!(&refused, GuardError::ForeignTable { table, .. } if table == "sales_sale"),
+            "tenia que rechazarse por tabla ajena: {refused}"
+        );
+    }
+
+    // ── Lo que no se puede LEER no entra (hub#1149) ──────────────────────────────────
+
+    /// 🔴 `split_statements` no entendía **dollar-quoting**, así que el `;` de dentro de un
+    /// `DO $$ … $$` partía el bloque y los inspectores miraban trozos de algo que ya no era la
+    /// sentencia que Postgres iba a ejecutar. Es la pieza que rompe primero.
+    #[test]
+    fn a_dollar_quoted_body_is_one_statement() {
+        for sql in [
+            "DO $$\nBEGIN\n  DELETE FROM sales_line WHERE legacy = 'yes';\nEND\n$$;",
+            "CREATE FUNCTION sales_touch() RETURNS trigger AS $body$\nBEGIN\n  DELETE FROM sales_line;\n  RETURN NEW;\nEND\n$body$ LANGUAGE plpgsql;",
+        ] {
+            let statements = split_statements(sql);
+            assert_eq!(
+                statements.len(),
+                1,
+                "el cuerpo entre `$…$` es UNA sentencia, no {}: {statements:?}",
+                statements.len()
+            );
+        }
+    }
+
+    /// 🔴 **El agujero de la issue.** El guard es un lint sobre el TEXTO y no puede afirmar nada
+    /// de un cuerpo procedimental: dentro cabe `EXECUTE format('DROP TABLE %I', …)`, donde ni el
+    /// verbo ni la tabla son tokens que leer. Así que no se inspecciona: se rechaza — «lo que no
+    /// se puede apartar, no entra». Medido antes de escribirlo: **cero** de las 155 migraciones
+    /// publicadas en los 27 repos usa un cuerpo procedimental, así que el radio de explosión es 0.
+    #[test]
+    fn a_procedural_body_does_not_enter_a_module_migration() {
+        for sql in [
+            "DO $$\nBEGIN\n  DELETE FROM sales_line WHERE legacy = 'yes';\nEND\n$$",
+            "DO $limpia$ BEGIN EXECUTE 'DELETE FROM sales_line'; END $limpia$",
+            "CREATE FUNCTION sales_touch() RETURNS trigger AS $$ BEGIN RETURN NEW; END $$ LANGUAGE plpgsql",
+            "CREATE OR REPLACE FUNCTION sales_touch() RETURNS trigger AS $$ BEGIN RETURN NEW; END $$ LANGUAGE plpgsql",
+            "CREATE PROCEDURE sales_clean() LANGUAGE plpgsql AS $$ BEGIN DELETE FROM sales_line; END $$",
+        ] {
+            for kind in [Kind::Expand, Kind::Backfill, Kind::Contract] {
+                let refused = check("sales", "migrations/postgres/020_x.sql", sql, kind)
+                    .err()
+                    .unwrap_or_else(|| panic!("`{sql}` no es inspeccionable y no puede entrar ({kind:?})"));
+                assert!(
+                    matches!(refused, GuardError::NotInspectable { .. }),
+                    "`{sql}` tenia que rechazarse por no inspeccionable ({kind:?}): {refused}"
+                );
+            }
+        }
+    }
+
+    /// El error dice **qué** construcción y **por dónde** se sale, que es lo que separa un guard
+    /// de un muro: un módulo sin instalar y sin explicación es el fallo caro.
+    #[test]
+    fn the_refusal_names_the_construct_and_the_way_out() {
+        let refused = check("sales", "migrations/postgres/020_x.sql", "DO $$ BEGIN PERFORM 1; END $$", Kind::Expand)
+            .expect_err("no inspeccionable");
+        let message = refused.to_string();
+
+        assert!(message.contains("DO"), "nombra la construccion: {message}");
+        assert!(message.to_lowercase().contains("sql"), "y dice por donde SI se pasa: {message}");
+    }
+
+    /// 🔴 **Control de falsos positivos**, que aquí valen un módulo sin instalar. Un `$$` dentro
+    /// de un literal o de un comentario **no** abre un cuerpo procedimental, y una migración
+    /// normal con un `$` suelto sigue pasando.
+    #[test]
+    fn words_that_only_look_like_a_dollar_quote_are_not_one() {
+        for sql in [
+            "INSERT INTO sales_line (label) VALUES ('$$ no es un cuerpo $$')",
+            "-- el coste va en $$ y no abre nada\nCREATE TABLE sales_line (id BIGINT)",
+            "CREATE TABLE sales_line (id BIGINT, note TEXT DEFAULT 'precio en $')",
+        ] {
+            check("sales", "migrations/postgres/021_x.sql", sql, Kind::Expand)
+                .unwrap_or_else(|e| panic!("`{sql}` es SQL correcto y tiene que pasar: {e}"));
+        }
+    }
+
+    /// Las migraciones de **sistema** son nuestras, se leen en una PR y no pasan por [`check`]:
+    /// ahí un cuerpo procedimental sí cabe. Sin este control, la regla se habría llevado por
+    /// delante la puerta de al lado.
+    #[test]
+    fn a_system_migration_may_still_use_a_procedural_body() {
+        kind_matches("DO $$ BEGIN PERFORM 1; END $$", Kind::Expand)
+            .expect("las de sistema son nuestras y se revisan en una PR");
     }
 }
