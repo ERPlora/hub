@@ -12,6 +12,7 @@
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test -c tests/playwright.config.ts",
     "verify": "pnpm run typecheck && pnpm run test",
     "preview": "vite preview"
   },

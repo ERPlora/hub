@@ -1,5 +1,5 @@
 # ==============================================================================
-# ERPlora Hub (JS/TS) — typecheck + unit tests of the web shell and the packages
+# ERPlora Hub (JS/TS) — typecheck + unit tests + E2E Playwright del shell web
 # ==============================================================================
 #
 # WHY THIS EXISTS (hub#422). The only required gate of this repo was
@@ -20,21 +20,57 @@
 # The `paths` filter (same trick as test-shell.yml) keeps Rust-only PRs at zero
 # cost: they never trigger this workflow.
 #
-# Cheaper alternative if the budget ever demands it: this job is one command,
-# `pnpm verify` (root) — move it to the local pre-push hook and delete this file.
+# ── E2E + capturas (hub#1240) ────────────────────────────────────────────────
+# `apps/web/tests/e2e/` (6 specs Playwright contra el runtime REAL) existía desde
+# hacía meses y NO lo corría nadie: ni un script de npm, ni un workflow, ni el
+# hook. Nada estaba roto — faltaba un cable, y un cable que falta no deja rojo en
+# ningún sitio. El job `e2e` de abajo es ese cable.
+#
+# Trae además la primera baseline visual del monorepo (`toHaveScreenshot`). Hacía
+# falta porque las 511 pruebas de componentes corren en happy-dom, que NO calcula
+# layout: pasaron en verde con dos componentes peor colocados que antes, y las
+# issues de pulido del hub (#1197 #1169 #1166 #1106) son todas de geometría.
+#
+# 🔴 LAS BASELINES SE GENERAN AQUÍ, NUNCA EN UN MAC. Otra pila de fuentes y otro
+# antialiasing hacen que un PNG hecho en macOS no case jamás con el de este
+# runner. Para regenerarlas:
+#
+#     Actions → este workflow → «Run workflow» → update_baselines: true
+#
+# Ese run corre Playwright con `--update-snapshots` y sube los PNG como artefacto
+# `playwright-baselines`; se descargan y se commitean en
+# `apps/web/tests/e2e/<spec>.spec.ts-snapshots/`. Mientras la baseline de la
+# plataforma no exista, el caso visual se SALTA en voz alta en vez de fallar: un
+# rojo permanente por un fichero que aún no se ha generado no es una señal, es
+# ruido que se aprende a ignorar.
+#
+# ── Push a develop + issue de alerta (hub#1200) ──────────────────────────────
+# Este workflow solo se disparaba en `push: main`, así que un test web rojo en
+# `develop` no lo veía nadie — que es literalmente hub#1200. `test-hub.yml` tiene
+# el trigger de develop desde hub#572 y este fichero se quedó atrás. El job
+# `alert-develop` copia su patrón: notificar por Actions no notifica a nadie
+# (image-freshness.yml, hub#652, lo demostró), una issue sí.
+#
+# Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
+# como un paso del job `verify` (un test de la guarda que no corre en ningún
+# sitio es la lista de la compra, no una guarda).
 # ==============================================================================
 
-name: Web tests (typecheck · vitest)
+name: Web tests (typecheck · vitest · e2e)
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - "apps/web/**"
       - "packages/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
   pull_request:
     paths:
@@ -43,8 +79,17 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
   workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: "Regenerar las capturas de toHaveScreenshot EN ESTE RUNNER y subirlas como artefacto (luego se commitean a mano)"
+        type: boolean
+        default: false
 
 concurrency:
   group: test-web-${{ github.ref }}
@@ -87,3 +132,228 @@ jobs:
       # "fixing" a TS5097 by deleting an extension turns this job red instead of shipping broken.
       - name: pnpm verify
         run: pnpm verify
+
+      # El contrato de ESTE fichero (hub#1240): que siga habiendo `test:e2e`, que el job e2e siga
+      # existiendo, que el trigger de develop siga puesto y que la vía de regenerar capturas siga
+      # entera. Son ~2 s de bash y es lo único que puede notar un cable que se cae.
+      - name: Contrato de test-web.yml (scripts/tests/test-web-workflow.test.sh)
+        run: bash ./scripts/tests/test-web-workflow.test.sh
+
+  e2e:
+    name: playwright (test:e2e, runtime real)
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 40
+
+    services:
+      postgres:
+        # pgvector, NO `postgres:18` a secas: el runtime arranca con la extensión `vector`
+        # disponible (ADR-0282). Misma imagen que `test-hub.yml` A PROPÓSITO — si una cambia, la
+        # otra también (ese desfase ya tuvo `main` en rojo 7 runs seguidos el 2026-08-09).
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: test
+          # La BD del banco: el runtime NO la crea, tiene que existir antes de arrancar.
+          POSTGRES_DB: hub_e2e_web
+        # Puerto de host DINÁMICO (hub#898): los dos runners gemelos de la org viven en la MISMA
+        # máquina, así que un puerto fijo hace que el segundo job no pueda atar y muera en ~9 s con
+        # un mensaje que solo sale en las anotaciones.
+        #
+        # A diferencia de `test-hub.yml`, aquí NO se reinicia el contenedor para subirle los
+        # cerrojos: aquella suite crea un esquema efímero POR TEST y agota el techo global; esta
+        # usa DOS bases y ya está. Sin reinicio, el puerto del contexto del job es fiable y no hace
+        # falta la danza de `docker port`.
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CI: "1"
+      RUSTFLAGS: "-C debuginfo=0"
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 🔴 Misma defensa que `test-hub.yml`: el resolutor de módulos del shell mira al hermano
+      # `modules-workspace/` del checkout, que cae FUERA del workspace y PERSISTE entre jobs. Si
+      # otro job deja ahí un catálogo, este banco deja de ser el hub VACÍO que los specs afirman.
+      - name: Quitar restos de `modules-workspace` en el runner (hub#1216)
+        run: |
+          STRAY="$GITHUB_WORKSPACE/../modules-workspace"
+          if [ -e "$STRAY" ]; then
+            n=$(find "$STRAY" -mindepth 3 -maxdepth 3 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+            echo "::warning::restos de modules-workspace en el runner (${n} módulos) — se borran."
+            rm -rf "$STRAY"
+          fi
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Node 22 + pnpm (pinned by package.json `packageManager`)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo (no toca ni el PATH ni los toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
+
+      # `cache-bin: false` + `save-if` off en runner propio: el paso `Post` de esta acción limpia
+      # `$CARGO_HOME/bin` (se lleva el `rustup` del runner) y `~/.cargo/registry/src`, que las dos
+      # ranuras de `ci-runner-1` COMPARTEN. Explicación larga en `test-shell.yml`.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
+
+      # El binario de DEBUG, no release: `AssistantGrounded.spec.ts` arranca su propio runtime por
+      # la ruta `target/debug/erplora-server`, y el `webServer` del config lo alcanza por
+      # `cargo run` (instantáneo con el binario ya construido).
+      - name: cargo build -p erplora-server
+        run: cargo build -p erplora-server
+
+      # `vite build` a secas y no `pnpm build`: el `vue-tsc` ya lo corre el job `verify` y el
+      # `prebuild` (sync-modules) no tiene nada que sincronizar aquí. El `dist/` lo necesita
+      # `AssistantGrounded.spec.ts`, que sirve el shell desde el runtime (HUB_WEB_DIR), sin Vite.
+      - name: Build del shell (dist para el spec del asistente)
+        run: pnpm -F @erplora/web exec vite build
+
+      # Segunda BD: `AssistantGrounded.spec.ts` levanta un runtime PROPIO (:8791) y no puede
+      # compartir la del banco principal — dos runtimes migrando y sembrando la misma BD se pisan.
+      - name: Crear la BD del spec del asistente + exportar los DSN
+        env:
+          PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          set -euo pipefail
+          PG=$(docker ps --filter "publish=${PG_PORT}" --format '{{.ID}}' | head -1)
+          if [ -z "$PG" ]; then
+            echo "::error::no hay contenedor Postgres publicando el puerto ${PG_PORT}."
+            docker ps --format '  {{.ID}}  {{.Image}}  {{.Ports}}'
+            exit 1
+          fi
+          docker exec "$PG" psql -U postgres -c "CREATE DATABASE hub_e2e_assistant;"
+          {
+            echo "HUB_E2E_DATABASE_URL=postgres://postgres:test@localhost:${PG_PORT}/hub_e2e_web"
+            echo "E2E_DATABASE_URL=postgres://postgres:test@localhost:${PG_PORT}/hub_e2e_assistant"
+          } >> "$GITHUB_ENV"
+
+      # `--with-deps`: un runner limpio no tiene las librerías del sistema que pide Chromium, y sin
+      # ellas el navegador muere al lanzarse con un error que no menciona ninguna dependencia.
+      - name: Instalar el navegador de Playwright
+        run: pnpm -F @erplora/web exec playwright install --with-deps chromium
+
+      - name: pnpm -F @erplora/web test:e2e
+        id: e2e
+        if: ${{ github.event.inputs.update_baselines != 'true' }}
+        run: pnpm -F @erplora/web test:e2e
+
+      # Vía de regeneración de capturas: solo por `workflow_dispatch` con la casilla marcada. Se
+      # separa del paso normal a propósito — `--update-snapshots` NUNCA debe correr en un push,
+      # porque reescribiría la baseline con lo que acabe de salir y el contrato visual dejaría de
+      # afirmar nada.
+      - name: Regenerar las capturas (--update-snapshots)
+        if: ${{ github.event.inputs.update_baselines == 'true' }}
+        env:
+          HUB_UPDATE_BASELINES: "1"
+        # `exec playwright` y no `test:e2e --`: pnpm mete un `--` literal en la lista de argumentos
+        # y Playwright se lo come sin quejarse, dejando el filtro siguiente sin efecto. Y el modo
+        # va explícito (`=all`): sin él la bandera toma su modo por defecto, que no regenera lo que
+        # ya existe, y una baseline desfasada seguiría desfasada tras el run que la iba a arreglar.
+        run: pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts --update-snapshots=all
+
+      - name: Subir las capturas regeneradas
+        if: ${{ github.event.inputs.update_baselines == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-baselines
+          path: apps/web/tests/e2e/**/*-snapshots/**
+          if-no-files-found: error
+
+      # La traza de un fallo (el config guarda `trace: retain-on-failure`): sin esto, un rojo de
+      # e2e en CI solo deja el mensaje de la aserción y hay que reproducirlo a ciegas en local.
+      - name: Subir las trazas del fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.run_id }}
+          path: |
+            apps/web/test-results/**
+            apps/web/playwright-report/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Un rojo POST-MERGE en develop se hace ruidoso (hub#572 en test-hub.yml, hub#652 en
+  # image-freshness.yml): las notificaciones nativas de Actions no llegaron demostrablemente a
+  # nadie; una issue notifica a los watchers y aterriza en el board. Job aparte y no un paso en
+  # cada job porque la alerta cubre a LOS DOS: hub#1200 fue un test web rojo — el job `verify` —,
+  # no un e2e.
+  alert-develop:
+    name: Alerta de develop roto
+    needs: [verify, e2e]
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
+      (needs.verify.result == 'failure' || needs.e2e.result == 'failure')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Abrir o refrescar la issue de alerta (hub#1240)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          set -euo pipefail
+          subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
+          title="el web de develop esta roto tras un merge"
+          body="Detectado por la suite del web sobre develop (hub#1240).
+
+          - develop HEAD: \`${SHA}\` — '${subject}'
+          - run fallido: ${RUN_URL}
+          - verify (vue-tsc + vitest): ${VERIFY_RESULT} · e2e (playwright): ${E2E_RESULT}
+
+          Hasta hub#1240 este workflow solo corría en \`main\`, y por eso hub#1200 (un test web rojo) aguantó en develop sin que lo viera nadie. Este run es el primero que mira develop tal como lo dejó el merge.
+
+          Ojo: el rojo puede ser del diff o del ENTORNO (disco, contenedor de servicio, navegador). El run enlazado lo dice; si es entorno, se cierra esta issue y ya está.
+
+          Esta issue se REUTILIZA (un comentario por detección) mientras develop siga rojo; ciérrala cuando vuelva a verde."
+
+          # Frase de búsqueda sin dos puntos ni acentos a propósito (los dos puntos son sintaxis de
+          # búsqueda en GitHub) y estable — es lo que hace idempotente la alerta.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search '"el web de develop esta roto tras un merge" in:title' \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refrescando la issue de alerta abierta #$existing"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

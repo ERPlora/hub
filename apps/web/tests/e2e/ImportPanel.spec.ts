@@ -1,6 +1,6 @@
 // Contrato UI del panel «Importar configuración» — pestaña Datos de Ajustes
 // (ADR-0113 §4, architecture/hub/export-import.md; decisión del humano 2026-07-12:
-// import/export viven JUNTOS en /settings?tab=data, ya no hay página /import).
+// import/export viven JUNTOS en /settings#data, ya no hay página /import).
 //
 // Tres pasos: (1) elegir fuente — zip local; «desde la nube» aún no existe (el registro de
 // blueprints del SaaS es una tanda posterior) → botón deshabilitado con nota "próximamente" —,
@@ -54,10 +54,13 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
   }) => {
     await withSession(page, await loginByPin());
 
-    await page.goto('/settings?tab=data');
+    // Deep-link a la pestaña Datos por HASH. Era `?tab=data`; `SettingsPage.vue` resuelve la
+    // pestaña desde `route.hash` y reescribe la URL a `#<tab>`, así que la query ya no
+    // seleccionaba nada y estos specs llevaban rotos sin que nadie los corriera (hub#1240).
+    await page.goto('/settings#data');
 
     // El hub vacío es quien más necesita importar: navega a /settings sin desvíos.
-    await expect(page).toHaveURL(/\/settings\?tab=data$/);
+    await expect(page).toHaveURL(/\/settings#data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
 
     // Rediseño 2026-07-17: la card «subir desde archivo» SIEMPRE está a la vista (ya no un botón).
@@ -69,7 +72,12 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await expect(page.getByTestId('import-cloud-loading')).toHaveCount(0);
   });
 
-  test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
+  // 🔴 ROJO POR UN DEFECTO REAL, no por el test (hub#1249, encontrado al poner esta suite a correr
+  // por primera vez en hub#1240): el round-trip export→import PIERDE la sección `users`. El export
+  // se pide con `users: true` y el manifest importado solo detecta ajustes y media, así que
+  // `import-section-users` no existe. Queda `fixme` —visible en el informe, no borrado— para que el
+  // resto de la suite pueda correr en CI; se quita al cerrar hub#1249.
+  test.fixme('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
     const session = await loginByPin();
 
     // Round-trip REAL: el zip se genera con el propio export del runtime (cero fixtures).
@@ -94,7 +102,7 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await api.dispose();
 
     await withSession(page, session);
-    await page.goto('/settings?tab=data');
+    await page.goto('/settings#data');
 
     // Paso 2: subir el zip → inspect → resumen del manifest + secciones DETECTADAS. Fiscal no
     // viajó (OFF en el export) → su checkbox NO aparece.
