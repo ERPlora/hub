@@ -160,3 +160,51 @@ async fn install_refuses_an_anchor_that_names_no_statement() {
         "the refusal names the anchor and the command: {msg}"
     );
 }
+
+// ── The other half of hub#1091: `min_affected_rows` ──────────────────────────────────────────
+//
+// The anchor above closed the hole for `expect_rows`. `min_affected_rows` — the legacy gate
+// (hub#140) — counts the batch exactly the same way, and CANNOT be anchored: it is an integer in
+// `schemas/module.schema.json`, so there is nowhere to name a statement, and the installer forbids
+// pairing it with `expect_rows`. A module that declares it over two statements therefore has no
+// way at all to arm its guard, while the schema keeps promising «never a 200 ok with 0 rows nor a
+// false event».
+//
+// The fix is the door, not a second mechanism: a multi-statement `min_affected_rows` is REFUSED at
+// install, and the refusal names `expect_rows.statement` as the way to say what it meant. There is
+// no migration cost — the sweep of the 27 module repos (`origin/main`, 25/08/2026) finds exactly
+// ONE `min_affected_rows` in the whole catalogue, `flows.drafts.resolve`, and it is a single
+// statement, which keeps working untouched (the test below pins that).
+
+/// A `min_affected_rows` spread over two statements is the neutralizable shape with no anchor
+/// available. It does not install, and the refusal says where to go.
+#[tokio::test]
+async fn install_refuses_a_multi_statement_min_affected_rows() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let err = rt
+        .install_from_dir(&fixture("gate_legacy_multi"))
+        .await
+        .expect_err("a batch-counted legacy gate with no way to anchor must not install");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("gate_legacy_multi.create") && msg.contains("min_affected_rows"),
+        "the refusal names the command and the offending key: {msg}"
+    );
+    assert!(
+        msg.contains("expect_rows.statement"),
+        "the refusal points at the anchor that CAN express the intent: {msg}"
+    );
+}
+
+/// Compat, pinned: the single-statement `min_affected_rows` is not touched. It is the only shape
+/// in the published catalogue (`flows.drafts.resolve`) and it never had the hole — one statement
+/// IS the batch.
+#[tokio::test]
+async fn single_statement_min_affected_rows_still_installs() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(&fixture("gate_legacy_single"))
+        .await
+        .expect("a one-statement legacy gate has no batch to be neutralized by");
+}

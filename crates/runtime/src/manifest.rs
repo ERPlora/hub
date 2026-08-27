@@ -1433,6 +1433,13 @@ pub struct CommandDef {
     ///   no casa (recurso inexistente o ya en el estado destino). `Some(0)` declararía
     ///   explícitamente un no-op idempotente permitido que igual emite.
     ///
+    /// **Solo sobre UNA sentencia** (hub#1091). Siendo un entero no tiene dónde nombrar la
+    /// sentencia que porta la guarda, así que sobre un lote queda neutralizable sin cura: una
+    /// sentencia incondicional hermana satisface el mínimo por la que falló y el caller recibe
+    /// `200 ok` con un evento de un hecho que no ocurrió. El installer rechaza el manifest que lo
+    /// declare con más de una `sql`; la guarda sobre una sentencia de un lote se declara con
+    /// [`ExpectRows::statement`].
+    ///
     /// Ver [`crate::commands`] para el gate y
     /// [`crate::errors::RuntimeError::MinAffectedRows`].
     #[serde(default)]

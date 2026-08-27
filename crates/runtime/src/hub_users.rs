@@ -1166,6 +1166,15 @@ async fn list_approvals(
            LEFT JOIN hub_user approver ON approver.id = a.approved_by \
           WHERE a.hub_id = :hub_id";
 
+    // hub#1173: the core's own list goes through the same vocabulary door as a module's. It is
+    // reachable from `/api/query` like any other, so leaving it out would fix the silence for the
+    // 73 module lists and keep it for the one the core serves. `:hub_id` is a bind of BASE_SQL,
+    // so it is vocabulary and a caller that echoes it is not refused — it just cannot win the
+    // insert below.
+    // `None`: la lista del core no declara JSON Schema — su vocabulario es el `spec` de arriba
+    // más los binds de `BASE_SQL`.
+    crate::queries::reject_undeclared_params("hub.approvals.list", BASE_SQL, &spec, None, params)?;
+
     // The caller's list params travel as-is; `hub_id` is inserted LAST so nothing in the payload
     // can override the tenant.
     let mut bound = params.clone();

@@ -5,6 +5,12 @@
 //!
 //!  * **Desactivar arrastra hacia abajo.** Apagar `taxes` apaga a quien no puede vivir sin él
 //!    (`inventory`, `sales`…). Los arrastrados caen como AUTO — quieren volver.
+//!
+//! ⚠️ **Este fichero se mide contra los módulos PUBLICADOS**, y su topología cambia: sales#25
+//! (v2.16.36, 27/08) sacó `inventory` de `depends_on` de `sales` —pasa a capacidad OPCIONAL, para
+//! que una peluquería de solo servicios no se lleve un almacén—, dejando `taxes` como única dura.
+//! Las aserciones de abajo son las de ESE contrato. Lo cazó el job de hub#1216 a las horas de
+//! publicarse; antes de él, un desajuste así no lo veía nadie automáticamente.
 //!  * **Reactivar devuelve SOLO lo que cayó en cascada.** Lo que el admin apagó A MANO se
 //!    respeta: fue su decisión.
 //!  * **Activar arrastra hacia arriba.** Encender `sales` enciende sus dependencias.
@@ -54,23 +60,25 @@ async fn desactivar_taxes_arrastra_a_sus_dependientes_activos() {
 async fn reactivar_devuelve_solo_lo_que_cayo_en_cascada() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let mut rt = hub_pos().await;
-    // ADR-0141: la cadena real es taxes → inventory → sales (dependencias FUNCIONALES: IVA y stock).
-    // `customers` ya no está en ella — el pedido no sabe de clientes.
-    // El admin apaga inventory A MANO (su decisión) → sales cae en cascada.
+    // sales#25 (2.16.36): `inventory` es capacidad OPCIONAL, no dependencia dura — una peluquería
+    // que solo vende servicios no puede llevarse un almacén que no quiere. La única dura es
+    // `taxes`: sin regla fiscal ninguna venta cierra. Así que apagar inventory NO toca a sales.
     rt.deactivate("inventory").await.unwrap();
-    assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto);
-    // Y luego apaga taxes.
+    assert_eq!(
+        status_of(&rt, "sales"),
+        ModuleStatus::Active,
+        "sales ya NO depende de inventory (capacidad opcional, sales#25): sigue vendiendo servicios"
+    );
+    // Lo que sí lo arrastra es taxes.
     rt.deactivate("taxes").await.unwrap();
+    assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto, "taxes sigue siendo dura");
 
-    // Reactivar taxes NO devuelve inventory (fue decisión del admin) ni sales (sin inventory).
+    // Reactivar taxes NO devuelve inventory (fue decisión del admin), pero sales sí vuelve: taxes
+    // era su única dependencia dura.
     rt.activate("taxes").await.unwrap();
     assert_eq!(status_of(&rt, "inventory"), ModuleStatus::Inactive, "lo apagado A MANO se respeta");
-    assert_eq!(status_of(&rt, "sales"), ModuleStatus::InactiveAuto, "sin inventory no puede volver");
+    assert_eq!(status_of(&rt, "sales"), ModuleStatus::Active, "su única dep dura volvió → vuelve");
     assert_eq!(status_of(&rt, "customers"), ModuleStatus::Active, "customers es ajeno a esta cadena");
-
-    // Al reactivar inventory, sales revive solo (barrido a punto fijo).
-    rt.activate("inventory").await.unwrap();
-    assert_eq!(status_of(&rt, "sales"), ModuleStatus::Active, "todas sus deps activas → vuelve solo");
 }
 
 #[tokio::test]
@@ -78,14 +86,19 @@ async fn activar_arrastra_hacia_arriba() {
     if !erplora_runtime::require_modules_workspace() { return; }
     let mut rt = hub_pos().await;
     rt.deactivate("inventory").await.unwrap();
-    rt.deactivate("taxes").await.unwrap(); // → sales caído; inventory manual
+    rt.deactivate("taxes").await.unwrap(); // → sales caído por taxes; inventory manual
 
-    // Encender sales enciende TODO lo que necesita, incluida la decisión manual sobre inventory:
-    // el admin acaba de pedir sales explícitamente, y sales no existe sin stock.
+    // Encender sales enciende lo que NECESITA — y desde sales#25 eso es `taxes`, no el catálogo.
+    // `inventory` se queda apagado: era decisión del admin y sales ya no lo exige.
     rt.activate("sales").await.unwrap();
-    for m in ["sales", "inventory", "taxes"] {
+    for m in ["sales", "taxes"] {
         assert_eq!(status_of(&rt, m), ModuleStatus::Active, "{m} debe encenderse con sales");
     }
+    assert_eq!(
+        status_of(&rt, "inventory"),
+        ModuleStatus::Inactive,
+        "inventory es OPCIONAL (sales#25): encender sales no revierte la decisión del admin"
+    );
 }
 
 #[tokio::test]
@@ -120,11 +133,12 @@ async fn modules_expone_depends_on_para_que_la_ui_avise_de_la_cascada() {
     // lista de módulos tiene que exponer las dependencias declaradas.
     let rt = hub_pos().await;
     let sales = rt.modules().into_iter().find(|m| m.id == "sales").unwrap();
-    for dep in ["inventory", "taxes"] {
-        assert!(sales.depends_on.iter().any(|d| d == dep), "sales debe declarar {dep}");
-    }
-    // ADR-0141: y NO debe declarar los satélites — la asociación la owna el satélite, no el pedido.
-    for no_dep in ["customers", "tables"] {
+    assert!(sales.depends_on.iter().any(|d| d == "taxes"), "sales debe declarar taxes");
+    // ADR-0141: NO declara los satélites — la asociación la owna el satélite, no el pedido.
+    // Y desde sales#25 tampoco `inventory`: es capacidad OPCIONAL, leída con `required: false`,
+    // así que no puede aparecer aquí — si apareciera, la cascada volvería a arrastrar un almacén
+    // a quien solo vende servicios.
+    for no_dep in ["customers", "tables", "inventory"] {
         assert!(!sales.depends_on.iter().any(|d| d == no_dep), "sales no debe declarar {no_dep}");
     }
 }
