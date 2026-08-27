@@ -1507,6 +1507,39 @@ export async function bootHubContext(): Promise<HubContext | null> {
   }
 }
 
+/**
+ * Vuelve a preguntar al runtime la zona horaria RESUELTA del negocio y la republica (hub#1154).
+ *
+ * Hace falta porque el ajuste que se guarda NO es el que se usa: `hub_settings.timezone` puede ser
+ * `null` («dedúcela del país»), y quien sabe deducirla —y quien conoce la tabla de husos— es el
+ * runtime, no el navegador. Duplicar aquí esa deducción crearía una segunda autoridad sobre el
+ * reloj del negocio, que es justo lo que `schedules` acaba de retirar por haberse desincronizado.
+ * Así que tras guardar se pregunta, no se calcula.
+ *
+ * Es deliberadamente MÁS ESTRECHO que `bootHubContext`: lee el mismo documento pero solo toca la
+ * zona. Reusar el boot entero desde una pantalla de ajustes re-sembraría la cache de settings, el
+ * idioma y la URL de Cloud como efecto colateral de cambiar una lista desplegable.
+ *
+ * Best-effort por contrato: si el runtime no contesta se queda la zona publicada anterior y se
+ * devuelve `null`. Lo que NO hace es publicar un valor inventado — un reloj que miente con
+ * confianza es peor que uno que se ha quedado atrás.
+ */
+export async function refreshHubTimezone(): Promise<string | null> {
+  try {
+    const res = await fetch(`${RUNTIME_URL}/api/hub/context`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return null;
+    const ctx = (await res.json()) as HubContext;
+    const zone = typeof ctx.timezone === 'string' && ctx.timezone.trim() ? ctx.timezone.trim() : null;
+    if (!zone) return null;
+    publishHubTimezone(zone);
+    return zone;
+  } catch {
+    return null;
+  }
+}
+
 // ── Reset del hub (volver a cero, ADR-0170 — architecture/hub/export-import.md §8) ────────────
 // El espejo DESTRUCTIVO del export. Dos pasos deliberados: `plan` (dry-run) enumera qué hay y qué
 // está bloqueado; `reset` borra. La UI nunca inventa cifras: las saca del plan. Solo owner/admin
