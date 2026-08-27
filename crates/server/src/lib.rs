@@ -49,7 +49,6 @@ pub mod devices;
 pub mod elevation;
 pub mod embed;
 pub mod entitlement;
-pub mod whatsapp_quota;
 pub mod error_sink;
 /// **Server-side agent runner** (ADR-0283 K5, hub#665): the tool loop of an `ai` step, in Rust and
 /// outside the runtime's global lock. It lives here and not in the runtime because it needs
@@ -1092,27 +1091,6 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let (outcome, heartbeat_result) =
                     tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
-                // La cuota del canal de WhatsApp se refleja en el medidor del módulo (hub#1089).
-                // Se lee EN VIVO de `whatsapp/plan/` con esta MISMA credencial de máquina, no de
-                // un claim del token: ese endpoint devuelve tier + consumo, y el consumo es un
-                // contador que se mueve con cada mensaje. Si el Cloud no contesta no se escribe
-                // nada — el medidor conserva lo que ya medía, porque en este canal `0` significa
-                // «sin tope» y un fallo de red no es un plan. Un hub sin el módulo ni pregunta.
-                match whatsapp_quota::sync_once(
-                    &st.runtime,
-                    &st.http,
-                    &st.config.cloud_base_url,
-                    &auth,
-                )
-                .await
-                {
-                    whatsapp_quota::QuotaSync::Written(limit) => {
-                        tracing::debug!(monthly_limit = limit, "cuota de WhatsApp al día")
-                    }
-                    // Los demás casos ya se han contado donde tocaba (o son el no-op esperado
-                    // en la flota que no compró el canal): aquí no se repite el ruido.
-                    other => tracing::trace!(?other, "sincronización de cuota de WhatsApp"),
-                }
                 match heartbeat_result {
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
@@ -1343,10 +1321,6 @@ pub fn app(state: AppState) -> Router {
     let activity_state = state.activity.clone();
     Router::new()
         .route("/healthz", get(healthz))
-        // Un hub no se indexa (ver `with_noindex`). Va en el router de API, ANTES del
-        // fallback SPA: sin esta ruta, `/robots.txt` devolvía `index.html` con un 200, que
-        // un rastreador lee como «este sitio no tiene reglas».
-        .route("/robots.txt", get(robots_txt))
         // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
         // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
         // segundo, que es el que Swarm mira para decidir si revierte.
@@ -1537,13 +1511,6 @@ pub fn app(state: AppState) -> Router {
             "/api/print/jobs",
             get(print::list_jobs).post(print::enqueue_job),
         )
-        // Sacar del atasco UN trabajo (hub#1108): devolverlo a la cola o retirarlo. Sesión
-        // **admin** (+ capability `printer` si quien llama es un módulo): leer la cola es
-        // cualquier sesión —quien está al lado de la impresora—, pero tirar un tique a la basura o
-        // volver a lanzarlo es el gesto del dueño, con el precedente del CRUD de estaciones.
-        // Descartar NUNCA borra: la fila queda sellada con quién, cuándo y por qué.
-        .route("/api/print/jobs/:job_id/retry", post(print::retry_job))
-        .route("/api/print/jobs/:job_id/discard", post(print::discard_job))
         // ── Registro de HOSTS de impresión (ADR-0196 §6, hub#342) ────────────────────────────
         // Quién drena cada rol. Un dispositivo se registra/late/se retira A SÍ MISMO (el sujeto es
         // su `X-Device-Id`, no hay parámetro para nombrar otro) → basta sesión de usuario: la app
@@ -1944,45 +1911,6 @@ pub fn with_static_frontend(router: Router, web_dir: &str) -> Router {
     router.fallback_service(ServeDir::new(web_dir).fallback(ServeFile::new(index)))
 }
 
-/// `X-Robots-Tag: noindex` en TODAS las respuestas del hub + `/robots.txt`.
-///
-/// Un hub es la caja de un cliente: **nunca** se indexa. No es una preferencia de SEO —
-/// `{slug}.erplora.com` dice quién es el cliente, la portada dice qué módulos tiene instalados, y
-/// detrás hay un login de un TPV real. Y no hay nada que ganar en el otro platillo: ninguna página
-/// de un hub es un resultado de búsqueda que queramos.
-///
-/// Dos capas porque tapan agujeros distintos: el `robots.txt` es para el rastreador que pregunta,
-/// y la cabecera para el que no —y para la URL que un `robots.txt` no sabe describir, como un
-/// enlace profundo que alguien pegó en una issue pública—. `noarchive` va porque una copia
-/// cacheada de una pantalla de caja no debe sobrevivir a la pantalla.
-///
-/// La tercera capa vive en `apps/web/index.html` (meta `robots`), que es la copia del documento
-/// que esta capa NO cubre: la que va empaquetada dentro de la app instalada. Contrato completo en
-/// `crates/server/tests/never_indexed.rs`.
-const ROBOTS_TAG: &str = "noindex, nofollow, noarchive";
-
-/// Cuerpo del `robots.txt` de un hub: sin `Allow`, sin `Sitemap`, sin excepciones.
-const HUB_ROBOTS_TXT: &str = "User-agent: *\nDisallow: /\n";
-
-async fn robots_txt() -> impl axum::response::IntoResponse {
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            "text/plain; charset=utf-8",
-        )],
-        HUB_ROBOTS_TXT,
-    )
-}
-
-/// Añade la cabecera a lo que salga del router — incluidos los 404 y el fallback SPA, que son
-/// justo las respuestas que una capa montada «por ruta» se dejaría fuera.
-pub fn with_noindex(router: Router) -> Router {
-    router.layer(tower_http::set_header::SetResponseHeaderLayer::overriding(
-        axum::http::HeaderName::from_static("x-robots-tag"),
-        HeaderValue::from_static(ROBOTS_TAG),
-    ))
-}
-
 /// Añade el header `Content-Security-Policy` a TODAS las respuestas (ADR-0050). La CSP de
 /// `tauri.conf` **no** aplica a este documento —solo la inyecta el protocolo de assets de Tauri, y
 /// la ventana de la app instalada navega a ESTE servidor (ADR-0159)—, así que el runtime es el
@@ -2012,7 +1940,7 @@ pub fn with_csp(router: Router, csp: &str) -> Router {
 /// la composición REAL sin bindear un puerto. Que la cabecera no dependa de una rama `if let` es el
 /// contrato que fija `crates/server/tests/cloud_csp.rs`.
 pub fn build_serving_router(state: AppState, web_dir: Option<&str>, csp: &str) -> Router {
-    with_noindex(with_csp(build_router(state, web_dir), csp))
+    with_csp(build_router(state, web_dir), csp)
 }
 
 /// Compone el router de API (`app`) con, opcionalmente, el frontend estático servido en el **MISMO
@@ -2782,21 +2710,6 @@ async fn cloud_get_raw(
     headers: &HeaderMap,
     req: cloud_client::PreparedRequest,
 ) -> Result<(StatusCode, axum::body::Bytes), CloudGetError> {
-    cloud_get_raw_full(st, headers, req)
-        .await
-        .map(|(status, _retry_after, body)| (status, body))
-}
-
-/// Como [`cloud_get_raw`] pero devolviendo además el `Retry-After` en segundos cuando el Cloud lo
-/// manda (hub#1167). Sólo lo necesita quien tiene que **dejar de llamar**: DRF pone esa cabecera
-/// en sus 429 y es el único que sabe cuánto le queda a la ventana de la hora — en producción se
-/// han visto 2828 s. Estimarla es peor que leerla, y seguir llamando durante ese rato mantiene
-/// vacío un cubo de tokens que comparte toda la flota (saas#1640).
-async fn cloud_get_raw_full(
-    st: &AppState,
-    headers: &HeaderMap,
-    req: cloud_client::PreparedRequest,
-) -> Result<(StatusCode, Option<i64>, axum::body::Bytes), CloudGetError> {
     let Some(auth) = auth::hub_scoped_auth(headers, st) else {
         return Err(CloudGetError::NoCredential);
     };
@@ -2812,19 +2725,11 @@ async fn cloud_get_raw_full(
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
     let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
-    // `Retry-After` admite segundos o una fecha HTTP; DRF manda siempre segundos. Una fecha o un
-    // valor ilegible se ignoran (=> `None`) y el llamador aplica su default acotado: preferimos
-    // una ventana nuestra a una interpretación inventada de la ajena.
-    let retry_after = resp
-        .headers()
-        .get(axum::http::header::RETRY_AFTER)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.trim().parse::<i64>().ok());
     let body = resp
         .bytes()
         .await
         .map_err(|e| CloudGetError::Network(e.to_string()))?;
-    Ok((status, retry_after, body))
+    Ok((status, body))
 }
 
 /// Respuesta HTTP para un [`CloudGetError`] (contrato previo de `proxy_cloud_get`, sin cambios).
@@ -2942,52 +2847,12 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
         .map(|g| g.revalidation_json(&installed, entitlement::now_unix()))
         .unwrap_or(Value::Null);
 
-    let now = entitlement::now_unix();
-
-    // ¿Hace falta salir a la red? El shell pregunta una vez por `focus` de ventana y otra por cada
-    // vista de módulo que monta; sin este corte cada una de esas veces era una llamada al SaaS.
-    let decision = st
-        .entitlement_proxy
-        .read()
-        .map(|cache| cache.decide(now))
-        .unwrap_or(entitlement::Decision::Ask);
-    match decision {
-        entitlement::Decision::Serve(body) => {
-            return entitlement_response(StatusCode::OK, body, revalidation)
-        }
-        entitlement::Decision::RateLimited => return rate_limited_response(revalidation),
-        entitlement::Decision::Ask => {}
-    }
-
-    match cloud_get_raw_full(&st, &headers, cloud.entitlement(&placeholder)).await {
-        // El SaaS nos está limitando la tasa. Ni el status ni su prosa pueden llegar al navegador:
-        // el shell lee el error como «no hay módulos» y degrada pantallas de módulos ya comprados,
-        // y el `{"detail":"Request was throttled…"}` de DRF es inglés dentro de una UI en español.
-        Ok((StatusCode::TOO_MANY_REQUESTS, retry_after, _body)) => {
-            let served = match st.entitlement_proxy.write() {
-                Ok(mut cache) => {
-                    cache.open_backoff(retry_after, now);
-                    cache.last_good().cloned()
-                }
-                Err(_) => None,
-            };
-            report_cloud_rate_limited(retry_after, served.is_some());
-            match served {
-                Some(body) => entitlement_response(StatusCode::OK, body, revalidation),
-                None => rate_limited_response(revalidation),
-            }
-        }
-        Ok((status, _retry_after, body)) => match serde_json::from_slice::<Value>(&body) {
+    match cloud_get_raw(&st, &headers, cloud.entitlement(&placeholder)).await {
+        Ok((status, body)) => match serde_json::from_slice::<Value>(&body) {
             // Body objeto JSON → se le inyecta la clave aditiva.
-            Ok(Value::Object(obj)) => {
-                // Sólo se guarda lo que el Cloud dio por bueno: cachear un 4xx/5xx lo convertiría
-                // en la verdad del hub durante toda la ventana de frescura.
-                if status.is_success() {
-                    if let Ok(mut cache) = st.entitlement_proxy.write() {
-                        cache.store_success(Value::Object(obj.clone()), now);
-                    }
-                }
-                entitlement_response(status, Value::Object(obj), revalidation)
+            Ok(Value::Object(mut obj)) => {
+                obj.insert("revalidation".into(), revalidation);
+                (status, Json(Value::Object(obj))).into_response()
             }
             // Body no-objeto (raro: HTML de error, vacío) → tal cual, como antes.
             _ => (
@@ -3004,64 +2869,6 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
             .into_response(),
         Err(e) => cloud_get_error_response(e),
     }
-}
-
-/// Respuesta del proxy de entitlement: el cuerpo del Cloud con el bloque aditivo `revalidation`,
-/// que SIEMPRE se recalcula (es estado local, y es justo lo que la UI necesita cuando el Cloud no
-/// contesta) y por eso nunca se guarda en la caché.
-fn entitlement_response(status: StatusCode, body: Value, revalidation: Value) -> Response {
-    match body {
-        Value::Object(mut obj) => {
-            obj.insert("revalidation".into(), revalidation);
-            (status, Json(Value::Object(obj))).into_response()
-        }
-        other => (status, Json(other)).into_response(),
-    }
-}
-
-/// El único caso en que el rate-limit del Cloud se le cuenta al shell: no había ningún entitlement
-/// bueno que servir. Viaja con **código estable** en el envelope de siempre
-/// (`{"ok":false,"error":{"code":…}}`) para que la UI lo traduzca por código (ADR-0055) en vez de
-/// pintar la frase inglesa que escribió DRF.
-fn rate_limited_response(revalidation: Value) -> Response {
-    (
-        StatusCode::TOO_MANY_REQUESTS,
-        Json(json!({
-            "ok": false,
-            "error": {
-                "code": entitlement::CLOUD_RATE_LIMITED,
-                "message": "the Cloud is rate-limiting this hub; the entitlement could not be refreshed",
-            },
-            "revalidation": revalidation,
-        })),
-    )
-        .into_response()
-}
-
-/// Deja el rate-limit VISIBLE. Un límite que falla en silencio es peor que uno que grita: sin esto
-/// la única huella era una línea roja en la consola del navegador del cajero, que nadie recoge.
-/// Va al log del runtime **y** al registro de errores, que es el canal que llega al Cloud.
-fn report_cloud_rate_limited(retry_after: Option<i64>, served_from_cache: bool) {
-    use erplora_runtime::error_registry::{ErrorEvent, ErrorRegistry};
-
-    tracing::warn!(
-        retry_after_secs = retry_after.unwrap_or(-1),
-        served_from_cache,
-        "el Cloud limita la tasa del entitlement (saas#1640)"
-    );
-    ErrorRegistry::global().report(
-        ErrorEvent::new(
-            erplora_runtime::error_registry::source::HUB,
-            entitlement::CLOUD_RATE_LIMITED,
-            "el Cloud respondió 429 al refrescar el entitlement",
-            erplora_runtime::error_registry::severity::UNEXPECTED,
-        )
-        .with_context(json!({
-            "retry_after_secs": retry_after,
-            // `cache` = el cajero no se enteró; `none` = se le contó el fallo, que es lo grave.
-            "outcome": if served_from_cache { "cache" } else { "none" },
-        })),
-    );
 }
 
 /// GET /api/marketplace/catalog — the real marketplace catalogue.
@@ -3645,12 +3452,6 @@ pub(crate) fn err_status_and_code(
         E::MissingRequiredParam { .. } => {
             (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
         }
-        // hub#1173: the twin of the above at the same door — a param the LIST query does not
-        // declare. Same `422` (it is a payload-contract refusal, caught before any read) with its
-        // own stable code, so the caller can tell "that query has no such filter" from "you did
-        // not send what it needs" — and fix the call instead of trusting a page that quietly held
-        // the whole list.
-        E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.

@@ -140,18 +140,3 @@ test('hub#1070/#1185: `invalid_field` pasa intacto — su `detail` dice más de 
   // Y el motivo es DATO, no prosa: quien quiera traducirlo ramifica sobre `reason`.
   assert.equal(platformFailureMessage({ code: 'invalid_field', field: 'role_key', reason: 'immutable' }, 'es'), null);
 });
-
-test('hub#1102: a required read that failed is NOT told as «the app is missing» — the runtime does not know why it failed', () => {
-  // `ReadUnavailable` is raised for ANY failure of a `required` read (commands.rs, rule 4): the
-  // owning app not installed, but also broken SQL, a missing table or a database that timed out.
-  // Telling the cashier «install taxes» when taxes IS installed sends the owner after the wrong
-  // remedy, so the sentence names the app whose data did not arrive and leaves the cause open.
-  const unavailable = platformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es');
-  const missing = platformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es');
-  assert.ok(unavailable);
-  assert.notEqual(unavailable, missing, 'a read that failed is not the same fact as an app that is missing');
-  assert.match(unavailable!, /taxes/, 'it still names the app whose data did not arrive');
-  assert.doesNotMatch(unavailable!, /^Falta la app/, 'it must not assert a cause the runtime did not establish');
-  const en = platformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'en');
-  assert.ok(en && en !== unavailable, 'en source + es translation (ADR-0055)');
-});
