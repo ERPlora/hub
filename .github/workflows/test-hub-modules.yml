@@ -167,6 +167,13 @@ jobs:
       # llega como cadena VACÍA, no como error — el mismo modo de fallo que dejó
       # `CI_RUNNER_LABEL` vacía y mandó jobs a `ubuntu-latest` en verde. Por eso se
       # comprueba explícitamente antes de usarlo.
+      #
+      # El clonado en sí NO vive aquí: lo hace `scripts/materialize-published-modules.sh`,
+      # el MISMO script que el gate local invoca desde `.githooks/pre-push` (hub#1153). Antes
+      # el bucle de clonado, el suelo de ≥25 y el fallo ruidoso estaban escritos dentro de
+      # este `run:`, así que el gate local no tenía forma de reutilizarlos y medía contra el
+      # checkout aparcado de `modules-workspace`. Una sola copia: la deriva entre copias de
+      # la misma lógica ya tumbó `main` una vez con la config de Postgres (hub#647).
       - name: Traer el catálogo de módulos por su estado PUBLICADO (main)
         env:
           MODULES_DEPLOY_KEYS: ${{ secrets.MODULES_DEPLOY_KEYS }}
@@ -180,18 +187,20 @@ jobs:
             exit 1
           fi
 
-          KEYS="$HOME/.erplora-module-keys"
-          mkdir -p "$KEYS" && chmod 700 "$KEYS"
-          printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
-          chmod 600 "$KEYS"/*
-
           # La lista de módulos SALE DEL PROPIO PAQUETE DE CLAVES, no de una lista escrita aquí:
           # cada módulo necesita su deploy key de todas formas, así que el paquete es la única
           # fuente que no puede quedarse corta. Una lista a mano sí: la primera versión traía 13 de
           # los 27 y `module_manifest_contract` lo cazó — pero solo porque exige un MÍNIMO (≥20).
           # Un módulo nuevo que faltase sin bajar de ese umbral no se habría probado, en silencio.
-          MODS=$(cd "$KEYS" && ls)
-          echo "módulos en el paquete de claves: $(printf '%s\n' "$MODS" | wc -l | tr -d ' ')"
+          # Quien lee el paquete es el script; aquí solo se desempaqueta.
+          KEYS="$HOME/.erplora-module-keys"
+          rm -rf "$KEYS"
+          mkdir -p "$KEYS" && chmod 700 "$KEYS"
+          printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
+          chmod 600 "$KEYS"/*
+
+          mkdir -p ~/.ssh
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
           # 🔴 En `$RUNNER_TEMP`, que se vacía en cada job — NUNCA junto al checkout.
           #
@@ -206,46 +215,28 @@ jobs:
           #      y eso es carísimo de diagnosticar.
           DEST="$RUNNER_TEMP/modules-workspace/modules"
           rm -rf "$DEST"
-          mkdir -p "$DEST"
 
           # Y se limpia lo YA filtrado por la versión anterior en este runner, que si no se queda
           # ahí envenenando a `test-hub.yml` para siempre.
           rm -rf "$GITHUB_WORKSPACE/../modules-workspace"
 
-          mkdir -p ~/.ssh
-          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-
-          for m in $MODS; do
-            # Cada módulo tiene SU clave: una deploy key sirve para un solo repo, así que
-            # el permiso es el mínimo (lectura de ese repo y nada más).
-            GIT_SSH_COMMAND="ssh -i $KEYS/$m -o IdentitiesOnly=yes -o BatchMode=yes" \
-              git clone --depth 1 --branch main --quiet \
-              "git@github.com:ERPlora/$m.git" "$DEST/$m"
-            printf '  %-16s %s\n' "$m" "$(python3 -c "import json;print(json.load(open('$DEST/$m/module.json'))['version'])")"
-          done
-
-          # El `dist/` va COMMITEADO en cada repo de módulo, así que no hay nada que
-          # compilar aquí — lo que se prueba es exactamente lo que se publica.
-          missing=0
-          for m in $MODS; do
-            [ -f "$DEST/$m/module.json" ] || { echo "::error::falta $m/module.json"; missing=1; }
-          done
-          [ "$missing" -eq 0 ] || exit 1
-
-          # El catálogo publicado son ~27 módulos. `module_manifest_contract` exige ≥20, así que
-          # por sí solo NO caza que falten unos pocos: la primera versión de este job clonaba 13 y
-          # habría pasado de haber sido 21. Este suelo es el que convierte «faltan módulos» en un
-          # fallo del job y no en una cobertura silenciosamente recortada.
-          n=$(find "$DEST" -mindepth 2 -maxdepth 2 -name module.json | wc -l | tr -d ' ')
-          echo "módulos clonados con manifiesto: $n"
-          if [ "$n" -lt 25 ]; then
-            echo "::error::solo $n módulos con module.json (esperados ~27). Si se publicó un módulo"
-            echo "nuevo, hay que añadir su deploy key al paquete MODULES_DEPLOY_KEYS (hub#1216)."
+          # El `dist/` va COMMITEADO en cada repo de módulo, así que no hay nada que compilar —
+          # lo que se prueba es exactamente lo que se publica. El suelo de ≥25 manifests y el
+          # fallo ruidoso por módulo inalcanzable los aplica el script (`--floor 25`): el catálogo
+          # publicado son ~27 módulos y `module_manifest_contract` exige ≥20, así que por sí solo
+          # NO caza que falten unos pocos.
+          # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
+          # Actions, y el script también lo corre el gate local, donde solo sería ruido.
+          if ! RESOLVED=$(bash scripts/materialize-published-modules.sh \
+              --dest "$DEST" --keys "$KEYS" --floor 25); then
+            echo "::error::no se pudo materializar el catálogo PUBLICADO (el detalle, arriba en"
+            echo "este mismo paso). Si se publicó un módulo nuevo, hay que añadir su deploy key"
+            echo "al paquete MODULES_DEPLOY_KEYS (hub#1216)."
             exit 1
           fi
 
           rm -rf "$KEYS"
-          echo "ERPLORA_MODULES_DIR=$(cd "$DEST" && pwd)" >> "$GITHUB_ENV"
+          echo "ERPLORA_MODULES_DIR=$RESOLVED" >> "$GITHUB_ENV"
 
       - name: Raise Postgres lock limits (hub#526) + export dynamic port (hub#898)
         run: |
