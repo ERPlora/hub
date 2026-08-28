@@ -399,6 +399,77 @@
             />
           </ion-card-content>
         </ion-card>
+
+        <!-- Declaración responsable DENTRO del producto (art. 13.2 RRSIF — hub#528): la norma
+             exige que conste «de modo visible en el propio sistema informático en cada una de sus
+             versiones». La mitad pública (el archivo de erplora.com, que se entrega al cliente y al
+             comercializador al comprar) ya existía; esta es la que enseña el negocio desde SU TPV
+             cuando se la piden. Va la última de esta pestaña, detrás de la identidad fiscal, el
+             certificado y el otorgamiento: son las cuatro cosas que mira una inspección, y esta es
+             la única que no se rellena — solo se lee.
+             Los datos salen de `GET /api/system/declaration`, que proyecta el MISMO bloque
+             `SistemaInformatico` que viaja en cada registro. Nunca constantes: una pantalla con la
+             identidad copiada a mano se ve igual que esta hasta el día en que divergen, y entonces
+             el TPV certifica una cosa y Hacienda recibe otra. -->
+        <ion-card class="mt-3 responsible-declaration">
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.declarationTitle') }}</h2>
+              <p>{{ t('settings.declarationDesc') }}</p>
+            </ion-label>
+
+            <p v-if="declarationError" class="responsible-declaration-error mt-2">
+              {{ t('settings.declarationError') }}
+            </p>
+
+            <template v-else-if="declaration">
+              <a
+                class="responsible-declaration-link mt-2"
+                :href="declaration.declarationUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ t('settings.declarationRead') }}
+              </a>
+
+              <h3 class="text-base font-semibold mt-4 mb-1">
+                {{ t('settings.declarationDataTitle') }}
+              </h3>
+              <!-- Sin los hechos del fabricante no hay bloque que enseñar, y no se rellena el
+                   hueco: el motor fiscal tampoco construye el sobre en ese estado. Lo que este hub
+                   sabe de sí mismo (versión e instalación) sí se sigue viendo. -->
+              <p
+                v-if="!declaration.sistemaInformatico"
+                class="responsible-declaration-pending mt-1"
+              >
+                {{ t('settings.declarationPending') }}
+              </p>
+              <ion-list lines="none">
+                <ion-item
+                  v-for="row in declarationRows"
+                  :key="row.field"
+                  class="responsible-declaration-field"
+                >
+                  <!-- Etiqueta → VALOR → nombre del elemento, apilados y a una columna. El valor
+                       NO va en `slot="end"`: el más largo es un UUID de 36 caracteres y a 390 px se
+                       montaba encima del nombre del elemento, que también parte. Apilado se lee
+                       igual en las tres anchuras y el dato que se enseña queda entero. -->
+                  <ion-label>
+                    <h2>{{ row.label }}</h2>
+                    <p class="responsible-declaration-value">{{ row.value }}</p>
+                    <!-- El nombre LITERAL del elemento del registro de facturación: es por el que
+                         pregunta una inspección, y no se traduce. -->
+                    <p class="responsible-declaration-element">{{ row.field }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-list>
+            </template>
+
+            <div v-else class="flex justify-center py-4">
+              <ion-spinner name="dots" />
+            </div>
+          </ion-card-content>
+        </ion-card>
       </template>
 
       <!-- ── Tab: Tickets ── -->
@@ -561,6 +632,14 @@ import { isTauri } from '../lib/device';
 // hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
 // dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
 import { receiptTemplateTarget } from '../lib/receipt-template';
+// hub#528 (art. 13.2 RRSIF): la declaración responsable de la versión instalada, leída del
+// runtime — que proyecta el mismo bloque `SistemaInformatico` que viaja en cada registro.
+import {
+  DECLARATION_FIELDS,
+  fetchResponsibleDeclaration,
+  type DeclarationField,
+  type SystemDeclaration,
+} from '../lib/responsible-declaration';
 import { moduleNav } from '../lib/nav';
 import { useI18n } from 'vue-i18n';
 import {
@@ -1080,6 +1159,65 @@ async function removeCert(): Promise<void> {
   }
 }
 
+// ── Declaración responsable (hub#528, art. 13.2 RRSIF) ──────────────────────────────────────
+// Se lee al entrar en la pestaña Negocio, como la cobertura de impresión entra en Tickets: los
+// hechos del fabricante llegan por el latido y pueden no estar todavía en un hub recién arrancado,
+// así que una lectura latida para siempre enseñaría «faltan datos» cuando ya han llegado.
+const declaration = ref<SystemDeclaration | null>(null);
+const declarationError = ref<boolean>(false);
+
+/** Etiqueta legible de cada elemento; el nombre del elemento se pinta al lado, sin traducir. */
+const DECLARATION_LABELS = computed<Record<DeclarationField, string>>(() => ({
+  NombreRazon: t('settings.declarationNombreRazon'),
+  NIF: t('settings.declarationNIF'),
+  NombreSistemaInformatico: t('settings.declarationNombreSistemaInformatico'),
+  IdSistemaInformatico: t('settings.declarationIdSistemaInformatico'),
+  Version: t('settings.declarationVersion'),
+  NumeroInstalacion: t('settings.declarationNumeroInstalacion'),
+  TipoUsoPosibleSoloVerifactu: t('settings.declarationTipoUsoPosibleSoloVerifactu'),
+  TipoUsoPosibleMultiOT: t('settings.declarationTipoUsoPosibleMultiOT'),
+  IndicadorMultiplesOT: t('settings.declarationIndicadorMultiplesOT'),
+}));
+
+/**
+ * Las filas que se pintan, en el orden del XSD para poder leerse al lado de un registro. Sin el
+ * bloque del fabricante quedan las dos que este hub declara por sí mismo (versión e instalación):
+ * son suyas y son ciertas, y esconderlas convertiría un dato que falta en una pantalla vacía.
+ */
+const declarationRows = computed(() => {
+  const current = declaration.value;
+  if (!current) return [];
+  const block: Partial<Record<DeclarationField, string>> = current.sistemaInformatico ?? {
+    Version: current.version,
+    NumeroInstalacion: current.numeroInstalacion,
+  };
+  return DECLARATION_FIELDS.filter((field) => !!block[field]).map((field) => ({
+    field,
+    label: DECLARATION_LABELS.value[field],
+    value: block[field] as string,
+  }));
+});
+
+async function loadResponsibleDeclaration(): Promise<void> {
+  try {
+    declaration.value = await fetchResponsibleDeclaration();
+    declarationError.value = false;
+  } catch {
+    // «No se ha podido cargar» es su propio estado: nunca una tarjeta vacía que se lea como «este
+    // sistema no declara nada» justo en la pantalla que se le enseña a una inspección (hub#375).
+    declaration.value = null;
+    declarationError.value = true;
+  }
+}
+
+watch(
+  tab,
+  (current) => {
+    if (current === 'tax') void loadResponsibleDeclaration();
+  },
+  { immediate: true },
+);
+
 // ── Print coverage (hub#800): the read model of `GET /api/print/hosts` for the Receipts tab ──
 // Reloaded EVERY time the tab is entered, not latched like the permissions below: whether the
 // kitchen's host is alive is exactly the kind of fact that changes while the app stays open, and a
@@ -1207,5 +1345,37 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+
+/* Declaración responsable (hub#528). El dato es lo que se lee, así que destaca sobre la etiqueta y
+   sobre el nombre del elemento; se cualifica con `ion-label` porque Ionic pinta los `p` de una
+   etiqueta en gris de segundo plano y aquí la jerarquía es la contraria. Parte donde haga falta:
+   el valor más largo es el `NumeroInstalacion`, un UUID de 36 caracteres, y el dato que se le
+   enseña a una inspección tiene que leerse ENTERO en el móvil del mostrador. */
+ion-label p.responsible-declaration-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--ion-text-color);
+  font-weight: 600;
+}
+
+/* Enlace al texto firmado: se lee como enlace (es lo que es), no como botón mudo. */
+.responsible-declaration-link {
+  display: inline-block;
+  color: var(--ion-color-primary);
+  text-decoration: underline;
+}
+
+/* Los dos estados que NO son la tarjeta llena. Ninguno se pinta en verde: una lectura fallida y
+   unos datos que aún no han llegado son cosas distintas, y las dos se dicen. */
+.responsible-declaration-pending,
+.responsible-declaration-error {
+  color: var(--ion-color-medium-shade);
+}
+
+/* El nombre literal del elemento del registro (`IdSistemaInformatico`…): se lee como dato
+   técnico, en monoespaciada, para poder cotejarlo carácter a carácter con un XML. */
+.responsible-declaration-element {
+  font-family: var(--ion-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
 </style>

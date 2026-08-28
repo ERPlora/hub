@@ -606,6 +606,26 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+    // Declaración responsable dentro del producto (art. 13.2 RRSIF — hub#528). Los nombres de los
+    // elementos (`NombreRazon`, `IdSistemaInformatico`…) NO se traducen: son los del registro de
+    // facturación y la pantalla existe para poder leerse al lado de uno.
+    declarationTitle: 'Declaración responsable',
+    declarationDesc:
+      'La declaración que ERPlora firma para la versión del sistema que ejecuta este hub, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
+    declarationRead: 'Leer la declaración firmada',
+    declarationDataTitle: 'Datos identificativos de este sistema',
+    declarationPending:
+      'Este hub todavía no ha recibido los datos identificativos de ERPlora. Llegan solos al minuto de estar en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
+    declarationError: 'No se ha podido cargar la declaración responsable.',
+    declarationNombreRazon: 'Productor',
+    declarationNIF: 'NIF del productor',
+    declarationNombreSistemaInformatico: 'Nombre del sistema',
+    declarationIdSistemaInformatico: 'Código del sistema',
+    declarationVersion: 'Versión instalada',
+    declarationNumeroInstalacion: 'Número de instalación',
+    declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
+    declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
+    declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
   print: {

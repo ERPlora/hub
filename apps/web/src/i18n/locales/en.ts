@@ -646,6 +646,26 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+    // Declaración responsable dentro del producto (art. 13.2 RRSIF — hub#528). Los nombres de los
+    // elementos (`NombreRazon`, `IdSistemaInformatico`…) NO se traducen: son los del registro de
+    // facturación y la pantalla existe para poder leerse al lado de uno.
+    declarationTitle: 'Responsible declaration',
+    declarationDesc:
+      'The declaration ERPlora signs for the version of the system this hub is running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
+    declarationRead: 'Read the signed declaration',
+    declarationDataTitle: 'Identifying data of this system',
+    declarationPending:
+      'This hub has not received ERPlora’s identifying data yet. It arrives on its own within a minute of the hub coming online; until then no invoice can be sent to the tax agency.',
+    declarationError: 'Could not load the responsible declaration.',
+    declarationNombreRazon: 'Producer',
+    declarationNIF: 'Producer tax id',
+    declarationNombreSistemaInformatico: 'System name',
+    declarationIdSistemaInformatico: 'System code',
+    declarationVersion: 'Installed version',
+    declarationNumeroInstalacion: 'Installation number',
+    declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
+    declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
+    declarationIndicadorMultiplesOT: 'Serving several taxpayers',
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
   // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the

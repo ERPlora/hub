@@ -1364,6 +1364,14 @@ pub fn app(state: AppState) -> Router {
             "/api/system/update-history",
             get(system::update_history),
         )
+        // La declaración responsable de ESTA versión, dentro del producto (art. 13.2 RRSIF —
+        // hub#528). Proyecta el mismo bloque `SistemaInformatico` que viaja en cada registro:
+        // los hechos del productor que sirve el plano de control + la `Version` de este binario
+        // + el `hub_id` como `NumeroInstalacion`. Nunca constantes.
+        .route(
+            "/api/system/declaration",
+            get(settings::get_responsible_declaration),
+        )
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(
