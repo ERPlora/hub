@@ -1434,7 +1434,19 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/fiscal/representation-grant",
             get(representation_grant::get_representation_grant)
-                .post(representation_grant::post_representation_grant),
+                .post(representation_grant::post_representation_grant)
+                // 🔴 El límite por defecto de axum son 2 MB y aquí viajan hasta CUATRO documentos
+                // escaneados (hub#1293): sin esto, el rechazo lo da el framework antes de llegar a
+                // `validate` y la pantalla no tiene ningún código que enseñar.
+                .layer(axum::extract::DefaultBodyLimit::max(
+                    representation_grant::MAX_UPLOAD_BYTES,
+                )),
+        )
+        // El modelo oficial pre-relleno, para imprimir y firmar a mano o firmar con AutoFirma
+        // (hub#1293). Proxy puro hacia el SaaS, que es donde vive el texto: admin, como la subida.
+        .route(
+            "/api/fiscal/representation-grant/model",
+            post(representation_grant::post_representation_grant_model),
         )
         .route(
             "/api/business/fiscal-identity",

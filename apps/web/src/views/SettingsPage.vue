@@ -396,6 +396,7 @@
               class="mt-2"
               :obligado-nif="businessTaxId"
               :obligado-name="businessLegalName"
+              :obligado-address="businessAddress"
             />
           </ion-card-content>
         </ion-card>

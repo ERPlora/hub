@@ -1,37 +1,58 @@
 // @vitest-environment happy-dom
-// Contrato de la pantalla donde el cliente FIRMA el otorgamiento de representación (hub#817).
+// Contrato de la pantalla del otorgamiento de representación (hub#1293 — rehace hub#817).
 //
-// 🔴 El agujero que esto cierra: `saas#1252` dejó el modelo, el servicio, la API y el admin… y la
-// pantalla sin hacer. La única forma de crear un otorgamiento era llamar a la API a mano, así que
-// un cliente real no podía firmar. Un mecanismo sin puerta.
+// 🔴 Lo que esto cierra: la pantalla hacía firmar con un TRAZO en un canvas sobre una PARÁFRASIS del
+// Anexo I compuesta por el runtime. La FAQ de colaboración social de la AEAT admite exactamente dos
+// firmas —manuscrita sobre el modelo impreso (con sello si el otorgante es sociedad) o electrónica
+// con certificado cualificado del propio cliente— y el modelo oficial dice que su texto «no podrá
+// ser modificado». Un trazo en pantalla no es ninguna de las dos, y un sello no cabe en un canvas.
 //
-// Lo que NO vale (requisito legal, no de producto): una casilla de «acepto». La FAQ de
-// desarrolladores de la AEAT v1.3 §16.4 admite formularios web, pero **exige** «la cumplimentación
-// y firma (incluyendo electrónica) del otorgamiento» — y el representante responde de la
-// autenticidad de la firma y de la copia del DNI. De ahí que este contrato exija trazo + DNI, y no
-// deje enviar sin los dos.
+// El flujo que sí vale: descargar el modelo oficial que sirve el SaaS → firmarlo FUERA → subirlo →
+// esperar a que lo revise una persona (24-72 h). Nada se pone `vigente` solo.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
 const getRepresentationGrant = vi.fn();
 const postRepresentationGrant = vi.fn();
+const downloadRepresentationGrantModel = vi.fn();
+const saveDownload = vi.fn();
+const openExternal = vi.fn();
+
+// `vi.mock` se iza por encima de todo, así que la clase que la factoría devuelve tiene que existir
+// ANTES: `vi.hoisted` es la única forma de declararla arriba del todo sin duplicarla.
+const { RepresentationGrantError } = vi.hoisted(() => ({
+  RepresentationGrantError: class RepresentationGrantError extends Error {
+    readonly code?: string;
+    readonly statusCode?: number;
+    constructor(message: string, code?: string, statusCode?: number) {
+      super(message);
+      this.name = 'RepresentationGrantError';
+      this.code = code;
+      this.statusCode = statusCode;
+    }
+  },
+}));
 
 vi.mock('../lib/runtime', () => ({
+  RepresentationGrantError,
   getRepresentationGrant: (...a: unknown[]) => getRepresentationGrant(...a),
   postRepresentationGrant: (...a: unknown[]) => postRepresentationGrant(...a),
+  downloadRepresentationGrantModel: (...a: unknown[]) => downloadRepresentationGrantModel(...a),
 }));
 vi.mock('../lib/session', () => ({ isAdmin: { value: true } }));
+vi.mock('../lib/save-download', () => ({
+  saveDownload: (...a: unknown[]) => saveDownload(...a),
+  saveDownloadMessageKey: () => 'download.failed',
+  SaveDownloadError: class extends Error {},
+}));
+vi.mock('../lib/open-external', () => ({ openExternal: (...a: unknown[]) => openExternal(...a) }));
+vi.mock('../lib/config', () => ({
+  config: { hubId: 'hub-abc', cloudApiUrl: 'https://erplora.com' },
+}));
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import RepresentationGrantPanel from './RepresentationGrantPanel.vue';
-
-// Como lo sirve el runtime: con sus placeholders, que es lo que el panel rellena para que la
-// persona lea el documento CON sus datos dentro y no una plantilla en blanco.
-const ANEXO =
-  'OTORGAMIENTO DE LA REPRESENTACIÓN DIRECTA … VERI*FACTU … BOE-A-2024-27600. ' +
-  'DON/DOÑA {signer_name}, con NIF/NIE {signer_nif} … OBLIGADO TRIBUTARIO REPRESENTADO: ' +
-  '{obligado_name}, con NIF {obligado_nif}.';
 
 const i18n = createI18n({
   legacy: false,
@@ -43,228 +64,319 @@ const i18n = createI18n({
 
 function mountPanel(props: Record<string, unknown> = {}) {
   return mount(RepresentationGrantPanel, {
-    props: { obligadoNif: 'B12345678', obligadoName: 'Bar Manolo SL', ...props },
+    props: { obligadoNif: 'B12345674', obligadoName: 'Bar Manolo SL', ...props },
     global: { plugins: [i18n], renderStubDefaultSlot: true },
     shallow: true,
   });
 }
 
 type Panel = {
-  anexoText: string;
   status: string;
+  rejectedReason: string;
+  obligadoMunicipio: string;
+  obligadoVia: string;
+  obligadoNumero: string;
   signerNif: string;
   signerName: string;
-  signature: string;
+  signerMunicipio: string;
+  signerVia: string;
+  signerNumero: string;
+  documentType: 'dni' | 'nie';
+  signedDocument: File | null;
   dniFile: File | null;
-  confirmed: boolean;
+  signatureSample: File | null;
+  representationProof: File | null;
+  needsSignatureSample: boolean;
+  needsRepresentationProof: boolean;
+  canDownloadModel: boolean;
   canSubmit: boolean;
+  errorKey: string;
+  downloadModel: () => Promise<void>;
   submit: () => Promise<void>;
+  openDashboard: () => Promise<void>;
 };
 
 function vm(wrapper: ReturnType<typeof mountPanel>): Panel {
   return wrapper.vm as unknown as Panel;
 }
 
-/** Deja el formulario completo: firmante + trazo + DNI + confirmación explícita. */
-function fillIn(panel: Panel) {
+function pdf(name = 'anexo-i.pdf') {
+  return new File([new Uint8Array([1, 2, 3])], name, { type: 'application/pdf' });
+}
+function image(name = 'dni.jpg') {
+  return new File([new Uint8Array([4, 5])], name, { type: 'image/jpeg' });
+}
+
+/** Deja el paso 1 relleno: es lo mínimo para poder pedir el modelo. */
+function fillModelFields(panel: Panel) {
   panel.signerNif = '12345678Z';
   panel.signerName = 'Manolo García';
-  panel.signature = 'data:image/png;base64,iVBORw0KGgo=';
-  panel.dniFile = new File([new Uint8Array([1, 2, 3])], 'dni.jpg', { type: 'image/jpeg' });
-  panel.confirmed = true;
+}
+
+/** Deja el paso 2 relleno para una SOCIEDAD con DNI: modelo firmado + DNI + justificante. */
+function fillUpload(panel: Panel) {
+  panel.signedDocument = pdf();
+  panel.dniFile = image();
+  panel.representationProof = pdf('escritura.pdf');
 }
 
 beforeEach(() => {
   getRepresentationGrant.mockReset();
-  getRepresentationGrant.mockResolvedValue({ status: 'absent', at: '', anexo_text: ANEXO });
+  getRepresentationGrant.mockResolvedValue({
+    status: 'absent',
+    at: '',
+    rejected_reason: '',
+    signature_kind: '',
+    document_type: '',
+  });
   postRepresentationGrant.mockReset();
-  postRepresentationGrant.mockResolvedValue({ status: 'vigente', at: '2026-08-11T09:00:00Z' });
+  postRepresentationGrant.mockResolvedValue({ status: 'pendiente', at: '2026-08-28T09:00:00Z' });
+  downloadRepresentationGrantModel.mockReset();
+  downloadRepresentationGrantModel.mockResolvedValue(
+    new Blob(['%PDF-1.7'], { type: 'application/pdf' }),
+  );
+  saveDownload.mockReset();
+  saveDownload.mockResolvedValue(null);
+  openExternal.mockReset();
+  openExternal.mockResolvedValue(undefined);
 });
 
-describe('el texto que se firma', () => {
-  it('se muestra ENTERO en la pantalla, no detrás de un enlace', async () => {
+describe('lo que la pantalla ya NO hace', () => {
+  it('🔴 no hay canvas de firma: un trazo no es ninguna de las dos vías que admite la AEAT', async () => {
     const w = mountPanel();
     await flushPromises();
 
-    expect(vm(w).anexoText).toContain('VERI*FACTU');
-    expect(w.text()).toContain('BOE-A-2024-27600');
+    expect(w.find('canvas').exists()).toBe(false);
+    expect(w.find('[data-testid="grant-canvas"]').exists()).toBe(false);
   });
 
-  it('lo sirve el runtime, para que lo leído y lo archivado sean la MISMA cadena', async () => {
-    // Una copia en el bundle de i18n sería el mismo documento diciendo dos cosas.
-    mountPanel();
-    await flushPromises();
-
-    expect(getRepresentationGrant).toHaveBeenCalled();
-  });
-});
-
-describe('el obligado', () => {
-  it('viene del perfil fiscal del Hub y NO se puede editar aquí', async () => {
+  it('🔴 tampoco compone el documento: el texto del modelo no vive en el Hub', async () => {
     const w = mountPanel();
     await flushPromises();
 
-    // Aparece DENTRO del documento que se lee, ya sustituido.
-    expect(w.text()).toContain('B12345678');
-    expect(w.text()).toContain('Bar Manolo SL');
-    // Y en sus campos, en SOLO LECTURA: se cambia donde se configura la identidad fiscal, no
-    // dentro del documento que se firma — el NIF del obligado ancla la cadena y viaja como
-    // `IDEmisorFactura`.
-    const nif = w.get('[data-testid="grant-obligado-nif"]');
-    const name = w.get('[data-testid="grant-obligado-name"]');
-    expect(nif.attributes('value')).toBe('B12345678');
-    expect(name.attributes('value')).toBe('Bar Manolo SL');
-    expect(nif.attributes('readonly')).toBeDefined();
-    expect(name.attributes('readonly')).toBeDefined();
+    // El GET ya no devuelve `anexo_text`, y la pantalla no lo pinta desde ningún sitio.
+    expect(w.html()).not.toContain('OTORGA su representación');
+    expect(w.find('[data-testid="grant-anexo"]').exists()).toBe(false);
   });
 });
 
-describe('qué hace falta para poder firmar', () => {
-  it('una casilla de «acepto» NO basta: sin trazo no se envía', async () => {
+describe('paso 1 · el modelo oficial', () => {
+  it('se pide al runtime con los datos de las dos partes y se GUARDA con save-download', async () => {
+    // `save-download` y no un `<a download>`: dentro de la app instalada en Android el ancla no
+    // hace literalmente nada, y este es el fichero que el cliente tiene que firmar.
+    const w = mountPanel({ obligadoAddress: 'Rúa do Príncipe 10' });
+    await flushPromises();
+    const panel = vm(w);
+    fillModelFields(panel);
+
+    await panel.downloadModel();
+
+    expect(downloadRepresentationGrantModel).toHaveBeenCalledTimes(1);
+    const sent = downloadRepresentationGrantModel.mock.calls[0][0] as Record<string, string>;
+    expect(sent.obligado_nif).toBe('B12345674');
+    expect(sent.obligado_name).toBe('Bar Manolo SL');
+    expect(sent.signer_nif).toBe('12345678Z');
+    // La dirección del negocio que ya está configurada se aprovecha: nadie la escribe dos veces.
+    expect(sent.obligado_via).toBe('Rúa do Príncipe 10');
+    expect(saveDownload).toHaveBeenCalledTimes(1);
+    expect(saveDownload.mock.calls[0][1]).toBeInstanceOf(Blob);
+  });
+
+  it('sin firmante no se puede pedir: un modelo en blanco es un papel firmado para nada', async () => {
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(vm(w).canDownloadModel).toBe(false);
+  });
+
+  it('🔴 si el SaaS aún no tiene la ruta (404) se DICE, no se queda en blanco', async () => {
+    downloadRepresentationGrantModel.mockRejectedValueOnce(
+      new RepresentationGrantError('representation-grant-model → 502', 'cloud_rejected', 404),
+    );
     const w = mountPanel();
     await flushPromises();
     const panel = vm(w);
-    fillIn(panel);
-    panel.signature = '';
+    fillModelFields(panel);
 
-    expect(panel.canSubmit).toBe(false);
-  });
+    await panel.downloadModel();
 
-  it('sin la copia del DNI tampoco', async () => {
-    const w = mountPanel();
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-    panel.dniFile = null;
-
-    expect(panel.canSubmit).toBe(false);
-  });
-
-  it('sin el firmante tampoco — y el firmante es una PERSONA, no la sociedad', async () => {
-    const w = mountPanel();
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-    panel.signerNif = '';
-
-    expect(panel.canSubmit).toBe(false);
-  });
-
-  it('sin la RAZÓN SOCIAL del obligado tampoco: el documento nombraría a nadie', async () => {
-    // El Anexo I identifica al obligado por NIF **y** por razón social. Con el nombre vacío se
-    // archivaría «OBLIGADO TRIBUTARIO REPRESENTADO: , con NIF B12345678», que es una prueba legal
-    // a medio rellenar. Se arregla donde se configura la identidad fiscal, justo encima.
-    const w = mountPanel({ obligadoName: '' });
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-
-    expect(panel.canSubmit).toBe(false);
-  });
-
-  it('sin confirmación explícita tampoco', async () => {
-    const w = mountPanel();
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-    panel.confirmed = false;
-
-    expect(panel.canSubmit).toBe(false);
-  });
-
-  it('con todo puesto, sí', async () => {
-    const w = mountPanel();
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-
-    expect(panel.canSubmit).toBe(true);
+    expect(panel.errorKey).toBe('grant.errors.cloud_rejected');
   });
 });
 
-describe('lo que se envía', () => {
-  it('manda el NIF del NEGOCIO como obligado, nunca otro', async () => {
+describe('paso 2 · la subida', () => {
+  it('manda el modelo firmado, la copia del documento y el tipo, y NO manda un trazo', async () => {
     const w = mountPanel();
     await flushPromises();
     const panel = vm(w);
-    fillIn(panel);
+    fillUpload(panel);
 
     await panel.submit();
 
     expect(postRepresentationGrant).toHaveBeenCalledTimes(1);
     const sent = postRepresentationGrant.mock.calls[0][0] as Record<string, unknown>;
-    expect(sent.obligado_nif).toBe('B12345678');
-    expect(sent.obligado_name).toBe('Bar Manolo SL');
-    expect(sent.signer_nif).toBe('12345678Z');
-    expect(sent.signer_name).toBe('Manolo García');
-    expect(sent.signature).toBeInstanceOf(Blob);
+    expect(sent.signed_document).toBeInstanceOf(File);
     expect(sent.dni_copy).toBeInstanceOf(File);
+    expect(sent.document_type).toBe('dni');
+    expect(sent.signature).toBeUndefined();
   });
 
-  it('🔒 el Hub OLVIDA el trazo y el DNI en cuanto salen', async () => {
+  it('🔴 con NIE hace falta una muestra de firma, y sin ella no se envía', async () => {
+    // Muchos documentos de identidad extranjeros no llevan firma impresa, y ERPlora responde de la
+    // autenticidad de la del otorgante: sin nada con que compararla, el revisor no puede.
+    const w = mountPanel();
+    await flushPromises();
+    const panel = vm(w);
+    fillUpload(panel);
+    panel.documentType = 'nie';
+    await flushPromises();
+
+    expect(panel.needsSignatureSample).toBe(true);
+    expect(panel.canSubmit).toBe(false);
+
+    panel.signatureSample = image('firma.jpg');
+    await flushPromises();
+    expect(panel.canSubmit).toBe(true);
+  });
+
+  it('🔴 una SOCIEDAD tiene que acreditar quién firma por ella; un autónomo no', async () => {
+    const company = mountPanel();
+    await flushPromises();
+    const panel = vm(company);
+    panel.signedDocument = pdf();
+    panel.dniFile = image();
+    await flushPromises();
+
+    expect(panel.needsRepresentationProof).toBe(true);
+    expect(panel.canSubmit).toBe(false);
+
+    const person = mountPanel({ obligadoNif: '12345678Z', obligadoName: 'Manolo García' });
+    await flushPromises();
+    const solo = vm(person);
+    solo.signedDocument = pdf();
+    solo.dniFile = image();
+    await flushPromises();
+
+    expect(solo.needsRepresentationProof).toBe(false);
+    expect(solo.canSubmit).toBe(true);
+  });
+
+  it('tras subir queda PENDIENTE: nada se pone vigente solo', async () => {
+    const w = mountPanel();
+    await flushPromises();
+    const panel = vm(w);
+    fillUpload(panel);
+
+    await panel.submit();
+
+    expect(panel.status).toBe('pendiente');
+  });
+
+  it('🔴 el rechazo del runtime se pinta POR CÓDIGO, no por su frase', async () => {
+    postRepresentationGrant.mockRejectedValueOnce(
+      new RepresentationGrantError('post → 400', 'signed_document_not_pdf'),
+    );
+    const w = mountPanel();
+    await flushPromises();
+    const panel = vm(w);
+    fillUpload(panel);
+
+    await panel.submit();
+
+    expect(panel.errorKey).toBe('grant.errors.signed_document_not_pdf');
+  });
+
+  it('un fallo NO borra lo que la persona acaba de adjuntar', async () => {
+    postRepresentationGrant.mockRejectedValueOnce(new Error('offline'));
+    const w = mountPanel();
+    await flushPromises();
+    const panel = vm(w);
+    fillUpload(panel);
+
+    await panel.submit();
+
+    expect(panel.signedDocument).not.toBeNull();
+    expect(panel.dniFile).not.toBeNull();
+  });
+
+  it('🔒 en el camino de éxito el Hub OLVIDA los documentos', async () => {
     // RGPD: la custodia es del SaaS. Un hub que se los queda los mete en cada backup y en cada
     // blueprint que exporte.
     const w = mountPanel();
     await flushPromises();
     const panel = vm(w);
-    fillIn(panel);
+    fillUpload(panel);
 
     await panel.submit();
 
-    expect(panel.signature).toBe('');
+    expect(panel.signedDocument).toBeNull();
     expect(panel.dniFile).toBeNull();
-  });
-
-  it('un fallo del runtime NO borra lo que la persona acaba de rellenar', async () => {
-    postRepresentationGrant.mockRejectedValueOnce(new Error('cloud_rejected'));
-    const w = mountPanel();
-    await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
-
-    await panel.submit();
-
-    expect(panel.signature).not.toBe('');
-    expect(panel.dniFile).not.toBeNull();
+    expect(panel.representationProof).toBeNull();
   });
 });
 
-describe('el estado del otorgamiento', () => {
-  it('se pinta al cargar', async () => {
+describe('lo que se lee en pantalla', () => {
+  it('🔴 las DOS direcciones se distinguen: «Municipio/Vía/Número» aparece dos veces', async () => {
+    // Detectado mirando la pantalla a 390/768/1280: los tres campos de dirección salían repetidos
+    // sin nada que dijera cuál es la del negocio y cuál la de quien firma. Dos bloques idénticos
+    // seguidos es exactamente cómo se rellena el segundo con los datos del primero.
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(w.find('[data-testid="grant-party-obligado"]').exists()).toBe(true);
+    expect(w.find('[data-testid="grant-party-signer"]').exists()).toBe(true);
+  });
+
+  it('con el otorgamiento en revisión NO se invita a volver a hacerlo', async () => {
+    // «Lo descargas, lo firmas y lo vuelves a subir» debajo de «lo estamos revisando» es lo que
+    // produce el segundo envío que otra persona tiene que desempatar a mano.
     getRepresentationGrant.mockResolvedValue({
-      status: 'vigente',
-      at: '2026-08-11T09:00:00Z',
-      anexo_text: ANEXO,
+      status: 'pendiente',
+      at: '2026-08-28T09:00:00Z',
+      rejected_reason: '',
+      signature_kind: '',
+      document_type: 'dni',
     });
 
     const w = mountPanel();
     await flushPromises();
 
-    expect(vm(w).status).toBe('vigente');
+    expect(w.find('[data-testid="grant-intro"]').exists()).toBe(false);
+    expect(w.find('[data-testid="grant-submit"]').exists()).toBe(false);
   });
+});
 
-  it('«revocado» es un estado propio: el cliente puede revocar solo y sin avisarnos', async () => {
+describe('el estado', () => {
+  it('«pendiente» es un estado propio: se está revisando', async () => {
     getRepresentationGrant.mockResolvedValue({
-      status: 'revocado',
-      at: '2026-08-11T10:00:00Z',
-      anexo_text: ANEXO,
+      status: 'pendiente',
+      at: '2026-08-28T09:00:00Z',
+      rejected_reason: '',
+      signature_kind: 'handwritten',
+      document_type: 'dni',
     });
 
     const w = mountPanel();
     await flushPromises();
 
-    expect(vm(w).status).toBe('revocado');
+    expect(vm(w).status).toBe('pendiente');
+    expect(w.find('[data-testid="grant-state-pendiente"]').exists()).toBe(true);
   });
 
-  it('tras firmar, pasa a vigente sin recargar la página', async () => {
+  it('🔴 «rechazado» enseña el MOTIVO: es lo único con lo que el cliente puede actuar', async () => {
+    getRepresentationGrant.mockResolvedValue({
+      status: 'rechazado',
+      at: '2026-08-29T10:00:00Z',
+      rejected_reason: 'La copia del DNI está ilegible.',
+      signature_kind: '',
+      document_type: 'dni',
+    });
+
     const w = mountPanel();
     await flushPromises();
-    const panel = vm(w);
-    fillIn(panel);
 
-    await panel.submit();
-
-    expect(panel.status).toBe('vigente');
+    expect(vm(w).rejectedReason).toContain('ilegible');
+    expect(w.text()).toContain('ilegible');
   });
 
   it('si el runtime no contesta, no se inventa un estado', async () => {
@@ -274,5 +386,21 @@ describe('el estado del otorgamiento', () => {
     await flushPromises();
 
     expect(vm(w).status).toBe('');
+  });
+});
+
+describe('la salida al ordenador', () => {
+  it('abre el dashboard del Cloud POR FUERA, nunca llevándose esta ventana', async () => {
+    // Dentro de la app instalada el webview no tiene barra ni Atrás: navegar en sitio deja al
+    // usuario atrapado en el SaaS sin vuelta.
+    const w = mountPanel();
+    await flushPromises();
+
+    await vm(w).openDashboard();
+
+    expect(openExternal).toHaveBeenCalledTimes(1);
+    expect(openExternal.mock.calls[0][0]).toBe(
+      'https://erplora.com/dashboard/hubs/hub-abc/fiscal/representation-grant/',
+    );
   });
 });

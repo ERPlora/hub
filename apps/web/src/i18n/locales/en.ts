@@ -497,22 +497,71 @@ export default {
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   grant: {
     intro:
-      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that, and this is it. Read it, sign it and attach a copy of your ID.',
-    stateVigente: 'Signed on {date}. ERPlora may file on your behalf.',
+      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that: the official form of the colaboración social agreement. You download it, sign it away from this screen, and upload it back.',
+    stateVigente: 'Approved on {date}. ERPlora may file on your behalf.',
+    statePendiente:
+      'Uploaded on {date}. We are checking it and will email you within 24-72 hours.',
+    stateRejected: 'Sent back on {date}. Fix what is noted below and upload it again.',
     stateRevoked: 'Revoked on {date}. ERPlora cannot file on your behalf.',
     stateAbsent: 'Not signed yet. Your business cannot go live until it is.',
     stateUnknown: 'Checking with ERPlora…',
+    stateUnreachable: 'We could not reach ERPlora, so we cannot tell you where this stands.',
+    step1Title: '1 · Get the official form',
+    step1Hint:
+      'We fill it in with your details. Its wording is set by the tax authority and cannot be changed.',
+    step2Title: '2 · Upload the signed form',
+    step2Hint: 'A person at ERPlora checks it and emails you within 24-72 hours.',
+    partyObligado: 'Your business',
+    partySigner: 'The person signing',
     obligadoNif: 'Taxpayer ID (your business)',
     obligadoName: 'Legal name (your business)',
+    municipio: 'Town or city',
+    via: 'Street',
+    numero: 'Number',
     signerNif: 'ID number of the person signing',
     signerName: 'Full name of the person signing',
-    signatureTitle: 'Signature',
-    signatureHint:
-      'Draw your signature. For a company, the legal representative signs — and the ID copy below is theirs, not the company\u2019s.',
-    signatureClear: 'Clear signature',
+    downloadModel: 'Download the form',
+    howToByHand:
+      'By hand: print it, sign it, stamp it with the company seal if your business is a company, and scan it back to PDF.',
+    howToElectronic:
+      'Electronically: sign the PDF with AutoFirma using your own qualified certificate. A drawn signature is not accepted.',
+    privacyTitle: 'Data protection — the essentials (art. 13 GDPR)',
+    privacyController:
+      'Controller: ERPLORA CLOUD SL (B27593136). We hold these documents as your representative.',
+    privacyPurpose:
+      'Purpose and basis: to file your invoicing records with the Spanish tax authority on your behalf, under the grant you sign and our legal duties. We keep them while the grant lasts and for the tax retention periods.',
+    privacyRights:
+      "Your rights: access, rectification, erasure, objection and portability at privacy{'@'}erplora.com.",
+    documentType: 'Identity document',
+    documentTypeDni: 'DNI (Spanish national ID)',
+    documentTypeNie: 'NIE (foreign resident ID)',
+    signedDocumentChoose: 'Attach the signed form (PDF)',
     dniChoose: 'Attach a copy of the ID',
-    confirm: 'I have read the grant above and I sign it.',
-    submit: 'Sign and send',
+    signatureSampleWhy:
+      'A NIE often carries no printed signature, so we need a sheet with your handwritten signature to compare it against.',
+    signatureSampleChoose: 'Attach a signature sample',
+    representationProofWhy:
+      'Your business is a company, so we need the document that names the person allowed to sign for it.',
+    representationProofChoose: 'Attach the proof of representation',
+    submit: 'Send for review',
+    preferComputer: 'I would rather do this from my computer',
+    errors: {
+      obligado_nif_required: 'Your business needs a taxpayer ID before you can do this.',
+      signer_required: 'Fill in the name and ID number of the person signing.',
+      document_type_invalid: 'Pick the kind of identity document.',
+      signed_document_required: 'Attach the signed form.',
+      signed_document_not_pdf: 'The signed form has to be a PDF — scan it or sign it with AutoFirma.',
+      dni_copy_required: 'Attach a copy of the identity document.',
+      signature_sample_required: 'With a NIE we also need a sample of your handwritten signature.',
+      representation_proof_required:
+        'Attach the document that proves you may sign for the company.',
+      document_too_large: 'Each file has to be under 10 MB.',
+      invalid_via: 'That route is not one we can file through.',
+      cloud_rejected: 'ERPlora could not handle this right now. Try again in a few minutes.',
+      hub_not_enrolled: 'This hub is not connected to ERPlora yet.',
+      open_external_failed: 'We could not open your browser.',
+      unknown: 'It did not work. Try again.',
+    },
   },
   settings: {
     hubWide: 'General settings',

@@ -459,22 +459,71 @@ export default {
   // Ver la nota del bloque equivalente en `en.ts`.
   grant: {
     intro:
-      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado para eso, y esto es ese consentimiento. Léelo, fírmalo y adjunta una copia del DNI.',
-    stateVigente: 'Firmado el {date}. ERPlora puede remitir en tu nombre.',
+      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado: el modelo oficial del acuerdo de colaboración social. Lo descargas, lo firmas fuera de esta pantalla y lo vuelves a subir.',
+    stateVigente: 'Aprobado el {date}. ERPlora puede remitir en tu nombre.',
+    statePendiente: 'Subido el {date}. Lo estamos revisando y te avisamos por email en 24-72 horas.',
+    stateRejected: 'Devuelto el {date}. Corrige lo que se indica abajo y vuelve a subirlo.',
     stateRevoked: 'Revocado el {date}. ERPlora no puede remitir en tu nombre.',
     stateAbsent: 'Sin firmar. Tu negocio no puede pasar a producción hasta que lo firmes.',
     stateUnknown: 'Consultando con ERPlora…',
+    stateUnreachable: 'No hemos podido contactar con ERPlora, así que no podemos decirte cómo va.',
+    step1Title: '1 · Consigue el modelo oficial',
+    step1Hint:
+      'Te lo rellenamos con tus datos. Su texto lo fija la Agencia Tributaria y no se puede modificar.',
+    step2Title: '2 · Sube el modelo firmado',
+    step2Hint: 'Lo revisa una persona de ERPlora y te avisa por email en 24-72 horas.',
+    partyObligado: 'Tu negocio',
+    partySigner: 'Quien firma',
     obligadoNif: 'NIF del obligado (tu negocio)',
     obligadoName: 'Razón social (tu negocio)',
+    municipio: 'Municipio',
+    via: 'Vía pública',
+    numero: 'Número',
     signerNif: 'NIF/NIE de quien firma',
     signerName: 'Nombre y apellidos de quien firma',
-    signatureTitle: 'Firma',
-    signatureHint:
-      'Dibuja tu firma. En una empresa firma el representante legal — y la copia del DNI de abajo es la SUYA, no la de la sociedad.',
-    signatureClear: 'Borrar firma',
-    dniChoose: 'Adjuntar copia del DNI/NIE',
-    confirm: 'He leído el otorgamiento de arriba y lo firmo.',
-    submit: 'Firmar y enviar',
+    downloadModel: 'Descargar el modelo',
+    howToByHand:
+      'A mano: imprímelo, fírmalo, ponle el sello de la entidad si tu negocio es una sociedad, y escanéalo a PDF.',
+    howToElectronic:
+      'Electrónicamente: firma el PDF con AutoFirma usando tu propio certificado cualificado. Una firma dibujada no vale.',
+    privacyTitle: 'Protección de datos — información básica (art. 13 RGPD)',
+    privacyController:
+      'Responsable: ERPLORA CLOUD SL (B27593136). Custodiamos estos documentos como representante tuyo.',
+    privacyPurpose:
+      'Finalidad y base: remitir en tu nombre los registros de facturación a la Agencia Tributaria, al amparo del otorgamiento que firmas y de nuestras obligaciones legales. Los conservamos mientras dure la representación y durante los plazos tributarios.',
+    privacyRights:
+      "Tus derechos: acceso, rectificación, supresión, oposición y portabilidad en privacy{'@'}erplora.com.",
+    documentType: 'Documento de identidad',
+    documentTypeDni: 'DNI',
+    documentTypeNie: 'NIE',
+    signedDocumentChoose: 'Adjuntar el modelo firmado (PDF)',
+    dniChoose: 'Adjuntar copia del documento de identidad',
+    signatureSampleWhy:
+      'Muchos NIE no llevan firma impresa, así que necesitamos una hoja con tu firma manuscrita para poder compararla.',
+    signatureSampleChoose: 'Adjuntar muestra de firma',
+    representationProofWhy:
+      'Tu negocio es una sociedad, así que necesitamos el documento que acredita quién puede firmar por ella.',
+    representationProofChoose: 'Adjuntar el justificante de representación',
+    submit: 'Enviar a revisión',
+    preferComputer: 'Prefiero hacerlo desde el ordenador',
+    errors: {
+      obligado_nif_required: 'Tu negocio necesita un NIF antes de poder hacer esto.',
+      signer_required: 'Rellena el nombre y el NIF de quien firma.',
+      document_type_invalid: 'Elige el tipo de documento de identidad.',
+      signed_document_required: 'Adjunta el modelo firmado.',
+      signed_document_not_pdf:
+        'El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.',
+      dni_copy_required: 'Adjunta una copia del documento de identidad.',
+      signature_sample_required: 'Con NIE necesitamos además una muestra de tu firma manuscrita.',
+      representation_proof_required:
+        'Adjunta el documento que acredita que puedes firmar por la sociedad.',
+      document_too_large: 'Cada fichero tiene que ocupar menos de 10 MB.',
+      invalid_via: 'Esa vía no es una por la que podamos remitir.',
+      cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
+      hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+      open_external_failed: 'No hemos podido abrir tu navegador.',
+      unknown: 'No ha funcionado. Vuelve a intentarlo.',
+    },
   },
   settings: {
     hubWide: 'Ajustes generales',
