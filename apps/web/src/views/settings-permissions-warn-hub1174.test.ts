@@ -172,4 +172,16 @@ describe('Settings → Permissions · what breaks while the switch is off (hub#1
     const wrapper = await mountPermissions([cap('certificate', false)]);
     expect(wrapper.find('[data-testid="cap-breaks-certificate"]').text()).toContain(CERT_BREAKS);
   });
+
+  // Ionic's `--ion-color-warning` (#ffc409) renders at ~1.6:1 contrast on white — and its
+  // `-shade` (#e0ac08), the fallback already used by ExportPanel/ImportPanel, only reaches
+  // ~2.1:1. Both fail WCAG AA's 4.5:1 floor for normal text. This sentence is not decorative:
+  // the owner has to READ it to know their invoices stop reaching Hacienda. The market pattern
+  // (iOS/Android permission screens, Shopify, Square) keeps the warning accent on the ICON and
+  // reads the sentence in the theme's normal/muted text colour.
+  it('the consequence sentence is legible: never rendered in the raw warning yellow (hub#1174)', async () => {
+    const wrapper = await mountPermissions([cap('certificate', false)]);
+    const warn = wrapper.find('[data-testid="cap-breaks-certificate"]');
+    expect(warn.attributes('color'), 'warning-yellow text is ~1.6:1 on white, under WCAG AA 4.5:1').not.toBe('warning');
+  });
 });

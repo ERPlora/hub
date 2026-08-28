@@ -504,10 +504,14 @@
                   <!-- hub#1174: la descripción dice qué PERMITE; mientras el interruptor está
                        apagado hace falta decir qué se ROMPE. La frase vive en el catálogo de
                        capabilities (una sola verdad, por id) y aquí solo se traduce. La acción que
-                       lo arregla es el toggle de esta misma fila (hub#800 §3). -->
+                       lo arregla es el toggle de esta misma fila (hub#800 §3).
+                       `color="medium"`, no "warning": el amarillo de Ionic (#ffc409) da ~1.6:1 de
+                       contraste sobre blanco — ni con el shade (#e0ac08, ~2.1:1) llega al 4.5:1 de
+                       WCAG AA para texto normal, y esta frase hay que LEERLA. El acento de aviso
+                       se queda en el icono (patrón de iOS/Android, Shopify, Square). -->
                   <ion-note
                     v-if="!cap.granted"
-                    color="warning"
+                    color="medium"
                     class="cap-breaks"
                     :data-testid="`cap-breaks-${cap.id}`"
                   >
@@ -1238,5 +1242,7 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 .cap-breaks-icon {
   flex: none;
   margin-top: 0.1rem;
+  /* El texto lee en `--ion-color-medium` (AA); el icono se queda con el acento de aviso. */
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
 }
 </style>
