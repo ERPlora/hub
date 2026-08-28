@@ -299,3 +299,74 @@ async fn a_hub_without_a_machine_credential_saves_without_publishing() {
     );
     assert!(published.lock().unwrap().is_empty());
 }
+
+/// 🔴 **An unreachable control plane is reported by CODE, never by reqwest's prose.** That prose
+/// names the control plane's address (`error_redaction_door`), and a save is not the place to
+/// print it: the answer is `200` with `cloud_unreachable`, and nothing in the body says where the
+/// hub tried to go.
+#[tokio::test]
+async fn an_unreachable_control_plane_is_reported_by_code_without_its_address() {
+    // Nothing listens on port 1: the connection is refused at once, no 5 s wait.
+    let (router, admin) = fixture(
+        "unreachable",
+        "http://127.0.0.1:1",
+        Some("machine-secret"),
+        None,
+    )
+    .await;
+
+    let response = put(&router, &admin, json!({ "business_tax_id": "B12345674" })).await;
+
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the save is the customer's"
+    );
+    let body = body_json(response).await;
+    assert_eq!(
+        body["fiscal_identity_publish_error"],
+        json!("cloud_unreachable"),
+        "an unreachable control plane has its own code: {body}"
+    );
+    let text = body.to_string();
+    assert!(
+        !text.contains("127.0.0.1") && !text.contains("error sending request"),
+        "reqwest's prose (control-plane address included) leaked into the save: {text}"
+    );
+}
+
+/// The explicit door (`POST /api/business/fiscal-identity`) answered with `e.to_string()` until
+/// hub#1306 — reqwest's prose, control-plane address included. Same rule as the save: a stable
+/// code, and nothing else.
+#[tokio::test]
+async fn the_explicit_door_reports_an_unreachable_control_plane_by_code_too() {
+    let (router, admin) = fixture(
+        "explicit-unreachable",
+        "http://127.0.0.1:1",
+        Some("machine-secret"),
+        Some("B12345674"),
+    )
+    .await;
+
+    let response = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/business/fiscal-identity")
+                .header("x-hub-session", &admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = body_json(response).await;
+    assert_eq!(body["error"], json!("cloud_unreachable"), "{body}");
+    let text = body.to_string();
+    assert!(
+        !text.contains("127.0.0.1") && !text.contains("error sending request"),
+        "reqwest's prose (control-plane address included) leaked out of the door: {text}"
+    );
+}
