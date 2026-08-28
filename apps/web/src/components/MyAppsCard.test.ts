@@ -21,6 +21,9 @@ import { createI18n } from 'vue-i18n';
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import MyAppsCard from './MyAppsCard.vue';
+// The `<style>` block exactly as it ships: happy-dom does not apply an SFC's `scoped` styles, so
+// the CSS contract of hub#1268 is asserted against the source, not against the DOM.
+import cardSource from './MyAppsCard.vue?raw';
 import { APP_USAGE_KEY, readAppUsage } from '../lib/app-usage';
 // REAL catalogues: English is the source language and Spanish is NOT optional (binding rule of
 // 2026-08-04). A card with half its strings untranslated ships as half-Spanish.
@@ -278,5 +281,60 @@ describe('a launcher that failed says so', () => {
     expect(mountCard([], i18nEs, 'error').find('[data-testid="apps-error"]').text()).toBe(
       es.dashboard.appsLoadError,
     );
+  });
+});
+
+// hub#1268 — the tile was splitting words in half: «Automatizaciones» painted as
+// «Automatizacio» / «nes».
+//
+// The cause was `word-break: break-word` on `.apps-tile-label`. No setting that still authorises a
+// break INSIDE the word fixes it: measured in Chromium over this very component, `overflow-wrap:
+// anywhere` + `word-break: normal` (what the original issue body asked for) produces EXACTLY the
+// same cut, because the name is 104px wide and the label only 84-90px.
+//
+// What every launcher on the market does instead —macOS Launchpad, the Windows Start menu, the
+// Android/iOS home screens, Google's app grid— is the opposite: never break the word, TRUNCATE it
+// with an ellipsis. That is what this contract pins, and the full name is not lost because it
+// travels in the label's `title`.
+//
+// ⚠️ happy-dom computes NO layout and applies no `scoped` SFC style: `getComputedStyle` here would
+// return the initial value and the test would pass with ANY CSS. So the contract is asserted
+// against this file's own `<style>` block, which IS what gets deployed. The proof that it LOOKS
+// right is in the PR: a Chromium screenshot at 1440 and at 390px.
+describe('the tile label never splits a word (hub#1268)', () => {
+  // Comments stripped: the rule's own comment NAMES the forbidden values in order to explain why
+  // they are forbidden, and an assertion that read them would fail against its own rationale.
+  const labelRule = (/\.apps-tile-label\s*\{([^}]*)\}/.exec(cardSource)?.[1] ?? '').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  );
+  const declaration = (property: string): string =>
+    new RegExp(`(?:^|;|\\n)\\s*${property}\\s*:\\s*([^;\\n]+)`).exec(labelRule)?.[1].trim() ?? '';
+
+  it('the_tile_label_does_not_split_words_hub1268', () => {
+    expect(labelRule, '.apps-tile-label rule not found in MyAppsCard.vue').not.toBe('');
+
+    // The two properties that authorise a break INSIDE a word. Either of them reopens
+    // «Automatizacio/nes».
+    expect(declaration('word-break'), '.apps-tile-label word-break').toBe('normal');
+    expect(declaration('overflow-wrap'), '.apps-tile-label overflow-wrap').toBe('normal');
+    expect(labelRule, '.apps-tile-label must not allow breaking inside a word').not.toMatch(
+      /(?:word-break|overflow-wrap|line-break)\s*:\s*(?:break-word|break-all|anywhere)/,
+    );
+
+    // And a name that does not fit is truncated — the only way out a tile has once it may not
+    // break: an ellipsis within the two clamped lines, with the overflow clipped.
+    expect(declaration('text-overflow'), '.apps-tile-label text-overflow').toBe('ellipsis');
+    expect(declaration('overflow'), '.apps-tile-label overflow').toBe('hidden');
+    expect(declaration('-webkit-line-clamp'), '.apps-tile-label -webkit-line-clamp').toBe('2');
+    // The label may not outgrow its tile: without this the `span` grows to `max-content` and the
+    // ellipsis never appears (measured: a 104px label inside a 96px cell).
+    expect(declaration('max-width'), '.apps-tile-label max-width').toBe('100%');
+  });
+
+  it('truncating loses nothing: the full name travels in the tile title', () => {
+    const w = mountCard([{ path: '/m/flows', label: 'Automatizaciones', icon: 'flash-outline' }]);
+
+    expect(w.find('.apps-tile-label').attributes('title')).toBe('Automatizaciones');
   });
 });
