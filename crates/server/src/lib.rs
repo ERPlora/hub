@@ -1364,10 +1364,10 @@ pub fn app(state: AppState) -> Router {
             "/api/system/update-history",
             get(system::update_history),
         )
-        // La declaración responsable de ESTA versión, dentro del producto (art. 13.2 RRSIF —
-        // hub#528). Proyecta el mismo bloque `SistemaInformatico` que viaja en cada registro:
-        // los hechos del productor que sirve el plano de control + la `Version` de este binario
-        // + el `hub_id` como `NumeroInstalacion`. Nunca constantes.
+        // The responsible declaration of THIS version, inside the product (art. 13.2 RRSIF —
+        // hub#528). Projects the same `SistemaInformatico` block that travels in every record:
+        // the producer facts the control plane serves + this binary's `Version` + the `hub_id`
+        // as `NumeroInstalacion`. Never constants.
         .route(
             "/api/system/declaration",
             get(settings::get_responsible_declaration),

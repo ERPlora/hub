@@ -373,7 +373,7 @@ pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: Header
     }
 }
 
-// ── Declaración responsable dentro del producto (art. 13.2 RRSIF — hub#528) ────────────────────
+// ── Responsible declaration inside the product (art. 13.2 RRSIF — hub#528) ─────────────────────
 
 /// `GET /api/system/declaration` — the *declaración responsable* of the version this hub is
 /// running, from inside the product.

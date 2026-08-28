@@ -646,9 +646,9 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
-    // Declaración responsable dentro del producto (art. 13.2 RRSIF — hub#528). Los nombres de los
-    // elementos (`NombreRazon`, `IdSistemaInformatico`…) NO se traducen: son los del registro de
-    // facturación y la pantalla existe para poder leerse al lado de uno.
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
     declarationTitle: 'Responsible declaration',
     declarationDesc:
       'The declaration ERPlora signs for the version of the system this hub is running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
