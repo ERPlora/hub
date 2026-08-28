@@ -652,10 +652,14 @@ fn detalle_de_entrada(e: &Json) -> Result<Detalle, VerifactuError> {
     })
 }
 
-fn desglose(record: &Json) -> Result<String, VerifactuError> {
+/// Lee un `tax_breakdown` de factura en sus líneas de desglose, aceptando las DOS generaciones del
+/// contrato descrito arriba. Un desglose vacío o ilegible NO es un error aquí: son cero líneas, y
+/// quien llama decide con qué las sustituye (`desglose` con el tipo de la fila, `breakdown_rates`
+/// con nada). Lo que sí falla es una línea que declara importes imposibles de leer — ese es el
+/// registro que no se puede declarar (hub#324).
+fn detalles_del_desglose(tax_breakdown: &str) -> Result<Vec<Detalle>, VerifactuError> {
     let mut lines: Vec<Detalle> = Vec::new();
-
-    match serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
+    match serde_json::from_str::<Json>(tax_breakdown) {
         // Formato nuevo: una entrada por clave fiscal completa.
         Ok(Json::Array(entries)) => {
             for e in &entries {
@@ -678,6 +682,24 @@ fn desglose(record: &Json) -> Result<String, VerifactuError> {
         }
         _ => {}
     }
+    Ok(lines)
+}
+
+/// Los TIPOS IMPOSITIVOS (%) que declara un `tax_breakdown`, uno por línea de desglose y en el
+/// orden en que vienen. Desglose vacío, ilegible o con importes que no se pueden leer → sin tipos
+/// declarados; quien llama decide qué hacer con ese hueco.
+///
+/// Existe para que la columna `tax_rate` de la fila lea el desglose por el MISMO parseo con el que
+/// se construye el XML, en vez de por una copia que solo entendía una de las dos generaciones
+/// (hub#1198).
+pub(crate) fn breakdown_rates(tax_breakdown: &str) -> Vec<f64> {
+    detalles_del_desglose(tax_breakdown)
+        .map(|lines| lines.iter().map(|d| d.rate).collect())
+        .unwrap_or_default()
+}
+
+fn desglose(record: &Json) -> Result<String, VerifactuError> {
+    let mut lines = detalles_del_desglose(&s(record, "tax_breakdown"))?;
     if lines.is_empty() {
         // Facturas anteriores al campo (`'{}'`), o un desglose ilegible: el tipo efectivo de una
         // factura de tipo único ES su tipo real, y `Desglose` no puede quedarse sin detalle.

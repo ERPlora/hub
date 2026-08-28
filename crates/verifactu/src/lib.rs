@@ -202,26 +202,35 @@ fn int_field(v: &Json, k: &str, default: i64) -> i64 {
     }
 }
 
-/// Deriva el **TipoImpositivo** (% IVA) para el DesgloseIVA del registro VeriFactu a partir del
-/// desglose real de la factura. El registro lleva un **único** `tax_rate` (un solo bloque de
-/// desglose), así que:
-/// - Si el `tax_breakdown` de la factura (JSON `{"21.00":{base,tax}, …}`, importes en céntimos)
-///   tiene **un único tipo** → se usa ESE tipo exacto (lo correcto y el caso normal del POS).
-/// - Si tiene **varios tipos** (factura mixta 21%+10%) o está vacío/inválido → se cae al **tipo
-///   efectivo** `tax/base*100` redondeado a 2 decimales.
+/// Deriva el **TipoImpositivo** (% IVA) de la COLUMNA `tax_rate` del registro a partir del desglose
+/// real de la factura. La fila lleva un tipo único, así que:
+/// - Si el desglose declara **un solo tipo** → se usa ESE tipo exacto (el caso normal del POS).
+/// - Si declara **varios tipos distintos** (factura mixta 21 %+10 %) o no declara ninguno (vacío,
+///   ilegible, importes que no se pueden leer) → **tipo efectivo** `tax/base*100` a 2 decimales.
 ///
-/// El desglose multi-tipo REAL (varias líneas DesgloseIVA en el XML) queda pendiente de diseño del
-/// humano (TODO §G / decision-log). Antes esto era fijo 21% — incorrecto en facturas a 10% (QA 2026-06-25).
+/// El desglose se lee por `aeat::breakdown_rates`, que es el MISMO parseo con el que se construye
+/// el XML: entiende las dos generaciones del contrato con `invoice` — el mapa viejo por tipo
+/// (`{"21.00":{base,tax}}`) y el array vivo por clave fiscal completa (ADR-0186). Leerlo por una
+/// copia propia que solo veía el mapa hacía que TODO tique real cayera al tipo efectivo, y con el
+/// redondeo por línea de `invoice` el efectivo no es un tipo español: 4 líneas de 0,50 € al 21 %
+/// (base 200 / cuota 44) se guardaban como 22,0 % (hub#1198). El XML nunca dependió de esto —
+/// `aeat::desglose` emite una línea por tipo real—, pero sí la columna que agrupan los KPIs y la
+/// que mide la regla de fila del módulo (`ck_verifactu_record_quota_matches_row_rate`), que con el
+/// tipo efectivo cuadraba por construcción y por tanto no medía nada.
+///
+/// **Mixta: se queda el efectivo a propósito.** No hay «el tipo» de esa fila, y tomar el de la
+/// primera entrada sería inventar un dato fiscal. El desglose íntegro viaja igualmente al XML.
+/// Varias entradas que declaran el MISMO tipo (misma clave fiscal repetida, o recargo de
+/// equivalencia, que va en su propio par) sí tienen un tipo único y se guarda ese.
 fn derive_tax_rate(tax_breakdown: &str, base_cents: f64, tax_cents: f64) -> f64 {
-    if let Ok(Json::Object(map)) = serde_json::from_str::<Json>(tax_breakdown) {
-        if map.len() == 1 {
-            if let Some(rate) = map.keys().next().and_then(|k| k.trim().parse::<f64>().ok()) {
-                return rate;
-            }
+    let declared = aeat::breakdown_rates(tax_breakdown);
+    if let Some(first) = declared.first() {
+        if declared.iter().all(|rate| rate == first) {
+            return *first;
         }
     }
-    // Fallback (multi-tipo o sin desglose): tipo efectivo redondeado a 2 decimales. La división
-    // conserva el signo en rectificativas (base y cuota negativas → ratio positivo).
+    // Fallback (multi-tipo o sin desglose legible): tipo efectivo redondeado a 2 decimales. La
+    // división conserva el signo en rectificativas (base y cuota negativas → ratio positivo).
     if base_cents != 0.0 {
         (tax_cents / base_cents * 10_000.0).round() / 100.0
     } else {
@@ -1211,8 +1220,9 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
             // NO convertir aquí (el `* 100.0` previo declaraba importes ×100 a la AEAT — QA 2026-06-25).
             base_amount: num_field(&inv, "base_amount", 0.0),
-            // Tipo EFECTIVO de la factura. Es la columna de la fila y el fallback de facturas sin
-            // desglose; el XML ya NO lo usa en factura mixta (emite una línea por tipo real).
+            // Tipo de la COLUMNA de la fila: el que declara el desglose cuando es único, y solo
+            // el efectivo si no hay uno (mixta o sin desglose legible). El XML no lo usa salvo
+            // como fallback sin desglose: `aeat::desglose` emite una línea por tipo real.
             tax_rate: derive_tax_rate(
                 &str_field(&inv, "tax_breakdown"),
                 num_field(&inv, "base_amount", 0.0),
@@ -3483,8 +3493,8 @@ mod tests {
 
     #[test]
     fn mixto_o_vacio_cae_al_tipo_efectivo() {
-        // Mixto 21%+10%: el registro es de tipo único → efectivo (no es un tipo real, limitación
-        // documentada; el desglose multi-línea queda para el humano).
+        // Mixto 21%+10% en el mapa viejo: la fila es de tipo único → efectivo. El XML sí emite
+        // una línea por tipo real (`aeat::desglose`), así que no se pierde nada declarado.
         let mixto = r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
         let r = derive_tax_rate(mixto, 11000.0, 2200.0); // 2200/11000 = 20%
         assert_eq!(r, 20.0);
@@ -3506,6 +3516,57 @@ mod tests {
         assert_eq!(derive_tax_rate(tb, -10000.0, -2100.0), 21.0);
         // Sin desglose, efectivo de negativos: (-210)/(-1000) → 21%.
         assert_eq!(derive_tax_rate("{}", -1000.0, -210.0), 21.0);
+    }
+
+    /// Regression test for ERPlora/hub#1198.
+    ///
+    /// The live `tax_breakdown` that `invoice` writes is the ARRAY generation (one entry per full
+    /// tax key, per the breakdown contract of `aeat::desglose`), not the old rate-keyed map. The
+    /// row used to read only the map, so every real ticket fell through to the effective rate —
+    /// and with `invoice`'s per-line rounding the effective rate is not a Spanish rate at all
+    /// (4 lines of 0,50 € at 21 % → base 200 / quota 44 → 22,0 %).
+    #[test]
+    fn derive_tax_rate_reads_the_array_breakdown_hub1198() {
+        // The exact ticket of the issue: one fiscal key at 21 %, quota rounded up per line.
+        let real_ticket = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#;
+        assert_eq!(derive_tax_rate(real_ticket, 200.0, 44.0), 21.0);
+
+        // Reduced rate, exact amounts: same reading, no rounding involved.
+        let reduced = r#"[{"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":1100,"quota":110}]"#;
+        assert_eq!(derive_tax_rate(reduced, 1100.0, 110.0), 10.0);
+
+        // Equivalence surcharge: it travels in its own pair, so the effective rate (2620/10000 =
+        // 26,2 %) is not a rate anybody charged. The declared one is.
+        let surcharge = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
+        assert_eq!(derive_tax_rate(surcharge, 10000.0, 2620.0), 21.0);
+
+        // Several entries that all declare the SAME rate (same rate, different regime) still have
+        // one rate — the row can state it without inventing anything.
+        let same_rate_twice = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100},
+                                  {"tax":"vat","regime":"51","class":"subject","rate":21.0,"base":5000,"quota":1050}]"#;
+        assert_eq!(derive_tax_rate(same_rate_twice, 15000.0, 3150.0), 21.0);
+
+        // A rectifying record keeps the sign of the amounts and the declared rate stays positive.
+        let rectificativa = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-10000,"quota":-2100}]"#;
+        assert_eq!(derive_tax_rate(rectificativa, -10000.0, -2100.0), 21.0);
+    }
+
+    /// hub#1198 — two DIFFERENT declared rates leave the row without «the» rate of the invoice, so
+    /// the effective rate stands (deliberate: picking the first entry would invent a fiscal fact).
+    /// The XML does not depend on this — `aeat::desglose` emits one line per real rate.
+    #[test]
+    fn derive_tax_rate_falls_back_to_the_effective_rate_on_a_mixed_array_hub1198() {
+        let mixed = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100},
+                        {"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":1000,"quota":100}]"#;
+        assert_eq!(derive_tax_rate(mixed, 11000.0, 2200.0), 20.0);
+
+        // An array whose amounts cannot be read is not a breakdown: nothing is declared, so the
+        // effective rate is all that is left (and `aeat::desglose` refuses the record anyway).
+        let unreadable = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"quota":2100}]"#;
+        assert_eq!(derive_tax_rate(unreadable, 10000.0, 2100.0), 21.0);
+
+        // An empty array declares nothing either.
+        assert_eq!(derive_tax_rate("[]", 1000.0, 100.0), 10.0);
     }
 }
 
