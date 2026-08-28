@@ -29,6 +29,21 @@
 # ningún commit del hub de por medio.
 # ==============================================================================
 
+# ── Lints (hub#1242) ─────────────────────────────────────────────────────────
+# Este workflow es también el gate de lints del hub: corre `cargo clippy --workspace` ANTES de la
+# suite. Los NIVELES no viven aquí sino en `[workspace.lints]` del `Cargo.toml` raíz, heredados
+# por los 14 miembros con `[lints] workspace = true`.
+#
+# 🔒 RATCHET — promocionar un grupo a `deny` son DOS pasos, y ninguno toca este fichero:
+#   1. dejar el grupo a cero hallazgos
+#      (`cargo clippy -p <crate> --all-targets --fix` cubre casi todo);
+#   2. cambiar su `level` a `"deny"` en `[workspace.lints.clippy]` del `Cargo.toml` raíz.
+# Hoy: `correctness` = deny (0 hallazgos, así que el gate nace verde); `suspicious` = warn (58);
+# style/complexity/perf en su warn por defecto (129) y 30 avisos propios de rustc. El paso NO
+# lleva `-D warnings` justamente porque pasaría por encima de esa tabla y haría error todo lo
+# anterior — un gate rojo el primer día se aprende a ignorar. El cableado lo vigila `scripts/tests/clippy-lints.test.sh`, que corre
+# como primer paso de este mismo job.
+
 name: Hub tests (Rust · Postgres)
 
 # ── Con `pull_request`, otra vez ──────────────────────────────────────────────
@@ -149,6 +164,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # Contrato del cableado de lints (hub#1242): que la tabla `[workspace.lints]` exista, que
+      # TODOS los miembros la hereden y que el paso de clippy de más abajo siga aquí y antes de la
+      # suite. Es bash puro y tarda milisegundos, así que va lo primero: un cable suelto no debe
+      # esperar 20 min detrás de los tests para notarse.
+      - name: Contrato del gate de lints (hub#1242)
+        run: bash scripts/tests/clippy-lints.test.sh
 
       # 🔴 Este job resuelve los módulos por la ruta RELATIVA al checkout
       # (`crates/runtime/../../../modules-workspace/modules`), que cae FUERA del workspace y
@@ -297,6 +319,30 @@ jobs:
       # `--exclude tauri-plugin-erplora-android`: mismo motivo — depende de `tauri`, así que
       # también arrastra GTK en Linux. Su valor real son los tests KOTLIN (`testDebugUnitTest`),
       # que es donde vive la lógica; la parte Rust es el registro del plugin.
+      # ── clippy (hub#1242) ────────────────────────────────────────────────────────────────
+      # Antes de la suite A PROPÓSITO: un error de lint es instantáneo y la suite tarda ~20 min;
+      # detrás de ella el aviso llega cuando ya no lo mira nadie.
+      #
+      # Los NIVELES no están aquí: los manda `[workspace.lints]` del `Cargo.toml` raíz, que es
+      # donde está documentado el ratchet y donde se promociona un grupo. Por eso este paso NO
+      # lleva `-D warnings`: ese flag pasaría por encima de la tabla y convertiría en error los
+      # grupos que hoy siguen sucios (58 `suspicious`, 129 entre style/complexity/perf) más los 30
+      # avisos propios de rustc — o sea, entregaría el gate rojo el primer día. `correctness`
+      # está en `deny` en la tabla y eso ya es un error de compilación: este paso falla con él.
+      #
+      # `--all-targets`: los tests son donde más código nuevo entra; sin esto no se miran.
+      #
+      # Mismas exclusiones que el paso de tests, y por el mismo motivo: `erplora-tauri` y el
+      # plugin Android arrastran tauri/wry → GTK/webkit2gtk, system-libs que este runner no
+      # tiene. Ambos SÍ heredan la tabla de lints; quien los linta es `test-shell.yml`.
+      #
+      # `--no-deps`: linta el workspace, no las ~600 cajas de terceros (sus avisos no los
+      # arreglamos y solo ensucian el log).
+      - name: cargo clippy --workspace
+        run: |
+          cargo clippy --workspace --all-targets --no-deps \
+            --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+
       - name: cargo test --workspace
         id: tests
         run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android

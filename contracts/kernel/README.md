@@ -73,6 +73,16 @@ UPDATE_KERNEL_CONTRACT=1 pnpm -F @erplora/module-sdk contract:check
   `#[serde(transparent)]` y `skip_serializing_if`. Un `.wasm` publicado no se recompila: renombrar
   un campo de aquí rompe a la vez a todos los handlers Tier 2 instalados.
 
+## Lo que vigila el compilador, no un snapshot
+
+Un snapshot congela una **forma**; los bugs de forma correcta los caza el compilador. Desde
+hub#1242 el workspace declara **lints Rust**: `[workspace.lints.clippy] correctness = "deny"`
+(más `future_incompatible = "deny"` de rustc) en el `Cargo.toml` raíz, heredados por los 14
+miembros con `[lints] workspace = true`, y verificados por el paso `cargo clippy --workspace`
+de `.github/workflows/test-hub.yml` — el ratchet para subir el siguiente grupo está documentado
+en la propia tabla. El cableado lo vigila `scripts/tests/clippy-lints.test.sh`, que corre en ese
+mismo workflow.
+
 ## Lo que NO va aquí
 
 Superficie declarada que **no existe** se retira, no se congela (`navigation[].actions`,
