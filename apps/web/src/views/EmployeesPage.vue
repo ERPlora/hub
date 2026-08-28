@@ -114,7 +114,7 @@
               :helper-text="form.local ? t('employeeForm.localPinHelp', { n: hubPinLength }) : t('employeeForm.accountPinHelp', { n: hubPinLength })"
               :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`, { n: hubPinLength }) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(pinIssue) }"
-              :maxlength="8"
+              :maxlength="hubPinLength"
             />
             <ion-button
               type="submit"

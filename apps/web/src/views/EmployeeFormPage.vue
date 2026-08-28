@@ -85,7 +85,7 @@
               mode="md"
               fill="outline"
               inputmode="numeric"
-              :maxlength="8"
+              :maxlength="hubPinLength"
               :helper-text="pinHelp"
               :error-text="pinError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
