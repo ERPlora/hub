@@ -241,16 +241,28 @@ jobs:
       # hay build ni artefacto que generar, y su única devDependency (`typescript`) solo la usa
       # `contract:check`. `--dry-run` primero para que el contenido del tarball quede en el log:
       # `files` es lo único que decide qué sale, y un tarball vacío se publica igual de bien.
+      #
+      # `--tag` SIEMPRE explícito: sin él `npm publish` mueve el dist-tag `latest` a lo último que
+      # se publica, así que una candidata `vX.Y.Z-rc.N` (canal canary) dejaría `latest` apuntando a
+      # la rc y un `npm install @erplora/module-sdk` a secas se llevaría la candidata. Es el mismo
+      # criterio que `image-tags.sh` aplica a la imagen: una rc NUNCA mueve `:latest`. Las
+      # prereleases van a `next` (la convención de npm); las finales, a `latest`.
       - name: Publicar en GitHub Packages
         working-directory: packages/module-sdk
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          npm publish --dry-run
-          npm publish
+          version="${GITHUB_REF_NAME#v}"
+          case "$version" in
+            *-*) dist_tag="next" ;;
+            *)   dist_tag="latest" ;;
+          esac
+          echo "dist-tag npm: $dist_tag (versión $version)"
+          npm publish --dry-run --tag "$dist_tag"
+          npm publish --tag "$dist_tag"
           echo ""
-          echo "Publicado @erplora/module-sdk@${GITHUB_REF_NAME#v} en https://npm.pkg.github.com"
+          echo "Publicado @erplora/module-sdk@${version} (dist-tag ${dist_tag}) en https://npm.pkg.github.com"
           echo "Consumir (requiere un token con read:packages sobre ERPlora/hub):"
           echo "  .npmrc → @erplora:registry=https://npm.pkg.github.com"
           echo "  package.json → \"@erplora/module-sdk\": \"^${GITHUB_REF_NAME#v}\""

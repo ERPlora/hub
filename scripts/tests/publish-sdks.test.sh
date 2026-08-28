@@ -193,6 +193,22 @@ else
     else
         ok "build-hub.yml publica el paquete en GitHub Packages, solo desde un tag \`v*\`"
     fi
+
+    # A PRERELEASE (`vX.Y.Z-rc.N`, the canary channel) must not become npm's `latest`. Without
+    # `--tag`, `npm publish` moves the `latest` dist-tag to whatever was published last, so a bare
+    # `npm install @erplora/module-sdk` would pull the candidate. Same rule `image-tags.sh` already
+    # enforces on the image: an rc NEVER moves `:latest`.
+    if [ -n "$real_publish" ]; then
+        if ! printf '%s\n' "$real_publish" | grep -q -- '--tag'; then
+            bad "una prerelease (rc) no se publica como \`latest\`" \
+                "el \`npm publish\` real no lleva \`--tag\`: una \`X.Y.Z-rc.N\` movería \`latest\` en GitHub Packages, y \`npm install @erplora/module-sdk\` se llevaría la candidata"
+        elif ! grep -qE '^[[:space:]]*\*-\*\)' "$build_workflow"; then
+            bad "el dist-tag de npm distingue prerelease de final" \
+                "no hay un \`case\` con la rama \`*-*)\` que mande una \`X.Y.Z-rc.N\` a un dist-tag distinto de \`latest\`"
+        else
+            ok "una rc se publica con su propio dist-tag (\`next\`), nunca como \`latest\`"
+        fi
+    fi
 fi
 
 # ── 5. `erplora-guest-sdk` es consumible por git tag ─────────────────────────
