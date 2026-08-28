@@ -3976,16 +3976,21 @@ pub(crate) fn unauthorized(e: auth::AuthError) -> Response {
 
 /// The same refusal, telling **"who are you"** apart from **"not you"** (hub#660): a valid session
 /// with an insufficient role answers `403`, because re-authenticating as the same cashier would
-/// never help. Body shape unchanged, so a caller that only reads `error` keeps working.
+/// never help. The body carries a **stable code** (`unauthorized` / `forbidden`) next to the
+/// message, the shape of [`tenant_rejected`] and of the dead-letter doors (`outbox_admin`): the UI
+/// branches on the code, never on prose (hub#1241). One implementation on purpose — two copies of
+/// a refusal is how one ends up being the permissive one.
 pub(crate) fn auth_rejected(e: auth::AuthError) -> Response {
-    if e.is_forbidden() {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({ "ok": false, "error": e.message() })),
-        )
-            .into_response();
-    }
-    unauthorized(e)
+    let (status, code) = if e.is_forbidden() {
+        (StatusCode::FORBIDDEN, "forbidden")
+    } else {
+        (StatusCode::UNAUTHORIZED, "unauthorized")
+    };
+    (
+        status,
+        Json(json!({ "ok": false, "error": { "code": code, "message": e.message() } })),
+    )
+        .into_response()
 }
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.

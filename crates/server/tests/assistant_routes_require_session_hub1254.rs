@@ -155,16 +155,16 @@ async fn assistant_config_without_a_session_is_401_hub1254() {
 
     let response = router.oneshot(read_config(None)).await.unwrap();
 
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(
-        response.status(),
-        StatusCode::UNAUTHORIZED,
-        "un anónimo no lee el plan del asistente de este hub: {:?}",
-        body_json(response).await
+        body_json(response).await["error"]["code"],
+        "unauthorized",
+        "an anonymous caller must not read this hub's assistant plan, and the refusal carries a stable code"
     );
     assert_eq!(
         hits.count(),
         0,
-        "la petición anónima llegó hasta el Cloud: la puerta no está antes del proxy"
+        "the anonymous request reached the Cloud: the gate is not before the proxy"
     );
     served.abort();
 }
@@ -176,16 +176,16 @@ async fn assistant_checkout_without_a_session_is_401_hub1254() {
 
     let response = router.oneshot(open_checkout(None)).await.unwrap();
 
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     assert_eq!(
-        response.status(),
-        StatusCode::UNAUTHORIZED,
-        "un anónimo no abre un checkout a cuenta de este hub: {:?}",
-        body_json(response).await
+        body_json(response).await["error"]["code"],
+        "unauthorized",
+        "an anonymous caller must not open a checkout billed to this hub, and the refusal carries a stable code"
     );
     assert_eq!(
         hits.count(),
         0,
-        "se creó una sesión de checkout en el Cloud para un llamador anónimo"
+        "a checkout session was created in the Cloud for an anonymous caller"
     );
     served.abort();
 }
@@ -203,9 +203,18 @@ async fn assistant_checkout_with_an_employee_session_is_403_hub1254() {
     assert_eq!(
         response.status(),
         StatusCode::FORBIDDEN,
-        "quien contrata el plan es owner/admin; volver a autenticarse como cajero no ayudaría"
+        "only owner/admin contracts the plan; re-authenticating as the same cashier would never help"
     );
-    assert_eq!(hits.count(), 0, "el cajero llegó a crear el checkout");
+    assert_eq!(
+        body_json(response).await["error"]["code"],
+        "forbidden",
+        "a valid session with the wrong role is `forbidden`, not `unauthorized`: the UI branches on the code"
+    );
+    assert_eq!(
+        hits.count(),
+        0,
+        "the cashier got as far as creating the checkout"
+    );
     served.abort();
 }
 
@@ -220,7 +229,7 @@ async fn assistant_config_with_any_session_still_reaches_the_cloud_hub1254() {
     assert_eq!(
         body_json(response).await["tier"],
         "basic",
-        "el JSON del Cloud se entrega tal cual (contrato previo de `proxy_cloud_get`)"
+        "the Cloud JSON is handed over untouched (previous contract of `proxy_cloud_get`)"
     );
     assert_eq!(hits.count(), 1);
     served.abort();
@@ -237,7 +246,7 @@ async fn assistant_checkout_with_an_admin_session_still_reaches_the_cloud_hub125
     assert_eq!(
         body_json(response).await["checkout_url"],
         "https://checkout.stripe.test/s/1",
-        "cerrar la puerta no puede romper la compra de quien SÍ contrata"
+        "closing the door must not break the purchase of the one who DOES contract"
     );
     assert_eq!(hits.count(), 1);
     served.abort();
