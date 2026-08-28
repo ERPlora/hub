@@ -1,58 +1,57 @@
-//! Backfill **idempotente** de dinero euros→céntimos para hubs ya desplegados (ADR-0007).
+//! **Idempotent** euros→cents money backfill for hubs that are already deployed (ADR-0007).
 //!
-//! ## Por qué existe (y por qué FUERA de la cadena de migraciones)
+//! ## Why it exists (and why it lives OUTSIDE the migration chain)
 //!
-//! Cada módulo de dinero tiene su `001_init` **ya en céntimos** (`INTEGER`): una instalación
-//! NUEVA nace correcta. Pero los hubs **ya desplegados** aplicaron el `001` viejo (euros,
-//! `NUMERIC`) y su columna sigue en euros. El código nuevo (handlers en céntimos) multiplicaría
-//! por 100 esos importes → corrupción.
+//! Every money module ships its `001_init` **already in cents** (`INTEGER`): a NEW install is born
+//! correct. But hubs that were **already deployed** applied the old `001` (euros, `NUMERIC`) and
+//! their columns are still in euros. The new code (handlers in cents) would multiply those amounts
+//! by 100 → corruption.
 //!
-//! NO se puede arreglar con una migración `002` "en cadena" (`col = ROUND(col*100)`): se
-//! aplicaría TAMBIÉN a las instalaciones nuevas (cuyo `001` ya dejó los datos en céntimos) →
-//! **doble conversión**. Por eso el backfill vive **fuera** de `_hub_migrations`/
-//! `_hub_system_migrations`: es una conversión de datos **única por BD de hub**, guardada por un
-//! marcador a nivel de BD, no por la cadena de versiones de esquema.
+//! It cannot be fixed with a chained `002` migration (`col = ROUND(col*100)`): it would ALSO run on
+//! new installs (whose `001` already left the data in cents) → **double conversion**. That is why
+//! the backfill lives **outside** `_hub_migrations`/`_hub_system_migrations`: it is a one-off data
+//! conversion **per hub database**, guarded by a database-level marker, not by the schema version
+//! chain.
 //!
-//! ## Marcador (`_hub_meta`)
+//! ## Marker (`_hub_meta`)
 //!
-//! Una tabla de sistema `_hub_meta(key TEXT PRIMARY KEY, value TEXT)` con la fila
-//! `('money_unit','cents')`. Es la fuente de verdad de idempotencia:
-//!  - Si el marcador dice `cents` → el backfill **no hace nada** (ni en hub viejo ya convertido
-//!    ni en hub nuevo ya marcado).
-//!  - Si no está → el backfill mira **el tipo declarado** de **todas** las columnas de dinero
-//!    presentes (`information_schema.columns`, ver [`detect_money_unit`]) y exige unanimidad:
-//!      - todas `INTEGER` → esquema **ya en céntimos** (instalación nueva) → solo siembra el
-//!        marcador, **no toca datos**.
-//!      - todas `NUMERIC`/`REAL`/decimal → esquema viejo en **euros** → convierte
-//!        (`ROUND(col*100)`) y luego siembra el marcador.
-//!      - **mezcla** de las dos → hub a medio migrar → **no convierte, no marca y falla de forma
-//!        visible** (hub#1209). Ver [`MoneyUnit::Mixed`].
+//! A system table `_hub_meta(key TEXT PRIMARY KEY, value TEXT)` with the row
+//! `('money_unit','cents')`. It is the source of truth for idempotency:
+//!  - If the marker says `cents` → the backfill **does nothing** (neither on an old hub already
+//!    converted nor on a new hub already marked).
+//!  - If it is absent → the backfill reads **the declared type** of **every** money column present
+//!    (`information_schema.columns`, see [`detect_money_unit`]) and demands unanimity:
+//!      - all `INTEGER` → schema **already in cents** (new install) → only seeds the marker,
+//!        **never touches data**.
+//!      - all `NUMERIC`/`REAL`/decimal → old schema in **euros** → converts (`ROUND(col*100)`) and
+//!        then seeds the marker.
+//!      - a **mix** of the two → half-migrated hub → **no conversion, no marker, and a visible
+//!        failure** (hub#1209). See [`MoneyUnit::Mixed`].
 //!
-//! Así un hub nuevo NUNCA se convierte (aunque aún no tenga marcador la primera vez) y un hub
-//! viejo se convierte exactamente una vez. Tras sembrar el marcador, cualquier re-ejecución es
-//! un no-op total.
+//! So a new hub is NEVER converted (even the first time, before it has a marker) and an old hub is
+//! converted exactly once. Once the marker is seeded, every re-run is a total no-op.
 //!
-//! ## Por qué el veredicto es un CONSENSO y no la primera columna (hub#1209)
+//! ## Why the verdict is a CONSENSUS and not the first column (hub#1209)
 //!
-//! Hasta el 28/08/2026 bastaba la **primera** columna de dinero que existiese para sentenciar al
-//! hub entero, y la función salía ahí mismo. En un hub a medio migrar eso hacía que el resultado
-//! dependiese del orden de una lista escrita a mano, con dos desenlaces igual de silenciosos: si
-//! ganaba una entera se sembraba el marcador y los módulos en euros se quedaban en euros **para
-//! siempre** (el marcador convierte toda re-ejecución en no-op); si ganaba una decimal se
-//! convertían **todas** las presentes, incluidas las que ya estaban en céntimos, **multiplicándolas
-//! por 100**. Reproducido contra Postgres real: 999 ¢ → 99 900 ¢. Por eso la mezcla no se resuelve
-//! eligiendo una rama del `if` — se **rechaza**.
+//! Until 2026-08-28 the **first** money column that existed sentenced the whole hub, and the
+//! function returned right there. On a half-migrated hub that made the outcome depend on the order
+//! of a hand-written list, with two equally silent endings: if an integer column won, the marker
+//! was seeded and the modules still in euros stayed in euros **forever** (the marker turns every
+//! re-run into a no-op); if a decimal column won, **every** present column was converted, including
+//! the ones already in cents, **multiplying them by 100**. Reproduced against a real Postgres:
+//! 999 ¢ → 99 900 ¢. That is why a mix is not resolved by picking a branch of the `if` — it is
+//! **refused**.
 //!
-//! ## Forma de entrega (ops)
+//! ## Delivery (ops)
 //!
-//! Subcomando del binario del server: `erplora-server --backfill-money` (ver
-//! `crates/server/src/main.rs`). Conecta al Postgres del hub (`HUB_DATABASE_URL`), corre
-//! [`run`] y sale. SEGURO de re-ejecutar.
+//! A subcommand of the server binary: `erplora-server --backfill-money` (see
+//! `crates/server/src/main.rs`). It connects to the hub's Postgres (`HUB_DATABASE_URL`), runs
+//! [`run`] and exits. SAFE to re-run.
 //!
-//! Y su hermano de **solo lectura**, `erplora-server --check-money-unit` ([`check_logged`],
-//! hub#1209): dice en qué unidad está declarado el dinero de un hub sin escribir nada, para poder
-//! barrer la flota buscando hubs a medio migrar. `--backfill-money` no vale para auditar: sobre un
-//! hub viejo en euros **convertiría**.
+//! And its **read-only** sibling, `erplora-server --check-money-unit` ([`check_logged`],
+//! hub#1209): says which unit a hub's money is declared in without writing anything, so the fleet
+//! can be swept for half-migrated hubs. `--backfill-money` is no audit: on an old hub in euros it
+//! **would convert**.
 
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
@@ -64,30 +63,30 @@ use crate::registry::now_rfc3339;
 const MONEY_UNIT_KEY: &str = "money_unit";
 const MONEY_UNIT_CENTS: &str = "cents";
 
-/// Inventario **autoritativo** de columnas de dinero por tabla (todas las que el `001` nuevo dejó
-/// en `INTEGER` céntimos; extraído de los `001_init` de los módulos, ADR-0007 §2). NO incluye
-/// tasas/porcentajes (`tax_rate`, `discount_percent`, …) ni cantidades (`quantity`) — esas son
-/// `REAL` y no se multiplican por 100.
+/// **Authoritative** inventory of money columns per table (every column the new `001` left as
+/// `INTEGER` cents; extracted from the modules' `001_init`, ADR-0007 §2). Does NOT include rates or
+/// percentages (`tax_rate`, `discount_percent`, …) nor quantities (`quantity`) — those are `REAL`
+/// and are not multiplied by 100.
 ///
-/// Cada entrada: `(tabla, &[columnas de dinero])`. Si la tabla no existe en la BD (módulo no
-/// instalado), se ignora silenciosamente.
+/// Each entry: `(table, &[money columns])`. If the table does not exist in the database (module
+/// not installed) it is silently ignored.
 ///
-/// 🔴 **«Autoritativo» aquí es una afirmación comprobada, no una promesa.** Esa misma frase
-/// convivió durante meses con seis entradas cuyas tablas no existían: como `declared_type()`
-/// devuelve `None` para lo que la BD no tiene, una entrada muerta se salta **en silencio** y nada
-/// la delata. Quien la leía no podía saber cuáles de las 32 eran reales, y retirar una tabla en un
-/// módulo obligaba a venir a leer este fichero para demostrar que no había un consumidor vivo
-/// (services#67, services#69). Lo que sostiene la palabra es `tests/money_columns_inventory.rs`:
-/// pone en rojo una tabla que un `contract` publicado ya retiró, una que ningún módulo crea, una
-/// columna repetida (se convertiría dos veces: ×10 000) y un reordenado de la lista.
+/// 🔴 **"Authoritative" here is a verified claim, not a promise.** That same sentence lived for
+/// months next to six entries whose tables did not exist: since `declared_type()` returns `None`
+/// for whatever the database lacks, a dead entry is skipped **silently** and nothing gives it away.
+/// Whoever read the list could not tell which of the 32 were real, and retiring a table in a module
+/// meant coming here to prove there was no live consumer (services#67, services#69). What backs the
+/// word is `tests/money_columns_inventory.rs`: it goes red on a table a published `contract` already
+/// retired, on one no module creates, and on a repeated column (it would be converted twice:
+/// ×10 000).
 ///
-/// ✅ **El ORDEN ya no decide nada** (hub#1209). Hasta el 28/08/2026 el veredicto del hub entero lo
-/// dictaba la **primera** columna de dinero que existiese —o sea, la posición 0 de esta lista—, así
-/// que reordenar «para agrupar» movía el criterio que decide si el dinero de un cliente se
-/// multiplica por 100. Hoy [`detect_money_unit`] clasifica **todas** las columnas presentes y exige
-/// unanimidad; añadir, quitar o reordenar entradas ya no cambia el veredicto de una BD dada.
-/// Lo que sigue importando de esta lista es **qué** hay en ella: una entrada duplicada convertiría
-/// dos veces (×10 000) y una columna que falte se queda sin convertir. Eso lo fija
+/// ✅ **ORDER no longer decides anything** (hub#1209). Until 2026-08-28 the verdict for the whole hub
+/// was dictated by the **first** money column that existed — position 0 of this list — so
+/// reordering "to group things" moved the criterion that decides whether a customer's money is
+/// multiplied by 100. Today [`detect_money_unit`] classifies **every** present column and demands
+/// unanimity; adding, removing or reordering entries no longer changes the verdict for a given
+/// database. What still matters about this list is **what** is in it: a duplicate entry would
+/// convert twice (×10 000) and a missing column stays unconverted. That is pinned by
 /// `tests/money_columns_inventory.rs`.
 pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // appointments
@@ -158,31 +157,30 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     ("verifactu_record", &["base_amount", "tax_amount", "total_amount"]),
 ];
 
-/// La unidad en la que está declarado el dinero de una BD de hub, decidida sobre **todas** las
-/// columnas de [`MONEY_COLUMNS`] que existan (hub#1209).
+/// The unit a hub database's money is declared in, decided over **every** column of
+/// [`MONEY_COLUMNS`] that exists (hub#1209).
 ///
-/// Antes el veredicto lo daba la primera columna encontrada y la función salía ahí mismo: en un hub
-/// a medio migrar eso convertía la posición en la lista en el criterio que decide si el dinero de un
-/// cliente se multiplica por 100. Ahora es un consenso, y la discrepancia tiene su propio caso
-/// —[`MoneyUnit::Mixed`]— en vez de resolverse adivinando.
+/// The verdict used to come from the first column found, and the function returned right there: on
+/// a half-migrated hub that turned list position into the criterion that decides whether a
+/// customer's money is multiplied by 100. Now it is a consensus, and disagreement has its own case
+/// — [`MoneyUnit::Mixed`] — instead of being settled by guessing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MoneyUnit {
-    /// No hay ninguna tabla de dinero instalada: no hay nada que convertir y el hub es
-    /// «trivialmente» en céntimos.
+    /// No money table is installed: nothing to convert, the hub is "trivially" in cents.
     NoMoneyColumns,
-    /// Todas las columnas de dinero presentes están declaradas enteras: instalación nueva.
+    /// Every money column present is declared integer: new install.
     Cents,
-    /// Todas las columnas de dinero presentes están declaradas decimales: hub viejo en euros.
+    /// Every money column present is declared decimal: old hub in euros.
     Euros,
-    /// Hay columnas de las DOS clases. No se convierte, no se marca y se reporta: las dos lecturas
-    /// posibles corrompen dinero real en direcciones opuestas. Lleva los `tabla.columna` de cada
-    /// lado para que ops actúe sobre ellos.
+    /// Columns of BOTH kinds. Nothing is converted, nothing is marked, and it is reported: both
+    /// possible readings corrupt real money in opposite directions. Carries the `table.column`
+    /// names of each side so ops can act on them.
     Mixed { cents: Vec<String>, euros: Vec<String> },
 }
 
 impl MoneyUnit {
-    /// El error estable que representa un hub mixto, con las columnas que discrepan. `None` para
-    /// cualquier veredicto que sí se pueda aplicar.
+    /// The stable error that represents a mixed hub, with the columns that disagree. `None` for
+    /// any verdict that can actually be applied.
     fn refusal(&self) -> Option<crate::errors::RuntimeError> {
         match self {
             Self::Mixed { cents, euros } => Some(crate::errors::RuntimeError::MoneyUnitAmbiguous {
@@ -194,11 +192,13 @@ impl MoneyUnit {
     }
 }
 
-/// Clasifica **todas** las columnas de dinero presentes en la BD y devuelve el veredicto del hub.
+/// Classifies **every** money column present in the database and returns the hub's verdict.
 ///
-/// Recorre [`MONEY_COLUMNS`] entera —sin salir en la primera coincidencia— y reparte cada columna
-/// que exista según su tipo declarado ([`is_integer_type`]). El resultado depende solo de lo que hay
-/// en la BD, nunca del orden de la lista (hub#1209).
+/// Walks the WHOLE of [`MONEY_COLUMNS`] — never returning on the first match — and sorts each
+/// existing column by its declared type ([`is_integer_type`]). The result depends only on what the
+/// database holds, never on the order of the list (hub#1209). Rows do not vote: an empty table, a
+/// column holding only `NULL`s or all-zero amounts is classified by its declared type like any
+/// other, because the type is what the handlers will write into it tomorrow.
 pub async fn detect_money_unit(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
     let mut cents: Vec<String> = Vec::new();
     let mut euros: Vec<String> = Vec::new();
@@ -222,9 +222,11 @@ pub async fn detect_money_unit(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
     })
 }
 
-/// Reporta un hub mixto al registro de errores (severidad `unexpected`, ver
-/// [`crate::error_registry::severity_of`]) y por `stderr`. Un fallo que no se ve no existe: esta es
-/// la única forma en que ops se entera de que un hub se quedó a medio migrar (hub#1209).
+/// Reports a mixed hub to the error registry (severity `unexpected`, see
+/// [`crate::error_registry::severity_of`]) and on `stderr`. A failure nobody sees does not exist:
+/// this is how ops learns that a hub was left half migrated (hub#1209). On the boot path the
+/// registry has no sink yet (`install_error_reporting` runs after `ensure_system_tables`), so there
+/// the `stderr` line is the one that reaches the hub's log.
 fn report_mixed(err: &crate::errors::RuntimeError, source: &str) {
     eprintln!("[backfill-money] 🔴 {err}");
     crate::error_registry::report_runtime_error(err, source, None, json!({ "issue": "hub#1209" }));
@@ -258,9 +260,9 @@ pub async fn is_marked_cents(db: &dyn DatabaseAdapter) -> Result<bool> {
     Ok(res.rows.iter().any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
 }
 
-/// Igual que [`is_marked_cents`] pero **sin crear nada**: si `_hub_meta` no existe todavía,
-/// devuelve `false` en vez de crearla. Lo usa la auditoría de solo lectura [`check_logged`], que
-/// no puede permitirse escribir en la BD de un cliente solo por mirarla (hub#1209).
+/// Same as [`is_marked_cents`] but **creating nothing**: if `_hub_meta` does not exist yet it
+/// returns `false` instead of creating it. Used by the read-only audit [`check_logged`], which
+/// cannot afford to write into a customer's database just for looking at it (hub#1209).
 async fn is_marked_cents_readonly(db: &dyn DatabaseAdapter) -> Result<bool> {
     let exists = db
         .query(
@@ -278,15 +280,25 @@ async fn is_marked_cents_readonly(db: &dyn DatabaseAdapter) -> Result<bool> {
     Ok(res.rows.iter().any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
 }
 
-/// Siembra el marcador `money_unit=cents` (idempotente: UPSERT por dialecto).
-async fn mark_cents(db: &dyn DatabaseAdapter) -> Result<()> {
+/// The statement that seeds the `money_unit=cents` marker (idempotent: UPSERT, `key` is the PK —
+/// ADR-0154, Postgres-only). Exposed as an op so [`run`] can commit it in the SAME transaction as
+/// the conversion it seals.
+fn mark_cents_op() -> (String, Params) {
     let mut p = Params::new();
     p.insert("key".into(), json!(MONEY_UNIT_KEY));
     p.insert("value".into(), json!(MONEY_UNIT_CENTS));
-    // ON CONFLICT (key) DO UPDATE; key es PK (ADR-0154: Postgres-only).
-    let sql = "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
-               ON CONFLICT (key) DO UPDATE SET value = :value";
-    db.execute(sql, &p).await?;
+    (
+        "INSERT INTO _hub_meta (key, value) VALUES (:key, :value) \
+         ON CONFLICT (key) DO UPDATE SET value = :value"
+            .to_string(),
+        p,
+    )
+}
+
+/// Seeds the `money_unit=cents` marker on its own (idempotent).
+async fn mark_cents(db: &dyn DatabaseAdapter) -> Result<()> {
+    let (sql, p) = mark_cents_op();
+    db.execute(&sql, &p).await?;
     Ok(())
 }
 
@@ -321,50 +333,46 @@ fn is_integer_type(ty: &str) -> bool {
     t == "INTEGER" || t == "BIGINT" || t == "INT" || t == "INT8" || t == "SMALLINT"
 }
 
-/// Convierte una columna de dinero en sitio: `col = ROUND(col*100)` (euros→céntimos), saltando
-/// NULLs. Devuelve filas afectadas. SQLite es de tipado dinámico: tras el UPDATE el valor se
-/// almacena como entero aunque la columna siga declarada `NUMERIC` (el runtime lee la clase de
-/// almacenamiento, no el tipo declarado). En Postgres la columna `NUMERIC` guarda el entero sin
-/// pérdida; el flip de tipo de columna a `INTEGER` lo hará el esquema nuevo en instalaciones
-/// futuras, no aquí (el dato ya queda en céntimos, que es lo que consume el handler).
-async fn convert_column(db: &dyn DatabaseAdapter, table: &str, column: &str) -> Result<u64> {
-    // Nombres de tabla/columna vienen de la constante `MONEY_COLUMNS` (no input externo).
-    let sql = format!(
+/// The statement that converts one money column in place: `col = ROUND(col*100)` (euros→cents),
+/// skipping NULLs. In Postgres the `NUMERIC` column stores the integer without loss; flipping the
+/// column type to `INTEGER` is the job of the new schema on future installs, not of this backfill
+/// (the data is already in cents, which is what the handler consumes).
+fn convert_column_sql(table: &str, column: &str) -> String {
+    // Table/column names come from the `MONEY_COLUMNS` constant (never external input).
+    format!(
         "UPDATE {table} SET {column} = CAST(ROUND({column} * 100) AS INTEGER) \
          WHERE {column} IS NOT NULL"
-    );
-    let res = db.execute(&sql, &Params::new()).await?;
-    Ok(res.affected)
+    )
 }
 
-/// Detecta si el esquema de dinero nace en céntimos (instalación nueva) y, **solo en ese caso**,
-/// siembra el marcador `money_unit=cents`. NO convierte datos nunca. Pensado para llamarse al
-/// arrancar (`ensure_system_tables`): así una instalación NUEVA queda marcada automáticamente y
-/// el backfill jamás la tocará, mientras que un hub VIEJO en euros **no** se auto-marca (queda a
-/// la espera de que ops corra `--backfill-money` explícitamente, que es quien convierte).
+/// Detects whether the money schema is born in cents (new install) and, **only then**, seeds the
+/// `money_unit=cents` marker. NEVER converts data. Meant to be called at boot
+/// (`ensure_system_tables`): a NEW install gets marked automatically and the backfill will never
+/// touch it, while an OLD hub in euros is **not** auto-marked (it waits for ops to run
+/// `--backfill-money` explicitly, which is what converts).
 ///
-/// Idempotente y barato: si el marcador ya está, no hace nada.
+/// Idempotent and cheap: if the marker is already there, nothing happens.
 ///
-/// **Un hub mixto (hub#1209) no se marca — y tampoco tumba el arranque.** Esto corre en el camino
-/// de arranque que toma cualquier hub (`ensure_system_tables`), donde un `Err` es una tienda que no
-/// abre; y sellar el marcador sería peor todavía: congelaría la anomalía para siempre. Así que es
-/// un no-op RUIDOSO: se reporta al registro de errores y por `stderr`, no se marca, el hub sigue
-/// sirviendo y `--backfill-money` —el que sí reescribe dinero— se niega en redondo. Mismo criterio
-/// que el aviso de `access_email::report_unresolved` justo debajo en `ensure_system_tables`.
+/// **A mixed hub (hub#1209) is not marked — and does not brick the boot either.** This runs on the
+/// boot path every hub takes (`ensure_system_tables`), where an `Err` is a shop that does not open;
+/// and sealing the marker would be even worse: it would freeze the anomaly forever. So it is a LOUD
+/// no-op: reported to the error registry and on `stderr`, not marked, the hub keeps serving, and
+/// `--backfill-money` — the one that rewrites money — flatly refuses. Same criterion as the
+/// `access_email::report_unresolved` warning right below it in `ensure_system_tables`.
 pub async fn seed_marker_if_cents(db: &dyn DatabaseAdapter) -> Result<bool> {
     if is_marked_cents(db).await? {
         return Ok(true);
     }
     match detect_money_unit(db).await? {
-        // Instalación nueva, o hub sin módulos de dinero (esquema "trivialmente" en céntimos):
-        // marcar para que un futuro install no dispare una conversión espuria.
+        // New install, or hub without money modules (schema "trivially" in cents): mark it so a
+        // future install does not trigger a spurious conversion.
         MoneyUnit::Cents | MoneyUnit::NoMoneyColumns => {
             mark_cents(db).await?;
             Ok(true)
         }
-        // Hub viejo en euros: NO marcar (espera a `--backfill-money`, que es quien convierte).
+        // Old hub in euros: do NOT mark (waits for `--backfill-money`, which is what converts).
         MoneyUnit::Euros => Ok(false),
-        // Hub a medio migrar: ni se marca ni se adivina.
+        // Half-migrated hub: neither marked nor guessed.
         unit @ MoneyUnit::Mixed { .. } => {
             if let Some(err) = unit.refusal() {
                 report_mixed(&err, "money_backfill::seed_marker_if_cents");
@@ -374,34 +382,35 @@ pub async fn seed_marker_if_cents(db: &dyn DatabaseAdapter) -> Result<bool> {
     }
 }
 
-/// Ejecuta el backfill idempotente sobre la BD del hub.
+/// Runs the idempotent backfill on the hub database.
 ///
-/// 1. Si el marcador ya dice `cents` → no-op (devuelve `already_marked = true`).
-/// 2. Si no, decide por **tipo declarado** de **todas** las columnas de dinero presentes
-///    ([`detect_money_unit`]): si todas son enteras → esquema nuevo en céntimos → solo siembra el
-///    marcador (`schema_already_cents = true`), sin tocar datos.
-/// 3. Si todas son `NUMERIC`/decimal → hub viejo en euros → convierte todas las columnas de todas
-///    las tablas presentes (`ROUND(col*100)`) y luego siembra el marcador.
-/// 4. Si hay de las dos clases (hub a medio migrar) → **`Err`**
-///    ([`RuntimeError::MoneyUnitAmbiguous`](crate::errors::RuntimeError::MoneyUnitAmbiguous)): no
-///    convierte, no marca y lo reporta. Es el único caso en que este subcomando falla, y falla a
-///    propósito: adivinar multiplica por 100 el dinero de un cliente o lo deja en euros para
-///    siempre (hub#1209).
+/// 1. If the marker already says `cents` → no-op (returns `already_marked = true`).
+/// 2. Otherwise decides by the **declared type** of **every** money column present
+///    ([`detect_money_unit`]): all integer → new schema in cents → only seeds the marker
+///    (`schema_already_cents = true`), without touching data.
+/// 3. All `NUMERIC`/decimal → old hub in euros → converts every money column of every present
+///    table (`ROUND(col*100)`) and seeds the marker, all in ONE transaction: a run that dies
+///    halfway leaves nothing behind for the re-run to convert twice.
+/// 4. Both kinds present (half-migrated hub) → **`Err`**
+///    ([`RuntimeError::MoneyUnitAmbiguous`](crate::errors::RuntimeError::MoneyUnitAmbiguous)):
+///    nothing converted, nothing marked, and reported. It is the only case in which this subcommand
+///    fails, and it fails on purpose: guessing multiplies a customer's money by 100 or leaves it in
+///    euros forever (hub#1209).
 ///
-/// Idempotente: tras correr, el marcador deja cualquier re-ejecución en no-op.
+/// Idempotent: once it has run, the marker turns every re-run into a no-op.
 pub async fn run(db: &dyn DatabaseAdapter) -> Result<BackfillReport> {
     let mut report = BackfillReport::default();
 
-    // (1) Guarda por marcador.
+    // (1) Marker guard.
     if is_marked_cents(db).await? {
         report.already_marked = true;
         return Ok(report);
     }
 
-    // (2) ¿Esquema ya en céntimos? Se clasifican TODAS las columnas de dinero presentes y se exige
-    // unanimidad (hub#1209). Si el hub disiente consigo mismo no hay veredicto que aplicar: las dos
-    // lecturas posibles corrompen dinero real en direcciones opuestas, así que se rechaza sin
-    // convertir ni marcar, y se reporta para que ops lo mire.
+    // (2) Schema already in cents? EVERY money column present is classified and unanimity is
+    // demanded (hub#1209). If the hub disagrees with itself there is no verdict to apply: both
+    // possible readings corrupt real money in opposite directions, so it is refused without
+    // converting or marking, and reported for ops to look at.
     let unit = detect_money_unit(db).await?;
     if let Some(err) = unit.refusal() {
         report_mixed(&err, "money_backfill::run");
@@ -410,19 +419,24 @@ pub async fn run(db: &dyn DatabaseAdapter) -> Result<BackfillReport> {
     let schema_is_cents = matches!(unit, MoneyUnit::Cents | MoneyUnit::NoMoneyColumns);
 
     if schema_is_cents {
-        // Instalación nueva (o sin módulos de dinero): NO tocar datos, solo marcar.
+        // New install (or no money modules): do NOT touch data, only mark.
         report.schema_already_cents = true;
         mark_cents(db).await?;
         return Ok(report);
     }
 
-    // (3) Hub viejo en euros: convierte todas las columnas de dinero presentes.
+    // (3) Old hub in euros: convert every money column present — in ONE transaction together with
+    // the marker that seals it. With autocommit, a run that died halfway (a lock, a lost
+    // connection) left the first tables already in cents, no marker and every column still
+    // `NUMERIC`, so the re-run read the hub as euros again and multiplied those tables by 100.
+    // Either everything is converted and sealed, or nothing is.
+    let mut ops: Vec<(String, Params)> = Vec::new();
     for (table, columns) in MONEY_COLUMNS {
         let mut table_touched = false;
         for col in *columns {
-            // Solo convertimos columnas que existen (tabla/columna presente = módulo instalado).
+            // Only columns that exist are converted (table/column present = module installed).
             if declared_type(db, table, col).await?.is_some() {
-                report.rows_updated += convert_column(db, table, col).await?;
+                ops.push((convert_column_sql(table, col), Params::new()));
                 table_touched = true;
             }
         }
@@ -430,37 +444,38 @@ pub async fn run(db: &dyn DatabaseAdapter) -> Result<BackfillReport> {
             report.converted_tables.push((*table).to_string());
         }
     }
-
-    // Sella el marcador: a partir de aquí, re-ejecutar es no-op.
-    mark_cents(db).await?;
+    ops.push(mark_cents_op());
+    let res = db.execute_tx(&ops).await?;
+    // The marker upsert is the last op and always touches exactly one row.
+    report.rows_updated = res.affected.saturating_sub(1);
     Ok(report)
 }
 
-/// Comprobación **de solo lectura** de la unidad monetaria de un hub, para que ops pueda barrer la
-/// flota buscando hubs a medio migrar sin arriesgar nada (hub#1209).
+/// **Read-only** check of a hub's money unit, so ops can sweep the fleet for half-migrated hubs
+/// without risking anything (hub#1209).
 ///
-/// No escribe **nada**: ni convierte, ni siembra el marcador, ni siquiera crea `_hub_meta` (no mira
-/// el marcador a propósito — lo que se audita aquí es el ESQUEMA, que es lo que puede discrepar
-/// consigo mismo). Es seguro correrla contra la BD de un cliente en producción, incluida la de un
-/// hub viejo en euros que aún no se ha convertido: `--backfill-money` no sirve para auditar porque
-/// sobre ese hub **convertiría**. La entrega es `erplora-server --check-money-unit` (ver
+/// Writes **nothing**: no conversion, no marker, not even `_hub_meta` gets created (the marker is
+/// deliberately not consulted for the verdict — what is audited here is the SCHEMA, which is what
+/// can disagree with itself). Safe to run against a customer's production database, including an
+/// old hub in euros that has not been converted yet: `--backfill-money` is no audit because on that
+/// hub it **would convert**. Delivered as `erplora-server --check-money-unit` (see
 /// `crates/server/src/main.rs`).
 ///
-/// Devuelve `Err` solo en el caso mixto, para que el barrido pueda apoyarse en el código de salida.
+/// Returns `Err` only in the mixed case, so the sweep can rely on the exit code.
 pub async fn check_logged(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
     let unit = detect_money_unit(db).await?;
     let marked = is_marked_cents_readonly(db).await?;
     match &unit {
         MoneyUnit::NoMoneyColumns => {
-            eprintln!("[check-money-unit] sin tablas de dinero instaladas — nada que convertir.");
+            eprintln!("[check-money-unit] no money tables installed — nothing to convert.");
         }
         MoneyUnit::Cents => {
-            eprintln!("[check-money-unit] céntimos: todas las columnas de dinero son enteras.");
+            eprintln!("[check-money-unit] cents: every money column is integer.");
         }
         MoneyUnit::Euros => {
             eprintln!(
-                "[check-money-unit] euros: todas las columnas de dinero son decimales — este hub \
-                 espera a `--backfill-money`."
+                "[check-money-unit] euros: every money column is decimal — this hub is waiting for \
+                 `--backfill-money`."
             );
         }
         MoneyUnit::Mixed { cents, euros } => {
@@ -469,18 +484,27 @@ pub async fn check_logged(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
                 euros: euros.join(", "),
             };
             report_mixed(&err, "money_backfill::check_logged");
-            eprintln!("[check-money-unit]   · en céntimos ({}): {}", cents.len(), cents.join(", "));
-            eprintln!("[check-money-unit]   · en euros ({}): {}", euros.len(), euros.join(", "));
-            // El marcador NO decide por sí solo si esto es grave: cambia CUÁL de las dos lecturas
-            // es la cierta, y las dos existen de verdad. Se imprime junto al veredicto para que
-            // quien barre no tenga que ir a buscarlo (y para que no lo confunda con un permiso).
+            eprintln!("[check-money-unit]   · in cents ({}): {}", cents.len(), cents.join(", "));
+            eprintln!("[check-money-unit]   · in euros ({}): {}", euros.len(), euros.join(", "));
+            // The marker alone does not say whether this is serious: it changes WHICH of the two
+            // readings is the true one, and both really happen. It is printed next to the verdict
+            // so whoever sweeps does not have to go and look it up (and does not mistake it for a
+            // permission).
             if marked {
                 eprintln!(
-                    "[check-money-unit]   · marcador `money_unit=cents`: PUESTO → dos lecturas                      posibles, y hay que distinguirlas MIRANDO LOS IMPORTES de las columnas                      decimales de arriba: (a) benigno — el hub se convirtió en su día (la                      conversión deja el DATO en céntimos pero no cambia el TIPO de la columna) y                      luego instaló un módulo nuevo, que nació `INTEGER`; (b) GRAVE — el hub se                      selló por el defecto de hub#1209 y esas columnas decimales siguen en EUROS.                      Si los importes son ~100 veces menores de lo que deberían, es (b)."
+                    "[check-money-unit]   · marker `money_unit=cents`: PRESENT → two readings are \
+                     possible and only the AMOUNTS in the decimal columns above tell them apart: \
+                     (a) benign — the hub was converted back in the day (the conversion leaves the \
+                     DATA in cents but does not change the column TYPE) and later installed a new \
+                     module, born `INTEGER`; (b) SERIOUS — the hub was sealed by the hub#1209 defect \
+                     and those decimal columns still hold EUROS. If the amounts are ~100 times \
+                     smaller than they should be, it is (b)."
                 );
             } else {
                 eprintln!(
-                    "[check-money-unit]   · marcador `money_unit=cents`: AUSENTE → hub a medio                      migrar y sin sellar. `--backfill-money` se niega (es lo correcto): no hay                      conversión automática que pueda arreglar esto sin decidir columna por columna."
+                    "[check-money-unit]   · marker `money_unit=cents`: ABSENT → half-migrated hub, \
+                     not sealed. `--backfill-money` refuses (which is right): no automatic \
+                     conversion can fix this without deciding column by column."
                 );
             }
             return Err(err);

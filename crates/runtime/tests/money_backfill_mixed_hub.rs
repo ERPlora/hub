@@ -18,7 +18,9 @@
 //! describe is about `information_schema` types across several tables: an empty database, or the
 //! SQLite the rest of the suite once used, would go green without ever seeing it.
 use erplora_db::{testutil::fresh_db, DatabaseAdapter, Params, PgAdapter};
+use erplora_runtime::error_registry::error_code_of;
 use erplora_runtime::money_backfill::{self, MoneyUnit};
+use erplora_runtime::RuntimeError;
 
 /// Reads a numeric cell whatever its JSON shape: Postgres decodes `NUMERIC` as a **string**
 /// (precision contract of `pg_cell`) and integers as numbers.
@@ -68,6 +70,26 @@ async fn payments_in_euros(db: &PgAdapter) {
         .unwrap();
 }
 
+/// `sales_sale` as a module still on the OLD schema leaves it: `NUMERIC`, values in euros.
+async fn sales_in_euros(db: &PgAdapter) {
+    db.execute_batch(
+        "CREATE TABLE sales_sale (\
+            id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+            subtotal NUMERIC NOT NULL DEFAULT 0, tax_amount NUMERIC NOT NULL DEFAULT 0, \
+            discount_amount NUMERIC NOT NULL DEFAULT 0, total NUMERIC NOT NULL DEFAULT 0, \
+            amount_tendered NUMERIC NOT NULL DEFAULT 0, change_due NUMERIC NOT NULL DEFAULT 0);",
+    )
+    .await
+    .unwrap();
+    db.execute_batch(
+        "INSERT INTO sales_sale \
+         (id, hub_id, subtotal, tax_amount, discount_amount, total, amount_tendered, change_due) \
+         VALUES ('s1', 'h', 12.34, 2.59, 0, 14.93, 20.00, 5.07);",
+    )
+    .await
+    .unwrap();
+}
+
 async fn read_one(db: &PgAdapter, sql: &str) -> i64 {
     let res = db.query(sql, &Params::new()).await.unwrap();
     num_i64(res.rows[0].as_object().unwrap().values().next().unwrap())
@@ -83,6 +105,14 @@ async fn a_mixed_hub_is_refused_not_guessed_hub1209() {
     let err = money_backfill::run(&db)
         .await
         .expect_err("a hub with money columns in BOTH units must be refused, never guessed");
+
+    // The refusal is its own stable case, never a generic failure: ops alerts on the CODE, so the
+    // variant and its code are the contract, not the sentence.
+    assert!(
+        matches!(err, RuntimeError::MoneyUnitAmbiguous { .. }),
+        "a mixed hub must be refused with its own variant, got: {err:?}"
+    );
+    assert_eq!(error_code_of(&err), "money_unit_ambiguous");
 
     // The refusal names the evidence, both sides of it — ops has to be able to act on it without
     // opening a psql.
@@ -323,4 +353,130 @@ async fn a_sealed_marker_does_not_excuse_a_mixed_hub_hub1209() {
         .await
         .expect_err("a sealed mixed hub is the hub#1209 damage, not a hub that is fine");
     assert!(err.to_string().contains("payments_payment.amount"), "{err}");
+}
+
+/// 🔴 Rows do not vote: the verdict is about DECLARED TYPES, so an empty table, a column holding
+/// only `NULL`s or all-zero amounts can neither flip the verdict nor mask a mixed hub.
+///
+/// The realistic shape is an old hub in euros (rows present) that installs a brand-new module
+/// today: its `001` is `INTEGER` and the table is still empty. A verdict that skipped empty tables
+/// would call that hub "euros", convert it and seal the marker — after which the new module keeps
+/// writing cents into a hub whose every other column was just rewritten, and nothing ever looks
+/// again. The type is what the handlers will write tomorrow; that is what gets classified.
+#[tokio::test]
+async fn rows_do_not_vote_empty_or_null_only_tables_cannot_flip_the_verdict_hub1209() {
+    // (a) An INTEGER table with ZERO rows next to a NUMERIC table with rows: still mixed, still
+    // refused, nothing touched, nothing sealed.
+    let db = fresh_db().await;
+    db.execute_batch(
+        "CREATE TABLE sales_sale (\
+            id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, \
+            subtotal INTEGER NOT NULL DEFAULT 0, tax_amount INTEGER NOT NULL DEFAULT 0, \
+            discount_amount INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, \
+            amount_tendered INTEGER NOT NULL DEFAULT 0, change_due INTEGER NOT NULL DEFAULT 0);",
+    )
+    .await
+    .unwrap();
+    payments_in_euros(&db).await;
+    let err = money_backfill::run(&db)
+        .await
+        .expect_err("an empty cents table still counts: the hub is mixed by schema");
+    assert!(matches!(err, RuntimeError::MoneyUnitAmbiguous { .. }), "{err:?}");
+    assert_eq!(
+        read_one(&db, "SELECT amount FROM payments_payment WHERE id = 'p1'").await,
+        10,
+        "the euros must not be converted on the strength of an empty table"
+    );
+    assert!(!money_backfill::is_marked_cents(&db).await.unwrap());
+
+    // (b) A NUMERIC table whose only rows are NULL and 0 next to an INTEGER table with rows: the
+    // decimal column has no amount to look at, and is still a euros column.
+    let db = fresh_db().await;
+    sales_in_cents(&db).await;
+    db.execute_batch(
+        "CREATE TABLE payments_payment (id TEXT PRIMARY KEY, amount NUMERIC); \
+         INSERT INTO payments_payment (id, amount) VALUES ('n', NULL), ('z', 0);",
+    )
+    .await
+    .unwrap();
+    assert!(
+        matches!(
+            money_backfill::detect_money_unit(&db).await.unwrap(),
+            MoneyUnit::Mixed { .. }
+        ),
+        "NULL-only / zero-only amounts must not hide a decimal column"
+    );
+    assert!(money_backfill::run(&db).await.is_err());
+    assert_eq!(
+        read_one(&db, "SELECT total FROM sales_sale WHERE id = 's1'").await,
+        1493,
+        "the cents side must not be multiplied by 100"
+    );
+
+    // (c) Alone, an empty decimal table is a plain euros hub — not "no money columns", which would
+    // seal the marker at boot and strand the rows it receives afterwards.
+    let db = fresh_db().await;
+    db.execute_batch("CREATE TABLE payments_payment (id TEXT PRIMARY KEY, amount NUMERIC);")
+        .await
+        .unwrap();
+    assert_eq!(
+        money_backfill::detect_money_unit(&db).await.unwrap(),
+        MoneyUnit::Euros
+    );
+    assert!(
+        !money_backfill::seed_marker_if_cents(&db).await.unwrap(),
+        "an empty euros table must not be sealed as cents at boot"
+    );
+}
+
+/// 🔴 The conversion is ONE transaction with its marker: a run that dies halfway leaves the hub
+/// exactly as it was, so the re-run converts once — never twice (found in the review of hub#1209).
+///
+/// Without the transaction `run()` rewrote table after table with autocommit and sealed the marker
+/// last. A failure in the middle (a lock, a trigger, a lost connection) left the first tables
+/// already in cents, no marker, and every column still declared `NUMERIC` — so the re-run read the
+/// hub as "euros" and multiplied the converted tables by 100. Same money, same ×100, and no mixed
+/// schema for the consensus rule to refuse.
+#[tokio::test]
+async fn a_conversion_that_dies_halfway_leaves_nothing_behind_to_convert_twice_hub1209() {
+    let db = fresh_db().await;
+    // Two euros tables, in inventory order: `payments_payment` is converted before `sales_sale`.
+    payments_in_euros(&db).await;
+    sales_in_euros(&db).await;
+    // The SECOND table refuses the UPDATE, the way a lock or a lost connection would.
+    db.execute_batch(
+        "CREATE FUNCTION refuse_update() RETURNS trigger LANGUAGE plpgsql AS $$ \
+            BEGIN RAISE EXCEPTION 'simulated failure mid-backfill'; END $$; \
+         CREATE TRIGGER refuse BEFORE UPDATE ON sales_sale FOR EACH ROW EXECUTE FUNCTION refuse_update();",
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        money_backfill::run(&db).await.is_err(),
+        "the run must surface the failure, not swallow it"
+    );
+
+    // Nothing was committed: the first table is still in euros and there is no marker.
+    assert_eq!(
+        read_one(&db, "SELECT amount FROM payments_payment WHERE id = 'p1'").await,
+        10,
+        "a run that failed halfway must not leave a table already converted behind"
+    );
+    assert!(!money_backfill::is_marked_cents(&db).await.unwrap());
+
+    // The obstacle goes away; the re-run converts exactly once (1 payments row + 6 sales columns).
+    db.execute_batch("DROP TRIGGER refuse ON sales_sale;").await.unwrap();
+    let report = money_backfill::run(&db).await.unwrap();
+    assert_eq!(report.rows_updated, 7);
+    assert_eq!(
+        read_one(&db, "SELECT amount FROM payments_payment WHERE id = 'p1'").await,
+        999,
+        "9.99 € converted once, not 99 900"
+    );
+    assert_eq!(
+        read_one(&db, "SELECT subtotal FROM sales_sale WHERE id = 's1'").await,
+        1234
+    );
+    assert!(money_backfill::is_marked_cents(&db).await.unwrap());
 }

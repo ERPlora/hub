@@ -33,16 +33,16 @@ async fn backfill_money() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Audita la unidad monetaria del hub **sin escribir nada** (hub#1209). Ver
+/// Audits the hub's money unit **without writing anything** (hub#1209). See
 /// [`erplora_runtime::money_backfill::check_logged`].
 async fn check_money_unit() -> Result<(), Box<dyn std::error::Error>> {
     use erplora_runtime::money_backfill;
 
     let dsn = normalize_pg_dsn(std::env::var("HUB_DATABASE_URL").unwrap_or_default().trim());
     if dsn.is_empty() {
-        return Err("HUB_DATABASE_URL es obligatoria para --check-money-unit (ADR-0154)".into());
+        return Err("HUB_DATABASE_URL is required for --check-money-unit (ADR-0154)".into());
     }
-    eprintln!("[check-money-unit] conectando al Postgres del hub (solo lectura) …");
+    eprintln!("[check-money-unit] connecting to the hub's Postgres (read-only) …");
     let db = erplora_db::PgAdapter::connect(&dsn).await?;
     money_backfill::check_logged(&db).await?;
     Ok(())
