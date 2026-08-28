@@ -1745,7 +1745,7 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
 pub const RETIRED_FIELDS: &[(&str, &str, &str)] = &[(
     "commands.*",
     "validates",
-    "declared by 7 commands of `inventory`/`services` and NEVER implemented by the runtime \
+    "declared by published commands of `inventory` and NEVER implemented by the runtime \
      (hub#610): the validation it describes does NOT run — use `reads` + `expect_rows`",
 )];
 
