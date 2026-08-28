@@ -142,7 +142,8 @@ export interface HubUserPatch {
 interface Envelope<T> {
   ok?: boolean;
   data?: T;
-  error?: { message?: string; code?: string } | string;
+  // hub#1190: `field`/`reason` travel beside the code on an `invalid_field` refusal (ADR-0398 §6).
+  error?: { message?: string; code?: string; field?: string; reason?: string } | string;
 }
 
 /**
@@ -151,7 +152,14 @@ interface Envelope<T> {
  * contra el código (ver [`hubUserErrorKey`]).
  */
 export class HubUsersError extends Error {
-  constructor(message: string, readonly code?: string) {
+  constructor(
+    message: string,
+    readonly code?: string,
+    // hub#1190: `field` and `reason` of an `invalid_field` refusal (ADR-0398 §6), carried as DATA
+    // so the screen translates by code instead of painting the runtime's English sentence.
+    readonly field?: string,
+    readonly reason?: string,
+  ) {
     super(message);
     this.name = 'HubUsersError';
   }
@@ -171,8 +179,16 @@ function errorCode(body: unknown): string | undefined {
   return typeof error === 'string' ? undefined : error?.code;
 }
 
+/** `field` and `reason` of the envelope when the refusal names one (hub#1190). */
+function errorFieldReason(body: unknown): [string | undefined, string | undefined] {
+  const error = (body as Envelope<unknown> | undefined)?.error;
+  if (typeof error === 'string' || !error) return [undefined, undefined];
+  return [error.field, error.reason];
+}
+
 function failed(body: unknown, fallback: string): HubUsersError {
-  return new HubUsersError(errorMessage(body, fallback), errorCode(body));
+  const [field, reason] = errorFieldReason(body);
+  return new HubUsersError(errorMessage(body, fallback), errorCode(body), field, reason);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -210,11 +226,16 @@ export async function listHubRoles(): Promise<HubRole[]> {
  */
 export class RoleActivationError extends Error {
   readonly code?: string;
+  /** hub#1190: `field`/`reason` of an `invalid_field` refusal, so the panel translates by code. */
+  readonly field?: string;
+  readonly reason?: string;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, field?: string, reason?: string) {
     super(message);
     this.name = 'RoleActivationError';
     this.code = code;
+    this.field = field;
+    this.reason = reason;
   }
 }
 
@@ -233,12 +254,14 @@ export async function setRoleActivation(key: string, active: boolean): Promise<H
   const env = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     data?: HubRole[];
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; field?: string; reason?: string };
   };
   if (!res.ok || env.ok === false) {
     throw new RoleActivationError(
       env.error?.message ?? `roles/${key} → ${res.status}`,
       env.error?.code,
+      env.error?.field,
+      env.error?.reason,
     );
   }
   return Array.isArray(env.data) ? env.data : [];

@@ -76,10 +76,11 @@ import {
   setRoleActivation,
   type HubRole,
 } from '../lib/hub-users';
+import { invalidFieldMessage } from '../lib/invalid-field';
 import { isAdmin } from '../lib/session';
 import { toast } from '../lib/toast';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 
 type Row = Record<string, unknown>;
 interface DataTableColumn {
@@ -193,8 +194,16 @@ const columns = computed<DataTableColumn[]>(() => [
 /**
  * Motivo REAL del rechazo, o `fallback` si el runtime no dio ninguno (red/500). Mismo criterio que
  * `AppsPage.reasonOf` (hub#314): `code` presente = hay una razón de negocio que enseñar.
+ *
+ * hub#1190: si el rechazo es un `invalid_field` del core, la frase sale del catálogo del shell —
+ * el `message` del runtime está en INGLÉS a propósito (regla del idioma del código) y pintarlo tal
+ * cual dejaba a un hub en español leyendo «role `admin` is a base role of the hub…». Solo se
+ * traduce lo que el catálogo tiene: para cualquier otro motivo se conserva la frase que vino, que
+ * dice más que cualquier genérico (misma regla que `platformFailureMessage`, hub#1102).
  */
 function reasonOf(error: unknown, fallback: string): string {
+  const translated = invalidFieldMessage(error, t, te);
+  if (translated) return translated;
   return error instanceof RoleActivationError && error.code && error.message
     ? error.message
     : fallback;

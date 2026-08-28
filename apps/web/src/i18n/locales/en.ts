@@ -1581,4 +1581,58 @@ export default {
     unavailable:
       'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
   },
+  // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 Â§6).
+  //
+  // The runtime answers `{code:"invalid_field", field, reason, message}` and the `message` is the
+  // English source written for a log. These are the sentences a person reads instead. Keyed by
+  // DATA â the pair first, the reason alone as the fallback â because the pair is what the screen
+  // has, and parsing the sentence is what ADR-0055 forbids.
+  //
+  // A reason with no entry here is NOT invented: the screen keeps the runtime's own sentence,
+  // which names the role, the length or the accepted values (same rule as `platformFailureMessage`,
+  // hub#1102).
+  invalidField: {
+    byField: {
+      name: {
+        required: 'Type the name.',
+        too_long: 'That name is too long: use 150 characters or fewer.',
+        duplicate:
+          'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+      },
+      role: {
+        required: 'Pick a role.',
+        too_long: 'That role name is too long: use 50 characters or fewer.',
+      },
+      pin: { format: 'The PIN is {length} digits, numbers only.' },
+      badge: {
+        length: 'The badge must be between 4 and 64 characters.',
+        format: 'The badge only accepts letters, digits, “-” and “_”.',
+      },
+      email: { format: 'That email address is not valid.' },
+      role_key: {
+        required: 'Pick a role.',
+        immutable:
+          'This role comes with the hub: it is always on and cannot be switched off.',
+        unknown:
+          'No installed app declares this role. Install the app that brings it, or pick another role.',
+        inactive:
+          'This role is switched off in this hub. Switch it on in Settings → Roles before assigning it.',
+      },
+      language: { unknown: 'That language is not available in this hub.' },
+      theme_mode: { unknown: 'That appearance is not one this hub offers.' },
+      theme_palette: { unknown: 'That colour scheme is not one this hub offers.' },
+    },
+    // Fallback by reason alone: covers a field that gains a refusal before this table does, which
+    // is how the last sixteen fixes of this family started.
+    byReason: {
+      required: 'This field is required.',
+      too_long: 'This value is too long.',
+      length: 'This value does not have the length this hub expects.',
+      format: 'This value does not have the shape this hub expects.',
+      unknown: 'This hub does not accept that value.',
+      immutable: 'This value cannot be changed.',
+      inactive: 'This value is switched off in this hub.',
+      duplicate: 'This hub already has that value.',
+    },
+  },
 } as const;

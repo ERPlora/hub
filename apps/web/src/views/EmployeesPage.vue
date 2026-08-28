@@ -214,10 +214,12 @@ import {
   type HubRole,
   type HubUser,
 } from '../lib/hub-users';
+import { invalidFieldMessage } from '../lib/invalid-field';
+import { hubPinLength } from '../lib/pin-length';
 import { isAdmin, user } from '../lib/session';
 import { toast } from '../lib/toast';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 
 type Row = Record<string, unknown>;
 interface DataTableColumn {
@@ -469,10 +471,19 @@ async function createUser(): Promise<void> {
   }
 }
 
-/** Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso. */
+/**
+ * Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso.
+ *
+ * Tres escalones, en este orden (hub#1190): motivo de NEGOCIO del core (`hub.users.*`, hub#355) →
+ * campo rechazado (`invalid_field` + `field`/`reason`, ADR-0398 §6) → la frase que vino. El
+ * `message` del runtime está en inglés a propósito (regla del idioma del código); enseñarlo tal
+ * cual es lo que ponía «the name is required» delante de una encargada.
+ */
 function rejectionMessage(error: unknown): string {
   const key = hubUserErrorKey(error);
   if (key) return t(`employeeForm.errors.${key}`);
+  const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });
+  if (translated) return translated;
   return error instanceof Error ? error.message : t('employees.saveError');
 }
 
@@ -499,7 +510,8 @@ async function deactivateUser(row: Row): Promise<void> {
     await load();
     void toast(t('employees.deactivated'), 'success');
   } catch (error) {
-    void toast(error instanceof Error ? error.message : t('employees.deleteError'), 'danger');
+    // hub#1190: la baja pasa por la misma puerta y se dice en el mismo idioma.
+    void toast(rejectionMessage(error), 'danger');
   }
 }
 
