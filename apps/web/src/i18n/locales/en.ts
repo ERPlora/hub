@@ -1581,11 +1581,11 @@ export default {
     unavailable:
       'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
   },
-  // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 Â§6).
+  // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 §6).
   //
   // The runtime answers `{code:"invalid_field", field, reason, message}` and the `message` is the
   // English source written for a log. These are the sentences a person reads instead. Keyed by
-  // DATA â the pair first, the reason alone as the fallback â because the pair is what the screen
+  // DATA — the pair first, the reason alone as the fallback — because the pair is what the screen
   // has, and parsing the sentence is what ADR-0055 forbids.
   //
   // A reason with no entry here is NOT invented: the screen keeps the runtime's own sentence,

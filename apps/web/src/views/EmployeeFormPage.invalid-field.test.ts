@@ -39,7 +39,7 @@ const ENGLISH_FROM_THE_RUNTIME = 'the name is required';
 function runtimeRefusing(error: Record<string, unknown> | null): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
+    vi.fn(async (_url: string, init?: RequestInit) => {
       if (init?.method === 'POST' && error) {
         return { ok: false, status: 422, json: async () => ({ ok: false, error }) };
       }

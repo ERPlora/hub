@@ -479,12 +479,12 @@ async function createUser(): Promise<void> {
  * `message` del runtime está en inglés a propósito (regla del idioma del código); enseñarlo tal
  * cual es lo que ponía «the name is required» delante de una encargada.
  */
-function rejectionMessage(error: unknown): string {
+function rejectionMessage(error: unknown, fallback = t('employees.saveError')): string {
   const key = hubUserErrorKey(error);
   if (key) return t(`employeeForm.errors.${key}`);
   const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });
   if (translated) return translated;
-  return error instanceof Error ? error.message : t('employees.saveError');
+  return error instanceof Error ? error.message : fallback;
 }
 
 async function deactivateUser(row: Row): Promise<void> {
@@ -510,8 +510,9 @@ async function deactivateUser(row: Row): Promise<void> {
     await load();
     void toast(t('employees.deactivated'), 'success');
   } catch (error) {
-    // hub#1190: la baja pasa por la misma puerta y se dice en el mismo idioma.
-    void toast(rejectionMessage(error), 'danger');
+    // hub#1190: la baja pasa por la misma puerta y se dice en el mismo idioma. Su frase genérica
+    // sigue siendo la de la baja, no la del guardado.
+    void toast(rejectionMessage(error, t('employees.deleteError')), 'danger');
   }
 }
 
