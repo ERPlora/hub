@@ -78,6 +78,12 @@ pub async fn put_settings(
 
 /// Catálogo legible (ES) de las capabilities conocidas. El server es la autoridad de las etiquetas;
 /// el frontend las pinta tal cual (con un fallback local).
+///
+/// 🔴 **Esta lista de brazos es la LISTA MAESTRA de capabilities del core.** Si añades uno aquí,
+/// añádelo también al espejo `apps/web/src/lib/module-capabilities.ts` **con su `breaksKey`** (qué
+/// deja de funcionar si el permiso no se concede, hub#1174) y sus cadenas `en` + `es`. No es una
+/// convención: `apps/web/src/lib/module-capabilities.test.ts` lee ESTE fichero, compara la lista y
+/// falla nombrando la capability que se quedó sin espejo o sin «qué se rompe».
 fn capability_meta(id: &str) -> (&'static str, &'static str) {
     match id {
         "network" => (

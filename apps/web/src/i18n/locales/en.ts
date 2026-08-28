@@ -658,6 +658,19 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+    // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
+    // invisible consequence is not. One sentence per capability id; the catalogue in
+    // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
+    // fixes it is the toggle in the same row (hub#800 §3).
+    capabilityBreaks: {
+      network: 'Without this, the app cannot go online: whatever it syncs, sends or checks over the internet stays undone.',
+      certificate: 'Without this, your invoices are not signed and never reach the tax authority.',
+      printer: 'Without this, receipts and kitchen orders pile up in the print queue and nothing comes out.',
+      notify: 'Without this, no reminder or confirmation reaches your customers by email, SMS or WhatsApp.',
+      manage_flows: 'Without this, the app cannot create or edit your automations, so the ones it needs never run.',
+      // A capability this shell does not know yet: say something true rather than nothing.
+      unknown: 'Without this, the part of the app that needs this permission will not work.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
   // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the

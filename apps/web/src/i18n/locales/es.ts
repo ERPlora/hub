@@ -613,6 +613,15 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+    // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
+    capabilityBreaks: {
+      network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',
+      certificate: 'Sin esto, tus facturas no se firman y no llegan a Hacienda.',
+      printer: 'Sin esto, los tiques y las comandas se quedan en la cola de impresión y no sale ninguno.',
+      notify: 'Sin esto, no llega ningún recordatorio ni confirmación a tus clientes por email, SMS o WhatsApp.',
+      manage_flows: 'Sin esto, la app no puede crear ni editar tus automatizaciones, así que las que necesita no se ejecutan.',
+      unknown: 'Sin esto, la parte de la app que necesita este permiso no funcionará.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
   print: {
