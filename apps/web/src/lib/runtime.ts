@@ -911,6 +911,22 @@ export interface ExportModuleTables {
 }
 
 /**
+ * Lo que `GET /api/hub/export/tables` le cuenta al formulario de export.
+ *
+ * `lockedPurpose` es el `purpose` que el hub tiene IMPUESTO (hub#377, ADR-0195): un hub de
+ * desarrollo sin enrolar o una demo efímera exporta SIEMPRE como plantilla, decida lo que decida
+ * el formulario. `null` = el usuario elige.
+ *
+ * 🔴 hub#1249: sin este dato el formulario ofrecía «copia de seguridad» con la casilla de usuarios
+ * marcada y el servidor devolvía un zip sin usuarios, en silencio — una copia que parece hecha y
+ * no lo está.
+ */
+export interface ExportTablesInfo {
+  modules: ExportModuleTables[];
+  lockedPurpose: BundlePurpose | null;
+}
+
+/**
  * Para qué es el bundle (ADR-0195). `backup` = copia/migración privada (lo lleva todo);
  * `template` = plantilla publicable, y entonces el motor EXCLUYE identidades y fiscal del zip
  * marque lo que marque el formulario.
@@ -1245,14 +1261,26 @@ function filenameFromDisposition(header: string | null): string | null {
  * devuelve vacío y el formulario sigue funcionando exactamente como antes —todas las tablas—, en
  * vez de romper la pantalla de export por una comodidad.
  */
-export async function fetchExportTables(): Promise<ExportModuleTables[]> {
+export async function fetchExportTables(): Promise<ExportTablesInfo> {
+  const empty: ExportTablesInfo = { modules: [], lockedPurpose: null };
   try {
     const res = await runtimeFetch(`${RUNTIME_URL}/api/hub/export/tables`, { headers: runtimeHeaders() });
-    if (!res.ok) return [];
-    const body = (await res.json()) as { modules?: ExportModuleTables[] };
-    return Array.isArray(body.modules) ? body.modules : [];
+    if (!res.ok) return empty;
+    const body = (await res.json()) as {
+      modules?: ExportModuleTables[];
+      locked_purpose?: BundlePurpose | null;
+    };
+    return {
+      modules: Array.isArray(body.modules) ? body.modules : [],
+      // Un runtime anterior a hub#1249 no manda el campo: `null` = «elige tú», que es lo que ese
+      // runtime hacía. Solo un valor conocido ata el formulario — un `purpose` que no entendemos
+      // no puede desactivar casillas a ciegas.
+      lockedPurpose: body.locked_purpose === 'template' || body.locked_purpose === 'backup'
+        ? body.locked_purpose
+        : null,
+    };
   } catch {
-    return [];
+    return empty;
   }
 }
 

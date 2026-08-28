@@ -1349,6 +1349,7 @@ export default {
     purposeBackupDesc: 'Private copy to restore or move this business. Includes your people and their access.',
     purposeTemplate: 'Template to share',
     purposeTemplateDesc: 'To publish or hand to another business. Never includes people, PINs or tax certificates.',
+    purposeLocked: 'This is a demo or a test installation, so it can only export templates: people, PINs and tax details never travel in its file.',
     sectionUsers: 'Users',
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',

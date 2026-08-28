@@ -174,6 +174,21 @@ fn is_safe_locale(s: &str) -> bool {
 ///
 /// Misma puerta que el export (`require_admin_session`): la respuesta dice cuántas filas tiene cada
 /// tabla del negocio, así que no puede ser más abierta que el volcado que la usa.
+/// El `purpose` que este hub tiene IMPUESTO, o `None` si quien exporta puede elegirlo.
+///
+/// Un hub que no es un negocio real nunca exporta más que una plantilla (hub#377, ADR-0195): el
+/// hub de desarrollo sin enrolar (`is_dev_hub`) y la demo efímera (ADR-0197). La regla es la
+/// misma de siempre; lo que cambia es que ahora tiene UN solo sitio y las dos puertas del export
+/// la leen de aquí — la que empaqueta el zip y la que el formulario consulta antes de pintarse.
+///
+/// 🔴 hub#1249: vivía SOLO dentro de `export_blueprint`, así que el formulario seguía ofreciendo
+/// «copia de seguridad» con la casilla de usuarios marcada y el zip volvía sin ellos, sin un solo
+/// aviso. Es exactamente la casilla que `ExportPanel.vue` tiene prohibido pintar («una casilla que
+/// el motor va a ignorar es una mentira»), solo que la mentira la escribía el servidor.
+pub(crate) fn locked_purpose(st: &AppState) -> Option<BundlePurpose> {
+    (st.is_dev_hub() || st.config.demo).then_some(BundlePurpose::Template)
+}
+
 pub async fn export_tables(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
@@ -190,8 +205,11 @@ pub async fn export_tables(State(st): State<AppState>, headers: HeaderMap) -> Re
         Err(e) => return unauthorized(e),
     };
     let ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+    // `locked_purpose`: el formulario no puede ofrecer lo que el motor va a ignorar (hub#1249).
+    let locked = locked_purpose(&st);
     match export::module_table_counts(&rt, &data_hub_id, &ids).await {
-        Ok(modules) => Json(json!({ "ok": true, "modules": modules })).into_response(),
+        Ok(modules) => Json(json!({ "ok": true, "modules": modules, "locked_purpose": locked }))
+            .into_response(),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }
@@ -251,8 +269,8 @@ pub async fn export_blueprint(
     // encima de las casillas (export.rs), así que esto basta: no hace falta tocar `users`/`fiscal`
     // uno a uno. (La issue hablaba de `is_demo`; ese nombre se retiró en ADR-0212 porque era ambiguo
     // — `is_dev_hub` es lo que significaba.)
-    if st.is_dev_hub() || st.config.demo {
-        selection.purpose = BundlePurpose::Template;
+    if let Some(forced) = locked_purpose(&st) {
+        selection.purpose = forced;
     }
 
     // Motor del runtime (Fase 1): manifest + data/*.sql. `created_at` lo aporta esta capa

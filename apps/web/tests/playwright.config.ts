@@ -27,6 +27,11 @@ const WEB_URL = process.env.HUB_WEB_URL ?? 'http://localhost:5173';
 const DATABASE_URL =
   process.env.HUB_E2E_DATABASE_URL ?? 'postgres://postgres:test@localhost:5433/hub_e2e_web';
 
+// `hub_id` del banco: cualquiera MENOS el de dev (`00000000-…-0001`). Es lo que separa «un hub
+// recién creado» de «el hub de desarrollo», y el core cambia de comportamiento entre los dos
+// (hub#1249): un hub de dev no exporta más que plantillas, así que sus copias no llevan usuarios.
+const E2E_HUB_ID = process.env.HUB_ID ?? 'e2e00000-0000-4000-8000-000000000001';
+
 // Directorio de módulos VACÍO a propósito: los specs afirman sobre el hub recién creado, y con el
 // workspace de módulos del monorepo delante afirmarían sobre otra cosa distinta en cada máquina.
 const EMPTY_MODULES_DIR = mkdtempSync(join(tmpdir(), 'e2e-empty-modules-'));
@@ -60,9 +65,12 @@ export default defineConfig({
       // binario lo construye un paso anterior, así que esto arranca en segundos.
       command: 'cargo run -q -p erplora-server',
       cwd: HUB_ROOT,
-      // `/api/system` y no `/healthz`: contesta 200 solo cuando el runtime ya migró y sembró,
-      // que es lo que los specs necesitan. `/healthz` responde en cuanto el router se ata.
-      url: `${RUNTIME_URL}/api/system`,
+      // `/readyz` (ADR-0291) y no `/healthz`: contesta 200 solo cuando la BD responde y las
+      // migraciones de sistema están aplicadas, que es lo que los specs necesitan; `/healthz`
+      // responde en cuanto el router se ata. El seed ya corrió cuando el puerto contesta algo (se
+      // aplica en el arranque, ANTES de atar el listener). Era `/api/system`, que es `auth:session`
+      // y en este banco ya no hay puerta de dev que lo abra sin sesión (hub#1249).
+      url: `${RUNTIME_URL}/readyz`,
       reuseExistingServer: !process.env.CI,
       // En CI el binario ya está: 3 min es holgura de arranque (migraciones + seed), no de build.
       // En local el primer arranque SÍ compila el runtime entero, y 15 min es el techo realista.
@@ -72,25 +80,42 @@ export default defineConfig({
       env: {
         HUB_DATABASE_URL: DATABASE_URL,
         HUB_BIND: RUNTIME_BIND,
-        // Mismo trío que el runtime que `AssistantGrounded.spec.ts` ya arranca — se copia porque
-        // funciona, no por parecido. `HUB_AUTH=dev` + el `hub_id` de dev hacen `is_dev_hub()`, que
-        // es la ÚNICA excepción al registro de máquina (`crates/server/src/lib.rs`): sin ella el
-        // runtime contesta 428 `machine_registration_required` a TODA la superficie de negocio y
-        // el banco se cae entero antes del primer spec. Los specs siguen entrando por
-        // `/api/auth/pin`, la misma puerta que una cajera.
-        HUB_AUTH: 'dev',
+        // ── El banco es un hub REAL, no el hub de dev ni una demo (hub#1249) ──────────────────
+        //
+        // Hasta aquí este banco arrancaba con `HUB_AUTH=dev` + el `hub_id` de dev + `HUB_DEMO=1`,
+        // y esa combinación no es «un hub recién creado»: es un hub que el core trata como NO
+        // REAL, y eso le cambia el negocio a los specs por debajo. Dos consecuencias, las dos
+        // mudas:
+        //   · `POST /api/hub/export` fuerza `purpose: template` en un hub de dev o de demo
+        //     (hub#377, ADR-0195), así que las secciones de identidad NUNCA entraban en el zip y
+        //     el round-trip export→import perdía los usuarios — hub#1249;
+        //   · en `AuthMode::Dev` el contexto sale de las cabeceras (`x-hub-id`, por defecto
+        //     `local`) mientras el seed escribe el usuario Demo bajo el `hub_id` del despliegue,
+        //     así que el volcado miraba a OTRO hub y salía vacío aunque la sección viajase.
+        //
+        // `HUB_AUTH=session` es además la puerta de producción, y la que los specs ya usaban:
+        // entran por `/api/auth/pin` e inyectan `X-Hub-Session`, exactamente como el navegador de
+        // una cajera. Un `hub_id` propio + el token de máquina hacen `machine_registered()`, que es
+        // la otra forma —la real— de pasar la barrera de `require_machine_registration`.
+        HUB_AUTH: 'session',
+        HUB_ID: E2E_HUB_ID,
         HUB_DEV_MODE: '1',
-        // `HUB_DEMO` (ADR-0197) es lo que hace que el PIN se pueda usar en este banco. El seed
-        // sembraba una fila `hub_trusted_device` llamada `demo-trusted-device` y hub#630 la BORRÓ:
-        // el `device_id` se lo acuña el navegador, así que nadie iba a presentar jamás ese nombre.
-        // Lo que la sustituyó es el trust-on-first-use de un hub de demo — el PRIMER dispositivo
-        // que se presenta queda adoptado (`device_mode::demo_would_adopt`) — y sin esta variable
-        // los specs que entran por `/api/auth/pin` reciben 403 `device_untrusted`. Llevaban rotos
-        // desde hub#630 sin que nadie lo viera, que es exactamente lo que hub#1240 arregla.
-        HUB_DEMO: '1',
+        // El PIN de una cajera se presenta desde un navegador cuyo `device_id` acuña el propio
+        // navegador (`apps/web/src/lib/device.ts`), así que en un banco efímero no hay dispositivo
+        // de confianza que valga: la puerta se desarma A PROPÓSITO y en voz alta. Antes esto se
+        // compraba con `HUB_DEMO=1` (trust-on-first-use de la demo), que de paso convertía el hub
+        // en una demo a todos los efectos — el precio que pagaba hub#1249.
+        HUB_DEVICE_TRUST: 'off',
         // Token de máquina (X-Hub-Token): en prod lo inyecta el provisioning; sin él la sesión por
         // PIN no tiene credencial hub-scoped y el proxy del asistente contesta 401.
         HUB_CLOUD_API_TOKEN: 'e2e-machine-token',
+        // 🔴 EL BANCO NO LLAMA A PRODUCCIÓN. Sin esto, `cloud_base_url` es `https://erplora.com` y
+        // el hub del banco —que allí no existe— recibe **410 `hub_not_found`** del gate de
+        // entitlement; el shell lo trata como «este hub fue borrado» (`setOnHubGone`, main.ts),
+        // cierra sesión y manda a /login a mitad de spec. Un puerto cerrado convierte eso en un
+        // fallo de red, que es lo que un banco sin Cloud tiene que parecer — el mismo truco que
+        // usan los tests del server (`cloud_base_url: http://127.0.0.1:1`).
+        HUB_CLOUD_API_URL: 'http://127.0.0.1:1',
         // Seed de dev: usuario Demo (PIN 0000). Sin él no hay a quién autenticar y el login por
         // PIN de todos los specs falla antes del primer caso.
         HUB_SEED_SQL_PATH: join(HUB_ROOT, 'crates', 'server', 'seeds', 'demo.sql'),

@@ -24,11 +24,13 @@ interface Session {
 /** Sesión REAL del runtime vía `/api/auth/pin` (usuario Demo / PIN 0000 del seed de dev). */
 async function loginByPin(): Promise<Session> {
   const api = await pwRequest.newContext();
-  // Names the device the dev seed marked as trusted (`demo-trusted-device`). Device-trust is armed
-  // by default since hub#330: a PIN login that identifies no device is refused, which is exactly
-  // what a browser on a fresh till gets — so naming it here is the real contract, not a workaround.
+  // The device identifies itself, exactly as the browser of a real till does (hub#330: a PIN login
+  // that identifies no device is refused). The bank disarms the trust gate with
+  // `HUB_DEVICE_TRUST=off` (see `playwright.config.ts`) because the id a browser mints is random
+  // and there is nothing to pre-trust in an ephemeral bank — it used to buy that with `HUB_DEMO=1`,
+  // which turned the whole hub into a demo and broke the export round trip (hub#1249).
   const res = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '0000', device_id: 'e2e-browser-device' },
   });
   expect(res.ok(), `login PIN falló: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = await res.json();
@@ -72,12 +74,14 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await expect(page.getByTestId('import-cloud-loading')).toHaveCount(0);
   });
 
-  // 🔴 ROJO POR UN DEFECTO REAL, no por el test (hub#1249, encontrado al poner esta suite a correr
-  // por primera vez en hub#1240): el round-trip export→import PIERDE la sección `users`. El export
-  // se pide con `users: true` y el manifest importado solo detecta ajustes y media, así que
-  // `import-section-users` no existe. Queda `fixme` —visible en el informe, no borrado— para que el
-  // resto de la suite pueda correr en CI; se quita al cerrar hub#1249.
-  test.fixme('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
+  // Regression test for ERPlora/hub#1249 — el round-trip export→import PERDÍA los usuarios.
+  //
+  // No era el motor: era el BANCO. Este runtime arrancaba como hub de dev + demo, y en un hub que
+  // el core no considera un negocio real el export fuerza `purpose: template` (hub#377, ADR-0195),
+  // que excluye las identidades del zip. El manifest llegaba con ajustes y media, sin usuarios, y
+  // nadie se enteraba. El banco es ahora un hub real (`playwright.config.ts`), así que esta prueba
+  // vuelve a decir lo que dice su nombre: la copia de un hub se puede volver a importar ENTERA.
+  test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
     const session = await loginByPin();
 
     // Round-trip REAL: el zip se genera con el propio export del runtime (cero fixtures).

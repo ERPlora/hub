@@ -1256,6 +1256,7 @@ export default {
     purposeBackupDesc: 'Copia privada para restaurar o mudar este negocio. Incluye a tu gente y sus accesos.',
     purposeTemplate: 'Plantilla para compartir',
     purposeTemplateDesc: 'Para publicar o dar a otro negocio. Nunca incluye personas, PIN ni certificados fiscales.',
+    purposeLocked: 'Esta es una instalación de demostración o de pruebas, así que solo puede exportar plantillas: las personas, los PIN y los datos fiscales nunca viajan en su archivo.',
     sectionUsers: 'Usuarios',
     sectionUsersDesc: 'Empleados, roles y permisos',
     sectionSettings: 'Ajustes',
