@@ -337,6 +337,9 @@ export default {
     // el hub esté vacío, y propone recargar: las apps siguen instaladas.
     appsLoadError:
       'No se han podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.',
+    // hub#1197 — en móvil la rejilla se pliega a las dos filas; esta es la baldosa que lleva al
+    // resto, el mismo catálogo que ya abre ＋ Añadir apps (`/apps`).
+    appsViewAll: 'Ver todas las apps',
     blueprintTitle: 'Configura tu negocio',
     blueprintBody: 'Carga una plantilla para tu negocio o restaura una copia para empezar.',
     blueprintCta: 'Configurar',

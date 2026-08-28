@@ -15,6 +15,7 @@ vi.mock('./module-loader', () => ({
 
 import {
   MAX_VISIBLE_ROWS,
+  PHONE_MAX_VISIBLE_ROWS,
   ORIGIN_USER,
   isInherited,
   SETUP_STATUS_QUERY,
@@ -215,6 +216,43 @@ describe('what is in sight and what is folded', () => {
     const view = checklistView(parseSetupStatus([doc(items)]), { expanded: true });
 
     expect(view.rows.map((r) => r.key)).toEqual(['apps', 'business_identity', 'verifactu.setup']);
+  });
+
+  // hub#1197 — on a 390px hub the card's own 5 rows were, by themselves, most of a screen and a
+  // half: the practice of the trade caps a DESKTOP card at 5, but a phone does not have room for
+  // that many at once. `maxRows` overrides the fold point without touching what is IN it (still ⛔
+  // and 🔴 first, 🟡 only if nothing else is left) or the counters (still the query's).
+  it('a caller may ask for fewer rows than the desktop default (hub#1197)', () => {
+    const items = Array.from({ length: 9 }, (_, n) => item(`m${n}.setup`));
+    const status = parseSetupStatus([doc(items)]);
+
+    const phone = checklistView(status, { maxRows: PHONE_MAX_VISIBLE_ROWS });
+
+    expect(phone.rows).toHaveLength(PHONE_MAX_VISIBLE_ROWS);
+    expect(PHONE_MAX_VISIBLE_ROWS).toBeLessThan(MAX_VISIBLE_ROWS);
+    expect(phone.hidden).toBe(9 - PHONE_MAX_VISIBLE_ROWS);
+    // Nothing else about the fold changes: the desktop default still applies without the option.
+    expect(checklistView(status).rows).toHaveLength(MAX_VISIBLE_ROWS);
+  });
+
+  it('`maxRows` never widens the fold past what the whole list has', () => {
+    const items = [item('apps'), item('team')];
+    const status = parseSetupStatus([doc(items)]);
+
+    const view = checklistView(status, { maxRows: PHONE_MAX_VISIBLE_ROWS });
+
+    expect(view.rows).toHaveLength(2);
+    expect(view.hidden).toBe(0);
+  });
+
+  it('expanded ALWAYS shows everything — `maxRows` only shapes the short view', () => {
+    const items = Array.from({ length: 9 }, (_, n) => item(`m${n}.setup`));
+    const status = parseSetupStatus([doc(items)]);
+
+    const view = checklistView(status, { maxRows: PHONE_MAX_VISIBLE_ROWS, expanded: true });
+
+    expect(view.rows).toHaveLength(9);
+    expect(view.hidden).toBe(0);
   });
 });
 

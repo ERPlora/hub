@@ -25,12 +25,33 @@ const _compact = ref<boolean>(false);
 /** `true` while the screen is too narrow to sit the global actions beside the title. */
 export const isCompactViewport: ComputedRef<boolean> = computed(() => _compact.value);
 
+/**
+ * The width at which the panel's two setup cards fold (hub#1197) — «My apps» and the setup
+ * checklist. Narrower than {@link COMPACT_VIEWPORT_QUERY}: the topbar runs out of room a full
+ * tablet step before a card's grid/rows do, and folding both at 767px would cost a tablet its full
+ * checklist for no width reason. 540px is not invented for this: it is the breakpoint the setup
+ * card's own stylesheet already used for its footer button.
+ */
+export const PHONE_VIEWPORT_QUERY = '(max-width: 540px)';
+
+const _phone = ref<boolean>(false);
+
+/** `true` while the screen is too narrow for the panel's cards to show everything at once. */
+export const isPhoneViewport: ComputedRef<boolean> = computed(() => _phone.value);
+
 // Bound at load, not on the first render: a topbar that painted its buttons and then swapped them
-// for a menu would flash on every boot of the till.
+// for a menu would flash on every boot of the till — and the same is true of a card that paints
+// every row and then folds most of them away a frame later.
 if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-  const mql = window.matchMedia(COMPACT_VIEWPORT_QUERY);
-  _compact.value = mql.matches;
-  mql.addEventListener('change', (event) => {
+  const compactMql = window.matchMedia(COMPACT_VIEWPORT_QUERY);
+  _compact.value = compactMql.matches;
+  compactMql.addEventListener('change', (event) => {
     _compact.value = event.matches;
+  });
+
+  const phoneMql = window.matchMedia(PHONE_VIEWPORT_QUERY);
+  _phone.value = phoneMql.matches;
+  phoneMql.addEventListener('change', (event) => {
+    _phone.value = event.matches;
   });
 }

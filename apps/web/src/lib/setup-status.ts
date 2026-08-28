@@ -56,6 +56,16 @@ export const LEVEL_RECOMMENDED = 'recommended';
  */
 export const MAX_VISIBLE_ROWS = 5;
 
+/**
+ * The fold on a phone (hub#1197).
+ *
+ * At 390px the desktop cap of 5 was, by itself, most of a screen and a half — before the apps card
+ * above it and the widget board below it even painted. Progress + the couple of items that actually
+ * need the owner right now is the same trade every mobile checklist makes (Square/Shopify's mobile
+ * onboarding: progress + one CTA); the rest is one tap away behind «view all», same door as desktop.
+ */
+export const PHONE_MAX_VISIBLE_ROWS = 2;
+
 /** One item of the checklist, exactly as `hub.setup.status` emits it. */
 export interface SetupItem {
   /** Stable key. For a CORE item it is ALSO its i18n key; for a module it is `<module_id>.setup`. */
@@ -135,6 +145,12 @@ export interface ChecklistOptions {
    * left the deduplicated item with no row anywhere on the panel.
    */
   alreadyOnScreen?: readonly string[];
+  /**
+   * How many rows the SHORT view shows before folding the rest (hub#1197). `MAX_VISIBLE_ROWS` when
+   * omitted — the desktop default. Never widens the fold past the list itself, and `expanded`
+   * ignores it entirely: the whole point of «view all» is that it hides nothing.
+   */
+  maxRows?: number;
 }
 
 const _status = ref<SetupStatus | null>(null);
@@ -214,7 +230,7 @@ export function checklistView(status: SetupStatus | null, opts: ChecklistOptions
     // ⛔ and 🔴 in sight, 🟡 folded — unless the only thing left is 🟡, in which case folding it
     // would leave the card with a headline and an empty body.
     const upfront = left.filter((i) => i.level !== LEVEL_RECOMMENDED);
-    rows = (upfront.length ? upfront : left).slice(0, MAX_VISIBLE_ROWS);
+    rows = (upfront.length ? upfront : left).slice(0, opts.maxRows ?? MAX_VISIBLE_ROWS);
   }
 
   return { ...counters, rows, hidden: items.length - rows.length, complete, empty };
