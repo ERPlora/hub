@@ -13,6 +13,7 @@
 // retiró (contradice ADR-0269) y esto no lo reintroduce: aquí no hay ninguna acción.
 
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
+import { formatDate, formatTime, hubDayKey } from './format-datetime';
 
 /** Una transición tal como la devuelve `GET /api/system/update-history`. */
 export interface UpdateHistoryEntry {
@@ -37,14 +38,14 @@ export interface UpdateHistoryEntry {
   at: string;
 }
 
-/** Una entrada ya lista para pintar: la de arriba más su hora en local. */
+/** Una entrada ya lista para pintar: la de arriba más su hora en el reloj del NEGOCIO. */
 export interface DisplayEntry extends UpdateHistoryEntry {
   time: string;
 }
 
 /** Un día con algo que contar. Los días sin cambios no producen grupo. */
 export interface DayGroup {
-  /** `YYYY-MM-DD` en hora local — la clave del `v-for`, estable y ordenable. */
+  /** `YYYY-MM-DD` del día del NEGOCIO — la clave del `v-for`, estable y ordenable. */
   key: string;
   /** La fecha ya formateada. Vacía cuando es hoy o ayer: esos se nombran, no se fechan. */
   label: string;
@@ -67,11 +68,14 @@ export function versionJump(entry: UpdateHistoryEntry): string {
   return `${entry.from} → ${entry.to}`;
 }
 
-/** `YYYY-MM-DD` del día LOCAL de una fecha (no UTC: el dueño vive en su huso, no en Greenwich). */
-function localDayKey(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+/**
+ * `YYYY-MM-DD` del día del NEGOCIO (hub#1212) — no UTC (el dueño no vive en Greenwich) y tampoco el
+ * del navegador, que es el mismo fallo con otra ropa: un hub en Las Palmas abierto desde Madrid
+ * archivaba un cambio de las 23:30 bajo el día siguiente. Lo resuelve `hubDayKey`; si el instante
+ * no se puede leer, quien llama ya tiene su grupo `UNDATED`.
+ */
+function businessDayKey(at: Date | string): string {
+  return hubDayKey(at) ?? UNDATED;
 }
 
 /**
@@ -96,19 +100,20 @@ export function groupByDay(
   now: Date,
   locale: string,
 ): DayGroup[] {
-  const todayKey = localDayKey(now);
+  const todayKey = businessDayKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayKey = localDayKey(yesterday);
+  const yesterdayKey = businessDayKey(yesterday);
 
   const byDay = new Map<string, DisplayEntry[]>();
   const sorted = [...entries].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
   for (const entry of sorted) {
-    const at = new Date(entry.at);
-    const readable = !Number.isNaN(at.getTime());
-    const key = readable ? localDayKey(at) : UNDATED;
-    const time = readable ? at.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '';
+    const key = businessDayKey(entry.at);
+    const time =
+      key === UNDATED
+        ? ''
+        : (formatTime(entry.at, { locale, hour: '2-digit', minute: '2-digit' }) ?? '');
     const bucket = byDay.get(key);
     if (bucket) bucket.push({ ...entry, time });
     else byDay.set(key, [{ ...entry, time }]);
@@ -122,11 +127,12 @@ export function groupByDay(
       isYesterday: key === yesterdayKey,
       label: named
         ? ''
-        : new Date(dayEntries[0].at).toLocaleDateString(locale, {
+        : (formatDate(dayEntries[0].at, {
+            locale,
             day: 'numeric',
             month: 'short',
             year: 'numeric',
-          }),
+          }) ?? ''),
       entries: dayEntries,
     };
   });

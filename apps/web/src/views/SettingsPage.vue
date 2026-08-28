@@ -621,6 +621,7 @@ import {
   type BusinessCertificate,
 } from '../lib/runtime';
 import { zoneClock, zoneOptions } from '../lib/timezone';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te } = useI18n();
 
@@ -1001,8 +1002,8 @@ const certBusy = ref<boolean>(false);
 const certUploadedLabel = computed<string>(() => {
   const raw = cert.value.uploaded_at;
   if (!raw) return '';
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+  // Sin `locale` explícito: esta pantalla no lo destructura y el helper cae al locale activo.
+  return formatDateTime(raw) ?? raw;
 });
 
 // Lee el estado del certificado al abrir Ajustes (best-effort; degrada a "Sin certificado").

@@ -84,8 +84,22 @@ export const hubSettings = ref<HubSettings | null>(null);
  * entrega a los handlers como `context.timezone` / `:timezone`.
  */
 export function hubTimezone(): string {
+  return publishedHubTimezone() ?? 'UTC';
+}
+
+/**
+ * La zona ya PUBLICADA, o `null` si el boot todavía no la ha sembrado (hub#1212).
+ *
+ * Es la misma lectura que `hubTimezone()` sin su degradación, y existe porque `UTC` y «aún no lo
+ * sé» son dos respuestas distintas que `hubTimezone()` no puede separar. Quien pinta fechas
+ * (`lib/format-datetime.ts`) necesita distinguirlas: antes del boot, `UTC` sería una hora mal en
+ * España diez meses al año, así que ahí cae al huso del navegador —lo que ya se veía— en vez de
+ * afirmar un reloj que nadie ha dicho. El contrato de `hubTimezone()` no cambia: el SDK de los
+ * módulos sigue leyendo `UTC` como último recurso.
+ */
+export function publishedHubTimezone(): string | null {
   const published = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
-  return typeof published === 'string' && published.trim() ? published.trim() : 'UTC';
+  return typeof published === 'string' && published.trim() ? published.trim() : null;
 }
 
 /**

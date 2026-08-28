@@ -199,6 +199,7 @@ import {
   type HubDevice,
 } from '../lib/devices';
 import { isAdmin, logout } from '../lib/session';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -240,10 +241,9 @@ function modeOf(device: HubDevice): string {
   return device.mode === 'personal' ? t('devices.modePersonal') : t('devices.modeShared');
 }
 
-/** Una fecha como la lee una persona, en su idioma. Un ISO crudo no es una señal, es ruido. */
+/** Una fecha como la lee una persona, en su idioma y en el RELOJ DEL NEGOCIO (hub#1212). */
 function when(iso: string): string {
-  const at = new Date(iso);
-  return Number.isNaN(at.getTime()) ? iso : at.toLocaleString(locale.value);
+  return formatDateTime(iso, { locale: locale.value }) ?? iso;
 }
 
 /**

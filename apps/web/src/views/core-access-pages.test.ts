@@ -19,7 +19,11 @@ describe('core access and account pages', () => {
 
   it('localizes billing dates and reports external-action failures', () => {
     const billing = source('BillingPage.vue');
-    expect(billing).toContain("locale.value === 'en' ? 'en-GB' : 'es-ES'");
+    // hub#1212 moved the `en → en-GB` / `es-ES` mapping out of every screen and into
+    // `formatLocale()` (`lib/format-datetime.ts`), which also passes the BUSINESS timezone. What
+    // this page still has to do — and what "localizes billing dates" ever meant — is hand the
+    // formatter the locale of the APP instead of letting the browser decide.
+    expect(billing).toContain("formatDate(iso, {\n      locale: locale.value,");
     // hub#480 replaced the single `billing.downloadError` here: that sentence only ever fitted the
     // fetch half, and inside the installed app the half that fails is the SAVE. The key now comes
     // from `saveDownloadMessageKey`, which tells "this device has nowhere to put it" — the one the
