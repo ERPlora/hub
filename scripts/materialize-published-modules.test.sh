@@ -214,6 +214,70 @@ n=$(find "$base/dest" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc
     && ok "no deploy key: ssh remotes go through the developer's own ssh, not an empty GIT_SSH_COMMAND" \
     || bad "no deploy key: ssh remotes go through the developer's own ssh, not an empty GIT_SSH_COMMAND" "$errs out=$(tail -c 400 "$OUT")"
 
+# ── 9. A Mac-built bundle carries AppleDouble `._<module>` entries ────────────
+#    Regression test for ERPlora/hub#1153 (CI red of PR #1256, run 33128409723).
+#    `MODULES_DEPLOY_KEYS` is a tar+base64 built on a Mac, so for every key it
+#    also carries an AppleDouble sidecar `._<module>`. The inline version of this
+#    loop listed the bundle with plain `ls`, which HIDES dotfiles, so it never saw
+#    them; this script listed it with `ls -A`, which does not — and the catalogue
+#    became 54 "modules". The 27 real ones cloned fine and the 27 sidecars each
+#    died with `git@github.com: Permission denied (publickey)`, failing the job.
+#
+#    A module id is `^[a-z][a-z0-9_]*$` (schemas/module.schema.json), so anything
+#    else in the bundle is not a module and must be ignored — out loud, never in
+#    silence, because a genuinely mistyped id has to stay visible.
+#
+#    The case also pins WHICH key each clone uses: a fake `ssh` on PATH records
+#    its `-i` argument and then serves the upload-pack locally, so it stays
+#    offline. `._mod01` must never be handed to git as a key.
+base=$(make_catalogue 26)
+OUT="$base/out"
+keys="$base/keys"
+mkdir -p "$keys" "$base/bin"
+export KEYLOG="$base/KEYS_USED"
+: > "$KEYLOG"
+for i in $(seq 1 26); do
+    id=$(printf 'mod%02d' "$i")
+    printf 'real-key-for-%s\n' "$id" > "$keys/$id"
+    printf 'Mac Finder junk\n'      > "$keys/._$id"      # the AppleDouble sidecar
+done
+printf 'junk\n' > "$keys/.DS_Store"
+cat > "$base/bin/ssh" <<'FAKE'
+#!/usr/bin/env bash
+# fake ssh: records the -i key it was handed, then runs the git command locally
+key=""; prev=""
+for a in "$@"; do [ "$prev" = "-i" ] && key="$a"; prev="$a"; done
+[ -n "$key" ] && [ -n "${KEYLOG:-}" ] && printf '%s\n' "$(basename "$key")" >> "$KEYLOG"
+cmd="${!#}"
+exec sh -c "${cmd/#git-upload-pack/git upload-pack}"
+FAKE
+chmod +x "$base/bin/ssh"
+code=$(PATH="$base/bin:$PATH" run_script bash "$SCRIPT" --dest "$base/dest" \
+        --keys "$keys" --floor 25 \
+        --remote-template "ssh://localhost$base/origins/%s.git")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+n=$(find "$base/dest" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" = 26 ] || errs="$errs manifests=$n(want 26)"
+# Nothing named `._*` may be treated as a module…
+ls -A "$base/dest" 2>/dev/null | grep -q '^\._' && errs="$errs applelDouble-was-materialised-as-a-module"
+# `── ._mod…` is the per-module failure header: it can only appear if a sidecar
+# reached the clone loop. The names themselves DO appear in the "ignored" notice,
+# on purpose, so a bare grep for `._mod` would be wrong here.
+grep -q '── \._' "$OUT" && errs="$errs applelDouble-reached-the-clone-loop"
+# …and the announcement must count 26, never 52+1.
+grep -q '26 module(s)' "$OUT" || errs="$errs id-count-is-not-26"
+# The keys actually handed to git are the REAL ones, never a sidecar.
+grep -q '^\._' "$KEYLOG" && errs="$errs an-AppleDouble-file-was-used-AS-A-KEY"
+[ "$(sort -u "$KEYLOG" | wc -l | tr -d ' ')" = 26 ] || errs="$errs distinct-keys=$(sort -u "$KEYLOG" | wc -l | tr -d ' ')(want 26)"
+grep -qx 'mod07' "$KEYLOG" || errs="$errs mod07-was-not-cloned-with-its-own-key"
+# Ignoring is LOUD: a mistyped id must not vanish in silence.
+grep -qi 'ignor' "$OUT" || errs="$errs entries-were-dropped-silently"
+unset KEYLOG
+[ -z "$errs" ] \
+    && ok "a Mac-built bundle's AppleDouble entries are ignored, and each clone uses its real key" \
+    || bad "a Mac-built bundle's AppleDouble entries are ignored, and each clone uses its real key" "$errs out=$(tail -c 500 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

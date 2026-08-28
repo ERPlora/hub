@@ -105,6 +105,25 @@ fi
 # shellcheck disable=SC2086  # word splitting is how the id list is normalised
 ids="$(printf '%s\n' $ids | sed '/^$/d' | sort -u)"
 
+# Only real module ids survive. The pattern is the manifest's own
+# (`schemas/module.schema.json` → `id`), not one invented here.
+#
+# Why this exists: `MODULES_DEPLOY_KEYS` is a tar built on a Mac, so next to every key it
+# carries an AppleDouble sidecar `._<module>` (and the odd `.DS_Store`). The inline loop this
+# script replaced listed the bundle with plain `ls`, which HIDES dotfiles, so it never saw
+# them; listing with `ls -A` does — and a 27-module catalogue became 54, with the 27 sidecars
+# each handed to ssh AS A PRIVATE KEY and dying on `Permission denied (publickey)`
+# (hub#1153, run 33128409723). The real modules had cloned fine; the junk failed the job.
+#
+# Ignoring is LOUD. A silent filter would turn a mistyped id into missing coverage, which is
+# exactly the failure the floor below exists to catch — so the names are printed.
+MODULE_ID_RE='^[a-z][a-z0-9_]*$'
+ignored="$(printf '%s\n' "$ids" | grep -Ev "$MODULE_ID_RE" || true)"
+ids="$(printf '%s\n' "$ids" | grep -E "$MODULE_ID_RE" || true)"
+if [ -n "$ignored" ]; then
+    say "   ⚠️  ignoring $(printf '%s\n' "$ignored" | wc -l | tr -d ' ') entry(ies) that are not a module id (${MODULE_ID_RE}): $(printf '%s ' $ignored)"
+fi
+
 if [ -z "$ids" ]; then
     say "❌ materialize-published-modules: no module ids to materialise."
     say "   Tried, in order: --modules, the deploy-key bundle ($KEYS_DIR),"
