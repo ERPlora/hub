@@ -719,6 +719,8 @@ export default {
     consentCancel: 'Cancelar',
     installedButNoPermissions: '«{name}» se instaló, pero no se pudieron conceder sus permisos. Sin ellos no funcionará: actívalos en Ajustes → Permisos.',
     goToPermissions: 'Ir a Permisos',
+    publicationRetired: 'Retirada',
+    retiredNotice: 'Ya no están en el catálogo: {apps}. Aquí siguen funcionando y siguen recibiendo actualizaciones — simplemente ya no se ofrecen, así que no las encontrarás para instalarlas en otro sitio.',
   },
   employees: {
     searchEmployee: 'Buscar usuario…',

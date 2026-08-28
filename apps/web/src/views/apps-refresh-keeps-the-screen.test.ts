@@ -85,6 +85,9 @@ vi.mock('../lib/runtime', () => ({
   updateModule: vi.fn(),
   listModuleUpdates: async () => [],
   listModuleVersions: async () => [],
+  // hub#1134: la pantalla pregunta por el estado de publicación de lo instalado que el catálogo no
+  // lista. Aquí no hay ninguno en ese caso, y `null` es «no lo sé» — que es lo que no pinta nada.
+  modulePublicationStatus: async () => null,
 }));
 // `vi.hoisted`: the `vi.mock` factory is lifted above every `const` in this file, so a ref the
 // factory RETURNS (rather than closes over lazily) has to be created up there with it.

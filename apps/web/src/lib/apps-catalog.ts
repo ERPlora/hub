@@ -60,3 +60,66 @@ export function catalogActionFor(state: CatalogRowState): 'install' | 'update' |
   if (state === 'updatable') return 'update';
   return null;
 }
+
+// --- Publication status of a module in the marketplace (ADR-0380, hub#1134) ------------------
+
+/**
+ * Whether the marketplace still OFFERS a module — the second axis of "is this on the shelf?".
+ *
+ * `listed` is on the shelf, `unlisted` is off the listing but still installable by direct
+ * reference, and `retired` is the offer closed: what already runs keeps running and keeps
+ * updating, and no new hub will ever install it.
+ */
+export type PublicationStatus = 'listed' | 'unlisted' | 'retired';
+
+const PUBLICATION_STATUSES: readonly PublicationStatus[] = ['listed', 'unlisted', 'retired'];
+
+/**
+ * What the Cloud said, or `listed` when it said nothing this screen understands.
+ *
+ * Silence is NOT "retired". A SaaS older than the field (saas#1542) omits it entirely, and a value
+ * we do not know is a newer rung of a ladder this build has not learnt — reading either as a closed
+ * offer would put a warning on every app of every hub that talks to an older or newer Cloud. The
+ * only safe reading of silence is the state that changes nothing on screen.
+ */
+export function publicationStatusOf(raw: unknown): PublicationStatus {
+  return PUBLICATION_STATUSES.includes(raw as PublicationStatus)
+    ? (raw as PublicationStatus)
+    : 'listed';
+}
+
+/**
+ * Which installed modules still need their publication status asked for, one by one.
+ *
+ * **The catalogue answers for everything it lists.** `GET /api/v1/marketplace/modules/` only ever
+ * serves `publication_status='listed'` (the SaaS filters it in the `list` action), so a module that
+ * came back in the catalogue is `listed` by construction and asking about it again is pure cost.
+ * The suspects are the installed ids the catalogue did NOT list — a set that is empty on a healthy
+ * hub, which is what keeps this off the `window.focus` refresh path.
+ *
+ * `known` is what has already been answered: a status is asked for once per screen, never again on
+ * every refresh.
+ */
+export function modulesWithUnknownPublication(
+  installedIds: readonly string[],
+  listedIds: ReadonlySet<string>,
+  known: ReadonlyMap<string, PublicationStatus | null>,
+): string[] {
+  return installedIds.filter((id) => !listedIds.has(id) && !known.has(id));
+}
+
+/**
+ * The publication status of ONE installed module, from the two things the screen knows.
+ *
+ * Listed in the catalogue ⇒ `listed`, with no round-trip: that is what being in the catalogue
+ * MEANS. Otherwise it is whatever was asked for and answered — and `null` when it could not be
+ * asked, which is neither `listed` nor `retired` and must not be painted as either.
+ */
+export function publicationOf(
+  id: string,
+  listedIds: ReadonlySet<string>,
+  known: ReadonlyMap<string, PublicationStatus | null>,
+): PublicationStatus | null {
+  if (listedIds.has(id)) return 'listed';
+  return known.get(id) ?? null;
+}

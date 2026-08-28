@@ -492,6 +492,17 @@ impl CloudClient {
     /// `cloud/apps/public/modules/api_views.py::versions`). La respuesta es un array JSON
     /// (`ModuleVersionSerializer`): `version`, `changelog`, `is_active`, `file_size_bytes`,
     /// `created_at`. El `sha256` se parsea si el Cloud lo expone (ver `ModuleVersion`). §2.2.
+    /// Lo que el marketplace dice de UN módulo (`GET /api/v1/marketplace/modules/{module_id}/`).
+    ///
+    /// Es la puerta de DETALLE, no la del catálogo, y esa diferencia es el motivo de existir
+    /// (hub#1134): el listado sólo sirve lo que se sigue OFRECIENDO —`publication_status='listed'`,
+    /// filtrado por el SaaS en su acción `list`—, así que un módulo que este hub corre y el
+    /// marketplace ha RETIRADO (ADR-0380) no sale ahí. `retrieve` parte del queryset base y admite
+    /// el token de máquina (`MACHINE_OK_ACTIONS`), así que es la única que sigue contestando por él.
+    pub fn module_detail(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        self.get(&format!("/api/v1/marketplace/modules/{module_id}/"), auth)
+    }
+
     pub fn versions(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
         self.get(
             &format!("/api/v1/marketplace/modules/{module_id}/versions/"),

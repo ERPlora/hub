@@ -789,6 +789,11 @@ export default {
     consentCancel: 'Cancel',
     installedButNoPermissions: '"{name}" was installed, but its permissions could not be granted. It will not work without them: turn them on in Settings → Permissions.',
     goToPermissions: 'Go to Permissions',
+    // ADR-0380 (hub#1134). The marketplace closed the OFFER, never the supply: the app keeps
+    // working and keeps updating. Both strings say that, because a chip that only says «Retired»
+    // reads as «broken» and the first thing anybody would do is uninstall a healthy app.
+    publicationRetired: 'Retired',
+    retiredNotice: 'No longer in the catalog: {apps}. They keep working here and keep receiving updates — they are just not offered any more, so you will not find them to install somewhere else.',
   },
   employees: {
     searchEmployee: 'Search user…',
