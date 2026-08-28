@@ -47,7 +47,7 @@ if ! python3 -c 'import yaml' 2>/dev/null; then
     exit 1
 fi
 
-WORKFLOW="$workflow" python3 - <<'PY'
+WORKFLOW="$workflow" REPO_ROOT="$script_dir/../.." python3 - <<'PY'
 import os
 import sys
 
@@ -250,11 +250,48 @@ check(
     "a cancelled run (cancel-in-progress fires daily) must still clean up",
 )
 
-clone = [s for s in steps if 'lt 25' in str(s.get("run", ""))]
+# hub#1153: the clone loop, the floor and the loud per-module failure moved into
+# `scripts/materialize-published-modules.sh`, which `.githooks/pre-push` runs too. Two copies of
+# this logic is how the local gate ended up measuring against the PARKED `modules-workspace`
+# checkout while this job measured the published catalogue — and copies of the same config drifting
+# apart already cost `main` once (the Postgres image, hub#647). So the guard now asserts the SHARE,
+# not the inline code.
+MATERIALIZER = "scripts/materialize-published-modules.sh"
+
+
+def code_of(step):
+    """The step's shell, with the comments stripped.
+
+    A `--floor 25` written in a COMMENT would keep these cases green while the real flag was
+    gone — the same trap the alert lookup above dodges.
+    """
+    return "\n".join(
+        l for l in str(step.get("run", "")).splitlines() if not l.lstrip().startswith("#")
+    )
+
+
+clone = [s for s in steps if MATERIALIZER in code_of(s)]
 check(
-    "the >=25 published manifests floor stays",
+    f"the catalogue is materialised by the shared `{MATERIALIZER}`",
     len(clone) >= 1,
+    "a second copy of the clone logic is how the local gate and this job drifted apart (hub#1153)",
+)
+check(
+    "the >=25 published manifests floor stays (`--floor 25`)",
+    any("--floor 25" in code_of(s) for s in clone),
     "without it, a partial clone silently shrinks coverage instead of failing (hub#1216)",
+)
+check(
+    "the materialiser is asked for the deploy-key bundle (`--keys`)",
+    any("--keys" in code_of(s) for s in clone),
+    "each module needs its own read-only key; the bundle is also the id source (hub#1216)",
+)
+# Resolved against the REPO, never against `--workflow`: the whole point of that flag is to run
+# this guard over a mutated COPY living somewhere else.
+check(
+    f"`{MATERIALIZER}` really exists in this checkout",
+    os.path.isfile(os.path.join(os.environ["REPO_ROOT"], MATERIALIZER)),
+    "a workflow that calls a script nobody shipped fails at 3am, not at review time",
 )
 
 require = (job.get("env") or {}).get("ERPLORA_E2E_REQUIRE_MODULES")
