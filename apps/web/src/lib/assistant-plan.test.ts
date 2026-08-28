@@ -72,3 +72,58 @@ describe('startAssistantCheckout — que el botón lleve a algún sitio', () => 
     expect(await startAssistantCheckout('basic')).toBeNull();
   });
 });
+
+// ── hub#1183 — el plan sirve para AVISAR y para ELEGIR, no solo para contar ────────────────────
+//
+// El CTA se llamaba «ver planes» y no enseñaba ninguno: mandaba directo al checkout de `basic`.
+// Un hub que necesita `pro` compraba el más barato, lo agotaba igual y volvía. Y sin la fecha de
+// renovación, «has gastado 30 de 30» no deja decidir entre esperar y pagar.
+describe('hub#1183 — el plan trae con qué avisar y con qué elegir', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  it('trae los planes contratables que ofrece el SaaS, no un tier inventado', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tier: 'free',
+        usage: { messages_used: 25, messages_limit: 30, resets_at: '2026-09-01T00:00:00+00:00' },
+        available_paid_tiers: [
+          { slug: 'basic', name: 'Basic', price_monthly: '11.99', price_annual: '119.90' },
+          { slug: 'pro', name: 'Pro', price_monthly: '44.99', price_annual: '449.90' },
+        ],
+      }),
+    });
+
+    const plan = await assistantPlan();
+
+    expect(plan?.paidTiers.map((t) => t.slug)).toEqual(['basic', 'pro']);
+    expect(plan?.paidTiers[1].name).toBe('Pro');
+    expect(plan?.paidTiers[1].priceMonthly).toBe('44.99');
+  });
+
+  it('trae la fecha en que se renueva el consumo', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tier: 'free',
+        usage: { messages_used: 25, messages_limit: 30, resets_at: '2026-09-01T00:00:00+00:00' },
+      }),
+    });
+
+    expect((await assistantPlan())?.resetsAt).toBe('2026-09-01T00:00:00+00:00');
+  });
+
+  // Un hub sin planes contratables (catálogo vacío) NO puede quedarse con una lista a medias:
+  // la ausencia se dice como lista vacía, para que la pantalla sepa que no hay nada que ofrecer.
+  it('sin planes contratables devuelve la lista vacía, nunca `undefined`', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ tier: 'free', usage: { messages_used: 1, messages_limit: 30 } }),
+    });
+
+    expect((await assistantPlan())?.paidTiers).toEqual([]);
+  });
+});

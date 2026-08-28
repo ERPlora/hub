@@ -24,7 +24,7 @@ vi.mock('./runtime', async (importOriginal) => ({
 vi.mock('./config', () => ({ config: { hubId: 'h1' } }));
 vi.mock('./cloud', () => ({ getAccessToken: () => 'tok' }));
 
-import { streamAssistant, type AssistantFailure } from './assistant';
+import { streamAssistant, type AssistantFailure, type AssistantUsage } from './assistant';
 
 function sseStream(lines: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -47,6 +47,38 @@ const QUOTA_FRAME =
     tier: 'free',
     kind: 'messages',
     upgrade_required: true,
+  }) +
+  '\n\n';
+
+/** El frame de cuota tal y como viaja HOY (`QuotaExceeded.to_dict()`, saas#1540 ya desplegado):
+ *  con `code` legible por máquina y con `resets_at`. */
+const QUOTA_FRAME_WITH_CODE =
+  'data: ' +
+  JSON.stringify({
+    type: 'error',
+    error: 'Monthly message quota exhausted',
+    code: 'quota_exceeded',
+    limit: 30,
+    used: 30,
+    tier: 'free',
+    kind: 'messages',
+    upgrade_required: true,
+    resets_at: '2026-09-01T00:00:00+00:00',
+  }) +
+  '\n\n';
+
+/** El frame POST-turno que cierra cada stream (saas#1540). */
+const USAGE_FRAME =
+  'data: ' +
+  JSON.stringify({
+    type: 'usage',
+    tier: 'free',
+    tier_name: 'Free',
+    sessions_used: 3,
+    sessions_limit: 10,
+    messages_used: 25,
+    messages_limit: 30,
+    resets_at: '2026-09-01T00:00:00+00:00',
   }) +
   '\n\n';
 
@@ -103,5 +135,92 @@ describe('la cuota agotada llega con su plan y su salida', () => {
 
     expect(failure?.quota).toBeUndefined();
     expect(failure?.message).toContain('upstream');
+  });
+});
+
+// ── hub#1183 — el contrato NUEVO del SaaS tiene que LLEGAR, no caerse en el cliente ────────────
+//
+// saas#1540 dejó el stream diciendo tres cosas más que aquí nadie recogía: el `code` legible por
+// máquina, la fecha en que vuelven los mensajes, y los contadores POST-turno. Sin ellas el drawer
+// sabe que se acabó, pero no cuándo vuelve ni cuánto lleva gastado ANTES de agotarlo.
+
+describe('hub#1183 — el motivo, la fecha y los contadores cruzan hasta la pantalla', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // El motivo se LEE, no se infiere de un booleano cualquiera: `upgrade_required` es una
+  // recomendación comercial y `code` es el hecho. Se queda como respaldo por si un emisor viejo
+  // no manda `code` todavía (el test de arriba, con el frame sin `code`, es ese respaldo).
+  it('reconoce la cuota por su `code`, aunque no venga `upgrade_required`', async () => {
+    const frame =
+      'data: ' +
+      JSON.stringify({
+        type: 'error',
+        error: 'Monthly message quota exhausted',
+        code: 'quota_exceeded',
+        limit: 30,
+        used: 30,
+        tier: 'free',
+      }) +
+      '\n\n';
+
+    const failure = (await runAndCaptureFailure([frame])) as AssistantFailure;
+
+    expect(failure?.quota, 'el `code` es el hecho; el flag es solo la recomendación').toBeTruthy();
+    expect(failure!.quota!.used).toBe(30);
+  });
+
+  // «Has gastado 30 de 30» sin fecha es un callejón: no se puede decidir si esperar o pagar.
+  it('trae la fecha en que se renuevan los mensajes', async () => {
+    const failure = (await runAndCaptureFailure([QUOTA_FRAME_WITH_CODE])) as AssistantFailure;
+
+    expect(failure!.quota!.resetsAt).toBe('2026-09-01T00:00:00+00:00');
+  });
+
+  // El contador POST-turno: la cabecera `X-Assistant-Usage` va siempre un mensaje por detrás
+  // (se escribe antes del cuerpo), así que el dato bueno es este frame.
+  it('el frame `usage` que cierra el turno llega al llamador', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, body: sseStream([USAGE_FRAME, 'data: {"type":"done"}\n\n']) }) as unknown as Response),
+    );
+
+    const seen: AssistantUsage[] = [];
+    await new Promise<void>((resolve) => {
+      streamAssistant([{ role: 'user', content: 'hola' }] as never, {
+        onToken: () => {},
+        onUsage: (u: AssistantUsage) => seen.push(u),
+        onDone: () => resolve(),
+        onError: () => resolve(),
+      } as never);
+      setTimeout(resolve, 50);
+    });
+
+    expect(seen, 'sin este frame el contador del pie no se mueve hasta recargar').toHaveLength(1);
+    expect(seen[0].messagesUsed).toBe(25);
+    expect(seen[0].messagesLimit).toBe(30);
+    expect(seen[0].tier).toBe('free');
+    expect(seen[0].resetsAt).toBe('2026-09-01T00:00:00+00:00');
+  });
+
+  // Y lo que NO puede pasar: que el frame `usage` se pinte como si el modelo lo hubiera dicho.
+  it('el frame `usage` no aporta ni un token al texto de la respuesta', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, body: sseStream([USAGE_FRAME, 'data: {"type":"done"}\n\n']) }) as unknown as Response),
+    );
+
+    let text = '';
+    await new Promise<void>((resolve) => {
+      streamAssistant([{ role: 'user', content: 'hola' }] as never, {
+        onToken: (t: string) => {
+          text += t;
+        },
+        onDone: () => resolve(),
+        onError: () => resolve(),
+      } as never);
+      setTimeout(resolve, 50);
+    });
+
+    expect(text).toBe('');
   });
 });
