@@ -3367,6 +3367,16 @@ fn bad_gateway(reason: String) -> Response {
 /// del SaaS es información que el llamador necesita, y traducirlo a un genérico es exactamente el
 /// fallo que esta issue documenta.
 async fn assistant_config(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    // The hub's machine token further down (`hub_scoped_auth`) is the credential the runtime uses
+    // to TALK to the Cloud, not a gate on who is asking (ADR-0003): without this session check the
+    // route answered anybody who reached the hub's URL — ERPlora/hub#1254. A read any signed-in
+    // user needs (the drawer prints the tier and what is left of the month), so: session.
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return auth_rejected(e);
+        }
+    }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let placeholder = cloud_client::Auth::HubToken {
         hub_id: String::new(),
@@ -3384,6 +3394,16 @@ async fn assistant_checkout(
     headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> Response {
+    // Contracting the plan is billed to the hub, so it is the ADMIN door — the same one as
+    // settings, API keys and the certificate. Until ERPlora/hub#1254 the only credential here was
+    // the OUTBOUND machine token, and any anonymous caller who reached the hub could open Stripe
+    // checkout sessions in its name.
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return auth_rejected(e);
+        }
+    }
     let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
         return (
             StatusCode::UNAUTHORIZED,
@@ -3952,6 +3972,20 @@ pub(crate) fn unauthorized(e: auth::AuthError) -> Response {
         Json(json!({ "ok": false, "error": e.message() })),
     )
         .into_response()
+}
+
+/// The same refusal, telling **"who are you"** apart from **"not you"** (hub#660): a valid session
+/// with an insufficient role answers `403`, because re-authenticating as the same cashier would
+/// never help. Body shape unchanged, so a caller that only reads `error` keeps working.
+pub(crate) fn auth_rejected(e: auth::AuthError) -> Response {
+    if e.is_forbidden() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "ok": false, "error": e.message() })),
+        )
+            .into_response();
+    }
+    unauthorized(e)
 }
 
 /// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
