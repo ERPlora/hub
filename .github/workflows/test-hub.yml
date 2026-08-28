@@ -172,6 +172,15 @@ jobs:
       - name: Contrato del gate de lints (hub#1242)
         run: bash scripts/tests/clippy-lints.test.sh
 
+      # Contrato de publicación de los SDK (hub#1236): que `@erplora/module-sdk` siga siendo
+      # publicable, que `erplora-guest-sdk` siga resolviendo en un clon por git tag y que
+      # `scripts/stamp-version.sh` escriba de verdad el número en los TRES ficheros que lo llevan.
+      # Corre AQUÍ, en cada PR, y no solo en `build-hub.yml`: ese workflow no se dispara en una PR,
+      # así que un cambio que rompiera la publicación no daría rojo hasta el día de la release —
+      # cuando ya no hay a quién preguntarle. Bash + python3 puros, milisegundos.
+      - name: Contrato de publicación de los SDK (hub#1236)
+        run: bash scripts/tests/publish-sdks.test.sh
+
       # 🔴 Este job resuelve los módulos por la ruta RELATIVA al checkout
       # (`crates/runtime/../../../modules-workspace/modules`), que cae FUERA del workspace y
       # PERSISTE entre jobs del runner. Cualquier cosa que otro job deje ahí cambia lo que este
