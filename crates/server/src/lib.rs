@@ -4257,10 +4257,22 @@ async fn query(
         Err(e) => return tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
+    let mut ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Entitlement-blocked module ids (hub#1175), stamped on the context so the runtime's own idea
+    // of "available" — `hub.setup.status` reads it right next to `is_active` — cannot promise a
+    // route the entitlement gate below is about to refuse for a DIFFERENT query. Same source as
+    // `revalidation.blocked_modules` on `GET /api/entitlement` (`proxy_entitlement`): this hub's
+    // installed ids against the last verified claims.
+    let installed: Vec<String> = rt.modules().into_iter().map(|m| m.id).collect();
+    if let Ok(revalidation) = st.entitlement.read() {
+        ctx.blocked_modules = revalidation
+            .blocked_modules(&installed, entitlement::now_unix())
+            .into_iter()
+            .collect();
+    }
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
     let owner = rt
         .registry()

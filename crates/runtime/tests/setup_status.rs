@@ -613,6 +613,55 @@ async fn a_module_that_is_installed_but_inactive_does_not_contribute_its_item() 
     );
 }
 
+/// hub#1175: `invoice_series` stayed **installed and active** in a hub after its own retirement
+/// from the marketplace (ERPlora/invoice#31) — the runtime's own idea of "active" never moved, so
+/// its `setup` item kept sending the owner to `/m/invoice_series/list`, a route the dispatcher's
+/// entitlement gate (`crates/server::entitlement`, HTTP 402 `module_entitlement_blocked`) refuses
+/// at the door. The checklist promised a task the product could not deliver, right next to a
+/// SECOND item — `invoice`'s own — with the same title, which is what made it read as a bug and
+/// not two unrelated screens.
+///
+/// The runtime cannot know this on its own (no view of the SaaS's signed claims); the server
+/// stamps the blocked ids onto the context, the exact same shape as [`registry::RequestContext`]
+/// already uses for `is_active`.
+#[tokio::test]
+async fn a_module_blocked_by_entitlement_leaves_no_checklist_item_hub1175() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("invoice_series", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    let mut blocked = ctx("hub-setup", &[SESSION, ADMINISTER, "invoice_series.configure"]);
+    blocked.blocked_modules = std::collections::HashSet::from(["invoice_series".to_string()]);
+
+    let doc = status(&rt, &blocked).await;
+    assert!(
+        item(&doc, "invoice_series.setup").is_none(),
+        "an entitlement-blocked module must not offer a route the dispatcher will refuse: {:?}",
+        keys(&doc)
+    );
+}
+
+/// The other half of hub#1175: entitlement blocking must name the module it blocks, not turn into
+/// a blanket filter. A hub whose entitlement blocks nobody (the default, and the common case —
+/// dev/local, or a hub with a fresh successful refresh) must keep every module's item exactly as
+/// it did before this field existed.
+#[tokio::test]
+async fn a_module_the_entitlement_does_not_name_keeps_its_checklist_item_hub1175() {
+    let mut rt = runtime("hub-setup").await;
+    let dir = setup_module("invoice", true, json!({}));
+    rt.install_from_dir(&dir).await.unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    // `blocked_modules` defaults empty — nobody stamped it, same as every context before hub#1175.
+    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "invoice.configure"])).await;
+    assert!(
+        item(&doc, "invoice.setup").is_some(),
+        "a module the entitlement did not name must keep its item: {:?}",
+        keys(&doc)
+    );
+}
+
 // ── Already filtered ──────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]

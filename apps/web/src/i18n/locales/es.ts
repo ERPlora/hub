@@ -1413,6 +1413,9 @@ export default {
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
     emptyTitle: 'Aquí todavía no hay nada',
     emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'Esta app no está disponible para este hub.',
   },
   moduleSettings: {
     tab: 'Ajustes',
