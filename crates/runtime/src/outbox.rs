@@ -453,7 +453,13 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         {
             failures += 1;
             permanent = f.permanent;
-            dead_now = f.dead_now;
+            // The stamp travels WITH the verdict (hub#1192). Before, `dead_now` arrived as a bare
+            // bool and the row was killed with whatever `dead_now_kind` happened to hold — `''` —
+            // which is precisely the classification `replay_capability_denied` cannot sweep.
+            if let Some(kind) = f.dead_now {
+                dead_now = true;
+                dead_now_kind = kind;
+            }
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_NOTIFY_LISTENER}: {}", f.error));
             }
@@ -472,6 +478,13 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
         if let Err(e) = deliver_host_print(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
         {
             failures += 1;
+            // The twin of the gate above (hub#1192): `printer` is the same default-deny switch, so
+            // a refusal here is terminal now and STAMPED — otherwise granting «Impresora» leaves
+            // the ticket in the dead-letter, which is the same silent loss by another door.
+            if matches!(e, RuntimeError::CapabilityDenied { .. }) {
+                dead_now = true;
+                dead_now_kind = FAILURE_CAPABILITY_DENIED;
+            }
             if first_err.is_none() {
                 first_err = Some(format!("{HOST_PRINT_LISTENER}: {e}"));
             }
@@ -558,9 +571,15 @@ struct NotifyFailure {
     /// The classification the row is stamped with when this is terminal ([`FAILURE_RELEASE_REVOKED`]).
     /// `None` = retryable.
     permanent: Option<&'static str>,
-    /// Terminal for the relay but not for an operator (hub#971): the row dies on this pass, unstamped
-    /// and with its payload, so a manual retry can pick it up once the cause (a quota) is gone.
-    dead_now: bool,
+    /// Terminal for the relay but not for an operator (hub#971): the row dies on this pass, with its
+    /// payload intact, so a manual retry can pick it up once the cause is gone. `None` = retryable
+    /// on the ladder; `Some(kind)` = dead now, stamped with `kind` (`""` when there is nothing to
+    /// say beyond the error, as for a spent quota).
+    ///
+    /// **It has to be the stamp and not a bool** (hub#1192): `replay_capability_denied` sweeps the
+    /// dead-letter BY `failure_kind`, so a row that dies unclassified is never put back when the
+    /// owner grants the capability — the reminder is lost, not delayed.
+    dead_now: Option<&'static str>,
 }
 
 impl NotifyFailure {
@@ -569,16 +588,17 @@ impl NotifyFailure {
         Self {
             error,
             permanent: Some(kind),
-            dead_now: false,
+            dead_now: None,
         }
     }
 
-    /// A refusal the ladder cannot outwait, that a person can (hub#971).
-    fn dead_now(error: RuntimeError) -> Self {
+    /// A refusal the ladder cannot outwait, that a person can (hub#971) — stamped with `kind` so
+    /// whoever fixes the cause can find the row again (hub#1192).
+    fn dead_now(kind: &'static str, error: RuntimeError) -> Self {
         Self {
             error,
             permanent: None,
-            dead_now: true,
+            dead_now: Some(kind),
         }
     }
 }
@@ -591,7 +611,7 @@ impl From<RuntimeError> for NotifyFailure {
         Self {
             error,
             permanent: None,
-            dead_now: false,
+            dead_now: None,
         }
     }
 }
@@ -676,14 +696,23 @@ async fn deliver_host_notify(
             )
             .into());
         }
-        crate::capabilities::require(
+        // Not `?` (hub#1192): a capability nobody granted is the same kind of no that hub#1171
+        // taught the module-listener path to recognise, and the gate here is the same default-deny
+        // gate (hub#240). It is NOT `permanent`: granting `notify` is literally the remedy, so the
+        // row dies now — stamped, payload intact, retryable — and `replay_capability_denied` puts
+        // it back the moment the owner flips the switch. Burning the ladder to reach `failure_kind
+        // = ''` is what made the reminder unrecoverable instead of merely late.
+        if let Err(e) = crate::capabilities::require(
             db,
             registry,
             module_id,
             hub_id,
             crate::manifest::CapabilityKind::Notify,
         )
-        .await?;
+        .await
+        {
+            return Err(NotifyFailure::dead_now(FAILURE_CAPABILITY_DENIED, e));
+        }
         // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
         host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
         // Puerta 3 — el destinatario sale de los datos del hub, no del payload del handler.
@@ -698,9 +727,12 @@ async fn deliver_host_notify(
         // A spent quota is not a stumble (hub#971): no ladder, dead now — but retryable by hand,
         // because a quota, unlike a revoked release, comes back.
         host_notify::SendOutcome::QuotaExceeded { detail } => {
-            return Err(NotifyFailure::dead_now(RuntimeError::Notify(format!(
-                "quota exceeded: {detail}"
-            ))));
+            // Unstamped on purpose: a quota has nothing to add beyond its error, and no gesture
+            // sweeps by it — an operator's manual retry is the way back.
+            return Err(NotifyFailure::dead_now(
+                "",
+                RuntimeError::Notify(format!("quota exceeded: {detail}")),
+            ));
         }
     }
     // Envío con éxito → marca la entrega (idempotencia ante un reinicio entre send y mark).
@@ -3604,5 +3636,133 @@ mod tests {
             .unwrap();
 
         assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "still dead, still visible");
+    }
+
+    // ── hub#1192: the SAME refusal, one gate further out — the host listener of `host.notify` ──
+    //
+    // hub#1171 taught the relay that a capability nobody granted is not a stumble, but it only
+    // taught it about listeners of a MODULE. The host listener of `host.notify` (ADR-0012) has the
+    // very same gate in front of it — `capabilities::require(…, Notify)`, default-deny since
+    // hub#240 — and its refusal travels a different road: it reaches `NotifyFailure` through `?`,
+    // which classifies everything it does not know as retryable.
+    //
+    // The four minutes of ladder are NOT the damage. `replay_capability_denied` sweeps **by stamp**
+    // (`requeue_dead(…, &[FAILURE_CAPABILITY_DENIED])`) and `capabilities::set_grant` calls it the
+    // moment the switch goes on. A row that dies with `failure_kind = ''` is therefore never put
+    // back: the owner grants `notify`, every refused reminder stays dead, and the customer's
+    // reminder is lost unless somebody happens to find System → Events and press retry per row.
+
+    /// Regression test for ERPlora/hub#1192 — a hub whose `appt` module DECLARES `notify` and whom
+    /// nobody has granted it (default-deny, ADR-0079): the reminder dies on the first pass and, the
+    /// part that matters, dies **stamped**.
+    ///
+    /// Named `hub1192_…` per the merge gate (pm#177). The triage proposed a Spanish name; the
+    /// repo's binding language rule keeps identifiers in English, so the stamp travels in the name.
+    #[tokio::test]
+    async fn hub1192_a_reminder_due_without_granted_notify_dies_on_the_first_pass_with_its_stamp() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        // NO `authorize_notify`: the switch is off, which is how every hub starts.
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert!(transport.sent().is_empty(), "sin grant no sale nada del hub (hub#240)");
+        let dead = list_dead(&db, "h1", 50).await.unwrap();
+        assert_eq!(dead.len(), 1, "one pass, not eight: «Eventos caídos» has to SEE it: {dead:?}");
+        assert_eq!(dead[0].event_name, "appt.reminder.due");
+        assert!(
+            dead[0].last_error.contains("notify"),
+            "the operator reads which permission to grant: {}",
+            dead[0].last_error
+        );
+        assert_eq!(
+            dead[0].failure_kind, FAILURE_CAPABILITY_DENIED,
+            "the stamp is what `replay_capability_denied` sweeps by — without it the row is lost"
+        );
+        assert!(
+            dead[0].retryable,
+            "granting `notify` IS the remedy, so the retry button must work"
+        );
+    }
+
+    /// Regression test for ERPlora/hub#1192 — **the half that proves the fix**. Counting attempts
+    /// would pass without curing anything: what was lost is the reminder, and it is lost because
+    /// flipping the switch never brought it back.
+    #[tokio::test]
+    async fn hub1192_granting_notify_requeues_the_dead_reminder() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "dead while the switch is off");
+
+        // The owner flips «Notificaciones» on in Ajustes → Permisos (and the recipient is a
+        // customer of the hub, as the other three gates require).
+        authorize_notify(&db, &reg, "cliente@x.com").await;
+
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            0,
+            "granting `notify` put the refused reminder back in front of the relay"
+        );
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(transport.sent().len(), 1, "…and the reminder finally reached the customer");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            1,
+            "the row is delivered, not sitting in a queue nobody looks at"
+        );
+    }
+
+    /// Regression test for ERPlora/hub#1192 — **the twin, fixed here under the same roof.** The host
+    /// listener of `host.print` (hub#957) sits behind the very same default-deny gate, and its
+    /// refusal took the very same road: ladder, then `failure_kind = ''`, which
+    /// `replay_capability_denied` cannot sweep. Granting «Impresora» left the ticket dead. Leaving
+    /// one of two identical doors open is how a fixed bug comes back through the other one.
+    #[tokio::test]
+    async fn hub1192_a_print_due_without_granted_printer_dies_stamped_and_granting_it_requeues_the_ticket() {
+        let db = db_for_print().await;
+        let reg = registry_for_print();
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert!(queued_jobs(&db).await.is_empty(), "sin grant de `printer` no se encola nada");
+        let dead = list_dead(&db, "h1", 50).await.unwrap();
+        assert_eq!(dead.len(), 1, "one pass, not eight: {dead:?}");
+        assert_eq!(
+            dead[0].failure_kind, FAILURE_CAPABILITY_DENIED,
+            "same stamp as its notify twin, or granting the capability leaves the ticket dead"
+        );
+        assert!(dead[0].retryable, "granting `printer` IS the remedy");
+
+        authorize_print(&db, &reg).await;
+
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            0,
+            "granting `printer` put the refused ticket back in front of the relay"
+        );
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(queued_jobs(&db).await.len(), 1, "…and the document reached the print queue");
     }
 }
