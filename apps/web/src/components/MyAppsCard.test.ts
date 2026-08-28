@@ -20,11 +20,21 @@ import { createI18n } from 'vue-i18n';
 // workaround as SetupChecklistCard.test.ts / ImportPanel.test.ts).
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
+// hub#1197 — the grid folds tighter on a phone. `isPhoneViewport` is the shell's ONE reactive
+// answer to "is this a phone?" (`lib/viewport.ts`, same pattern `AppTopbar.compact.test.ts` mocks
+// for the topbar's own breakpoint); mocked here so each test can move it without a real `matchMedia`.
+const { isPhoneViewport } = await vi.hoisted(async () => {
+  const { ref } = await import('vue');
+  return { isPhoneViewport: ref(false) };
+});
+vi.mock('../lib/viewport', () => ({ isPhoneViewport }));
+
 import MyAppsCard from './MyAppsCard.vue';
 // The `<style>` block exactly as it ships: happy-dom does not apply an SFC's `scoped` styles, so
 // the CSS contract of hub#1268 is asserted against the source, not against the DOM.
 import cardSource from './MyAppsCard.vue?raw';
 import { APP_USAGE_KEY, readAppUsage } from '../lib/app-usage';
+import { PHONE_GRID_COLUMNS, PHONE_VISIBLE_ROWS } from '../lib/apps-grid';
 // REAL catalogues: English is the source language and Spanish is NOT optional (binding rule of
 // 2026-08-04). A card with half its strings untranslated ships as half-Spanish.
 import enCatalogue from '../i18n/locales/en';
@@ -69,8 +79,16 @@ function mountCard(
 const tilePaths = (w: ReturnType<typeof mountCard>): string[] =>
   w.findAll('[data-testid="apps-tile"]').map((t) => t.attributes('data-path') ?? '');
 
+/** 25 installed apps — hub#1197's own measurement (26 tiles with the ＋ one included = 7 rows). */
+const manyApps = Array.from({ length: 25 }, (_, n) => ({
+  path: `/m/app-${n}`,
+  label: `App ${n}`,
+  icon: 'cube-outline',
+}));
+
 beforeEach(() => {
   localStorage.clear();
+  isPhoneViewport.value = false;
 });
 
 describe('the grid is the installed apps', () => {
@@ -336,5 +354,79 @@ describe('the tile label never splits a word (hub#1268)', () => {
     const w = mountCard([{ path: '/m/flows', label: 'Automatizaciones', icon: 'flash-outline' }]);
 
     expect(w.find('.apps-tile-label').attributes('title')).toBe('Automatizaciones');
+  });
+});
+
+// hub#1197 — «Mis apps» ran to 7 rows at 390px with 25 installed apps, and together with the setup
+// checklist that put the widget board 2.6 SCREENS down before a single KPI painted. What every
+// launcher on the market does once the list outgrows the screen (macOS Launchpad's pages, the
+// Android app drawer's «see all») is show a first taste and a deliberate way to see the rest.
+describe('my apps does not grow past two rows on a phone (hub#1197)', () => {
+  it('folds to the phone cap instead of growing the card to fit every app', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard(manyApps);
+
+    // The whole grid — the tiles shown, the «view all» tile, and ＋ Add apps — has to fit inside
+    // PHONE_VISIBLE_ROWS rows of PHONE_GRID_COLUMNS columns. hub#1197's own measurement was 7 rows
+    // for 26 tiles; a cap that only counted app tiles and forgot the trailing two put THIS list on
+    // 4 rows, not the 2 the issue asked for.
+    const cells = tilePaths(w).length + 1 /* view-all */ + 1 /* ＋ Add apps */;
+    expect(Math.ceil(cells / PHONE_GRID_COLUMNS)).toBeLessThanOrEqual(PHONE_VISIBLE_ROWS);
+    expect(tilePaths(w).length).toBeLessThan(manyApps.length);
+  });
+
+  it('off the phone every installed app still shows — nothing folds on a tablet or desktop', () => {
+    isPhoneViewport.value = false;
+    const w = mountCard(manyApps);
+
+    expect(tilePaths(w)).toHaveLength(25);
+    expect(w.find('[data-testid="apps-view-all"]').exists()).toBe(false);
+  });
+
+  it('offers a way to the rest, leading to the same catalogue as ＋ Add apps', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard(manyApps);
+
+    const viewAll = w.find('[data-testid="apps-view-all"]');
+    expect(viewAll.exists()).toBe(true);
+    expect(viewAll.html()).toContain('/apps');
+  });
+
+  it('keeps the most-used-first order for the tiles that DO show', () => {
+    localStorage.setItem(APP_USAGE_KEY, JSON.stringify({ '/m/app-24': 9 }));
+    isPhoneViewport.value = true;
+
+    expect(tilePaths(mountCard(manyApps))[0]).toBe('/m/app-24');
+  });
+
+  it('＋ Add apps stays the LAST tile even when the fold adds its own «view all»', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard(manyApps);
+
+    const all = w.findAll(
+      '[data-testid="apps-tile"], [data-testid="apps-view-all"], [data-testid="apps-add"]',
+    );
+    expect(all[all.length - 1].attributes('data-testid')).toBe('apps-add');
+  });
+
+  it('a short list does not fold even on a phone: the cap is for what does not fit', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard([pos, stock]);
+
+    expect(tilePaths(w)).toEqual(['/m/pos', '/m/inventory']);
+    expect(w.find('[data-testid="apps-view-all"]').exists()).toBe(false);
+  });
+
+  it('ships «view all» in both languages', () => {
+    const en = enCatalogue as unknown as { dashboard: Record<string, string> };
+    const es = esCatalogue as unknown as { dashboard: Record<string, string> };
+
+    expect(en.dashboard.appsViewAll, 'en.dashboard.appsViewAll').toBeTruthy();
+    expect(es.dashboard.appsViewAll, 'es.dashboard.appsViewAll').toBeTruthy();
+    expect(es.dashboard.appsViewAll).not.toBe(en.dashboard.appsViewAll);
+
+    isPhoneViewport.value = true;
+    const w = mountCard(manyApps, i18nEs);
+    expect(w.find('[data-testid="apps-view-all"]').text()).toBe(es.dashboard.appsViewAll);
   });
 });

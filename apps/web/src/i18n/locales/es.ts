@@ -344,6 +344,9 @@ export default {
     // (hub#375); «Sistema conectado/desconectado» se ha ido a propósito: era un veredicto sobre
     // todo sacado de una sonda que solo sabía del equipo de la impresora.
     openSystem: 'Ver sistema',
+    // hub#1197 — en móvil la rejilla se pliega a las dos filas; esta es la baldosa que lleva al
+    // resto, el mismo catálogo que ya abre ＋ Añadir apps (`/apps`).
+    appsViewAll: 'Ver todas las apps',
   },
   profile: {
     title: 'Mi perfil',

@@ -369,6 +369,9 @@ export default {
     // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
     // everything drawn from a probe that only ever knew about the printer host.
     openSystem: 'View system',
+    // hub#1197 — on a phone the grid folds after two rows; this is the tile that leads to the rest,
+    // the same catalogue ＋ Add apps already opens (`/apps`).
+    appsViewAll: 'View all apps',
   },
   profile: {
     title: 'My profile',
