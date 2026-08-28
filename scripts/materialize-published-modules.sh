@@ -24,6 +24,16 @@
 # per module, `git fetch` to refresh. No archive format, no lockfile, no
 # manifest of its own.
 #
+# ERPlora/hub#1294. A clone/fetch that fails with a TRANSIENT transport or
+# auth error (a dropped SSH handshake, a reset connection) is retried with
+# backoff before the module is given up on. On 2026-08-28 at 11:55-11:56Z one
+# such flake — `Permission denied (publickey)` on `invoice_series`, with the
+# very same deploy key that had cloned it fine three hours before — turned the
+# whole "e2e con módulos reales" job red with zero retries and blocked nine
+# approved PRs behind it. A PERMANENT failure (e.g. "repository not found",
+# meaning the key or the repo name is wrong) is never retried: retrying it
+# only delays the same answer.
+#
 # The contract it implements: `architecture/hub/kernel-contract.md`
 # (ADR «El Hub se CIERRA como KERNEL», 2026-08-27), §6 hole #2.
 #
@@ -49,6 +59,12 @@
 #
 #   stdout: the resolved catalogue directory, and nothing else — callers
 #           consume it (`ERPLORA_MODULES_DIR=$(… )`). Progress goes to stderr.
+#
+#   env HUB_MATERIALIZE_RETRY_DELAYS  space-separated backoff (seconds) between
+#                            retries of a transient clone/fetch failure
+#                            (default "2 8 30" — 3 retries, 4 attempts total).
+#                            Only ever overridden by the test suite, to run
+#                            the retry cases without sitting through real time.
 #
 # Tests: scripts/materialize-published-modules.test.sh (local bare repos over
 # `file://` — no network, no GitHub, no deploy keys).
@@ -191,6 +207,57 @@ module_version() {          # $1 = tree
         "$1/module.json" 2>/dev/null || printf '?'
 }
 
+# ── 2b · Retry on transient clone/fetch failures (hub#1294) ──────────────────
+# Only a transport/auth failure is worth a retry — one bad SSH handshake does
+# not mean the repo or the key is wrong. "repository not found" and similar
+# are config errors: retrying them wastes the whole backoff window only to
+# report the same failure, so they are NOT in this list on purpose.
+RETRY_DELAYS="${HUB_MATERIALIZE_RETRY_DELAYS:-2 8 30}"
+
+is_transient_git_failure() {   # $1 = path to the failed attempt's log
+    grep -qiE 'permission denied \(publickey\)|connection reset|early eof|could not read from remote|timed out' \
+        "$1" 2>/dev/null
+}
+
+# Runs a git network step (clone, or fetch+checkout+clean) with retries on
+# transient failures, backing off per $RETRY_DELAYS between attempts. A
+# permanent failure (message does not match is_transient_git_failure) returns
+# immediately on the FIRST attempt — no retry, no wasted backoff.
+#   $1 = id (for the retry log line)   $2 = log file the step writes to
+#   $3.. = the command to run (its own function, so `&&` chains stay intact)
+run_with_retry() {
+    local id="$1" log="$2" attempt=1 delays="$RETRY_DELAYS" delay
+    shift 2
+    while true; do
+        if "$@" >"$log" 2>&1; then
+            return 0
+        fi
+        is_transient_git_failure "$log" || return 1   # permanent: give up now
+        delay="${delays%% *}"
+        [ -n "$delay" ] || return 1                    # retry budget exhausted
+        attempt=$((attempt + 1))
+        say "   ⏳ $id: transient git failure — retrying (attempt ${attempt}) in ${delay}s…"
+        sleep "$delay"
+        case "$delays" in
+            *' '*) delays="${delays#* }" ;;
+            *)     delays="" ;;
+        esac
+    done
+}
+
+# The two network steps a module can need, each wrapped by run_with_retry so
+# a flaky attempt starts from a clean slate rather than a half-written tree.
+fetch_existing_tree() {     # $1 = ssh_cmd  $2 = tree  $3 = url  $4 = branch
+    git_with_key "$1" -C "$2" fetch -q --depth 1 "$3" "$4" \
+        && git -C "$2" checkout -q --detach FETCH_HEAD \
+        && git -C "$2" clean -qfdx
+}
+
+clone_new_tree() {          # $1 = ssh_cmd  $2 = url  $3 = tree  $4 = branch
+    rm -rf "$3"
+    git_with_key "$1" clone -q --depth 1 --branch "$4" "$2" "$3"
+}
+
 # ── 3 · Materialise, cached ──────────────────────────────────────────────────
 # A re-clone of 27 repos on every push would make the opt-in unusable, and a
 # cache that never refreshes would recreate the very staleness this exists to
@@ -212,17 +279,14 @@ for id in $ids; do
     tree="$DEST/$id"
     log="$DEST/.$id.log"
     if [ -d "$tree/.git" ]; then
-        if git_with_key "$ssh_cmd" -C "$tree" fetch -q --depth 1 "$url" "$BRANCH" >"$log" 2>&1 \
-            && git -C "$tree" checkout -q --detach FETCH_HEAD >>"$log" 2>&1 \
-            && git -C "$tree" clean -qfdx >>"$log" 2>&1; then
+        if run_with_retry "$id" "$log" fetch_existing_tree "$ssh_cmd" "$tree" "$url" "$BRANCH"; then
             rm -f "$log"
         else
             failed="$failed $id"
             continue
         fi
     else
-        rm -rf "$tree"
-        if git_with_key "$ssh_cmd" clone -q --depth 1 --branch "$BRANCH" "$url" "$tree" >"$log" 2>&1; then
+        if run_with_retry "$id" "$log" clone_new_tree "$ssh_cmd" "$url" "$tree" "$BRANCH"; then
             rm -f "$log"
         else
             failed="$failed $id"
