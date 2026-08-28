@@ -20,6 +20,55 @@ members = [
     "crates/tauri-plugin-erplora-android",
 ]
 
+# ── Lints Rust del workspace (hub#1242, ADR «El Hub se CIERRA como KERNEL») ───────────────────
+# Hasta hub#1242 el hub no tenía NINGÚN lint: ni `clippy.toml`, ni `deny.toml`, ni `[lints]`, ni
+# un `#![deny]`, y la palabra `clippy` no aparecía en `.github/`, `.githooks/` ni `scripts/`. La
+# única guardia era un hook LOCAL, no versionado, que además solo AVISA y solo sobre lo que
+# escribe la IA. Un `unwrap()` mal puesto en el camino del runtime tumba una caja de un cliente.
+#
+# Esta tabla no hace nada por sí sola: cada miembro del workspace la hereda con
+#   [lints]
+#   workspace = true
+# Un crate que se olvide de esas dos líneas queda EXENTO en silencio — por eso
+# `scripts/tests/clippy-lints.test.sh` recorre `members` y lo comprueba uno a uno.
+#
+# 🔒 RATCHET — cómo se sube un grupo (medido el 2026-08-28 sobre `develop@8102e42`):
+#
+#   | grupo                     | hallazgos hoy | nivel              |
+#   |---------------------------|---------------|--------------------|
+#   | clippy::correctness       |             0 | **deny**           |
+#   | clippy::suspicious        |            58 | warn               |
+#   | style + complexity + perf |           129 | warn (por defecto) |
+#   | avisos propios de rustc   |            30 | warn (por defecto) |
+#
+#   (217 avisos en total, `cargo clippy --workspace --all-targets --no-deps` sin los dos crates
+#   de tauri; 56 de los 58 `suspicious` son un mismo lint, `await_holding_lock`.)
+#
+# `correctness` entra en `deny` porque está LIMPIO: el gate nace verde y cualquier hallazgo nuevo
+# es, por definición, de esta PR. Promocionar el siguiente grupo son dos pasos, en este orden:
+#   1. dejar el grupo a cero (`cargo clippy -p <crate> --all-targets --fix` cubre casi todo);
+#   2. cambiar aquí su `level` a `"deny"` — no hay que tocar el workflow.
+# Lo que NO se hace es subirlo con hallazgos vivos: un gate que nace rojo se aprende a ignorar.
+#
+# 🔴 Y por eso el paso de CI NO lleva `-D warnings` (todavía): ese flag convierte en error TODO
+# lo que esté en `warn`, incluidos los 58 de `suspicious` y los 30 avisos propios de rustc
+# (`unused_imports`, `dead_code`, `non_snake_case`…) que hoy siguen vivos. Sería
+# entregar el gate ROJO el primer día. Entra cuando la tabla de arriba esté a cero; hasta
+# entonces el nivel lo manda ESTA tabla, que es donde se opera el ratchet.
+[workspace.lints.clippy]
+# Los bugs de verdad: `&mut` a un temporal, comparaciones que siempre son falsas, `Ord` mal
+# implementado, aritmética que se desborda en el sitio equivocado. Cero hallazgos hoy.
+correctness = { level = "deny", priority = -1 }
+# Explícito aunque coincida con el nivel por defecto de clippy: es la siguiente muesca del
+# ratchet y se opera aquí. Hoy lo llena `await_holding_lock` (56 de sus 58 hallazgos).
+suspicious = { level = "warn", priority = -1 }
+
+[workspace.lints.rust]
+# El equivalente de `correctness` en el propio rustc: código que el compilador ya sabe que
+# RECHAZARÁ en una versión futura. También está limpio hoy, así que se cierra igual — y así el
+# hub no se entera de una rotura del lenguaje el día que le toque subir de toolchain.
+future_incompatible = { level = "deny", priority = -1 }
+
 [workspace.package]
 edition = "2021"
 # Versión semántica del hub (hub#515, ADR-0269 modelo de actualización). Fuente única de verdad:

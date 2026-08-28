@@ -83,3 +83,8 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # there is always a print host draining the hub's queue. The OS keeps the state (LaunchAgent /
 # registry / autostart dir); the shell only exposes enable/disable/is_enabled over `invoke`.
 tauri-plugin-autostart = "2"
+
+# Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
+# queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
+[lints]
+workspace = true
