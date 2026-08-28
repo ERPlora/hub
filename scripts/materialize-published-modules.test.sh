@@ -278,6 +278,108 @@ unset KEYLOG
     && ok "a Mac-built bundle's AppleDouble entries are ignored, and each clone uses its real key" \
     || bad "a Mac-built bundle's AppleDouble entries are ignored, and each clone uses its real key" "$errs out=$(tail -c 500 "$OUT")"
 
+# ── 10-12. Retry on transient clone failures ───────────────────────────────
+# Regression tests for ERPlora/hub#1294: on 2026-08-28 at 11:55-11:56Z a ONE
+# clone in the "e2e con módulos reales" job hit `git@github.com: Permission
+# denied (publickey)` while the SAME deploy key had cloned the same module
+# fine three hours earlier (a transient rejection, not a config problem) —
+# and with zero retry, that one flake turned the whole job red and blocked
+# nine approved PRs. A fake `git` on PATH stands in for a flaky remote: it
+# fails the first N `clone` invocations, then delegates to the real git, so
+# these cases stay offline and deterministic. Delays are driven down to 0s via
+# `HUB_MATERIALIZE_RETRY_DELAYS` so the suite does not sit through real
+# backoff.
+REAL_GIT="$(command -v git)"
+
+# Writes a `git` stub to $1 (a bin dir) that fails every `clone` invocation
+# while its shared counter is <= $STUB_FAIL_COUNT, writing $STUB_FAIL_MESSAGE
+# to stderr; every other invocation (including later `clone` calls once the
+# threshold is passed) runs the real git. Config comes through env vars —
+# set STUB_COUNTER/STUB_FAIL_COUNT/STUB_FAIL_MESSAGE/STUB_REAL_GIT — so the
+# heredoc itself never needs per-case quoting.
+make_flaky_git_stub() {      # $1 = bin dir
+    mkdir -p "$1"
+    cat > "$1/git" <<'STUB'
+#!/usr/bin/env bash
+if [ "$1" = "clone" ]; then
+    n=$(( $(cat "$STUB_COUNTER" 2>/dev/null || echo 0) + 1 ))
+    printf '%s\n' "$n" > "$STUB_COUNTER"
+    if [ "$n" -le "$STUB_FAIL_COUNT" ]; then
+        printf '%s\n' "$STUB_FAIL_MESSAGE" >&2
+        exit 128
+    fi
+fi
+exec "$STUB_REAL_GIT" "$@"
+STUB
+    chmod +x "$1/git"
+}
+
+# ── 10. A clone that fails twice with a transient error, then succeeds ───────
+base=$(make_catalogue 25)
+OUT="$base/out"
+make_flaky_git_stub "$base/bin"
+export STUB_COUNTER="$base/clone-attempts" STUB_FAIL_COUNT=2 \
+       STUB_FAIL_MESSAGE='git@github.com: Permission denied (publickey).' \
+       STUB_REAL_GIT="$REAL_GIT"
+: > "$STUB_COUNTER"
+code=$(PATH="$base/bin:$PATH" HUB_MATERIALIZE_RETRY_DELAYS="0 0 0" \
+        run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ -f "$base/dest/mod01/module.json" ] || errs="$errs mod01-was-not-materialised"
+retries=$(grep -ci 'retry\|retrying' "$OUT" || true)
+[ "${retries:-0}" -ge 2 ] || errs="$errs retries-not-logged(saw=$retries)"
+unset STUB_COUNTER STUB_FAIL_COUNT STUB_FAIL_MESSAGE STUB_REAL_GIT
+[ -z "$errs" ] \
+    && ok "hub#1294: a transient Permission-denied clone failure is retried, and each retry is logged" \
+    || bad "hub#1294: a transient Permission-denied clone failure is retried, and each retry is logged" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 11. A clone that keeps failing transiently exhausts the retry budget ─────
+#    "The door does not open": once retries run out, the module is still
+#    reported as NOT materialised — never silently dropped.
+base=$(make_catalogue 25)
+OUT="$base/out"
+make_flaky_git_stub "$base/bin"
+export STUB_COUNTER="$base/clone-attempts" STUB_FAIL_COUNT=99 \
+       STUB_FAIL_MESSAGE='git@github.com: Permission denied (publickey).' \
+       STUB_REAL_GIT="$REAL_GIT"
+: > "$STUB_COUNTER"
+code=$(PATH="$base/bin:$PATH" HUB_MATERIALIZE_RETRY_DELAYS="0 0 0" \
+        run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-with-a-persistently-failing-clone"
+grep -q 'could NOT materialise:.*mod01' "$OUT" || errs="$errs failure-does-not-name-mod01"
+[ -f "$base/dest/mod01/module.json" ] && errs="$errs mod01-was-materialised-despite-exhausted-retries"
+unset STUB_COUNTER STUB_FAIL_COUNT STUB_FAIL_MESSAGE STUB_REAL_GIT
+[ -z "$errs" ] \
+    && ok "hub#1294: a persistently failing transient clone exhausts retries and is still reported, never silently" \
+    || bad "hub#1294: a persistently failing transient clone exhausts retries and is still reported, never silently" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 12. "repository not found" is a PERMANENT failure: no retry at all ───────
+#    Retrying a config error just delays the same answer. This also proves
+#    the retry loop discriminates by message, not just "any git failure".
+base=$(make_catalogue 25)
+OUT="$base/out"
+make_flaky_git_stub "$base/bin"
+export STUB_COUNTER="$base/clone-attempts" STUB_FAIL_COUNT=99 \
+       STUB_FAIL_MESSAGE="ERROR: Repository not found." \
+       STUB_REAL_GIT="$REAL_GIT"
+: > "$STUB_COUNTER"
+code=$(PATH="$base/bin:$PATH" HUB_MATERIALIZE_RETRY_DELAYS="0 0 0" \
+        run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-with-an-unreachable-repository"
+grep -q 'could NOT materialise:.*mod01' "$OUT" || errs="$errs failure-does-not-name-mod01"
+grep -qi 'retry\|retrying' "$OUT" && errs="$errs retried-a-permanent-repository-not-found-failure"
+# Only mod01 was attempted once before giving up; the rest of the 25 modules
+# clone normally (their attempts push the shared counter well past 1), so a
+# counter of exactly 25 proves mod01 was never retried.
+[ "$(cat "$STUB_COUNTER" 2>/dev/null)" = 25 ] || errs="$errs unexpected-clone-attempt-count=$(cat "$STUB_COUNTER" 2>/dev/null)"
+unset STUB_COUNTER STUB_FAIL_COUNT STUB_FAIL_MESSAGE STUB_REAL_GIT
+[ -z "$errs" ] \
+    && ok "hub#1294: 'repository not found' fails immediately, with no retry" \
+    || bad "hub#1294: 'repository not found' fails immediately, with no retry" "$errs out=$(tail -c 500 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
