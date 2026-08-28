@@ -308,7 +308,7 @@
               <!-- Paso: alta del PIN (primer login con "Confiar en este dispositivo") -->
               <div v-else-if="step === 'setup'" class="step-form">
                 <ion-text color="medium" class="setup-hint">
-                  <p>{{ setupPhase === 'first' ? t('login.setupChoosePin') : t('login.setupConfirmPin') }}</p>
+                  <p>{{ setupPhase === 'first' ? t('login.setupChoosePin', { n: hubPinLength }) : t('login.setupConfirmPin') }}</p>
                 </ion-text>
 
                 <!-- ok-pinpad reutilizado para el alta de PIN. -->

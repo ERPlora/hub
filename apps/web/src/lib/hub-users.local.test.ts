@@ -94,7 +94,8 @@ describe('alta de usuario local (hub#355)', () => {
     // Cinco dígitos ya no es «dentro del rango»: el hub pide exactamente cuatro.
     expect(localUserIssue({ ...ok, pin: '13579' }, census)).toBe('pin_length');
     expect(localUserIssue({ ...ok, pin: '1357' }, census)).toBe('');
-    // Administrar el hub sale de una cuenta, nunca de cuatro dígitos.
+    // Administrar el hub sale de una cuenta, nunca de un PIN (hub#1302: la longitud es del hub,
+    // nunca la nombres a mano en un comentario).
     for (const role of ['admin', 'owner', 'ADMIN']) {
       expect(localUserIssue({ ...ok, role }, census)).toBe('local_cannot_administer');
     }

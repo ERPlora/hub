@@ -4,7 +4,7 @@
 
   A cashier tries something only a manager may do. The till does not log them out and does not swap
   to a manager MODE that stays open behind them: a dialog appears, the manager taps their name and
-  four digits, the action goes through, and the runtime records both names — who was at the till and
+  their PIN, the action goes through, and the runtime records both names — who was at the till and
   who allowed it.
 
   Three things this screen deliberately does NOT do:
@@ -34,11 +34,11 @@
            (`approved_by`) es un sello de goma: nombra una decisión que nadie vio. -->
       <p data-testid="elevation-what" class="elevation-what">{{ whatIsBeingApproved }}</p>
       <p data-testid="elevation-lead" class="elevation-lead">{{ t('elevation.lead') }}</p>
-      <!-- **Pasar la tarjeta ES la aprobación** (hub#658): es lo que hacen Toast, Aloha y Square, y
-           obligar al encargado a teclear cuatro dígitos delante del cliente cuando lleva la tarjeta
-           en la mano es fricción que el mercado quitó hace veinte años. Se dice en los dos pasos
-           del diálogo porque la placa no necesita que se elija a nadie antes: resuelve la persona
-           entera. No hay campo que enfocar — la ráfaga la caza el listener global del shell. -->
+      <!-- **Swiping the badge IS the approval** (hub#658): it is what Toast, Aloha and Square do,
+           and making the manager type their PIN in front of the customer when they are already
+           holding the card is friction the market dropped twenty years ago. Said in both steps of
+           the dialog because the badge needs nobody chosen first: it resolves the whole person by
+           itself. No field to focus — the shell's global listener catches the swipe. -->
       <p data-testid="elevation-badge-hint" class="elevation-badge-hint">
         {{ t('elevation.orSwipeBadge') }}
       </p>
@@ -87,8 +87,9 @@
         </template>
       </template>
 
-      <!-- Step 2 — the four digits. Same `ok-pinpad` as the login screen: the manager types the
-           credential they already know, in the shape they already know it. -->
+      <!-- Step 2 — the PIN. Same `ok-pinpad` as the login screen, sized to THIS hub's PIN length
+           (`hubPinLength`, hub#1302): the manager types the credential they already know, in the
+           shape they already know it. -->
       <template v-else>
         <div class="elevation-approver">
           <ok-avatar :name="approver" size="lg"></ok-avatar>

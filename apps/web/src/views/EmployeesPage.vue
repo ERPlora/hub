@@ -111,8 +111,8 @@
               label-placement="floating"
               inputmode="numeric"
               :label="t('employeeForm.pin')"
-              :helper-text="form.local ? t('employeeForm.localPinHelp') : t('employeeForm.accountPinHelp')"
-              :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`) : ''"
+              :helper-text="form.local ? t('employeeForm.localPinHelp', { n: hubPinLength }) : t('employeeForm.accountPinHelp', { n: hubPinLength })"
+              :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`, { n: hubPinLength }) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(pinIssue) }"
               :maxlength="8"
             />

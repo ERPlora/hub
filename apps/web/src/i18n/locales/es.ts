@@ -980,7 +980,7 @@ export default {
     email: 'Email',
     role: 'Rol',
     pin: 'PIN local',
-    pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
+    pinHelp: '{n} dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
     badge: 'Placa',
@@ -996,11 +996,11 @@ export default {
     localUser: 'Usuario local',
     localUserHelp:
       'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
-    localPinHelp: 'Entre 4 y 8 dígitos. Obligatorio: es cómo entra esta persona.',
+    localPinHelp: '{n} dígitos. Obligatorio: es cómo entra esta persona.',
     accountEmailHelp:
       'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
     accountPinHelp:
-      'Opcional: entre 4 y 8 dígitos. Solo si además atiende una caja compartida de este hub.',
+      'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
       local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
       account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
@@ -1008,7 +1008,7 @@ export default {
       email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
       role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
       invalid_email: 'Introduce un email válido.',
-      pin_length: 'El PIN debe tener entre 4 y 8 dígitos.',
+      pin_length: 'El PIN debe tener {n} dígitos.',
       pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
       pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',
       local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
@@ -1246,7 +1246,7 @@ export default {
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
     // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
     sessionTakenOver: 'Sesión abierta en otro dispositivo',
-    setupChoosePin: 'Elige un PIN de 4 dígitos',
+    setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
