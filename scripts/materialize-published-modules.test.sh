@@ -180,6 +180,40 @@ grep -qi 'no module ids' "$OUT" || errs="$errs failure-does-not-say-there-are-no
     && ok "no resolvable module ids: refuses instead of handing back an empty tree" \
     || bad "no resolvable module ids: refuses instead of handing back an empty tree" "$errs out=$(tail -c 400 "$OUT")"
 
+# ── 8. No deploy key: the developer's OWN ssh is used, never an EMPTY one ─────
+#    Regression test for ERPlora/hub#1153 (review). The fallback path — no keys
+#    bundle, remotes taken from the local checkouts — used to export
+#    `GIT_SSH_COMMAND=""`, and git does not read an empty value as "unset": it
+#    tries to run an empty program ("error: cannot run : No such file or
+#    directory / fatal: unable to fork"), so EVERY ssh remote failed. The 27
+#    checkouts on the fleet machine are https, which is why a smoke test there
+#    never saw it; a developer with `git@github.com:` remotes would have.
+#    A fake `ssh` on PATH stands in for the developer's own: it drops the host
+#    and runs the upload-pack locally, so the case stays offline.
+base=$(make_catalogue 25)
+OUT="$base/out"
+mkdir -p "$base/bin"
+cat > "$base/bin/ssh" <<'FAKE'
+#!/usr/bin/env bash
+# fake ssh: `ssh [options] host '<git command>'` → run the command locally
+cmd="${!#}"
+exec sh -c "${cmd/#git-upload-pack/git upload-pack}"
+FAKE
+chmod +x "$base/bin/ssh"
+for i in $(seq 1 25); do
+    id=$(printf 'mod%02d' "$i")
+    git -C "$base/workspace/$id" remote set-url origin "ssh://localhost$base/origins/$id.git"
+done
+code=$(PATH="$base/bin:$PATH" run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+grep -q 'unable to fork\|cannot run :' "$OUT" && errs="$errs git-was-handed-an-EMPTY-ssh-command"
+n=$(find "$base/dest" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" = 25 ] || errs="$errs manifests=$n(want 25)"
+[ -z "$errs" ] \
+    && ok "no deploy key: ssh remotes go through the developer's own ssh, not an empty GIT_SSH_COMMAND" \
+    || bad "no deploy key: ssh remotes go through the developer's own ssh, not an empty GIT_SSH_COMMAND" "$errs out=$(tail -c 400 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

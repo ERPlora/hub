@@ -151,6 +151,20 @@ ssh_for() {                 # $1 = id — the module's own deploy key, or nothin
     fi
 }
 
+# Only set GIT_SSH_COMMAND when there IS a key. An empty value is not "unset" to
+# git: it tries to run an empty program ("fatal: unable to fork") and every ssh
+# remote fails — the whole fallback path for a developer with `git@github.com:`
+# remotes. Without a key the developer's own ssh (agent, config) does the work.
+git_with_key() {            # $1 = ssh command or empty; the rest = git arguments
+    local ssh_cmd=$1
+    shift
+    if [ -n "$ssh_cmd" ]; then
+        GIT_SSH_COMMAND="$ssh_cmd" git "$@"
+    else
+        git "$@"
+    fi
+}
+
 # The version is DISPLAY only — it makes a red readable ("sales 2.16.29") — so a
 # machine without python3 loses the column, never the guard.
 module_version() {          # $1 = tree
@@ -179,7 +193,7 @@ for id in $ids; do
     tree="$DEST/$id"
     log="$DEST/.$id.log"
     if [ -d "$tree/.git" ]; then
-        if GIT_SSH_COMMAND="$ssh_cmd" git -C "$tree" fetch -q --depth 1 "$url" "$BRANCH" >"$log" 2>&1 \
+        if git_with_key "$ssh_cmd" -C "$tree" fetch -q --depth 1 "$url" "$BRANCH" >"$log" 2>&1 \
             && git -C "$tree" checkout -q --detach FETCH_HEAD >>"$log" 2>&1 \
             && git -C "$tree" clean -qfdx >>"$log" 2>&1; then
             rm -f "$log"
@@ -189,7 +203,7 @@ for id in $ids; do
         fi
     else
         rm -rf "$tree"
-        if GIT_SSH_COMMAND="$ssh_cmd" git clone -q --depth 1 --branch "$BRANCH" "$url" "$tree" >"$log" 2>&1; then
+        if git_with_key "$ssh_cmd" clone -q --depth 1 --branch "$BRANCH" "$url" "$tree" >"$log" 2>&1; then
             rm -f "$log"
         else
             failed="$failed $id"
