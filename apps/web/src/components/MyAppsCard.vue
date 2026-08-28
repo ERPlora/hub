@@ -43,7 +43,9 @@
         >
           <span class="apps-tile-body">
             <HubIcon class="apps-tile-icon" :name="app.icon" />
-            <span class="apps-tile-label">{{ app.label }}</span>
+            <!-- `title`: a name that does not fit the tile is TRUNCATED (hub#1268), so the full one
+                 has to stay reachable — the native tooltip is what every launcher uses for this. -->
+            <span class="apps-tile-label" :title="app.label">{{ app.label }}</span>
           </span>
         </ion-button>
       </li>
@@ -59,7 +61,9 @@
         >
           <span class="apps-tile-body">
             <HubIcon class="apps-tile-icon" name="add-outline" />
-            <span class="apps-tile-label">{{ t('dashboard.appsAdd') }}</span>
+            <span class="apps-tile-label" :title="t('dashboard.appsAdd')">{{
+              t('dashboard.appsAdd')
+            }}</span>
           </span>
         </ion-button>
       </li>
@@ -164,11 +168,16 @@ function remember(path: string): void {
 }
 .apps-grid-cell {
   display: flex;
+  /* `min-width: 0` on the cell and on the tile (hub#1268): a grid/flex item refuses by default to
+     shrink below its `min-content`, so a long name widened the tile past its own column instead of
+     being clipped, and the ellipsis never got the chance to appear. */
+  min-width: 0;
 }
 .apps-tile {
   /* ion-button in `clear` fill, re-shaped as a tile: full cell, stacked icon over label, and the
      Ionic uppercase/letter-spacing undone (an app's name is a name, not a shout). */
   flex: 1;
+  min-width: 0;
   height: auto;
   --padding-top: 0.7rem;
   --padding-bottom: 0.7rem;
@@ -200,7 +209,18 @@ function remember(path: string): void {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
+  /* Never mid-word (hub#1268). `word-break: break-word` split «Automatizaciones» into
+     «Automatizacio» / «nes», which reads as a typo and not as a name. Neither does
+     `overflow-wrap: anywhere` help: measured in Chromium over this very card, the name is 104px
+     wide and the label 84-90px, so ANY setting that authorises breaking inside a word produces the
+     same cut. What every launcher does instead —macOS Launchpad, the Windows Start menu, the
+     Android/iOS home screens, Google's app grid— is refuse to break the word and TRUNCATE it; the
+     whole name stays one hover away in the tile's `title`.
+     Guard: MyAppsCard.test.ts → `the_tile_label_does_not_split_words_hub1268`. */
+  word-break: normal;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 /* The catalogue tile reads as an offer, not as one more installed app: dashed outline, muted ink. */
 .apps-tile--add {

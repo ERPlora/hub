@@ -562,7 +562,7 @@ pub fn translate_sse_line(
     }
 
     // El Cloud emite eventos JSON del orquestador. Extraemos el texto incremental para el
-    // frame `token` del frontend; `error`/`function_call` se reenvían; el resto se ignora.
+    // frame `token` del frontend; `error`/`usage`/`function_call` se reenvían; el resto se ignora.
     let ev: Value = match serde_json::from_str(payload) {
         Ok(v) => v,
         Err(_) => return Some(sse(&json!({ "type": "token", "text": payload }))),
@@ -581,6 +581,12 @@ pub fn translate_sse_line(
 
     match ev.get("type").and_then(Value::as_str) {
         Some("error") => Some(sse(&ev)),
+        // The POST-turn counters that close every stream (saas#1540, hub#1183). Forwarded
+        // VERBATIM like `error`: they are the SaaS's own numbers and the runtime has no business
+        // reinterpreting them. It has to be a FRAME and not the `X-Assistant-Usage` header,
+        // because a header is written before the body — on a stream it is always one message
+        // behind, so the drawer's counter would lag by a turn forever.
+        Some("usage") => Some(sse(&ev)),
         // `function_call`: el bucle del web app ejecuta la op con la sesión del usuario
         // (§9.2). Se anota su `kind` (query/command) desde el catálogo ensamblado, para que
         // el web app sepa si es LECTURA (auto) o ESCRITURA (pide confirmación antes).
@@ -1566,6 +1572,43 @@ mod tests {
         assert!(out.contains("\"kind\":\"command\""), "{out}");
         assert!(out.contains("\"risk\":\"normal\""), "{out}");
         assert!(out.contains("price_cents"), "the money marking must reach the card: {out}");
+    }
+
+    /// Regression test for ERPlora/hub#1183 — the POST-turn `usage` frame must CROSS the runtime.
+    ///
+    /// The SaaS closes every stream with `{"type":"usage", …}` right before `[DONE]` (saas#1540),
+    /// because `X-Assistant-Usage` cannot do that job: a header is written before the body, so on
+    /// its own it is always one message behind. The runtime's `match` ended in `_ => None`, so the
+    /// frame died here and the drawer's counter could never move without a reload.
+    ///
+    /// Forwarded VERBATIM, like `error`: these are the SaaS's own numbers and the runtime has no
+    /// business reinterpreting them.
+    #[test]
+    fn translate_forwards_the_post_turn_usage_frame_hub_1183() {
+        let notes = std::collections::HashMap::new();
+        let line = r#"data: {"type":"usage","tier":"free","messages_used":24,"messages_limit":30,"resets_at":"2026-09-01T00:00:00+00:00"}"#;
+
+        let out =
+            translate_sse_line(line, &notes).expect("the usage frame must be forwarded, not dropped");
+
+        assert!(out.contains("\"type\":\"usage\""), "{out}");
+        assert!(out.contains("\"messages_used\":24"), "the counters must survive: {out}");
+        assert!(out.contains("\"messages_limit\":30"), "the counters must survive: {out}");
+        assert!(
+            out.contains("2026-09-01T00:00:00+00:00"),
+            "resets_at is what turns \"0 left\" into something actionable: {out}"
+        );
+    }
+
+    /// The other half of ERPlora/hub#1183: opening the door for `usage` must NOT open it for
+    /// everything. An unknown frame type stays dropped — turning one into text would let the Cloud
+    /// put words in the assistant's mouth that the model never wrote.
+    #[test]
+    fn translate_still_drops_an_unknown_frame_type_hub_1183() {
+        let notes = std::collections::HashMap::new();
+        let line = r#"data: {"type":"something_new","payload":"whatever"}"#;
+
+        assert_eq!(translate_sse_line(line, &notes), None);
     }
 
     #[test]

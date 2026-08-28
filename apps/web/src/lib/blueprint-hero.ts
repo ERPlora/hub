@@ -119,14 +119,25 @@ export interface HeroInput {
  * the import installs apps, which ticks the very item this card reads, so the card that started the
  * job would otherwise vanish half-way and take its own report with it.
  *
- * **And once it is up it does not close on its own** (`shown`, hub#1120). A FREE hub arrives with
- * `customers` already installed, so the `apps` item ticks `done` on a business that has configured
- * nothing — and the panel re-reads `hub.setup.status` while the owner is still reading the card.
- * Without the latch the card is pulled out of the DOM mid-reading and the press aimed at «Use this»
- * lands on empty space: no spinner, no error, no request, which is exactly how a live button gets
- * reported as dead. The offer now leaves for one of the two reasons the owner can see: they used a
- * template, or they closed it. The protection is untouched, because `shown` only latches AFTER the
- * business legitimately counted as empty — a hub that already had apps never sees the card at all.
+ * **And once it is up it does not close on its own** (`shown`, hub#1120). `hubIsEmpty` stops saying
+ * "empty" for three things that are not the owner acting, and the panel re-reads
+ * `hub.setup.status` while the owner is still on the card: the document coming back `null` because
+ * the re-read failed (hub#1120 turned out to be the 429 of saas#1640), the `apps` item dropping out
+ * of it for this session (hub#435), and the import THIS card started ticking the very item it
+ * reads. Without the latch the card is pulled out of the DOM mid-reading and the press aimed at
+ * «Use this» lands on empty space: no spinner, no error, no request, which is exactly how a live
+ * button gets reported as dead. The offer now leaves for one of the two reasons the owner can see:
+ * they used a template, or they closed it. The protection is untouched, because `shown` only
+ * latches AFTER the business legitimately counted as empty — a hub that already had apps never
+ * sees the card at all.
+ *
+ * What is **not** one of those reasons, despite what this comment used to claim (hub#1179): a FREE
+ * hub arriving with `customers` preinstalled. Nothing installs a module into a newborn hub — the
+ * boot import of the deploy-declared blueprint is gone (a hub is born empty), the `HUB_MODULES_DIR`
+ * scan is developer-mode only and no deployment asks for developer mode, and the SaaS holds no
+ * credential that could make a hub install anything. `crates/server/tests/newborn_hub_is_empty.rs`
+ * and `crates/runtime/tests/setup_status_apps_ignores_preinstalled_hub1179.rs` are what keep it
+ * that way.
  */
 export function heroVisible(input: HeroInput): boolean {
   if (!input.canAdminister || input.dismissed) return false;

@@ -112,23 +112,39 @@
             <!-- El «ver planes» que la issue pedía y no existía (saas#1540): sin una salida, la
                  frase de cuota agotada es un callejón, y el único momento de conversión del tier
                  gratuito muere ahí. Solo en el mensaje que TRAE la cuota, no en todos. -->
+            <!-- Y solo a quien PUEDE pagarlo (hub#1259): contratar el plan es la puerta de
+                 admin desde hub#1254, así que un cajero que pulsa este botón solo puede recibir un
+                 403 y un error genérico. Al resto se le dice a quién pedírselo — que es lo que
+                 hacen Shopify, Square y Business Central con las acciones de facturación. -->
             <div v-if="assistantQuota && i === messages.length - 1" class="chat-quota-cta">
-              <ion-button size="small" :disabled="checkoutPending" @click="openPlans()">
+              <ion-button
+                v-if="isAdmin"
+                size="small"
+                data-testid="assistant-quota-cta"
+                :disabled="checkoutPending"
+                @click="openPlans()"
+              >
                 <HubIcon slot="start" name="arrow-up-circle-outline" />
                 {{ t('assistant.quotaCta') }}
               </ion-button>
+              <p v-else class="chat-quota-ask" data-testid="assistant-quota-ask-admin">
+                {{ t('assistant.quotaAskAdmin') }}
+              </p>
             </div>
+            <!-- hub#1291: the sentence used to inherit `.chat-grounding-line`'s warning yellow
+                 (~2.1:1 on white even with the `-shade`, under WCAG AA); it now reads `medium`
+                 and the warning accent lives only on `.chat-grounding-icon`. -->
             <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
               <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.claimedWithoutEffect') }}
               </p>
               <p v-if="m.grounding.unsourcedIds.length" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.unsourcedId') }}
               </p>
               <p v-if="m.grounding.unknownRoutes.length" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.unknownRoute') }}
               </p>
             </div>
@@ -168,6 +184,17 @@
       </div>
 
       <footer class="assistant-foot">
+        <!-- El aviso del 80 % (hub#1183). El hub no conocía su plan hasta que lo agotaba, así que
+             el dueño se enteraba del límite justo cuando ya no podía preguntar. `role="status"`:
+             es información que aparece sola, no una alerta que interrumpa. -->
+        <p
+          v-if="quotaWarningText"
+          class="quota-warning"
+          data-testid="assistant-quota-warning"
+          role="status"
+        >
+          {{ quotaWarningText }}
+        </p>
         <!-- Bandeja de adjuntos pendientes (antes de enviar). -->
         <div v-if="pendingAttachments.length || attachError || voiceError" class="attach-tray">
           <span v-for="(p, pi) in pendingAttachments" :key="pi" class="attach-chip">
@@ -259,6 +286,7 @@ import {
   messageAttachments,
   startVoiceRecording,
   transcribeAudio,
+  type AssistantUsage,
   type ChatMessage,
   type ChatContent,
   type ChatContentPart,
@@ -271,12 +299,18 @@ import { refreshSetupStatus, setupStatus, type SetupItem } from '../lib/setup-st
 import { moduleNav } from '../lib/nav';
 import { describeToolCall } from '../lib/assistant-confirm';
 import { confirmationFor } from '../lib/assistant-danger';
-import { startAssistantCheckout } from '../lib/assistant-plan';
+import {
+  assistantPlan,
+  startAssistantCheckout,
+  type AssistantPlan,
+  type AssistantTierOption,
+} from '../lib/assistant-plan';
 import { parseMarkdown, type Inline } from '../lib/assistant-markdown';
 import { elevationCatalogue } from '../lib/elevation-label';
 import type { TurnAudit } from '../lib/assistant-grounding';
 import { assistantTasks, setupBriefing } from '../lib/assistant-setup';
 import { getClient } from '../lib/runtime';
+import { isAdmin } from '../lib/session';
 
 const { t, te, locale } = useI18n();
 const router = useRouter();
@@ -376,18 +410,126 @@ const assistantQuota = ref<{ tier?: string; used?: number; limit?: number } | nu
  *  accidental es más probable (saas#1541). */
 const checkoutPending = ref(false);
 
-/** Abre el checkout del plan. Si no llega url NO se navega: mejor no moverse que llevar a una
- *  página vacía justo cuando el dueño está intentando pagar. */
+// ── El plan de ESTE hub, conocido ANTES de agotarlo (hub#1183) ─────────────────────────────────
+//
+// `assistantPlan()` existía y no la llamaba nadie desde producción: el hub descubría su límite al
+// gastarlo, o sea en el peor momento posible. Se lee al ABRIR el drawer (una llamada por apertura,
+// no por turno) y se refresca con el frame `usage` que cierra cada turno — que es el único
+// contador que no va un mensaje por detrás.
+
+/** Plan + consumo + planes contratables. `null` mientras no se haya podido leer: nunca se inventa
+ *  un plan, porque el consumo es el número con el que el dueño decide si paga. */
+const plan = ref<AssistantPlan | null>(null);
+
+/** Desde dónde se avisa. El 80 % es el punto convencional del sector (Shopify, Square, Twilio):
+ *  deja margen para decidir sin convertir el aviso en ruido durante todo el mes. */
+const QUOTA_WARN_RATIO = 0.8;
+
+/** La frase del pie, o `''` si no toca avisar. Agotado NO entra aquí: ese estado ya lo cuenta el
+ *  mensaje de cuota con su CTA, y repetirlo en el pie sería decir dos veces lo mismo. */
+const quotaWarningText = computed<string>(() => {
+  const p = plan.value;
+  if (!p || typeof p.used !== 'number' || typeof p.limit !== 'number' || p.limit <= 0) return '';
+  if (p.used >= p.limit) return '';
+  if (p.used / p.limit < QUOTA_WARN_RATIO) return '';
+  const line = t('assistant.quotaRemaining', {
+    tier: p.tier ?? '—',
+    remaining: p.limit - p.used,
+    limit: p.limit,
+  });
+  const resets = formatResetDate(p.resetsAt);
+  return resets ? `${line} ${t('assistant.quotaResets', { date: resets })}` : line;
+});
+
+/** La fecha de renovación en el idioma activo, o `''` si no vino o no se puede leer. Una fecha
+ *  ilegible es peor que ninguna: el dueño la usa para decidir entre esperar y pagar. */
+function formatResetDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
+/** Lee el plan del hub. Un fallo deja `plan` como estaba (o en `null`): sin dato no se avisa, que
+ *  es mejor que avisar con un número inventado. */
+async function loadPlan(): Promise<void> {
+  const read = await assistantPlan();
+  if (read) plan.value = read;
+}
+
+/** Aplica los contadores POST-turno sin perder los planes contratables ya leídos. */
+function applyUsage(usage: AssistantUsage): void {
+  const current = plan.value;
+  plan.value = {
+    tier: usage.tier ?? current?.tier,
+    used: usage.messagesUsed ?? current?.used,
+    limit: usage.messagesLimit ?? current?.limit,
+    resetsAt: usage.resetsAt ?? current?.resetsAt,
+    paidTiers: current?.paidTiers ?? [],
+  };
+}
+
+/** Cómo se lee un plan en la hoja de selección: nombre y precio, o solo el nombre si el SaaS no
+ *  manda precio (no se inventa un importe). */
+function tierLabel(tier: AssistantTierOption): string {
+  return tier.priceMonthly
+    ? t('assistant.planOption', { name: tier.name, price: tier.priceMonthly })
+    : tier.name;
+}
+
+/**
+ * Deja ELEGIR el plan (hub#1183) y abre su checkout.
+ *
+ * El botón se llamaba «ver planes» y no enseñaba ninguno: iba derecho al checkout de `basic`, así
+ * que un hub que necesitaba `pro` compraba el más barato, lo agotaba igual y volvía. Los planes
+ * los da el SaaS (`available_paid_tiers`), no una lista escrita aquí.
+ *
+ * Si no llega url NO se navega: mejor no moverse que llevar a una página vacía justo cuando el
+ * dueño está intentando pagar.
+ */
 async function openPlans(): Promise<void> {
   if (checkoutPending.value) return;
+  const tiers = plan.value?.paidTiers ?? [];
+  if (tiers.length === 0) {
+    // Sin catálogo no hay nada que ofrecer, y mandar al checkout a ciegas solo produce un error.
+    toastError(t('assistant.plansUnavailable'));
+    return;
+  }
+  const chosen = tiers.length === 1 ? tiers[0].slug : await pickTier(tiers);
+  if (!chosen) return;
   checkoutPending.value = true;
   try {
-    const url = await startAssistantCheckout('basic');
+    const url = await startAssistantCheckout(chosen);
     if (url) window.location.assign(url);
     else toastError(t('assistant.error'));
   } finally {
     checkoutPending.value = false;
   }
+}
+
+/** La hoja de selección: el MISMO `alertController` con radios que ya usa la tarjeta de
+ *  confirmación de escrituras. Nada de un componente nuevo para elegir entre tres opciones. */
+async function pickTier(tiers: AssistantTierOption[]): Promise<string | null> {
+  const alert = await alertController.create({
+    header: t('assistant.plansTitle'),
+    inputs: tiers.map((tier, i) => ({
+      type: 'radio' as const,
+      label: tierLabel(tier),
+      value: tier.slug,
+      checked: i === 0,
+    })),
+    buttons: [
+      { text: t('assistant.confirmCancel'), role: 'cancel' },
+      { text: t('assistant.plansConfirm'), role: 'confirm' },
+    ],
+  });
+  await alert.present();
+  const { role, data } = await alert.onDidDismiss<{ values?: string }>();
+  return role === 'confirm' && typeof data?.values === 'string' ? data.values : null;
 }
 const draft = ref('');
 const streaming = ref(false);
@@ -639,20 +781,43 @@ async function send(): Promise<void> {
       if (!messageText(assistantMsg.value.content)) assistantMsg.value.content = t('assistant.noReply');
       saveAssistantHistory();
     },
+    // Los contadores POST-turno (saas#1540, hub#1183): el pie se mueve sin recargar. Tiene que
+    // ser el frame y no la cabecera `X-Assistant-Usage`, que se escribe antes del cuerpo y por
+    // tanto va siempre un mensaje por detrás.
+    onUsage: (usage: AssistantUsage) => applyUsage(usage),
     onError: (failure: unknown) => {
       streaming.value = false;
       abort = null;
       // Quedarse sin mensajes NO es una avería (saas#1540): se dice el plan, el consumo y por
       // dónde se amplía. «No se pudo contactar» ahí es una mentira que además pierde la venta.
-      const quota = (failure as { quota?: { tier?: string; used?: number; limit?: number } })?.quota;
+      const quota = (
+        failure as {
+          quota?: { tier?: string; used?: number; limit?: number; resetsAt?: string };
+        }
+      )?.quota;
       if (quota) {
         assistantQuota.value = quota;
+        // El pie tiene que contar lo MISMO que el mensaje (hub#1183): sin esto seguiría diciendo
+        // «te quedan 5» debajo de un «has gastado 30 de 30», y dos cifras que se contradicen en la
+        // misma pantalla valen menos que ninguna.
+        applyUsage({
+          tier: quota.tier,
+          messagesUsed: quota.used,
+          messagesLimit: quota.limit,
+          resetsAt: quota.resetsAt,
+        });
         if (!messageText(assistantMsg.value.content)) {
-          assistantMsg.value.content = `${t('assistant.quotaTitle')} ${t('assistant.quotaUsed', {
+          // La fecha de renovación (hub#1183): «has gastado 30 de 30» sin horizonte es un
+          // callejón — no se puede decidir entre esperar y pagar.
+          const resets = formatResetDate(quota.resetsAt);
+          const spent = `${t('assistant.quotaTitle')} ${t('assistant.quotaUsed', {
             tier: quota.tier ?? '—',
             used: quota.used ?? '—',
             limit: quota.limit ?? '—',
           })}`;
+          assistantMsg.value.content = resets
+            ? `${spent} ${t('assistant.quotaResets', { date: resets })}`
+            : spent;
         }
       } else if (!messageText(assistantMsg.value.content)) {
         assistantMsg.value.content = t('assistant.error');
@@ -743,6 +908,9 @@ watch(
     // offer the items of whatever screen last happened to read it (or none at all, from a screen
     // that never does).
     if (open && setupChat.value) void refreshSetupStatus(getClient());
+    // Qué plan tiene este hub y cuánto lleva gastado (hub#1183). Una lectura por APERTURA, no por
+    // turno: dentro del hilo el contador lo mueve el frame `usage` de cada respuesta.
+    if (open) void loadPlan();
   },
   { immediate: true }
 );
@@ -758,6 +926,18 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* Aviso del 80 % (hub#1183) y la línea de «pídeselo al responsable» (hub#1259): texto de apoyo,
+   discreto a propósito — informan, no interrumpen. */
+.quota-warning,
+.chat-quota-ask {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--ion-color-medium, #6b7280);
+}
+.chat-quota-ask {
+  margin: 0.25rem 0 0;
+}
 /* Scrim: SOLO en móvil (<768px). Desde tablet el panel es push y ambos lados siguen interactivos. */
 .assistant-scrim {
   position: fixed;
@@ -949,6 +1129,11 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.35;
+  /* hub#1291: was `--ion-color-warning-shade` (~2.1:1 on white) — still under WCAG AA. Same
+     `medium` as `.quota-warning` just above; the icon alone carries the warning accent. */
+  color: var(--ion-color-medium, #6b7280);
+}
+.chat-grounding-icon {
   color: var(--ion-color-warning-shade, #b88a00);
 }
 .chat-bubble {

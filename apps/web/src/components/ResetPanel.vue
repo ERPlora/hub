@@ -58,8 +58,11 @@
             <span class="reset-row-rows">{{ t('settings.resetRows', { n: s.rows }) }}</span>
           </div>
         </ion-checkbox>
-        <!-- El motivo del bloqueo se lee en pantalla; si no, parece un fallo del producto. -->
-        <ion-note v-if="s.blocked_by" slot="end" color="warning" class="reset-blocked">
+        <!-- El motivo del bloqueo se lee en pantalla; si no, parece un fallo del producto.
+             hub#1291: `color="warning"` rendered Ionic's raw yellow (~1.6:1 on white, under
+             WCAG AA); the row is already disabled and the checkbox communicates the block, so
+             the note reads `medium` with no separate accent needed. -->
+        <ion-note v-if="s.blocked_by" slot="end" color="medium" class="reset-blocked">
           {{ s.blocked_by }}
         </ion-note>
       </ion-item>

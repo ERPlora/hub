@@ -106,6 +106,18 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
+    // moment. From 80% on, the drawer says what is left and when it comes back.
+    quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
+    quotaResets: 'They come back on {date}.',
+    // hub#1259 — contracting the plan is the admin door (hub#1254). A cashier who presses this
+    // button only gets a 403 and a generic error: worse than not seeing it, and worse than
+    // reading who to ask.
+    quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    plansTitle: 'Choose a plan',
+    plansConfirm: 'Go to payment',
+    planOption: '{name} — {price} €/month',
+    plansUnavailable: 'There are no plans to upgrade to right now.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -666,6 +678,19 @@ export default {
     declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
     declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
     declarationIndicadorMultiplesOT: 'Serving several taxpayers',
+    // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
+    // invisible consequence is not. One sentence per capability id; the catalogue in
+    // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
+    // fixes it is the toggle in the same row (hub#800 §3).
+    capabilityBreaks: {
+      network: 'Without this, the app cannot go online: whatever it syncs, sends or checks over the internet stays undone.',
+      certificate: 'Without this, your invoices are not signed and never reach the tax authority.',
+      printer: 'Without this, receipts and kitchen orders pile up in the print queue and nothing comes out.',
+      notify: 'Without this, no reminder or confirmation reaches your customers by email, SMS or WhatsApp.',
+      manage_flows: 'Without this, the app cannot create or edit your automations, so the ones it needs never run.',
+      // A capability this shell does not know yet: say something true rather than nothing.
+      unknown: 'Without this, the part of the app that needs this permission will not work.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
   // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the
@@ -1369,6 +1394,7 @@ export default {
     purposeBackupDesc: 'Private copy to restore or move this business. Includes your people and their access.',
     purposeTemplate: 'Template to share',
     purposeTemplateDesc: 'To publish or hand to another business. Never includes people, PINs or tax certificates.',
+    purposeLocked: 'This is a demo or a test installation, so it can only export templates: people, PINs and tax details never travel in its file.',
     sectionUsers: 'Users',
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',
@@ -1547,6 +1573,8 @@ export default {
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
     protectedTitle: 'Open the cash drawer first',
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
+    emptyTitle: 'Nothing to show here yet',
+    emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
   },
   moduleSettings: {
     tab: 'Settings',

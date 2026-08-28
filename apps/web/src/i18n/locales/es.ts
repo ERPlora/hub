@@ -104,6 +104,13 @@ export default {
     quotaTitle: 'Has usado todos tus mensajes del asistente',
     quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
     quotaCta: 'Ver planes',
+    quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
+    quotaResets: 'Se renuevan el {date}.',
+    quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    plansTitle: 'Elige un plan',
+    plansConfirm: 'Ir al pago',
+    planOption: '{name} — {price} €/mes',
+    plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -626,6 +633,15 @@ export default {
     declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
     declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
     declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
+    // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
+    capabilityBreaks: {
+      network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',
+      certificate: 'Sin esto, tus facturas no se firman y no llegan a Hacienda.',
+      printer: 'Sin esto, los tiques y las comandas se quedan en la cola de impresión y no sale ninguno.',
+      notify: 'Sin esto, no llega ningún recordatorio ni confirmación a tus clientes por email, SMS o WhatsApp.',
+      manage_flows: 'Sin esto, la app no puede crear ni editar tus automatizaciones, así que las que necesita no se ejecutan.',
+      unknown: 'Sin esto, la parte de la app que necesita este permiso no funcionará.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
   print: {
@@ -1276,6 +1292,7 @@ export default {
     purposeBackupDesc: 'Copia privada para restaurar o mudar este negocio. Incluye a tu gente y sus accesos.',
     purposeTemplate: 'Plantilla para compartir',
     purposeTemplateDesc: 'Para publicar o dar a otro negocio. Nunca incluye personas, PIN ni certificados fiscales.',
+    purposeLocked: 'Esta es una instalación de demostración o de pruebas, así que solo puede exportar plantillas: las personas, los PIN y los datos fiscales nunca viajan en su archivo.',
     sectionUsers: 'Usuarios',
     sectionUsersDesc: 'Empleados, roles y permisos',
     sectionSettings: 'Ajustes',
@@ -1414,6 +1431,8 @@ export default {
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
     protectedTitle: 'Abre la caja primero',
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
+    emptyTitle: 'Aquí todavía no hay nada',
+    emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
   },
   moduleSettings: {
     tab: 'Ajustes',

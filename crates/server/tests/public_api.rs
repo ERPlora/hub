@@ -5,7 +5,8 @@ use std::path::PathBuf;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use erplora_db::testutil::fresh_db;
+use erplora_db::testutil::{fresh_db, TestDb};
+use erplora_db::{DatabaseAdapter, Params};
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use http_body_util::BodyExt;
@@ -602,4 +603,227 @@ async fn openapi_anonymous_in_session_mode_with_docs_off_is_404() {
         .unwrap();
     // Docs apagadas por defecto → 404 server-side (defensa en profundidad), sin llegar al gate de sesión.
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+// ── hub#1187 · lo que el contrato de esta puerta no fijaba ───────────────────────────────────
+
+/// Regression test for ERPlora/hub#1187 — the `422 unknown_filter` contract of hub#1173 pinned on
+/// the PUBLIC door (`POST /api/v1/{module}/q/{name}`), not only on the internal dispatcher.
+///
+/// The failure hub#1173 closed is the **silent success**: a param the list query does not declare
+/// used to be ignored, and the page answered `200 ok` **with the whole list** — indistinguishable
+/// from a filter that ran and matched everything. Fixing it in the runtime and asserting it on
+/// `/api/query` left the door a third party actually calls untested: `api_keys.rs` reuses
+/// `crate::err_response`, so it *should* travel, but "should" is what a regression is made of, and
+/// here the caller is an integration we do not control, wiring itself against a list it believes
+/// it narrowed.
+///
+/// Both halves are asserted on purpose: a door that answered `422` to everything would pass the
+/// negative on its own. A DECLARED param still opens the door and still narrows the page.
+#[tokio::test]
+async fn an_undeclared_filter_is_422_on_the_public_door_hub1187() {
+    let app = make_app().await;
+    let (_id, secret) = create_key(&app).await;
+
+    for name in ["Alpha", "Beta"] {
+        let resp = app
+            .clone()
+            .oneshot(api_post(
+                "/api/v1/catalog/c/item.create",
+                &secret,
+                json!({ "payload": { "name": name } }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "seeding `{name}` by the public door");
+    }
+
+    // Positivo 1 — la puerta ABRE: sin params sale la lista entera.
+    let resp = app
+        .clone()
+        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret, json!({ "params": {} })))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(j["data"]["total"], json!(2), "{j}");
+
+    // Positivo 2 — un param DECLARADO (`list.search = ["name"]`) filtra de verdad: salen menos
+    // filas. Sin esto, un `422` a todo pasaría el negativo de abajo sin probar nada.
+    let resp = app
+        .clone()
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret,
+            json!({ "params": { "search": "Alpha" } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(j["data"]["total"], json!(1), "un param declarado filtra: {j}");
+    assert_eq!(j["data"]["rows"][0]["name"], json!("Alpha"), "{j}");
+
+    // Negativo 1 — el descuido clásico: la COLUMNA sin el prefijo `f_` del motor. Antes de
+    // hub#1173 esto devolvía `200` con las dos filas, como si hubiera filtrado por «Alpha».
+    let resp = app
+        .clone()
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret,
+            json!({ "params": { "name": "Alpha" } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "un param que la lista no declara se rehúsa; nunca 200 con la lista entera"
+    );
+    let j = body_json(resp).await;
+    assert_eq!(j["ok"], json!(false), "{j}");
+    assert_eq!(j["error"]["code"], json!("unknown_filter"), "{j}");
+    assert!(j["data"].is_null(), "una refusal no trae página: {j}");
+
+    // Negativo 2 — el param inventado, y el mensaje lo NOMBRA: es lo único con lo que un tercero
+    // encuentra su propia errata desde fuera (mismo contrato que en `/api/query`, hub#1241).
+    let resp = app
+        .clone()
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret,
+            json!({ "params": { "active_only": true } }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let j = body_json(resp).await;
+    assert_eq!(j["error"]["code"], json!("unknown_filter"), "{j}");
+    assert!(
+        j["error"]["message"].as_str().unwrap_or_default().contains("active_only"),
+        "el param rechazado se nombra o el tercero no puede arreglar la llamada: {j}"
+    );
+}
+
+/// Two deployments, two `hub_id`s, **one schema**: the worst case the row contract of ADR-0201 has
+/// to hold in. Each hub seeds its own row through the door that injects `hub_id` (its own API key
+/// on `POST /api/v1/catalog/c/item.create`) — never a seeding helper, which would prove nothing
+/// about the door under test.
+async fn public_api_app_for(db: &TestDb, hub_id: &str) -> axum::Router {
+    let adapter = db.adapter().await;
+    let mut rt = Runtime::with_hub_id(Box::new(adapter), hub_id);
+    rt.ensure_system_tables().await.unwrap();
+    rt.install_from_dir(&fixture()).await.unwrap();
+    let mut cfg = dev_config();
+    cfg.hub_id = hub_id.to_string();
+    app(AppState::with_config(rt, cfg))
+}
+
+/// POST admin contra la puerta de gestión de un hub concreto (el `x-hub-id` que inyecta su
+/// despliegue).
+fn admin_post_as_hub(hub_id: &str, uri: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("x-hub-id", hub_id)
+        .header("x-user-id", "admin-1")
+        .header("x-permissions", "*")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// Regression test for ERPlora/hub#1187 — tenancy on the PUBLIC door.
+///
+/// `tests/multitenant.rs` proves a hub only touches its own pool, but it proves it on `/api/query`
+/// and with a database per org, so the row-level `hub_id` scoping is never the thing under test.
+/// Here both hubs share ONE schema on purpose: if the scoping holds when the tables are literally
+/// the same, it holds a fortiori with a database per hub (ADR-0201). Everything goes through the
+/// enforcing door — seeding included — because a helper that writes the rows itself proves nothing
+/// about the door.
+#[tokio::test]
+async fn a_key_of_one_hub_never_reads_rows_of_another_hub1187() {
+    const HUB_A: &str = "hub-pub-a";
+    const HUB_B: &str = "hub-pub-b";
+
+    let db = TestDb::new().await;
+    let app_a = public_api_app_for(&db, HUB_A).await;
+    let app_b = public_api_app_for(&db, HUB_B).await;
+
+    // Una key por hub, cada una por la puerta de gestión de SU despliegue.
+    let mut secrets = Vec::new();
+    for (app, hub_id, item) in [(&app_a, HUB_A, "Only in A"), (&app_b, HUB_B, "Only in B")] {
+        let resp = app
+            .clone()
+            .oneshot(admin_post_as_hub(
+                hub_id,
+                "/api/keys",
+                json!({ "name": hub_id, "scope": [{ "module": "catalog", "read": true, "write": true }] }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let secret = body_json(resp).await["data"]["secret"].as_str().unwrap().to_string();
+        // Y su fila, escrita por la puerta pública: el `hub_id` lo pone el despliegue, no el body.
+        let resp = app
+            .clone()
+            .oneshot(api_post(
+                "/api/v1/catalog/c/item.create",
+                &secret,
+                json!({ "payload": { "name": item } }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "{hub_id} siembra su fila por su puerta");
+        secrets.push(secret);
+    }
+    let (secret_a, secret_b) = (secrets[0].clone(), secrets[1].clone());
+
+    // CONTROL DEL POSITIVO: las dos filas están de verdad en la MISMA tabla. Sin esto, un
+    // aislamiento «verde» podría serlo porque la fila del vecino nunca llegó a existir.
+    let probe = db.adapter().await;
+    let rows = probe
+        .query("SELECT hub_id, name FROM catalog_items ORDER BY name", &Params::new())
+        .await
+        .unwrap()
+        .rows;
+    assert_eq!(rows.len(), 2, "las dos filas comparten tabla: {rows:?}");
+    assert_eq!(rows[0]["hub_id"], json!(HUB_A), "{rows:?}");
+    assert_eq!(rows[1]["hub_id"], json!(HUB_B), "{rows:?}");
+
+    // La key de A solo ve lo de A…
+    let resp = app_a
+        .clone()
+        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_a, json!({ "params": {} })))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(j["data"]["total"], json!(1), "la key de A no cuenta las filas de B: {j}");
+    assert_eq!(j["data"]["rows"][0]["name"], json!("Only in A"), "{j}");
+
+    // …y la de B, solo lo de B (el aislamiento va en los dos sentidos, no solo hacia el que probé).
+    let resp = app_b
+        .clone()
+        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_b, json!({ "params": {} })))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let j = body_json(resp).await;
+    assert_eq!(j["data"]["total"], json!(1), "la key de B no cuenta las filas de A: {j}");
+    assert_eq!(j["data"]["rows"][0]["name"], json!("Only in B"), "{j}");
+
+    // Y la key de A presentada en el despliegue de B ni siquiera autentica: la búsqueda de la key
+    // filtra por `hub_id`, así que un secreto robado de otro hub no abre esta puerta.
+    let resp = app_b
+        .clone()
+        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_a, json!({ "params": {} })))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNAUTHORIZED,
+        "la key de A no es una key de B: {:?}",
+        body_json(resp).await
+    );
 }

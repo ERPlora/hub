@@ -1,7 +1,29 @@
 <template>
   <AppPage :title="moduleName">
-    <div v-if="status === 'loading'" class="state-loading">
-      <ion-spinner name="crescent" /> {{ t('moduleView.loading') }}
+    <!-- hub#1169 — estado de CARGA del shell mientras baja el WC del módulo.
+         Antes: un `ion-spinner` y el texto pegados a la esquina superior izquierda de un área
+         vacía a pantalla completa; en la primera visita (o en 3G) eso no se lee como «esto viene»,
+         se lee como «esto está roto». Ahora un SKELETON de página con `ion-skeleton-text` (barra
+         de cabecera + filas) que ocupa el área que va a ocupar el contenido — el patrón de Ionic,
+         el mismo que usan Shopify (Polaris SkeletonPage) y Square.
+         Las barras son decorativas (`aria-hidden`): la frase la dice el contenedor, con
+         `role="status"` + `aria-busy`, para quien no está mirando la pantalla. -->
+    <div
+      v-if="status === 'loading'"
+      class="module-skeleton"
+      data-testid="module-skeleton"
+      role="status"
+      aria-busy="true"
+      :aria-label="t('moduleView.loading')"
+    >
+      <ion-skeleton-text animated class="module-skeleton__heading" aria-hidden="true" />
+      <ion-skeleton-text
+        v-for="row in SKELETON_ROWS"
+        :key="row"
+        animated
+        class="module-skeleton__row"
+        aria-hidden="true"
+      />
     </div>
     <ok-inline-feedback
       v-else-if="status === 'error'"
@@ -14,6 +36,18 @@
         {{ t('moduleView.retry') }}
       </ion-button>
     </ok-inline-feedback>
+    <!-- hub#1169 — VACÍO, que no es lo mismo que fallo. El menú contestó y este módulo no tiene
+         ninguna entrada de `navigation[]` que pintar (desactivado, o un módulo que no declara
+         navegación). Antes esto caía en el estado de ERROR: «No se pudo cargar el módulo» con un
+         botón Reintentar que solo puede volver a dar la misma respuesta — decir «falló» sobre un
+         hecho, el mismo engaño que hub#770 arregló para las listas. -->
+    <ok-empty-state
+      v-else-if="status === 'empty'"
+      icon="apps-outline"
+      :heading="t('moduleView.emptyTitle')"
+      :message="t('moduleView.emptyHint')"
+      data-testid="module-empty"
+    />
     <!-- Pestaña sintética "Plan" (auto-inyectada para módulos con `billing`): panel del SHELL,
          no un WC del módulo. Se muestra en vez del outlet del WC cuando está activa. -->
     <ModulePlanPanel
@@ -109,7 +143,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import {
   IonToolbar, IonCard, IonCardContent, IonButton,
-  IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSpinner,
+  IonFooter, IonSegment, IonSegmentButton,  IonLabel, IonSkeletonText,
   onIonViewDidLeave, onIonViewWillEnter
 } from '@ionic/vue';
 import HubIcon from '../components/HubIcon.vue';
@@ -146,7 +180,16 @@ const outlet = ref<HTMLDivElement | null>(null);
 const protectsOutlet = ref<HTMLDivElement | null>(null);
 /** El `ion-segment` del tabbar de footer (ver `revealActiveTab`). */
 const tabbar = ref<{ $el?: HTMLElement } | null>(null);
-const status = ref<'loading' | 'ready' | 'error'>('loading');
+/**
+ * Filas del skeleton de carga (hub#1169). Seis más la barra de cabecera: bastantes para que el
+ * bloque ocupe el alto de una pantalla de listado sin fingir un número de filas concreto.
+ */
+const SKELETON_ROWS = 6;
+/**
+ * Lo que la pantalla sabe de su propia carga. `empty` NO es `error`: el módulo contestó y no hay
+ * nada que pintar (hub#1169). Son tres frases distintas y la pantalla no puede decir una por otra.
+ */
+const status = ref<'loading' | 'ready' | 'error' | 'empty'>('loading');
 const moduleName = ref<string>('');
 /** Entradas de `navigation[]` del módulo activo (pestañas del tabbar). */
 const tabs = ref<MenuEntry[]>([]);
@@ -317,7 +360,11 @@ async function mount(): Promise<void> {
     const entry: MenuEntry | undefined =
       tabs.value.find((tb) => tb.nav.id === navId) ?? tabs.value[0];
     if (!entry) {
-      status.value = 'error';
+      // El menú vino bien; este módulo simplemente no aporta ninguna pestaña. Vacío, no fallo
+      // (hub#1169): un Reintentar aquí solo puede repetir la misma respuesta.
+      moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
+      if (outlet.value) outlet.value.replaceChildren();
+      status.value = 'empty';
       return;
     }
     moduleName.value = entry.moduleName;
@@ -505,15 +552,31 @@ onBeforeUnmount(() => {
   line-height: 1.1;
 }
 
-/* Estados de carga/error al montar el WC del módulo. Antes usaban utilidades Tailwind
-   (flex/opacity) y un valor arbitrario text-[color:...]; ahora scoped con tokens Ionic,
-   misma línea que el dashboard. */
-.state-loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 2rem 0;
-  opacity: 0.7;
+/* Skeleton de carga del módulo (hub#1169). Bloque, no fila: ocupa el ANCHO del área de contenido
+   —que es lo que va a ocupar la pantalla que está bajando— en vez de colapsar en una línea corta
+   arriba a la izquierda, que es exactamente lo que se reportó. Sin `align-items: center`: las
+   barras son de ancho completo y se apilan. */
+.module-skeleton {
+  display: block;
+  width: 100%;
+  padding: 1rem 0;
+}
+
+/* La barra de cabecera: más alta y más corta que las filas, para que el bloque se lea como una
+   página (título + contenido) y no como una tabla suelta. */
+.module-skeleton__heading {
+  height: 1.5rem;
+  width: 40%;
+  max-width: 18rem;
+  margin: 0 0 1.5rem;
+  border-radius: 6px;
+}
+
+.module-skeleton__row {
+  height: 1rem;
+  width: 100%;
+  margin: 0 0 0.875rem;
+  border-radius: 6px;
 }
 .blocked-card {
   margin: 12px 0;

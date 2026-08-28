@@ -12,6 +12,8 @@
 //! - `[core_queries]` — `hub_users::CORE_QUERIES`, the reserved `hub.*` namespace.
 //! - `[capabilities]` — `CapabilityKind::ALL`, cross-checked against `schemas/module.schema.json`
 //!   so a capability cannot exist in one and not the other.
+//! - `[migration_not_expand]` — `migration_guard::NOT_EXPAND`, the verbs that take a migration
+//!   out of `expand` (hub#1163).
 //! - `[command_origins]`, `[migration_kinds]`, `[row_gates]` — read from the runtime's own source,
 //!   because the items are `pub(crate)` and opening them for a test would widen the very surface
 //!   this contract is closing.
@@ -155,6 +157,15 @@ fn generate() -> String {
     out.push_str("\n[migration_kinds]\n");
     for kind in migration_kinds() {
         out.push_str(&format!("{kind}\n"));
+    }
+
+    // Y los verbos que SACAN una migración de `expand` (hub#1163). Es la mitad del contrato de
+    // actualización que un módulo programa contra: con `start-first` la versión anterior sigue
+    // sirviendo contra el esquema ya migrado, así que lo que no es aditivo tiene que declararse.
+    // Congelarlos aquí es lo que hace visible en una PR que la puerta se ha ensanchado.
+    out.push_str("\n[migration_not_expand]\n");
+    for verb in erplora_runtime::migration_guard::NOT_EXPAND {
+        out.push_str(&format!("{verb}\n"));
     }
 
     // Las guardas de FILA de un command: sin ellas un UPDATE que no casa nada devuelve `200 ok`.

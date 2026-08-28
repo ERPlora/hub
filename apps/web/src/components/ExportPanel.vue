@@ -42,16 +42,26 @@
     <ion-card>
       <ion-card-content class="p-0">
         <ion-list lines="none">
+          <!-- Hub atado (hub#1249): el motor va a exportar plantilla decida lo que decida el
+               formulario, así que la elección se apaga y se DICE por qué. Ofrecer «copia de
+               seguridad» aquí sería la misma mentira que una casilla que el motor ignora.
+               El `disabled` va en CADA `ion-radio`: `ion-radio-group` no tiene esa prop en
+               Ionic 8, y puesto ahí no hace nada (un clic volvía a «copia de seguridad»). -->
+          <ion-item v-if="isPurposeLocked">
+            <ion-note data-testid="export-purpose-locked" class="cb-desc">
+              {{ t('exportPage.purposeLocked') }}
+            </ion-note>
+          </ion-item>
           <ion-item>
             <ion-radio-group v-model="purpose" data-testid="export-purpose">
               <ion-item>
-                <ion-radio value="backup" justify="start" label-placement="end" alignment="start">
+                <ion-radio value="backup" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
                   <h2 class="cb-title">{{ t('exportPage.purposeBackup') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeBackupDesc') }}</p>
                 </ion-radio>
               </ion-item>
               <ion-item>
-                <ion-radio value="template" justify="start" label-placement="end" alignment="start">
+                <ion-radio value="template" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
                   <h2 class="cb-title">{{ t('exportPage.purposeTemplate') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeTemplateDesc') }}</p>
                 </ion-radio>
@@ -125,7 +135,11 @@
             >
               <h2 class="cb-title">{{ t('exportPage.sectionFiscal') }}</h2>
               <p class="cb-desc">{{ t('exportPage.sectionFiscalDesc') }}</p>
-              <ion-note data-testid="export-fiscal-note" color="warning" class="fiscal-note">
+              <!-- hub#1291: `color="warning"` on the NOTE renders Ionic's raw yellow, ~1.6:1 on
+                   white — under WCAG AA's 4.5:1 for normal text. The sentence reads `medium`
+                   (~4.83:1 in this shell's theme); the warning accent stays on the icon alone
+                   (`.fiscal-note-icon`), same pattern as Settings → Permissions (hub#1174). -->
+              <ion-note data-testid="export-fiscal-note" color="medium" class="fiscal-note">
                 <HubIcon name="warning-outline" class="fiscal-note-icon" />
                 {{ t('exportPage.fiscalWarning') }}
               </ion-note>
@@ -285,6 +299,12 @@ const filenamePreview = computed<string>(
 const purpose = ref<BundlePurpose>('backup');
 const esPlantilla = computed(() => purpose.value === 'template');
 
+// `purpose` IMPUESTO por el hub (hub#377, ADR-0195): un hub de desarrollo sin enrolar o una demo
+// efímera exporta siempre como plantilla. Lo publica `GET /api/hub/export/tables`; hasta hub#1249
+// el formulario no lo sabía y el servidor cambiaba el `purpose` a espaldas del usuario.
+const lockedPurpose = ref<BundlePurpose | null>(null);
+const isPurposeLocked = computed<boolean>(() => lockedPurpose.value !== null);
+
 const selUsers = ref<boolean>(true);
 const selSettings = ref<boolean>(true);
 const selFiscal = ref<boolean>(false);
@@ -398,7 +418,12 @@ onMounted(async () => {
   }
   // Las tablas de cada módulo con su recuento (hub#534). Va aparte y DEGRADA EN SILENCIO: si el
   // runtime no lo sirve, el formulario sigue exportando todo, que es lo que hacía antes.
-  moduleTables.value = await fetchExportTables();
+  const exportTables = await fetchExportTables();
+  moduleTables.value = exportTables.modules;
+  // Si el hub tiene el `purpose` atado, el formulario se pone en ESE estado antes de que nadie
+  // toque nada: la elección se apaga y las casillas de identidad desaparecen solas (`esPlantilla`).
+  lockedPurpose.value = exportTables.lockedPurpose;
+  if (exportTables.lockedPurpose) purpose.value = exportTables.lockedPurpose;
 });
 
 // ── Casillas por TABLA (hub#534) ─────────────────────────────────────────────────────────────
@@ -508,8 +533,10 @@ defineExpose({ doExport, tablesOf, toggleTable, rows });
   color: var(--ion-color-medium);
   margin: 0 0 0.5rem;
 }
+/* hub#1291: was `--ion-color-warning-shade` (~2.08:1 on white) — still under WCAG AA. `medium`
+   matches `.page-lead`'s own color; there is no icon here to carry a separate accent. */
 .admin-note {
-  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  color: var(--ion-color-medium);
 }
 .section-title {
   font-size: 1rem;
@@ -554,6 +581,8 @@ ion-checkbox::part(label) {
 .fiscal-note-icon {
   flex: none;
   margin-top: 0.1rem;
+  /* hub#1291: the note's own text reads `medium`; the icon keeps the warning accent. */
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
 }
 .error-note {
   display: block;
