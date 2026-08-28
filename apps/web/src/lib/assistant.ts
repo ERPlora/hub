@@ -101,8 +101,49 @@ export function messageAttachments(content: ChatContent): { kind: 'image' | 'fil
 export type AssistantEvent =
   | { type: 'token'; text: string }
   | { type: 'done' }
-  | { type: 'error'; message?: string; error?: string; limit?: number; used?: number; tier?: string; kind?: string; upgrade_required?: boolean }
+  | {
+      type: 'error';
+      message?: string;
+      error?: string;
+      code?: string;
+      limit?: number;
+      used?: number;
+      tier?: string;
+      kind?: string;
+      upgrade_required?: boolean;
+      resets_at?: string;
+    }
+  | {
+      type: 'usage';
+      tier?: string;
+      tier_name?: string;
+      messages_used?: number;
+      messages_limit?: number;
+      resets_at?: string;
+    }
   | { type: string; [k: string]: unknown };
+
+/** El código que el SaaS manda cuando el turno murió por cuota (`QUOTA_EXCEEDED_CODE`,
+ *  saas#1540). Es un HECHO legible por máquina; `upgrade_required` es solo la recomendación
+ *  comercial que lo acompaña, y decidir por ella confunde «no te quedan mensajes» con «te
+ *  convendría otro plan». */
+export const QUOTA_EXCEEDED_CODE = 'quota_exceeded';
+
+/**
+ * Consumo del mes tal y como lo cierra el SaaS (frame `usage`, saas#1540).
+ *
+ * Tiene que ser un FRAME y no la cabecera `X-Assistant-Usage`: una cabecera se escribe antes del
+ * cuerpo, así que en un stream va siempre un mensaje por detrás y el contador de la pantalla
+ * quedaría desfasado un turno para siempre.
+ */
+export interface AssistantUsage {
+  tier?: string;
+  tierName?: string;
+  messagesUsed?: number;
+  messagesLimit?: number;
+  /** ISO-8601: cuándo vuelven los mensajes. Un consumo sin horizonte no deja decidir nada. */
+  resetsAt?: string;
+}
 
 export interface StreamCallbacks {
   /** Un token de texto del modelo (se va concatenando en la burbuja viva). */
@@ -131,6 +172,12 @@ export interface StreamCallbacks {
    * a flagged verdict into a SYSTEM notice; it is never text the model wrote.
    */
   onAudit?: (audit: TurnAudit) => void;
+  /**
+   * Los contadores POST-turno que cierran el stream (frame `usage`, saas#1540 · hub#1183). El
+   * drawer los usa para avisar ANTES de agotar la cuota: sin esto el hub no conocía su plan
+   * hasta que lo gastaba, y el dueño se enteraba del límite en el peor momento posible.
+   */
+  onUsage?: (usage: AssistantUsage) => void;
   /** The hub's real navigation map, so a named screen can be checked (hub#1047, #1048). */
   knownRoutes?: string[];
 }
@@ -148,7 +195,16 @@ export interface AssistantFailure {
   message: string;
   /** Presente SOLO si el turno murió por cuota. Un error de transporte no la lleva: pintar un
    *  botón de pagar sobre una caída de red no arregla nada y encima cobra. */
-  quota?: { limit?: number; used?: number; tier?: string; kind?: string; upgradeRequired: boolean };
+  quota?: {
+    limit?: number;
+    used?: number;
+    tier?: string;
+    kind?: string;
+    upgradeRequired: boolean;
+    /** ISO-8601 de la renovación (saas#1540, hub#1183). «Has gastado 30 de 30» sin fecha es un
+     *  callejón: no se puede decidir entre esperar y pagar. */
+    resetsAt?: string;
+  };
 }
 
 /** A tool call the model asked for (forwarded by the runtime from the Cloud). */
@@ -333,6 +389,23 @@ async function streamRound(
           arguments: typeof fc.arguments === 'string' ? fc.arguments : '{}',
           kind: typeof fc.kind === 'string' ? fc.kind : undefined,
         });
+      } else if (evt.type === 'usage') {
+        // Contadores POST-turno (saas#1540, hub#1183). Nunca texto: es chrome del plan, no algo
+        // que el modelo haya dicho. El runtime los reenvía verbatim (`translate_sse_line`).
+        const u = evt as {
+          tier?: string;
+          tier_name?: string;
+          messages_used?: number;
+          messages_limit?: number;
+          resets_at?: string;
+        };
+        cb.onUsage?.({
+          tier: u.tier,
+          tierName: u.tier_name,
+          messagesUsed: u.messages_used,
+          messagesLimit: u.messages_limit,
+          resetsAt: u.resets_at,
+        });
       } else if (evt.type === 'done') {
         return { functionCalls, text, errored: false };
       } else if (evt.type === 'error') {
@@ -341,20 +414,26 @@ async function streamRound(
         const e = evt as {
           message?: string;
           error?: string;
+          code?: string;
           limit?: number;
           used?: number;
           tier?: string;
           kind?: string;
           upgrade_required?: boolean;
+          resets_at?: string;
         };
         const failure: AssistantFailure = { message: e.error ?? e.message ?? 'assistant error' };
-        if (e.upgrade_required) {
+        // El motivo se LEE del `code` (hub#1183); `upgrade_required` se queda de respaldo para un
+        // emisor que aún no lo mande. Inferir el estado de un flag comercial es cómo «no te
+        // quedan mensajes» y «te convendría otro plan» acabaron siendo la misma cosa.
+        if (e.code === QUOTA_EXCEEDED_CODE || e.upgrade_required) {
           failure.quota = {
             limit: e.limit,
             used: e.used,
             tier: e.tier,
             kind: e.kind,
-            upgradeRequired: true,
+            upgradeRequired: e.upgrade_required ?? true,
+            resetsAt: e.resets_at,
           };
         }
         cb.onError?.(failure);

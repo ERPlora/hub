@@ -31,7 +31,7 @@
     </p>
 
     <ul class="apps-grid">
-      <li v-for="app in ordered" :key="app.path" class="apps-grid-cell">
+      <li v-for="app in gridView.tiles" :key="app.path" class="apps-grid-cell">
         <ion-button
           class="apps-tile"
           fill="clear"
@@ -43,7 +43,27 @@
         >
           <span class="apps-tile-body">
             <HubIcon class="apps-tile-icon" :name="app.icon" />
-            <span class="apps-tile-label">{{ app.label }}</span>
+            <!-- `title`: a name that does not fit the tile is TRUNCATED (hub#1268), so the full one
+                 has to stay reachable — the native tooltip is what every launcher uses for this. -->
+            <span class="apps-tile-label" :title="app.label">{{ app.label }}</span>
+          </span>
+        </ion-button>
+      </li>
+      <!-- The fold on a phone (hub#1197): the grid stopped growing to fit every installed app —
+           what does not fit behind the row budget (`lib/apps-grid.ts`) gets one tile, not a taller
+           card, same door the ＋ tile below already opens (`/apps`). Never present off the phone:
+           there the grid still shows everything, as it always has. -->
+      <li v-if="gridView.hidden > 0" class="apps-grid-cell">
+        <ion-button
+          class="apps-tile apps-tile--view-all"
+          fill="clear"
+          router-link="/apps"
+          router-direction="forward"
+          data-testid="apps-view-all"
+        >
+          <span class="apps-tile-body">
+            <HubIcon class="apps-tile-icon" name="apps-outline" />
+            <span class="apps-tile-label">{{ t('dashboard.appsViewAll') }}</span>
           </span>
         </ion-button>
       </li>
@@ -59,7 +79,9 @@
         >
           <span class="apps-tile-body">
             <HubIcon class="apps-tile-icon" name="add-outline" />
-            <span class="apps-tile-label">{{ t('dashboard.appsAdd') }}</span>
+            <span class="apps-tile-label" :title="t('dashboard.appsAdd')">{{
+              t('dashboard.appsAdd')
+            }}</span>
           </span>
         </ion-button>
       </li>
@@ -83,8 +105,10 @@ import { IonButton } from '@ionic/vue';
 
 import HubIcon from './HubIcon.vue';
 import { orderAppsByUsage, recordAppLaunch } from '../lib/app-usage';
+import { appsGridView } from '../lib/apps-grid';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import type { ModuleNavItem } from '../lib/nav';
+import { isPhoneViewport } from '../lib/viewport';
 
 const props = withDefaults(
   defineProps<{
@@ -110,6 +134,12 @@ const ordered = computed<ModuleNavItem[]>(() => orderAppsByUsage(props.apps));
 
 /** Which of «apps / still asking / it failed / genuinely none» this card is looking at (hub#770). */
 const display = computed(() => listDisplay(props.state, ordered.value.length));
+
+/**
+ * What the grid actually paints (hub#1197): on a phone, a long list folds behind «View all apps»
+ * instead of growing the card to fit every installed app — see `lib/apps-grid.ts` for the cap.
+ */
+const gridView = computed(() => appsGridView(ordered.value, isPhoneViewport.value));
 
 /** Opening an app is what counts it — the catalogue tile is not an app and never enters the rank. */
 function remember(path: string): void {
@@ -152,8 +182,8 @@ function remember(path: string): void {
   color: var(--ion-color-danger);
 }
 
-/* Auto-fill grid: 4-5 tiles per row on a desktop, 3 on a phone, without a media query per breakpoint
-   (the tiles are square-ish and the label wraps to two lines at most). */
+/* Auto-fill grid: 4-5 tiles per row on a desktop, 3 on a phone (measured in Chromium — that already
+   holds with no media query at 390px, hub#1268). */
 .apps-grid {
   list-style: none;
   margin: 0.75rem 0 0;
@@ -162,13 +192,30 @@ function remember(path: string): void {
   grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
   gap: 0.5rem;
 }
+/* hub#1197 — pinned to a FIXED column count on a phone, where `auto-fill` alone did not hold: at
+   390px it already gives 3, but nothing stopped it drifting to 4-5 as the viewport approaches
+   540px. `lib/apps-grid.ts` folds the list to a CELL BUDGET (`PHONE_GRID_COLUMNS ×
+   PHONE_VISIBLE_ROWS`, reserving a cell each for the ＋ Add apps tile and the folding «view all»
+   tile) so the whole card never exceeds 2 rows — a budget only holds if the column count it was
+   computed for is the one that actually renders. The threshold matches `isPhoneViewport`
+   (`lib/viewport.ts`) and the setup card's own breakpoint, so both cards fold at the same width. */
+@media (max-width: 540px) {
+  .apps-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 .apps-grid-cell {
   display: flex;
+  /* `min-width: 0` on the cell and on the tile (hub#1268): a grid/flex item refuses by default to
+     shrink below its `min-content`, so a long name widened the tile past its own column instead of
+     being clipped, and the ellipsis never got the chance to appear. */
+  min-width: 0;
 }
 .apps-tile {
   /* ion-button in `clear` fill, re-shaped as a tile: full cell, stacked icon over label, and the
      Ionic uppercase/letter-spacing undone (an app's name is a name, not a shout). */
   flex: 1;
+  min-width: 0;
   height: auto;
   --padding-top: 0.7rem;
   --padding-bottom: 0.7rem;
@@ -200,7 +247,18 @@ function remember(path: string): void {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word;
+  /* Never mid-word (hub#1268). `word-break: break-word` split «Automatizaciones» into
+     «Automatizacio» / «nes», which reads as a typo and not as a name. Neither does
+     `overflow-wrap: anywhere` help: measured in Chromium over this very card, the name is 104px
+     wide and the label 84-90px, so ANY setting that authorises breaking inside a word produces the
+     same cut. What every launcher does instead —macOS Launchpad, the Windows Start menu, the
+     Android/iOS home screens, Google's app grid— is refuse to break the word and TRUNCATE it; the
+     whole name stays one hover away in the tile's `title`.
+     Guard: MyAppsCard.test.ts → `the_tile_label_does_not_split_words_hub1268`. */
+  word-break: normal;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 /* The catalogue tile reads as an offer, not as one more installed app: dashed outline, muted ink. */
 .apps-tile--add {
@@ -211,5 +269,14 @@ function remember(path: string): void {
 }
 .apps-tile--add .apps-tile-icon {
   color: var(--ion-color-medium, #92949c);
+}
+/* hub#1197 — the fold's own tile: a tint instead of the ＋ tile's dashed outline, so «there is more
+   of what you already have» does not read as «add something new» (the ＋ tile's own job). */
+.apps-tile--view-all {
+  --background: color-mix(in srgb, var(--ion-color-primary, #0091ce) 8%, transparent);
+  --color: var(--ion-color-primary, #0091ce);
+}
+.apps-tile--view-all .apps-tile-icon {
+  color: var(--ion-color-primary, #0091ce);
 }
 </style>

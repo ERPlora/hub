@@ -364,6 +364,16 @@ pub async fn status(
         if !registry.is_active(&manifest.id) {
             continue;
         }
+        // A module the SaaS entitlement no longer grants is the SAME kind of absence (hub#1175):
+        // `invoice_series` stayed installed and active in a hub from before its own retirement,
+        // and its item kept sending the owner to a route the dispatcher's own entitlement gate
+        // refuses at the door (`module_entitlement_blocked`, HTTP 402). The runtime has no view of
+        // the SaaS's claims on its own — the server stamps the blocked ids onto the context
+        // (`ctx.blocked_modules`) the way it stamps everything else this crate cannot know by
+        // itself, and this is where the runtime's own idea of "available" ends.
+        if ctx.blocked_modules.contains(&manifest.id) {
+            continue;
+        }
         if !applies_to_country(&def.countries, &country) {
             continue;
         }

@@ -106,6 +106,18 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
+    // moment. From 80% on, the drawer says what is left and when it comes back.
+    quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
+    quotaResets: 'They come back on {date}.',
+    // hub#1259 — contracting the plan is the admin door (hub#1254). A cashier who presses this
+    // button only gets a 403 and a generic error: worse than not seeing it, and worse than
+    // reading who to ask.
+    quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    plansTitle: 'Choose a plan',
+    plansConfirm: 'Go to payment',
+    planOption: '{name} — {price} €/month',
+    plansUnavailable: 'There are no plans to upgrade to right now.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -357,6 +369,9 @@ export default {
     // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
     // everything drawn from a probe that only ever knew about the printer host.
     openSystem: 'View system',
+    // hub#1197 — on a phone the grid folds after two rows; this is the tile that leads to the rest,
+    // the same catalogue ＋ Add apps already opens (`/apps`).
+    appsViewAll: 'View all apps',
   },
   profile: {
     title: 'My profile',
@@ -482,22 +497,71 @@ export default {
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   grant: {
     intro:
-      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that, and this is it. Read it, sign it and attach a copy of your ID.',
-    stateVigente: 'Signed on {date}. ERPlora may file on your behalf.',
+      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that: the official form of the colaboración social agreement. You download it, sign it away from this screen, and upload it back.',
+    stateVigente: 'Approved on {date}. ERPlora may file on your behalf.',
+    statePendiente:
+      'Uploaded on {date}. We are checking it and will email you within 24-72 hours.',
+    stateRejected: 'Sent back on {date}. Fix what is noted below and upload it again.',
     stateRevoked: 'Revoked on {date}. ERPlora cannot file on your behalf.',
     stateAbsent: 'Not signed yet. Your business cannot go live until it is.',
     stateUnknown: 'Checking with ERPlora…',
+    stateUnreachable: 'We could not reach ERPlora, so we cannot tell you where this stands.',
+    step1Title: '1 · Get the official form',
+    step1Hint:
+      'We fill it in with your details. Its wording is set by the tax authority and cannot be changed.',
+    step2Title: '2 · Upload the signed form',
+    step2Hint: 'A person at ERPlora checks it and emails you within 24-72 hours.',
+    partyObligado: 'Your business',
+    partySigner: 'The person signing',
     obligadoNif: 'Taxpayer ID (your business)',
     obligadoName: 'Legal name (your business)',
+    municipio: 'Town or city',
+    via: 'Street',
+    numero: 'Number',
     signerNif: 'ID number of the person signing',
     signerName: 'Full name of the person signing',
-    signatureTitle: 'Signature',
-    signatureHint:
-      'Draw your signature. For a company, the legal representative signs — and the ID copy below is theirs, not the company\u2019s.',
-    signatureClear: 'Clear signature',
+    downloadModel: 'Download the form',
+    howToByHand:
+      'By hand: print it, sign it, stamp it with the company seal if your business is a company, and scan it back to PDF.',
+    howToElectronic:
+      'Electronically: sign the PDF with AutoFirma using your own qualified certificate. A drawn signature is not accepted.',
+    privacyTitle: 'Data protection — the essentials (art. 13 GDPR)',
+    privacyController:
+      'Controller: ERPLORA CLOUD SL (B27593136). We hold these documents as your representative.',
+    privacyPurpose:
+      'Purpose and basis: to file your invoicing records with the Spanish tax authority on your behalf, under the grant you sign and our legal duties. We keep them while the grant lasts and for the tax retention periods.',
+    privacyRights:
+      "Your rights: access, rectification, erasure, objection and portability at privacy{'@'}erplora.com.",
+    documentType: 'Identity document',
+    documentTypeDni: 'DNI (Spanish national ID)',
+    documentTypeNie: 'NIE (foreign resident ID)',
+    signedDocumentChoose: 'Attach the signed form (PDF)',
     dniChoose: 'Attach a copy of the ID',
-    confirm: 'I have read the grant above and I sign it.',
-    submit: 'Sign and send',
+    signatureSampleWhy:
+      'A NIE often carries no printed signature, so we need a sheet with your handwritten signature to compare it against.',
+    signatureSampleChoose: 'Attach a signature sample',
+    representationProofWhy:
+      'Your business is a company, so we need the document that names the person allowed to sign for it.',
+    representationProofChoose: 'Attach the proof of representation',
+    submit: 'Send for review',
+    preferComputer: 'I would rather do this from my computer',
+    errors: {
+      obligado_nif_required: 'Your business needs a taxpayer ID before you can do this.',
+      signer_required: 'Fill in the name and ID number of the person signing.',
+      document_type_invalid: 'Pick the kind of identity document.',
+      signed_document_required: 'Attach the signed form.',
+      signed_document_not_pdf: 'The signed form has to be a PDF — scan it or sign it with AutoFirma.',
+      dni_copy_required: 'Attach a copy of the identity document.',
+      signature_sample_required: 'With a NIE we also need a sample of your handwritten signature.',
+      representation_proof_required:
+        'Attach the document that proves you may sign for the company.',
+      document_too_large: 'Each file has to be under 10 MB.',
+      invalid_via: 'That route is not one we can file through.',
+      cloud_rejected: 'ERPlora could not handle this right now. Try again in a few minutes.',
+      hub_not_enrolled: 'This hub is not connected to ERPlora yet.',
+      open_external_failed: 'We could not open your browser.',
+      unknown: 'It did not work. Try again.',
+    },
   },
   settings: {
     hubWide: 'General settings',
@@ -646,6 +710,39 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Responsible declaration',
+    declarationDesc:
+      'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
+    declarationRead: 'Read the signed declaration',
+    declarationDataTitle: 'Identifying data of this system',
+    declarationPending:
+      'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
+    declarationError: 'Could not load the responsible declaration.',
+    declarationNombreRazon: 'Producer',
+    declarationNIF: 'Producer tax id',
+    declarationNombreSistemaInformatico: 'System name',
+    declarationIdSistemaInformatico: 'System code',
+    declarationVersion: 'Installed version',
+    declarationNumeroInstalacion: 'Installation number',
+    declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
+    declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
+    declarationIndicadorMultiplesOT: 'Serving several taxpayers',
+    // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
+    // invisible consequence is not. One sentence per capability id; the catalogue in
+    // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
+    // fixes it is the toggle in the same row (hub#800 §3).
+    capabilityBreaks: {
+      network: 'Without this, the app cannot go online: whatever it syncs, sends or checks over the internet stays undone.',
+      certificate: 'Without this, your invoices are not signed and never reach the tax authority.',
+      printer: 'Without this, receipts and kitchen orders pile up in the print queue and nothing comes out.',
+      notify: 'Without this, no reminder or confirmation reaches your customers by email, SMS or WhatsApp.',
+      manage_flows: 'Without this, the app cannot create or edit your automations, so the ones it needs never run.',
+      // A capability this shell does not know yet: say something true rather than nothing.
+      unknown: 'Without this, the part of the app that needs this permission will not work.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
   // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the
@@ -1533,6 +1630,11 @@ export default {
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
     protectedTitle: 'Open the cash drawer first',
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
+    emptyTitle: 'Nothing to show here yet',
+    emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'This app is not available for this hub.',
   },
   moduleSettings: {
     tab: 'Settings',

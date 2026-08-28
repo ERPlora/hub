@@ -16,7 +16,7 @@ No es un invento nuestro: es lo que hacen Kotlin (`apiCheck` / binary-compatibil
 | Fichero | Qué congela | Lo genera |
 |---|---|---|
 | `routes.snapshot` | Cada ruta HTTP/WS de `app()`: método · ruta · clase de auth | `cargo test -p erplora-server --test kernel_contract_routes` |
-| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración, guardas de fila | `cargo test -p erplora-runtime --test kernel_contract_engine` |
+| `engine.snapshot` | Motor declarativo: params inyectados, `hub.*`, capabilities, orígenes del dispatcher, `kind`s de migración **y los verbos que sacan una migración de `expand`**, guardas de fila | `cargo test -p erplora-runtime --test kernel_contract_engine` |
 | `guest.snapshot` | Contrato del guest WASM: campos de `Input`/`Output` y topes de `WasmLimits` | `cargo test -p erplora-runtime --test kernel_contract_guest` |
 | `tables.snapshot` | Tablas de sistema (`hub_*`, `_*`) con sus columnas, **reflejadas** de un hub recién arrancado | `cargo test -p erplora-runtime --test kernel_contract_tables` (necesita Postgres, `DATABASE_URL`) |
 | `sdk.d.ts` | API pública de `@erplora/module-sdk`, tal cual la emite `tsc` | `pnpm -F @erplora/module-sdk contract:check` (va en `pnpm verify`) |
@@ -67,6 +67,10 @@ UPDATE_KERNEL_CONTRACT=1 pnpm -F @erplora/module-sdk contract:check
   `system_params`, no de una copia de sus claves. `[capabilities]` se cruza con el bloque
   `capabilities` de `schemas/module.schema.json`: lo que el host gatea y lo que el schema deja
   declarar no pueden divergir.
+  `[migration_not_expand]` sale de `migration_guard::NOT_EXPAND` (hub#1163): con `start-first` la
+  versión ANTERIOR del hub sigue sirviendo contra el esquema ya migrado, así que lo que no es
+  aditivo tiene que declararse `contract`. Cada verbo tiene su control positivo en los tests, y
+  congelarlo aquí es lo que hace visible en una PR que la puerta se ha ensanchado.
 - **`tables.snapshot`** — reflejado de `information_schema` tras `Runtime::ensure_system_tables`,
   no parseado del SQL: un `CREATE TABLE` que Postgres rechazaría no puede colarse aquí.
 - **`guest.snapshot`** — obtenido SERIALIZANDO valores reales, así que respeta

@@ -104,6 +104,13 @@ export default {
     quotaTitle: 'Has usado todos tus mensajes del asistente',
     quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
     quotaCta: 'Ver planes',
+    quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
+    quotaResets: 'Se renuevan el {date}.',
+    quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    plansTitle: 'Elige un plan',
+    plansConfirm: 'Ir al pago',
+    planOption: '{name} — {price} €/mes',
+    plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -337,6 +344,9 @@ export default {
     // (hub#375); «Sistema conectado/desconectado» se ha ido a propósito: era un veredicto sobre
     // todo sacado de una sonda que solo sabía del equipo de la impresora.
     openSystem: 'Ver sistema',
+    // hub#1197 — en móvil la rejilla se pliega a las dos filas; esta es la baldosa que lleva al
+    // resto, el mismo catálogo que ya abre ＋ Añadir apps (`/apps`).
+    appsViewAll: 'Ver todas las apps',
   },
   profile: {
     title: 'Mi perfil',
@@ -449,22 +459,71 @@ export default {
   // Ver la nota del bloque equivalente en `en.ts`.
   grant: {
     intro:
-      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado para eso, y esto es ese consentimiento. Léelo, fírmalo y adjunta una copia del DNI.',
-    stateVigente: 'Firmado el {date}. ERPlora puede remitir en tu nombre.',
+      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado: el modelo oficial del acuerdo de colaboración social. Lo descargas, lo firmas fuera de esta pantalla y lo vuelves a subir.',
+    stateVigente: 'Aprobado el {date}. ERPlora puede remitir en tu nombre.',
+    statePendiente: 'Subido el {date}. Lo estamos revisando y te avisamos por email en 24-72 horas.',
+    stateRejected: 'Devuelto el {date}. Corrige lo que se indica abajo y vuelve a subirlo.',
     stateRevoked: 'Revocado el {date}. ERPlora no puede remitir en tu nombre.',
     stateAbsent: 'Sin firmar. Tu negocio no puede pasar a producción hasta que lo firmes.',
     stateUnknown: 'Consultando con ERPlora…',
+    stateUnreachable: 'No hemos podido contactar con ERPlora, así que no podemos decirte cómo va.',
+    step1Title: '1 · Consigue el modelo oficial',
+    step1Hint:
+      'Te lo rellenamos con tus datos. Su texto lo fija la Agencia Tributaria y no se puede modificar.',
+    step2Title: '2 · Sube el modelo firmado',
+    step2Hint: 'Lo revisa una persona de ERPlora y te avisa por email en 24-72 horas.',
+    partyObligado: 'Tu negocio',
+    partySigner: 'Quien firma',
     obligadoNif: 'NIF del obligado (tu negocio)',
     obligadoName: 'Razón social (tu negocio)',
+    municipio: 'Municipio',
+    via: 'Vía pública',
+    numero: 'Número',
     signerNif: 'NIF/NIE de quien firma',
     signerName: 'Nombre y apellidos de quien firma',
-    signatureTitle: 'Firma',
-    signatureHint:
-      'Dibuja tu firma. En una empresa firma el representante legal — y la copia del DNI de abajo es la SUYA, no la de la sociedad.',
-    signatureClear: 'Borrar firma',
-    dniChoose: 'Adjuntar copia del DNI/NIE',
-    confirm: 'He leído el otorgamiento de arriba y lo firmo.',
-    submit: 'Firmar y enviar',
+    downloadModel: 'Descargar el modelo',
+    howToByHand:
+      'A mano: imprímelo, fírmalo, ponle el sello de la entidad si tu negocio es una sociedad, y escanéalo a PDF.',
+    howToElectronic:
+      'Electrónicamente: firma el PDF con AutoFirma usando tu propio certificado cualificado. Una firma dibujada no vale.',
+    privacyTitle: 'Protección de datos — información básica (art. 13 RGPD)',
+    privacyController:
+      'Responsable: ERPLORA CLOUD SL (B27593136). Custodiamos estos documentos como representante tuyo.',
+    privacyPurpose:
+      'Finalidad y base: remitir en tu nombre los registros de facturación a la Agencia Tributaria, al amparo del otorgamiento que firmas y de nuestras obligaciones legales. Los conservamos mientras dure la representación y durante los plazos tributarios.',
+    privacyRights:
+      "Tus derechos: acceso, rectificación, supresión, oposición y portabilidad en privacy{'@'}erplora.com.",
+    documentType: 'Documento de identidad',
+    documentTypeDni: 'DNI',
+    documentTypeNie: 'NIE',
+    signedDocumentChoose: 'Adjuntar el modelo firmado (PDF)',
+    dniChoose: 'Adjuntar copia del documento de identidad',
+    signatureSampleWhy:
+      'Muchos NIE no llevan firma impresa, así que necesitamos una hoja con tu firma manuscrita para poder compararla.',
+    signatureSampleChoose: 'Adjuntar muestra de firma',
+    representationProofWhy:
+      'Tu negocio es una sociedad, así que necesitamos el documento que acredita quién puede firmar por ella.',
+    representationProofChoose: 'Adjuntar el justificante de representación',
+    submit: 'Enviar a revisión',
+    preferComputer: 'Prefiero hacerlo desde el ordenador',
+    errors: {
+      obligado_nif_required: 'Tu negocio necesita un NIF antes de poder hacer esto.',
+      signer_required: 'Rellena el nombre y el NIF de quien firma.',
+      document_type_invalid: 'Elige el tipo de documento de identidad.',
+      signed_document_required: 'Adjunta el modelo firmado.',
+      signed_document_not_pdf:
+        'El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.',
+      dni_copy_required: 'Adjunta una copia del documento de identidad.',
+      signature_sample_required: 'Con NIE necesitamos además una muestra de tu firma manuscrita.',
+      representation_proof_required:
+        'Adjunta el documento que acredita que puedes firmar por la sociedad.',
+      document_too_large: 'Cada fichero tiene que ocupar menos de 10 MB.',
+      invalid_via: 'Esa vía no es una por la que podamos remitir.',
+      cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
+      hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+      open_external_failed: 'No hemos podido abrir tu navegador.',
+      unknown: 'No ha funcionado. Vuelve a intentarlo.',
+    },
   },
   settings: {
     hubWide: 'Ajustes generales',
@@ -606,6 +665,35 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Declaración responsable',
+    declarationDesc:
+      'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
+    declarationRead: 'Leer la declaración firmada',
+    declarationDataTitle: 'Datos identificativos de este sistema',
+    declarationPending:
+      'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
+    declarationError: 'No se ha podido cargar la declaración responsable.',
+    declarationNombreRazon: 'Productor',
+    declarationNIF: 'NIF del productor',
+    declarationNombreSistemaInformatico: 'Nombre del sistema',
+    declarationIdSistemaInformatico: 'Código del sistema',
+    declarationVersion: 'Versión instalada',
+    declarationNumeroInstalacion: 'Número de instalación',
+    declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
+    declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
+    declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
+    // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
+    capabilityBreaks: {
+      network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',
+      certificate: 'Sin esto, tus facturas no se firman y no llegan a Hacienda.',
+      printer: 'Sin esto, los tiques y las comandas se quedan en la cola de impresión y no sale ninguno.',
+      notify: 'Sin esto, no llega ningún recordatorio ni confirmación a tus clientes por email, SMS o WhatsApp.',
+      manage_flows: 'Sin esto, la app no puede crear ni editar tus automatizaciones, así que las que necesita no se ejecutan.',
+      unknown: 'Sin esto, la parte de la app que necesita este permiso no funcionará.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
   print: {
@@ -1397,6 +1485,11 @@ export default {
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
     protectedTitle: 'Abre la caja primero',
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
+    emptyTitle: 'Aquí todavía no hay nada',
+    emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'Esta app no está disponible para este hub.',
   },
   moduleSettings: {
     tab: 'Ajustes',

@@ -98,6 +98,8 @@ import HubIcon from './HubIcon.vue';
 import {
   LEVEL_LEGAL,
   LEVEL_RECOMMENDED,
+  MAX_VISIBLE_ROWS,
+  PHONE_MAX_VISIBLE_ROWS,
   STATE_DONE,
   STATE_PENDING,
   STATE_UNAVAILABLE,
@@ -107,6 +109,7 @@ import {
   type SetupItem,
   type SetupStatus,
 } from '../lib/setup-status';
+import { isPhoneViewport } from '../lib/viewport';
 
 const props = withDefaults(
   defineProps<{
@@ -132,8 +135,15 @@ const { t, te } = useI18n();
 
 const expanded = ref(false);
 
+// hub#1197 — at 390px the desktop fold (`MAX_VISIBLE_ROWS`) was, by itself, most of a screen and a
+// half before the widget board even painted. A phone gets the tighter cap; `checklistView` decides
+// nothing about WHY, it only takes the number.
 const view = computed(() =>
-  checklistView(props.status, { expanded: expanded.value, alreadyOnScreen: props.alreadyOnScreen }),
+  checklistView(props.status, {
+    expanded: expanded.value,
+    alreadyOnScreen: props.alreadyOnScreen,
+    maxRows: isPhoneViewport.value ? PHONE_MAX_VISIBLE_ROWS : MAX_VISIBLE_ROWS,
+  }),
 );
 
 /** Progress 0-1. A hub with no items does not divide by zero: there is no meter to fill. */

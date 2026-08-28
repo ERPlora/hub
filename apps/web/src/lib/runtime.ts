@@ -828,40 +828,108 @@ export async function publishFiscalIdentity(): Promise<void> {
   if (!res.ok) throw new Error(`publish-fiscal-identity → ${res.status}`);
 }
 
-// ── Otorgamiento de representación (hub#817 / saas#1438) ──────────────────────────────────────
+// ── Otorgamiento de representación (hub#817 / saas#1438 · rehecho en hub#1293) ────────────────
 // ERPlora remite los registros VERI*FACTU EN NOMBRE del obligado, y eso exige su consentimiento
-// firmado (Anexo I, Resolución DG AEAT 18/12/2024). Se firma aquí y lo CUSTODIA el SaaS.
+// firmado (Anexo I del acuerdo de colaboración social 017). El modelo oficial lo genera el SaaS, el
+// cliente lo firma FUERA de la pantalla —a mano sobre el papel o con AutoFirma— y lo sube aquí.
 //
-// 🔴 Las dos llamadas van al RUNTIME, nunca al SaaS: el token de máquina del hub es secreto suyo y
-// no cruza a este navegador (ADR-0003). El runtime pone la cabecera, compone el documento y lo
-// manda; este lado no guarda ni el trazo ni el DNI.
+// 🔴 Las tres llamadas van al RUNTIME, nunca al SaaS: el token de máquina del hub es secreto suyo y
+// no cruza a este navegador (ADR-0003). El runtime pone la cabecera y reenvía; este lado no guarda
+// ni el documento firmado ni la copia del DNI.
 
-/** Lo que las dos rutas contestan siempre. `status: ''` = el runtime no contestó. */
+/** Los estados del otorgamiento, con las palabras del SaaS. `''` = el runtime no contestó. */
+export type RepresentationGrantStatusValue =
+  | ''
+  | 'absent'
+  | 'pendiente'
+  | 'vigente'
+  | 'rechazado'
+  | 'revocado';
+
+/** Lo que las rutas de escritura contestan siempre. */
 export interface RepresentationGrantStatus {
-  status: '' | 'absent' | 'vigente' | 'revocado';
-  /** Fecha DEL ESTADO: cuándo se firmó si está vigente, cuándo se revocó si está revocado. */
+  status: RepresentationGrantStatusValue;
+  /** Fecha DEL ESTADO: firmado si vigente/pendiente, revisado si rechazado, revocado si revocado. */
   at: string;
 }
 
 /**
- * Lo que contesta el **GET**: el estado más el texto que hay que enseñar.
+ * Lo que contesta el **GET**: el estado y lo poco que se puede decir de él sin enseñar el documento.
  *
- * `anexo_text` viaja solo aquí, y por eso es un tipo aparte: el POST no lo devuelve, y declararlo
- * en el tipo común diría que sí — que es justo la clase de mentira que un tipo existe para evitar.
+ * `rejected_reason` es lo ÚNICO accionable de un «rechazado»: sin él la pantalla manda al cliente a
+ * volver a subirlo sin saber qué cambiar.
  */
 export interface RepresentationGrantState extends RepresentationGrantStatus {
-  /** El texto del Anexo I con sus placeholders, servido por el runtime (fuente única). */
-  anexo_text: string;
+  rejected_reason: string;
+  /** `handwritten` | `electronic` | `''` — lo que detectó el SaaS, informativo. */
+  signature_kind: string;
+  /** `dni` | `nie` | `''`. */
+  document_type: string;
 }
 
-/** Lo que la pantalla manda a firmar. `signature` es el trazo; el documento lo monta el runtime. */
+/** Los diez huecos del modelo oficial. Los de dirección pueden ir vacíos (se rellenan a mano). */
+export interface RepresentationGrantModelFields {
+  obligado_nif: string;
+  obligado_name: string;
+  obligado_municipio: string;
+  obligado_via: string;
+  obligado_numero: string;
+  signer_nif: string;
+  signer_name: string;
+  signer_municipio: string;
+  signer_via: string;
+  signer_numero: string;
+}
+
+/** Lo que la pantalla sube: el modelo YA firmado, más lo que ERPlora tiene que custodiar con él. */
 export interface RepresentationGrantCapture {
   obligado_nif: string;
   obligado_name: string;
   signer_nif: string;
   signer_name: string;
-  signature: Blob;
+  document_type: 'dni' | 'nie';
+  /** El modelo oficial firmado (a mano y escaneado, o con AutoFirma). PDF. */
+  signed_document: File;
+  /** Copia del documento de identidad del firmante. */
   dni_copy: File;
+  /** Muestra de firma — obligatoria con NIE. */
+  signature_sample?: File;
+  /** Justificante de representación — obligatorio si el obligado es una sociedad. */
+  representation_proof?: File;
+}
+
+/**
+ * Un rechazo del otorgamiento, **con su código**, que es lo que la pantalla traduce (ADR-0055).
+ *
+ * `statusCode` viaja solo cuando quien rechazó fue el plano de control (`cloud_rejected`): el orden
+ * de despliegue es SaaS antes que Hub, así que mientras eso está en vuelo la ruta del modelo
+ * contesta **404** — y un «404» es algo que una persona entiende, mientras que un botón que no hace
+ * nada no lo es.
+ */
+export class RepresentationGrantError extends Error {
+  readonly code?: string;
+  readonly statusCode?: number;
+
+  constructor(message: string, code?: string, statusCode?: number) {
+    super(message);
+    this.name = 'RepresentationGrantError';
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
+/** Lee el `{ok:false, error, status_code}` del runtime sin inventarse un motivo si no lo hay. */
+async function grantFailure(res: Response, where: string): Promise<RepresentationGrantError> {
+  let code: string | undefined;
+  let statusCode: number | undefined;
+  try {
+    const body = (await res.json()) as { error?: string; status_code?: number | null };
+    if (typeof body.error === 'string') code = body.error;
+    if (typeof body.status_code === 'number') statusCode = body.status_code;
+  } catch {
+    // Un cuerpo que no es JSON no añade nada: queda el status HTTP, que ya viaja en el mensaje.
+  }
+  return new RepresentationGrantError(`${where} → ${res.status}`, code, statusCode);
 }
 
 /**
@@ -875,13 +943,34 @@ export async function getRepresentationGrant(): Promise<RepresentationGrantState
   const res = await runtimeFetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
     headers: runtimeHeaders(),
   });
-  if (!res.ok) throw new Error(`get-representation-grant → ${res.status}`);
+  if (!res.ok) throw await grantFailure(res, 'get-representation-grant');
   return (await res.json()) as RepresentationGrantState;
 }
 
 /**
+ * Trae el **modelo oficial pre-relleno** como PDF (`POST …/representation-grant/model`).
+ *
+ * Devuelve el `Blob` y no lo guarda: quien lo llama lo pasa por `save-download.ts`, que es la única
+ * vía que funciona también dentro de la app instalada (en Android un `<a download>` no hace
+ * literalmente nada). Solo admin — el runtime revalida.
+ */
+export async function downloadRepresentationGrantModel(
+  fields: RepresentationGrantModelFields,
+): Promise<Blob> {
+  const res = await runtimeFetch(`${RUNTIME_URL}/api/fiscal/representation-grant/model`, {
+    method: 'POST',
+    headers: { ...runtimeHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw await grantFailure(res, 'representation-grant-model');
+  return await res.blob();
+}
+
+/**
  * Sube el otorgamiento firmado (`POST /api/fiscal/representation-grant`, multipart). Solo admin
- * (el runtime revalida). Lanza si el runtime o el SaaS lo rechazan.
+ * (el runtime revalida). Lanza {@link RepresentationGrantError} con el código del rechazo.
+ *
+ * Lo que vuelve es `pendiente`: lo revisa una persona de ERPlora (24-72 h).
  */
 export async function postRepresentationGrant(
   capture: RepresentationGrantCapture,
@@ -891,14 +980,27 @@ export async function postRepresentationGrant(
   form.append('obligado_name', capture.obligado_name);
   form.append('signer_nif', capture.signer_nif);
   form.append('signer_name', capture.signer_name);
-  form.append('signature', capture.signature, 'signature.png');
+  form.append('document_type', capture.document_type);
+  form.append('signed_document', capture.signed_document, capture.signed_document.name);
   form.append('dni_copy', capture.dni_copy, capture.dni_copy.name);
+  // Lo que no se subió NO viaja como parte vacía: un adjunto en blanco es lo que hace que el
+  // revisor no sepa si falta o si falló al subirse.
+  if (capture.signature_sample) {
+    form.append('signature_sample', capture.signature_sample, capture.signature_sample.name);
+  }
+  if (capture.representation_proof) {
+    form.append(
+      'representation_proof',
+      capture.representation_proof,
+      capture.representation_proof.name,
+    );
+  }
   const res = await runtimeFetch(`${RUNTIME_URL}/api/fiscal/representation-grant`, {
     method: 'POST',
     headers: runtimeHeaders(),
     body: form,
   });
-  if (!res.ok) throw new Error(`post-representation-grant → ${res.status}`);
+  if (!res.ok) throw await grantFailure(res, 'post-representation-grant');
   return (await res.json()) as RepresentationGrantStatus;
 }
 

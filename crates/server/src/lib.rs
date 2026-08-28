@@ -1364,6 +1364,14 @@ pub fn app(state: AppState) -> Router {
             "/api/system/update-history",
             get(system::update_history),
         )
+        // The responsible declaration of THIS version, inside the product (art. 13.2 RRSIF —
+        // hub#528). Projects the same `SistemaInformatico` block that travels in every record:
+        // the producer facts the control plane serves + this binary's `Version` + the `hub_id`
+        // as `NumeroInstalacion`. Never constants.
+        .route(
+            "/api/system/declaration",
+            get(settings::get_responsible_declaration),
+        )
         // Settings del hub (store key/value de sistema, tabla `hub_settings`). GET = cualquier
         // sesión de usuario; PUT = sesión admin (owner/admin). Contrato del frontend.
         .route(
@@ -1426,7 +1434,19 @@ pub fn app(state: AppState) -> Router {
         .route(
             "/api/fiscal/representation-grant",
             get(representation_grant::get_representation_grant)
-                .post(representation_grant::post_representation_grant),
+                .post(representation_grant::post_representation_grant)
+                // 🔴 El límite por defecto de axum son 2 MB y aquí viajan hasta CUATRO documentos
+                // escaneados (hub#1293): sin esto, el rechazo lo da el framework antes de llegar a
+                // `validate` y la pantalla no tiene ningún código que enseñar.
+                .layer(axum::extract::DefaultBodyLimit::max(
+                    representation_grant::MAX_UPLOAD_BYTES,
+                )),
+        )
+        // El modelo oficial pre-relleno, para imprimir y firmar a mano o firmar con AutoFirma
+        // (hub#1293). Proxy puro hacia el SaaS, que es donde vive el texto: admin, como la subida.
+        .route(
+            "/api/fiscal/representation-grant/model",
+            post(representation_grant::post_representation_grant_model),
         )
         .route(
             "/api/business/fiscal-identity",
@@ -4340,10 +4360,22 @@ async fn query(
         Err(e) => return tenant_rejected(e),
     };
     let rt = arc.lock().await;
-    let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
+    let mut ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
     };
+    // Entitlement-blocked module ids (hub#1175), stamped on the context so the runtime's own idea
+    // of "available" — `hub.setup.status` reads it right next to `is_active` — cannot promise a
+    // route the entitlement gate below is about to refuse for a DIFFERENT query. Same source as
+    // `revalidation.blocked_modules` on `GET /api/entitlement` (`proxy_entitlement`): this hub's
+    // installed ids against the last verified claims.
+    let installed: Vec<String> = rt.modules().into_iter().map(|m| m.id).collect();
+    if let Ok(revalidation) = st.entitlement.read() {
+        ctx.blocked_modules = revalidation
+            .blocked_modules(&installed, entitlement::now_unix())
+            .into_iter()
+            .collect();
+    }
     // Gate de entitlement (defensa en profundidad): módulo dueño bloqueado → 402 estable.
     let owner = rt
         .registry()

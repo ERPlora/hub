@@ -31,6 +31,7 @@ GET     /api/events                                    auth:api-key
 POST    /api/events/ticket                             auth:session
 GET     /api/fiscal/representation-grant               auth:session
 POST    /api/fiscal/representation-grant               auth:admin
+POST    /api/fiscal/representation-grant/model         auth:admin
 GET     /api/hub/context                               auth:none
 GET     /api/hub/events                                auth:admin+capability
 POST    /api/hub/events/:id/discard                    auth:admin+capability
@@ -127,6 +128,7 @@ POST    /api/query                                     auth:any-credential
 GET     /api/settings                                  auth:session
 PUT     /api/settings                                  auth:admin
 GET     /api/system                                    auth:session
+GET     /api/system/declaration                        auth:session
 GET     /api/system/metrics                            auth:admin
 GET     /api/system/update-history                     auth:session
 GET     /api/system/usage-series                       auth:session

@@ -135,7 +135,11 @@
             >
               <h2 class="cb-title">{{ t('exportPage.sectionFiscal') }}</h2>
               <p class="cb-desc">{{ t('exportPage.sectionFiscalDesc') }}</p>
-              <ion-note data-testid="export-fiscal-note" color="warning" class="fiscal-note">
+              <!-- hub#1291: `color="warning"` on the NOTE renders Ionic's raw yellow, ~1.6:1 on
+                   white — under WCAG AA's 4.5:1 for normal text. The sentence reads `medium`
+                   (~4.83:1 in this shell's theme); the warning accent stays on the icon alone
+                   (`.fiscal-note-icon`), same pattern as Settings → Permissions (hub#1174). -->
+              <ion-note data-testid="export-fiscal-note" color="medium" class="fiscal-note">
                 <HubIcon name="warning-outline" class="fiscal-note-icon" />
                 {{ t('exportPage.fiscalWarning') }}
               </ion-note>
@@ -529,8 +533,10 @@ defineExpose({ doExport, tablesOf, toggleTable, rows });
   color: var(--ion-color-medium);
   margin: 0 0 0.5rem;
 }
+/* hub#1291: was `--ion-color-warning-shade` (~2.08:1 on white) — still under WCAG AA. `medium`
+   matches `.page-lead`'s own color; there is no icon here to carry a separate accent. */
 .admin-note {
-  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  color: var(--ion-color-medium);
 }
 .section-title {
   font-size: 1rem;
@@ -575,6 +581,8 @@ ion-checkbox::part(label) {
 .fiscal-note-icon {
   flex: none;
   margin-top: 0.1rem;
+  /* hub#1291: the note's own text reads `medium`; the icon keeps the warning accent. */
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
 }
 .error-note {
   display: block;
