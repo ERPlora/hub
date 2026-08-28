@@ -678,6 +678,18 @@ pub enum CapabilityKind {
 }
 
 impl CapabilityKind {
+    /// El set CERRADO, en orden estable. Es contrato del kernel (hub#1235):
+    /// `tests/kernel_contract_engine.rs` lo congela, comprueba contra el bloque `capabilities` de
+    /// `schemas/module.schema.json` que host y schema no puedan divergir, y lee las variantes del
+    /// enum de la propia fuente para que esta lista no se quede corta.
+    pub const ALL: &'static [CapabilityKind] = &[
+        CapabilityKind::Network,
+        CapabilityKind::Certificate,
+        CapabilityKind::Printer,
+        CapabilityKind::Notify,
+        CapabilityKind::ManageFlows,
+    ];
+
     /// Nombre canónico estable (clave de grant + de UI).
     pub fn as_str(self) -> &'static str {
         match self {
@@ -1015,8 +1027,6 @@ pub enum ExpectRowsOp {
     Min,
 }
 
-/// Gate of a declarative SQL command (hub#139) that turns an `UPDATE ... WHERE` matching fewer
-/// rows than expected into a stable business rejection instead of an ambiguous `200 ok`.
 /// State of one declared domain error code (ADR-0398). An empty object is the normal entry;
 /// `deprecated` names the version since which consumers are told to stop relying on it — the
 /// first of the two publications retiring a code needs (the second one deletes it).
@@ -1026,6 +1036,8 @@ pub struct ErrorDecl {
     pub deprecated: Option<String>,
 }
 
+/// Gate of a declarative SQL command (hub#139) that turns an `UPDATE ... WHERE` matching fewer
+/// rows than expected into a stable business rejection instead of an ambiguous `200 ok`.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ExpectRows {
     pub op: ExpectRowsOp,
