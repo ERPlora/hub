@@ -44,22 +44,24 @@
         <ion-list lines="none">
           <!-- Hub atado (hub#1249): el motor va a exportar plantilla decida lo que decida el
                formulario, así que la elección se apaga y se DICE por qué. Ofrecer «copia de
-               seguridad» aquí sería la misma mentira que una casilla que el motor ignora. -->
+               seguridad» aquí sería la misma mentira que una casilla que el motor ignora.
+               El `disabled` va en CADA `ion-radio`: `ion-radio-group` no tiene esa prop en
+               Ionic 8, y puesto ahí no hace nada (un clic volvía a «copia de seguridad»). -->
           <ion-item v-if="isPurposeLocked">
             <ion-note data-testid="export-purpose-locked" class="cb-desc">
               {{ t('exportPage.purposeLocked') }}
             </ion-note>
           </ion-item>
           <ion-item>
-            <ion-radio-group v-model="purpose" data-testid="export-purpose" :disabled="isPurposeLocked">
+            <ion-radio-group v-model="purpose" data-testid="export-purpose">
               <ion-item>
-                <ion-radio value="backup" justify="start" label-placement="end" alignment="start">
+                <ion-radio value="backup" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
                   <h2 class="cb-title">{{ t('exportPage.purposeBackup') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeBackupDesc') }}</p>
                 </ion-radio>
               </ion-item>
               <ion-item>
-                <ion-radio value="template" justify="start" label-placement="end" alignment="start">
+                <ion-radio value="template" justify="start" label-placement="end" alignment="start" :disabled="isPurposeLocked">
                   <h2 class="cb-title">{{ t('exportPage.purposeTemplate') }}</h2>
                   <p class="cb-desc">{{ t('exportPage.purposeTemplateDesc') }}</p>
                 </ion-radio>

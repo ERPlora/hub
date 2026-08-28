@@ -226,3 +226,31 @@ describe('ExportPanel · el hub puede tener el propósito ATADO (hub#1249)', () 
     expect((await selectionEnviada(w)).purpose).toBe('backup');
   });
 });
+
+describe('ExportPanel · el propósito atado se queda atado tras un clic (hub#1249, revisión)', () => {
+  // 🔴 Regression test for ERPlora/hub#1249 (review). `ion-radio-group` has NO `disabled` prop in
+  // Ionic 8 (only `ion-radio` does), so a `:disabled` on the group is a no-op: one click on «backup»
+  // flipped `purpose`, the users/fiscal boxes came back and the server silently forced `template`
+  // again — the exact lie this fix removes. The lock has to live on each radio.
+  const atado = () =>
+    fetchExportTables.mockResolvedValue({ modules: [], lockedPurpose: 'template' });
+
+  it('con el propósito atado CADA radio está desactivado', async () => {
+    atado();
+    const w = mountPanel();
+    await flushPromises();
+
+    const radios = w.findAll('[data-testid="export-purpose"] ion-radio-stub');
+    expect(radios.length).toBe(2);
+    for (const r of radios) expect(r.attributes('disabled')).toBe('true');
+  });
+
+  it('un hub normal no tiene ningún radio desactivado', async () => {
+    const w = mountPanel();
+    await flushPromises();
+
+    const radios = w.findAll('[data-testid="export-purpose"] ion-radio-stub');
+    expect(radios.length).toBe(2);
+    for (const r of radios) expect(r.attributes('disabled')).not.toBe('true');
+  });
+});
