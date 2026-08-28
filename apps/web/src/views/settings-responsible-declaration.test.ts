@@ -1,16 +1,16 @@
 // @vitest-environment happy-dom
-// **La declaración responsable se ve DENTRO del producto, en cada versión** (hub#528).
+// **The responsible declaration is visible INSIDE the product, in every version** (hub#528).
 //
-// Art. 13.2 RRSIF (RD 1007/2023): la declaración responsable del productor tiene que constar «por
-// escrito y de modo visible en el propio sistema informático **en cada una de sus versiones**».
-// Hasta hub#528 el Hub no la enseñaba en ningún sitio: existía la mitad pública (el archivo de
-// erplora.com) y ninguna dentro del TPV, que es donde la pide una inspección.
+// Art. 13.2 RRSIF (RD 1007/2023): the producer's responsible declaration must appear «por escrito
+// y de modo visible en el propio sistema informático **en cada una de sus versiones**». Until
+// hub#528 the Hub showed it nowhere: the public half existed (the erplora.com archive) and none
+// inside the till, which is where an inspection asks for it.
 //
-// Lo que estos tests clavan no es que la tarjeta exista, sino de dónde salen sus datos. Una
-// pantalla que pintara `ERPlora Hub / EC / 1.0.0` desde constantes se ve IGUAL que esta — hasta el
-// día en que el plano de control corrige el bloque del fabricante y el TPV certifica una identidad
-// mientras cada factura declara otra. Así que se monta la SettingsPage real sobre la lib real, con
-// solo `fetch` interceptado, y se comprueba que lo pintado es lo que respondió el runtime.
+// What these tests pin is not that the card exists but where its data comes from. A screen that
+// painted `ERPlora Hub / EC / 1.0.0` out of constants looks THE SAME as this one — until the day
+// the control plane corrects the manufacturer's block and the till certifies one identity while
+// every invoice declares another. So the real SettingsPage is mounted over the real lib, with only
+// `fetch` intercepted, and what is painted is checked against what the runtime answered.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { ref } from 'vue';
@@ -18,8 +18,8 @@ import { createI18n } from 'vue-i18n';
 
 import en from '../i18n/locales/en';
 
-// El registro de iconos arrastra ~70 ids virtuales `~icons/…?raw` que este entorno deniega; tiene
-// su propio test (`lib/icons.test.ts`). Mismo seam que los tests vecinos de Ajustes.
+// The icon registry drags ~70 virtual `~icons/…?raw` ids this environment denies; it has its own
+// test (`lib/icons.test.ts`). Same seam as the neighbouring Settings tests.
 vi.mock('../lib/icons', () => ({
   resolveIcon: () => '',
   manifestIcon: () => '',
@@ -48,12 +48,12 @@ vi.mock('../lib/autostart', () => ({
   autostartState: vi.fn().mockResolvedValue({ available: false, enabled: false }),
   setAutostart: vi.fn(),
 }));
-// La representación (hub#817) tiene su propio panel y su propio test; aquí estorba con sus fetch.
+// The representation grant (hub#817) has its own panel and its own test; here its fetches only get in the way.
 vi.mock('../components/RepresentationGrantPanel.vue', () => ({
   default: { name: 'RepresentationGrantPanel', template: '<div />' },
 }));
-// La lib de runtime se mockea para las OTRAS lecturas de esta página (certificado, módulos); las
-// dos constantes que la lib real de la declaración importa de ella tienen que seguir funcionando.
+// The runtime lib is mocked for the OTHER reads of this page (certificate, modules); the two
+// constants the real declaration lib imports from it must keep working.
 vi.mock('../lib/runtime', () => ({
   RUNTIME_URL: '',
   runtimeHeaders: () => ({}),
@@ -74,12 +74,12 @@ const i18n = createI18n({
   messages: { en },
 });
 
-/** Un stub que SÍ pinta lo que envuelve (un stub pelado se come su slot). */
+/** A stub that DOES render what it wraps (a bare stub swallows its slot). */
 const PASSTHROUGH = { template: '<div><slot /></div>' };
 
 const HUB_ID = '6c9e7a52-0f1b-4b2e-9c1d-2f8a5e3d7b10';
 
-/** La respuesta del runtime tal cual la sirve `GET /api/system/declaration`. */
+/** The runtime's answer exactly as `GET /api/system/declaration` serves it. */
 function declarationPayload(overrides: Record<string, unknown> = {}) {
   return {
     version: '2.4.1',
@@ -100,7 +100,7 @@ function declarationPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Responde `/api/system/declaration` con `payload`; cualquier otra URL de esta página, 404 mudo. */
+/** Answers `/api/system/declaration` with `payload`; any other URL of this page, a silent 404. */
 function stubDeclarationFetch(payload: unknown, status = 200): void {
   vi.stubGlobal(
     'fetch',
@@ -140,31 +140,31 @@ beforeEach(() => {
   push.mockClear();
 });
 
-describe('Ajustes › Negocio · declaración responsable (hub#528)', () => {
-  it('muestra la DR de la versión instalada (hub#528)', async () => {
+describe('Settings › Business · responsible declaration (hub#528)', () => {
+  it('shows the responsible declaration of the installed version (hub#528)', async () => {
     stubDeclarationFetch(declarationPayload());
     const wrapper = await mountTaxTab();
 
     const card = wrapper.find('.responsible-declaration');
-    expect(card.exists(), 'la tarjeta de la declaración responsable se pinta').toBe(true);
+    expect(card.exists(), 'the responsible declaration card is rendered').toBe(true);
     const text = card.text();
 
-    // La versión del BINARIO que corre este hub, no la del `package.json` ni una constante.
+    // The version of the BINARY this hub runs, not the `package.json` one nor a constant.
     expect(text).toContain('2.4.1');
-    // `NumeroInstalacion` = el `hub_id`: es lo que identifica esta instalación ante la AEAT.
+    // `NumeroInstalacion` = the `hub_id`: what identifies this installation before the AEAT.
     expect(text).toContain(HUB_ID);
-    // Los datos identificativos del art. 13.4, con el nombre literal del elemento del registro.
+    // The identifying data of art. 13.4, with the literal name of the record element.
     expect(text).toContain('ERPLORA CLOUD SL');
     expect(text).toContain('B27593136');
     expect(text).toContain('IdSistemaInformatico');
     expect(text).toContain('EC');
-    // El texto firmado se lee en el plano de control de ESTE hub (aquí, PRE).
+    // The signed text is read on THIS hub's control plane (here, PRE).
     expect(card.find('a.responsible-declaration-link').attributes('href')).toBe(
       'https://pre.erplora.com/legal/declaracion-responsable/',
     );
   });
 
-  it('no inventa la identidad del fabricante cuando el hub todavía no la ha recibido', async () => {
+  it('does not invent the manufacturer identity while the hub has not received it (hub#528)', async () => {
     stubDeclarationFetch(declarationPayload({ sistemaInformatico: null }));
     const wrapper = await mountTaxTab();
 
@@ -172,12 +172,12 @@ describe('Ajustes › Negocio · declaración responsable (hub#528)', () => {
     expect(card.exists()).toBe(true);
     expect(card.find('.responsible-declaration-pending').exists()).toBe(true);
     expect(card.text()).not.toContain('ERPLORA CLOUD SL');
-    // Lo que este hub SÍ sabe de sí mismo se sigue enseñando.
+    // What this hub DOES know about itself is still shown.
     expect(card.text()).toContain('2.4.1');
     expect(card.text()).toContain(HUB_ID);
   });
 
-  it('una lectura fallida se dice, nunca se pinta una tarjeta vacía en verde', async () => {
+  it('a failed read is stated, never painted as an empty green card (hub#528)', async () => {
     stubDeclarationFetch({ ok: false }, 500);
     const wrapper = await mountTaxTab();
 

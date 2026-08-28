@@ -185,3 +185,67 @@ fn the_signed_declaration_is_linked_on_this_hubs_control_plane_hub528() {
         "the trailing slash of the base url must not double up"
     );
 }
+
+/// The DOOR, not only the projection: `GET /api/system/declaration` must serve the block the
+/// process-wide cache holds — the one the heartbeat installs and `verifactu` reads — plus this
+/// binary's version and this hub's own id. The pure-function tests above cannot see a handler
+/// that hands `declaration_payload` a stale copy, a literal or `None`; this one goes through the
+/// router, so the value on the wire is compared with the value the engine would put in the XML.
+#[tokio::test]
+async fn the_route_projects_the_process_wide_producer_facts_hub528() {
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use erplora_db::testutil::fresh_db;
+    use erplora_runtime::producer_facts::ProducerFactsCache;
+    use erplora_runtime::Runtime;
+    use erplora_server::{app, AppState, AuthMode, HubConfig};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    let db = fresh_db().await;
+    let rt = Runtime::new(Box::new(db));
+    let config = HubConfig::from_env_with_auth(AuthMode::Dev);
+    let hub_id = config.hub_id.clone();
+    let cloud_base_url = config.cloud_base_url.clone();
+    let router = app(AppState::with_config(rt, config));
+
+    // What the heartbeat would have installed: the same block the XML is built from.
+    ProducerFactsCache::global().store(facts());
+
+    let response = router
+        .oneshot(
+            Request::builder()
+                .uri("/api/system/declaration")
+                .header("x-hub-id", &hub_id)
+                .header("x-user-id", "u1")
+                .header("x-permissions", "*")
+                .body(Body::empty())
+                .expect("a well-formed request"),
+        )
+        .await
+        .expect("the router answers");
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("a readable body")
+        .to_bytes();
+    let served: Value = serde_json::from_slice(&bytes).expect("a JSON body");
+
+    let expected = declaration_payload(
+        Some(&facts()),
+        erplora_server::version::HUB_VERSION,
+        &hub_id,
+        &cloud_base_url,
+    );
+    assert_eq!(
+        served, expected,
+        "the route does not serve the process-wide producer facts + this binary + this hub"
+    );
+    assert_eq!(
+        served["sistemaInformatico"]["NombreRazon"],
+        json!("ERPLORA CLOUD SL"),
+        "the manufacturer's block did not come from the cache: {served}"
+    );
+}

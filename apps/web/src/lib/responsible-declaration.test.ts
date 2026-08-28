@@ -1,11 +1,11 @@
-// **El lector de la declaración responsable no completa lo que falta** (hub#528).
+// **The responsible declaration reader does not fill in what is missing** (hub#528).
 //
-// El bloque `SistemaInformatico` no tiene hijos opcionales: o están los nueve elementos o no hay
-// declaración que enseñar. El runtime ya aplica esa regla del lado del fabricante
-// (`ProducerFacts::parse` es todo-o-nada porque un solo carácter mal es el error 1100 de la AEAT en
-// todos los registros de toda la flota); estos tests clavan que el navegador no la relaje —
-// rellenar un hueco aquí haría que el TPV certificara una identidad que las facturas no llevan, que
-// es justo lo que el art. 13 sanciona.
+// The `SistemaInformatico` block has no optional children: either the nine elements are there or
+// there is no declaration to show. The runtime already applies that rule on the manufacturer's
+// side (`ProducerFacts::parse` is all-or-nothing because a single wrong character is AEAT error
+// 1100 on every record of the whole fleet); these tests pin that the browser does not relax it —
+// filling a gap here would make the till certify an identity the invoices do not carry, which is
+// exactly what art. 13 sanctions.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -15,7 +15,7 @@ import {
 
 const HUB_ID = '6c9e7a52-0f1b-4b2e-9c1d-2f8a5e3d7b10';
 
-/** El bloque completo, tal y como lo sirve `GET /api/system/declaration`. */
+/** The complete block, exactly as `GET /api/system/declaration` serves it. */
 function block(): Record<string, string> {
   return {
     NombreRazon: 'ERPLORA CLOUD SL',
@@ -41,8 +41,8 @@ beforeEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('lectura de la declaración responsable (hub#528)', () => {
-  it('devuelve los nueve elementos en el orden del XSD', async () => {
+describe('reading the responsible declaration (hub#528)', () => {
+  it('returns the nine elements in XSD order (hub#528)', async () => {
     stubFetch({
       version: '2.4.1',
       numeroInstalacion: HUB_ID,
@@ -58,7 +58,7 @@ describe('lectura de la declaración responsable (hub#528)', () => {
   });
 
   it.each(DECLARATION_FIELDS)(
-    'sin `%s` no hay bloque: un bloque a medias no es media declaración, es una equivocada',
+    'without `%s` there is no block: a partial block is not half a declaration, it is a wrong one (hub#528)',
     async (missing) => {
       const partial = block();
       delete partial[missing];
@@ -71,20 +71,20 @@ describe('lectura de la declaración responsable (hub#528)', () => {
 
       const declaration = await fetchResponsibleDeclaration();
 
-      expect(declaration.sistemaInformatico, `falta \`${missing}\` y aun así se sirvió`).toBeNull();
-      // Lo que este hub sabe de sí mismo no depende del fabricante y se sigue pudiendo enseñar.
+      expect(declaration.sistemaInformatico, `\`${missing}\` is missing and the block was served anyway`).toBeNull();
+      // What this hub knows about itself does not depend on the manufacturer and can still be shown.
       expect(declaration.version).toBe('2.4.1');
       expect(declaration.numeroInstalacion).toBe(HUB_ID);
     },
   );
 
-  it('una negativa del runtime LANZA — nunca resuelve en una declaración vacía', async () => {
+  it('a runtime refusal THROWS — it never resolves into an empty declaration (hub#528)', async () => {
     stubFetch({ ok: false }, 401);
 
     await expect(fetchResponsibleDeclaration()).rejects.toThrow('401');
   });
 
-  it('una respuesta ilegible LANZA en vez de inventarse una URL de archivo', async () => {
+  it('an unreadable response THROWS instead of inventing an archive URL (hub#528)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('no soy json', { status: 200 })),
