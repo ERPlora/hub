@@ -16,6 +16,18 @@ import type { ModuleCapability } from './runtime';
 export interface CapabilityMeta {
   label: string;
   description: string;
+  /**
+   * i18n key of what STOPS WORKING while this permission is denied (hub#1174).
+   *
+   * A **key**, never a sentence: the owner reads it in their own language (ADR-0055/0199), and the
+   * screen only translates it. It lives here — next to the capability it belongs to — so the
+   * sentence is written ONCE and every surface that shows a denied permission says the same thing.
+   *
+   * Default-deny (ADR-0079) is the right default; a consequence nobody can see is not. With
+   * `certificate` denied the hub issues invoices that never reach the tax authority; with `printer`
+   * denied every ticket piles up in the queue.
+   */
+  breaksKey: string;
 }
 
 /**
@@ -33,12 +45,14 @@ export const CAPABILITY_CATALOG: Record<string, CapabilityMeta> = {
   network: {
     label: 'Acceso a internet',
     description: 'Permite al módulo conectarse a servidores externos (solo a los hosts declarados).',
+    breaksKey: 'settings.capabilityBreaks.network',
   },
   certificate: {
     label: 'Certificado del negocio (firma fiscal)',
     description:
       'Permite usar el certificado de la empresa para firmar y transmitir documentos (p.ej. a Hacienda). '
       + 'La clave privada nunca sale del Hub.',
+    breaksKey: 'settings.capabilityBreaks.certificate',
   },
   printer: {
     label: 'Impresora',
@@ -48,10 +62,12 @@ export const CAPABILITY_CATALOG: Record<string, CapabilityMeta> = {
     description:
       'Permite imprimir en las impresoras de ticket/cocina a través de la cola de impresión del Hub, '
       + 'que drena erplora-app como host de impresión.',
+    breaksKey: 'settings.capabilityBreaks.printer',
   },
   notify: {
     label: 'Notificaciones',
     description: 'Permite enviar notificaciones por email, SMS o WhatsApp.',
+    breaksKey: 'settings.capabilityBreaks.notify',
   },
   // hub#714. La descripción dice lo que el dueño arriesga, no el nombre técnico.
   manage_flows: {
@@ -59,17 +75,31 @@ export const CAPABILITY_CATALOG: Record<string, CapabilityMeta> = {
     description:
       'Permite crear, editar y borrar los flujos del hub, sus permisos y sus secretos. Un flujo ejecuta '
       + 'acciones en tu negocio sin nadie delante, así que concédelo solo al módulo con el que quieras editarlos.',
+    breaksKey: 'settings.capabilityBreaks.manage_flows',
   },
 };
 
 const UNKNOWN: CapabilityMeta = {
   label: 'Permiso',
   description: 'Permiso solicitado por el módulo.',
+  // A capability of the core this mirror has not learnt yet still has to say something: an empty
+  // warning shouts at the owner without telling them anything.
+  breaksKey: 'settings.capabilityBreaks.unknown',
 };
 
 /** Etiqueta y descripción de un permiso. Un id desconocido SE ENSEÑA igual, con texto genérico. */
 export function capabilityMeta(id: string): CapabilityMeta {
   return CAPABILITY_CATALOG[id] ?? UNKNOWN;
+}
+
+/**
+ * i18n key of what stops working while this permission is DENIED (hub#1174).
+ *
+ * The single source of that sentence. A screen must never type its own: the owner has to read the
+ * same consequence in the consent modal and in Settings → Permissions.
+ */
+export function capabilityBreaksKey(id: string): string {
+  return capabilityMeta(id).breaksKey;
 }
 
 /**
@@ -79,7 +109,12 @@ export function capabilityMeta(id: string): CapabilityMeta {
  * concedido — eso solo lo sabe el runtime, y para un módulo aún no instalado la respuesta es «nada».
  */
 export function capabilitiesFromIds(ids: readonly string[]): ModuleCapability[] {
-  return ids.map((id) => ({ id, ...capabilityMeta(id), requested: true, granted: false }));
+  // Solo `label` y `description`: `ModuleCapability` es la forma que devuelve el RUNTIME, y
+  // `breaksKey` es metadato de pantalla del shell — meterlo aquí lo colaría en un contrato ajeno.
+  return ids.map((id) => {
+    const { label, description } = capabilityMeta(id);
+    return { id, label, description, requested: true, granted: false };
+  });
 }
 
 /**

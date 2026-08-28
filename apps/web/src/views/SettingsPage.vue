@@ -501,6 +501,19 @@
                 <ion-label>
                   <h2>{{ cap.label }}</h2>
                   <p>{{ cap.description }}</p>
+                  <!-- hub#1174: la descripción dice qué PERMITE; mientras el interruptor está
+                       apagado hace falta decir qué se ROMPE. La frase vive en el catálogo de
+                       capabilities (una sola verdad, por id) y aquí solo se traduce. La acción que
+                       lo arregla es el toggle de esta misma fila (hub#800 §3). -->
+                  <ion-note
+                    v-if="!cap.granted"
+                    color="warning"
+                    class="cap-breaks"
+                    :data-testid="`cap-breaks-${cap.id}`"
+                  >
+                    <HubIcon name="warning-outline" class="cap-breaks-icon" />
+                    {{ t(capabilityBreaksKey(cap.id)) }}
+                  </ion-note>
                 </ion-label>
                 <ion-toggle
                   :checked="cap.granted"
@@ -562,6 +575,9 @@ import { isTauri } from '../lib/device';
 // dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
 import { receiptTemplateTarget } from '../lib/receipt-template';
 import { moduleNav } from '../lib/nav';
+// hub#1174: la consecuencia de un permiso denegado se nombra UNA vez, en el catálogo de
+// capabilities, y esta pantalla solo la traduce — nunca la escribe.
+import { capabilityBreaksKey } from '../lib/module-capabilities';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -1207,5 +1223,20 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+/* hub#1174: el aviso de «qué se rompe» de un permiso denegado. Mismo patrón que la nota fiscal de
+   ExportPanel: icono + frase, dentro de la propia tarjeta del permiso. */
+.cap-breaks {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  /* La frase es larga a propósito; en móvil tiene que envolver, no recortarse. */
+  white-space: normal;
+}
+.cap-breaks-icon {
+  flex: none;
+  margin-top: 0.1rem;
 }
 </style>

@@ -5,9 +5,12 @@ import {
   CAPABILITY_CATALOG,
   capabilitiesToConsent,
   capabilitiesFromIds,
+  capabilityBreaksKey,
   capabilityMeta,
 } from './module-capabilities';
 import type { ModuleCapability } from './runtime';
+import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 // Lo que devuelve el runtime para un módulo que YA estuvo instalado.
 function runtimeCap(id: string, granted = false): ModuleCapability {
@@ -61,6 +64,66 @@ describe('capabilityMeta — el catálogo de etiquetas', () => {
     const arm = rs.match(/"printer"\s*=>\s*\(\s*"Impresora"\s*,\s*"([^"]+)"/);
     expect(arm, 'no se encontró el brazo "printer" de capability_meta en settings.rs').not.toBeNull();
     expect(CAPABILITY_CATALOG.printer.description).toBe(arm?.[1]);
+  });
+});
+
+// Regression test for ERPlora/hub#1174 — Ajustes → Permisos pintaba label + descripción + toggle y
+// NADA decía qué deja de funcionar con el interruptor apagado. La frase de la consecuencia vive en
+// UN sitio (este catálogo, por id de capability) y es una CLAVE i18n, no texto: la pantalla solo la
+// traduce. Este es el guardia que impide que se añada una capability al core sin ella.
+describe('capabilityBreaksKey — qué se rompe con el permiso denegado (hub#1174)', () => {
+  /** Los ids que el SERVIDOR conoce: `capability_meta` en `crates/server/src/settings.rs`. */
+  function serverCapabilityIds(): string[] {
+    const rs = readFileSync(
+      new URL('../../../../crates/server/src/settings.rs', import.meta.url),
+      'utf8',
+    );
+    const body = rs.match(/fn capability_meta\(id: &str\)[\s\S]*?\n\}/);
+    expect(body, 'no se encontró `fn capability_meta` en crates/server/src/settings.rs').not.toBeNull();
+    return [...(body?.[0] ?? '').matchAll(/^\s*"([a-z_]+)" => \(/gm)].map((m) => m[1]).sort();
+  }
+
+  /** Resuelve `settings.capabilityBreaks.x` dentro de un catálogo de locale. */
+  function lookup(catalogue: unknown, key: string): unknown {
+    return key.split('.').reduce<unknown>(
+      (node, part) => (node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined),
+      catalogue,
+    );
+  }
+
+  it('🔴 el espejo web conoce EXACTAMENTE las capabilities que el servidor declara', () => {
+    // Sin esto, una capability nueva del core entra sin etiqueta y sin consecuencia, y el fallo
+    // solo se ve en la pantalla del cliente.
+    expect(Object.keys(CAPABILITY_CATALOG).sort()).toEqual(serverCapabilityIds());
+  });
+
+  it('🔴 CADA capability declara qué se rompe si no se concede — el fallo nombra la que falta', () => {
+    const missing = serverCapabilityIds().filter((id) => !CAPABILITY_CATALOG[id]?.breaksKey);
+    expect(
+      missing,
+      `capabilities sin «qué se rompe» en CAPABILITY_CATALOG: ${missing.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('🔴 la consecuencia está traducida en en Y en es — el fallo nombra la clave que falta', () => {
+    // ADR-0055/0199: inglés fuente + su `es`. Una clave sin traducción sale como clave cruda en la
+    // tarjeta, que es peor que no decir nada.
+    for (const id of [...serverCapabilityIds(), 'some_future_capability']) {
+      const key = capabilityBreaksKey(id);
+      for (const [locale, catalogue] of [['en', en], ['es', es]] as const) {
+        const text = lookup(catalogue, key);
+        expect(typeof text, `falta ${key} en ${locale}.ts (capability ${id})`).toBe('string');
+        expect(text, `${key} está vacía en ${locale}.ts`).not.toBe('');
+      }
+    }
+  });
+
+  it('una capability desconocida cae en la consecuencia genérica, nunca en una clave inventada', () => {
+    // Un id que este espejo no conoce tiene que decir algo: un aviso en blanco grita sin informar.
+    expect(capabilityBreaksKey('some_future_capability')).toBe(
+      capabilityBreaksKey('another_future_capability'),
+    );
+    expect(capabilityBreaksKey('certificate')).not.toBe(capabilityBreaksKey('printer'));
   });
 });
 
