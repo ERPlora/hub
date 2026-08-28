@@ -196,6 +196,7 @@ import { GREETING_KEY, panelHeading } from '../lib/dashboard-heading';
 import { hubSettings } from '../lib/hub-settings';
 import { formatAmount } from '../lib/money';
 import type { WidgetDef, WidgetPreset, OkWidgetBoardLabels } from '@erplora/outfitkit';
+import { formatDate, formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -381,10 +382,10 @@ const heading = computed<string>(() => {
   return resolved.kind === 'business' ? resolved.name : t(GREETING_KEY[resolved.slot]);
 });
 const todayLabel = computed<string>(() => {
-  const today = new Date().toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-    weekday: 'long', day: 'numeric', month: 'long',
+  const today = formatDate(new Date(), {
+    locale: locale.value, weekday: 'long', day: 'numeric', month: 'long',
   });
-  return `${t('dashboard.todayLabel')}, ${today}`;
+  return today ? `${t('dashboard.todayLabel')}, ${today}` : t('dashboard.todayLabel');
 });
 
 // ── Zone 5 — what the hub says about itself (hub#375) ─────────────────────────────────────────
@@ -421,11 +422,10 @@ async function loadSystemHealth(): Promise<void> {
 // ── Actividad reciente = últimas ventas (datos reales; sin histórico de eventos aún) ─────────
 // Vista de data-table: columnas con filtros (método/estado), búsqueda, orden y paginación.
 const fmtDateTime = (iso: string): string =>
-  iso
-    ? new Date(iso).toLocaleString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-    : '—';
+  formatDateTime(iso, {
+    locale: locale.value,
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }) ?? '—';
 
 // Pill de estado (tinte suave con tokens Ionic; cruzan el shadow de la tabla).
 function badgeCell(text: string, tone: Tone): Node {

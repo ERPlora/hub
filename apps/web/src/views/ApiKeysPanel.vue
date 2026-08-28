@@ -219,6 +219,7 @@ import {
   listApiKeys, createApiKey, rotateApiKey, revokeApiKey,
   type ApiKey, type ApiKeyAccess, type ApiKeyScopeEntry,
 } from '../lib/api-keys';
+import { formatDate } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 
@@ -251,8 +252,9 @@ interface CreateForm {
 }
 const form = reactive<CreateForm>({ name: '', rate_limit_per_minute: 60, access: 'custom', scope: {} });
 
+// hub#1212: el reloj del NEGOCIO y el idioma ACTIVO — 'es-ES' estaba clavado aquí a mano.
 const fmtDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  formatDate(iso, { locale: locale.value, day: '2-digit', month: 'short', year: 'numeric' }) ?? iso;
 
 // ── Celdas ricas (DOM Node; patrón de EmployeesPage para consumir ok-data-table desde Vue). ──
 function badgeCell(text: string, tone: 'success' | 'medium' | 'danger'): Node {

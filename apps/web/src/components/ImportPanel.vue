@@ -375,6 +375,7 @@ import {
 import { retryAvailability, retryErrorKey } from '../lib/import-retry';
 import { formatAmount } from '../lib/money';
 import { appLabel, loadAppNames, type AppNames } from '../lib/app-names';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -715,12 +716,11 @@ async function loadRecoveredReport(): Promise<void> {
   }
 }
 
-/** Fecha legible del informe recuperado (la que pintó el browser, no la cruda RFC3339). */
+/** Fecha legible del informe recuperado, en el reloj del NEGOCIO (hub#1212), no la cruda RFC3339. */
 const recoveredLabel = computed<string>(() => {
   const raw = recoveredReport.value?.created_at;
   if (!raw) return '';
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+  return formatDateTime(raw, { locale: locale.value }) ?? raw;
 });
 
 /** Descarta el informe recuperado y vuelve al catálogo: el admin ya lo leyó y quiere reintentar. */
@@ -819,8 +819,7 @@ const hasMedia = computed<boolean>(() => hasSection('media'));
 const createdLabel = computed<string>(() => {
   const raw = manifest.value?.created_at;
   if (!raw) return '';
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+  return formatDateTime(raw, { locale: locale.value }) ?? raw;
 });
 
 /** Siembra la selección a partir del manifest recién inspeccionado (todo ON por defecto). */

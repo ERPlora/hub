@@ -218,6 +218,7 @@ import { invalidFieldMessage } from '../lib/invalid-field';
 import { hubPinLength } from '../lib/pin-length';
 import { isAdmin, user } from '../lib/session';
 import { toast } from '../lib/toast';
+import { formatDate } from '../lib/format-datetime';
 
 const { t, te, locale } = useI18n();
 
@@ -309,12 +310,14 @@ const pinIssue = computed(() =>
 );
 
 function fmtDate(iso: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return (
+    formatDate(iso, {
+      locale: locale.value,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }) ?? '—'
+  );
 }
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */

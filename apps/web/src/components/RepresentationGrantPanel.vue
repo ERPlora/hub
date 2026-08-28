@@ -174,6 +174,7 @@ import {
 import { getRepresentationGrant, postRepresentationGrant } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
 import HubIcon from './HubIcon.vue';
+import { formatDate } from '../lib/format-datetime';
 
 const props = defineProps<{ obligadoNif: string; obligadoName: string }>();
 const emit = defineEmits<{ (e: 'signed'): void }>();
@@ -203,8 +204,7 @@ const stateIcon = computed(() =>
 
 const atLabel = computed(() => {
   if (!at.value) return '';
-  const parsed = new Date(at.value);
-  return Number.isNaN(parsed.getTime()) ? at.value : parsed.toLocaleDateString(locale.value);
+  return formatDate(at.value, { locale: locale.value }) ?? at.value;
 });
 
 /** El texto tal y como lo va a archivar el runtime, con las partes ya puestas. */

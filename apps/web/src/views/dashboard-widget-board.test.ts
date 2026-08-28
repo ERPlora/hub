@@ -53,6 +53,10 @@ vi.mock('../lib/dashboard-heading', () => ({
 }));
 vi.mock('../lib/hub-settings', () => ({
   hubSettings: ref({ business_legal_name: 'Bar Manolo SL', country_code: 'ES', language: 'es' }),
+  // hub#1212: the dashboard formats its dates through `lib/format-datetime`, which asks this module
+  // for the business timezone. `null` = the boot has not seeded it, so the helper falls back to the
+  // machine zone — which is what this board test wants: it asserts labels, not clocks.
+  publishedHubTimezone: () => null,
 }));
 vi.mock('../lib/money', () => ({ formatAmount: (n: number) => String(n) }));
 vi.mock('../lib/data-table-labels', () => ({ dataTableLabels: () => ({}) }));

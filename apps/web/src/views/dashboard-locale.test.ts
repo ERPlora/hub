@@ -1,7 +1,12 @@
 // #273 — «La fecha mezcla español e inglés»: el label «Hoy» del dashboard usaba
 // `toLocaleDateString(undefined, …)`, que cae al locale del NAVEGADOR/SO, no al de la app. Con la
-// app en `es` y el navegador en `en-US` salía «lunes, July 2026». El resto del dashboard ya usa
-// `locale.value === 'en' ? 'en-GB' : 'es-ES'`; este test fija que el label de hoy haga lo mismo.
+// app en `es` y el navegador en `en-US` salía «lunes, July 2026».
+//
+// hub#1212 movió el mapeo `en → en-GB` / resto `→ es-ES` de cada pantalla a `formatLocale()`
+// (`lib/format-datetime.ts`), así que la regla de #273 ya no se comprueba buscando el ternario en
+// el SFC —ya no existe en ninguno— sino en dos mitades: aquí, que la pantalla SIGUE pasando el
+// locale de la app (y no `undefined`); y en `lib/format-datetime.test.ts`, que ese locale acaba
+// siendo `en-GB`/`es-ES`. Lo que #273 protege no cambia: el idioma lo decide la app.
 //
 // Patrón del hub (apps-core.test.ts): se lee el source del SFC y se aserta sobre él, sin montar
 // (montar requeriría mockear Ionic + vue-i18n + router para un cambio de una línea).
@@ -25,7 +30,12 @@ describe('el formato de fecha sigue el locale de la app, no el del navegador (#2
     const start = dashboard.indexOf('const todayLabel');
     const end = dashboard.indexOf('});', start) + '});'.length;
     const block = dashboard.slice(start, end);
-    expect(block).toContain("locale.value === 'en' ? 'en-GB' : 'es-ES'");
+    // El ternario vive ahora en `formatLocale()`; lo que la pantalla tiene que seguir haciendo es
+    // ENTREGARLE el locale de la app. Un `formatDate(...)` sin `locale:` volvería a #273 en cuanto
+    // el usuario cambiase de idioma: el `computed` dejaría de depender de él y no se repintaría.
+    expect(block, 'todayLabel ya no pasa el locale de la app al formateador').toContain(
+      'locale: locale.value',
+    );
   });
 
   it('ModulePlanPanel no usa `undefined` como locale (mismo bug en fmtDate)', () => {
