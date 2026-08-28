@@ -3,7 +3,7 @@
 # (ERPlora/module-toolkit#61)
 # ==============================================================================
 #
-# `ERPlora/module-toolkit` copia A MANO seis cosas cuya autoridad vive en este repo:
+# `ERPlora/module-toolkit` copia A MANO siete cosas cuya autoridad vive en este repo:
 #
 #   1. `schemas/module.schema.json` — vendorizado byte a byte (el gate de los 25 repos
 #      de módulo corre sin checkout del hub, así que el validador no puede ir a buscarlo);
@@ -13,8 +13,10 @@
 #   4. `crates/runtime/src/hub_users.rs::CORE_QUERIES` — las capacidades del namespace `hub.`;
 #   5. `crates/runtime/src/migration_guard.rs::GRANDFATHERED`;
 #   6. `apps/web/src/main.ts` — el pin de Ionic a `ios`, que es la PREMISA del guard de `fill`.
+#   7. `contracts/kernel/**` — la superficie CONGELADA del hub (ADR «El Hub se CIERRA como
+#      KERNEL», 2026-08-27): rutas, motor, guest, tablas de sistema y el `.d.ts` del SDK.
 #
-# EL AGUJERO QUE CIERRA. El toolkit ya tenía el test que compara los seis
+# EL AGUJERO QUE CIERRA. El toolkit ya tenía el test que compara los espejos
 # (`test/canonical-mirrors.test.mjs`), pero cada uno abría con
 # `if (!existsSync(canonical)) return t.skip(…)` y buscaba el hub como HERMANO DE DISCO. En el CI
 # del toolkit no hay hub —ni lo puede haber: la org está en plan free, donde «organization-level
@@ -51,6 +53,12 @@ on:
       # `.vue` nueva le hiciera decir algo distinto que el guard propio del hub, las dos puertas
       # estarían diciendo cosas distintas del mismo markup y lo pagarían los autores de módulos.
       - 'apps/web/src/**/*.vue'
+      # La superficie CONGELADA del kernel: seis ficheros que el toolkit vendoriza desde
+      # module-toolkit#115 y compara byte a byte. Sin esta ruta, una PR que SOLO mueva el
+      # contrato del kernel no dispara este workflow y la copia del toolkit se queda atrás
+      # sin un solo rojo — pasó con hub#1260, que tocó `routes.snapshot` y no lo vio nadie
+      # (hub#1261). Un guard que no corre no deniega: queda ABIERTO.
+      - 'contracts/kernel/**'
       - '.github/workflows/canonical-mirrors.yml'
   push:
     branches: [main, develop]
@@ -62,6 +70,7 @@ on:
       - 'crates/runtime/src/migration_guard.rs'
       - 'apps/web/src/main.ts'
       - 'apps/web/src/**/*.vue'
+      - 'contracts/kernel/**'
       - '.github/workflows/canonical-mirrors.yml'
   workflow_dispatch:
 

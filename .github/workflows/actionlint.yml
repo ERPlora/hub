@@ -39,6 +39,7 @@ on:
       # El test de contrato de abajo vive fuera de `.github/`, así que sin esto una PR que
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
+      - 'scripts/tests/canonical-mirrors-workflow.test.sh'
   workflow_dispatch:
 
 permissions:
@@ -98,3 +99,17 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet --disable-pip-version-check pyyaml
           bash ./scripts/tests/test-hub-modules-workflow.test.sh
+
+      # ── Contrato de `canonical-mirrors.yml` (hub#1261) ───────────────────────────────
+      # Mismo razonamiento y misma razón para vivir AQUÍ: `canonical-mirrors.yml` se dispara
+      # por su propio filtro `paths`, así que una PR que borrase una ruta de ese filtro
+      # tampoco ejecutaría al guardia que lo protege. Lo que comprueba: que las rutas de las
+      # superficies vendorizadas por el toolkit —`contracts/kernel/**` incluida— siguen en el
+      # filtro, en los DOS bloques (`pull_request` y `push`), y que el paso que gatean sigue
+      # siendo la comparación de los espejos.
+      #
+      # pyyaml ya está instalado por el paso de arriba.
+      - name: Contrato de canonical-mirrors.yml (hub#1261)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/canonical-mirrors-workflow.test.sh
