@@ -100,6 +100,7 @@ fn variant_of(e: &RuntimeError) -> &'static str {
         E::BusinessTaxIdFrozen { .. } => "BusinessTaxIdFrozen",
         E::HubCountryFrozen { .. } => "HubCountryFrozen",
         E::DemoLocked { .. } => "DemoLocked",
+        E::MoneyUnitAmbiguous { .. } => "MoneyUnitAmbiguous",
         E::Other(_) => "Other",
     }
 }
@@ -253,6 +254,11 @@ fn census(db: RuntimeError) -> Vec<RuntimeError> {
         },
         E::DemoLocked {
             lock: DemoLock::FiscalIdentity,
+        },
+        // hub#1209: the half-migrated hub the euros→cents backfill refuses to guess about.
+        E::MoneyUnitAmbiguous {
+            cents: s("sales_sale.total"),
+            euros: s("payments_payment.amount"),
         },
         E::Other(s("hasher failed")),
     ]
