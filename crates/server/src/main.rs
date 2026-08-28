@@ -13,6 +13,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().any(|a| a == "--backfill-money") {
         return backfill_money().await;
     }
+    if std::env::args().any(|a| a == "--check-money-unit") {
+        return check_money_unit().await;
+    }
     serve(ServeConfig::from_env()).await
 }
 
@@ -27,5 +30,20 @@ async fn backfill_money() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("[backfill-money] conectando al Postgres del hub …");
     let db = erplora_db::PgAdapter::connect(&dsn).await?;
     money_backfill::run_logged(&db).await?;
+    Ok(())
+}
+
+/// Audits the hub's money unit **without writing anything** (hub#1209). See
+/// [`erplora_runtime::money_backfill::check_logged`].
+async fn check_money_unit() -> Result<(), Box<dyn std::error::Error>> {
+    use erplora_runtime::money_backfill;
+
+    let dsn = normalize_pg_dsn(std::env::var("HUB_DATABASE_URL").unwrap_or_default().trim());
+    if dsn.is_empty() {
+        return Err("HUB_DATABASE_URL is required for --check-money-unit (ADR-0154)".into());
+    }
+    eprintln!("[check-money-unit] connecting to the hub's Postgres (read-only) …");
+    let db = erplora_db::PgAdapter::connect(&dsn).await?;
+    money_backfill::check_logged(&db).await?;
     Ok(())
 }

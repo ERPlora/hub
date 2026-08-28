@@ -3780,6 +3780,12 @@ fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         E::Io(_) | E::Manifest { .. } | E::Db(_) | E::Wasm(_) | E::Native(_) | E::Schema { .. } => {
             false
         }
+        // hub#1209: the half-migrated hub the money backfill refuses to guess about. It is raised
+        // by an ops subcommand and by the boot path, never inside a request, so it does not travel
+        // through this door at all — and if it ever did, its sentence is an inventory of this
+        // hub's own table.column names: internal shape a caller can neither act on nor need. Ops
+        // reads it in the log and in the error registry, which is where it is aimed.
+        E::MoneyUnitAmbiguous { .. } => false,
         // ── Sentences this hub, or a module, wrote ON PURPOSE for whoever reads them: they name
         // the operation, the permission, the app or the business rule that refused, which is what
         // the screen has to be able to say. What they must never do is smuggle driver text in, and

@@ -382,6 +382,11 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // report it, it ACTS on it — it lists `dependents` and offers «remove it anyway» — so it
         // must be distinguishable from every other refusal of an uninstall.
         E::HasDependents { .. } => "has_dependents",
+        // hub#1209: its own code. A half-migrated hub is not a generic failure — it is the one
+        // state in which the backfill must refuse, and ops has to be able to alert on exactly it.
+        // Deliberately NOT in the `user` group above: nobody "caused" it from a keyboard, and it
+        // is worth an issue every single time.
+        E::MoneyUnitAmbiguous { .. } => "money_unit_ambiguous",
         E::Other(_) => "other",
     })
 }
