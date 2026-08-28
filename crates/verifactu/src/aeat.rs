@@ -652,11 +652,11 @@ fn detalle_de_entrada(e: &Json) -> Result<Detalle, VerifactuError> {
     })
 }
 
-/// Lee un `tax_breakdown` de factura en sus líneas de desglose, aceptando las DOS generaciones del
-/// contrato descrito arriba. Un desglose vacío o ilegible NO es un error aquí: son cero líneas, y
-/// quien llama decide con qué las sustituye (`desglose` con el tipo de la fila, `breakdown_rates`
-/// con nada). Lo que sí falla es una línea que declara importes imposibles de leer — ese es el
-/// registro que no se puede declarar (hub#324).
+/// Reads an invoice `tax_breakdown` into its breakdown lines, accepting BOTH generations of the
+/// contract described above. An empty or unreadable breakdown is NOT an error here: it is zero
+/// lines, and the caller decides what stands in for them (`desglose` the row's own rate,
+/// `breakdown_rates` nothing). What does fail is a line that declares amounts nobody can read —
+/// that is the record that cannot be declared (hub#324).
 fn detalles_del_desglose(tax_breakdown: &str) -> Result<Vec<Detalle>, VerifactuError> {
     let mut lines: Vec<Detalle> = Vec::new();
     match serde_json::from_str::<Json>(tax_breakdown) {
@@ -685,12 +685,12 @@ fn detalles_del_desglose(tax_breakdown: &str) -> Result<Vec<Detalle>, VerifactuE
     Ok(lines)
 }
 
-/// Los TIPOS IMPOSITIVOS (%) que declara un `tax_breakdown`, uno por línea de desglose y en el
-/// orden en que vienen. Desglose vacío, ilegible o con importes que no se pueden leer → sin tipos
-/// declarados; quien llama decide qué hacer con ese hueco.
+/// The TAX RATES (%) a `tax_breakdown` declares, one per breakdown line and in the order they
+/// come. An empty or unreadable breakdown, or one whose amounts cannot be read → no declared
+/// rates; the caller decides what to do with that gap.
 ///
-/// Existe para que la columna `tax_rate` de la fila lea el desglose por el MISMO parseo con el que
-/// se construye el XML, en vez de por una copia que solo entendía una de las dos generaciones
+/// It exists so that the row's `tax_rate` column reads the breakdown through the SAME parser the
+/// XML is built from, instead of through a copy that understood only one of the two generations
 /// (hub#1198).
 pub(crate) fn breakdown_rates(tax_breakdown: &str) -> Vec<f64> {
     detalles_del_desglose(tax_breakdown)
