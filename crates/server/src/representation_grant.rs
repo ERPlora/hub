@@ -303,12 +303,19 @@ pub fn validate_model_fields(fields: &ModelFields) -> Result<(), &'static str> {
 
 /// Drains the browser's multipart into a [`Capture`].
 ///
-/// A field that cannot be read is skipped rather than aborting: [`validate`] is what decides
-/// whether what arrived is enough, in one place, so a truncated upload produces "the signed
-/// document is missing" and not a parser error nobody can act on.
-pub async fn collect(mut multipart: Multipart) -> Capture {
+/// A text field that cannot be read is skipped: [`validate`] decides in one place whether what
+/// arrived is enough. **A stream that breaks is not skipped.** Behind the route's body limit
+/// ([`MAX_UPLOAD_BYTES`]) the one thing that cuts the stream in practice is an upload heavier than
+/// the door, and an empty capture would then answer `obligado_nif_required` — «your business needs
+/// a taxpayer ID» — to somebody whose only mistake was a 45 MB scan. The code names the problem.
+pub async fn collect(mut multipart: Multipart) -> Result<Capture, &'static str> {
     let mut capture = Capture::default();
-    while let Ok(Some(field)) = multipart.next_field().await {
+    loop {
+        let field = match multipart.next_field().await {
+            Ok(Some(field)) => field,
+            Ok(None) => break,
+            Err(_) => return Err("document_too_large"),
+        };
         let name = field.name().unwrap_or_default().to_string();
         match name.as_str() {
             "signed_document" | "dni_copy" | "signature_sample" | "representation_proof" => {
@@ -317,7 +324,7 @@ pub async fn collect(mut multipart: Multipart) -> Capture {
                     .map(str::to_string)
                     .unwrap_or_else(|| name.clone());
                 let Ok(bytes) = field.bytes().await else {
-                    continue;
+                    return Err("document_too_large");
                 };
                 let upload = Some((file_name, bytes.to_vec()));
                 match name.as_str() {
@@ -345,7 +352,7 @@ pub async fn collect(mut multipart: Multipart) -> Capture {
             _ => {}
         }
     }
-    capture
+    Ok(capture)
 }
 
 /// Sends the capture up to the control plane with the MACHINE credential.
@@ -643,13 +650,19 @@ pub async fn post_representation_grant(
             return unauthorized(error);
         }
     }
-    let capture = collect(multipart).await;
-    if let Err(reason) = validate(&capture) {
-        return (
+    let refused = |reason: &'static str| {
+        (
             StatusCode::BAD_REQUEST,
             Json(json!({ "ok": false, "error": reason })),
         )
-            .into_response();
+            .into_response()
+    };
+    let capture = match collect(multipart).await {
+        Ok(capture) => capture,
+        Err(reason) => return refused(reason),
+    };
+    if let Err(reason) = validate(&capture) {
+        return refused(reason);
     }
     let Some(machine) = auth::machine_auth(&st) else {
         return (

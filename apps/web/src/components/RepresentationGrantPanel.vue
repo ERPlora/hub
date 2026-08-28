@@ -342,7 +342,7 @@ const props = defineProps<{
   obligadoAddress?: string;
 }>();
 const emit = defineEmits<{ (e: 'signed'): void }>();
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 
 /**
  * Las letras que un NIF español lleva delante cuando pertenece a una **entidad** y no a una
@@ -535,7 +535,10 @@ function showFailure(e: unknown) {
     return;
   }
   if (e instanceof RepresentationGrantError && e.code) {
-    errorKey.value = `grant.errors.${e.code}`;
+    // `te` antes de `t`: el runtime contesta un 401 con `error: <prosa>`, y `t` de una clave que
+    // no existe devuelve la clave — en pantalla, «grant.errors.falta sesión (…)».
+    const key = `grant.errors.${e.code}`;
+    errorKey.value = te(key) ? key : 'grant.errors.unknown';
     errorStatusCode.value = e.statusCode ?? null;
     return;
   }

@@ -53,13 +53,17 @@ vi.mock('../lib/config', () => ({
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
 import RepresentationGrantPanel from './RepresentationGrantPanel.vue';
+import en from '../i18n/locales/en';
 
+// El catálogo REAL, no uno vacío: la pantalla decide si un código de error tiene traducción
+// (`te`) antes de pintarlo, y con `{}` todo código caería al genérico y las pruebas por código no
+// probarían nada.
 const i18n = createI18n({
   legacy: false,
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: { en: {} },
+  messages: { en },
 });
 
 function mountPanel(props: Record<string, unknown> = {}) {
@@ -284,6 +288,22 @@ describe('paso 2 · la subida', () => {
     await panel.submit();
 
     expect(panel.errorKey).toBe('grant.errors.signed_document_not_pdf');
+  });
+
+  it('🔴 un código que la pantalla no conoce cae al genérico, no se pinta la clave', async () => {
+    // El runtime contesta 401 con `error: <prosa en español>` cuando la sesión caduca a mitad del
+    // formulario; sin esta red, en pantalla salía literalmente `grant.errors.falta sesión (…)`.
+    postRepresentationGrant.mockRejectedValueOnce(
+      new RepresentationGrantError('post → 401', 'falta sesión (cabecera X-Hub-Session)'),
+    );
+    const w = mountPanel();
+    await flushPromises();
+    const panel = vm(w);
+    fillUpload(panel);
+
+    await panel.submit();
+
+    expect(panel.errorKey).toBe('grant.errors.unknown');
   });
 
   it('un fallo NO borra lo que la persona acaba de adjuntar', async () => {
