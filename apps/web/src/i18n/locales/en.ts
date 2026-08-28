@@ -1528,6 +1528,8 @@ export default {
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
     protectedTitle: 'Open the cash drawer first',
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
+    emptyTitle: 'Nothing to show here yet',
+    emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
   },
   moduleSettings: {
     tab: 'Settings',
