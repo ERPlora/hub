@@ -518,6 +518,17 @@ impl CloudClient {
         )
     }
 
+    /// Lo que el marketplace dice de UN módulo (`GET /api/v1/marketplace/modules/{module_id}/`).
+    ///
+    /// Es la puerta de DETALLE, no la del catálogo, y esa diferencia es el motivo de existir
+    /// (hub#1134): el listado sólo sirve lo que se sigue OFRECIENDO —`publication_status='listed'`,
+    /// filtrado por el SaaS en su acción `list`—, así que un módulo que este hub corre y el
+    /// marketplace ha RETIRADO (ADR-0380) no sale ahí. `retrieve` parte del queryset base y admite
+    /// el token de máquina (`MACHINE_OK_ACTIONS`), así que es la única que sigue contestando por él.
+    pub fn module_detail(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        self.get(&format!("/api/v1/marketplace/modules/{module_id}/"), auth)
+    }
+
     /// **Flujo real de instalación, paso 2** — descarga el ZIP binario de una versión.
     /// `GET /api/v1/marketplace/modules/{module_id}/download/?version={version}` (FileResponse,
     /// verificado en `api_views.py::download`). §2.2.
