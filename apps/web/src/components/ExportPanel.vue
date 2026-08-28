@@ -42,8 +42,16 @@
     <ion-card>
       <ion-card-content class="p-0">
         <ion-list lines="none">
+          <!-- Hub atado (hub#1249): el motor va a exportar plantilla decida lo que decida el
+               formulario, así que la elección se apaga y se DICE por qué. Ofrecer «copia de
+               seguridad» aquí sería la misma mentira que una casilla que el motor ignora. -->
+          <ion-item v-if="isPurposeLocked">
+            <ion-note data-testid="export-purpose-locked" class="cb-desc">
+              {{ t('exportPage.purposeLocked') }}
+            </ion-note>
+          </ion-item>
           <ion-item>
-            <ion-radio-group v-model="purpose" data-testid="export-purpose">
+            <ion-radio-group v-model="purpose" data-testid="export-purpose" :disabled="isPurposeLocked">
               <ion-item>
                 <ion-radio value="backup" justify="start" label-placement="end" alignment="start">
                   <h2 class="cb-title">{{ t('exportPage.purposeBackup') }}</h2>
@@ -285,6 +293,12 @@ const filenamePreview = computed<string>(
 const purpose = ref<BundlePurpose>('backup');
 const esPlantilla = computed(() => purpose.value === 'template');
 
+// `purpose` IMPUESTO por el hub (hub#377, ADR-0195): un hub de desarrollo sin enrolar o una demo
+// efímera exporta siempre como plantilla. Lo publica `GET /api/hub/export/tables`; hasta hub#1249
+// el formulario no lo sabía y el servidor cambiaba el `purpose` a espaldas del usuario.
+const lockedPurpose = ref<BundlePurpose | null>(null);
+const isPurposeLocked = computed<boolean>(() => lockedPurpose.value !== null);
+
 const selUsers = ref<boolean>(true);
 const selSettings = ref<boolean>(true);
 const selFiscal = ref<boolean>(false);
@@ -398,7 +412,12 @@ onMounted(async () => {
   }
   // Las tablas de cada módulo con su recuento (hub#534). Va aparte y DEGRADA EN SILENCIO: si el
   // runtime no lo sirve, el formulario sigue exportando todo, que es lo que hacía antes.
-  moduleTables.value = await fetchExportTables();
+  const exportTables = await fetchExportTables();
+  moduleTables.value = exportTables.modules;
+  // Si el hub tiene el `purpose` atado, el formulario se pone en ESE estado antes de que nadie
+  // toque nada: la elección se apaga y las casillas de identidad desaparecen solas (`esPlantilla`).
+  lockedPurpose.value = exportTables.lockedPurpose;
+  if (exportTables.lockedPurpose) purpose.value = exportTables.lockedPurpose;
 });
 
 // ── Casillas por TABLA (hub#534) ─────────────────────────────────────────────────────────────

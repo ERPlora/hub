@@ -737,3 +737,183 @@ async fn real_hub_export_respects_the_requested_purpose() {
     };
     assert_eq!(manifest["purpose"], json!("backup"), "un hub real respeta el purpose pedido");
 }
+
+// ── hub#1249: los USUARIOS sobreviven al round-trip export → inspect ────────────────────────────
+
+/// Un hub REAL con una sesión de administrador REAL: `AuthMode::Session`, `hub_id` propio y token
+/// de máquina, o sea el estado de un hub de cliente. Importa que sea `Session` y no `Dev`: en Dev
+/// el contexto sale de las cabeceras (`x-hub-id`, por defecto `local`) mientras el seed escribe los
+/// usuarios bajo el `hub_id` del despliegue, así que el volcado miraría a OTRO hub y saldría vacío
+/// sin que nada fallase — la segunda mitad de hub#1249.
+async fn real_hub_with_admin(tag: &str) -> (axum::Router, String, String) {
+    let db = fresh_db().await;
+    let hub_id = format!("hub-{tag}");
+    let rt = Runtime::with_hub_id(Box::new(db), &hub_id);
+    rt.ensure_system_tables().await.expect("esquema de sistema");
+    let user_id = rt
+        .create_user("Marta Ruiz", "1234", "admin", None)
+        .await
+        .expect("crear administradora");
+    let session = rt.create_session(&user_id, 3600, None).await.expect("sesión");
+    let mut cfg = test_config(AuthMode::Session, tag);
+    cfg.hub_id = hub_id;
+    (app(AppState::with_config(rt, cfg)), session, user_id)
+}
+
+/// POST con sesión de usuario (`X-Hub-Session`), que es la puerta de un hub real.
+fn post_json_as(uri: &str, session: &str, body: Value) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", "application/json")
+        .header("x-hub-session", session)
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+/// `manifest.json` del zip que devuelve el export.
+fn manifest_of(zip_bytes: &[u8]) -> Value {
+    use std::io::Read as _;
+    let mut ar = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes.to_vec())).unwrap();
+    let mut f = ar.by_name("manifest.json").expect("manifest.json en el zip");
+    let mut s = String::new();
+    f.read_to_string(&mut s).unwrap();
+    serde_json::from_str(&s).unwrap()
+}
+
+/// Exporta un backup con `users: true` desde `real_hub_with_admin` y devuelve el zip crudo.
+async fn export_backup_with_users(app: axum::Router, session: &str) -> Vec<u8> {
+    let resp = app
+        .oneshot(post_json_as(
+            "/api/hub/export",
+            session,
+            json!({
+                "name": "copia",
+                "locale": "es",
+                "selection": {
+                    "users": true, "settings": true, "settings_items": null,
+                    "fiscal": false, "media": false, "modules": [],
+                    "purpose": "backup"
+                }
+            }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "el export de un hub real responde 200");
+    resp.into_body().collect().await.unwrap().to_bytes().to_vec()
+}
+
+/// 🔴 Regression test for ERPlora/hub#1249 — el round-trip export→import PERDÍA los usuarios.
+///
+/// Es el motor del BACKUP y de la migración de un hub entre despliegues (ADR-0113 §1): si la
+/// sección `hub_users` no viaja, restaurar la copia devuelve el hub sin su personal —sin roles y
+/// sin PINs— y nadie se entera, porque no falla nada. Este test mira el ARTEFACTO que se descarga:
+/// el manifest declara la sección y el fichero trae la fila con su rol.
+#[tokio::test]
+async fn el_export_con_users_lista_hub_users_en_sections_hub_1249() {
+    let (app, session, user_id) = real_hub_with_admin("export1249").await;
+    let zip = export_backup_with_users(app, &session).await;
+
+    let manifest = manifest_of(&zip);
+    let sections = manifest["sections"].as_array().cloned().unwrap_or_default();
+    assert!(
+        sections.iter().any(|s| s == "hub_users"),
+        "`hub_users` no está en manifest.sections: {sections:?}"
+    );
+
+    let mut ar = zip::ZipArchive::new(std::io::Cursor::new(zip.clone())).unwrap();
+    let sql = {
+        use std::io::Read as _;
+        let mut f = ar.by_name("data/hub_users.sql").expect("data/hub_users.sql en el zip");
+        let mut s = String::new();
+        f.read_to_string(&mut s).unwrap();
+        s
+    };
+    // La FILA, no solo el fichero: un volcado vacío pasaría igual de bien una comprobación de ruta
+    // y es exactamente el modo de fallo que hub#1249 describe (la copia parece hecha y no lo está).
+    assert!(sql.contains(&user_id), "el volcado no trae la administradora: {sql}");
+    assert!(sql.contains("admin"), "el volcado no trae el ROL de la administradora: {sql}");
+}
+
+/// 🔴 Regression test for ERPlora/hub#1249 — el otro lado del round-trip.
+///
+/// El importador solo ofrece las secciones que el inspect DETECTA en el manifest. Si el zip lleva
+/// `hub_users` pero el inspect no lo devuelve, la pantalla ofrece dos secciones en vez de tres y
+/// los usuarios no se pueden importar de un hub a otro.
+#[tokio::test]
+async fn el_inspect_detecta_hub_users_hub_1249() {
+    let (app, session, _) = real_hub_with_admin("inspect1249").await;
+    let zip = export_backup_with_users(app.clone(), &session).await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/hub/import/inspect")
+                .header("content-type", "application/octet-stream")
+                .header("x-hub-session", &session)
+                .body(Body::from(zip))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    let sections = body["manifest"]["sections"].as_array().cloned().unwrap_or_default();
+    assert!(
+        sections.iter().any(|s| s == "hub_users"),
+        "el inspect no detecta `hub_users`: {sections:?}"
+    );
+}
+
+/// 🔴 Regression test for ERPlora/hub#1249 — el formulario tiene que SABER que el hub está atado.
+///
+/// Un hub que no es un negocio real (dev sin enrolar, demo efímera) exporta siempre como plantilla
+/// (hub#377): el override de `export_blueprint` cambia el `purpose` DESPUÉS de que el formulario
+/// haya pintado sus casillas. El resultado era una mentira muda — «copia de seguridad» marcada,
+/// «usuarios» marcado, y un zip sin usuarios— que es justo la casilla que el propio ExportPanel
+/// tiene prohibido pintar («una casilla que el motor va a ignorar es una mentira»). El contrato:
+/// `GET /api/hub/export/tables` publica el `purpose` impuesto, y `null` cuando no hay ninguno.
+#[tokio::test]
+async fn el_formulario_sabe_que_un_hub_demo_solo_exporta_plantillas_hub_1249() {
+    // (1) Hub real: el formulario elige.
+    let (real, session, _) = real_hub_with_admin("tables1249").await;
+    let resp = real
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/export/tables")
+                .header("x-hub-session", &session)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(
+        body["locked_purpose"],
+        Value::Null,
+        "un hub real no tiene el purpose impuesto: {body}"
+    );
+
+    // (2) Hub de dev sin enrolar: `is_dev_hub()` — el mismo estado que el banco e2e.
+    let db = fresh_db().await;
+    let rt = Runtime::with_hub_id(Box::new(db), DEV_HUB_ID);
+    let demo = app(AppState::with_config(rt, demo_dev_config("tables1249_demo")));
+    let resp = demo
+        .oneshot(
+            Request::builder()
+                .uri("/api/hub/export/tables")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(
+        body["locked_purpose"],
+        json!("template"),
+        "un hub de dev/demo solo puede exportar plantillas: {body}"
+    );
+}

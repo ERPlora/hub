@@ -55,7 +55,7 @@ beforeEach(() => {
   listInstalledModules.mockReset();
   listInstalledModules.mockResolvedValue([]);
   fetchExportTables.mockReset();
-  fetchExportTables.mockResolvedValue([]);
+  fetchExportTables.mockResolvedValue({ modules: [], lockedPurpose: null });
 });
 
 describe('ExportPanel · propósito del bundle (ADR-0195)', () => {
@@ -126,15 +126,18 @@ describe('ExportPanel · error accionable ante fallo (hub#765)', () => {
 describe('ExportPanel · casillas por TABLA (hub#534)', () => {
   const conInventory = () => {
     listInstalledModules.mockResolvedValue([{ id: 'inventory', name: 'Inventory', version: '1.0.0' }]);
-    fetchExportTables.mockResolvedValue([
-      {
-        module_id: 'inventory',
-        tables: [
-          { table: 'inventory_product', rows: 280 },
-          { table: 'inventory_stock_movement', rows: 1240 },
-        ],
-      },
-    ]);
+    fetchExportTables.mockResolvedValue({
+      modules: [
+        {
+          module_id: 'inventory',
+          tables: [
+            { table: 'inventory_product', rows: 280 },
+            { table: 'inventory_stock_movement', rows: 1240 },
+          ],
+        },
+      ],
+      lockedPurpose: null,
+    });
   };
 
   it('sin tocar nada manda `tables: null` — «todas», que es lo que significaba antes', async () => {
@@ -177,5 +180,49 @@ describe('ExportPanel · casillas por TABLA (hub#534)', () => {
       { table: 'inventory_product', rows: 280 },
       { table: 'inventory_stock_movement', rows: 1240 },
     ]);
+  });
+});
+
+
+describe('ExportPanel · el hub puede tener el propósito ATADO (hub#1249)', () => {
+  // 🔴 Regression test for ERPlora/hub#1249. Un hub de dev sin enrolar o una demo efímera exporta
+  // SIEMPRE como plantilla (hub#377): el servidor cambia el `purpose` después de que el formulario
+  // se haya pintado. El panel ofrecía «copia de seguridad» con «usuarios» marcado y devolvía un zip
+  // sin usuarios, sin un solo aviso — una copia que parece hecha y no lo está.
+  const atado = () =>
+    fetchExportTables.mockResolvedValue({ modules: [], lockedPurpose: 'template' });
+
+  it('con el propósito atado el panel exporta como PLANTILLA sin que nadie lo toque', async () => {
+    atado();
+    const w = mountPanel();
+    await flushPromises();
+
+    expect((await selectionEnviada(w)).purpose).toBe('template');
+  });
+
+  it('con el propósito atado NO se ofrecen identidades ni fiscal (el motor las va a ignorar)', async () => {
+    atado();
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(w.find('[data-testid="export-section-users"]').exists()).toBe(false);
+    expect(w.find('[data-testid="export-section-fiscal"]').exists()).toBe(false);
+  });
+
+  it('y lo DICE: la nota explica por qué no se puede elegir', async () => {
+    atado();
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(w.find('[data-testid="export-purpose-locked"]').exists()).toBe(true);
+  });
+
+  it('un hub normal sigue eligiendo: ni nota ni casillas escondidas', async () => {
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(w.find('[data-testid="export-purpose-locked"]').exists()).toBe(false);
+    expect(w.find('[data-testid="export-section-users"]').exists()).toBe(true);
+    expect((await selectionEnviada(w)).purpose).toBe('backup');
   });
 });
