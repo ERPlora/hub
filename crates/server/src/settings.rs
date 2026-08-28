@@ -18,6 +18,8 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Map, Value};
 
+use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
+
 use crate::auth;
 use crate::state::AppState;
 
@@ -375,6 +377,93 @@ pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: Header
         )
             .into_response(),
     }
+}
+
+// ── Responsible declaration inside the product (art. 13.2 RRSIF — hub#528) ─────────────────────
+
+/// `GET /api/system/declaration` — the *declaración responsable* of the version this hub is
+/// running, from inside the product.
+///
+/// Art. 13.2 of the RRSIF (RD 1007/2023) requires the producer's declaration to be «por escrito y
+/// de modo visible en el propio sistema informático **en cada una de sus versiones**». The public
+/// archive on the control plane covers the other half of that article (the customer and the
+/// reseller at the moment of acquisition); this door covers the in-product one, so a business
+/// inspected by the AEAT can show it **from its own till**, offline from any browser bookmark.
+///
+/// Auth = any signed-in hub user, like `GET /api/system`. Not public: which version a hub runs is a
+/// map of its attack surface, and «visible in the system» means visible to whoever uses the system.
+pub async fn get_responsible_declaration(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    Json(declaration_payload(
+        ProducerFactsCache::global().current().as_ref(),
+        crate::version::HUB_VERSION,
+        &st.hub_id(),
+        &st.config.cloud_base_url,
+    ))
+    .into_response()
+}
+
+/// What the panel shows — and it is the **same `SistemaInformatico` block that travels inside every
+/// record** (ADR-0202 §5.1, hub#323), never a copy of it.
+///
+/// Nine elements with two owners: the control plane declares the manufacturer's seven (identity,
+/// product, declared modality, `IndicadorMultiplesOT`) and this hub declares the two only it can —
+/// `Version`, the binary it is actually running, and `NumeroInstalacion`, its own `hub_id`. The
+/// keys keep the AEAT's literal Spanish spelling because that is what the XML carries: a
+/// camelCase transliteration would invent a second name for a legal element, and the whole point of
+/// this screen is that an inspector can put it next to a record and read the same strings.
+///
+/// **Nothing here is a constant.** A panel that printed `ERPLORA CLOUD SL / EC / 1.0.0` from
+/// literals looks identical to this one until the day the control plane corrects the block — and
+/// then the till certifies one identity while every invoice declares another, which is exactly what
+/// makes the declaration sanctionable. `crates/server/tests/responsible_declaration.rs` cross-checks
+/// every value against a real envelope built by the fiscal engine.
+///
+/// `facts = None` is a hub nobody has told yet (it has never reached the control plane). There are
+/// no defaults for a legal declaration — the engine refuses to build the envelope in that state —
+/// so the block comes back `null` and the screen says so, instead of filling the gap.
+pub fn declaration_payload(
+    facts: Option<&ProducerFacts>,
+    version: &str,
+    hub_id: &str,
+    cloud_base_url: &str,
+) -> Value {
+    let sistema_informatico = facts.map(|facts| {
+        let mut block = facts.to_json();
+        if let Some(fields) = block.as_object_mut() {
+            fields.insert("Version".into(), Value::String(version.to_string()));
+            fields.insert(
+                "NumeroInstalacion".into(),
+                Value::String(hub_id.to_string()),
+            );
+        }
+        block
+    });
+    json!({
+        // The two facts this hub owns travel at the top level too: they are what the screen can
+        // always show, including on a hub the control plane has never spoken to.
+        "version": version,
+        "numeroInstalacion": hub_id,
+        // The signed text lives on the control plane THIS hub belongs to (a PRE hub must not send
+        // its owner to the production archive). No version in the path: the archive is versioned by
+        // DECLARATION (`v1`, `v2`…), not by release number, so the root resolves to the current one
+        // and lists every previous one (art. 13.3).
+        "declarationUrl": format!(
+            "{}/legal/declaracion-responsable/",
+            cloud_base_url.trim_end_matches('/')
+        ),
+        "sistemaInformatico": sistema_informatico,
+    })
 }
 
 #[cfg(test)]

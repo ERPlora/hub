@@ -613,6 +613,26 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Declaración responsable',
+    declarationDesc:
+      'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
+    declarationRead: 'Leer la declaración firmada',
+    declarationDataTitle: 'Datos identificativos de este sistema',
+    declarationPending:
+      'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
+    declarationError: 'No se ha podido cargar la declaración responsable.',
+    declarationNombreRazon: 'Productor',
+    declarationNIF: 'NIF del productor',
+    declarationNombreSistemaInformatico: 'Nombre del sistema',
+    declarationIdSistemaInformatico: 'Código del sistema',
+    declarationVersion: 'Versión instalada',
+    declarationNumeroInstalacion: 'Número de instalación',
+    declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
+    declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
+    declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
     // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
     capabilityBreaks: {
       network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',

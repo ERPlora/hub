@@ -658,6 +658,26 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Responsible declaration',
+    declarationDesc:
+      'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
+    declarationRead: 'Read the signed declaration',
+    declarationDataTitle: 'Identifying data of this system',
+    declarationPending:
+      'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
+    declarationError: 'Could not load the responsible declaration.',
+    declarationNombreRazon: 'Producer',
+    declarationNIF: 'Producer tax id',
+    declarationNombreSistemaInformatico: 'System name',
+    declarationIdSistemaInformatico: 'System code',
+    declarationVersion: 'Installed version',
+    declarationNumeroInstalacion: 'Installation number',
+    declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
+    declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
+    declarationIndicadorMultiplesOT: 'Serving several taxpayers',
     // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
     // invisible consequence is not. One sentence per capability id; the catalogue in
     // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
