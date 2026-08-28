@@ -205,17 +205,20 @@ describe('when the card is on screen', () => {
 
   // 🔴 hub#1120 — the door must not close under the pointer.
   //
-  // A FREE hub is provisioned with `customers` already installed, so the runtime's `apps` item
-  // ticks `done` on a business that has configured NOTHING — and the panel re-reads
-  // `hub.setup.status` while the owner is reading the card. The card would then be pulled out of
-  // the DOM mid-reading, and a press aimed at «Use this» lands on empty space: no spinner, no
-  // error, no request. That is the shape the owner reported, and it is indistinguishable from a
-  // dead button.
+  // The panel re-reads `hub.setup.status` while the owner is reading the card, and `hubIsEmpty`
+  // stops saying «empty» for three things that are not the owner acting: a failed re-read (the
+  // document arrives `null` — hub#1120 turned out to be the 429 of saas#1640), the `apps` item
+  // dropping out for this session (hub#435), and the import this card itself started. The card
+  // would then be pulled out of the DOM mid-reading, and a press aimed at «Use this» lands on empty
+  // space: no spinner, no error, no request. That is the shape the owner reported, and it is
+  // indistinguishable from a dead button.
   //
   // So once the card has been shown to THIS session it stays until the owner acts on it or closes
   // it — the same contract as the onboarding guides of Shopify, Odoo or Square. The protection is
   // untouched: `shown` only latches AFTER the business legitimately counted as empty, so a hub
   // that already had apps still never sees the offer.
+  //
+  // (This used to say a FREE hub arrives with `customers` preinstalled. It does not — hub#1179.)
   it('does not close on its own once it is up, even when `apps` ticks done', () => {
     expect(heroVisible(input({ shown: true, status: status([item({ state: 'done' })]) }))).toBe(true);
   });
