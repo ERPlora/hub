@@ -35,6 +35,19 @@ describe('Personal (core)', () => {
     expect(listSource).not.toContain("value=\"users\"");
   });
 
+  it('la baja que falla en mudo dice «no se pudo dar de baja», no «no se pudo guardar» (hub#1190)', () => {
+    // Regression test for ERPlora/hub#1190: al pasar la baja por `rejectionMessage` para traducir
+    // `invalid_field`, el último recurso de un fallo mudo (red/500 sin código) pasó a ser
+    // `employees.saveError` («Changes could not be saved»). Una baja no guarda nada: su frase
+    // genérica es `employees.deleteError`, la que tenía antes.
+    const deactivate = listSource.slice(
+      listSource.indexOf('async function deactivateUser'),
+      listSource.indexOf('const staffTable'),
+    );
+    expect(deactivate).toContain("t('employees.deleteError')");
+    expect(deactivate).not.toContain('employees.saveError');
+  });
+
   it('marca el acceso y el estado de cada usuario en la tabla', () => {
     expect(listSource).toContain('has_pin');
     expect(listSource).toContain('is_active');

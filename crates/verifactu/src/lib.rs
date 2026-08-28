@@ -270,6 +270,27 @@ fn op(command: &str, p: Json) -> Operation {
     Operation::sql(command, params(p))
 }
 
+/// `details` de una fila de auditoría, con su **clave de mensaje estable** delante (hub#1178).
+///
+/// Todo el corpus de `verifactu_event.message` que escribe este motor nace en español y en duro, y
+/// la pantalla **Eventos** del módulo lo pinta tal cual: un hub que no esté en castellano lee su
+/// auditoría fiscal en castellano igual. El canal para arreglarlo es el que hub#1103 abrió con
+/// `details.scope` — **un código estable dentro de `details`**, con los datos que la frase necesita
+/// al lado — y el catálogo `en`+`es` en quien la pinta (ADR-0055: el inglés es la fuente).
+///
+/// `message` sigue viajando y sigue en español **a propósito**: es lo que la pantalla lee HOY, y
+/// cambiarlo antes de que exista el catálogo pondría inglés delante de un usuario español — que es
+/// exactamente el defecto de hub#1190. Deja de importar el día que el módulo componga la frase.
+fn details_for(message_key: &str, extra: Json) -> String {
+    let mut details = json!({ "message_key": message_key });
+    if let (Some(target), Some(source)) = (details.as_object_mut(), extra.as_object()) {
+        for (key, value) in source {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    details.to_string()
+}
+
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
 ///
 /// **Certificado (ADR-0079/0081, ADR-0202 §2.1):** el PKCS#12 vive en el core (`_hub_certificate`),
@@ -1481,11 +1502,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "event_type": "record_created",
                 "severity": "info",
                 "message": format!("Registro {} #{sequence_number} de {} creado", r.record_type, r.invoice_number),
-                "details": json!({
+                "details": details_for("verifactu.record_created", json!({
+                    "record_type": r.record_type,
+                    "invoice_number": r.invoice_number,
                     "sequence_number": sequence_number,
                     "record_hash": record_hash,
                     "is_first_record": is_first,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -1506,12 +1529,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                      destinatario la AEAT rechaza el tipo declarado (error 1189)",
                     r.invoice_number, r.downgraded_from, r.invoice_type
                 ),
-                "details": json!({
+                "details": details_for("verifactu.invoice_type_downgraded", json!({
+                    "invoice_number": r.invoice_number,
                     "declared": r.downgraded_from,
                     "effective": r.invoice_type,
                     "reason": REASON_MISSING_RECIPIENT,
                     "sequence_number": sequence_number,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -1860,7 +1884,7 @@ async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("XML no conforme al esquema de la AEAT; no se ha transmitido: {reason}"),
-                        "details": json!({ "validation_error": reason }).to_string(),
+                        "details": details_for("verifactu.xsd_invalid", json!({ "validation_error": reason })),
                         "timestamp": ctx.now,
                     }),
                 ),
@@ -1990,7 +2014,12 @@ async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
-                        "details": json!({ "error": reason.clone(), "attempts": retry.attempts }).to_string(),
+                        "details": details_for("verifactu.transmission_retry", json!({
+                            "environment": environment,
+                            "backoff_minutes": backoff_minutes,
+                            "error": reason.clone(),
+                            "attempts": retry.attempts,
+                        })),
                         "timestamp": ctx.now,
                     }),
                 ),
@@ -2160,12 +2189,11 @@ async fn refuse_transmission(
                     "event_type": "transmission_failure",
                     "severity": "error",
                     "message": format!("No se ha transmitido a la AEAT: {reason}"),
-                    "details": json!({
+                    "details": details_for("verifactu.not_transmitted", json!({
                         "reason": refusal.code,
                         "error": reason,
                         "attempts": retry.attempts,
-                    })
-                    .to_string(),
+                    })),
                     "timestamp": ctx.now,
                 }),
             ),
@@ -2244,14 +2272,15 @@ fn response_ops(
                     Some(n) => format!("AEAT ({environment}): {} {} — {n}", resp.estado_envio, resp.estado_registro),
                     None => format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
                 },
-                "details": json!({
+                "details": details_for("verifactu.aeat_verdict", json!({
+                    "environment": environment,
                     "estado_envio": resp.estado_envio,
                     "estado_registro": resp.estado_registro,
                     "csv": resp.csv,
                     "codigo_error": resp.codigo_error,
                     "descripcion_error": resp.descripcion_error,
                     "note": note,
-                }).to_string(),
+                })),
                 "timestamp": now,
             }),
         ),
@@ -2574,7 +2603,7 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
             "event_type": "contingency_processed",
             "severity": if failed > 0 { "warning" } else { "info" },
             "message": format!("Cola de contingencia procesada: {successful} enviados, {failed} con error"),
-            "details": json!({ "successful": successful, "failed": failed }).to_string(),
+            "details": details_for("verifactu.contingency_processed", json!({ "successful": successful, "failed": failed })),
             "timestamp": ctx.now,
         }),
     ));
@@ -2760,7 +2789,12 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
             } else {
                 "Prueba VeriFactu: certificado no válido".to_string()
             },
-            "details": details.to_string(),
+            // hub#1178: dos hechos distintos, dos claves — «la prueba corrió» y «el certificado no
+            // vale» piden cosas distintas de quien lo lee.
+            "details": details_for(
+                if cert_ok { "verifactu.diagnostic_ran" } else { "verifactu.diagnostic_certificate_invalid" },
+                details,
+            ),
             "timestamp": ctx.now,
         }),
     )))
@@ -3054,7 +3088,11 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             "event_type": event_type,
             "severity": severity,
             "message": message,
-            "details": details.to_string(),
+            // hub#1178: la clave sigue al veredicto, como ya hacía `event_type`.
+            "details": details_for(
+                if valid { "verifactu.chain_validated" } else { "verifactu.chain_broken" },
+                details,
+            ),
             "timestamp": ctx.now,
         }),
     )))
@@ -3098,7 +3136,7 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
             "event_type": "aeat_queried",
             "severity": "info",
             "message": format!("Consulta AEAT: {limit} registro(s) recuperados para {issuer_nif}"),
-            "details": json!({ "count": limit, "issuer_nif": issuer_nif }).to_string(),
+            "details": details_for("verifactu.aeat_queried", json!({ "count": limit, "issuer_nif": issuer_nif })),
             "timestamp": ctx.now,
         }),
     ));
@@ -3184,12 +3222,13 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
                 "event_type": "chain_recovered",
                 "severity": "warning",
                 "message": format!("Cadena recuperada desde la AEAT para {issuer_nif}: huella {}…", short(&record_hash)),
-                "details": json!({
+                "details": details_for("verifactu.chain_recovered_from_aeat", json!({
                     "source": "aeat",
+                    "issuer_nif": issuer_nif,
                     "record_hash": record_hash,
                     "sequence_number": seq,
                     "found": limit,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -3267,14 +3306,116 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
                 "event_type": "chain_recovered",
                 "severity": "warning",
                 "message": format!("Cadena continuada manualmente para {issuer_nif}: huella {}…", short(&record_hash)),
-                "details": json!({
+                "details": details_for("verifactu.chain_continued_manually", json!({
                     "source": "manual",
+                    "issuer_nif": issuer_nif,
                     "record_hash": record_hash,
                     "sequence_number": seq,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         )))
+}
+
+#[cfg(test)]
+mod audit_message_keys {
+    //! Cada fila de auditoría del motor fiscal lleva un CÓDIGO, no solo una frase (hub#1178).
+    //!
+    //! Todo el corpus de `verifactu_event.message` nace en español y en duro, y la pantalla
+    //! **Eventos** del módulo lo pinta tal cual: un hub en catalán, gallego o inglés lee su
+    //! auditoría fiscal en castellano. Va contra ADR-0055/0199 y es la misma familia que hub#1190
+    //! (la pantalla no puede traducir lo que llega como prosa).
+    //!
+    //! El canal decidido es el que hub#1103 ya empezó con `details.scope`: **un código estable
+    //! dentro de `details`** (`message_key`, espacio `verifactu.`) más los datos que la frase
+    //! necesita, y el catálogo `en`+`es` en quien la pinta. `message` se queda como el respaldo
+    //! honesto que hoy se lee — cambiarlo a inglés ANTES de que el módulo traduzca pondría inglés
+    //! delante de un usuario español, que es justo el defecto de hub#1190.
+    //!
+    //! Esta guarda es de patrón, no de punto: barre el FUENTE. Un evento nuevo escrito sin su
+    //! clave falla aquí, en vez de descubrirse cuando alguien abra el hub en otro idioma.
+
+    /// Este mismo fichero. La verdad sobre qué eventos escribe el motor.
+    const SOURCE: &str = include_str!("lib.rs");
+
+    /// The command every audit row goes through.
+    const INSERT_EVENT: &str = "\"verifactu._insert_event\"";
+
+    #[test]
+    fn every_verifactu_event_carries_a_stable_message_key_hub1178() {
+        let sites: Vec<usize> = SOURCE
+            .match_indices(INSERT_EVENT)
+            .map(|(at, _)| at)
+            .filter(|at| SOURCE[..*at].rfind("mod audit_message_keys").is_none())
+            .collect();
+        assert!(
+            sites.len() >= 12,
+            "el barrido encontró solo {} sitios de `verifactu._insert_event`: ha dejado de casar \
+             con la forma del fichero",
+            sites.len()
+        );
+
+        for at in sites {
+            // El payload del evento va desde el nombre del command hasta su `timestamp`, que es la
+            // última clave de todos ellos.
+            let rest = &SOURCE[at..];
+            let end = rest
+                .find("\"timestamp\"")
+                .expect("todo evento persiste su instante");
+            let payload = &rest[..end];
+            let line = SOURCE[..at].lines().count();
+            assert!(
+                payload.contains(&format!("details_{}(", "for")),
+                "el evento de la línea {line} escribe su `details` sin clave de mensaje: la \
+                 pantalla de Eventos solo podrá repetir la frase castellana del motor (hub#1178)"
+            );
+        }
+    }
+
+    /// Y la clave que se escribe es de VERDAD un código estable, no una frase disfrazada.
+    #[test]
+    fn a_message_key_is_a_stable_code_in_the_verifactu_namespace_hub1178() {
+        // La aguja se compone en tiempo de ejecución para que ESTE fichero no la contenga
+        // literalmente: si no, el barrido se contaría a sí mismo.
+        let needle = format!("details_{}(", "for");
+        // De cada llamada se leen TODAS las claves de su primer argumento: dos de los eventos
+        // eligen la suya según el veredicto (`if valid { … } else { … }`), y las dos cuentan.
+        let mut keys: Vec<&str> = Vec::new();
+        for (at, _) in SOURCE.match_indices(needle.as_str()) {
+            let rest = &SOURCE[at + needle.len()..];
+            // El primer argumento acaba donde empieza el segundo: o el `json!` de los datos, o la
+            // variable `details` que dos de los sitios ya tenían construida. Se toma el que llegue
+            // antes; sin ninguno, un tramo corto acotado.
+            let arg_end = [rest.find("json!"), rest.find("details,")]
+                .into_iter()
+                .flatten()
+                .min()
+                .unwrap_or(rest.len().min(400));
+            let mut slice = &rest[..arg_end];
+            while let Some(open) = slice.find('"') {
+                let after = &slice[open + 1..];
+                let close = match after.find('"') {
+                    Some(i) => i,
+                    None => break,
+                };
+                keys.push(&after[..close]);
+                slice = &after[close + 1..];
+            }
+        }
+        assert!(keys.len() >= 12, "solo {} claves encontradas", keys.len());
+        for key in keys {
+            assert!(
+                key.starts_with("verifactu."),
+                "`{key}` no está en el espacio de nombres del módulo"
+            );
+            assert!(
+                key[10..]
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "`{key}` no es un código estable (se esperaba `verifactu.<snake_case>`)"
+            );
+        }
+    }
 }
 
 #[cfg(test)]

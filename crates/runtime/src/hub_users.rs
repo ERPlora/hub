@@ -267,13 +267,6 @@ pub struct UpdateHubUser {
     pub badge: Option<String>,
 }
 
-fn invalid(detail: impl Into<String>) -> RuntimeError {
-    RuntimeError::InvalidPayload {
-        name: "hub.users".into(),
-        detail: detail.into(),
-    }
-}
-
 /// A refused field of a hub user, named by field and reason (hub#1070): what a test asserts on
 /// and what the UI translates; `detail` is the English fallback only.
 fn invalid_field(field: &str, reason: &str, detail: impl Into<String>) -> RuntimeError {
@@ -397,8 +390,12 @@ fn clean_badge(value: &str) -> Result<String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
-        return Err(invalid(
-            "la placa solo admite letras, dígitos, `-` y `_`",
+        // hub#1190: named by field and reason like every other refusal of this door, so the
+        // screen translates it instead of repeating the runtime's sentence.
+        return Err(invalid_field(
+            "badge",
+            "format",
+            "the badge only accepts letters, digits, `-` and `_`",
         ));
     }
     Ok(badge.to_string())
@@ -451,7 +448,13 @@ async fn ensure_name_is_free(
     if res.rows.is_empty() {
         Ok(())
     } else {
-        Err(invalid(format!("ya hay un usuario activo llamado «{name}»")))
+        // hub#1190 («fleco del mismo #1185»): `name`/`duplicate`, not the last untyped refusal of
+        // this door. The screen anchors it under the name field and says it in the hub's language.
+        Err(invalid_field(
+            "name",
+            "duplicate",
+            format!("there is already an active user called «{name}»"),
+        ))
     }
 }
 
@@ -1196,6 +1199,37 @@ mod tests {
         let db = fresh_db().await;
         identity::ensure_tables(&db).await.unwrap();
         db
+    }
+
+    /// The two refusals #1185 left behind (hub#1190, «fleco del mismo #1185»): both were still
+    /// Spanish `InvalidPayload` prose, so the screen had no `(field, reason)` to translate and no
+    /// choice but to paint the sentence. Every other refusal of this door already travels as data.
+    #[test]
+    fn a_badge_with_the_wrong_shape_is_refused_by_field_and_reason_hub1190() {
+        let err = clean_badge("bad badge!").unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::InvalidField { field, reason, .. }
+                     if field == "badge" && reason == "format"),
+            "a badge the hub refuses has to name its field and its reason: {err}"
+        );
+        // The runtime writes English (code-language rule); Spanish is the UI's job (ADR-0055).
+        assert!(!err.to_string().contains("placa"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_name_is_refused_by_field_and_reason_hub1190() {
+        let db = db().await;
+        identity::create_user(&db, HUB, "Marta", "1234", "cashier", None)
+            .await
+            .unwrap();
+        let err = ensure_name_is_free(&db, HUB, "Marta", None).await.unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::InvalidField { field, reason, .. }
+                     if field == "name" && reason == "duplicate"),
+            "a name already taken has to name its field and its reason: {err}"
+        );
+        assert!(err.to_string().contains("Marta"), "{err}");
+        assert!(!err.to_string().contains("usuario activo llamado"), "{err}");
     }
 
     #[test]

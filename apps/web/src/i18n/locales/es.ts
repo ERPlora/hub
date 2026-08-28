@@ -1450,4 +1450,47 @@ export default {
     unavailable:
       'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
   },
+  // Lo que dice el CORE cuando rechaza UN campo (hub#1190, ADR-0398 §6). Traducción de
+  // `invalidField` de `en.ts` — el inglés es la fuente (ADR-0055).
+  invalidField: {
+    byField: {
+      name: {
+        required: 'Escribe el nombre.',
+        too_long: 'Ese nombre es demasiado largo: usa 150 caracteres o menos.',
+        duplicate:
+          'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+      },
+      role: {
+        required: 'Elige un rol.',
+        too_long: 'Ese nombre de rol es demasiado largo: usa 50 caracteres o menos.',
+      },
+      pin: { format: 'El PIN es de {length} dígitos, solo números.' },
+      badge: {
+        length: 'La placa debe tener entre 4 y 64 caracteres.',
+        format: 'La placa solo admite letras, dígitos, «-» y «_».',
+      },
+      email: { format: 'Ese correo electrónico no es válido.' },
+      role_key: {
+        required: 'Elige un rol.',
+        immutable: 'Este rol viene con el hub: está siempre activo y no se puede apagar.',
+        unknown:
+          'Ninguna app instalada declara este rol. Instala la app que lo trae o elige otro rol.',
+        inactive:
+          'Este rol está apagado en este hub. Enciéndelo en Ajustes → Roles antes de asignarlo.',
+      },
+      language: { unknown: 'Ese idioma no está disponible en este hub.' },
+      theme_mode: { unknown: 'Ese aspecto no es uno de los que ofrece este hub.' },
+      theme_palette: { unknown: 'Esa combinación de colores no es una de las que ofrece este hub.' },
+    },
+    byReason: {
+      required: 'Este campo es obligatorio.',
+      too_long: 'Este valor es demasiado largo.',
+      length: 'Este valor no tiene la longitud que espera este hub.',
+      format: 'Este valor no tiene la forma que espera este hub.',
+      unknown: 'Este hub no acepta ese valor.',
+      immutable: 'Este valor no se puede cambiar.',
+      inactive: 'Este valor está apagado en este hub.',
+      duplicate: 'Este hub ya tiene ese valor.',
+    },
+  },
 } as const;

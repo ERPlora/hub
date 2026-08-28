@@ -169,3 +169,37 @@ async fn an_undeclared_list_param_names_itself_instead_of_being_redacted() {
     // The net underneath stays in place: travelling whole is not a licence to leak plumbing.
     assert_redacted(&body);
 }
+
+/// The invariant behind all of the above, swept over the door instead of case by case (hub#1241).
+///
+/// Every refusal `/api/command` and `/api/query` answer with carries a stable code a screen can
+/// branch on — never the flat `"error"` bucket, which is what left the UI with nothing but
+/// `error.message` and put driver text (hub#1074) and English prose (hub#1190) on a till. The
+/// per-variant half of this guard lives in `erplora-runtime`
+/// (`tests/core_errors_carry_a_code.rs`, hub#1241); this is the same rule seen from outside, at
+/// the door the UI, the assistant, the flows and the public API all come through.
+#[tokio::test]
+async fn every_refusal_of_the_authenticated_door_carries_a_code_hub1241() {
+    let refusals: [(&str, Value); 6] = [
+        // Plumbing (redacted), a module's own rejection, a typo in the name, an undeclared filter,
+        // a query whose SQL cannot run, and a command the caller may not even name.
+        ("/api/command", json!({ "name": "dberr.notes.create", "payload": { "topic_id": "nope" } })),
+        ("/api/command", json!({ "name": "dberr.notes.reject" })),
+        ("/api/command", json!({ "name": "dberr.notes.nope" })),
+        ("/api/query", json!({ "name": "dberr.notes.paged", "params": { "nosuchfilter": "x" } })),
+        ("/api/query", json!({ "name": "dberr.notes.broken" })),
+        ("/api/query", json!({ "name": "dberr.notes.nope" })),
+    ];
+
+    for (uri, request) in refusals {
+        let body = call(uri, request.clone()).await;
+        assert_eq!(body["ok"], json!(false), "{request} should have been refused: {body}");
+        let code = body["error"]["code"].as_str().unwrap_or_default();
+        assert!(!code.is_empty(), "{request} was refused with NO code: {body}");
+        assert_ne!(
+            code, "error",
+            "{request} falls into the flat `error` bucket, so a screen has nothing to branch on \
+             and is back to painting the sentence (hub#1102/#1190): {body}"
+        );
+    }
+}
