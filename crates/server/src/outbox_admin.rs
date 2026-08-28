@@ -106,6 +106,39 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
     }
 }
 
+/// GET /api/hub/events/discarded — **las cerradas a mano**, con su sello entero: quién las cerró,
+/// cuándo y con qué motivo (hub#1117). Las más recientes primero. Auth = la misma puerta del
+/// fichero (sesión admin + `manage_flows` si la petición nombra un módulo).
+///
+/// El sello se escribía completo desde hub#955 y no lo proyectaba ninguna superficie: `…/dead`
+/// filtra `status='dead'`, así que cerrar una fila la sacaba del único listado que había, y
+/// `…/{id}/trace` no devuelve ninguna de las tres columnas. La bandeja promete en pantalla que «el
+/// hub guarda quién cerró cada uno, cuándo y por qué durante noventa días» y esa frase solo se
+/// podía comprobar con `psql`. Un registro que nadie puede leer no es un registro.
+///
+/// **Sin payload**, a diferencia de `…/dead`: allí el payload es lo que permite decidir entre
+/// reintentar y cerrar, y aquí la decisión ya está tomada. Lo que se le pregunta a una fila cerrada
+/// es el sello, no la carga — y esta lectura es la más ancha del outbox, así que no se ensancha más
+/// de lo que el caso necesita.
+///
+/// Los noventa días de ADR-0309 se respetan **por construcción**: la poda es un `DELETE` duro, así
+/// que lo podado no está en la tabla y no puede salir aquí. Nada que filtrar, nada que se
+/// desincronice con la política.
+pub async fn list_discarded(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
+    }
+    match rt.list_discarded_events(DEAD_PAGE).await {
+        Ok(events) => Json(json!({ "ok": true, "data": events })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// GET /api/hub/events/dead/count — cuántas dead-letters hay AHORA. Count barato (sin payloads)
 /// para alimentar el badge de la campana del topbar por sondeo, sin arrastrar las filas enteras que
 /// pesa el listado. Cuenta SOLO `dead` (no `delivered`/`pending`/`discarded`). Auth = sesión admin.

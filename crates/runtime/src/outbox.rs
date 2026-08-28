@@ -1092,6 +1092,85 @@ fn dead_event(row: &Json) -> DeadEvent {
     }
 }
 
+/// **One dead-letter an operator CLOSED**, with the whole stamp the close left behind (hub#1117).
+///
+/// The sibling of [`DeadEvent`], and deliberately not the same struct: the two lists answer
+/// different questions. A dead-letter is a decision waiting to be made, so it travels with its
+/// payload — that is what tells a lost invoice from noise. A discarded row is a decision already
+/// made, and what is asked of it afterwards is «who closed this, when, and why», never «what did it
+/// carry». So the payload does NOT travel here: this listing is the widest reading of the outbox
+/// that a closed row needs, and no wider.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DiscardedEvent {
+    pub id: String,
+    pub event_name: String,
+    /// The **emitting** module (attribution), the same field [`DeadEvent`] carries.
+    pub module_id: String,
+    /// Why it died in the first place — the half of the story the hub knows on its own.
+    pub last_error: String,
+    pub created_at: String,
+    /// When it was closed. Also the row's retention clock: ninety days from here it is pruned.
+    pub discarded_at: String,
+    /// `hub_user:<id>` — the session the HTTP layer resolved, never anything a caller sent.
+    pub discarded_by: String,
+    /// **Why a person closed it** — the half only they knew ([`clamp_discard_reason`]). Empty when
+    /// the row was closed without an explanation, which stays a legitimate gesture.
+    pub discard_reason: String,
+}
+
+/// Dead-letters of this hub an operator has CLOSED, newest closure first. `limit` is clamped to
+/// [`MAX_DEAD_PAGE`].
+///
+/// The read half of [`discard`]. The stamp had been written in full since hub#955 and no surface
+/// projected any of it: `list_dead` filters `status = 'dead'`, so closing a row removed it from the
+/// only listing there was, and the tray's own promise —«el hub guarda quién cerró cada uno, cuándo
+/// y por qué durante noventa días»— was verifiable only with `psql`. A record nobody can read is
+/// not a record.
+///
+/// **The ninety days are respected by construction, not by a filter here.** Retention is a hard
+/// `DELETE` (hub#699, [`crate::retention`]): a row past the window is gone from the table, so it
+/// cannot appear in this listing and asking for it is an ordinary «not found» rather than a
+/// special case. A `WHERE discarded_at > cutoff` on top of that would be a second, drifting copy of
+/// the same policy.
+///
+/// Ordered by `COALESCE(discarded_at, created_at)` — the same terminal moment `ix_outbox_prune`
+/// indexes — so a row whose stamp predates the column still sorts somewhere sane instead of
+/// wherever the dialect happens to put NULLs.
+pub async fn list_discarded(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    limit: i64,
+) -> Result<Vec<DiscardedEvent>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("status".into(), json!(STATUS_DISCARDED));
+    p.insert("lim".into(), json!(limit.clamp(1, MAX_DEAD_PAGE)));
+    let res = db
+        .query(
+            "SELECT id, event_name, module_id, last_error, created_at, discarded_at, \
+                    discarded_by, discard_reason \
+             FROM _event_outbox WHERE hub_id = :hub_id AND status = :status \
+             ORDER BY COALESCE(discarded_at, created_at) DESC LIMIT :lim",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.iter().map(discarded_event).collect())
+}
+
+fn discarded_event(row: &Json) -> DiscardedEvent {
+    let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
+    DiscardedEvent {
+        id: s("id"),
+        event_name: s("event_name"),
+        module_id: s("module_id"),
+        last_error: s("last_error"),
+        created_at: s("created_at"),
+        discarded_at: s("discarded_at"),
+        discarded_by: s("discarded_by"),
+        discard_reason: s("discard_reason"),
+    }
+}
+
 /// One stored event, reduced to what inferring a shape needs (hub#715).
 #[derive(Debug, Clone)]
 pub struct PayloadSample {
@@ -2576,6 +2655,139 @@ mod tests {
             count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
             1,
             "the dead-letter is untouched"
+        );
+    }
+
+    // ───────────── hub#1117 — a discard reason nobody can read is not an audit trail ─────────────
+    //
+    // `discard` has stamped the row with who, when and WHY since hub#955, and every one of the
+    // three was write-only: `list_dead` filters `status = 'dead'`, so the moment a row is closed it
+    // leaves the only listing there was, and `trace_event` projects none of the three columns. The
+    // tray promises on screen «el hub guarda quién cerró cada uno, cuándo y por qué durante noventa
+    // días» and the only way to check that sentence was `psql`.
+    //
+    // [`list_discarded`] is the reading half of the gesture, and it is deliberately the sibling of
+    // [`list_dead`] and not a filter parameter on it: the two lists answer different questions —
+    // «what needs me» versus «what did we decide» — and a queue that mixes the closed rows into the
+    // work is a queue that stops being drained.
+
+    /// Seeds a row that a NEIGHBOUR hub closed by hand: same table, another tenant, a reason of its
+    /// own. Written straight to the row because that is the state `discard` leaves behind, and the
+    /// point of the test is what the listing does with it, not how it got there.
+    async fn seed_foreign_discarded(db: &PgAdapter, hub_id: &str, id: &str, reason: &str) {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert("reason".into(), json!(reason));
+        p.insert("status".into(), json!(STATUS_DISCARDED));
+        db.execute(
+            "INSERT INTO _event_outbox \
+             (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, \
+              attempts, next_attempt_at, last_error, created_at, discarded_at, discarded_by, \
+              discard_reason) \
+             VALUES (:id, :hub_id, 'u9', '[]', 'flow.reminder.due', 'flows', '{}', 0, :status, \
+                     7, '2026-08-20T09:00:00+00:00', 'host.notify: the hub is not enrolled', \
+                     '2026-08-20T09:00:00+00:00', '2026-08-21T09:00:00+00:00', \
+                     'hub_user:neighbour-admin', :reason)",
+            &p,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// **The whole point of hub#1117**: after the row is closed, the three parts of the stamp —
+    /// who, when and why — come back over an ordinary read, without opening the database.
+    ///
+    /// The reason is the half that only the person closing the row knows, so losing it is losing
+    /// the decision itself. The other two travel WITH it because an audit trail is the three
+    /// together: «somebody closed this» and «closed because duplicada» answer different halves of
+    /// the same question six months later.
+    #[tokio::test]
+    async fn the_discard_reason_survives_the_close_and_is_readable_hub1117() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+
+        assert!(list_discarded(&db, "h1", 50).await.unwrap().is_empty(), "nothing closed yet");
+
+        assert!(discard(
+            &db,
+            "h1",
+            &id,
+            "hub_user:admin-1",
+            "  duplicada: la factura se registró a mano  "
+        )
+        .await
+        .unwrap());
+
+        // It left the queue of what needs attention — that is what closing it means…
+        assert!(list_dead(&db, "h1", 50).await.unwrap().is_empty());
+
+        // …and it is READABLE in the closed listing, with the whole stamp.
+        let closed = list_discarded(&db, "h1", 50).await.unwrap();
+        assert_eq!(closed.len(), 1, "the closed row is listed");
+        let row = &closed[0];
+        assert_eq!(row.id, id);
+        assert_eq!(row.event_name, "e");
+        assert_eq!(row.module_id, "m", "the EMITTING module, as in `list_dead`");
+        assert_eq!(
+            row.discard_reason, "duplicada: la factura se registró a mano",
+            "the reason is readable over the API, not only in psql"
+        );
+        assert_eq!(row.discarded_by, "hub_user:admin-1", "WHO closed it");
+        assert!(!row.discarded_at.is_empty(), "WHEN it was closed");
+        assert!(
+            row.last_error.contains("m.apply"),
+            "why it died in the first place travels too: {}",
+            row.last_error
+        );
+        assert!(!row.created_at.is_empty());
+    }
+
+    /// A neighbour's closed rows are not ours. This seeds a REAL discarded row of another tenant —
+    /// asking for a hub that has nothing in it proves nothing at all — and checks both directions:
+    /// ours never shows theirs, and theirs IS there when its own hub asks, so a listing that
+    /// returned nothing by accident could not pass this.
+    #[tokio::test]
+    async fn discarded_list_is_scoped_to_this_hub_hub1117() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "nuestra").await.unwrap());
+        seed_foreign_discarded(&db, "other-hub", "evt-neighbour", "la del vecino").await;
+
+        let ours = list_discarded(&db, "h1", 50).await.unwrap();
+        assert_eq!(ours.len(), 1, "only our own closed row");
+        assert_eq!(ours[0].id, id);
+        assert!(
+            !ours.iter().any(|r| r.discard_reason.contains("vecino")),
+            "a neighbour's reason never reaches this hub's audit listing"
+        );
+
+        // The control detects the positive: the row IS there, and its own hub sees it.
+        let theirs = list_discarded(&db, "other-hub", 50).await.unwrap();
+        assert_eq!(theirs.len(), 1, "the seeded neighbour row exists");
+        assert_eq!(theirs[0].discard_reason, "la del vecino");
+    }
+
+    /// The listing is newest-closed first and bounded, like [`list_dead`]: it feeds a tray that
+    /// renders a page, and «ninety days of a busy hub» is not a page.
+    #[tokio::test]
+    async fn the_discarded_listing_is_newest_first_and_capped_hub1117() {
+        let (db, _reg) = hub_with_a_dead_letter().await;
+        let id = dead_id(&db).await;
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "la reciente").await.unwrap());
+        // An older closure of THIS hub, stamped a month before the one above.
+        seed_foreign_discarded(&db, "h1", "evt-older", "la antigua").await;
+
+        let closed = list_discarded(&db, "h1", 50).await.unwrap();
+        assert_eq!(closed.len(), 2);
+        assert_eq!(closed[0].discard_reason, "la reciente", "newest closure first");
+        assert_eq!(closed[1].discard_reason, "la antigua");
+
+        assert_eq!(list_discarded(&db, "h1", 1).await.unwrap().len(), 1, "the limit is honoured");
+        assert_eq!(
+            list_discarded(&db, "h1", i64::MAX).await.unwrap().len(),
+            2,
+            "an absurd limit is clamped, never a table dump"
         );
     }
 
