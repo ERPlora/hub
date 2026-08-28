@@ -362,9 +362,6 @@ export default {
     // hub#894 — said INSTEAD of `appsEmpty` when the list could not be loaded. It never claims the
     // hub is empty, and it names reloading as the move, because the apps are still installed.
     appsLoadError: 'Could not load your apps. Reload the page; if it keeps failing, sign in again.',
-    // hub#1197 — on a phone the grid folds after two rows; this is the tile that leads to the rest,
-    // the same catalogue ＋ Add apps already opens (`/apps`).
-    appsViewAll: 'View all apps',
     blueprintTitle: 'Set up your business',
     blueprintBody: 'Load a template for your business or restore a backup to get started.',
     blueprintCta: 'Set up',
@@ -372,6 +369,9 @@ export default {
     // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
     // everything drawn from a probe that only ever knew about the printer host.
     openSystem: 'View system',
+    // hub#1197 — on a phone the grid folds after two rows; this is the tile that leads to the rest,
+    // the same catalogue ＋ Add apps already opens (`/apps`).
+    appsViewAll: 'View all apps',
   },
   profile: {
     title: 'My profile',
