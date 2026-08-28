@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteLocationNormalized, RouteLocationRaw, RouteRecordRaw } from 'vue-router';
 import { courierBootPending, takeShellCourierCode } from '../lib/courier';
 import { isAuthed, logout } from '../lib/session';
-import { isModuleEntitled, needsActivation } from '../lib/entitlement';
+import { isModuleBlocked, isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { machineRegistrationRequired } from '../lib/runtime';
 
@@ -122,6 +122,21 @@ export async function authGate(to: RouteLocationNormalized): Promise<true | Rout
   // Un hub vacío entra directo al dashboard y configura desde ahí si lo necesita.
   // Un módulo concreto solo se monta si el hub tiene derecho (acceso por URL directa).
   if (to.name === 'module' && !isModuleEntitled(String(to.params.moduleId))) {
+    // hub#1175: `!isModuleEntitled` used to lump TWO different reasons under the same silent
+    // bounce. A module the hybrid revalidation names BLOCKED (`isModuleBlocked`, ADR-0114 §6) is
+    // still installed and holds data — it only stopped being paid, or the marketplace retired it
+    // (hub#1175: `invoice_series`, which never even required payment) — and `ModuleView` ALREADY
+    // knows how to paint that case: the `blocked-card` explains why, the same notice a module
+    // blocked for non-payment gets. Letting it MOUNT is letting that screen exist, not a new
+    // permission: the dispatcher still refuses its queries/commands with 402 exactly as before.
+    if (isModuleBlocked(String(to.params.moduleId))) {
+      return true;
+    }
+    // The other half: an id the entitlement never named at all (a typo, a stale bookmark, a
+    // module this hub never installed). There is no screen to mount for that — but the bounce is
+    // no longer silent.
+    const [{ toastInfo }, { i18n }] = await Promise.all([import('../lib/toast'), import('../i18n')]);
+    void toastInfo(i18n.global.t('moduleView.notAvailableToast'));
     return { name: 'dashboard' };
   }
   // La doc de la API solo es navegable con el toggle de Ajustes activo (también por URL directa).

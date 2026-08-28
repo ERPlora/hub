@@ -214,11 +214,14 @@ describe('when the card asks the cloud anything at all', () => {
 
   // 🔴 hub#1120 — the offer must not be pulled out from under the pointer.
   //
-  // A FREE hub is provisioned with `customers` already installed, so `hub.setup.status` ticks the
-  // `apps` item `done` on a business that has configured nothing — and the panel re-reads that
-  // document while the owner is reading the card. The card used to leave with it, so a press aimed
-  // at «Use this» landed on empty space: no spinner, no error, no request. That is exactly how a
-  // live button gets reported as dead, and it left the one-click onboarding with no door at all.
+  // The panel re-reads `hub.setup.status` while the owner is reading the card, and the answer can
+  // stop saying «empty» without the owner doing anything: a failed re-read (hub#1120 turned out to
+  // be the 429 of saas#1640), the `apps` item dropping out for this session (hub#435), or the
+  // import this card itself started. The card used to leave with it, so a press aimed at «Use this»
+  // landed on empty space: no spinner, no error, no request. That is exactly how a live button gets
+  // reported as dead, and it left the one-click onboarding with no door at all.
+  //
+  // (This used to say a FREE hub arrives with `customers` preinstalled. It does not — hub#1179.)
   it('does not disappear under the owner when the checklist ticks `apps` (hub#1120)', async () => {
     const w = mountCard();
     await flushPromises();

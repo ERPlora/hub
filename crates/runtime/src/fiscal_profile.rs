@@ -440,14 +440,25 @@ pub const ALREADY_EMITTED: &str = "fiscal.already_emitted";
 /// screen has to be able to say which — one sends the user to the checklist, the other to a form.
 pub const NO_REPRESENTATION: &str = "fiscal.no_representation_grant";
 
-/// The three answers the control plane gives about the grant, plus `""` for "never asked".
+/// The answers the control plane gives about the grant, plus `""` for "never asked".
 ///
-/// They are the SaaS's own words (`vigente` / `revocado` / `absent`), copied rather than translated:
-/// a mapping in the middle is one more place for the two sides to drift apart, and this value is
-/// what decides whether a business may invoice for real.
+/// They are the SaaS's own words (`pendiente` / `vigente` / `rechazado` / `revocado` / `absent`),
+/// copied rather than translated: a mapping in the middle is one more place for the two sides to
+/// drift apart, and this value is what decides whether a business may invoice for real.
+///
+/// 🔴 **Only [`REPRESENTATION_VIGENTE`] opens the go-live.** Every upload lands on
+/// [`REPRESENTATION_PENDING`] and a person at ERPlora approves it (24-72 h): ERPlora answers to the
+/// AEAT for the authenticity of the signature and of the ID copy, and that is not a check a parser
+/// makes. `pendiente` and `rechazado` are therefore as closed as `absent` — what they change is
+/// what the SCREEN can say, which is why they exist as their own words instead of collapsing into
+/// one.
 pub const REPRESENTATION_VIGENTE: &str = "vigente";
 pub const REPRESENTATION_REVOKED: &str = "revocado";
 pub const REPRESENTATION_ABSENT: &str = "absent";
+/// Uploaded and waiting for a human reviewer at ERPlora. **Does not open the go-live.**
+pub const REPRESENTATION_PENDING: &str = "pendiente";
+/// A reviewer refused it (the reason travels next to it). **Does not open the go-live.**
+pub const REPRESENTATION_REJECTED: &str = "rechazado";
 
 /// **The hub ceased activity** (ADR-0273 D2, hub#557). One code, two doors: the dispatcher rejects
 /// writes with it ([`crate::commands`]), and so does an attempt to start issuing again — because
@@ -1783,6 +1794,43 @@ mod tests {
         let err = go_live(&db, "hub-es")
             .await
             .expect_err("sin otorgamiento no se remite en nombre de nadie");
+
+        assert_eq!(code_of(&err), NO_REPRESENTATION);
+    }
+
+    /// 🔴 **`pendiente` NO es firmado** (hub#1293). Desde que el otorgamiento se firma FUERA —a
+    /// mano sobre el modelo oficial o con AutoFirma— toda subida aterriza en `pendiente` y la
+    /// aprueba una persona de ERPlora (24-72 h): ERPlora responde ante la AEAT de la autenticidad
+    /// de la firma y de la copia del DNI, y eso no lo comprueba un parser. Así que la puerta de
+    /// producción sigue cerrada mientras se revisa — y se cierra con SU motivo, no con `NOT_READY`.
+    #[tokio::test]
+    async fn a_grant_awaiting_review_does_not_open_the_go_live() {
+        let db = fresh_db().await;
+        hub_ready_without_grant(&db, "hub-es").await;
+        record_representation(&db, "hub-es", REPRESENTATION_PENDING, "2026-08-28T09:00:00Z")
+            .await
+            .unwrap();
+
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("subido no es aprobado: lo revisa una persona");
+
+        assert_eq!(code_of(&err), NO_REPRESENTATION);
+    }
+
+    /// Y **`rechazado` tampoco**: un otorgamiento que un revisor devolvió no vale más que uno que
+    /// no existe. El motivo se lo enseña la pantalla al cliente para que vuelva a subirlo.
+    #[tokio::test]
+    async fn a_rejected_grant_does_not_open_the_go_live() {
+        let db = fresh_db().await;
+        hub_ready_without_grant(&db, "hub-es").await;
+        record_representation(&db, "hub-es", REPRESENTATION_REJECTED, "2026-08-28T10:00:00Z")
+            .await
+            .unwrap();
+
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("rechazado no es firmado");
 
         assert_eq!(code_of(&err), NO_REPRESENTATION);
     }

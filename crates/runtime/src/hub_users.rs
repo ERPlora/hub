@@ -173,9 +173,6 @@ pub fn is_extendable_base_role(role: &str) -> bool {
     is_base_role(role) && !is_admin_role(role)
 }
 
-/// Longitud válida de un PIN local (dígitos). El login es un pinpad numérico.
-const PIN_LEN: std::ops::RangeInclusive<usize> = 4..=8;
-
 /// Un usuario del hub tal y como lo pinta la pantalla de Personal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HubUserRow {
@@ -1353,5 +1350,74 @@ mod tests {
         assert!(!truthy(&json!(0)));
         assert!(truthy(&json!(true)));
         assert!(!truthy(&json!(null)));
+    }
+
+    /// Regression for ERPlora/hub#1302: a hub's PIN length is a SETTING (`pin_length_of`, 4 or 6,
+    /// hub#974) — never a fixed shape. `clean_pin` already threads the length through instead of
+    /// assuming one; this test pins that down by name so an edit that hardcodes `4` again breaks a
+    /// test that says exactly why.
+    #[test]
+    fn clean_pin_refuses_four_digits_when_the_hub_wants_six_hub1302() {
+        let err = clean_pin("4821", 6).unwrap_err();
+        match &err {
+            RuntimeError::InvalidField { field, reason, detail, .. } => {
+                assert_eq!(field, "pin");
+                assert_eq!(reason, "format");
+                // The refusal has to name what THIS hub expects (six), never what some other hub
+                // would have wanted (four) — the whole point of hub#1302.
+                assert!(detail.contains('6'), "refusal must name the hub's real length: {detail}");
+                assert!(!detail.contains('4'), "refusal must not claim four digits: {detail}");
+            }
+            other => panic!("expected InvalidField(pin, format), got {other:?}"),
+        }
+        // The mirror: six digits are exactly what a six-length hub wants.
+        assert_eq!(clean_pin("482137", 6).unwrap(), "482137");
+    }
+
+    /// GUARD for ERPlora/hub#1302 (zero-regression rule, root CLAUDE.md): no error message in
+    /// this file may hardcode a PIN digit count as a literal number — the length is per-hub
+    /// (`pin_length_of`) and has to flow through a variable, never be typed in as a fixed count.
+    ///
+    /// Scans this file's OWN source text (not its runtime output), so it catches the bug at the
+    /// place it would be introduced: a hardcoded `"N digits"` literal, not the `{length}`-style
+    /// interpolation `clean_pin` actually uses. Mirrors the equivalent rule on the web's locale
+    /// strings (`apps/web/src/i18n/pin-length-not-hardcoded.hub1302.test.ts`).
+    #[test]
+    fn no_message_literal_hardcodes_a_pin_digit_count_hub1302() {
+        let source = include_str!("hub_users.rs");
+        for (lineno, line) in source.lines().enumerate() {
+            // Skip this guard's own text (and the regression test above), so the assertion cannot
+            // trip over the words describing the rule.
+            if line.contains("hub1302") {
+                continue;
+            }
+            assert!(
+                !hardcodes_digit_count(line),
+                "hub_users.rs:{} hardcodes a PIN digit count: {}",
+                lineno + 1,
+                line.trim()
+            );
+        }
+    }
+
+    /// A digit sitting immediately (optionally through one space or hyphen) before the word
+    /// "digit" or "dígito" — spelled out so this very sentence does not trip its own rule: a
+    /// numeral, then optionally a space or a hyphen, then straight into "digit(s)"/"dígito(s)".
+    /// Not the bare word: `"the badge must be between 4 and 64 characters"` and `"avoid repeated
+    /// digits (1111)"` do NOT match, because neither has a digit sitting right next to the word.
+    fn hardcodes_digit_count(line: &str) -> bool {
+        let lower = line.to_ascii_lowercase();
+        for needle in ["digit", "díg"] {
+            let mut search_from = 0;
+            while let Some(pos) = lower[search_from..].find(needle) {
+                let at = search_from + pos;
+                let before = lower[..at].trim_end_matches([' ', '-']);
+                if before.ends_with(|c: char| c.is_ascii_digit()) {
+                    return true;
+                }
+                search_from = at + needle.len();
+            }
+        }
+        false
     }
 }

@@ -5,14 +5,15 @@
   The shift changes mid-ticket. Until now the only way to change operator was `login.changeUser`,
   which walks back to the grid of faces OUTSIDE the session: a sign-out, with the screen, the route
   and the half-finished gesture gone with it. The sector's standard (Square, Toast; decision #658)
-  is this instead — a lock screen ON TOP of the app: the other employee taps their face, types four
-  digits, and the same sale carries on, recorded under their name from that moment.
+  is this instead — a lock screen ON TOP of the app: the other employee taps their face, types
+  their PIN, and the same sale carries on, recorded under their name from that moment.
 
   It is the elevation dialog's shape on purpose (`ElevationDialog.vue`): faces, then `ok-pinpad`,
   one sentence when it is refused. Two doors at one counter that look and behave alike is not
-  duplication for its own sake — it is the same four digits the person already knows, asked the same
-  way. What differs is what happens afterwards: elevation borrows a manager for ONE action and gives
-  the till back; this one swaps who the till belongs to.
+  duplication for its own sake — it is the same PIN the person already knows, asked the same way
+  (both size the pinpad off `hubPinLength`, hub#1302: THIS hub's length, never a fixed count).
+  What differs is what happens afterwards: elevation borrows a manager for ONE action and gives the
+  till back; this one swaps who the till belongs to.
 
   Three things this screen deliberately does NOT do:
     - it never decides whether a PIN is right (the runtime does — `lib/user-switch` → `/api/auth/pin`);
@@ -78,8 +79,9 @@
         </template>
       </template>
 
-      <!-- Step 2 — the four digits. The same `ok-pinpad` as the login screen and the elevation
-           dialog: plate and PIN are one identity (decision #658), asked in the shape already known. -->
+      <!-- Step 2 — the PIN. The same `ok-pinpad` as the login screen and the elevation dialog,
+           sized to THIS hub's PIN length (`hubPinLength`, hub#1302): plate and PIN are one
+           identity (decision #658), asked in the shape already known. -->
       <template v-else>
         <div class="user-switch-chosen">
           <ok-avatar :name="chosen" size="lg"></ok-avatar>

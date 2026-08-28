@@ -85,7 +85,7 @@
               mode="md"
               fill="outline"
               inputmode="numeric"
-              :maxlength="8"
+              :maxlength="hubPinLength"
               :helper-text="pinHelp"
               :error-text="pinError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
@@ -307,7 +307,9 @@ const emailError = computed(() => {
 });
 const pinError = computed(() => {
   const issue = issueOn(PIN_ISSUES);
-  return issue ? t(`employeeForm.errors.${issue}`) : rejectionOn('pin');
+  // hub#1302: `pin_length` needs the digit count THIS hub asks for — harmless for the other two
+  // PIN_ISSUES keys, which do not interpolate `{n}` at all.
+  return issue ? t(`employeeForm.errors.${issue}`, { n: hubPinLength.value }) : rejectionOn('pin');
 });
 const BADGE_SHAPE = /^[A-Za-z0-9\-_]{4,64}$/;
 const badgeError = computed(() =>
@@ -325,10 +327,13 @@ const badgeHelp = computed(() => {
   return hasBadge.value ? t('employeeForm.badgeSetHelp') : t('employeeForm.badgeHelp');
 });
 const pinHelp = computed(() => {
-  if (isLocal.value) return t('employeeForm.localPinHelp');
+  // hub#1302: `pinHelp`/`localPinHelp`/`accountPinHelp` state a digit count, which is this hub's
+  // `pin_length` (4 or 6, hub#974), never a fixed number — `pinSetHelp` below mentions none.
+  const n = { n: hubPinLength.value };
+  if (isLocal.value) return t('employeeForm.localPinHelp', n);
   if (hasPin.value) return t('employeeForm.pinSetHelp');
   // En el alta de cuenta el PIN es un extra —entra con su cuenta—, no la vía de acceso.
-  return isEdit.value ? t('employeeForm.pinHelp') : t('employeeForm.accountPinHelp');
+  return isEdit.value ? t('employeeForm.pinHelp', n) : t('employeeForm.accountPinHelp', n);
 });
 const canSubmit = computed(
   () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value && !badgeError.value,

@@ -1125,31 +1125,11 @@ pub struct Nav {
     #[serde(default)]
     pub icon: Option<String>,
     pub component: String,
-    /// Acciones de topbar de esta pestaña: el shell las pinta en `slot="end"` y al pulsar
-    /// reenvía `module-action` al Web Component montado. El manifest declara el botón;
-    /// el comportamiento vive en el componente del módulo.
-    #[serde(default)]
-    pub actions: Vec<NavAction>,
     /// Permiso que ABRE esta pestaña. Sin él, `/api/navigation` no la sirve (hub#1052).
     ///
-    /// Mismo contrato que [`NavAction::permission`] un escalón más arriba: el manifest declara a
-    /// quién le sirve la pestaña, y el runtime revalida siempre la query/command real detrás — esto
-    /// no es la puerta, es no enseñar una puerta cerrada. `None` = visible para todos, que es como
-    /// se comportan los manifests publicados hasta hoy.
-    #[serde(default)]
-    pub permission: Option<String>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct NavAction {
-    pub id: String,
-    pub label: String,
-    #[serde(default)]
-    pub icon: Option<String>,
-    /// Botón destacado (color primario).
-    #[serde(default)]
-    pub primary: bool,
-    /// Permiso para MOSTRAR el botón (show/hide de UI; Rust revalida siempre el command real).
+    /// El manifest declara a quién le sirve la pestaña, y el runtime revalida siempre la
+    /// query/command real detrás — esto no es la puerta, es no enseñar una puerta cerrada. `None`
+    /// = visible para todos, que es como se comportan los manifests publicados hasta hoy.
     #[serde(default)]
     pub permission: Option<String>,
 }
@@ -1650,15 +1630,7 @@ const CAPABILITY_FIELDS: &[&str] = &[
 const DIALECT_FIELDS: &[&str] = &["sqlite", "postgres"];
 const ROLE_FIELDS: &[&str] = &["key", "label", "extends"];
 const SCHEDULED_TASK_FIELDS: &[&str] = &["name", "command", "cron", "payload", "catch_up"];
-const NAV_FIELDS: &[&str] = &[
-    "id",
-    "label",
-    "icon",
-    "component",
-    "chrome",
-    "actions",
-    "permission",
-];
+const NAV_FIELDS: &[&str] = &["id", "label", "icon", "component", "chrome", "permission"];
 const PROTECTS_FIELDS: &[&str] = &[
     "settings_query",
     "enabled_setting",
@@ -1707,8 +1679,9 @@ const RECORD_FIELDS: &[&str] = &["mutable", "reason", "correct_with", "update", 
 ///
 /// Public because it is one half of a contract written twice: the other half is
 /// `schemas/module.schema.json`, and the test that compares them is what stops the two from
-/// drifting apart the way they already had (`navigation[].actions` existed here and was forbidden
-/// there; `compatibility` was read by the SaaS and forbidden by both).
+/// drifting apart the way they already had (`compatibility` was read by the SaaS and forbidden by
+/// both; `navigation[].actions` existed here and was forbidden there until hub#521 aligned them,
+/// and hub#1237 retired the field from both because nothing ever rendered it).
 pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
     Some(match path {
         "" => ROOT_FIELDS,
@@ -1734,20 +1707,32 @@ pub fn known_fields(path: &str) -> Option<&'static [&'static str]> {
     })
 }
 
-/// Names this core has **retired**: they sit where an unknown field would be refused, they are
-/// carried by manifests already published, and they do nothing.
+/// Names this core has **retired**: this core once declared them, manifests already published may
+/// carry them, and they do nothing.
 ///
-/// Refusing them would be the consistent reading — and would stop `inventory` and `services` from
-/// installing on hubs that already run them, with no way to update an installed module (ADR-0269).
-/// So they install, reported by name and pointed at the issue that decides their fate. Every entry
-/// is a debt with a number; the list is not a place to park a field to make a warning go away
-/// (`tests/manifest_fields_match_the_schema.rs` asserts a retired name is never also a known one).
-pub const RETIRED_FIELDS: &[(&str, &str, &str)] = &[(
-    "commands.*",
-    "validates",
-    "declared by published commands of `inventory` and NEVER implemented by the runtime \
-     (hub#610): the validation it describes does NOT run — use `reads` + `expect_rows`",
-)];
+/// Refusing them would be the consistent reading where the path refuses (`commands.*`) — and would
+/// stop `inventory` and `services` from installing on hubs that already run them, with no way to
+/// update an installed module (ADR-0269). So they install, reported by name and pointed at the
+/// issue that decides their fate. Where the path only warns (`navigation[]`), the entry is what
+/// turns a generic "this core does not read this field" into the sentence that says WHY it is
+/// gone. Every entry is a debt with a number; the list is not a place to park a field to make a
+/// warning go away (`tests/manifest_fields_match_the_schema.rs` asserts a retired name is never
+/// also a known one, nor declared by `schemas/module.schema.json`).
+pub const RETIRED_FIELDS: &[(&str, &str, &str)] = &[
+    (
+        "commands.*",
+        "validates",
+        "declared by published commands of `inventory` and NEVER implemented by the runtime \
+         (hub#610): the validation it describes does NOT run — use `reads` + `expect_rows`",
+    ),
+    (
+        "navigation[]",
+        "actions",
+        "topbar actions of ADR-0048 «level 2», RETIRED by hub#1237: the shell never painted them \
+         and `/api/navigation` never served them, so no `module-action` event ever reached a Web \
+         Component — declare the button inside your own component instead",
+    ),
+];
 
 /// Where an unknown field is refused rather than reported.
 ///
