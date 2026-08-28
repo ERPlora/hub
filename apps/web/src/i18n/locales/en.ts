@@ -1063,7 +1063,7 @@ export default {
     email: 'Email',
     role: 'Role',
     pin: 'Local PIN',
-    pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
+    pinHelp: '{n} digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
     // hub#658 — the badge, sibling of the PIN. Both words matter: «badge» is what the sector calls
@@ -1083,11 +1083,11 @@ export default {
     localUser: 'Local user',
     localUserHelp:
       'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
-    localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
+    localPinHelp: '{n} digits. Required: it is how this person signs in.',
     accountEmailHelp:
       'We email them an invitation to this hub. They choose their own password — you never see it.',
     accountPinHelp:
-      'Optional: between 4 and 8 digits. Only needed if they also work a shared till in this hub.',
+      'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
@@ -1096,7 +1096,7 @@ export default {
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
       invalid_email: 'Enter a valid email.',
-      pin_length: 'The PIN must be between 4 and 8 digits.',
+      pin_length: 'The PIN must be {n} digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
       pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
@@ -1347,7 +1347,7 @@ export default {
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
     // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
     sessionTakenOver: 'Session opened on another device',
-    setupChoosePin: 'Choose a 4-digit PIN',
+    setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
     setupSaveError: 'The PIN could not be saved. Please try again.',
