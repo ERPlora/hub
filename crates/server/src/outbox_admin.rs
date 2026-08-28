@@ -39,19 +39,12 @@ use crate::state::AppState;
 /// Cuántas dead-letters devuelve el listado. El tope duro lo pone el runtime (`MAX_DEAD_PAGE`).
 const DEAD_PAGE: i64 = 100;
 
-/// `401` si falta/ no vale la sesión; `403` si la sesión es válida pero el rol no administra el
-/// Hub. La distinción importa: a un cajero volver a autenticarse no le va a servir de nada.
+/// `401` when the session is missing or invalid; `403` when the session is valid but the role does
+/// not administer the Hub. The distinction matters: re-authenticating as the same cashier would
+/// never help. The crate-level [`crate::auth_rejected`] is the single implementation (hub#1254
+/// promoted it out of this file); this alias keeps the local name the gate below reads.
 fn rejected(e: auth::AuthError) -> Response {
-    let (status, code) = if e.is_forbidden() {
-        (StatusCode::FORBIDDEN, "forbidden")
-    } else {
-        (StatusCode::UNAUTHORIZED, "unauthorized")
-    };
-    (
-        status,
-        Json(json!({ "ok": false, "error": { "code": code, "message": e.message() } })),
-    )
-        .into_response()
+    crate::auth_rejected(e)
 }
 
 /// **Las dos puertas de este fichero**, en el orden que importa (hub#953).
