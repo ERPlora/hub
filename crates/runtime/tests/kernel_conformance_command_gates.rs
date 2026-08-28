@@ -106,12 +106,14 @@ async fn archiving_twice_is_refused_by_the_row_gate_hub1238() {
     rt.execute_command("kfx.item.archive", &archive, &admin())
         .await
         .expect("first archive");
-    assert!(matches!(
-        rt.execute_command("kfx.item.archive", &archive, &admin())
-            .await
-            .expect_err("the second one matches nothing"),
-        RuntimeError::Domain { .. }
-    ));
+    match rt
+        .execute_command("kfx.item.archive", &archive, &admin())
+        .await
+        .expect_err("the second one matches nothing")
+    {
+        RuntimeError::Domain { code, .. } => assert_eq!(code, "kfx.not_found"),
+        other => panic!("expected the declared domain code, got {other:?}"),
+    }
 }
 
 /// A command whose last segment starts with `_` is not a public door: it is reachable by the
@@ -164,8 +166,8 @@ async fn an_undeclared_command_is_refused_naming_it_hub1238() {
         .execute_command("kfx.item.explode", &Params::new(), &admin())
         .await
         .expect_err("no such command");
-    assert!(
-        err.to_string().contains("kfx.item.explode"),
-        "the refusal names the command: {err}"
-    );
+    match err {
+        RuntimeError::CommandNotFound(name) => assert_eq!(name, "kfx.item.explode"),
+        other => panic!("expected CommandNotFound naming the command, got {other:?}"),
+    }
 }

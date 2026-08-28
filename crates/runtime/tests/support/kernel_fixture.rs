@@ -93,6 +93,42 @@ pub fn broken_copy(tag: &str, mutate: impl FnOnce(&mut serde_json::Value)) -> Sc
     Scratch(dir)
 }
 
+/// A **twin** of the fixture at [`CURRENT`] under another module id: the same package with every
+/// `kfx` — id, tables, queries, commands, permissions, events, error codes — rewritten to `id`.
+///
+/// It is the NEIGHBOUR some clauses of the contract can only be proven against: a handler naming
+/// another module's command, a listener on somebody else's command, a slot filled from outside.
+/// Only the text files are rewritten; the compiled `handler.wasm` still speaks `kfx` and is never
+/// run under the twin.
+pub fn foreign_module_copy(id: &str) -> Scratch {
+    assert!(
+        id != MODULE_ID && !id.is_empty(),
+        "the twin needs an id of its own"
+    );
+    let dir = std::env::temp_dir().join(format!("erplora-kcs-twin-{id}-{}", uuid::Uuid::new_v4()));
+    copy_tree(&dir_at(CURRENT), &dir);
+    rewrite_tree(&dir, MODULE_ID, id);
+    Scratch(dir)
+}
+
+fn rewrite_tree(dir: &std::path::Path, from: &str, to: &str) {
+    for entry in std::fs::read_dir(dir).expect("read the twin").flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            rewrite_tree(&path, from, to);
+            continue;
+        }
+        let is_text = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| matches!(e, "json" | "sql"));
+        if is_text {
+            let text = std::fs::read_to_string(&path).expect("read a twin file");
+            std::fs::write(&path, text.replace(from, to)).expect("rewrite a twin file");
+        }
+    }
+}
+
 /// A scratch directory that removes itself, so a failing assertion does not leak one per run.
 pub struct Scratch(std::path::PathBuf);
 

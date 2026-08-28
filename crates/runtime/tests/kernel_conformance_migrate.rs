@@ -2,17 +2,41 @@
 //!
 //! Regression test for ERPlora/hub#1238. Kernel contract («El Hub se CIERRA como KERNEL») §5.
 //!
-//! The kernel's migration promise has two halves. The declared `kind` must match what the SQL does,
-//! and inside a `contract` a `DROP` is TRANSLATED into a rename — the rows stay, the retirement is
+//! The kernel's migration promise has two halves. The declared `kind` must match what the SQL does
+//! — an `expand` adds, a `backfill` rewrites rows and never the schema, a `contract` retires — and
+//! inside a `contract` a `DROP` is TRANSLATED into a rename: the rows stay, the retirement is
 //! reversible, and a module author who writes `DROP TABLE` over a customer's database gets a
-//! `_deprecated_` table rather than an empty one.
+//! `_deprecated_` table rather than an empty one. A refused migration is one stable code,
+//! `hub.module_migration_rejected`, whose detail names the file and the verb.
 #[path = "support/kernel_fixture.rs"]
 mod kernel_fixture;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::Runtime;
-use kernel_fixture::{broken_copy, dir_at, install_fixture_at, MODULE_ID, PREVIOUS};
+use erplora_runtime::{Runtime, RuntimeError};
+use kernel_fixture::{admin, broken_copy, dir_at, install_fixture_at, MODULE_ID, PREVIOUS};
 use serde_json::json;
+
+/// The stable code every refused module migration travels under.
+const REJECTED: &str = "hub.module_migration_rejected";
+
+/// The refusal, or a panic naming what came back instead.
+fn rejected(err: RuntimeError) -> String {
+    match err {
+        RuntimeError::Domain { code, message } => {
+            assert_eq!(code, REJECTED, "a refused migration is one stable code");
+            message
+        }
+        other => panic!("expected the stable migration refusal, got {other:?}"),
+    }
+}
+
+async fn create(rt: &Runtime, name: &str) {
+    let mut p = Params::new();
+    p.insert("name".into(), json!(name));
+    rt.execute_command("kfx.item.create", &p, &admin())
+        .await
+        .expect("create");
+}
 
 /// Which migration files this hub recorded as applied, in order.
 async fn applied(rt: &Runtime) -> Vec<String> {
@@ -41,7 +65,7 @@ async fn read(rt: &Runtime, table: &str) -> Result<Vec<serde_json::Value>, Strin
 }
 
 #[tokio::test]
-async fn both_migrations_run_once_and_in_order_hub1238() {
+async fn every_migration_runs_once_and_in_order_hub1238() {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     install_fixture_at(&mut rt, kernel_fixture::CURRENT).await;
@@ -51,6 +75,7 @@ async fn both_migrations_run_once_and_in_order_hub1238() {
         vec![
             "migrations/postgres/001_init.sql".to_string(),
             "migrations/postgres/002_retire_legacy.sql".to_string(),
+            "migrations/postgres/003_trim_names.sql".to_string(),
         ]
     );
     assert!(
@@ -101,14 +126,70 @@ async fn a_drop_declared_expand_is_refused_naming_the_verb_hub1238() {
         m["migrations"]["postgres"][1]["kind"] = json!("expand");
     });
 
-    let err = rt
-        .install_from_dir(broken.path())
-        .await
-        .expect_err("a DROP is not an expand")
-        .to_string();
+    let detail = rejected(
+        rt.install_from_dir(broken.path())
+            .await
+            .expect_err("a DROP is not an expand"),
+    );
     assert!(
-        err.to_uppercase().contains("DROP") && err.contains("contract"),
-        "the refusal names the verb it found and the kind it should carry: {err}"
+        detail.contains("002_retire_legacy.sql")
+            && detail.contains("DROP TABLE")
+            && detail.contains("contract"),
+        "the refusal names the file, the verb it found and the kind it should carry: {detail}"
+    );
+}
+
+/// 🔴 Proof the guard catches the positive: a `backfill` that changes the SCHEMA is refused naming
+/// the verb — a backfill rewrites rows, and DDL belongs in an `expand` or a `contract`.
+#[tokio::test]
+async fn a_backfill_that_changes_the_schema_is_refused_naming_the_verb_hub1238() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let broken = broken_copy("backfill-ddl", |_| {});
+    std::fs::write(
+        broken.path().join("migrations/postgres/003_trim_names.sql"),
+        "-- Kernel fixture · a backfill that grows the table instead of rewriting rows.\nALTER TABLE kfx_item ADD COLUMN extra TEXT;\n",
+    )
+    .unwrap();
+
+    let detail = rejected(
+        rt.install_from_dir(broken.path())
+            .await
+            .expect_err("DDL is not a backfill"),
+    );
+    assert!(
+        detail.contains("003_trim_names.sql") && detail.contains("ALTER"),
+        "the refusal names the file and the verb: {detail}"
+    );
+}
+
+/// A `backfill` is the migration that rewrites what the PREVIOUS version left behind: rows written
+/// under 1.0.0 come out of the 1.1.0 update rewritten in place, and nothing else changed.
+#[tokio::test]
+async fn a_backfill_rewrites_the_rows_the_previous_version_left_hub1238() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture_at(&mut rt, PREVIOUS).await;
+    create(&rt, "  padded  ").await;
+    create(&rt, "clean").await;
+
+    install_fixture_at(&mut rt, kernel_fixture::CURRENT).await;
+
+    assert!(
+        applied(&rt)
+            .await
+            .contains(&"migrations/postgres/003_trim_names.sql".to_string()),
+        "the backfill ran as part of the update"
+    );
+    let rows = rt
+        .execute_query("kfx.items.list", &Params::new(), &admin())
+        .await
+        .expect("list");
+    let names: Vec<&str> = rows.iter().map(|r| r["name"].as_str().unwrap()).collect();
+    assert_eq!(
+        names,
+        vec!["clean", "padded"],
+        "the row 1.0.0 wrote was rewritten in place; the clean one was left alone"
     );
 }
 
@@ -125,14 +206,14 @@ async fn a_contract_that_destroys_rows_is_refused_hub1238() {
     )
     .unwrap();
 
-    let err = rt
-        .install_from_dir(broken.path())
-        .await
-        .expect_err("a contract retires structure, never rows")
-        .to_string();
+    let detail = rejected(
+        rt.install_from_dir(broken.path())
+            .await
+            .expect_err("a contract retires structure, never rows"),
+    );
     assert!(
-        err.to_uppercase().contains("DELETE"),
-        "the refusal names the destructive verb: {err}"
+        detail.contains("002_retire_legacy.sql") && detail.to_uppercase().contains("DELETE"),
+        "the refusal names the file and the destructive verb: {detail}"
     );
 }
 

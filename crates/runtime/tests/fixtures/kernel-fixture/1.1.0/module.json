@@ -36,7 +36,8 @@
   "migrations": {
     "postgres": [
       { "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" },
-      { "file": "migrations/postgres/002_retire_legacy.sql", "kind": "contract", "since": "1.1.0" }
+      { "file": "migrations/postgres/002_retire_legacy.sql", "kind": "contract", "since": "1.1.0" },
+      { "file": "migrations/postgres/003_trim_names.sql", "kind": "backfill", "since": "1.1.0" }
     ]
   },
   "queries": {

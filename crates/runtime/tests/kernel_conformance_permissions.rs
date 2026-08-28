@@ -12,7 +12,7 @@ mod kernel_fixture;
 
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{registry::Principal, Runtime, RuntimeError};
-use kernel_fixture::{admin, ctx_with, install_fixture};
+use kernel_fixture::{admin, broken_copy, ctx_with, install_fixture};
 use serde_json::json;
 
 #[tokio::test]
@@ -111,6 +111,43 @@ async fn the_operations_of_a_handler_are_checked_against_the_caller_hub1238() {
             .expect("list")
             .len(),
         1
+    );
+}
+
+/// 🔴 …and the NEGATIVE half of the ceiling, the one hub#459 closed: the caller may run the command
+/// that pushed the operation, but the operation's own command asks for more. Refused FLAT — there
+/// is no elevation dialog in the middle of a transaction, even though `manager` could grant
+/// `kfx.write` at the front door — naming the operation and the permission, and no row lands.
+#[tokio::test]
+async fn a_handler_cannot_write_above_the_callers_permission_hub1238() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let raised = broken_copy("op-above-caller", |m| {
+        m["commands"]["kfx._insert_item"]["permission"] = json!("kfx.write");
+    });
+    rt.install_from_dir(raised.path())
+        .await
+        .expect("an operation asking for more than its command is a valid manifest");
+
+    let mut p = Params::new();
+    p.insert("names".into(), json!(["a"]));
+    match rt
+        .execute_command("kfx.items.bulk", &p, &ctx_with(&["kfx.bulk"]))
+        .await
+        .expect_err("kfx.write is above what the caller holds")
+    {
+        RuntimeError::PermissionDenied(detail) => assert!(
+            detail.contains("kfx._insert_item") && detail.contains("kfx.write"),
+            "the refusal names the operation and the permission it asks for: {detail}"
+        ),
+        other => panic!("a ceiling leak is a flat denial, got {other:?}"),
+    }
+    assert!(
+        rt.execute_query("kfx.items.list", &Params::new(), &admin())
+            .await
+            .expect("list")
+            .is_empty(),
+        "nothing was written"
     );
 }
 

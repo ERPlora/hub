@@ -86,8 +86,9 @@ async fn updating_keeps_the_data_and_adds_only_the_new_surface_hub1238() {
         vec![
             "migrations/postgres/001_init.sql".to_string(),
             "migrations/postgres/002_retire_legacy.sql".to_string(),
+            "migrations/postgres/003_trim_names.sql".to_string(),
         ],
-        "only the migration the new version adds ran"
+        "only the migrations the new version adds ran"
     );
 
     let rows = rt

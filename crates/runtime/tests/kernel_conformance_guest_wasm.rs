@@ -16,7 +16,7 @@ mod kernel_fixture;
 
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
-use kernel_fixture::{admin, install_fixture};
+use kernel_fixture::{admin, foreign_module_copy, install_fixture};
 use serde_json::json;
 
 /// The `.wasm` shipped in the fixture is a real Extism module, not a placeholder.
@@ -91,10 +91,11 @@ async fn guest_domain_error_travels_as_a_code_hub1238() {
     }
 }
 
-/// The guest may only name commands of its OWN module: an operation pointing elsewhere is a broken
-/// guest contract, refused by the host before a single row is written.
+/// An operation naming a command nobody declared is refused by the host before a single row is
+/// written — `CommandNotFound`, naming it. (`hub.*` is the core's reserved namespace, ADR-0192:
+/// no module can register there, so from the registry's point of view it does not exist.)
 #[tokio::test]
-async fn guest_cannot_drive_another_modules_command_hub1238() {
+async fn guest_cannot_drive_a_command_nobody_declared_hub1238() {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     install_fixture(&mut rt).await;
@@ -102,21 +103,66 @@ async fn guest_cannot_drive_another_modules_command_hub1238() {
     let mut payload = Params::new();
     payload.insert("names".into(), json!(["a"]));
     payload.insert("escape_to".into(), json!("hub.users.create"));
-    let err = rt
+    match rt
         .execute_command("kfx.items.bulk", &payload, &admin())
         .await
-        .expect_err("an operation outside the module is refused");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("hub.users.create"),
-        "the refusal names the command the guest tried to drive: {msg}"
-    );
+        .expect_err("an operation naming nothing is refused")
+    {
+        RuntimeError::CommandNotFound(name) => assert_eq!(
+            name, "hub.users.create",
+            "the refusal names the command the guest tried to drive"
+        ),
+        other => panic!("expected CommandNotFound, got {other:?}"),
+    }
 
     let rows = rt
         .execute_query("kfx.items.list", &Params::new(), &admin())
         .await
         .expect("list after the refusal");
     assert!(rows.is_empty(), "the whole batch rolled back");
+}
+
+/// 🔴 Proof the host catches the positive: the guest names a command that EXISTS and belongs to a
+/// neighbour. The same-module rule of `validate_operation` refuses it naming the command, and
+/// neither module gets a row — a handler is not a way into another module's tables.
+#[tokio::test]
+async fn guest_cannot_drive_another_modules_command_hub1238() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture(&mut rt).await;
+    let neighbour = foreign_module_copy("kfy");
+    rt.install_from_dir(neighbour.path())
+        .await
+        .expect("the twin installs next to the fixture");
+    assert!(
+        rt.registry().get_command("kfy._insert_item").is_some(),
+        "the command the guest will try to drive is real"
+    );
+
+    let mut payload = Params::new();
+    payload.insert("names".into(), json!(["a"]));
+    payload.insert("escape_to".into(), json!("kfy._insert_item"));
+    match rt
+        .execute_command("kfx.items.bulk", &payload, &admin())
+        .await
+        .expect_err("a command of another module is out of the guest's reach")
+    {
+        RuntimeError::PermissionDenied(detail) => assert!(
+            detail.contains("kfy._insert_item") && detail.contains("kfx"),
+            "the refusal names the foreign command and the handler's module: {detail}"
+        ),
+        other => panic!("expected the same-module refusal, got {other:?}"),
+    }
+
+    for table in ["kfx_item", "kfy_item"] {
+        let rows = rt
+            .db_for_test()
+            .query(&format!("SELECT id FROM {table}"), &Params::new())
+            .await
+            .expect("read the table")
+            .rows;
+        assert!(rows.is_empty(), "no row landed in {table}");
+    }
 }
 
 /// The permission gate is the host's, not the guest's: without the command's permission the guest
@@ -130,12 +176,17 @@ async fn the_host_gates_the_handler_before_loading_it_hub1238() {
     let ctx = RequestContext::new("h1", "u1", ["kfx.read".to_string()]);
     let mut payload = Params::new();
     payload.insert("names".into(), json!(["a"]));
-    assert!(matches!(
-        rt.execute_command("kfx.items.bulk", &payload, &ctx)
-            .await
-            .expect_err("kfx.write is required"),
-        RuntimeError::PermissionDenied(_)
-    ));
+    match rt
+        .execute_command("kfx.items.bulk", &payload, &ctx)
+        .await
+        .expect_err("kfx.bulk is required")
+    {
+        RuntimeError::PermissionDenied(permission) => assert_eq!(
+            permission, "kfx.bulk",
+            "the flat refusal names the permission the command declares"
+        ),
+        other => panic!("expected a flat denial, got {other:?}"),
+    }
 }
 
 /// The committed binary was built from the committed sources.

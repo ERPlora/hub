@@ -98,6 +98,80 @@ async fn install_refuses_an_expect_rows_code_outside_the_catalogue_hub1238() {
     );
 }
 
+/// 🔴 Proof the guard catches the positive at RUN time too: a handler returning a code outside the
+/// catalogue is a broken guest contract (`Wasm`, naming the code), never a `Domain` the UI would try
+/// to translate — while the same handler returning a declared code travels as `Domain`.
+///
+/// Driven through a native handler on a copy of the fixture: `Output.error` shares the exact code
+/// path with the WASM guest (`commands::persist_handler_output`), and this lets the test choose the
+/// code without recompiling a guest for every case.
+#[tokio::test]
+async fn a_handler_code_outside_the_catalogue_is_a_broken_contract_not_a_domain_error_hub1238() {
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use erplora_runtime::native::{NativeHandler, NativeHost};
+    use erplora_wasm_host::{guest_sdk::DomainError, Output};
+
+    /// Refuses with whatever code the payload names — the test drives the code.
+    #[derive(Debug)]
+    struct RefusingHandler;
+
+    #[async_trait]
+    impl NativeHandler for RefusingHandler {
+        async fn call(
+            &self,
+            _function: &str,
+            input: &serde_json::Value,
+            _host: &dyn NativeHost,
+        ) -> Result<Output, RuntimeError> {
+            let code = input["payload"]["code"]
+                .as_str()
+                .expect("the test names the code");
+            let mut out = Output::new();
+            out.error = Some(DomainError::new(code, "refused by the test handler"));
+            Ok(out)
+        }
+    }
+
+    let native = broken_copy("native-refusal", |m| {
+        m["commands"]["kfx.items.bulk"]["handler"] =
+            json!({ "type": "native", "function": "refuse" });
+    });
+
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    rt.install_from_dir(native.path())
+        .await
+        .expect("install the native variant");
+    rt.register_native(MODULE_ID, Arc::new(RefusingHandler));
+
+    let mut declared = Params::new();
+    declared.insert("code".into(), json!("kfx.not_found"));
+    match rt
+        .execute_command("kfx.items.bulk", &declared, &admin())
+        .await
+        .expect_err("the handler refuses")
+    {
+        RuntimeError::Domain { code, .. } => assert_eq!(code, "kfx.not_found"),
+        other => panic!("a declared code is a Domain refusal, got {other:?}"),
+    }
+
+    let mut smuggled = Params::new();
+    smuggled.insert("code".into(), json!("kfx.smuggled"));
+    match rt
+        .execute_command("kfx.items.bulk", &smuggled, &admin())
+        .await
+        .expect_err("the code is outside `errors`")
+    {
+        RuntimeError::Wasm(detail) => assert!(
+            detail.contains("kfx.smuggled") && detail.contains(MODULE_ID),
+            "the broken contract names the module and the code: {detail}"
+        ),
+        other => panic!("an undeclared code is a broken guest contract, got {other:?}"),
+    }
+}
+
 /// …and the same manifest WITH the code declared installs: the guard is about the catalogue, not
 /// about the shape of the clause.
 #[tokio::test]

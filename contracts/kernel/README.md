@@ -95,14 +95,14 @@ API está ahí, y solo ejecutarla dice que funciona.
 | Fichero | Qué prueba |
 |---|---|
 | `kernel_conformance_install.rs` | Instalar registra queries/commands/permisos/listeners; un campo desconocido dentro de un command se **rechaza nombrándolo**; un listener a un command ajeno también |
-| `kernel_conformance_migrate.rs` | `expand`/`contract`, el `DROP` traducido a `_deprecated_` (las filas sobreviven), `kind` que no cuadra con el SQL, y un `contract` que destruye FILAS |
+| `kernel_conformance_migrate.rs` | `expand`/`backfill`/`contract`: el `DROP` traducido a `_deprecated_` (las filas sobreviven), el `backfill` que reescribe las filas de la versión anterior, `kind` que no cuadra con el SQL (un `DROP` en un `expand`, un `ALTER` en un `backfill`) y un `contract` que destruye FILAS — todo bajo el código `hub.module_migration_rejected` |
 | `kernel_conformance_query_list_row.rs` | Motor de listas (paginado, `default_sort`, `search`, `filters`) y **el contrato de fila**: `hub_id`/`current_user_id`/`now` los sella el kernel y el payload NO los puede falsificar |
 | `kernel_conformance_command_gates.rs` | `expect_rows` (con su código), la transacción que revierte entera, y el command interno (`_`) que no es puerta pública |
-| `kernel_conformance_permissions.rs` | El gate, el **techo** de las operaciones de un handler (hub#459) y la elevación DERIVADA de `role_permissions.manager` (hub#351) |
+| `kernel_conformance_permissions.rs` | El gate, el **techo** de las operaciones de un handler (hub#459) por sus dos mitades —pasa con el permiso, se niega en seco por encima de él— y la elevación DERIVADA de `role_permissions.manager` (hub#351) |
 | `kernel_conformance_events.rs` | `emit` → `_event_outbox` → listener; el evento de un handler por el mismo camino; un command que falla no emite; nombre fuera de `events.emits` **rechazado nombrándolo** |
 | `kernel_conformance_slots_navigation.rs` | `navigation` (permiso, `chrome`), `provides_slots` y los `locales/` del módulo (`en` canónico, `es` traducido) |
-| `kernel_conformance_errors.rs` | El catálogo `errors` (ADR-0398/0412): servido ordenado, `deprecated` marcado, y `expect_rows.error` fuera del catálogo rechazado **al instalar** |
-| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad** |
+| `kernel_conformance_errors.rs` | El catálogo `errors` (ADR-0398/0412): servido ordenado, `deprecated` marcado, `expect_rows.error` fuera del catálogo rechazado **al instalar**, y un código fuera del catálogo devuelto por un handler es contrato roto (`Wasm`), nunca un `Domain` que la UI intente traducir |
+| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id) |
 | `kernel_conformance_update.rs` | Update en caliente (hub#516): los datos sobreviven, solo corre la migración nueva, y un update que falla deja **corriendo la versión anterior** |
 
 Todas usan el **módulo fixture del propio kernel** —`crates/runtime/tests/fixtures/kernel-fixture/`,
@@ -113,7 +113,7 @@ luego `1.1.0` ES el camino de actualización:
 ```text
 crates/runtime/tests/fixtures/kernel-fixture/
 ├── 1.0.0/            # antes de la retirada: 1 migración `expand`, 1 query, 1 command
-├── 1.1.0/            # + migración `contract`, handler Tier 2, eventos, navigation, errors, locales
+├── 1.1.0/            # + migraciones `contract` y `backfill`, handler Tier 2, eventos, navigation, errors, locales
 │   ├── handler.wasm         # binario COMPILADO, commiteado
 │   └── handler.build.json   # sello: sha256 de las fuentes y del binario
 ├── handler/          # el guest Rust (cdylib) del que sale ese .wasm

@@ -171,14 +171,18 @@ async fn an_uninstalled_module_is_not_a_broken_contract_hub1238() {
     );
 
     install_fixture(&mut rt).await;
-    assert!(
-        rt.execute_query(
+    match rt
+        .execute_query(
             "kfx.items.missing",
             &erplora_db::Params::new(),
-            &kernel_fixture::admin()
+            &kernel_fixture::admin(),
         )
         .await
-        .is_err(),
-        "an unknown query of an installed module is a broken contract, not an absence"
-    );
+        .expect_err("an unknown query of an installed module is a broken contract, not an absence")
+    {
+        erplora_runtime::RuntimeError::QueryNotFound(name) => {
+            assert_eq!(name, "kfx.items.missing", "the refusal names the query")
+        }
+        other => panic!("expected QueryNotFound naming the query, got {other:?}"),
+    }
 }
