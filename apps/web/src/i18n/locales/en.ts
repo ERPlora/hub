@@ -1010,6 +1010,15 @@ export default {
       // hub#658 — the badge may never be somebody's ONLY way in: a lost card would lock them out
       // of their own till (Square does not allow it either, and Lightspeed L-Series is why).
       badge_without_fallback: 'A badge cannot be their only way in: a lost card would lock them out. Keep their PIN, give them an account, or remove the badge as well.',
+      // hub#1214 — the OTHER half of an alta/baja: the record is saved on this hub, but who can
+      // sign in is administered in the Cloud (ADR-0157 §7). Four codes and not one bucket, because
+      // each asks something different of whoever is saving: wait, fix the address, retry, or call
+      // support. Before this, the raw body of the Cloud («el SaaS respondió 429: {"detail":…}») was
+      // painted here verbatim.
+      cloud_rate_limited: 'Too many changes in a short time, so the invitation has not gone out yet. Wait a few minutes and save again — nothing else was lost.',
+      cloud_rejected: 'The invitation for that email could not be created. Check the address and try again; if it keeps failing, contact support.',
+      cloud_unreachable: 'We could not reach ERPlora to send the invitation. The user is saved here: try saving again in a moment.',
+      not_enrolled: 'This hub cannot send invitations yet. The user is saved here; contact support so they can finish setting it up.',
     },
     activeUser: 'Active user',
     required: 'Required field',

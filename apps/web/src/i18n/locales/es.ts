@@ -929,6 +929,11 @@ export default {
       badge_shape: 'Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».',
       badge_in_use: 'Esa placa ya la lleva otro usuario activo. La placa dice quién está en la caja, así que no la pueden compartir dos personas.',
       badge_without_fallback: 'La placa no puede ser su única vía de entrada: si pierde la tarjeta se queda fuera. Consérvale el PIN, dale una cuenta, o retira también la placa.',
+      // hub#1214 — ver la nota en `en.ts`.
+      cloud_rate_limited: 'Demasiados cambios en poco tiempo: la invitación todavía no ha salido. Espera unos minutos y vuelve a guardar — no se ha perdido nada más.',
+      cloud_rejected: 'No se ha podido crear la invitación para ese email. Revisa la dirección y vuelve a intentarlo; si sigue fallando, avisa a soporte.',
+      cloud_unreachable: 'No hemos podido conectar con ERPlora para enviar la invitación. El usuario queda guardado aquí: vuelve a guardar dentro de un momento.',
+      not_enrolled: 'Este hub todavía no puede enviar invitaciones. El usuario queda guardado aquí; avisa a soporte para que termine de configurarlo.',
     },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
