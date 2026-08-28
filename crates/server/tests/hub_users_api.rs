@@ -345,7 +345,9 @@ async fn creating_a_user_with_email_provisions_the_access_in_the_saas() {
         "el hub no puede fingir que dio de alta el acceso"
     );
     let body = body_json(res).await;
-    assert_eq!(body["code"], "cloud_unreachable");
+    // hub#1214: el código va DENTRO de `error` — el envelope del resto del runtime — y la frase que
+    // acompaña no lleva nunca el cuerpo del SaaS.
+    assert_eq!(body["error"]["code"], "cloud_unreachable");
 
     // …y el alta LOCAL persiste (idempotente por email), como en /api/members: el admin reintenta.
     let users = body_json(get(&f.router, "/api/hub/users", Some(&f.owner)).await).await;
