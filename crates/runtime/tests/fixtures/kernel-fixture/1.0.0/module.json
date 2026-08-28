@@ -1,0 +1,37 @@
+{
+  "id": "kfx",
+  "name": "Kernel Conformance Fixture",
+  "version": "1.0.0",
+  "permissions": ["kfx.read", "kfx.write"],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["kfx.write"],
+    "employee": ["kfx.read"]
+  },
+  "migrations": {
+    "postgres": [
+      { "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" }
+    ]
+  },
+  "queries": {
+    "kfx.items.list": {
+      "permission": "kfx.read",
+      "sql": "queries/items_list.sql",
+      "list": {
+        "search": ["name"],
+        "sort": ["name", "created_at"],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": { "name": { "op": "like" } },
+        "page_size": 2
+      }
+    }
+  },
+  "commands": {
+    "kfx.item.create": {
+      "permission": "kfx.write",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+# Tier 2 guest of the kernel conformance fixture (hub#1238).
+#
+# It is a REAL Extism guest, compiled to `wasm32-unknown-unknown` and committed as
+# `../1.1.0/handler.wasm` with its build stamp in `../1.1.0/handler.build.json`. The point of
+# compiling it is that `contracts/kernel/guest.snapshot` freezes the `Input`/`Output` field names
+# and a published `.wasm` is never recompiled: only a binary built against those names proves the
+# host still speaks them.
+#
+# Rebuild: see `contracts/kernel/README.md` § «La suite de conformidad del kernel (KCS)».
+[package]
+name = "kernel-fixture-handler"
+version = "1.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+guest = ["dep:extism-pdk"]
+
+[dependencies]
+erplora-guest-sdk = { path = "../../../../../guest-sdk" }
+extism-pdk = { version = "1", optional = true }
+serde_json = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+[workspace]

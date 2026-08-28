@@ -83,6 +83,71 @@ de `.github/workflows/test-hub.yml` — el ratchet para subir el siguiente grupo
 en la propia tabla. El cableado lo vigila `scripts/tests/clippy-lints.test.sh`, que corre en ese
 mismo workflow.
 
+## La suite de conformidad del kernel (KCS)
+
+Los snapshots congelan la **forma** de la superficie; la KCS comprueba que esa superficie **hace lo
+que promete**. Viven juntas a propósito: un snapshot verde con un motor roto es exactamente el
+agujero que Android CTS y la conformance de Kubernetes existen para tapar — el fichero dice que la
+API está ahí, y solo ejecutarla dice que funciona.
+
+`crates/runtime/tests/kernel_conformance_*.rs`, un fichero por área:
+
+| Fichero | Qué prueba |
+|---|---|
+| `kernel_conformance_install.rs` | Instalar registra queries/commands/permisos/listeners; un campo desconocido dentro de un command se **rechaza nombrándolo**; un listener a un command ajeno también |
+| `kernel_conformance_migrate.rs` | `expand`/`backfill`/`contract`: el `DROP` traducido a `_deprecated_` (las filas sobreviven), el `backfill` que reescribe las filas de la versión anterior, `kind` que no cuadra con el SQL (un `DROP` en un `expand`, un `ALTER` en un `backfill`) y un `contract` que destruye FILAS — todo bajo el código `hub.module_migration_rejected` |
+| `kernel_conformance_query_list_row.rs` | Motor de listas (paginado, `default_sort`, `search`, `filters`) y **el contrato de fila**: `hub_id`/`current_user_id`/`now` los sella el kernel y el payload NO los puede falsificar |
+| `kernel_conformance_command_gates.rs` | `expect_rows` (con su código), la transacción que revierte entera, y el command interno (`_`) que no es puerta pública |
+| `kernel_conformance_permissions.rs` | El gate, el **techo** de las operaciones de un handler (hub#459) por sus dos mitades —pasa con el permiso, se niega en seco por encima de él— y la elevación DERIVADA de `role_permissions.manager` (hub#351) |
+| `kernel_conformance_events.rs` | `emit` → `_event_outbox` → listener; el evento de un handler por el mismo camino; un command que falla no emite; nombre fuera de `events.emits` **rechazado nombrándolo** |
+| `kernel_conformance_slots_navigation.rs` | `navigation` (permiso, `chrome`), `provides_slots` y los `locales/` del módulo (`en` canónico, `es` traducido) |
+| `kernel_conformance_errors.rs` | El catálogo `errors` (ADR-0398/0412): servido ordenado, `deprecated` marcado, `expect_rows.error` fuera del catálogo rechazado **al instalar**, y un código fuera del catálogo devuelto por un handler es contrato roto (`Wasm`), nunca un `Domain` que la UI intente traducir |
+| `kernel_conformance_guest_wasm.rs` | El round-trip Tier 2 contra un `.wasm` **compilado de verdad**; el guest no alcanza ni un command inexistente ni el de un módulo VECINO (un gemelo del fixture bajo otro id) |
+| `kernel_conformance_update.rs` | Update en caliente (hub#516): los datos sobreviven, solo corre la migración nueva, y un update que falla deja **corriendo la versión anterior** |
+
+Todas usan el **módulo fixture del propio kernel** —`crates/runtime/tests/fixtures/kernel-fixture/`,
+id `kfx`— y nunca `sales`, `kitchen` o `invoice`: lo que hace un módulo es asunto del módulo; lo que
+el hub debe es la superficie de debajo. El fixture trae **dos versiones** porque instalar `1.0.0` y
+luego `1.1.0` ES el camino de actualización:
+
+```text
+crates/runtime/tests/fixtures/kernel-fixture/
+├── 1.0.0/            # antes de la retirada: 1 migración `expand`, 1 query, 1 command
+├── 1.1.0/            # + migraciones `contract` y `backfill`, handler Tier 2, eventos, navigation, errors, locales
+│   ├── handler.wasm         # binario COMPILADO, commiteado
+│   └── handler.build.json   # sello: sha256 de las fuentes y del binario
+├── handler/          # el guest Rust (cdylib) del que sale ese .wasm
+└── build-handler.sh  # lo recompila y reescribe el sello
+```
+
+**El `.wasm` va commiteado a propósito.** `guest.snapshot` congela los nombres de campo de
+`Input`/`Output`, y un `.wasm` publicado **no se recompila**: la única prueba de que el host sigue
+hablando esa forma es un binario que se compiló contra ella. Por eso el round-trip de
+`wasm_tier2.rs::real_guest_bulk_create` —`#[ignore]` desde que existe, con la receta en un
+comentario— pasa a **obligatorio** aquí.
+
+Tras tocar `handler/`:
+
+```sh
+crates/runtime/tests/fixtures/kernel-fixture/build-handler.sh   # necesita el target wasm32-unknown-unknown
+```
+
+y se commitean `handler.wasm` **y** `handler.build.json`: `kernel_conformance_guest_wasm.rs`
+recalcula los dos sha256 y falla si el binario no sale de las fuentes commiteadas (agujero #7 del
+contrato, module-toolkit#93, aplicado al propio fixture).
+
+Correr la suite (necesita Postgres, igual que `tables.snapshot`):
+
+```sh
+DATABASE_URL=postgres://postgres:test@localhost:5433/hub_test \
+  cargo test -p erplora-runtime --test 'kernel_conformance_*'
+```
+
+Cada área lleva además su prueba de que **caza el positivo**: se rompe el contrato en una copia del
+fixture (código de error sin declarar, listener a un command ajeno, `DROP` declarado `expand`,
+evento fuera de `events.emits`…) y se comprueba que el runtime se niega **nombrando el elemento**.
+Un guard que no se ha visto fallar no es un guard.
+
 ## Lo que NO va aquí
 
 Superficie declarada que **no existe** se retira, no se congela (`navigation[].actions`,
