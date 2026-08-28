@@ -106,6 +106,18 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
+    // moment. From 80% on, the drawer says what is left and when it comes back.
+    quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
+    quotaResets: 'They come back on {date}.',
+    // hub#1259 — contracting the plan is the admin door (hub#1254). A cashier who presses this
+    // button only gets a 403 and a generic error: worse than not seeing it, and worse than
+    // reading who to ask.
+    quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    plansTitle: 'Choose a plan',
+    plansConfirm: 'Go to payment',
+    planOption: '{name} — {price} €/month',
+    plansUnavailable: 'There are no plans to upgrade to right now.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
