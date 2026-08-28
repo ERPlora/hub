@@ -959,6 +959,20 @@ pub struct RequestContext {
     /// route able to stamp it could file its events under somebody else's execution, which makes
     /// the whole audit trail worth exactly nothing.
     parent_event_id: String,
+    /// Ids of installed modules the SaaS entitlement no longer grants this hub (hub#1175):
+    /// retired or revoked, per the hybrid revalidation that lives in `erplora-server`
+    /// (`crate::entitlement` there, `RevalidationState::blocked_modules`). The runtime has no way
+    /// to know this on its own — it has no view of the SaaS's signed claims, only of what is
+    /// installed and active in THIS hub's own tables — so the server stamps the set on the way
+    /// in, the same shape as [`Self::permissions`]. Empty by default: every context nobody
+    /// populated (dev mode, tests, a machine principal, `erplora-server` builds that predate this
+    /// field) keeps seeing every installed module unfiltered, exactly like today.
+    ///
+    /// `pub`, not `pub(crate)`: unlike [`Self::automation`] this carries no privilege — a caller
+    /// that lied and claimed nothing is blocked would only get back the pre-hub#1175 behaviour
+    /// (an item that points at a route the dispatcher's own entitlement gate still refuses), never
+    /// an escalation.
+    pub blocked_modules: HashSet<String>,
 }
 
 /// Identity of the flow behind an automation request: which flow, and which of its runs.
@@ -1017,6 +1031,7 @@ impl RequestContext {
             approved_by: None,
             automation: None,
             parent_event_id: String::new(),
+            blocked_modules: HashSet::new(),
         }
     }
 

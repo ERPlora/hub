@@ -364,7 +364,11 @@ async function mount(): Promise<void> {
       // (hub#1169): un Reintentar aquí solo puede repetir la misma respuesta.
       moduleName.value = shellTabHeading(tabs.value, manifest, moduleId);
       if (outlet.value) outlet.value.replaceChildren();
-      status.value = 'empty';
+      // hub#1175 — a module the entitlement names BLOCKED lands here too: `loadMenu()` drops what
+      // is not entitled, so it contributes no tab. «Nothing to show» is the wrong sentence for it
+      // (the module IS active; the entitlement is what stops it): `ready` lets the `blocked-card`
+      // above say why, the same card a module blocked for non-payment gets.
+      status.value = isBlocked.value ? 'ready' : 'empty';
       return;
     }
     moduleName.value = entry.moduleName;

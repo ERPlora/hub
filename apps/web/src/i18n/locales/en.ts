@@ -1555,6 +1555,9 @@ export default {
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
     emptyTitle: 'Nothing to show here yet',
     emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'This app is not available for this hub.',
   },
   moduleSettings: {
     tab: 'Settings',
