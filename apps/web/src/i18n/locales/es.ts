@@ -521,6 +521,8 @@ export default {
       invalid_via: 'Esa vía no es una por la que podamos remitir.',
       cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
       hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+      identity_not_shared:
+        'No hemos podido decirle a ERPlora quién es el obligado. Si la página te pide tus datos fiscales, guárdalos otra vez en Ajustes → Negocio.',
       open_external_failed: 'No hemos podido abrir tu navegador.',
       unknown: 'No ha funcionado. Vuelve a intentarlo.',
     },

@@ -18,6 +18,7 @@ const postRepresentationGrant = vi.fn();
 const downloadRepresentationGrantModel = vi.fn();
 const saveDownload = vi.fn();
 const openExternal = vi.fn();
+const publishFiscalIdentity = vi.fn();
 
 // `vi.mock` se iza por encima de todo, así que la clase que la factoría devuelve tiene que existir
 // ANTES: `vi.hoisted` es la única forma de declararla arriba del todo sin duplicarla.
@@ -39,6 +40,7 @@ vi.mock('../lib/runtime', () => ({
   getRepresentationGrant: (...a: unknown[]) => getRepresentationGrant(...a),
   postRepresentationGrant: (...a: unknown[]) => postRepresentationGrant(...a),
   downloadRepresentationGrantModel: (...a: unknown[]) => downloadRepresentationGrantModel(...a),
+  publishFiscalIdentity: (...a: unknown[]) => publishFiscalIdentity(...a),
 }));
 vi.mock('../lib/session', () => ({ isAdmin: { value: true } }));
 vi.mock('../lib/save-download', () => ({
@@ -143,6 +145,8 @@ beforeEach(() => {
   saveDownload.mockResolvedValue(null);
   openExternal.mockReset();
   openExternal.mockResolvedValue(undefined);
+  publishFiscalIdentity.mockReset();
+  publishFiscalIdentity.mockResolvedValue(undefined);
 });
 
 describe('lo que la pantalla ya NO hace', () => {
@@ -422,5 +426,33 @@ describe('la salida al ordenador', () => {
     expect(openExternal.mock.calls[0][0]).toBe(
       'https://erplora.com/dashboard/hubs/hub-abc/fiscal/representation-grant/',
     );
+  });
+
+  // 🔴 hub#1306 — la página de allí NOMBRA al obligado, y solo lo conoce si el hub se lo ha
+  // publicado. Mandar al cliente allí sin publicar es mandarlo a un muro («pon antes tus datos
+  // fiscales») que él ya rellenó aquí, y que volver no arregla.
+  it('🔴 le dice a ERPlora quién es el obligado ANTES de abrir la página', async () => {
+    const w = mountPanel();
+    await flushPromises();
+
+    await vm(w).openDashboard();
+
+    expect(publishFiscalIdentity).toHaveBeenCalledTimes(1);
+    expect(
+      publishFiscalIdentity.mock.invocationCallOrder[0],
+      'publicar DESPUÉS de abrir llega tarde: la página ya se pintó sin obligado',
+    ).toBeLessThan(openExternal.mock.invocationCallOrder[0]);
+  });
+
+  it('si no se pudo publicar, abre igual y lo dice — no se queda muda', async () => {
+    // Puede que se publicara antes y allí ya lo sepan: no abrir sería quitarle la única otra vía.
+    publishFiscalIdentity.mockRejectedValue(new Error('publish-fiscal-identity → 502'));
+    const w = mountPanel();
+    await flushPromises();
+
+    await vm(w).openDashboard();
+
+    expect(openExternal).toHaveBeenCalledTimes(1);
+    expect(vm(w).errorKey).toBe('grant.errors.identity_not_shared');
   });
 });

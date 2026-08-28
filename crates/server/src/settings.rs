@@ -53,6 +53,11 @@ pub async fn get_settings(State(st): State<AppState>, headers: HeaderMap) -> Res
 /// PUT /api/settings — aplica un mapa parcial de settings (valida cada clave; rechaza desconocidas o
 /// valores inválidos → 422). Auth = sesión admin (owner/admin). Body = objeto plano
 /// `{ "currency": "USD", "language": "en", … }`. Devuelve el objeto completo actualizado (plano).
+///
+/// Si el guardado toca la identidad fiscal, la **publica** en el SaaS (hub#1306) por el mismo
+/// camino que la casilla de compartir: ver [`push_fiscal_identity`]. Fallar ahí NO cuesta el
+/// guardado —los ajustes ya están escritos— pero tampoco se traga: viaja como
+/// `fiscal_identity_publish_error` (código estable) en el objeto que se devuelve.
 pub async fn put_settings(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -63,17 +68,37 @@ pub async fn put_settings(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
-    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
-        Ok(u) => u,
-        Err(e) => return unauthorized(e),
+    // El guard del runtime se suelta ANTES de hablar con el SaaS: una llamada de red con el
+    // mutex del hub en la mano bloquearía la caja entera mientras el control plane tarda.
+    let mut settings = {
+        let rt = arc.lock().await;
+        let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
+            Ok(u) => u,
+            Err(e) => return unauthorized(e),
+        };
+        // Auditoría: quién cambió la config (el `hub_user` admin de la sesión).
+        let updated_by = format!("hub_user:{}", admin.id);
+        match rt.set_settings(&updates, &updated_by).await {
+            Ok(settings) => settings,
+            Err(e) => return crate::err_response(e),
+        }
     };
-    // Auditoría: quién cambió la config (el `hub_user` admin de la sesión).
-    let updated_by = format!("hub_user:{}", admin.id);
-    match rt.set_settings(&updates, &updated_by).await {
-        Ok(settings) => Json(settings).into_response(),
-        Err(e) => crate::err_response(e),
+
+    if touches_fiscal_identity(&updates) {
+        if let Err(failure) = push_fiscal_identity(&st, &settings).await {
+            if let Some(code) = failure.reportable_code() {
+                tracing::warn!(
+                    code,
+                    detail = %failure.detail(),
+                    "settings: the fiscal identity was saved but could not be published to the control plane"
+                );
+                if let Some(object) = settings.as_object_mut() {
+                    object.insert("fiscal_identity_publish_error".into(), json!(code));
+                }
+            }
+        }
     }
+    Json(settings).into_response()
 }
 
 // ── Capabilities de módulo (ADR-0079) ───────────────────────────────────────────────────────────
@@ -308,15 +333,140 @@ fn fiscal_identity_payload(settings: &Value) -> Option<Map<String, Value>> {
     Some(body)
 }
 
-/// POST /api/business/fiscal-identity — publica la identidad fiscal del negocio en el SaaS, que
-/// crea/actualiza el `BillingProfile` que paga este hub (ADR-0201 decisión 5).
+/// Claves de `hub_settings` que dicen QUIÉN es el obligado tributario. Un guardado que toca
+/// cualquiera de ellas republica la identidad; cualquier otro deja al SaaS en paz — si publicara en
+/// cada guardado, apagar la doc de la API mandaría una identidad fiscal.
+const FISCAL_IDENTITY_KEYS: [&str; 4] = [
+    "business_tax_id",
+    "business_legal_name",
+    "business_address",
+    "country_code",
+];
+
+fn touches_fiscal_identity(updates: &Map<String, Value>) -> bool {
+    FISCAL_IDENTITY_KEYS
+        .iter()
+        .any(|key| updates.contains_key(*key))
+}
+
+/// Cuánto espera el hub al SaaS antes de rendirse con una publicación. Para cuando se llega aquí
+/// el guardado YA está escrito: esto es una cortesía, y una caja no puede quedarse girando por
+/// ella. Sin este límite, `reqwest` esperaría indefinidamente.
+const PUBLISH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Por qué la identidad fiscal no llegó al SaaS. Códigos ESTABLES (ADR-0055): la pantalla se
+/// explica contra ellos, nunca contra la prosa del error.
+pub(crate) enum PublishFailure {
+    /// Aún no hay NIF guardado: no hay identidad que publicar.
+    NoTaxId,
+    /// Este hub no tiene credencial de máquina (un `pnpm dev` local): no hay a quién avisar.
+    NotEnrolled,
+    /// El SaaS contestó, y dijo que no.
+    Rejected(u16),
+    /// No se pudo hablar con el SaaS (red, DNS, timeout).
+    Unreachable(String),
+}
+
+impl PublishFailure {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::NoTaxId => "business_tax_id_required",
+            Self::NotEnrolled => "hub_not_enrolled",
+            Self::Rejected(_) => "cloud_rejected",
+            Self::Unreachable(_) => "cloud_unreachable",
+        }
+    }
+
+    /// El detalle para el LOG, nunca para la respuesta: el mensaje de `reqwest` lleva la URL
+    /// interna del control plane (`error_redaction_door`).
+    fn detail(&self) -> String {
+        match self {
+            Self::Rejected(status) => format!("control plane answered {status}"),
+            Self::Unreachable(e) => e.clone(),
+            other => other.code().to_string(),
+        }
+    }
+
+    /// El código que se le CUENTA a quien guardó, o `None` si no hay nada que contar: sin NIF no
+    /// había identidad, y sin credencial de máquina no había destinatario. Ninguna de las dos es
+    /// un fallo del guardado, y avisar de ellas en cada guardado sería ruido que se aprende a
+    /// ignorar — justo lo que hace invisible al fallo que sí importa.
+    fn reportable_code(&self) -> Option<&'static str> {
+        match self {
+            Self::NoTaxId | Self::NotEnrolled => None,
+            other => Some(other.code()),
+        }
+    }
+
+    /// La respuesta HTTP de la puerta explícita (`POST /api/business/fiscal-identity`).
+    fn into_response(self) -> Response {
+        let status = match self {
+            Self::NoTaxId => axum::http::StatusCode::BAD_REQUEST,
+            Self::NotEnrolled => axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            Self::Rejected(_) | Self::Unreachable(_) => axum::http::StatusCode::BAD_GATEWAY,
+        };
+        let mut body = Map::new();
+        body.insert("ok".into(), json!(false));
+        body.insert("error".into(), json!(self.code()));
+        match self {
+            Self::NoTaxId => {
+                body.insert(
+                    "message".into(),
+                    json!("Fill in the business tax id before sharing it with ERPlora"),
+                );
+            }
+            Self::Rejected(upstream) => {
+                body.insert("status".into(), json!(upstream));
+            }
+            _ => {}
+        }
+        (status, Json(Value::Object(body))).into_response()
+    }
+}
+
+/// **El único camino** por el que la identidad fiscal del negocio sube al SaaS, que crea/actualiza
+/// el `BillingProfile` que paga este hub (ADR-0201 decisión 5) y **espeja el NIF del obligado**
+/// para el otorgamiento del Anexo I (saas#1741). Lo comparten sus dos puertas: la casilla explícita
+/// ([`publish_fiscal_identity`]) y el guardado de Ajustes → Negocio ([`put_settings`], hub#1306).
+///
+/// La llamada la hace el runtime porque el `cloud_api_token` es secreto del hub y nunca cruza al
+/// navegador (ADR-0003).
+pub(crate) async fn push_fiscal_identity(
+    st: &AppState,
+    settings: &Value,
+) -> Result<(), PublishFailure> {
+    let Some(body) = fiscal_identity_payload(settings) else {
+        return Err(PublishFailure::NoTaxId);
+    };
+    let Some(machine) = auth::machine_auth(st) else {
+        return Err(PublishFailure::NotEnrolled);
+    };
+
+    let req = cloud_client::CloudClient::new(&st.config.cloud_base_url).fiscal_identity(&machine);
+    let client = reqwest::Client::builder()
+        .timeout(PUBLISH_TIMEOUT)
+        .build()
+        .map_err(|e| PublishFailure::Unreachable(e.to_string()))?;
+    let mut request = client.post(&req.url).json(&body);
+    for (name, value) in req.headers {
+        request = request.header(name, value);
+    }
+    match request.send().await {
+        Ok(response) if response.status().is_success() => Ok(()),
+        Ok(response) => Err(PublishFailure::Rejected(response.status().as_u16())),
+        Err(e) => Err(PublishFailure::Unreachable(e.to_string())),
+    }
+}
+
+/// POST /api/business/fiscal-identity — publica la identidad fiscal del negocio en el SaaS.
 ///
 /// Es la casilla *"usar estos datos también para mi factura de ERPlora"* de Ajustes → Negocio: el
 /// dato se escribió UNA vez aquí y la copia SUBE. Sin marcarla, el perfil se rellena aparte en el
-/// SaaS (el caso de la gestoría que paga los hubs de sus clientes).
+/// SaaS (el caso de la gestoría que paga los hubs de sus clientes). **No es la única puerta**: el
+/// propio guardado del NIF publica desde hub#1306, porque el SaaS necesita al obligado para el
+/// otorgamiento del Anexo I, no solo para su factura.
 ///
-/// **La llamada la hace el runtime**: el `cloud_api_token` es secreto del hub y nunca cruza al
-/// navegador (ADR-0003). Auth = sesión admin, porque la identidad fiscal es del dueño del negocio.
+/// Auth = sesión admin, porque la identidad fiscal es del dueño del negocio.
 pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(rt) => rt,
@@ -333,49 +483,16 @@ pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: Header
         }
     };
 
-    let Some(body) = fiscal_identity_payload(&settings) else {
-        return (
-            axum::http::StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "ok": false,
-                "error": "business_tax_id_required",
-                "message": "Fill in the business tax id before sharing it with ERPlora",
-            })),
-        )
-            .into_response();
-    };
-
-    let Some(machine) = auth::machine_auth(&st) else {
-        return (
-            axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({ "ok": false, "error": "hub_not_enrolled" })),
-        )
-            .into_response();
-    };
-
-    let req = cloud_client::CloudClient::new(&st.config.cloud_base_url).fiscal_identity(&machine);
-    let mut request = reqwest::Client::new().post(&req.url).json(&body);
-    for (name, value) in req.headers {
-        request = request.header(name, value);
-    }
-    match request.send().await {
-        Ok(response) if response.status().is_success() => {
-            Json(serde_json::json!({ "ok": true })).into_response()
+    match push_fiscal_identity(&st, &settings).await {
+        Ok(()) => Json(json!({ "ok": true })).into_response(),
+        Err(failure) => {
+            tracing::warn!(
+                code = failure.code(),
+                detail = %failure.detail(),
+                "settings: the fiscal identity could not be published to the control plane"
+            );
+            failure.into_response()
         }
-        Ok(response) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({
-                "ok": false,
-                "error": "cloud_rejected",
-                "status": response.status().as_u16(),
-            })),
-        )
-            .into_response(),
-        Err(e) => (
-            axum::http::StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
-        )
-            .into_response(),
     }
 }
 
