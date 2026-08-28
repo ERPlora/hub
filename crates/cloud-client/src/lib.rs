@@ -492,6 +492,13 @@ impl CloudClient {
     /// `cloud/apps/public/modules/api_views.py::versions`). La respuesta es un array JSON
     /// (`ModuleVersionSerializer`): `version`, `changelog`, `is_active`, `file_size_bytes`,
     /// `created_at`. El `sha256` se parsea si el Cloud lo expone (ver `ModuleVersion`). §2.2.
+    pub fn versions(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        self.get(
+            &format!("/api/v1/marketplace/modules/{module_id}/versions/"),
+            auth,
+        )
+    }
+
     /// Lo que el marketplace dice de UN módulo (`GET /api/v1/marketplace/modules/{module_id}/`).
     ///
     /// Es la puerta de DETALLE, no la del catálogo, y esa diferencia es el motivo de existir
@@ -501,13 +508,6 @@ impl CloudClient {
     /// el token de máquina (`MACHINE_OK_ACTIONS`), así que es la única que sigue contestando por él.
     pub fn module_detail(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
         self.get(&format!("/api/v1/marketplace/modules/{module_id}/"), auth)
-    }
-
-    pub fn versions(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
-        self.get(
-            &format!("/api/v1/marketplace/modules/{module_id}/versions/"),
-            auth,
-        )
     }
 
     /// **Flujo real de instalación, paso 2** — descarga el ZIP binario de una versión.
