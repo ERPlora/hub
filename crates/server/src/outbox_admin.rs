@@ -106,24 +106,24 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
     }
 }
 
-/// GET /api/hub/events/discarded — **las cerradas a mano**, con su sello entero: quién las cerró,
-/// cuándo y con qué motivo (hub#1117). Las más recientes primero. Auth = la misma puerta del
-/// fichero (sesión admin + `manage_flows` si la petición nombra un módulo).
+/// GET /api/hub/events/discarded — **the rows closed by hand**, with the whole stamp: who closed
+/// each one, when and why (hub#1117). Newest closure first. Auth = the same door as the rest of
+/// this file (admin session + `manage_flows` when the request names a module).
 ///
-/// El sello se escribía completo desde hub#955 y no lo proyectaba ninguna superficie: `…/dead`
-/// filtra `status='dead'`, así que cerrar una fila la sacaba del único listado que había, y
-/// `…/{id}/trace` no devuelve ninguna de las tres columnas. La bandeja promete en pantalla que «el
-/// hub guarda quién cerró cada uno, cuándo y por qué durante noventa días» y esa frase solo se
-/// podía comprobar con `psql`. Un registro que nadie puede leer no es un registro.
+/// The stamp had been written in full since hub#955 and no surface projected it: `…/dead` filters
+/// `status='dead'`, so closing a row took it out of the only listing there was, and
+/// `…/{id}/trace` returns none of the three columns. The tray promises on screen «el hub guarda
+/// quién cerró cada uno, cuándo y por qué durante noventa días» and that sentence could only be
+/// checked with `psql`. A record nobody can read is not a record.
 ///
-/// **Sin payload**, a diferencia de `…/dead`: allí el payload es lo que permite decidir entre
-/// reintentar y cerrar, y aquí la decisión ya está tomada. Lo que se le pregunta a una fila cerrada
-/// es el sello, no la carga — y esta lectura es la más ancha del outbox, así que no se ensancha más
-/// de lo que el caso necesita.
+/// **No payload**, unlike `…/dead`: there the payload is what lets an operator choose between
+/// retrying and closing, and here the decision is already made. What is asked of a closed row is
+/// the stamp, not the cargo — and this is the widest reading of the outbox, so it grows no wider
+/// than the case needs.
 ///
-/// Los noventa días de ADR-0309 se respetan **por construcción**: la poda es un `DELETE` duro, así
-/// que lo podado no está en la tabla y no puede salir aquí. Nada que filtrar, nada que se
-/// desincronice con la política.
+/// The ninety days of ADR-0309 are respected **by construction**: retention is a hard `DELETE`,
+/// so a pruned row is not in the table and cannot come out here. Nothing to filter, nothing to
+/// drift from the policy.
 pub async fn list_discarded(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let arc = match st.runtime_for(&st.hub_id()).await {
         Ok(arc) => arc,
