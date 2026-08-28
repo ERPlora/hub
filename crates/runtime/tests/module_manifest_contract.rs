@@ -501,3 +501,64 @@ async fn the_retired_validates_block_installs_but_says_out_loud_that_it_does_not
     );
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// Regression test for ERPlora/hub#1237 — `navigation[].actions` is RETIRED, not silently known.
+#[tokio::test]
+async fn the_retired_navigation_actions_install_but_say_out_loud_that_they_do_nothing_hub1237() {
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-manifest-contract");
+    runtime.ensure_system_tables().await.unwrap();
+    // hub#1237. ADR-0048 «Nivel 2» promised topbar actions: the manifest declares the button and
+    // the shell forwards a `module-action` event to the mounted Web Component. The shell never
+    // painted them and `/api/navigation` never served them, so the field parsed into a struct
+    // nobody read — a promise to module authors that no code keeps. Retiring it is the honest
+    // exit: a manifest carrying it still INSTALLS (a published module may have written it against
+    // the old contract, and refusing would brick a till over a button that never existed), and the
+    // hub says out loud, by name, that it does nothing.
+    let dir = fixture(
+        r#"{
+          "id":"services",
+          "name":"Services",
+          "version":"1.0.0",
+          "navigation":[{
+            "id":"services",
+            "label":"Services",
+            "component":"erp-services",
+            "actions":[{"id":"new","label":"New service","primary":true}]
+          }]
+        }"#,
+    );
+
+    let id = runtime
+        .install_from_dir(&dir)
+        .await
+        .expect("a retired name must not brick a module the fleet already runs");
+    assert_eq!(id, "services");
+
+    let module = runtime
+        .modules()
+        .into_iter()
+        .find(|m| m.id == "services")
+        .unwrap();
+    let warning = module
+        .manifest_warnings
+        .iter()
+        .find(|w| w.path == "navigation[0].actions")
+        .unwrap_or_else(|| {
+            panic!(
+                "the retired topbar actions must be reported by name: {:?}",
+                module.manifest_warnings
+            )
+        });
+    assert!(
+        warning.detail.contains("1237"),
+        "the warning must point at the issue that decides the name: {}",
+        warning.detail
+    );
+    assert!(
+        warning.detail.contains("module-action"),
+        "the warning must name the event that never fired: {}",
+        warning.detail
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
