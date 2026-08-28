@@ -17,11 +17,26 @@
 # entero a `${{ github.action_path }}/../../..`. Es el mismo camino por el que los 26 módulos
 # corren `validate-module`, y el que module-toolkit#61/#66 abrió para los espejos canónicos.
 #
-# POR QUÉ NO SE PUBLICA EN npm. Publicar crea un eje de deriva nuevo: el gate probaría los módulos
-# contra una VERSIÓN publicada del SDK, no contra el que el hub va a servir. Por aquí no hay copia
-# ni versión — es el `packages/module-sdk` del ref al que apunte el `uses:`, y punto. (La otra
-# mitad del motivo es que publicar expone el paquete al mundo y arrastra el gate de higiene
-# pre-publicación, module-toolkit#25, congelado tras «apertura del marketplace a terceros».)
+# EL PAQUETE SÍ SE PUBLICA — Y AUN ASÍ ESTA ACTION SIGUE SIENDO EL CAMINO (hub#1236). Desde el
+# cierre del hub como kernel, cada tag `v*` publica `@erplora/module-sdk@X.Y.Z` en GitHub Packages
+# (`build-hub.yml`, job `publish-module-sdk`). Eso NO sustituye a esta action, y conviene tenerlo
+# escrito para que nadie lo intente:
+#
+#   · Instalar desde GitHub Packages exige credencial también para LEER un paquete de un repo
+#     privado, y en el plan Free los secretos de organización no llegan a un repo privado — el
+#     mismo muro que hay tres párrafos más arriba. Meter un PAT `read:packages` en 26 repos sigue
+#     siendo una decisión de seguridad, no un detalle de CI.
+#   · Y publicar como vía de INSTALACIÓN crearía el eje de deriva que este comentario ya avisaba:
+#     el gate probaría los módulos contra una VERSIÓN publicada del SDK, no contra el que el hub
+#     va a servir (la política de qué ref se prueba es ERPlora/module-toolkit#99, todavía abierta).
+#
+# Lo que la publicación aporta es la IDENTIDAD del SDK, no su distribución en CI: un
+# `dist/<id>.esm.js` ya compilado puede decir contra qué SDK se construyó (`SDK_VERSION`,
+# `packages/module-sdk/src/version.ts`), y quien desarrolle un módulo fuera del monorepo puede
+# instalarlo con un número en vez de con un checkout. Por aquí sigue sin haber copia ni versión:
+# es el `packages/module-sdk` del ref al que apunte el `uses:`, y punto. (La higiene
+# pre-publicación de cara al mundo, module-toolkit#25, sigue congelada tras «apertura del
+# marketplace a terceros»: GitHub Packages es privado, no es «el mundo».)
 #
 # EL PAQUETE NO SE COMPILA. `package.json` dice `"main": "src/index.ts"`: se consume como FUENTE
 # TypeScript y vitest lo transpila. Que el directorio esté ahí es todo lo que hace falta — no hay

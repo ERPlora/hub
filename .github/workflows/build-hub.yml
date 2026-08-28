@@ -97,6 +97,13 @@ jobs:
       - name: Contrato del guardarraíl de versión
         run: ./scripts/tests/image-tags.test.sh
 
+      # El otro guardarraíl del mismo número: que la versión del tag llegue a los TRES ficheros que
+      # la llevan (Cargo.toml, el package.json del SDK y su `version.ts`) y que el paquete npm sea
+      # publicable. ~1 s, y sin él una release estampa el binario y publica un SDK que dice otra
+      # cosa — un desfase que solo se ve en el hub de un cliente (hub#1236).
+      - name: Contrato de publicación de los SDK (hub#1236)
+        run: bash ./scripts/tests/publish-sdks.test.sh
+
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
       # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
@@ -123,24 +130,22 @@ jobs:
       # (`X.Y.Z` o `X.Y.Z-rc.N`) o la prerelease de `develop` (`X.Y.Z-dev.<n>+g<sha>`), no el
       # «en desarrollo» del Cargo. `main` no se estampa (como siempre). Va DESPUÉS de la guarda:
       # no se reescribe nada por un tag que se va a rechazar.
-      - name: Estampar la versión en Cargo.toml
+      #
+      # Desde hub#1236 el estampado NO es un `python3` inline sino `scripts/stamp-version.sh`, y
+      # escribe los TRES ficheros que llevan el número: el `Cargo.toml` del workspace (de donde lo
+      # heredan los 14 crates, `erplora-guest-sdk` incluido), el `package.json` del SDK y su
+      # `src/version.ts` — lo único que un `dist/<id>.esm.js` YA COMPILADO puede imprimir sobre el
+      # SDK contra el que se construyó. El job `publish-module-sdk` corre exactamente el mismo
+      # script con el mismo número, así que imagen y paquete npm no pueden decir cosas distintas.
+      #
+      # La versión entra por `env:` y no interpolada en la línea de `run:`: un `${{ … }}` dentro
+      # del shell se sustituye ANTES de que bash lo lea, así que un valor con metacaracteres
+      # ejecutaría lo que llevase dentro. Es la misma forma que ya usaba el paso que sustituye.
+      - name: Estampar la versión (Cargo.toml + SDK npm + SDK_VERSION)
         if: steps.tags.outputs.stamp == '1'
         env:
           V: ${{ steps.tags.outputs.version }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os, pathlib, re
-          v = os.environ["V"]
-          p = pathlib.Path("Cargo.toml")
-          s = p.read_text()
-          s2 = re.sub(r'(\[workspace\.package\][^\[]*?version\s*=\s*)"[^"]*"',
-                      rf'\1"{v}"', s, count=1, flags=re.DOTALL)
-          if s == s2:
-              raise SystemExit("no se encontró [workspace.package].version para estampar")
-          p.write_text(s2)
-          print(f'Cargo.toml [workspace.package].version = "{v}"')
-          PY
+        run: ./scripts/stamp-version.sh --version "$V"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -179,6 +184,87 @@ jobs:
           echo ""
           echo "(:latest/:stable = hubs reales, solo desde main o un tag vX.Y.Z · :canary = tag rc · :dev = develop → pre)"
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
+
+  # ============================================================================
+  # `@erplora/module-sdk` → GitHub Packages, en cada tag `v*` (hub#1236)
+  # ============================================================================
+  #
+  # QUÉ ARREGLA. El paquete era `private: true, version "0.0.0"` y los 24 repos de módulo lo
+  # declaraban `workspace:*`. Un `dist/<id>.esm.js` publicado no tenía forma de decir contra qué
+  # SDK se compiló: la respuesta honesta era «contra el checkout del hub que tuviera el
+  # desarrollador». Publicarlo con la versión del tag le pone NOMBRE a ese número.
+  #
+  # 🔴 QUÉ **NO** ARREGLA, y hay que decirlo aquí para que nadie lo dé por hecho: esto NO cambia
+  # por dónde instalan el SDK los 26 repos de módulo en CI. GitHub Packages exige credencial
+  # también para LEER un paquete de un repo privado, y en el plan Free los secretos de
+  # organización no llegan a un repo privado. El camino de instalación sigue siendo la composite
+  # action `ERPlora/hub/.github/actions/module-sdk` (hub#1097), que es lo único que GitHub resuelve
+  # sin credencial. Lo que se gana aquí es la IDENTIDAD del SDK (versión publicada y verificable,
+  # `npm view @erplora/module-sdk@X.Y.Z`) y el desarrollo local fuera del monorepo.
+  #
+  # `needs: build-and-push` a propósito: `scripts/image-tags.sh` es quien rechaza un tag que no es
+  # semver, uno ya publicado o uno que retrocede. Una versión npm tampoco se despublica pasadas
+  # 72 h, así que no se publica ninguna que esa guarda no haya aprobado antes.
+  publish-module-sdk:
+    name: Publicar @erplora/module-sdk (GitHub Packages)
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write   # publicar en GitHub Packages con GITHUB_TOKEN
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # `registry-url` + `scope` son lo que escribe el `.npmrc` con
+      # `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}`. Sin este paso, `npm publish` iría al
+      # registro público de npmjs — el SDK de un repo privado, en abierto y sin vuelta atrás.
+      - name: Node + registro de la organización
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@erplora'
+
+      # El MISMO script que estampa la imagen, con el MISMO número: el del tag. Estampa los tres
+      # ficheros y se NIEGA si alguno no tiene dónde escribir, así que aquí no puede publicarse un
+      # paquete cuya `SDK_VERSION` diga otra cosa que su `package.json`.
+      - name: Estampar la versión del tag
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: ./scripts/stamp-version.sh --version "${GITHUB_REF_NAME#v}"
+
+      # Sin `npm install`: el paquete se publica como FUENTE TypeScript (`main: src/index.ts`), no
+      # hay build ni artefacto que generar, y su única devDependency (`typescript`) solo la usa
+      # `contract:check`. `--dry-run` primero para que el contenido del tarball quede en el log:
+      # `files` es lo único que decide qué sale, y un tarball vacío se publica igual de bien.
+      - name: Publicar en GitHub Packages
+        working-directory: packages/module-sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm publish --dry-run
+          npm publish
+          echo ""
+          echo "Publicado @erplora/module-sdk@${GITHUB_REF_NAME#v} en https://npm.pkg.github.com"
+          echo "Consumir (requiere un token con read:packages sobre ERPlora/hub):"
+          echo "  .npmrc → @erplora:registry=https://npm.pkg.github.com"
+          echo "  package.json → \"@erplora/module-sdk\": \"^${GITHUB_REF_NAME#v}\""
+
+      # `erplora-guest-sdk` no se publica en ningún registro: se consume por GIT TAG
+      # (`crates/guest-sdk/Cargo.toml` lleva `publish = false`). El tag ya existe —es el que ha
+      # disparado este workflow—, así que no hay nada que hacer salvo dejar escrita la línea que
+      # un módulo tiene que poner en su `handler/Cargo.toml`.
+      - name: Cómo se consume erplora-guest-sdk
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "erplora-guest-sdk se consume por git tag (sin registro, publish = false):"
+          echo "  erplora-guest-sdk = { git = \"https://github.com/ERPlora/hub\", tag = \"${GITHUB_REF_NAME}\" }"
 
 # ==============================================================================
 # Pendiente (requiere credenciales/acceso reales que hoy solo tiene Ioan, no una decisión de diseño):
