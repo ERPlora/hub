@@ -618,11 +618,11 @@ export default {
     // invoicing record and the screen exists to be read next to one.
     declarationTitle: 'Declaración responsable',
     declarationDesc:
-      'La declaración que ERPlora firma para la versión del sistema que ejecuta este hub, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
+      'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
     declarationRead: 'Leer la declaración firmada',
     declarationDataTitle: 'Datos identificativos de este sistema',
     declarationPending:
-      'Este hub todavía no ha recibido los datos identificativos de ERPlora. Llegan solos al minuto de estar en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
+      'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
     declarationError: 'No se ha podido cargar la declaración responsable.',
     declarationNombreRazon: 'Productor',
     declarationNIF: 'NIF del productor',

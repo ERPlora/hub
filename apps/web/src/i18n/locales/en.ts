@@ -663,11 +663,11 @@ export default {
     // invoicing record and the screen exists to be read next to one.
     declarationTitle: 'Responsible declaration',
     declarationDesc:
-      'The declaration ERPlora signs for the version of the system this hub is running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
+      'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
     declarationRead: 'Read the signed declaration',
     declarationDataTitle: 'Identifying data of this system',
     declarationPending:
-      'This hub has not received ERPlora’s identifying data yet. It arrives on its own within a minute of the hub coming online; until then no invoice can be sent to the tax agency.',
+      'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
     declarationError: 'Could not load the responsible declaration.',
     declarationNombreRazon: 'Producer',
     declarationNIF: 'Producer tax id',
