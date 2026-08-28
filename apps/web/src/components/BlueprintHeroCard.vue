@@ -414,8 +414,11 @@ function messageOf(err: unknown): string {
   font-size: 0.875rem;
   color: var(--ion-color-medium);
 }
+/* hub#1291: was `--ion-color-warning-shade` (~2.08:1 on white) — still under WCAG AA. `.hero-body`
+   already sets `medium`; there is no icon here to carry a separate accent, so this override is
+   just documented as intentionally gone rather than silently dropped. */
 .hero-blocked {
-  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  color: var(--ion-color-medium);
 }
 .hero-failed {
   color: var(--ion-color-danger-shade, var(--ion-color-danger));

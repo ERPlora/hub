@@ -131,17 +131,20 @@
                 {{ t('assistant.quotaAskAdmin') }}
               </p>
             </div>
+            <!-- hub#1291: the sentence used to inherit `.chat-grounding-line`'s warning yellow
+                 (~2.1:1 on white even with the `-shade`, under WCAG AA); it now reads `medium`
+                 and the warning accent lives only on `.chat-grounding-icon`. -->
             <div v-if="m.role === 'assistant' && m.grounding" class="chat-grounding" role="status">
               <p v-if="m.grounding.claimedWithoutEffect" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.claimedWithoutEffect') }}
               </p>
               <p v-if="m.grounding.unsourcedIds.length" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.unsourcedId') }}
               </p>
               <p v-if="m.grounding.unknownRoutes.length" class="chat-grounding-line">
-                <HubIcon name="alert-circle-outline" />
+                <HubIcon name="alert-circle-outline" class="chat-grounding-icon" />
                 {{ t('assistant.unknownRoute') }}
               </p>
             </div>
@@ -1126,6 +1129,11 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.35;
+  /* hub#1291: was `--ion-color-warning-shade` (~2.1:1 on white) — still under WCAG AA. Same
+     `medium` as `.quota-warning` just above; the icon alone carries the warning accent. */
+  color: var(--ion-color-medium, #6b7280);
+}
+.chat-grounding-icon {
   color: var(--ion-color-warning-shade, #b88a00);
 }
 .chat-bubble {

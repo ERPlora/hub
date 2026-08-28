@@ -259,7 +259,10 @@
                 <!-- Motivo del fallo tal cual lo reportó el motor (informe honesto). -->
                 <p v-if="row.reason" class="fail-reason">{{ row.reason }}</p>
               </ion-label>
-              <ion-note slot="end" :color="row.color">{{ row.statusLabel }}</ion-note>
+              <!-- hub#1291: the leading icon above keeps `row.color`'s accent (incl. warning
+                   yellow); this note is the readable status LABEL, so its text is remapped via
+                   `noteTextColor` — `medium`, never the raw ~1.6:1 warning yellow. -->
+              <ion-note slot="end" :color="noteTextColor(row.color)">{{ row.statusLabel }}</ion-note>
             </ion-item>
 
             <!-- Los módulos que el import instaló (o no pudo instalar). La pantalla los promete;
@@ -273,7 +276,10 @@
                 <h2>{{ row.label }}</h2>
                 <p v-if="row.reason" class="fail-reason">{{ row.reason }}</p>
               </ion-label>
-              <ion-note slot="end" :color="row.color">{{ row.statusLabel }}</ion-note>
+              <!-- hub#1291: the leading icon above keeps `row.color`'s accent (incl. warning
+                   yellow); this note is the readable status LABEL, so its text is remapped via
+                   `noteTextColor` — `medium`, never the raw ~1.6:1 warning yellow. -->
+              <ion-note slot="end" :color="noteTextColor(row.color)">{{ row.statusLabel }}</ion-note>
             </ion-item>
           </ion-list>
         </ion-card-content>
@@ -931,6 +937,16 @@ const visual = {
   blocked: { icon: 'cart-outline', color: 'warning', label: () => t('importPage.statusBlocked') },
 } as const;
 
+/**
+ * hub#1291: `row.color` still drives the leading `HubIcon`'s accent (`ignored`/`partial`/
+ * `blocked` stay visibly yellow there) — but the trailing `<ion-note>` renders the status LABEL
+ * as readable text, and Ionic's raw `--ion-color-warning` is ~1.6:1 on white, under WCAG AA. Only
+ * the note's own text color is remapped; `success`/`medium`/`danger` are unchanged.
+ */
+function noteTextColor(color: ReportRow['color']): ReportRow['color'] | 'medium' {
+  return color === 'warning' ? 'medium' : color;
+}
+
 // El motor del runtime NO copia media (lo hace la capa server) y la reporta `Skipped`; su
 // resultado REAL viene en `report.media`. Traducimos ese contador al estado verdadero de la fila
 // para no mentir con un «Saltado» cuando las imágenes sí se copiaron (informe de review, hallazgo #1).
@@ -1053,8 +1069,10 @@ async function finish(): Promise<void> {
   color: var(--ion-color-medium);
   margin: 0 0 0.5rem;
 }
+/* hub#1291: was `--ion-color-warning-shade` (~2.08:1 on white) — still under WCAG AA. `medium`
+   matches `.page-lead`'s own color; there is no icon here to carry a separate accent. */
 .admin-note {
-  color: var(--ion-color-warning-shade, var(--ion-color-warning));
+  color: var(--ion-color-medium);
 }
 .section-title {
   font-size: 1rem;
