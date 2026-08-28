@@ -702,7 +702,7 @@ async fn deliver_host_notify(
         // row dies now — stamped, payload intact, retryable — and `replay_capability_denied` puts
         // it back the moment the owner flips the switch. Burning the ladder to reach `failure_kind
         // = ''` is what made the reminder unrecoverable instead of merely late.
-        if let Err(e) = crate::capabilities::require(
+        match crate::capabilities::require(
             db,
             registry,
             module_id,
@@ -711,7 +711,14 @@ async fn deliver_host_notify(
         )
         .await
         {
-            return Err(NotifyFailure::dead_now(FAILURE_CAPABILITY_DENIED, e));
+            Ok(()) => {}
+            Err(e @ RuntimeError::CapabilityDenied { .. }) => {
+                return Err(NotifyFailure::dead_now(FAILURE_CAPABILITY_DENIED, e));
+            }
+            // Only the REFUSAL is terminal now. The gate reads the grants table, so a database
+            // blip surfaces at this same call — and that one keeps the ladder every other `?`
+            // keeps, or a transient error would die stamped with a remedy that does not apply.
+            Err(e) => return Err(e.into()),
         }
         // Puerta 2 — el canal tiene que estar declarado por el módulo emisor.
         host_notify::assert_channel_declared(registry, module_id, intent.channel)?;
@@ -3764,5 +3771,53 @@ mod tests {
         );
         drain(&db, &reg).await.unwrap();
         assert_eq!(queued_jobs(&db).await.len(), 1, "…and the document reached the print queue");
+    }
+
+    /// Regression test for ERPlora/hub#1192 (review) — **only the refusal is terminal-now.** The gate
+    /// the fix wraps reads the grants table, so a database blip surfaces at the very same call, and
+    /// it must keep the ladder every other `?` keeps: stamping it `module.capability_denied` would
+    /// kill it on the first pass and tell the operator to grant a capability that is already there.
+    #[tokio::test]
+    async fn hub1192_a_database_error_at_the_notify_gate_keeps_its_retry_ladder() {
+        use crate::host_notify::MockTransport;
+
+        let db = db_for_notify().await;
+        let mut reg = registry_for_notify(true);
+        let transport = std::sync::Arc::new(MockTransport::new());
+        reg.notify_transport = Some(transport.clone());
+        // Granted for real: what fails below is the DATABASE under the gate, not the gate.
+        authorize_notify(&db, &reg, "cliente@x.com").await;
+
+        let ctx = RequestContext::new("h1", "", ["*".to_string()]);
+        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
+            .await
+            .unwrap();
+        // The grants table goes away under the relay: `capabilities::require` fails on its query.
+        db.execute_batch("ALTER TABLE _module_capability_grants RENAME TO _module_capability_grants_gone;")
+            .await
+            .unwrap();
+        process_once(&db, &reg).await.unwrap();
+
+        assert_eq!(count_dead(&db, "h1").await.unwrap(), 0, "a database error is not a refusal: no first-pass death");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1").await,
+            1,
+            "the row is deferred on the ladder with its error"
+        );
+        assert_eq!(
+            one_text(&db, "SELECT failure_kind AS c FROM _event_outbox").await,
+            "",
+            "nothing stamps `module.capability_denied` on a row nobody refused"
+        );
+
+        // The database comes back and the ladder does its job: the reminder goes out.
+        db.execute_batch("ALTER TABLE _module_capability_grants_gone RENAME TO _module_capability_grants;")
+            .await
+            .unwrap();
+        db.execute("UPDATE _event_outbox SET next_attempt_at = '2020-01-01T00:00:00+00:00'", &Params::new())
+            .await
+            .unwrap();
+        drain(&db, &reg).await.unwrap();
+        assert_eq!(transport.sent().len(), 1, "…and the reminder reached the customer after the blip");
     }
 }
