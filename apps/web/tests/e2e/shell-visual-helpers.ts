@@ -9,6 +9,7 @@
 
 import { expect, request as pwRequest, type Page, type TestInfo } from '@playwright/test';
 import { existsSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { shouldSkipMissingBaselineLocally } from '../../src/lib/visual-baseline-gate';
 
 const RUNTIME = process.env.HUB_RUNTIME_URL ?? 'http://127.0.0.1:8787';
@@ -59,16 +60,23 @@ export async function loggedInSession(page: Page): Promise<void> {
 }
 
 /**
- * Salta el caso (con motivo, en voz alta) si la baseline de esta plataforma no existe TODAVÍA —
- * SOLO fuera de CI (hub#1250: en CI una baseline ausente tiene que fallar, nunca saltarse; ese
- * fallo lo produce `updateSnapshots: 'none'` en `playwright.config.ts`, no este guard).
+ * Salta el caso (con motivo, en voz alta) si la baseline de esta plataforma no existe TODAVÍA.
+ *
+ * Fuera de CI, siempre (hub#1240: un Mac nunca va a igualar el PNG de Linux). En CI, solo si esta
+ * pantalla no ha llegado a tener NINGUNA baseline generada todavía (el directorio
+ * `<Spec>.spec.ts-snapshots/` no existe) — que es el estado de hub#1250 hasta que
+ * `visual-baselines.yml` corra por primera vez. En cuanto exista una sola baseline para esta
+ * pantalla, que falte ESTE fichero deja de saltarse y cae a la aserción normal: alguien la borró
+ * en una PR, y eso tiene que fallar (`updateSnapshots: 'none'` en `playwright.config.ts`), no
+ * saltarse en silencio.
  *
  * `testInfo.skip()` aborta la ejecución del caso en el sitio si corresponde saltar — la llamada
  * es suficiente, no hace falta comprobar un valor de vuelta.
  */
 export function skipIfBaselineMissingLocally(testInfo: TestInfo, snapshot: string): void {
   const baseline = testInfo.snapshotPath(snapshot);
-  if (shouldSkipMissingBaselineLocally(process.env, existsSync(baseline))) {
+  const baselineDirExists = existsSync(dirname(baseline));
+  if (shouldSkipMissingBaselineLocally(process.env, existsSync(baseline), baselineDirExists)) {
     const reason = `falta la baseline ${baseline} — genérala con el workflow visual-baselines.yml (workflow_dispatch, en Linux)`;
     // El reporter `list` pinta un guion por caso saltado y el motivo no lo pinta nadie: sin esta
     // línea, el salto solo se descubre leyendo el log entero. En CI va además como anotación de

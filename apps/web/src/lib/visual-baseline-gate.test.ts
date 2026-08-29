@@ -35,21 +35,40 @@ describe('resolveUpdateSnapshotsMode (hub#1250)', () => {
 
 describe('shouldSkipMissingBaselineLocally (hub#1250)', () => {
   it('never skips on the dedicated baseline-update run, even before the PNG exists', () => {
-    expect(shouldSkipMissingBaselineLocally({ CI: '1', HUB_UPDATE_BASELINES: '1' }, false)).toBe(false);
+    expect(shouldSkipMissingBaselineLocally({ CI: '1', HUB_UPDATE_BASELINES: '1' }, false, false)).toBe(false);
   });
 
-  it('REGRESSION: a normal CI run with a missing baseline must NOT skip (hub#1250)', () => {
+  it('REGRESSION: in CI, once this spec already has SOME baseline committed, a missing one must NOT skip (hub#1250)', () => {
     // Before this fix the guard was `!UPDATING_BASELINES && !existsSync(baseline)`, true in every
-    // environment — so deleting the PNG in a PR flipped the case to a silent, skipped green
-    // instead of a red failure naming the missing capture.
-    expect(shouldSkipMissingBaselineLocally({ CI: '1', HUB_UPDATE_BASELINES: undefined }, false)).toBe(false);
+    // environment — so deleting one PNG out of an already-generated spec flipped the case to a
+    // silent, skipped green instead of a red failure naming the missing capture.
+    expect(shouldSkipMissingBaselineLocally({ CI: '1', HUB_UPDATE_BASELINES: undefined }, false, true)).toBe(false);
+  });
+
+  it('REGRESSION: in CI, a spec whose baseline directory was NEVER generated must still skip loudly (hub#1250 sequencing)', () => {
+    // This is what this very PR ships: five brand-new *Visual.spec.ts, zero PNGs committed
+    // anywhere in the repo (`visual-baselines.yml` cannot run yet — workflow_dispatch 404s until
+    // the file reaches `main`). Without this distinction, flipping the CI skip off unconditionally
+    // turns test-web.yml's `e2e` job permanently red for every PR touching apps/web/**, for as
+    // long as it takes to land the baselines — a self-inflicted regression, not the one hub#1250
+    // set out to close (a baseline DELETED from an already-working contract).
+    expect(shouldSkipMissingBaselineLocally({ CI: '1', HUB_UPDATE_BASELINES: undefined }, false, false)).toBe(true);
   });
 
   it('skips locally when the baseline does not exist yet (a Mac dev machine, hub#1240)', () => {
-    expect(shouldSkipMissingBaselineLocally({ CI: undefined, HUB_UPDATE_BASELINES: undefined }, false)).toBe(true);
+    expect(shouldSkipMissingBaselineLocally({ CI: undefined, HUB_UPDATE_BASELINES: undefined }, false, false)).toBe(
+      true,
+    );
+    // Outside CI the Linux baseline will never match anyway, so the directory having other
+    // viewports already generated changes nothing — always skip on a dev machine.
+    expect(shouldSkipMissingBaselineLocally({ CI: undefined, HUB_UPDATE_BASELINES: undefined }, false, true)).toBe(
+      true,
+    );
   });
 
   it('never skips once the baseline already exists', () => {
-    expect(shouldSkipMissingBaselineLocally({ CI: undefined, HUB_UPDATE_BASELINES: undefined }, true)).toBe(false);
+    expect(shouldSkipMissingBaselineLocally({ CI: undefined, HUB_UPDATE_BASELINES: undefined }, true, true)).toBe(
+      false,
+    );
   });
 });
