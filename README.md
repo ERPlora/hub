@@ -144,3 +144,4 @@ la baseline de tu plataforma, el caso visual se salta diciéndolo.
 - Multi-tenant **`hub_id` por fila**, **una BD por hub** (ADR-0201). Hardware por la **app instalable** vía `invoke` in-process (ADR-0196); cola de impresión en el hub (§6); en Android vuelve el Bluetooth SPP (ADR-0204, pendiente hub#388).
 - Red de módulos: **`http.fetch` mediado** (Opción A). Migración **POS-first**, gradual.
 - Auth: email (1er login) → dispositivo de confianza (enforce, sin bypass — hub#330) → PIN con rate-limit (hub#329); usuarios cloud y solo-locales.
+
