@@ -4,7 +4,15 @@
 // cliente lo aplana a «no se pudo», la guarda vuelve a ser un no-op mudo.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ModuleActionError, deactivateModule, uninstallModule } from './runtime';
+import {
+  ModuleActionError,
+  activateModule,
+  activeModuleIds,
+  deactivateModule,
+  publishActiveModuleIds,
+  refreshActiveModuleIds,
+  uninstallModule,
+} from './runtime';
 
 function respondWith(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -99,5 +107,66 @@ describe('desinstalar · el gate de dependientes', () => {
     const err = (await uninstallModule('taxes').catch((e: unknown) => e)) as ModuleActionError;
     expect(err.code).toBe('has_dependents');
     expect(err.dependents).toEqual(['sales', 'inventory', 'invoice', 'services']);
+  });
+});
+
+// hub#1211 — `queryOptional`/`queryAllOptional` (module-sdk) short-circuit an ABSENT module by
+// reading `activeModuleIds()` instead of asking the transport. A toggle that did not keep that set
+// current would just move the 404 from "every call" to "every call until the next unrelated
+// refresh" — still a defect, just a slower one.
+describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)', () => {
+  afterEach(() => {
+    publishActiveModuleIds(undefined);
+  });
+
+  /** Answers `/api/modules` (GET) and the action endpoint (POST) differently, by URL shape. */
+  function scriptedFetch(modulesBody: unknown, actionBody: unknown = { ok: true }): ReturnType<typeof vi.fn> {
+    const spy = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(url.includes('/api/modules?') ? modulesBody : actionBody),
+      }),
+    );
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  it('activateModule republica el conjunto ACTIVO tras el éxito', async () => {
+    scriptedFetch({
+      ok: true,
+      data: [{ id: 'cash_register', name: 'Caja', status: 'active', version: '1.0.0' }],
+    });
+
+    await activateModule('cash_register');
+
+    expect(activeModuleIds()).toEqual(new Set(['cash_register']));
+  });
+
+  it('deja fuera los módulos INACTIVOS: lo que corto-circuita es "activo", no "instalado"', async () => {
+    scriptedFetch({
+      ok: true,
+      data: [
+        { id: 'cash_register', name: 'Caja', status: 'inactive', version: '1.0.0' },
+        { id: 'sales', name: 'Ventas', status: 'active', version: '1.0.0' },
+      ],
+    });
+
+    await deactivateModule('cash_register');
+
+    expect(activeModuleIds()).toEqual(new Set(['sales']));
+  });
+
+  it('un refresco que falla CONSERVA la respuesta anterior, nunca la vacía', async () => {
+    publishActiveModuleIds(new Set(['sales']));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+    await refreshActiveModuleIds();
+
+    expect(activeModuleIds()).toEqual(new Set(['sales']));
+  });
+
+  it('sin ningún refresco todavía, la respuesta es "no lo sé" (undefined), nunca un [] inventado', () => {
+    expect(activeModuleIds()).toBeUndefined();
   });
 });

@@ -342,6 +342,10 @@ export function getClient(): ErploraClient {
         // (`hubTimezone()` ← `/api/hub/context`), para que un módulo que agende lea el MISMO
         // reloj que el runtime le entrega a un handler (`context.timezone`).
         timezone: hubTimezone,
+        // hub#1211: le da a `queryOptional`/`queryAllOptional` el conjunto de módulos ACTIVOS, sin
+        // el cual la única forma de saber que uno falta era preguntar al transporte igualmente y
+        // atrapar `module_not_installed` después de que la petición ya hubiera viajado.
+        installedModules: activeModuleIds,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
@@ -350,6 +354,15 @@ export function getClient(): ErploraClient {
       },
       bridge,
     );
+    // Siembra inicial (hub#1211): mientras resuelve, `activeModuleIds()` sigue devolviendo
+    // `undefined` ("no lo sé todavía") y el SDK cae a preguntar al transporte, como antes.
+    void refreshActiveModuleIds();
+    // `module.installed` (ARQUITECTURA.md §2.2/§4) es el único evento WS de ciclo de vida de
+    // módulos que existe hoy; activar/desactivar/desinstalar no emiten uno propio, así que esos
+    // tres se refrescan síncronamente al resolver en `moduleAction`.
+    _client.on('module.installed', () => {
+      void refreshActiveModuleIds();
+    });
   }
   return _client;
 }
@@ -514,6 +527,46 @@ export async function listInstalledModules(): Promise<InstalledModule[]> {
   return env.data ?? [];
 }
 
+// hub#1211 — the live set of ACTIVE module ids, published for `ErploraClient`'s `installedModules`
+// option (`getClient()` below): lets `queryOptional`/`queryAllOptional` learn a module is absent
+// WITHOUT a round trip, instead of asking the transport and catching `module_not_installed` after
+// the request already happened — which is what left a `404 POST /api/query` in the console on
+// EVERY call of an optional integration the hub does not have (`sales` asking `verifactu`, hub#1121
+// surfaced it as `sales` → `modifiers`). `undefined` means "not known yet"; the SDK treats that as
+// "cannot rule the module out" and falls back to asking the transport, same as before this existed.
+let activeModuleIdsCache: ReadonlySet<string> | undefined;
+
+/** Current answer for `ErploraClient`'s `installedModules` option. Inyectable/legible en tests. */
+export function activeModuleIds(): ReadonlySet<string> | undefined {
+  return activeModuleIdsCache;
+}
+
+/**
+ * Republishes the ACTIVE module id set (hub#1211). Exported so tests can seed/clear it exactly
+ * like `publishHubTimezone` — `null`/`undefined` clears it back to "not known yet".
+ */
+export function publishActiveModuleIds(ids: ReadonlySet<string> | null | undefined): void {
+  activeModuleIdsCache = ids ?? undefined;
+}
+
+/**
+ * Re-asks the runtime which modules are ACTIVE and republishes the set (hub#1211). Called once at
+ * client construction and after every install (`module.installed` WS event) / activate / deactivate
+ * / uninstall — the exact same moments the shell already refreshes its own nav and module list.
+ *
+ * Best-effort by contract, like `refreshHubTimezone`: a failed refresh KEEPS the previous answer
+ * (never publishes an empty set on a transient error, which would make every optional query look
+ * absent) — it just stays `undefined` ("not known yet") if there was no previous answer either.
+ */
+export async function refreshActiveModuleIds(): Promise<void> {
+  try {
+    const modules = await listInstalledModules();
+    publishActiveModuleIds(new Set(modules.filter((m) => m.status === 'active').map((m) => m.id)));
+  } catch {
+    // Deja la respuesta anterior — ver el comentario de arriba.
+  }
+}
+
 /**
  * Fallo de una acción de módulo que CONSERVA el código estable del runtime (hub#139).
  *
@@ -574,6 +627,10 @@ async function moduleAction(
       env.error?.dependents,
     );
   }
+  // hub#1211: activate/deactivate/uninstall change WHICH modules are active — re-publish the set
+  // the SDK's short-circuit reads, or an optional query for the module just (de)activated would
+  // keep answering with yesterday's cache until something else happened to refresh it.
+  await refreshActiveModuleIds();
 }
 
 /**

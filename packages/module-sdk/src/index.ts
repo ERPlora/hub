@@ -1976,10 +1976,49 @@ export class ErploraClient {
        * esto al Web Component. Inyectable para tests.
        */
       timezone?: () => string;
+      /**
+       * The live set of ACTIVE module ids (hub#1211) — the shell's `listInstalledModules()`
+       * filtered to `status === 'active'`, refreshed on install/uninstall/activate/deactivate.
+       * Lets `queryOptional`/`queryAllOptional` learn a module is absent WITHOUT a round trip:
+       * before this existed, the only way to find that out was asking the transport and catching
+       * `module_not_installed` after the request had already happened, so every optional
+       * integration a hub does not have left a failed `POST /api/query` in the console per call.
+       *
+       * `undefined` means "I do not know yet" (e.g. before the shell's first `GET /api/modules`
+       * resolves), and is treated as "cannot rule it out" — the SDK falls back to asking the
+       * transport, exactly like before this option existed. Guessing "absent" while unknown would
+       * be the SYMMETRIC regression: a real query silently skipped. Inyectable para tests.
+       */
+      installedModules?: () => ReadonlySet<string> | undefined;
     } = {},
     bridge?: BridgeTransport,
   ) {
     this.bridge = bridge;
+  }
+
+  /**
+   * The module id a namespaced query/command NAME belongs to (ADR-0127: every name is namespaced
+   * `modulo.entidad.accion`) — `"verifactu.records.by_invoice"` → `"verifactu"`. `undefined` for a
+   * name with no dot: that is not a shape this SDK's naming convention produces, and refusing to
+   * guess an owner keeps the short-circuit from ever misfiring on it (it just travels, as before).
+   */
+  private static ownerModuleOf(name: string): string | undefined {
+    const dot = name.indexOf('.');
+    return dot > 0 ? name.slice(0, dot) : undefined;
+  }
+
+  /**
+   * `true` only when the caller can PROVE the owning module is absent — `installedModules()`
+   * answered a concrete set and the module is not in it. Any doubt (no option wired, the set is
+   * not known yet, or the name carries no recognisable owner) resolves to `false`, which keeps the
+   * existing "ask the transport, catch the absence" path as the fallback.
+   */
+  private isKnownAbsent(name: string): boolean {
+    const owner = ErploraClient.ownerModuleOf(name);
+    if (!owner) return false;
+    const installed = this.opts.installedModules?.();
+    if (!installed) return false;
+    return !installed.has(owner);
   }
 
   /**
@@ -2149,8 +2188,15 @@ export class ErploraClient {
    * Todo lo demás EXPLOTA como en `query()`: una query renombrada en un módulo presente, un
    * permiso denegado o un handler roto son contratos rotos, no ausencias. Esto NO es un
    * `.catch(() => [])` — esa forma se tragaba las dos cosas y por eso se retiró.
+   *
+   * **Corto-circuito (hub#1211):** cuando `installedModules` (inyectado por el shell) PRUEBA que
+   * el módulo dueño está ausente, devuelve `undefined` sin llamar al transporte — antes se
+   * enteraba de la ausencia haciendo la petición igual, así que cada integración opcional ausente
+   * dejaba un `404 POST /api/query` en la consola en CADA llamada. Sin esa prueba (opción no
+   * inyectada, o aún no resuelta), cae al camino de siempre: pregunta y atrapa la ausencia.
    */
   async queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined> {
+    if (this.isKnownAbsent(name)) return undefined;
     try {
       return await this.query<T>(name, params);
     } catch (e) {
@@ -2212,8 +2258,12 @@ export class ErploraClient {
    * exactly like {@link queryOptional}: a renamed query, a denied permission or a broken handler
    * are broken contracts, not absences. And `[]` keeps meaning "installed, nothing to offer", which
    * is a different answer from "not installed" and must stay tellable apart by the caller.
+   *
+   * **Short-circuit (hub#1211):** same guard as {@link queryOptional} — when `installedModules`
+   * PROVES the owner is absent, this returns `undefined` without ever calling the transport.
    */
   async queryAllOptional<T = unknown>(name: string, params: ListParams = {}): Promise<T[] | undefined> {
+    if (this.isKnownAbsent(name)) return undefined;
     try {
       return await this.queryAll<T>(name, params);
     } catch (e) {

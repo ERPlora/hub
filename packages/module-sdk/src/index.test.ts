@@ -1107,6 +1107,88 @@ test('queryOptional también trata module_inactive como ausencia (cascada ADR-01
   assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
 });
 
+// ── queryOptional/queryAllOptional short-circuit: absence must not cost a ROUND TRIP (hub#1211) ─
+//
+// Before this fix, `queryOptional` learned a module was absent by asking the transport ANYWAY and
+// catching `module_not_installed` AFTER the request already happened. Every optional integration a
+// hub does not have left one `POST /api/query` → 404 in the browser console PER CALL — `sales`
+// asking `verifactu.records.by_invoice` on a hub with no VeriFactu logged a 404 on every sale
+// (surfaced as hub#1121, `sales`→`modifiers`). The shell now injects `installedModules`, the live
+// set of ACTIVE module ids (mirrors how `permissions`/`currency`/`timezone` are already injected);
+// when it says the query's owning module (the segment before the first `.`) is absent, the SDK
+// must never call the transport at all — this is a test that COUNTS REQUESTS, not one that only
+// asserts on the returned value (that shape already passed before this defect and would keep
+// passing after a fix that fixes nothing).
+
+function transporteQueCuenta(respuesta: unknown = { rows: [], total: 0, limit: 50, offset: 0 }) {
+  const calls: Array<{ name: string; params?: Record<string, unknown> }> = [];
+  return {
+    calls,
+    transport: {
+      query: async (name: string, params?: Record<string, unknown>) => {
+        calls.push({ name, params });
+        return respuesta;
+      },
+      command: async () => ({}),
+      subscribe: () => () => {},
+    },
+  };
+}
+
+test('query_optional_does_not_travel_when_the_owner_module_is_absent_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta();
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryOptional('verifactu.records.by_invoice', { invoice_id: 'i1' });
+
+  assert.equal(result, undefined, 'sin verifactu instalado, el llamador ve una ausencia');
+  assert.equal(calls.length, 0, 'el SDK NO puede preguntar al transporte para averiguarlo');
+});
+
+test('query_all_optional_does_not_travel_when_the_owner_module_is_absent_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta();
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryAllOptional('verifactu.records.by_invoice');
+
+  assert.equal(result, undefined);
+  assert.equal(calls.length, 0, 'queryAllOptional corto-circuita exactamente igual que queryOptional');
+});
+
+test('query_optional_still_travels_when_the_owner_module_is_installed_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta({ rows: [{ id: 'r1' }], total: 1, limit: 50, offset: 0 });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['verifactu']) });
+
+  const result = await c.queryOptional('verifactu.records.by_invoice');
+
+  assert.deepEqual(result, [{ id: 'r1' }]);
+  assert.equal(calls.length, 1, 'el módulo SÍ está instalado: la petición tiene que viajar de verdad');
+});
+
+test('query_optional_still_travels_when_the_installed_set_is_not_known_yet_hub1211', async () => {
+  // Antes de que resuelva el primer `GET /api/modules` del shell (o con un transporte antiguo que
+  // nunca pasa `installedModules`), el SDK no puede distinguir «ausente» de «no lo sé todavía» —
+  // y adivinar «ausente» sería la regresión SIMÉTRICA: una query real que se salta en silencio.
+  const c = new ErploraClient(transporteQueFalla('module_not_installed'), {
+    installedModules: () => undefined,
+  });
+
+  assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});
+
+test('a_renamed_query_still_explodes_hub1211', async () => {
+  // El módulo SÍ está presente (el corto-circuito no aplica) pero su query fue renombrada/borrada:
+  // eso es un contrato roto, no una ausencia, y tiene que explotar exactamente igual que antes.
+  const c = new ErploraClient(transporteQueFalla('not_found'), {
+    installedModules: () => new Set(['verifactu']),
+  });
+
+  await assert.rejects(() => c.queryOptional('verifactu.records.by_invoice'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === 'not_found', 'el contrato roto EXPLOTA igual');
+    return true;
+  });
+});
+
 // ── queryAllOptional: the WHOLE set of an OPTIONAL module (ERPlora/sales#186) ────────────────
 //
 // The two halves this needs already existed, and neither one alone is what a POS asks for:

@@ -48,13 +48,11 @@ async function withSession(page: Page, s: Session): Promise<void> {
   );
 }
 
-// 🔴 RED because of a real, already-filed defect, not because of this test (hub#1211, surfaced when
-// hub#1240 first ran this suite): `queryOptional` (ADR-0127) makes the request ANYWAY to find out a
-// module is absent, so every optional integration that is not installed leaves a `404 POST
-// /api/query` in the console — which is exactly what the second assertion below forbids. Left as
-// `fixme` — visible in the report, not deleted — so the rest of the suite can run in CI; drop the
-// marker when hub#1211 closes.
-test.fixme('panel loads fire no GET /api/query and no /api/query failure', async ({ page }) => {
+// hub#1211 fixed the real defect this pinned as `fixme` (surfaced when hub#1240 first ran this
+// suite): `queryOptional`/`queryAllOptional` no longer make the request to find out a module is
+// absent — the shell's `installedModules` (module-sdk) short-circuits from the live ACTIVE module
+// set, so an optional integration that is not installed leaves no `POST /api/query` at all.
+test('panel loads fire no GET /api/query and no /api/query failure', async ({ page }) => {
   const session = await loginByPin();
   await withSession(page, session);
 
