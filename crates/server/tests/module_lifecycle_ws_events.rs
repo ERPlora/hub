@@ -90,7 +90,7 @@ async fn activating_a_module_broadcasts_module_activated_exactly_once_hub1317() 
     // Arranca INACTIVO (llamado directo al runtime, sin pasar por HTTP: no debe emitir nada).
     state_owner
         .runtime
-        .lock()
+        .write()
         .await
         .deactivate("demo")
         .await
