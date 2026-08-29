@@ -100,10 +100,12 @@ fn admin() -> RequestContext {
 /// `records.create`'s own manifest schema (`schemas/record_create.json`) never accepts a
 /// `tax_breakdown`, so every call through this public command binds an EMPTY STRING to that
 /// column. On Postgres 18 that empty string trips a pre-existing bug in the sibling
-/// `ERPlora/verifactu` module (migration `011_arithmetic_integrity.sql`): its `alta`-only CHECK
-/// constraints call `JSON_EXISTS(tax_breakdown, … FALSE ON ERROR)`, and Postgres raises
-/// `invalid input syntax for type json` for that empty string — `ON ERROR` does not catch it —
-/// before the constraint's own `record_type <> 'alta'` guard ever gets to short-circuit it.
+/// `ERPlora/verifactu` module (migration `013_arithmetic_integrity.sql` on its `main` — `011` is
+/// a permanent gap in that repo's numbering): its `alta`-only CHECK constraints call
+/// `JSON_EXISTS(tax_breakdown, … FALSE ON ERROR)`, and Postgres raises `invalid input syntax
+/// for type json` (SQLSTATE 22P02) for that empty string — the text→json cast of the context
+/// item happens BEFORE path evaluation, so `ON ERROR` never sees it. For an `alta` the leading
+/// `record_type <> 'alta'` is false, so nothing short-circuits the call.
 /// Reproduced directly: `SELECT JSON_EXISTS('', 'strict $[*]' FALSE ON ERROR);` fails the same
 /// way against a bare `erplora-test-pg-5433`. That bug lives in `ERPlora/verifactu`, not in this
 /// repo (`origin: ERPlora/verifactu`, filed separately) — hub#1270 does not touch it.
