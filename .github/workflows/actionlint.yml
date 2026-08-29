@@ -40,6 +40,7 @@ on:
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
       - 'scripts/tests/canonical-mirrors-workflow.test.sh'
+      - 'scripts/tests/visual-baselines-workflow.test.sh'
   workflow_dispatch:
 
 permissions:
@@ -113,3 +114,13 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/canonical-mirrors-workflow.test.sh
+
+      # ── Contrato de `visual-baselines.yml` (hub#1250) ────────────────────────────────
+      # Mismo razonamiento: sin este paso, una PR que rompiera el workflow de regeneración de
+      # baselines visuales (trigger automático colado, grupo de concurrencia compartido con
+      # test-web.yml, filtro de specs perdido) no lo notaría nadie hasta el primer dispatch real
+      # — y ese dispatch es manual y poco frecuente, así que el hueco podría durar semanas.
+      - name: Contrato de visual-baselines.yml (hub#1250)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/visual-baselines-workflow.test.sh
