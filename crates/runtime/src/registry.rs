@@ -863,21 +863,20 @@ pub struct RequestContext {
     /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
     /// muestren el estado SIN leer la tabla de sistema directamente.
     pub has_certificate: bool,
-    /// **Este hub es una DEMO efímera** (`Registry::demo_hub`, sellado en el arranque desde
-    /// `HUB_DEMO` — ADR-0197, hub#1135). El dispatcher lo copia aquí junto a la identidad de
-    /// negocio, EXACTAMENTE el mismo patrón que [`Self::has_certificate`]: una condición del hub
-    /// que un módulo necesita para pintar (verifactu#40 — no ofrecer «Producción» en una demo que
-    /// `enforce_fiscal_environment_pin` va a negar siempre), sondeada por el runtime y expuesta
-    /// como 0/1 para que el SQL nunca lea una tabla de sistema.
+    /// **This hub is an ephemeral DEMO** (`Registry::demo_hub`, sealed at boot from `HUB_DEMO`
+    /// — ADR-0197, hub#1135). The dispatcher copies it here next to the business identity,
+    /// EXACTLY the same pattern as [`Self::has_certificate`]: a hub condition a module needs in
+    /// order to paint (verifactu#40 — do not offer "Production" in a demo that
+    /// `enforce_fiscal_environment_pin` is always going to deny), sounded by the runtime and
+    /// exposed as 0/1 so the SQL never reads a system table.
     ///
-    /// Es una COPIA de solo lectura para `system_params`, nunca la fuente de la verdad: el
-    /// cierre fiscal (`fiscal_environment_pin`, `fiscal_profile::determine_fiscal_mode`…) sigue
-    /// leyendo `Registry::demo_hub` DIRECTAMENTE, no este campo — por la misma razón que
-    /// `Registry::demo_hub` documenta: un `ctx` es una etiqueta que una puerta nueva podría
-    /// olvidar estampar, y el cierre no se puede permitir ese fallo abierto. Este campo solo
-    /// existe para que `system_params` tenga algo que leer; jamás lo escribe un caller —
-    /// `system_params` lo sobrescribe con el valor de `ctx` después de clonar el payload, igual
-    /// que `hub_id` o `has_certificate`.
+    /// It is a READ-ONLY copy for `system_params`, never the source of truth: the fiscal close
+    /// (`fiscal_environment_pin`, `fiscal_profile::determine_fiscal_mode`…) keeps reading
+    /// `Registry::demo_hub` DIRECTLY, not this field — for the same reason `Registry::demo_hub`
+    /// itself documents: a `ctx` is a label a new door could forget to stamp, and the close
+    /// cannot afford that fail-open. This field exists only so `system_params` has something to
+    /// read; a caller never writes it — `system_params` overwrites it with the value from `ctx`
+    /// after cloning the payload, exactly like `hub_id` or `has_certificate`.
     pub is_demo_hub: bool,
     /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
     /// inyecta el dispatcher junto a la identidad de negocio.
@@ -1188,9 +1187,9 @@ impl RequestContext {
         self
     }
 
-    /// Copia con la marca de DEMO efímera del hub (hub#1135). Lo rellena el dispatcher junto a
-    /// `with_business`/`with_certificate`, leyendo `Registry::demo_hub` — nunca el caller. Builder
-    /// para no romper los `new(...)`/tests existentes.
+    /// Copy with the hub's ephemeral DEMO mark (hub#1135). The dispatcher fills it next to
+    /// `with_business`/`with_certificate`, reading `Registry::demo_hub` — never the caller. A
+    /// builder so it does not break existing `new(...)`/tests.
     pub fn with_demo_hub(mut self, is_demo: bool) -> Self {
         self.is_demo_hub = is_demo;
         self

@@ -3006,12 +3006,12 @@ pub fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         "has_certificate".into(),
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
     );
-    // Marca de DEMO EFÍMERA del hub (ADR-0197, hub#1135), como 0/1 — MISMO patrón que
-    // `:has_certificate` justo arriba: una condición del hub que un módulo necesita para pintar
-    // (verifactu#40 — no ofrecer «Producción» en una demo que el cierre fiscal va a negar
-    // siempre), sondeada por el runtime, nunca adivinada por el módulo. No es un setting y no es
-    // escribible por payload: `ctx.is_demo_hub` la sobrescribe aquí, DESPUÉS de clonar `base`, así
-    // que un caller que la meta en su propio payload la pierde igual que pierde `:hub_id`.
+    // The hub's EPHEMERAL DEMO mark (ADR-0197, hub#1135), as 0/1 — SAME pattern as
+    // `:has_certificate` right above: a hub condition a module needs in order to paint
+    // (verifactu#40 — do not offer "Production" in a demo that the fiscal close is always going
+    // to deny), sounded by the runtime, never guessed by the module. It is not a setting and is
+    // not writable by payload: `ctx.is_demo_hub` overwrites it here, AFTER cloning `base`, so a
+    // caller that stuffs it into its own payload loses it exactly like it loses `:hub_id`.
     p.insert(
         "is_demo_hub".into(),
         Json::from(if ctx.is_demo_hub { 1 } else { 0 }),

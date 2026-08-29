@@ -177,9 +177,9 @@ pub async fn execute_page(
             )
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
-            // La marca de DEMO efímera (ADR-0197, hub#1135), MISMO patrón que `with_certificate`:
-            // copiada de `Registry::demo_hub`, nunca del caller, para que TODA query (no solo los
-            // commands) vea `:is_demo_hub` en vivo.
+            // The ephemeral DEMO mark (ADR-0197, hub#1135), SAME pattern as `with_certificate`:
+            // copied from `Registry::demo_hub`, never from the caller, so that EVERY query (not
+            // just commands) sees `:is_demo_hub` live.
             .with_demo_hub(registry.demo_hub);
         &enriched_ctx
     } else {
