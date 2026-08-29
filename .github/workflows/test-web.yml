@@ -60,23 +60,22 @@
 # sale hasta la siguiente PR del web. Si algún día eso pasa de verdad, la palanca
 # es añadir `crates/**` aquí — no antes.
 #
-# ── `schedule` nocturno sobre develop (hub#1253) ─────────────────────────────
-# El párrafo de arriba deja un hueco: sin `crates/**` en `paths`, un merge SOLO-Rust
-# en `develop` no dispara nunca este fichero, así que una regresión del runtime que
-# rompa el shell (un endpoint que cambia de forma, un 428/403 nuevo) no sale hasta
-# la siguiente PR que toque `apps/web/**` — y ahí le cae a otro. `schedule` es el
-# mecanismo aburrido y estándar (mismo patrón que `test-hub-modules.yml`, hub#1239):
-# corre TODO el fichero una vez al día, sin filtro de `paths` (un `schedule` no lo
-# tiene), y así ve develop tal como quedó tras cualquier merge, sea de Rust o no.
+# ── nightly `schedule` on develop (hub#1253) ─────────────────────────────────
+# The paragraph above leaves a gap: without `crates/**` in `paths`, a Rust-only merge
+# on `develop` never triggers this file, so a runtime regression that breaks the shell
+# (an endpoint that changes shape, a new 428/403) does not surface until the next PR
+# that touches `apps/web/**` — and lands on someone else. `schedule` is the boring,
+# standard mechanism (same pattern as `test-hub-modules.yml`, hub#1239): it runs the
+# WHOLE file once a day, with no `paths` filter (a `schedule` cannot have one), so it
+# sees develop as any merge left it, Rust or not.
 #
-# 🔴 GitHub solo dispara `schedule` desde el fichero que vive en la rama POR DEFECTO
-# del repo (`main`, ver `image-freshness.yml`) y por defecto haría checkout de ESA
-# rama — justo lo contrario de lo que se pide aquí. Los jobs `verify` y `e2e` fuerzan
-# `ref: develop` cuando `github.event_name == 'schedule'`; en cualquier otro evento
-# el checkout se comporta como siempre (la ref del propio evento). Hasta que este
-# fichero llegue a `main` en un lote de release, el cron no se dispara solo —
-# `workflow_dispatch` sigue sirviendo mientras tanto (mismo aviso que
-# `image-freshness.yml`).
+# 🔴 GitHub only fires `schedule` from the file living on the repo's DEFAULT branch
+# (`main`, see `image-freshness.yml`), and by default it would check out THAT branch —
+# the exact opposite of what is needed here. The `verify` and `e2e` jobs force
+# `ref: develop` when `github.event_name == 'schedule'`; on any other event the
+# checkout behaves as before (the event's own ref). Until this file reaches `main` in
+# a release batch, the cron will not fire on its own — `workflow_dispatch` still works
+# meanwhile (same caveat `image-freshness.yml` carries).
 #
 # Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
 # como un paso del job `verify` (un test de la guarda que no corre en ningún
@@ -95,8 +94,8 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "scripts/tests/test-web-workflow.test.sh"
-      # La guardia que `pnpm verify` corre primero (hub#1244): sin ella en `paths`, una
-      # PR que solo tocara `no-dead-packages.test.mjs` no disparaba ningún check (hub#1247).
+      # The guard `pnpm verify` runs first (hub#1244): without it in `paths`, a PR that
+      # only touched `no-dead-packages.test.mjs` triggered no check at all (hub#1247).
       - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
   pull_request:
@@ -110,9 +109,9 @@ on:
       - "scripts/tests/test-web-workflow.test.sh"
       - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
-  # Nocturno sobre develop, sin filtro de `paths` (hub#1253 — ver cabecera arriba).
+  # Nightly on develop, with no `paths` filter (hub#1253 — see header above).
   schedule:
-    - cron: "8 3 * * *" # diario, fuera de la hora en punto (pico de carga de GitHub)
+    - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
   workflow_dispatch:
     inputs:
       update_baselines:
@@ -143,10 +142,10 @@ jobs:
       CI: "1"
 
     steps:
-      # `ref` condicionado (hub#1253): `schedule` dispara el fichero que vive en `main`
-      # (rama por defecto) y por defecto haría checkout de ESA rama; en cualquier otro
-      # evento se comporta como siempre (la ref del propio evento — `github.ref` ya es
-      # eso mismo, así que el `||` es un no-op fuera del cron).
+      # Conditional `ref` (hub#1253): `schedule` fires the file living on `main`
+      # (default branch) and by default would check out THAT branch; on any other
+      # event this behaves as before (the event's own ref — `github.ref` already is
+      # that, so the `||` is a no-op outside the cron).
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -219,7 +218,7 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      # Mismo `ref` condicionado que el job `verify` (hub#1253) — ver el comentario allí.
+      # Same conditional `ref` as the `verify` job (hub#1253) — see the comment there.
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -359,11 +358,11 @@ jobs:
   alert-develop:
     name: Alerta de develop roto
     needs: [verify, e2e]
-    # `schedule` se suma aquí (hub#1253): sin esto, un cron rojo a las 3 de la mañana no
-    # lo ve nadie — el mismo agujero que hub#572/#1239 cerraron para `push`. El cron no
-    # tiene `github.ref == refs/heads/develop` (ese contexto reporta la rama POR DEFECTO,
-    # `main`), así que se acepta por el nombre del evento y punto: el `ref:` condicionado
-    # de los checkouts de arriba ya garantiza que lo que se probó fue `develop`.
+    # `schedule` is added here (hub#1253): without it, a red cron run at 3am is seen
+    # by nobody — the same hole hub#572/#1239 closed for `push`. The cron never
+    # satisfies `github.ref == refs/heads/develop` (that context reports the DEFAULT
+    # branch, `main`), so it is accepted by event name alone: the conditional `ref:`
+    # on the checkouts above already guarantees what was actually tested was `develop`.
     if: >-
       always() &&
       ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
@@ -387,11 +386,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # `github.sha`/`github.event.head_commit` describen el evento que disparó el
-          # run — para `schedule` eso es el HEAD de `main` (la rama por defecto), NO el
-          # `develop` que los jobs de arriba probaron de verdad (`ref:` condicionado,
-          # hub#1253). Se resuelve el HEAD real de develop con la API en ese camino en
-          # vez de confiar en un contexto que apunta a la rama equivocada.
+          # `github.sha`/`github.event.head_commit` describe the event that triggered
+          # the run — for `schedule` that is the HEAD of `main` (the default branch),
+          # NOT the `develop` the jobs above actually tested (conditional `ref:`,
+          # hub#1253). The real develop HEAD is resolved via the API on that path
+          # instead of trusting a context that points at the wrong branch.
           if [ "$TRIGGER" = "schedule" ]; then
             sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.sha')
             subject=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.commit.message' | head -n 1)

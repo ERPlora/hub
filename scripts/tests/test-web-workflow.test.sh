@@ -158,9 +158,10 @@ else
 fi
 
 # ── 8. Nightly schedule on develop (hub#1253) ────────────────────────────────
-# `crates/**` queda fuera de `paths` a propósito (ver cabecera del workflow): un merge
-# solo-Rust en develop no dispara nunca este fichero. Sin un `schedule`, una regresión
-# del runtime que rompa el shell no sale hasta la siguiente PR que toque `apps/web/**`.
+# `crates/**` is deliberately left out of `paths` (see the workflow header): a
+# Rust-only merge on develop never triggers this file. Without a `schedule`, a
+# runtime regression that breaks the shell does not surface until the next PR
+# that touches `apps/web/**`.
 schedule_block=$(on_sub_block schedule)
 verify_job=$(job_block verify)
 e2e_job=$(job_block e2e)
@@ -175,47 +176,47 @@ e2e_has_ref=1
 printf '%s' "$verify_job" | grep -q "event_name == 'schedule'" && printf '%s' "$verify_job" | grep -q "'develop'" || verify_has_ref=0
 printf '%s' "$e2e_job" | grep -q "event_name == 'schedule'" && printf '%s' "$e2e_job" | grep -q "'develop'" || e2e_has_ref=0
 if [ -z "$schedule_block" ]; then
-    bad "test-web.yml tiene un \`schedule\` nocturno" \
-        "no hay bloque \`schedule:\` en \`on:\`: un cambio de runtime que rompe el shell no se ve hasta la siguiente PR del web (hub#1253)"
+    bad "test-web.yml has a nightly \`schedule\`" \
+        "no \`schedule:\` block under \`on:\`: a runtime change that breaks the shell is not seen until the next PR to the web (hub#1253)"
 elif ! printf '%s' "$schedule_block" | grep -q 'cron:'; then
-    bad "el \`schedule\` declara un \`cron\`" \
-        "\`on.schedule\` existe pero sin \`cron:\`, así que GitHub no lo dispara nunca"
+    bad "the \`schedule\` declares a \`cron\`" \
+        "\`on.schedule\` exists but without \`cron:\`, so GitHub never fires it"
 elif [ "$verify_has_ref" -eq 0 ]; then
-    bad "el checkout del job \`verify\` fuerza develop en el cron" \
-        "\`schedule\` solo dispara el fichero que vive en \`main\` (comportamiento nativo de GitHub) y por defecto haría checkout de ESA rama — lo contrario de lo que pide hub#1253. Al job \`verify\` le falta un \`ref:\` condicionado a \`github.event_name == 'schedule'\` que fuerce \`develop\`"
+    bad "the \`verify\` job's checkout forces develop on the cron" \
+        "\`schedule\` only fires the file living on \`main\` (native GitHub behaviour) and by default would check out THAT branch — the opposite of what hub#1253 asks. The \`verify\` job is missing a \`ref:\` conditioned on \`github.event_name == 'schedule'\` that forces \`develop\`"
 elif [ "$e2e_has_ref" -eq 0 ]; then
-    bad "el checkout del job \`e2e\` fuerza develop en el cron" \
-        "mismo defecto que \`verify\` pero en el job \`e2e\`: sin el \`ref:\` condicionado, el cron probaría \`main\` en vez de \`develop\`"
+    bad "the \`e2e\` job's checkout forces develop on the cron" \
+        "same defect as \`verify\` but on the \`e2e\` job: without the conditional \`ref:\`, the cron would test \`main\` instead of \`develop\`"
 else
-    ok "on.schedule tiene cron y los checkouts de verify+e2e fuerzan develop en ese camino"
+    ok "on.schedule has a cron and the verify+e2e checkouts force develop on that path"
 fi
 
-# ── 9. La alerta también cubre el cron (hub#1253) ────────────────────────────
-# El job `alert-develop` solo miraba `github.event_name == 'push'`: un cron rojo a las
-# 3 de la mañana no lo ve nadie (el mismo agujero que hub#572/#1239 cerraron para push).
+# ── 9. The alert also covers the cron (hub#1253) ─────────────────────────────
+# The `alert-develop` job only checked `github.event_name == 'push'`: a red cron run
+# at 3am is seen by nobody (the same hole hub#572/#1239 closed for push).
 alert_job=$(job_block alert-develop)
 if [ -z "$alert_job" ]; then
-    bad "existe el job \`alert-develop\`" "no se encontró \`  alert-develop:\` en $workflow"
+    bad "the \`alert-develop\` job exists" "\`  alert-develop:\` was not found in $workflow"
 elif ! printf '%s' "$alert_job" | grep -q "event_name == 'schedule'"; then
-    bad "la alerta de develop roto también dispara con el \`schedule\`" \
-        "el \`if:\` de \`alert-develop\` solo mira \`github.event_name == 'push'\`: un cron rojo no abre ni refresca la issue de alerta (hub#1253)"
+    bad "the develop-broken alert also fires on \`schedule\`" \
+        "\`alert-develop\`'s \`if:\` only checks \`github.event_name == 'push'\`: a red cron run neither opens nor refreshes the alert issue (hub#1253)"
 else
-    ok "alert-develop dispara también cuando el trigger es \`schedule\`"
+    ok "alert-develop also fires when the trigger is \`schedule\`"
 fi
 
-# ── 10. `scripts/**` de la guardia dispara el gate (hub#1247) ────────────────
-# `pnpm verify` corre `node --test scripts/tests/no-dead-packages.test.mjs` como primer
-# paso (hub#1244), pero ese fichero no estaba en los `paths` de push/pull_request: una PR
-# que solo tocara la guardia no ejecutaba ningún check.
+# ── 10. The guard's `scripts/**` file triggers the gate (hub#1247) ───────────
+# `pnpm verify` runs `node --test scripts/tests/no-dead-packages.test.mjs` as its first
+# step (hub#1244), but that file was missing from the push/pull_request `paths`: a PR
+# that only touched the guard triggered no check at all.
 guard_path="scripts/tests/no-dead-packages.test.mjs"
 if ! printf '%s' "$push_block" | grep -qF "$guard_path"; then
-    bad "la guardia \`no-dead-packages\` dispara test-web.yml en push" \
-        "\`on.push.paths\` no incluye \`$guard_path\` (hub#1247)"
+    bad "the \`no-dead-packages\` guard triggers test-web.yml on push" \
+        "\`on.push.paths\` does not include \`$guard_path\` (hub#1247)"
 elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qF "$guard_path"; then
-    bad "la guardia \`no-dead-packages\` dispara test-web.yml en pull_request" \
-        "\`on.pull_request.paths\` no incluye \`$guard_path\` (hub#1247)"
+    bad "the \`no-dead-packages\` guard triggers test-web.yml on pull_request" \
+        "\`on.pull_request.paths\` does not include \`$guard_path\` (hub#1247)"
 else
-    ok "\`$guard_path\` está en los \`paths\` de push y pull_request"
+    ok "\`$guard_path\` is in both push and pull_request \`paths\`"
 fi
 
 # ── 11. The runtime `webServer` never falls back to production (hub#1279) ─────
