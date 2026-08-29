@@ -700,6 +700,11 @@ function notifyGrantFailed(name: string): void {
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 let unsubProgress: (() => void) | null = null;
+// hub#1317: activate/deactivate/uninstall (unlike install) emitted nothing of their own —
+// another tab/device of the same hub stayed on this list exactly as it was until it reloaded.
+let unsubActivated: (() => void) | null = null;
+let unsubDeactivated: (() => void) | null = null;
+let unsubUninstalled: (() => void) | null = null;
 
 // --- Consentimiento de permisos al instalar (modal best-effort) ---
 // Si el módulo a instalar DECLARA capabilities, las mostramos antes de instalar y al confirmar las
@@ -1288,12 +1293,37 @@ onMounted(() => {
     if (!root) return;
     setProgress(root, p?.module_id ?? root, p?.phase ?? '');
   });
+  // hub#1317 (review of hub#1311): activate/deactivate/uninstall emitted NOTHING over `/ws` —
+  // the same hole hub#631 closed only for `module.installed`. No toast here on purpose: the tab
+  // that DID the action already tells itself (`toggleModule`/`removeModule`, further up this
+  // file); this subscription is for the ones that did NOT.
+  unsubActivated = client.on('module.activated', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
+  unsubDeactivated = client.on('module.deactivated', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
+  unsubUninstalled = client.on('module.uninstalled', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
   unsubInstalled?.();
   unsubProgress?.();
+  unsubActivated?.();
+  unsubDeactivated?.();
+  unsubUninstalled?.();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });
