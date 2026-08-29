@@ -52,7 +52,7 @@ pub async fn update_history(
     // Which versions this hub runs is a map of its attack surface: an unauthenticated reader would
     // learn exactly which known bug applies. Same session gate as `/api/system`.
     let locale = q.locale.as_deref().unwrap_or("en");
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
         return (
             axum::http::StatusCode::UNAUTHORIZED,
@@ -104,7 +104,7 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
     // Sistema expone logs, métricas y detalles del almacenamiento. Es información interna del Hub:
     // la protección de la ruta Vue no sustituye la autenticación de la API.
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
             return (
                 axum::http::StatusCode::UNAUTHORIZED,
@@ -122,7 +122,7 @@ pub async fn system_info(State(st): State<AppState>, headers: HeaderMap) -> Resp
 
     // BD + logs (mismo lock del runtime; su outbox es el feed de eventos).
     let (database, logs) = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let db = rt.db();
         let database = collect_database(db).await;
         let logs = collect_logs(db, &st.hub_id()).await;

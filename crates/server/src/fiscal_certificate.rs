@@ -56,7 +56,6 @@ use cloud_client::{Auth, CloudClient, DelegatedCertificate};
 use erplora_db::DatabaseAdapter;
 use erplora_runtime::certificate;
 use erplora_runtime::certificate_refetch::RefetchSignal;
-use erplora_runtime::Runtime;
 
 use crate::state::AppState;
 
@@ -370,17 +369,17 @@ pub async fn refetch_once(
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &Auth,
-    runtime: &Arc<tokio::sync::Mutex<Runtime>>,
+    runtime: &crate::state::SharedRuntime,
     hub_id: &str,
 ) -> RefetchOutcome {
     let needed = match trigger {
         RefetchTrigger::Boot | RefetchTrigger::GrantSigned => {
-            let rt = runtime.lock().await;
+            let rt = runtime.read().await;
             boot_requires_refetch(rt.db(), hub_id).await
         }
         RefetchTrigger::Heartbeat { announced } => {
             let local = {
-                let rt = runtime.lock().await;
+                let rt = runtime.read().await;
                 certificate::delegated_version(rt.db(), hub_id).await.ok().flatten()
             };
             heartbeat_requires_refetch(local, announced)
@@ -415,7 +414,7 @@ pub async fn refetch_once(
         return RefetchOutcome::Done(DelegatedCertificateOutcome::NotProvisioned);
     };
     let stored = {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         store_delegated_certificate(rt.db(), hub_id, &cert).await
     };
     match stored {
@@ -525,6 +524,7 @@ pub fn spawn_refetch_service(st: &AppState, budget: Arc<RefetchBudget>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use erplora_runtime::Runtime;
     use axum::http::{HeaderMap, StatusCode};
     use axum::routing::get;
     use axum::Router;
@@ -988,15 +988,15 @@ mod tests {
     }
 
     /// The database wrapped the way the production path sees it: behind the runtime's lock.
-    fn runtime_of(db: PgAdapter) -> Arc<tokio::sync::Mutex<Runtime>> {
-        Arc::new(tokio::sync::Mutex::new(Runtime::with_hub_id(
+    fn runtime_of(db: PgAdapter) -> crate::state::SharedRuntime {
+        Arc::new(tokio::sync::RwLock::new(Runtime::with_hub_id(
             Box::new(db),
             "hub-test",
         )))
     }
 
-    async fn local_version(runtime: &Arc<tokio::sync::Mutex<Runtime>>) -> Option<i64> {
-        let rt = runtime.lock().await;
+    async fn local_version(runtime: &crate::state::SharedRuntime) -> Option<i64> {
+        let rt = runtime.read().await;
         certificate::delegated_version(rt.db(), "hub-test").await.unwrap()
     }
 
@@ -1004,7 +1004,7 @@ mod tests {
         trigger: RefetchTrigger,
         budget: &RefetchBudget,
         base: &str,
-        runtime: &Arc<tokio::sync::Mutex<Runtime>>,
+        runtime: &crate::state::SharedRuntime,
     ) -> RefetchOutcome {
         refetch_once(
             trigger,
@@ -1239,7 +1239,7 @@ mod tests {
         assert!(matches!(outcome, RefetchOutcome::Failed(_)));
         assert_eq!(local_version(&runtime).await, Some(4), "sigue con el suyo");
         {
-            let rt = runtime.lock().await;
+            let rt = runtime.read().await;
             assert_eq!(
                 certificate::active_kind(rt.db(), "hub-test").await.unwrap(),
                 Some(certificate::CertificateKind::Delegated),

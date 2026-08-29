@@ -96,7 +96,7 @@ pub async fn reset_plan(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -130,7 +130,7 @@ pub async fn reset_hub(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(u) => u,
         Err(e) => return unauthorized(e),
@@ -170,7 +170,7 @@ pub async fn import_batches(State(st): State<AppState>, headers: HeaderMap) -> R
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -206,7 +206,7 @@ pub async fn import_report(State(st): State<AppState>, headers: HeaderMap) -> Re
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -256,7 +256,7 @@ pub async fn undo_import_batch(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }

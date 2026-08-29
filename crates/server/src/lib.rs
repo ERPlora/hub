@@ -94,7 +94,9 @@ pub mod usage_series;
 pub mod tenant;
 pub mod version;
 
-pub use state::{AppState, AuthMode, HubConfig, HubId, MachineToken, WsEvent, DEV_HUB_ID};
+pub use state::{
+    AppState, AuthMode, HubConfig, HubId, MachineToken, SharedRuntime, WsEvent, DEV_HUB_ID,
+};
 pub use tenant::{
     EnvOrgResolver, OrgDescriptor, OrgId, OrgResolver, RuntimeFactory, TenantError, TenantRouter,
 };
@@ -496,7 +498,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         state = state.with_vector(vs);
     }
     // Tablas de sistema del runtime (outbox + scheduler) — para el caso de hub vacío sin módulos.
-    state.runtime.lock().await.ensure_system_tables().await?;
+    state.runtime.read().await.ensure_system_tables().await?;
 
     // Marca de actividad de usuario (hub#670): se ADOPTA la que dejó el proceso anterior, y a
     // partir de aquí se escribe sola cada `HUB_ACTIVITY_PERSIST_SECS`.
@@ -520,7 +522,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // más tarde se anote, más ventana hay de que el arranque se caiga antes y el salto se pierda.
     // Best-effort: no poder escribir el historial nunca impide abrir la tienda.
     {
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         match erplora_runtime::update_history::note_core_version(
             rt.db(),
             &state.hub_id(),
@@ -550,7 +552,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
     {
-        match state.runtime.lock().await.seed_owner(&owner_email).await {
+        match state.runtime.read().await.seed_owner(&owner_email).await {
             Ok(true) => eprintln!("auth: owner sembrado del env (HUB_OWNER_EMAIL={owner_email})"),
             Ok(false) => {} // ya existía: idempotente.
             Err(e) => eprintln!("✗ seed del owner (HUB_OWNER_EMAIL={owner_email}): {e}"),
@@ -566,7 +568,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let cache_root = state.config.module_cache.clone();
         match state
             .runtime
-            .lock()
+            .write()
             .await
             .rehydrate_installed(&cache_root)
             .await
@@ -587,7 +589,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     {
         let missing = state
             .runtime
-            .lock()
+            .read()
             .await
             .installed_but_unregistered()
             .await
@@ -600,7 +602,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     eprintln!("cache vacío: re-descargando {} módulo(s) instalados del marketplace…", missing.len());
                     // Pins de soporte de este hub (hub#516): `module_id → pinned_version`.
                     let pins: std::collections::HashMap<String, String> = {
-                        let rt = state.runtime.lock().await;
+                        let rt = state.runtime.read().await;
                         erplora_runtime::installer::installed_with_pin(rt.db(), &state.hub_id())
                             .await
                             .unwrap_or_default()
@@ -620,7 +622,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                         // el despliegue en vez de dejar el hub «sano» con el TPV roto.
                         let target = resolve_module_target(&state, &machine, &id, &version, pins.get(&id).map(String::as_str)).await;
 
-                        let mut rt = state.runtime.lock().await;
+                        let mut rt = state.runtime.write().await;
                         // El nombre que lee el dueño, capturado ANTES de tocar nada (hub#564): si el
                         // intento pierde el módulo, el registry ya no lo tiene y la entrada del
                         // historial se quedaría con el id — que es justo lo que la regla 3 prohíbe.
@@ -694,7 +696,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             // impide caer por debajo de lo que ya se tenía.
             let still_missing = state
                 .runtime
-                .lock()
+                .read()
                 .await
                 .installed_but_unregistered()
                 .await
@@ -707,7 +709,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let cache_root = state.config.module_cache.clone();
                 let policy = state.config.signature_policy();
                 let orphans = {
-                    let mut rt = state.runtime.lock().await;
+                    let mut rt = state.runtime.write().await;
                     install::restore_from_local_packages(
                         &cache_root,
                         &mut rt,
@@ -740,7 +742,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         let hub_id = state.hub_id();
         tokio::spawn(async move {
             let embedder = embed::CloudEmbedder::new(http, &cloud, machine);
-            let rt = runtime.lock().await;
+            let rt = runtime.read().await;
             let (modules, chunks) =
                 embed::backfill_index(&embedder, store.as_ref(), rt.registry(), &hub_id).await;
             if modules > 0 {
@@ -755,7 +757,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Si ambos están, gana el inline. La idempotencia la garantiza el propio SQL (`WHERE NOT
     // EXISTS`/`ON CONFLICT`). Un seed roto aborta el arranque (error claro), no se traga en silencio.
     if let Some(seed_sql) = load_seed_sql()? {
-        let n = state.runtime.lock().await.apply_seed(&seed_sql).await?;
+        let n = state.runtime.read().await.apply_seed(&seed_sql).await?;
         eprintln!("seed: aplicadas {n} sentencia(s) de configuración inicial");
     }
 
@@ -773,7 +775,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // ADR-0207), y quien la corrigió en Ajustes manda sobre ella.
     match state
         .runtime
-        .lock()
+        .read()
         .await
         .ensure_provisioned_country(&std::env::var("HUB_COUNTRY").unwrap_or_default())
         .await
@@ -794,7 +796,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // `own`, ni salir de `testing`. Lo que se arregla es que la checklist le pedía justo el dato
     // que el producto le prohibía escribir, y que su venta se cobraba sin llegar a emitir factura
     // (`invoice.create_from_sale` estampa `:business_tax_id` y el gate de ADR-0203 la rechazaba).
-    match state.runtime.lock().await.ensure_demo_fiscal_identity().await {
+    match state.runtime.read().await.ensure_demo_fiscal_identity().await {
         Ok(true) => eprintln!("demo: identidad fiscal de la demo sembrada (hub#684)"),
         Ok(false) => {}
         // No aborta el arranque: un hub que no abre es peor que una demo con la checklist a medias.
@@ -811,7 +813,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // DERIVADO, no hay nada que se quede mal escrito por no haber corrido: la siguiente lectura lo
     // vuelve a calcular. Aquí nada rechaza todavía (eso es hub#556).
     {
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         match rt.refresh_fiscal_profile().await {
             Ok(mode) => eprintln!("fiscal: perfil del hub resuelto → {mode:?}"),
             Err(e) => eprintln!("✗ fiscal: no se pudo resolver el perfil del hub (ADR-0273): {e}"),
@@ -828,7 +830,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Un hub sin enrolar falla RUIDOSAMENTE (reintento → dead-letter), que sí se ve.
     state
         .runtime
-        .lock()
+        .write()
         .await
         .set_notify_transport(notify_transport::build(
             state.http.clone(),
@@ -848,7 +850,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // vez las tareas con backlog vencido (collapse) y reprograma el resto. Se hace antes del loop.
     {
         let hub_id = state.hub_id();
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         match rt.scheduler_catch_up(&hub_id).await {
             Ok(n) if n > 0 => eprintln!("scheduler: catch-up de arranque ejecutó {n} tarea(s)"),
             Ok(_) => {}
@@ -857,7 +859,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     }
 
     // Bucle de background: relay de eventos del outbox (§5.4) + barrido del scheduler (ADR-0011).
-    // Ambos comparten el mismo tick de 1s y el mismo lock del runtime (un ECS container por hub).
+    // Ambos comparten el mismo tick de 1s y el mismo guard de LECTURA del runtime (hub#978): un
+    // tick que drena backlog ya no congela las cajas, porque los commands entran con su propio
+    // guard compartido; lo único que espera a que el tick acabe es un escritor (instalar/activar).
     {
         let scheduler_state = state.clone();
         tokio::spawn(async move {
@@ -868,7 +872,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let mut pending_io = Vec::new();
                 {
                     let hub_id = scheduler_state.hub_id();
-                    let rt = scheduler_state.runtime.lock().await;
+                    let rt = scheduler_state.runtime.read().await;
                     // Entrega at-least-once asíncrona del outbox a sus listeners (+ listener-host
                     // de host.notify para los eventos `*.reminder.due`).
                     if let Err(e) = rt.process_outbox().await {
@@ -880,10 +884,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     }
                     // Kernel de automatización (ADR-0283, hub#661): dispara los triggers de reloj,
                     // despierta los `delay` vencidos y avanza los runs reclamados. Comparte este
-                    // lock con los dos de arriba, y por eso su trabajo está ACOTADO por tick
+                    // guard con los dos de arriba, y su trabajo sigue ACOTADO por tick
                     // (`MAX_RUNS_PER_TICK` × `MAX_STEPS_PER_TICK`, todos sin I/O): un step `http` o
-                    // un turno de IA aquí dentro congelaría los commands de todo el hub, así que
-                    // esos van por claim → I/O → complete FUERA del lock (hub#662/#665).
+                    // un turno de IA aquí dentro retendría el guard 30 s, y un escritor en cola
+                    // (una instalación) pararía tras él a todo el TPV — el `RwLock` es justo, así
+                    // que los lectores nuevos esperan al escritor pendiente. Por eso esos van por
+                    // claim → I/O → complete FUERA del lock (hub#662/#665).
                     match rt.process_flows().await {
                         Ok(report) => pending_io = report.pending_io,
                         Err(e) => eprintln!("flows: {e}"),
@@ -933,7 +939,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 {
                     let mut swept = erplora_runtime::flows::ExpirySweepReport::default();
                     for _ in 0..erplora_runtime::retention::MAX_PASSES {
-                        let runtime = st.runtime.lock().await;
+                        let runtime = st.runtime.read().await;
                         let pass = runtime.sweep_expired_flow_approvals().await;
                         drop(runtime);
                         match pass {
@@ -962,7 +968,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let cutoffs = erplora_runtime::retention::Cutoffs::now();
                 let mut total = erplora_runtime::retention::PruneReport::default();
                 for _ in 0..erplora_runtime::retention::MAX_PASSES {
-                    let runtime = st.runtime.lock().await;
+                    let runtime = st.runtime.read().await;
                     let pass =
                         erplora_runtime::retention::prune_once(runtime.db(), &hub_id, &cutoffs)
                             .await;
@@ -1077,7 +1083,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let now = entitlement::now_unix();
                 let now_iso = chrono::Utc::now().to_rfc3339();
                 let mut usage = {
-                    let runtime = st.runtime.lock().await;
+                    let runtime = st.runtime.read().await;
                     let mut usage =
                         daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now_iso)
                             .await;
@@ -1237,7 +1243,7 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             // Se toma la caché (un `Arc` compartido con el registro) y se SUELTA el candado del
             // runtime antes de compilar: calentar no puede bloquear a quien esté cobrando.
             let (cache, modules) = {
-                let rt = warm_state.runtime.lock().await;
+                let rt = warm_state.runtime.read().await;
                 (
                     std::sync::Arc::clone(&rt.registry().wasm_cache),
                     rt.registry().handlers_to_warm_up(),
@@ -2100,7 +2106,7 @@ async fn hub_context(State(st): State<AppState>) -> Response {
     };
     // Lee pin_users + settings en un único lock del runtime (lectura de arranque, sin gate).
     let (pin_users, currency, currency_decimals, language, timezone) = {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         if let Err(error) = rt.ensure_system_tables().await {
             return err_response(error);
         }
@@ -2203,7 +2209,7 @@ async fn request_install(
     // navegador. Exigimos primero la sesión local de un owner/admin: de lo contrario cualquier
     // módulo web same-origin podría disparar instalaciones usando indirectamente el token del Hub.
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -2231,7 +2237,7 @@ async fn request_install(
         }));
     };
 
-    let mut rt = st.runtime.lock().await;
+    let mut rt = st.runtime.write().await;
     let result = install::install_from_cloud(
         &st.http,
         &st.config.cloud_base_url,
@@ -2355,7 +2361,7 @@ async fn update_module(
     use erplora_runtime::module_update::{update_with_fallback, Outcome};
 
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -2382,10 +2388,10 @@ async fn update_module(
 
     // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
     let installed = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         rt.registry().module_version(&module_id)
     };
-    if !st.runtime.lock().await.registry().is_installed(&module_id) {
+    if !st.runtime.read().await.registry().is_installed(&module_id) {
         return install_error_response(&install::InstallError::NotInstalled(module_id));
     }
 
@@ -2399,7 +2405,7 @@ async fn update_module(
         .version
         .unwrap_or_default();
     let target = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         install::resolve_update_target(
             &st.http,
             &st.config.cloud_base_url,
@@ -2441,7 +2447,7 @@ async fn update_module(
         let on_progress = &on_progress;
         let first_error = first_error.clone();
         async move {
-            let mut rt = st.runtime.lock().await;
+            let mut rt = st.runtime.write().await;
             let result = install::update_from_cloud(
                 &st.http,
                 &st.config.cloud_base_url,
@@ -2472,7 +2478,7 @@ async fn update_module(
     // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
     // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let module_name = rt
             .registry()
             .installed
@@ -2512,7 +2518,7 @@ async fn update_module(
             // La versión nueva puede describir tools distintas: un índice que se queda con el texto
             // de la anterior enruta a ciegas.
             let chunks = {
-                let rt = st.runtime.lock().await;
+                let rt = st.runtime.read().await;
                 ingest::collect_chunks(rt.registry(), &module_id)
             };
             index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
@@ -2555,7 +2561,7 @@ async fn update_module(
 /// inventar una versión sería peor que no decir nada.
 async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let installed: Vec<(String, String, Option<String>)> = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -2619,7 +2625,7 @@ async fn list_module_versions(
     headers: HeaderMap,
 ) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -2638,10 +2644,11 @@ async fn list_module_versions(
     }
 
     // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
-    // Sostener el `Mutex<Runtime>` durante un round-trip de red congelaría `/api/query` y
-    // `/api/command` —el TPV— mientras el marketplace tarda en contestar.
+    // Sostener el guard del runtime durante un round-trip de red retendría a cualquier escritor en
+    // cola (una instalación) y, tras él, a `/api/query` y `/api/command` —el TPV— mientras el
+    // marketplace tarda en contestar (hub#978: el `RwLock` es justo con los escritores).
     let (installed, pinned) = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         (
             install::installed_version(&rt, &module_id),
             install::support_pin(&rt, &module_id).await,
@@ -2795,7 +2802,7 @@ async fn serve_module_asset_at(
         return StatusCode::NOT_FOUND.into_response();
     }
     let installed = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         rt.modules().into_iter().any(|m| m.id == id)
     };
     if !installed {
@@ -2820,7 +2827,7 @@ async fn serve_module_asset(
 ) -> Response {
     // Versión instalada del módulo (del registro). Módulo no instalado → 404.
     let version = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         rt.modules()
             .into_iter()
             .find(|m| m.id == id)
@@ -3002,7 +3009,7 @@ async fn proxy_public_cloud_get(
 /// mismo status y mismos campos, solo se AÑADE la clave.
 async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3016,7 +3023,7 @@ async fn proxy_entitlement(State(st): State<AppState>, headers: HeaderMap) -> Re
 
     // Estado local de revalidación sobre los módulos INSTALADOS de este hub.
     let installed: Vec<String> = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         rt.modules().into_iter().map(|m| m.id).collect()
     };
     let revalidation = st
@@ -3180,7 +3187,7 @@ fn report_cloud_rate_limited(retry_after: Option<i64>, served_from_cache: bool) 
 /// at an installer that does not exist.
 async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3205,7 +3212,7 @@ async fn proxy_marketplace_module(
     headers: HeaderMap,
 ) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3264,7 +3271,7 @@ async fn proxy_marketplace_catalog(
     // that has not said (an old web build, a script), and it beats defaulting to English for a hub
     // that has told us in its settings which language it reads in.
     let catalog = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3291,7 +3298,7 @@ async fn proxy_marketplace_catalog(
     };
     match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &catalog)).await {
         Ok((status, body)) => {
-            let rt = st.runtime.lock().await;
+            let rt = st.runtime.read().await;
             if let Err(e) =
                 erplora_runtime::setup_status::record_catalog_response(rt.db(), status.as_u16(), &body)
                     .await
@@ -3312,7 +3319,7 @@ async fn proxy_marketplace_catalog(
 /// La **«fuente nube»** del panel de import (Ajustes → Datos). [ADR-0121]
 async fn proxy_blueprints_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3340,7 +3347,7 @@ async fn download_blueprint(
     headers: HeaderMap,
 ) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -3510,7 +3517,7 @@ async fn assistant_config(State(st): State<AppState>, headers: HeaderMap) -> Res
     // route answered anybody who reached the hub's URL — ERPlora/hub#1254. A read any signed-in
     // user needs (the drawer prints the tier and what is left of the month), so: session.
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
             return auth_rejected(e);
         }
@@ -3537,7 +3544,7 @@ async fn assistant_checkout(
     // the OUTBOUND machine token, and any anonymous caller who reached the hub could open Stripe
     // checkout sessions in its name.
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return auth_rejected(e);
         }
@@ -3586,7 +3593,7 @@ async fn assistant_chat_stream(
     // La sesión LOCAL del hub da el contexto/permisos para ensamblar las tools (gate = el de la UI)
     // y el id del usuario activo, que se manda como metadata de coste/auditoría (no permisos).
     let (all_tools, active_user, active_modules, instructions) = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
             Ok(c) => c,
             Err(e) => return unauthorized(e),
@@ -4149,7 +4156,7 @@ async fn navigation(
     Query(q): Query<LocaleQuery>,
 ) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
         Ok(ctx) => ctx,
         Err(e) => return unauthorized(e),
@@ -4222,7 +4229,7 @@ async fn list_modules(
     Query(q): Query<LocaleQuery>,
 ) -> Response {
     let locale = q.locale.as_deref().unwrap_or("en");
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -4269,7 +4276,7 @@ async fn install_module(
     headers: HeaderMap,
     Json(req): Json<InstallReq>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -4313,7 +4320,7 @@ async fn activate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -4328,7 +4335,7 @@ async fn deactivate_module(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let mut rt = st.runtime.lock().await;
+    let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -4357,7 +4364,7 @@ async fn uninstall_module(
     body: Option<Json<UninstallReq>>,
 ) -> Response {
     let force = body.map(|Json(b)| b.force).unwrap_or_default();
-    let mut rt = st.runtime.lock().await;
+    let mut rt = st.runtime.write().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -4394,7 +4401,7 @@ async fn query(
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let mut ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
@@ -4444,7 +4451,10 @@ async fn command(
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    // Guard COMPARTIDO (hub#978): N cajas cobrando a la vez ejecutan sus commands en paralelo
+    // —la transacción la da Postgres y el gasto de una aprobación lo da el propio store de
+    // grants—; solo una instalación/activación (escritor) espera a que estos terminen.
+    let rt = arc.read().await;
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),
@@ -4558,7 +4568,7 @@ struct CloudLoginReq {
 /// `device_untrusted`, con el mismo texto, para que la puerta no confirme si alguien cortó un
 /// dispositivo perdido (ADR-0258).
 async fn auth_pin(State(st): State<AppState>, Json(req): Json<PinReq>) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     // Qué dispositivo dice ser este cliente. **Se normaliza una sola vez** y de aquí sale todo lo
     // demás: una cabecera de espacios es un cliente que no se identificó, y tiene que caer en la
     // misma rama que no mandar nada — nunca en una búsqueda de `"  "` ni, con la puerta desarmada,
@@ -4711,7 +4721,7 @@ struct BadgeReq {
 /// nombre que teclear— y eso además la hace más precisa: bloquea la tarjeta que se está probando,
 /// sin que nadie pueda dejar fuera a un compañero pasando cinco veces una tarjeta rota a su nombre.
 async fn auth_badge(State(st): State<AppState>, Json(req): Json<BadgeReq>) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let device_id = req
         .device_id
         .as_deref()
@@ -4852,7 +4862,7 @@ async fn open_cloud_session(
     } else {
         email.clone()
     };
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     // ── Gate de presencia (ADR-0157 §5) + regla D (hub#348) ──────────────────────────────────
     // La autenticación (¿es un JWT válido del SaaS?) NO implica autorización (¿pertenece a ESTE
     // hub?). El token lleva el claim *coarse* `hubs: [{id, org}]` y el Hub solo deja entrar si el
@@ -5078,7 +5088,7 @@ async fn auth_set_pin(
     headers: HeaderMap,
     Json(req): Json<SetPinReq>,
 ) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let Some(token) = auth::session_token(&headers) else {
         return unauthorized(auth::AuthError::MissingSession);
     };
@@ -5100,7 +5110,7 @@ async fn auth_set_pin(
 /// Cierra la sesión del header `X-Hub-Session` (logout).
 async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) -> Response {
     if let Some(token) = auth::session_token(&headers) {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let _ = rt.delete_session(&token).await;
     }
     Json(json!({ "ok": true })).into_response()

@@ -102,7 +102,7 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 async fn runtime(
     st: &AppState,
-) -> Result<std::sync::Arc<tokio::sync::Mutex<erplora_runtime::Runtime>>, Response> {
+) -> Result<crate::state::SharedRuntime, Response> {
     st.runtime_for(&st.hub_id())
         .await
         .map_err(crate::tenant_rejected)
@@ -118,7 +118,7 @@ pub async fn get_device_mode(State(st): State<AppState>, headers: HeaderMap) -> 
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let device_id = device_id_of(&headers);
     let mode = match rt.device_mode(device_id).await {
         Ok(mode) => mode,
@@ -179,7 +179,7 @@ pub async fn put_device_mode(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(user) => user,
         Err(e) => return unauthorized(e),
