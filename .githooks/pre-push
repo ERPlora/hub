@@ -450,10 +450,92 @@ resolve_scope() {
 }
 resolve_scope
 
+# ── Etapa WEB (decisión de Ioan, 2026-08-29) ─────────────────────────────────
+# `cargo test --workspace` + e2e de módulos + web + playwright se ejecutan AQUÍ, en local, en
+# cada push, y NO en Actions: la nube se quedó con `develop`/`main` (la red post-merge de
+# hub#572). Consecuencia buscada: si algo está rojo, el push se aborta y sin push no hay PR.
+# Los ficheros que la disparan son LOS MISMOS que filtraba `test-web.yml`; si esa lista cambia
+# allí, cambia aquí (`scripts/tests/test-web-workflow.test.sh` fija la de allí).
+WEB_PREFIXES="apps/web/ packages/"
+WEB_FILES="package.json pnpm-lock.yaml pnpm-workspace.yaml"
+# Si no hay base contra la que diffear no se sabe qué toca el cambio. Para Rust el gate ya se
+# ensancha al workspace; aquí igual —pero solo si este repo TIENE web: ensanchar en un repo sin
+# `apps/web` no protegería nada y rompería cualquier push (no hay `package.json` que instalar).
+web_touched=0
+if [ "$changed_known" != 1 ] && { [ -d apps/web ] || [ -f package.json ]; }; then
+    web_touched=1
+fi
+if [ "$changed_known" = 1 ]; then
+    while IFS= read -r _f; do
+        [ -n "$_f" ] || continue
+        for _p in $WEB_PREFIXES; do
+            case "$_f" in "$_p"*) web_touched=1 ;; esac
+        done
+        for _n in $WEB_FILES; do
+            [ "$_f" = "$_n" ] && web_touched=1
+        done
+    done <<EOF
+$changed_files
+EOF
+fi
+
+# Corre la etapa web y aborta el push si está roja. Se llama en los DOS caminos (con Rust y
+# sin él), porque un cambio solo de `apps/web/**` no toca ningún paquete Rust y antes salía
+# por la puerta de `none` sin que nadie lo probara.
+run_web_stage() {
+    [ "$web_touched" = 1 ] || return 0
+    local web_cmd
+    if [ -n "${HUB_GATE_WEB_CMD:-}" ]; then
+        web_cmd="$HUB_GATE_WEB_CMD"
+    else
+        command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1 || {
+            echo "❌ pre-push: el diff toca web y no hay 'pnpm' ni 'corepack' en el PATH." >&2
+            echo "   Instálalos (corepack enable) o sáltate la etapa con SKIP_HUB_WEB=1." >&2
+            return 1
+        }
+        # Lo mismo que corría `test-web.yml`, en el mismo orden: instalar, verificar
+        # (vue-tsc + vitest + module-sdk) y los e2e de playwright contra el runtime real.
+        web_cmd='pnpm install --frozen-lockfile \
+            && pnpm verify \
+            && cargo build -p erplora-server \
+            && pnpm -F @erplora/web exec vite build \
+            && pnpm -F @erplora/web exec playwright install chromium \
+            && pnpm -F @erplora/web test:e2e'
+    fi
+    if [ "${SKIP_HUB_WEB:-0}" = 1 ]; then
+        echo "⏭️  pre-push: SKIP_HUB_WEB=1 — la etapa web NO se ha corrido (nadie más la corre: Actions ya no la mira en las PRs)." >&2
+        WEB_SKIPPED=1
+        return 0
+    fi
+    echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
+    if ! eval "$web_cmd"; then
+        echo "" >&2
+        echo "❌ pre-push: la etapa WEB está ROJA → push ABORTADO." >&2
+        echo "   Arréglalo y reintenta. (Sáltatela a sabiendas con 'SKIP_HUB_WEB=1 git push'.)" >&2
+        return 1
+    fi
+    echo "✅ pre-push: etapa web verde." >&2
+    return 0
+}
+
+# ── Política de alcance (Ioan, 2026-08-29) ───────────────────────────────────
+# `workspace` (defecto): una PR con Rust corre la suite ENTERA aquí. Es obligatorio desde que
+# Actions dejó de correrla en las PRs: `merge-pr.sh` autoriza el merge con la atestación de este
+# gate (pm#58/#60), y una pasada parcial dejaría el merge apoyado en menos de lo que promete.
+# `scoped`: el reparto de hub#1207 (local rápido + Actions completo). Volver a él es cambiar esta
+# variable, cuando la nube vuelva a correr la suite en las PRs.
+GATE_SCOPE_POLICY="${HUB_GATE_SCOPE_POLICY:-workspace}"
+if [ "$GATE_SCOPE_POLICY" = workspace ] && [ "$SCOPE_MODE" = packages ]; then
+    SCOPE_MODE=workspace
+    SCOPE_REASON="$SCOPE_REASON — pero la política es correr el workspace entero (pm#58/#60)"
+fi
+
 case "$SCOPE_MODE" in
     none)
         echo "⏭️  pre-push: no Rust in this diff ($SCOPE_REASON) → the Hub suite has nothing to run." >&2
-        echo "    Non-Rust changes are covered by their own checks on the PR." >&2
+        # OJO: ya no vale «lo cubren sus checks en la PR». Desde el 29/08 Actions no corre web ni
+        # los e2e en una PR, así que si el diff toca web hay que probarlo AQUÍ o no lo prueba nadie.
+        run_web_stage || exit 1
         exit 0
         ;;
     packages)
@@ -961,6 +1043,17 @@ if ! eval "$test_cmd"; then
     echo "❌ pre-push: the Hub suite is RED → push ABORTED." >&2
     echo "   Fix it and retry, or bypass with 'SKIP_HUB_TESTS=1 git push'." >&2
     exit 1
+fi
+
+run_web_stage || exit 1
+
+# Saltarse la etapa web deja pasar el push, pero ni cachea el verde ni atestigua: la atestación
+# es lo que `merge-pr.sh` usa para autorizar el merge, y firmar lo que no se ha corrido es
+# exactamente la razón por la que dejó de aceptarla en su día. Sin sello, no hay merge.
+if [ "${WEB_SKIPPED:-0}" = 1 ]; then
+    echo "⚠️  pre-push: la suite Rust está verde, pero como la etapa web se saltó NO se atestigua." >&2
+    echo "   Este push no autoriza ningún merge: corre el gate entero (sin SKIP_HUB_WEB) y reempuja." >&2
+    exit 0
 fi
 
 : > "$green"

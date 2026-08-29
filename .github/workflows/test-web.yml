@@ -78,16 +78,13 @@ on:
       - "pnpm-workspace.yaml"
       - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "apps/web/**"
-      - "packages/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "scripts/tests/test-web-workflow.test.sh"
-      - ".github/workflows/test-web.yml"
+  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): pnpm verify + playwright se ejecuta en el
+  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
+  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
+  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
+  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
+  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
+  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
   workflow_dispatch:
     inputs:
       update_baselines:

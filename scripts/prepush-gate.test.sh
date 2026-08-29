@@ -1028,7 +1028,10 @@ run_scoped() {
     local repo=$1 sha=$2
     shift 2
     rm -f "$repo/SCOPE"
+    # Estos casos fijan el resolutor de hub#1207, que hoy solo se usa con la politica `scoped`:
+    # el DEFECTO desde el 29/08 es `workspace` (la nube ya no corre la suite en las PRs).
     run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        HUB_GATE_SCOPE_POLICY=scoped \
         HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
         HUB_GATE_TEST_CMD='printf "%s|%s\n" "$HUB_GATE_SCOPE_MODE" "$HUB_GATE_SCOPE_PACKAGES" > '"$repo/SCOPE" \
         "$@"
@@ -1121,7 +1124,7 @@ exit 0
 GH
 )
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_SCOPE_POLICY=scoped HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
     HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
     HUB_GATE_TEST_CMD="true")
 sleep 2
@@ -1373,6 +1376,145 @@ cmp -s "$repo/installed/pre-push" "$HOOK" || errs="$errs installed-hook-replaced
 [ -z "$errs" ] \
     && ok "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" \
     || bad "drift: a canonical copy with no self-heal is refused (no sticky downgrade)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# ── Web stage: `pnpm verify` + playwright corren AQUÍ, no en la nube ──────────
+#    Decisión de Ioan (2026-08-29): `cargo test --workspace` + e2e + web + playwright
+#    se ejecutan en LOCAL en cada PR y NO en Actions; si no pasan, la rama no se
+#    empuja y por tanto no hay PR. Antes de esto el gate era solo Rust, así que un
+#    cambio de `apps/web/**` salía sin que nadie lo probara.
+
+# 1. Un diff SOLO de web: el alcance Rust es `none` y aun así el gate DEBE correr web.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+errs=""
+[ "$code" = 0 ]       || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBSTAGE" ]    || errs="$errs web-stage-did-not-run"
+[ -z "$errs" ] \
+    && ok "web: un diff solo de apps/web corre la etapa web aunque no haya Rust" \
+    || bad "web: un diff solo de apps/web corre la etapa web aunque no haya Rust" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# 2. Web en rojo = push ABORTADO (sin push no hay PR: es la puerta que pidió Ioan).
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="false")
+[ "$code" != 0 ] \
+    && ok "web: si la etapa web falla, el push se aborta" \
+    || bad "web: si la etapa web falla, el push se aborta" "exit=$code"
+
+# 3. Un diff sin web no paga la etapa web (los ~6 min de pnpm+playwright).
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+errs=""
+[ "$code" = 0 ]        || errs="$errs exit=$code(want 0)"
+[ ! -f "$repo/WEBSTAGE" ]   || errs="$errs web-stage-ran-for-a-rust-only-diff"
+[ -z "$errs" ] \
+    && ok "web: un diff sin web no corre la etapa web" \
+    || bad "web: un diff sin web no corre la etapa web" "$errs"
+
+# 4. Ni Rust ni web: no se corre nada y el push pasa (un .md no paga 25 min).
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" docs/nota.md)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+errs=""
+[ "$code" = 0 ]      || errs="$errs exit=$code(want 0)"
+[ ! -f "$repo/RAN" ] || errs="$errs rust-ran-for-a-docs-only-diff"
+[ ! -f "$repo/WEBSTAGE" ] || errs="$errs web-ran-for-a-docs-only-diff"
+[ -z "$errs" ] \
+    && ok "web: un diff de solo documentacion no corre nada" \
+    || bad "web: un diff de solo documentacion no corre nada" "$errs"
+
+# 5. Politica por defecto = WORKSPACE. Desde que Actions no corre la suite en las PRs, un
+#    `packages` local dejaria el merge autorizado por una pasada parcial (pm#58/#60): se ensancha.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+rm -f "$repo/SCOPE"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD='printf "%s\n" "$HUB_GATE_SCOPE_MODE" > '"$repo/SCOPE")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+[ "$(cat "$repo/SCOPE" 2>/dev/null)" = workspace ] \
+    || errs="$errs mode=$(cat "$repo/SCOPE" 2>/dev/null)(want workspace)"
+[ -z "$errs" ] \
+    && ok "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" \
+    || bad "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" "$errs"
+
+# 6. Sin base contra la que diffear no se sabe que toca el cambio: para Rust ya se ensancha al
+#    workspace, y para web hay que ser igual de conservador o el diff se cuela sin probar.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+# El repo TIENE web (como el hub): sin base para el diff, la etapa web debe correr igualmente.
+mkdir -p "$repo/apps/web/src"; echo '{}' > "$repo/package.json"
+git -C "$repo" add -A && git -C "$repo" commit -qm "web workspace"
+git -C "$repo" update-ref -d refs/remotes/origin/develop 2>/dev/null || true
+git -C "$repo" update-ref -d refs/remotes/origin/main 2>/dev/null || true
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+errs=""
+[ "$code" = 0 ]            || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBSTAGE" ]    || errs="$errs web-stage-skipped-with-no-base-to-diff"
+[ -z "$errs" ] \
+    && ok "web: sin base para el diff se corre la etapa web igualmente (conservador)" \
+    || bad "web: sin base para el diff se corre la etapa web igualmente (conservador)" "$errs"
+
+# 7. Saltarse la etapa web NO puede dejar una atestacion: `merge-pr.sh` autoriza el merge con
+#    ella, asi que atestiguar lo que no se ha corrido seria firmar en falso. Se usa el `gh` falso
+#    (make_gh) porque el status solo se publica tras verificar el ref en origin.
+attest_case() { # <SKIP_HUB_WEB 0|1> -> imprime los args del status publicado (vacio si no hubo)
+    local skip=$1 repo ghdir sha
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    touch_and_commit "$repo" crates/c/src/lib.rs >/dev/null   # Rust: es lo que se atestigua
+    sha=$(touch_and_commit "$repo" apps/web/src/App.vue)      # y web: es lo que se puede saltar
+    ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+    run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+        HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+        HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+        HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true" \
+        SKIP_HUB_WEB="$skip" >/dev/null
+    sleep 2
+    tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null
+}
+# Control primero: corriendo TODO si atestigua (si no, el caso de abajo no probaria nada).
+ctrl=$(attest_case 0)
+skipped=$(attest_case 1)
+errs=""
+case "$ctrl" in *context=local-gate/hub-tests*) ;; *) errs="$errs CONTROL-no-atestiguo-corriendo-todo";; esac
+[ -z "$skipped" ] || errs="$errs attested-a-run-that-skipped-web"
+[ -z "$errs" ] \
+    && ok "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua (control: sin skip SI atestigua)" \
+    || bad "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua" "$errs"
 
 echo
 echo "  $pass passed, $fail failed"
