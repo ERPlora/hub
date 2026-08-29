@@ -376,7 +376,6 @@ jobs:
         run: |
           set -euo pipefail
           subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
-          title="develop is broken after a merge: ${subject}"
           body="Detected by the post-merge suite on develop (hub#572).
 
           - develop HEAD: \`${SHA}\` — '${subject}'
@@ -388,14 +387,12 @@ jobs:
 
           This issue is reused (one comment per detection) while develop stays red; close it once develop is green again."
 
-          # Search phrase deliberately colon-free (colons are GitHub search
-          # syntax) and stable — it is what makes the alert idempotent.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"develop is broken after a merge" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refreshing open alert issue #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lists and matches LOCALLY, never `--search` (hub#1246):
+          # that reads GitHub's search index, which lags behind reality. MATCH=prefix because
+          # the title's `: <subject>` suffix changes on every commit — only the stable part
+          # before it is the idempotency key (a colon in the suffix is exactly what broke
+          # `--search`, which reads `:` as search syntax; `startswith()` does not care).
+          TITLE="develop is broken after a merge: ${subject}" \
+            MATCH=prefix MATCH_VALUE="develop is broken after a merge" \
+            LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
