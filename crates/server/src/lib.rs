@@ -653,7 +653,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                                 // Y no puede ser un silencio (update-model §3.1.1): si actualizamos
                                 // solos, una actualización que se cae —y más aún un hub que arranca
                                 // SIN el módulo— tiene que llegar a alguien, no morir en un log del
-                                // contenedor. Best-effort: sin sink (hub sin enrolar) se descarta.
+                                // contenedor. This runs BEFORE `install_error_reporting`, and that
+                                // is no longer a loss: the registry buffers the event and delivers
+                                // it when the sink arrives later in this same boot (hub#1274).
                                 report_failed_module_update(&id, &version, target.version(), &e.to_string(), fallback.is_ok());
                                 Some(match &fallback {
                                     Ok(_) => erplora_runtime::module_update::Outcome::RolledBack { stayed_on: version.clone(), error: e.to_string() },
@@ -844,6 +846,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // al Cloud (`POST /api/v1/hub/device/error-report/`, X-Hub-Token) cada error del runtime
     // (core + módulos), del panic hook y de la ruta local del frontend. Best-effort (spawn detached);
     // si el hub no está enrolado el sink descarta en silencio. Se hace una sola vez al arrancar.
+    //
+    // Everything reported EARLIER in this boot (`ensure_system_tables`, the module update pass,
+    // `report_incomplete_boot`) is not lost by arriving first: the registry buffered those events
+    // and this call flushes them, in order, into the sink (hub#1274). Only the excess above the
+    // buffer cap is dropped, and that loss is itself reported as `error_buffer_overflow`
+    // (hub#1324). The one silence left is this sink's own: no machine token, no delivery.
     install_error_reporting(&state);
 
     // Catch-up del scheduler al arrancar (ADR-0011): un hub que estuvo apagado ejecuta UNA sola
@@ -1833,8 +1841,12 @@ pub fn app(state: AppState) -> Router {
 /// Si actualizamos solos y sin preguntar (ADR-0269), una actualización que falla no puede quedarse
 /// en un `eprintln!` del contenedor: `outcome` distingue el caso tolerable —el hub siguió con la
 /// versión de ayer— del que no lo es: **el hub arrancó sin el módulo**, que es el único desenlace
-/// que este modelo prohíbe. Best-effort por contrato del registro: sin sink (hub sin enrolar) se
-/// descarta en silencio.
+/// que este modelo prohíbe.
+///
+/// Best-effort, and the two layers do NOT mean the same thing: no sink yet is only a matter of boot
+/// ORDER — this runs before `install_error_reporting`, so the registry buffers the event and hands
+/// it over when the sink lands (hub#1274). What still drops in silence is a hub that is not
+/// enrolled, one layer down in `error_sink::CloudErrorSink::submit` (no machine token, no delivery).
 fn report_failed_module_update(
     module_id: &str,
     from: &str,
@@ -1901,7 +1913,9 @@ fn incomplete_boot_event(orphans: &[(String, String)]) -> erplora_runtime::error
 /// Es el caso que ADR-0269 no puede cumplir: no hay copia, no hay versión anterior y no hay tarea
 /// vieja a la que volver. Lo único que sí está en nuestra mano es que **no sea un silencio** — un
 /// hub incompleto que solo lo cuenta en el log de un contenedor es un hub que nadie arregla.
-/// Best-effort por contrato del registro: sin sink (hub sin enrolar) se descarta.
+/// Best-effort: reaching the registry before `install_error_reporting` no longer loses the event —
+/// it is buffered and delivered when the sink is installed (hub#1274). It only really disappears if
+/// by then the hub is still not enrolled, which is `CloudErrorSink`'s silence, not the registry's.
 fn report_incomplete_boot(orphans: &[(String, String)]) {
     eprintln!(
         "🔴 el hub arranca SIN {} módulo(s): {}",

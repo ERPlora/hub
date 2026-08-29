@@ -35,8 +35,29 @@ const DEDUP_MAX_ENTRIES: usize = 1024;
 /// Tope del buffer de arranque temprano (hub#1274): eventos reportados antes de que el host llame
 /// a [`ErrorRegistry::install`]. Acotado por la misma razón que `DEDUP_MAX_ENTRIES` — un arranque
 /// que reporta en bucle antes de tener sink no debe crecer sin límite. FIFO: al llenarse se
-/// descarta el más antiguo, nunca el que se acaba de reportar.
+/// descarta el más antiguo, nunca el que se acaba de reportar — pero el descarte se CUENTA y se
+/// reporta al vaciar el buffer (hub#1324), nunca se pierde en silencio.
 const PENDING_MAX: usize = 64;
+
+/// Stable `error_code` of the synthetic event that makes a startup-buffer overflow visible
+/// (hub#1324). It is the only trace left of the events `PENDING_MAX` could not hold, so it travels
+/// through the very sink those events were waiting for — the boring, standard shape (Sentry client
+/// reports, OpenTelemetry's dropped-span counters): count what you drop and report the count on the
+/// channel you already own, instead of inventing a second one nobody reads.
+const BUFFER_OVERFLOW_CODE: &str = "error_buffer_overflow";
+
+/// The early-startup buffer plus what it had to throw away. Both live under the SAME `Mutex` on
+/// purpose: [`ErrorRegistry::flush_pending`] drains the events and takes the counter in one lock,
+/// so an overflow can neither be lost (counted after the drain) nor reported twice (counted by two
+/// racing flushes).
+#[derive(Default)]
+struct PendingBuffer {
+    /// Events reported before a sink existed, oldest first.
+    events: VecDeque<ErrorEvent>,
+    /// How many events were dropped because the buffer was already at [`PENDING_MAX`]. Reset to 0
+    /// by the flush that reports them.
+    dropped: usize,
+}
 
 /// Severidad de un error reportado.
 ///  - `"user"`: error esperable provocado por el llamador (payload inválido, permiso denegado,
@@ -148,9 +169,9 @@ pub struct ErrorRegistry {
     /// Dedup/throttle local: huella → instante del último reporte. `Mutex` corto (sin await dentro).
     recent: Mutex<HashMap<String, Instant>>,
     /// Buffer FIFO acotado ([`PENDING_MAX`]) de eventos reportados antes de que hubiera sink
-    /// (arranque temprano, hub#1274). [`ErrorRegistry::install`] lo vacía, en orden, en el sink
-    /// recién llegado.
-    pending: Mutex<VecDeque<ErrorEvent>>,
+    /// (arranque temprano, hub#1274), junto al contador de los que no cupieron (hub#1324).
+    /// [`ErrorRegistry::install`] lo vacía, en orden, en el sink recién llegado.
+    pending: Mutex<PendingBuffer>,
 }
 
 impl ErrorRegistry {
@@ -160,7 +181,7 @@ impl ErrorRegistry {
         REGISTRY.get_or_init(|| ErrorRegistry {
             sink: OnceLock::new(),
             recent: Mutex::new(HashMap::new()),
-            pending: Mutex::new(VecDeque::new()),
+            pending: Mutex::new(PendingBuffer::default()),
         })
     }
 
@@ -203,8 +224,9 @@ impl ErrorRegistry {
     }
 
     /// Guarda un evento en el buffer de arranque (FIFO acotado a [`PENDING_MAX`]: al llenarse se
-    /// descarta el más antiguo, nunca el que se acaba de reportar). Justo después vuelve a mirar
-    /// si ya hay sink: [`Self::install_sink`] corre UNA sola vez, así que si se instaló entre el
+    /// descarta el más antiguo, nunca el que se acaba de reportar), **contando** cada descarte para
+    /// que [`Self::flush_pending`] lo reporte (hub#1324). Justo después vuelve a mirar si ya hay
+    /// sink: [`Self::install_sink`] corre UNA sola vez, así que si se instaló entre el
     /// `sink.get()` de [`Self::report`] y el lock que acabamos de soltar, nadie más va a vaciar
     /// este buffer — lo hace este mismo hilo (hub#1274).
     fn buffer_pending(&self, event: ErrorEvent) {
@@ -213,9 +235,10 @@ impl ErrorRegistry {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            buf.push_back(event);
-            if buf.len() > PENDING_MAX {
-                buf.pop_front();
+            buf.events.push_back(event);
+            if buf.events.len() > PENDING_MAX {
+                buf.events.pop_front();
+                buf.dropped = buf.dropped.saturating_add(1);
             }
         }
         if self.sink.get().is_some() {
@@ -224,19 +247,32 @@ impl ErrorRegistry {
     }
 
     /// Vacía el buffer de arranque en el sink instalado, en el orden en que se reportaron los
-    /// eventos. No hace nada si todavía no hay sink, o si el buffer ya está vacío. Segura de
-    /// llamar desde varios hilos a la vez: cada uno solo entrega lo que quede en el buffer.
+    /// eventos, precedidos por el parte del desbordamiento si lo hubo (hub#1324). No hace nada si
+    /// todavía no hay sink, o si el buffer ya está vacío. Segura de llamar desde varios hilos a la
+    /// vez: cada uno solo entrega lo que quede en el buffer, y el contador de descartes se toma en
+    /// el MISMO lock que el drenaje, así que ningún descarte se reporta dos veces ni se pierde.
     fn flush_pending(&self) {
         let Some(sink) = self.sink.get() else {
             return;
         };
-        let events: Vec<ErrorEvent> = {
+        let (events, dropped): (Vec<ErrorEvent>, usize) = {
             let mut buf = match self.pending.lock() {
                 Ok(g) => g,
                 Err(poisoned) => poisoned.into_inner(),
             };
-            buf.drain(..).collect()
+            let dropped = std::mem::take(&mut buf.dropped);
+            (buf.events.drain(..).collect(), dropped)
         };
+
+        // El parte del desbordamiento va PRIMERO: la pérdida ocurrió antes que los eventos que sí
+        // sobrevivieron, y así se lee en ese orden. Va **sin** pasar por el dedup a propósito: es
+        // lo único que cuenta lo que ya no se puede recuperar, y el contador se reinicia en el lock
+        // de arriba, así que un segundo parte siempre significa descartes NUEVOS (hub#1324).
+        if dropped > 0 {
+            report_overflow_on_stderr(dropped);
+            sink.submit(buffer_overflow_event(dropped));
+        }
+
         for event in events {
             if !self.should_throttle(&event) {
                 sink.submit(event);
@@ -270,6 +306,42 @@ impl ErrorRegistry {
             }
         }
     }
+}
+
+/// Builds the synthetic event that makes a startup-buffer overflow visible (hub#1324): it names
+/// how many reports were lost and the capacity that could not hold them, so ops can tell a buffer
+/// that is one event too small from a hub that error-stormed its whole boot.
+fn buffer_overflow_event(dropped: usize) -> ErrorEvent {
+    ErrorEvent::new(
+        source::HUB,
+        BUFFER_OVERFLOW_CODE,
+        format!(
+            "startup error buffer overflowed: {dropped} event(s) reported before the sink was \
+             installed were dropped (capacity {PENDING_MAX})"
+        ),
+        // Losing telemetry is a failure of the Hub, not something the caller did wrong: it is what
+        // the Cloud groups and alerts on.
+        severity::UNEXPECTED,
+    )
+    .with_context(serde_json::json!({
+        "dropped": dropped,
+        "capacity": PENDING_MAX,
+        "issue": "hub#1324",
+    }))
+}
+
+/// Also prints the overflow on `stderr`, same as [`crate::money_backfill`] does with a mixed hub:
+/// it is the one line an operator tailing the container log sees with no Cloud round-trip — and the
+/// ONLY trace left if this hub is not enrolled, since `CloudErrorSink` drops without a machine
+/// token. Writes through [`std::io::Write`] instead of `eprintln!` because this module has to stay
+/// safe to call from the panic hook and the `eprintln!` macro panics if stderr is gone.
+fn report_overflow_on_stderr(dropped: usize) {
+    use std::io::Write;
+    let _ = writeln!(
+        std::io::stderr(),
+        "🔴 [error-registry] {dropped} error(s) reported before the sink was installed were \
+         dropped (buffer capacity {PENDING_MAX}) — reported as `{BUFFER_OVERFLOW_CODE}`"
+    );
 }
 
 /// Reporta un [`RuntimeError`] al registro global, clasificando severidad y derivando el
@@ -476,7 +548,7 @@ mod tests {
         let reg = ErrorRegistry {
             sink: OnceLock::new(),
             recent: Mutex::new(HashMap::new()),
-            pending: Mutex::new(VecDeque::new()),
+            pending: Mutex::new(PendingBuffer::default()),
         };
         let _ = reg.sink.set(sink);
         reg
@@ -488,7 +560,7 @@ mod tests {
         ErrorRegistry {
             sink: OnceLock::new(),
             recent: Mutex::new(HashMap::new()),
-            pending: Mutex::new(VecDeque::new()),
+            pending: Mutex::new(PendingBuffer::default()),
         }
     }
 
@@ -597,10 +669,78 @@ mod tests {
 
         reg.install_sink(Arc::new(CountingSink(count.clone())));
 
+        // El `+ 1` es el parte del desbordamiento que añade hub#1324, un evento NUEVO y no uno de
+        // los que el buffer guardó. El contrato que mide este test —cuántos de los reportados
+        // sobreviven al tope: los últimos PENDING_MAX, no los 128— no ha cambiado.
+
         assert_eq!(
             count.load(Ordering::SeqCst),
-            PENDING_MAX,
-            "el buffer debe quedarse con como mucho PENDING_MAX eventos, no con todos los reportados"
+            PENDING_MAX + 1,
+            "el buffer debe quedarse con como mucho PENDING_MAX eventos (+ el parte de hub#1324), \
+             no con todos los reportados"
+        );
+    }
+
+    /// 🔴 hub#1324: overflowing the startup buffer must NOT be silent. `PENDING_MAX` keeps the
+    /// buffer bounded (hub#1274), but everything it had to drop used to vanish without a trace —
+    /// the same "a failure nobody sees does not exist" the buffering fixed, only moved past the
+    /// 64th event. The loss now travels as a synthetic event through the very sink the dropped
+    /// ones were waiting for (the Sentry "client report" pattern), so ops reads the gap where it
+    /// already reads errors. Before the fix nothing carries `error_buffer_overflow` and this fails.
+    #[test]
+    fn overflowing_the_startup_buffer_reports_the_loss_hub1324() {
+        struct EventRecordingSink(Mutex<Vec<ErrorEvent>>);
+        impl ErrorSink for EventRecordingSink {
+            fn submit(&self, event: ErrorEvent) {
+                self.0.lock().unwrap().push(event);
+            }
+        }
+
+        let reg = isolated_without_sink();
+
+        // Twice the cap, every message distinct so the dedup does not colour what we measure:
+        // exactly PENDING_MAX events survive and exactly PENDING_MAX are dropped.
+        for i in 0..(PENDING_MAX * 2) {
+            reg.report(event("db", &format!("boom {i}")));
+        }
+
+        let sink = Arc::new(EventRecordingSink(Mutex::new(Vec::new())));
+        reg.install_sink(sink.clone());
+
+        let got = sink.0.lock().unwrap().clone();
+        let overflow = got
+            .iter()
+            .find(|e| e.error_code == "error_buffer_overflow")
+            .unwrap_or_else(|| {
+                panic!(
+                    "the overflow of the startup buffer must reach the sink as an \
+                     `error_buffer_overflow` event; got only {:?}",
+                    got.iter().map(|e| &e.error_code).collect::<Vec<_>>()
+                )
+            });
+
+        assert_eq!(
+            overflow.context["dropped"], PENDING_MAX,
+            "the synthetic event must carry HOW MANY events were lost, not just that some were"
+        );
+        assert_eq!(
+            overflow.context["capacity"], PENDING_MAX,
+            "and the capacity that could not hold them, so ops can tell a tight buffer from a storm"
+        );
+        assert_eq!(
+            overflow.severity,
+            severity::UNEXPECTED,
+            "losing telemetry is a Hub failure, not something the caller did wrong"
+        );
+        assert_eq!(
+            got.first().map(|e| e.error_code.as_str()),
+            Some("error_buffer_overflow"),
+            "the loss happened BEFORE the events that survived, so it is delivered first"
+        );
+        assert_eq!(
+            got.len(),
+            PENDING_MAX + 1,
+            "the synthetic event is added to what the buffer kept, it does not replace any of it"
         );
     }
 
