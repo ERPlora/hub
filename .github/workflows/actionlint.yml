@@ -60,6 +60,13 @@ on:
       - 'scripts/ci/kernel-e2e-targets.sh'
       - 'scripts/ci/kernel-e2e-targets.txt'
       - 'scripts/tests/kernel-e2e-targets.test.sh'
+      # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
+      # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
+      # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
+      # gate pre-push, y el gate resuelve con `cargo test --workspace`: nunca consulta la lista).
+      # Sin esta entrada, un slice de hub#1264 que borra el `.rs` y olvida el `.txt` no encuentra
+      # NINGÚN guardia antes de mergear y tumba `develop` en el push — el rojo de hub#1354 (hub#1369).
+      - 'crates/runtime/tests/**'
   workflow_dispatch:
 
 permissions:
