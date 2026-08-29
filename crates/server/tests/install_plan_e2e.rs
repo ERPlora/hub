@@ -477,3 +477,232 @@ async fn an_incomplete_plan_degrades_to_the_manifest_fallback_and_recovers() {
         "recovery goes through the manifest fallback (versions/ round-trip): {calls:?}"
     );
 }
+
+// ── hub#1130: the response must SAY what it dragged in ─────────────────────────────────────
+//
+// `POST /api/modules/request-install` only ever answered the headline `module_id`. Installing
+// `dependent` silently installed `leaf` too (ADR-0060's own topological closure), and nothing in
+// the response told the caller — the owner saw new icons nobody asked for, and the assistant/a
+// script could not report or undo what had just changed. The reverse door already names what it
+// removes (hub#1101, `409 has_dependents` + `error.dependents`); this pins the forward door naming
+// what it added.
+
+/// (6) A module whose dependency is missing reports it in `also_installed`, in the plan's own
+/// topological (installation) order — the headline module itself is never in its own list.
+#[tokio::test]
+async fn install_reports_the_modules_it_dragged_in_hub1130() {
+    let dep_a = module_zip("dep_a", &[]);
+    let dep_b = module_zip("dep_b", &[]);
+    let requested = module_zip("verifactu", &["dep_a", "dep_b"]);
+    let (sha_a, sha_b, sha_req) = (
+        sha256_hex(&dep_a),
+        sha256_hex(&dep_b),
+        sha256_hex(&requested),
+    );
+    let mut catalog = HashMap::new();
+    catalog.insert("dep_a".to_string(), (dep_a, sha_a.clone()));
+    catalog.insert("dep_b".to_string(), (dep_b, sha_b.clone()));
+    catalog.insert("verifactu".to_string(), (requested, sha_req.clone()));
+
+    let mock = Arc::new(MockCloud {
+        catalog,
+        plan: Some(json!({
+            "requested": "verifactu",
+            "plan": [node("dep_a", &sha_a, "dependency"),
+                     node("dep_b", &sha_b, "dependency"),
+                     node("verifactu", &sha_req, "requested")],
+            "already_satisfied": [],
+            "blocked": false,
+            "blocked_on": [],
+        })),
+        calls: Mutex::new(Vec::new()),
+        plan_bodies: Mutex::new(Vec::new()),
+    });
+    let base_url = spawn_mock_cloud(mock.clone()).await;
+
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    let installed = install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache_dir("dragged-in"),
+        &Auth::HubToken {
+            hub_id: "hub-test".into(),
+            token: "tok".into(),
+        },
+        &mut rt,
+        "verifactu",
+        "latest",
+        &|_, _| {},
+        &dev_policy(),
+    )
+    .await
+    .expect("the plan resolves and installs the whole closure");
+
+    assert_eq!(installed.module_id, "verifactu");
+    assert_eq!(
+        installed.also_installed,
+        vec!["dep_a".to_string(), "dep_b".to_string()],
+        "also_installed must name what got dragged in, in installation order"
+    );
+}
+
+/// (7) A module with no pending dependencies reports an EMPTY `also_installed` — never absent, so
+/// a caller never has to special-case the shape.
+#[tokio::test]
+async fn install_with_no_pending_dependencies_reports_empty_also_installed_hub1130() {
+    let standalone = module_zip("customers", &[]);
+    let sha = sha256_hex(&standalone);
+    let mut catalog = HashMap::new();
+    catalog.insert("customers".to_string(), (standalone, sha.clone()));
+
+    let mock = Arc::new(MockCloud {
+        catalog,
+        plan: Some(json!({
+            "requested": "customers",
+            "plan": [node("customers", &sha, "requested")],
+            "already_satisfied": [],
+            "blocked": false,
+            "blocked_on": [],
+        })),
+        calls: Mutex::new(Vec::new()),
+        plan_bodies: Mutex::new(Vec::new()),
+    });
+    let base_url = spawn_mock_cloud(mock.clone()).await;
+
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    let installed = install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache_dir("no-deps"),
+        &Auth::HubToken {
+            hub_id: "hub-test".into(),
+            token: "tok".into(),
+        },
+        &mut rt,
+        "customers",
+        "latest",
+        &|_, _| {},
+        &dev_policy(),
+    )
+    .await
+    .expect("a module without dependencies still installs");
+
+    assert_eq!(installed.module_id, "customers");
+    assert!(
+        installed.also_installed.is_empty(),
+        "no dependency was dragged in: {:?}",
+        installed.also_installed
+    );
+}
+
+/// (8) A dependency that was ALREADY installed before this call is not something THIS call
+/// installed — it must not show up in `also_installed` (it is not a surprise to the caller).
+#[tokio::test]
+async fn already_installed_dependency_is_not_reported_as_also_installed_hub1130() {
+    let leaf = module_zip("leaf", &[]);
+    let dependent = module_zip("dependent", &["leaf"]);
+    let (leaf_sha, dependent_sha) = (sha256_hex(&leaf), sha256_hex(&dependent));
+    let mut catalog = HashMap::new();
+    catalog.insert("leaf".to_string(), (leaf, leaf_sha.clone()));
+    catalog.insert("dependent".to_string(), (dependent, dependent_sha.clone()));
+
+    // The Cloud already knows `leaf` is there: it only plans `dependent`.
+    let mock = Arc::new(MockCloud {
+        catalog,
+        plan: Some(json!({
+            "requested": "dependent",
+            "plan": [node("dependent", &dependent_sha, "requested")],
+            "already_satisfied": ["leaf"],
+            "blocked": false,
+            "blocked_on": [],
+        })),
+        calls: Mutex::new(Vec::new()),
+        plan_bodies: Mutex::new(Vec::new()),
+    });
+    let base_url = spawn_mock_cloud(mock.clone()).await;
+
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
+    let cache = cache_dir("satisfied-also-installed");
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+
+    // Pre-install the dependency straight from disk so the registry really holds it BEFORE this
+    // request-install call — the same setup as scenario (3) above.
+    let leaf_dir = cache.join("preinstalled-leaf");
+    std::fs::create_dir_all(&leaf_dir).unwrap();
+    std::fs::write(
+        leaf_dir.join("module.json"),
+        serde_json::to_vec(&json!({"id":"leaf","name":"leaf","version":"1.0.0"})).unwrap(),
+    )
+    .unwrap();
+    rt.install_from_dir(&leaf_dir).await.unwrap();
+
+    let installed = install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache,
+        &auth,
+        &mut rt,
+        "dependent",
+        "latest",
+        &|_, _| {},
+        &dev_policy(),
+    )
+    .await
+    .expect("installs only what the plan lists");
+
+    assert_eq!(installed.module_id, "dependent");
+    assert!(
+        installed.also_installed.is_empty(),
+        "a pre-existing dependency was not dragged in by THIS call: {:?}",
+        installed.also_installed
+    );
+}
+
+/// (9) The manifest-nested fallback (Cloud without `install-plan/`) drags dependencies in exactly
+/// like the plan path — the caller must not lose the "what did you drag in" answer just because
+/// the safety net took over.
+#[tokio::test]
+async fn manifest_fallback_also_reports_dragged_in_dependencies_hub1130() {
+    let leaf = module_zip("leaf", &[]);
+    let dependent = module_zip("dependent", &["leaf"]);
+    let (leaf_sha, dependent_sha) = (sha256_hex(&leaf), sha256_hex(&dependent));
+    let mut catalog = HashMap::new();
+    catalog.insert("leaf".to_string(), (leaf, leaf_sha));
+    catalog.insert("dependent".to_string(), (dependent, dependent_sha));
+
+    let mock = Arc::new(MockCloud {
+        catalog,
+        plan: None, // 404: endpoint not deployed → manifest-nested fallback
+        calls: Mutex::new(Vec::new()),
+        plan_bodies: Mutex::new(Vec::new()),
+    });
+    let base_url = spawn_mock_cloud(mock.clone()).await;
+
+    let mut rt = Runtime::new(Box::new(fresh_db().await));
+    let installed = install_from_cloud(
+        &reqwest::Client::new(),
+        &base_url,
+        &cache_dir("fallback-dragged-in"),
+        &Auth::HubToken {
+            hub_id: "hub-test".into(),
+            token: "tok".into(),
+        },
+        &mut rt,
+        "dependent",
+        "latest",
+        &|_, _| {},
+        &dev_policy(),
+    )
+    .await
+    .expect("without a plan the hub still resolves deps from the manifest");
+
+    assert_eq!(installed.module_id, "dependent");
+    assert_eq!(
+        installed.also_installed,
+        vec!["leaf".to_string()],
+        "the manifest fallback must report the dependency it installed too"
+    );
+}

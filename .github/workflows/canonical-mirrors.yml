@@ -1,47 +1,64 @@
 # ==============================================================================
-# Los ESPEJOS canónicos del toolkit — la alarma, en el lado que la puede oír
-# (ERPlora/module-toolkit#61)
+# The toolkit's canonical mirrors — the alarm, on the side that can hear it
+# (ERPlora/module-toolkit#61), and the copy that FOLLOWS the hub instead of
+# blocking it (ERPlora/hub#1296)
 # ==============================================================================
 #
-# `ERPlora/module-toolkit` copia A MANO siete cosas cuya autoridad vive en este repo:
+# `ERPlora/module-toolkit` copies BY HAND seven things whose authority lives in this repo:
 #
-#   1. `schemas/module.schema.json` — vendorizado byte a byte (el gate de los 25 repos
-#      de módulo corre sin checkout del hub, así que el validador no puede ir a buscarlo);
-#   2. `crates/db/src/lib.rs::BRIDGE_FUNCTIONS` — las `erp_*` que el shim reescribe;
+#   1. `schemas/module.schema.json` — vendored byte for byte (the gate of the module repos runs
+#      with no hub checkout, so the validator cannot go and fetch it);
+#   2. `crates/db/src/lib.rs::BRIDGE_FUNCTIONS` — the `erp_*` the shim rewrites;
 #   3. `crates/runtime/src/manifest.rs` — `refuses_unknown_fields` + `RETIRED_FIELDS`
-#      (la puerta del autor y la de instalación tienen que decir lo mismo);
-#   4. `crates/runtime/src/hub_users.rs::CORE_QUERIES` — las capacidades del namespace `hub.`;
+#      (the author's door and the install door have to say the same thing);
+#   4. `crates/runtime/src/hub_users.rs::CORE_QUERIES` — the capabilities of the `hub.` namespace;
 #   5. `crates/runtime/src/migration_guard.rs::GRANDFATHERED`;
-#   6. `apps/web/src/main.ts` — el pin de Ionic a `ios`, que es la PREMISA del guard de `fill`.
-#   7. `contracts/kernel/**` — la superficie CONGELADA del hub (ADR «El Hub se CIERRA como
-#      KERNEL», 2026-08-27): rutas, motor, guest, tablas de sistema y el `.d.ts` del SDK.
+#   6. `apps/web/src/main.ts` — the Ionic `ios` pin, the PREMISE of the `fill` guard;
+#   7. `contracts/kernel/**` — the FROZEN surface of the hub (ADR «El Hub se CIERRA como
+#      KERNEL», 2026-08-27): routes, engine, guest, system tables and the SDK's `.d.ts`.
 #
-# EL AGUJERO QUE CIERRA. El toolkit ya tenía el test que compara los espejos
-# (`test/canonical-mirrors.test.mjs`), pero cada uno abría con
-# `if (!existsSync(canonical)) return t.skip(…)` y buscaba el hub como HERMANO DE DISCO. En el CI
-# del toolkit no hay hub —ni lo puede haber: la org está en plan free, donde «organization-level
-# secrets and variables are not accessible by private repositories», así que no existe credencial
-# para hacer checkout de este repo privado—, de modo que los siete se saltaban y el run salía
-# VERDE. Medido el 2026-08-20: `tests 7 · pass 0 · fail 0 · skipped 7`.
+# THE HOLE IT CLOSES (module-toolkit#61). The toolkit had the test that compares the mirrors
+# (`test/canonical-mirrors.test.mjs`), but every case opened with `if (!existsSync(canonical))
+# return t.skip(…)` and looked for the hub as a SIBLING ON DISK. The toolkit's CI has no hub — nor
+# can it: the org is on the free plan, where "organization-level secrets and variables are not
+# accessible by private repositories", so no credential can check this private repo out — and all
+# seven skipped and the run came out GREEN. Measured on 2026-08-20: `tests 7 · pass 0 · fail 0 ·
+# skipped 7`. A guard that skips does not deny: it stays OPEN.
 #
-# Un guard que se salta no deniega: queda ABIERTO. Y un skip silencioso es indistinguible de un
-# PASS en el resumen de un run.
+# WHY HERE. The divergence can only be introduced by editing THIS repo, and this repo is checked
+# out in its own CI. The one thing missing was the toolkit's vendored copy — and a composite
+# action is exactly what GitHub resolves WITHOUT a credential when the action's repo shares its
+# Actions with the organization (module-toolkit already does: it is how the module repos run
+# `validate-module`). The runner fetches the whole toolkit to run the action, and that is what
+# puts the copy on disk.
 #
-# POR QUÉ AQUÍ. La divergencia solo se puede introducir editando ESTE repo, y este repo sí está
-# checkouteado en su propio CI. Lo único que le faltaba era la copia vendorizada del toolkit — y
-# una composite action es justo la forma que GitHub resuelve SIN credencial cuando el repo de la
-# action comparte sus Actions con la organización (module-toolkit ya lo hace: es como los 24 repos
-# de módulo corren `validate-module`). El runner se trae el toolkit entero para ejecutar la action,
-# y eso es lo que pone la copia en disco.
+# THE SECOND HOLE, THE OPPOSITE WAY (hub#1296). The action compares byte for byte, so on a hub
+# PR that ADDS contract — a route, a type — it is red BY CONSTRUCTION: the copy lives in another
+# repo and cannot be ahead of the change it copies. Five approved PRs sat blocked on it in one
+# afternoon, each needing a resync PR in the toolkit and the pair rule of pm#181 to get in. The
+# market pattern (Kubernetes publishing-bot, rust-lang subtrees, Envoy api) is the other way
+# round: the canonical never blocks on the copy; the copy follows after the merge and fails only
+# when it DIVERGES. So the action's outcome is no longer the verdict — it is re-read by
+# `scripts/canonical-mirrors-verdict.sh`, with git and the hub's own history:
 #
-# COSTE. Diez segundos, y SOLO en las PR que tocan uno de los seis ficheros de arriba (el filtro de
-# `paths`). Lo que sustituye no costaba nada tampoco: no existía.
+#   · copy BEHIND an additive change → warning (it follows: `npm run sync-mirrors` in the toolkit);
+#   · copy carrying content the hub NEVER had (edited by hand) → failure;
+#   · the hub RETIRING what the copy still promises (a line, a file), or the schema — which the
+#     module gate READS — differing at all → failure: the pair rule (`Depends-On:` +
+#     `MERGE_PR_PAIR`, pm#181/pm#183) stays for exactly those;
+#   · the action failing for any OTHER reason (a hand-ported list, a broken reader, a change
+#     that touched the sources of those lists) → still a failure. Nothing is downgraded blind.
+#
+# COST. Ten seconds, and ONLY on PRs that touch one of the paths above (the `paths` filter).
+# `fetch-depth: 0` is what the verdict needs to tell a lagging copy from a tampered one; the hub's
+# pack is ~17 MB.
 # ==============================================================================
 
 name: Canonical mirrors (module-toolkit)
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'schemas/module.schema.json'
       - 'crates/db/src/lib.rs'
@@ -49,15 +66,15 @@ on:
       - 'crates/runtime/src/hub_users.rs'
       - 'crates/runtime/src/migration_guard.rs'
       - 'apps/web/src/main.ts'
-      # El control positivo del escáner de `fill` recorre TODAS las vistas del shell: si una
-      # `.vue` nueva le hiciera decir algo distinto que el guard propio del hub, las dos puertas
-      # estarían diciendo cosas distintas del mismo markup y lo pagarían los autores de módulos.
+      # The positive control of the `fill` scanner walks EVERY view of the shell: a new `.vue`
+      # that made it disagree with the hub's own guard would have the two doors saying different
+      # things about the same markup, and module authors would pay for it.
       - 'apps/web/src/**/*.vue'
-      # La superficie CONGELADA del kernel: seis ficheros que el toolkit vendoriza desde
-      # module-toolkit#115 y compara byte a byte. Sin esta ruta, una PR que SOLO mueva el
-      # contrato del kernel no dispara este workflow y la copia del toolkit se queda atrás
-      # sin un solo rojo — pasó con hub#1260, que tocó `routes.snapshot` y no lo vio nadie
-      # (hub#1261). Un guard que no corre no deniega: queda ABIERTO.
+      # The FROZEN kernel surface: the files the toolkit vendors since module-toolkit#115 and
+      # compares byte for byte. Without this path a PR that ONLY moves the kernel contract does
+      # not run this workflow and the toolkit's copy falls behind without a single red — it
+      # happened with hub#1260, which moved `routes.snapshot` and nobody saw it (hub#1261). A
+      # guard that does not run does not deny: it stays OPEN.
       - 'contracts/kernel/**'
       - '.github/workflows/canonical-mirrors.yml'
   push:
@@ -83,18 +100,51 @@ permissions:
 
 jobs:
   mirrors:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: la copia del toolkit sigue al día
-    # El runner propio de la org cuando `CI_RUNNER_LABEL` está puesta, la imagen hospedada cuando
-    # no. El fallback es el punto: si la variable desaparece, esto sigue corriendo en vez de
-    # encolarse para siempre contra una etiqueta que nadie atiende.
+    # The org's own runner when `CI_RUNNER_LABEL` is set, the hosted image when it is not. The
+    # fallback is the point: if the variable disappears, this keeps running instead of queueing
+    # forever against a label nobody answers to.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
+      # With history: the verdict below decides whether the toolkit's copy is an OLDER version of
+      # a hub file (behind) or content the hub never had (divergent) by looking for the copy's
+      # blob at that path in the commits reachable from the tree under review. On a pull request
+      # HEAD is the merge ref, so `HEAD^1` is the base branch and the history is develop's.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Sin `with: token`: la action se resuelve por el Actions-sharing de module-toolkit, no por
-      # una credencial. Si un día ese repo dejara de compartir sus Actions, este paso falla en
-      # ROJO diciendo que no la encuentra — nunca se degrada a verde.
-      - uses: ERPlora/module-toolkit/.github/actions/check-canonical-mirrors@main
+      # No `with: token`: the action resolves through module-toolkit's Actions-sharing, not a
+      # credential. If that repo ever stopped sharing its Actions this step fails RED saying it
+      # cannot find it — never degrades to green.
+      #
+      # `continue-on-error` is NOT a mute: the outcome is read by the next step, which is the
+      # verdict (hub#1296). A copy behind an additive change is the expected shape of every
+      # contract PR and must not end the job; everything else the action reports stays a failure.
+      - id: toolkit
+        uses: ERPlora/module-toolkit/.github/actions/check-canonical-mirrors@main
+        continue-on-error: true
         with:
           hub-dir: ${{ github.workspace }}
+
+      # The verdict. `ERPLORA_TOOLKIT` is where the action put the toolkit's checkout (its first
+      # step exports it to `GITHUB_ENV`); an empty value means the action never got that far, and
+      # the script refuses a directory it cannot read rather than reporting green on nothing.
+      - name: The copy follows the hub, it does not block it (hub#1296)
+        env:
+          TOOLKIT_OUTCOME: ${{ steps.toolkit.outcome }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ERPLORA_TOOLKIT:-}" ]; then
+            echo "::error::the toolkit's action did not export ERPLORA_TOOLKIT — its checkout is not on disk, so there is nothing to compare (outcome: ${TOOLKIT_OUTCOME})"
+            exit 1
+          fi
+          bash ./scripts/canonical-mirrors-verdict.sh \
+            --hub "$GITHUB_WORKSPACE" \
+            --toolkit "$ERPLORA_TOOLKIT" \
+            --toolkit-outcome "$TOOLKIT_OUTCOME"

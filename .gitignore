@@ -58,3 +58,7 @@ apps/web/tests/e2e/**/*-darwin.png
 # Nested guest of the kernel conformance fixture (hub#1238): cargo writes its lock, the build
 # stamp ignores it on purpose, and it is not part of the fixture.
 crates/runtime/tests/fixtures/kernel-fixture/handler/Cargo.lock
+
+# Python bytecode (scripts/ci/*.py): produced by py_compile in tests, never source.
+__pycache__/
+*.pyc

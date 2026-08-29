@@ -83,7 +83,7 @@ async fn serve() -> Server {
 /// A key of this hub, through the runtime — the same row the keys screen writes.
 async fn key_with(srv: &Server, access: ApiKeyAccess) -> String {
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     rt.create_api_key(
         "Integration",
         &ApiKeyScope::blanket(access),
@@ -377,7 +377,7 @@ async fn the_ticket_door_needs_a_session() {
     let t = ticket(&srv).await;
     assert!(t.starts_with("erpl_tkt_"));
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let keys = rt.list_api_keys().await.unwrap();
     assert_eq!(keys.len(), 1, "one key, however many tickets were asked for");
     assert!(keys[0].system);

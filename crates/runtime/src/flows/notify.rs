@@ -145,7 +145,7 @@ pub(crate) async fn prepare(
     // `module_id` is empty because no module emitted this — the kernel did. That emptiness is half
     // of what tells the relay this row may carry a flow's release, and it is not something a module
     // can produce (see `outbox::deliver_host_notify`).
-    let queue_op = outbox::insert_op(&ctx, "", outbox::FLOW_NOTIFY_EVENT, &payload, depth.max(0) as u32);
+    let queue_op = outbox::insert_op(&ctx, "", outbox::FLOW_NOTIFY_EVENT, &payload, depth.max(0) as u32, None);
     let event_id = queue_op
         .1
         .get("id")

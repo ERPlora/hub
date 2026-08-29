@@ -54,7 +54,7 @@ fn unauthorized(error: auth::AuthError) -> Response {
 }
 
 async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     auth::require_user_session(headers, &st.config, &rt)
         .await
         .map(|_| ())
@@ -62,7 +62,7 @@ async fn require_user(st: &AppState, headers: &HeaderMap) -> Result<(), Response
 }
 
 async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Response> {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     auth::require_admin_session(headers, &st.config, &rt)
         .await
         .map(|_| ())
@@ -1295,7 +1295,7 @@ async fn resolve_policy(st: &AppState, rel: &str) -> MediaPolicy {
     let Some(folder) = module_folder_of(rel) else {
         return policy_for(rel, None);
     };
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let owner = rt
         .registry()
         .installed

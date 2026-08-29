@@ -9,13 +9,15 @@
 //!  - **NUNCA** hace `panic!`/`unwrap`/`expect` en el camino de reporte (todo va envuelto).
 //!  - **NUNCA** bloquea al llamador: el `submit` del sink debe ser fire-and-forget (el sink real
 //!    del server hace `tokio::spawn`); aquí solo tomamos un `Mutex` muy corto para el dedup.
-//!  - Si no hay sink instalado todavía (arranque temprano) el evento se **descarta en silencio**.
+//!  - Si no hay sink instalado todavía (arranque temprano) el evento se **guarda en un buffer
+//!    acotado** y se reenvía, en orden, en cuanto el host instala el sink (hub#1274) — nunca se
+//!    tira.
 //!
 //! El **contrato** que se reenvía al Cloud (lo construye el sink a partir de [`ErrorEvent`]):
 //! `POST /api/v1/hub/device/error-report/` con
 //! `{ source, module_id, error_code, message, stack, severity, context, occurred_at }`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -29,6 +31,12 @@ const DEDUP_WINDOW: Duration = Duration::from_secs(30);
 /// Tope de entradas en la tabla de dedup (defensa: no crecer sin límite ante errores muy variados).
 /// Al alcanzarlo se purgan las entradas ya expiradas; si aún así está llena, se limpia entera.
 const DEDUP_MAX_ENTRIES: usize = 1024;
+
+/// Tope del buffer de arranque temprano (hub#1274): eventos reportados antes de que el host llame
+/// a [`ErrorRegistry::install`]. Acotado por la misma razón que `DEDUP_MAX_ENTRIES` — un arranque
+/// que reporta en bucle antes de tener sink no debe crecer sin límite. FIFO: al llenarse se
+/// descarta el más antiguo, nunca el que se acaba de reportar.
+const PENDING_MAX: usize = 64;
 
 /// Severidad de un error reportado.
 ///  - `"user"`: error esperable provocado por el llamador (payload inválido, permiso denegado,
@@ -134,10 +142,15 @@ pub trait ErrorSink: Send + Sync {
 /// El registro global de errores. Único por proceso (un contenedor ECS por hub / una app Tauri).
 /// Accede a él con [`ErrorRegistry::global`].
 pub struct ErrorRegistry {
-    /// Sink instalado por el host. `None` hasta [`ErrorRegistry::install`] (eventos previos se tiran).
+    /// Sink instalado por el host. `None` hasta [`ErrorRegistry::install`] — mientras tanto, los
+    /// eventos se acumulan en `pending` (hub#1274) en vez de tirarse.
     sink: OnceLock<std::sync::Arc<dyn ErrorSink>>,
     /// Dedup/throttle local: huella → instante del último reporte. `Mutex` corto (sin await dentro).
     recent: Mutex<HashMap<String, Instant>>,
+    /// Buffer FIFO acotado ([`PENDING_MAX`]) de eventos reportados antes de que hubiera sink
+    /// (arranque temprano, hub#1274). [`ErrorRegistry::install`] lo vacía, en orden, en el sink
+    /// recién llegado.
+    pending: Mutex<VecDeque<ErrorEvent>>,
 }
 
 impl ErrorRegistry {
@@ -147,13 +160,22 @@ impl ErrorRegistry {
         REGISTRY.get_or_init(|| ErrorRegistry {
             sink: OnceLock::new(),
             recent: Mutex::new(HashMap::new()),
+            pending: Mutex::new(VecDeque::new()),
         })
     }
 
-    /// Instala el sink (lo llama el host UNA vez al arrancar). Si ya había uno, no lo reemplaza
-    /// (best-effort, no hace `panic!`).
+    /// Instala el sink (lo llama el host UNA vez al arrancar). Delega en [`Self::install_sink`],
+    /// la versión de instancia — testable contra un registro AISLADO sin tocar el global.
     pub fn install(sink: std::sync::Arc<dyn ErrorSink>) {
-        let _ = Self::global().sink.set(sink);
+        Self::global().install_sink(sink);
+    }
+
+    /// Versión de instancia de [`Self::install`]. Si ya había un sink, no lo reemplaza
+    /// (best-effort, no hace `panic!`); en cualquier caso vacía el buffer de arranque temprano
+    /// (hub#1274) en el sink que quedó instalado, en el orden en que se reportaron los eventos.
+    fn install_sink(&self, sink: std::sync::Arc<dyn ErrorSink>) {
+        let _ = self.sink.set(sink);
+        self.flush_pending();
     }
 
     /// `true` si ya hay un sink instalado (útil para tests / introspección).
@@ -161,11 +183,13 @@ impl ErrorRegistry {
         self.sink.get().is_some()
     }
 
-    /// Reporta un evento. Si no hay sink → se descarta. Si la misma huella se vio en los últimos
-    /// ~30 s → se omite (throttle). En otro caso se entrega al sink. NUNCA hace `panic!`.
+    /// Reporta un evento. Si no hay sink → se guarda en el buffer de arranque (hub#1274) y se
+    /// reenvía al instalarse. Si la misma huella se vio en los últimos ~30 s → se omite (throttle).
+    /// En otro caso se entrega al sink. NUNCA hace `panic!`.
     pub fn report(&self, event: ErrorEvent) {
-        // Sin sink (arranque temprano / proceso sin host): tirar en silencio.
         let Some(sink) = self.sink.get() else {
+            // Sin sink todavía (arranque temprano / proceso sin host): buffer, no se tira.
+            self.buffer_pending(event);
             return;
         };
 
@@ -176,6 +200,48 @@ impl ErrorRegistry {
         }
 
         sink.submit(event);
+    }
+
+    /// Guarda un evento en el buffer de arranque (FIFO acotado a [`PENDING_MAX`]: al llenarse se
+    /// descarta el más antiguo, nunca el que se acaba de reportar). Justo después vuelve a mirar
+    /// si ya hay sink: [`Self::install_sink`] corre UNA sola vez, así que si se instaló entre el
+    /// `sink.get()` de [`Self::report`] y el lock que acabamos de soltar, nadie más va a vaciar
+    /// este buffer — lo hace este mismo hilo (hub#1274).
+    fn buffer_pending(&self, event: ErrorEvent) {
+        {
+            let mut buf = match self.pending.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            buf.push_back(event);
+            if buf.len() > PENDING_MAX {
+                buf.pop_front();
+            }
+        }
+        if self.sink.get().is_some() {
+            self.flush_pending();
+        }
+    }
+
+    /// Vacía el buffer de arranque en el sink instalado, en el orden en que se reportaron los
+    /// eventos. No hace nada si todavía no hay sink, o si el buffer ya está vacío. Segura de
+    /// llamar desde varios hilos a la vez: cada uno solo entrega lo que quede en el buffer.
+    fn flush_pending(&self) {
+        let Some(sink) = self.sink.get() else {
+            return;
+        };
+        let events: Vec<ErrorEvent> = {
+            let mut buf = match self.pending.lock() {
+                Ok(g) => g,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            buf.drain(..).collect()
+        };
+        for event in events {
+            if !self.should_throttle(&event) {
+                sink.submit(event);
+            }
+        }
     }
 
     /// ¿Hay que omitir este evento por dedup? Actualiza la tabla de huellas recientes. Best-effort:
@@ -410,9 +476,20 @@ mod tests {
         let reg = ErrorRegistry {
             sink: OnceLock::new(),
             recent: Mutex::new(HashMap::new()),
+            pending: Mutex::new(VecDeque::new()),
         };
         let _ = reg.sink.set(sink);
         reg
+    }
+
+    /// Construye un registro AISLADO **sin sink** — el estado exacto de arranque temprano, antes
+    /// de que el host llame a `install` (hub#1274).
+    fn isolated_without_sink() -> ErrorRegistry {
+        ErrorRegistry {
+            sink: OnceLock::new(),
+            recent: Mutex::new(HashMap::new()),
+            pending: Mutex::new(VecDeque::new()),
+        }
     }
 
     fn event(code: &str, msg: &str) -> ErrorEvent {
@@ -448,14 +525,83 @@ mod tests {
     }
 
     #[test]
-    fn no_sink_drops_quietly() {
-        let reg = ErrorRegistry {
-            sink: OnceLock::new(),
-            recent: Mutex::new(HashMap::new()),
-        };
+    fn no_sink_buffers_quietly_without_panicking() {
+        // hub#1274: ya no se descarta, se guarda para cuando llegue el sink — pero SIGUE sin
+        // poder hacer `panic!` ni bloquear al llamador, sea cual sea el estado del registro.
+        let reg = isolated_without_sink();
         assert!(!reg.has_sink());
-        // No debe entrar en pánico ni hacer nada observable.
         reg.report(event("db", "boom"));
+    }
+
+    /// 🔴 hub#1274: un evento reportado ANTES de instalar el sink (la ventana en la que corre
+    /// `ensure_system_tables`, antes de `install_error_reporting` en `serve()`) tiene que llegar al
+    /// sink una vez este se instala — no perderse. Antes del fix, `report()` lo tiraba en silencio
+    /// y esta aserción falla (0, no 1).
+    #[test]
+    fn error_registry_keeps_events_emitted_before_init_hub1274() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let reg = isolated_without_sink();
+
+        // Arranque temprano: se reporta ANTES de que exista sink.
+        reg.report(event("db", "boom during boot"));
+
+        // El host instala el sink más tarde, igual que `serve()` tras `ensure_system_tables`.
+        reg.install_sink(Arc::new(CountingSink(count.clone())));
+
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            1,
+            "un evento reportado antes de instalar el sink debe llegar al instalarse, no perderse"
+        );
+    }
+
+    /// El buffer respeta el ORDEN de llegada al vaciarse — no es solo "algo llega", es "llega lo
+    /// que se reportó, en la secuencia en que se reportó" (hub#1274).
+    #[test]
+    fn buffered_events_flush_in_the_order_they_were_reported_hub1274() {
+        struct RecordingSink(Mutex<Vec<String>>);
+        impl ErrorSink for RecordingSink {
+            fn submit(&self, event: ErrorEvent) {
+                self.0.lock().unwrap().push(event.message);
+            }
+        }
+
+        let reg = isolated_without_sink();
+        reg.report(event("db", "first"));
+        reg.report(event("wasm", "second"));
+        reg.report(event("io", "third"));
+
+        let sink = Arc::new(RecordingSink(Mutex::new(Vec::new())));
+        reg.install_sink(sink.clone());
+
+        let got = sink.0.lock().unwrap().clone();
+        assert_eq!(
+            got,
+            vec!["first".to_string(), "second".to_string(), "third".to_string()],
+            "el buffer debe vaciarse en el mismo orden en que se reportó"
+        );
+    }
+
+    /// El buffer está ACOTADO (hub#1274): un arranque que reporta en bucle antes de tener sink no
+    /// puede crecer sin límite — se queda con los últimos [`PENDING_MAX`], nunca con todos.
+    #[test]
+    fn buffer_is_bounded_and_keeps_the_most_recent_events_hub1274() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let reg = isolated_without_sink();
+
+        // El doble del tope, todos con huellas DISTINTAS (mensaje único) para que el dedup no
+        // interfiera con lo que este test mide: solo el tamaño del buffer.
+        for i in 0..(PENDING_MAX * 2) {
+            reg.report(event("db", &format!("boom {i}")));
+        }
+
+        reg.install_sink(Arc::new(CountingSink(count.clone())));
+
+        assert_eq!(
+            count.load(Ordering::SeqCst),
+            PENDING_MAX,
+            "el buffer debe quedarse con como mucho PENDING_MAX eventos, no con todos los reportados"
+        );
     }
 
     #[test]

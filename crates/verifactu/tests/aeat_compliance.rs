@@ -24,14 +24,16 @@
 //! &Huella={huella_anterior}&FechaHoraHusoGenRegistro={ISO+huso}
 //! record_hash = SHA256(input.utf8).hexdigest().UPPER()
 //! ```
-//! La ANULACIÓN usa la misma fórmula SIN `TipoFactura`, `CuotaTotal` ni `ImporteTotal`.
+//! The ANULACIÓN record omits `TipoFactura`, `CuotaTotal` and `ImporteTotal` AND uses the
+//! field names of the `RegistroAnulacion/IDFactura` XML (`IDEmisorFacturaAnulada`,
+//! `NumSerieFacturaAnulada`, `FechaExpedicionFacturaAnulada`) — spec §3.b; hub#1330.
 //!
-//! ## Nivel de confianza
-//! Los valores esperados se DERIVAN del algoritmo documentado (calculados de forma
-//! independiente, no copiados de la salida del motor), por lo que estos tests detectan
-//! cualquier desviación del motor respecto a la fórmula AEAT. La validación DEFINITIVA
-//! requeriría un **vector oficial de la AEAT** (entrada conocida → huella publicada por la
-//! Agencia); con él, basta cambiar las constantes esperadas de los tests por las oficiales.
+//! ## Confidence level
+//! The derived anchors below are computed independently (never copied from the engine), and
+//! the OFFICIAL AEAT vectors are pinned too (`*_official_case_*` tests): §6 "Casos 1, 2 y 3"
+//! of «Detalle de las especificaciones técnicas para generación de la huella o hash de los
+//! registros de facturación» (sistemas VERI*FACTU), v0.1.2, 27/08/2024 — published input →
+//! published hash, the three cases forming one chain (alta → alta → anulación).
 
 use erplora_verifactu::aeat;
 use erplora_verifactu::chain;
@@ -147,6 +149,81 @@ fn alta_hash_sensible_al_importe_en_euros_no_centimos() {
     );
 }
 
+#[test]
+fn alta_hash_matches_the_official_case_1_and_case_2_vectors_hub1330() {
+    // Official AEAT vectors for ALTA records — same document as Caso 3 (see
+    // `anulacion_hash_matches_the_official_case_3_vector_hub1330`): §6.1 "Caso 1" (first
+    // record of the chain, empty `Huella`, p. 10) and §6.2 "Caso 2" (chained to Caso 1,
+    // p. 11). Item 4 of hub#1330: the alta tests above derive their anchors independently
+    // but not from a value published by the AEAT.
+    const CASE_1_HASH: &str = "3C464DAF61ACB827C65FDA19F352A4E3BDC2C640E9E9FC4CC058073F38F12F60";
+    const CASE_2_HASH: &str = "F7B94CFD8924EDFF273501B01EE5153E4CE8F259766F88CF6ACB8935802A2B97";
+    const CASE_3_HASH: &str = "177547C0D57AC74748561D054A9CEC14B4C4EA23D1BEFD6F2E69E3A388F90C68";
+
+    // Independent oracle: the exact concatenations printed in the document.
+    let case_1_input = "IDEmisorFactura=89890001K&NumSerieFactura=12345678/G33\
+         &FechaExpedicionFactura=01-01-2024&TipoFactura=F1&CuotaTotal=12.35\
+         &ImporteTotal=123.45&Huella=&FechaHoraHusoGenRegistro=2024-01-01T19:20:30+01:00";
+    assert_eq!(
+        sha256_upper(case_1_input),
+        CASE_1_HASH,
+        "the test oracle must reproduce the hash the AEAT publishes for Caso 1"
+    );
+    let case_2_input = format!(
+        "IDEmisorFactura=89890001K&NumSerieFactura=12345679/G34\
+         &FechaExpedicionFactura=01-01-2024&TipoFactura=F1&CuotaTotal=12.35\
+         &ImporteTotal=123.45&Huella={CASE_1_HASH}\
+         &FechaHoraHusoGenRegistro=2024-01-01T19:20:35+01:00"
+    );
+    assert_eq!(
+        sha256_upper(&case_2_input),
+        CASE_2_HASH,
+        "the test oracle must reproduce the hash the AEAT publishes for Caso 2"
+    );
+
+    // Engine, with the inputs as the runtime hands them in (ISO date, euro amounts).
+    let case_1 = chain::alta_hash(
+        "89890001K",
+        "12345678/G33",
+        "2024-01-01",
+        "F1",
+        12.35,
+        123.45,
+        "",
+        "2024-01-01T19:20:30+01:00",
+    );
+    assert_eq!(
+        case_1, CASE_1_HASH,
+        "alta_hash must reproduce the official Caso 1 vector"
+    );
+    let case_2 = chain::alta_hash(
+        "89890001K",
+        "12345679/G34",
+        "2024-01-01",
+        "F1",
+        12.35,
+        123.45,
+        &case_1,
+        "2024-01-01T19:20:35+01:00",
+    );
+    assert_eq!(
+        case_2, CASE_2_HASH,
+        "alta_hash must reproduce the official Caso 2 vector"
+    );
+    // The three published vectors form ONE chain: Caso 3 (anulación) hangs from Caso 2.
+    let case_3 = chain::anulacion_hash(
+        "89890001K",
+        "12345679/G34",
+        "2024-01-01",
+        &case_2,
+        "2024-01-01T19:20:40+01:00",
+    );
+    assert_eq!(
+        case_3, CASE_3_HASH,
+        "anulacion_hash must chain to the official Caso 2 hash"
+    );
+}
+
 // ── 3. Encadenamiento: la huella N usa la huella N-1 ──────────────────────────────────────
 
 #[test]
@@ -176,18 +253,69 @@ fn encadenamiento_la_huella_n_usa_la_huella_n_menos_1() {
 
 #[test]
 fn anulacion_hash_coincide_con_formula_aeat() {
+    // hub#1330: los nombres de campo del registro de ANULACIÓN son los del XML
+    // `RegistroAnulacion/IDFactura` (`IDEmisorFacturaAnulada`/`NumSerieFacturaAnulada`/
+    // `FechaExpedicionFacturaAnulada`), NO los de alta — ya reflejado en `aeat.rs` líneas
+    // 746-748 (`build_soap`), antes solo `anulacion_hash` usaba los nombres equivocados.
     let input = format!(
-        "IDEmisorFactura={NIF}&NumSerieFactura={NUM1}&FechaExpedicionFactura={FECHA_AEAT}\
+        "IDEmisorFacturaAnulada={NIF}&NumSerieFacturaAnulada={NUM1}\
+         &FechaExpedicionFacturaAnulada={FECHA_AEAT}\
          &Huella=&FechaHoraHusoGenRegistro={TS1}"
     );
     let esperado = sha256_upper(&input);
-    assert_eq!(esperado, "E7D22B2996824720999CBF8B333AEC8AC4BAE2672932ABEE22DB4328B7B27B66");
+    assert_eq!(esperado, "BF697C1BE3F2A38B8A008037F9B745B40BC852D0579F6D932AB83AD0E29E1B3B");
 
     let obtenido = chain::anulacion_hash(NIF, NUM1, FECHA_ISO, "", TS1);
     assert_eq!(obtenido, esperado, "la huella de anulación omite tipo/cuota/importe");
-    // Y es distinta de la de alta (lleva menos campos).
+    // Y es distinta de la de alta (lleva menos campos Y nombres de campo distintos).
     let alta = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     assert_ne!(obtenido, alta);
+}
+
+#[test]
+fn anulacion_hash_matches_the_official_case_3_vector_hub1330() {
+    // Official AEAT vector for a CANCELLATION record (`RegistroAnulacion`). Source: AEAT,
+    // «Detalle de las especificaciones técnicas para generación de la huella o hash de los
+    // registros de facturación» (sistemas VERI*FACTU), v0.1.2 (27/08/2024), §3.b (field
+    // names fixed by the spec for `RegistroAnulacion/IDFactura`) + §6.3 "Caso 3" (worked
+    // example, expected hash on p. 12):
+    // https://www.agenciatributaria.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/Veri-Factu_especificaciones_huella_hash_registros.pdf
+    //
+    // Regression test for ERPlora/hub#1330: `chain::anulacion_hash` built the input string
+    // with the ALTA field names (`IDEmisorFactura`/`NumSerieFactura`/`FechaExpedicionFactura`)
+    // instead of the `...Anulada` names the spec requires for an anulación, so this official
+    // vector did not reproduce — while the alta vector ("Caso 2") did.
+    let issuer_nif = "89890001K";
+    let invoice_number = "12345679/G34";
+    let invoice_date_iso = "2024-01-01"; // → FechaExpedicionFacturaAnulada = 01-01-2024
+    let previous_hash = "F7B94CFD8924EDFF273501B01EE5153E4CE8F259766F88CF6ACB8935802A2B97";
+    let generation_timestamp = "2024-01-01T19:20:40+01:00";
+    const EXPECTED_HASH: &str = "177547C0D57AC74748561D054A9CEC14B4C4EA23D1BEFD6F2E69E3A388F90C68";
+
+    // Independent oracle: the exact concatenation the spec fixes for RegistroAnulacion.
+    let expected_input = format!(
+        "IDEmisorFacturaAnulada={issuer_nif}&NumSerieFacturaAnulada={invoice_number}\
+         &FechaExpedicionFacturaAnulada=01-01-2024\
+         &Huella={previous_hash}&FechaHoraHusoGenRegistro={generation_timestamp}"
+    );
+    assert_eq!(
+        sha256_upper(&expected_input),
+        EXPECTED_HASH,
+        "el oráculo del test debe reproducir el hash oficial publicado por la AEAT (Caso 3)"
+    );
+
+    let obtenido = chain::anulacion_hash(
+        issuer_nif,
+        invoice_number,
+        invoice_date_iso,
+        previous_hash,
+        generation_timestamp,
+    );
+    assert_eq!(
+        obtenido, EXPECTED_HASH,
+        "anulacion_hash debe usar los nombres de campo `...Anulada` del registro de \
+         anulación (hub#1330), no los del alta"
+    );
 }
 
 // ── 5. QR: URL de cotejo AEAT con parámetros bien formateados ─────────────────────────────

@@ -1107,6 +1107,113 @@ test('queryOptional también trata module_inactive como ausencia (cascada ADR-01
   assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
 });
 
+// ── queryOptional/queryAllOptional short-circuit: absence must not cost a ROUND TRIP (hub#1211) ─
+//
+// Before this fix, `queryOptional` learned a module was absent by asking the transport ANYWAY and
+// catching `module_not_installed` AFTER the request already happened. Every optional integration a
+// hub does not have left one `POST /api/query` → 404 in the browser console PER CALL — `sales`
+// asking `verifactu.records.by_invoice` on a hub with no VeriFactu logged a 404 on every sale
+// (surfaced as hub#1121, `sales`→`modifiers`). The shell now injects `installedModules`, the live
+// set of ACTIVE module ids (mirrors how `permissions`/`currency`/`timezone` are already injected);
+// when it says the query's owning module (the segment before the first `.`) is absent, the SDK
+// must never call the transport at all — this is a test that COUNTS REQUESTS, not one that only
+// asserts on the returned value (that shape already passed before this defect and would keep
+// passing after a fix that fixes nothing).
+
+function transporteQueCuenta(respuesta: unknown = { rows: [], total: 0, limit: 50, offset: 0 }) {
+  const calls: Array<{ name: string; params?: Record<string, unknown> }> = [];
+  return {
+    calls,
+    transport: {
+      query: async (name: string, params?: Record<string, unknown>) => {
+        calls.push({ name, params });
+        return respuesta;
+      },
+      command: async () => ({}),
+      subscribe: () => () => {},
+    },
+  };
+}
+
+test('query_optional_does_not_travel_when_the_owner_module_is_absent_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta();
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryOptional('verifactu.records.by_invoice', { invoice_id: 'i1' });
+
+  assert.equal(result, undefined, 'with verifactu not installed, the caller sees an absence');
+  assert.equal(calls.length, 0, 'the SDK must NOT ask the transport to find that out');
+});
+
+test('query_all_optional_does_not_travel_when_the_owner_module_is_absent_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta();
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryAllOptional('verifactu.records.by_invoice');
+
+  assert.equal(result, undefined);
+  assert.equal(calls.length, 0, 'queryAllOptional short-circuits exactly like queryOptional');
+});
+
+test('query_optional_still_travels_when_the_owner_module_is_installed_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta({ rows: [{ id: 'r1' }], total: 1, limit: 50, offset: 0 });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['verifactu']) });
+
+  const result = await c.queryOptional('verifactu.records.by_invoice');
+
+  assert.deepEqual(result, [{ id: 'r1' }]);
+  assert.equal(calls.length, 1, 'the module IS installed: the request has to travel for real');
+});
+
+test('query_optional_still_travels_when_the_installed_set_is_not_known_yet_hub1211', async () => {
+  // Before the shell's first `GET /api/modules` resolves (or with an old host that never passes
+  // `installedModules`), the SDK cannot tell "absent" from "not known yet" — and guessing "absent"
+  // would be the SYMMETRIC regression: a real query silently skipped.
+  const c = new ErploraClient(transporteQueFalla('module_not_installed'), {
+    installedModules: () => undefined,
+  });
+
+  assert.equal(await c.queryOptional('verifactu.records.by_invoice'), undefined);
+});
+
+test('a_renamed_query_still_explodes_hub1211', async () => {
+  // The module IS present (the short-circuit does not apply) but its query was renamed/removed:
+  // that is a broken contract, not an absence, and it has to explode exactly as before.
+  const c = new ErploraClient(transporteQueFalla('not_found'), {
+    installedModules: () => new Set(['verifactu']),
+  });
+
+  await assert.rejects(() => c.queryOptional('verifactu.records.by_invoice'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === 'not_found', 'the broken contract STILL explodes');
+    return true;
+  });
+});
+
+test('query_optional_never_short_circuits_the_core_namespace_hub1211', async () => {
+  // `hub.*` is the runtime's RESERVED namespace (ADR-0192, `hub_users.rs::CORE_NAMESPACE`): the
+  // core serves it before the registry, it is never an installed module, and the runtime never
+  // answers `module_not_installed` for it. `installedModules` lists modules, so `hub` is never in
+  // it — a short-circuit keyed on that set alone would turn every `queryOptional('hub.…')` into a
+  // silent `undefined`, which is the false-absence the whole fix exists to avoid.
+  const { transport, calls } = transporteQueCuenta({ rows: [{ id: 'row' }], total: 1, limit: 1, offset: 0 });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryOptional('hub.setup.status');
+
+  assert.deepEqual(result, [{ id: 'row' }], 'the core answered and the caller sees it');
+  assert.equal(calls.length, 1, 'the core namespace ALWAYS travels: nothing can prove it absent');
+});
+
+test('query_all_optional_never_short_circuits_the_core_namespace_hub1211', async () => {
+  const { transport, calls } = transporteQueCuenta({ rows: [{ id: 'row' }], total: 1, limit: 1, offset: 0 });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.queryAllOptional('hub.users.list');
+
+  assert.deepEqual(result, [{ id: 'row' }]);
+  assert.equal(calls.length, 1, 'same rule for queryAllOptional');
+});
+
 // ── queryAllOptional: the WHOLE set of an OPTIONAL module (ERPlora/sales#186) ────────────────
 //
 // The two halves this needs already existed, and neither one alone is what a POS asks for:

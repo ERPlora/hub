@@ -38,12 +38,11 @@
 //! tope*: son cosas opuestas, y confundirlas es facturar por mensaje sin límite. Por eso
 //! [`sync_once`] tiene un resultado explícito y ninguna rama silenciosa.
 
-use std::sync::Arc;
-
 use erplora_db::Params;
-use erplora_runtime::{RequestContext, Runtime};
+use erplora_runtime::RequestContext;
 use serde_json::{json, Value};
-use tokio::sync::Mutex;
+
+use crate::state::SharedRuntime;
 
 /// El módulo cuyo canal se mide (el mismo que poletea `crate::inbound_poll`).
 pub const MODULE_ID: &str = "whatsapp_inbox";
@@ -96,7 +95,7 @@ pub fn monthly_limit_from_plan(plan: &Value) -> Option<i64> {
 /// UN tick de sincronización: mira si el canal está activo, pregunta al Cloud por el plan y, si
 /// trae un tope bueno, lo escribe por la puerta interna del dispatcher.
 pub async fn sync_once(
-    runtime: &Arc<Mutex<Runtime>>,
+    runtime: &SharedRuntime,
     http: &reqwest::Client,
     cloud_base_url: &str,
     auth: &cloud_client::Auth,
@@ -104,7 +103,7 @@ pub async fn sync_once(
     // 1) ¿Está el canal instalado y activo? Mismo gate que `inbound_poll`. Va ANTES de la red a
     //    propósito: la flota que no compró el módulo no puede gastar cupo del cubo compartido.
     let hub_id = {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         if !rt.registry().is_active(MODULE_ID) {
             return QuotaSync::ModuleNotActive;
         }
@@ -134,7 +133,7 @@ pub async fn sync_once(
     payload.insert("monthly_limit".to_string(), Value::from(limit));
 
     let result = {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         rt.execute_command_internal(QUOTA_COMMAND, &payload, &ctx)
             .await
     };

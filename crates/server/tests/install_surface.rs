@@ -212,6 +212,13 @@ async fn instalar_del_marketplace_firmado_funciona_en_produccion() {
     assert_eq!(resp.status(), StatusCode::OK, "el marketplace debe instalar un módulo firmado");
     let body = body_json(resp).await;
     assert_eq!(body["ok"], json!(true), "{body}");
+    // hub#1130: the wire response must always carry `also_installed` — empty here (`notes` has no
+    // dependencies), but PRESENT, so a caller never has to special-case an absent field.
+    assert_eq!(
+        body["also_installed"],
+        json!([]),
+        "request-install must always report also_installed, even when nothing was dragged in: {body}"
+    );
 
     assert!(
         installed_ids(&router).await.contains(&"notes".to_string()),

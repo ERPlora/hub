@@ -125,7 +125,7 @@ pub fn dispatch(state: &AppState, pending: Vec<PendingIo>) {
                     crate::agent_runner::run_turn(&state, &run_id, &step_id).await
                 }
             };
-            let rt = state.runtime.lock().await;
+            let rt = state.runtime.read().await;
             if let Err(e) = rt.complete_flow_io(&run_id, &step_id, result).await {
                 eprintln!("flows: completing run {run_id} step `{step_id}`: {e}");
             }

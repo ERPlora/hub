@@ -1,0 +1,30 @@
+{
+  "id": "slowtill",
+  "name": "Slow till",
+  "version": "1.0.0",
+  "permissions": ["slowtill.view_sale", "slowtill.add_sale"],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["slowtill.view_sale", "slowtill.add_sale"],
+    "employee": ["slowtill.view_sale", "slowtill.add_sale"]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": ["migrations/postgres/001_init.sql"]
+  },
+  "queries": {
+    "slowtill.sales.list": { "permission": "slowtill.view_sale", "sql": "queries/sales_list.sql" }
+  },
+  "commands": {
+    "slowtill.sale.create": {
+      "permission": "slowtill.add_sale",
+      "transaction": true,
+      "sql": ["commands/sale_create_slow.sql"]
+    },
+    "slowtill.sale.create_fast": {
+      "permission": "slowtill.add_sale",
+      "transaction": true,
+      "sql": ["commands/sale_create_fast.sql"]
+    }
+  }
+}

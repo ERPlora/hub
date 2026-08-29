@@ -24,7 +24,7 @@ fn admin() -> RequestContext {
 }
 
 /// El modulo vive en `modules-workspace`, un repo HERMANO que el CI del hub no clona. Igual que
-/// `sales_e2e` y compañia: si no esta en disco, el test se SALTA con aviso en vez de romper el
+/// `kitchen_e2e` y compañia: si no esta en disco, el test se SALTA con aviso en vez de romper el
 /// pipeline. En local (con el workspace al lado) se ejecuta de verdad contra el modulo real.
 fn staff_en_disco() -> bool {
     mdir("staff").join("module.json").exists()

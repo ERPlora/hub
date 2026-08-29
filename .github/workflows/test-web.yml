@@ -79,6 +79,7 @@ on:
       - "scripts/tests/test-web-workflow.test.sh"
       - ".github/workflows/test-web.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "apps/web/**"
       - "packages/**"
@@ -103,6 +104,10 @@ permissions:
 
 jobs:
   verify:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: pnpm verify (vue-tsc + vitest + module-sdk)
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Este es el
     # único check que corre de verdad en las PRs del web, así que sin él una PR no se puede mergear.
@@ -143,6 +148,10 @@ jobs:
         run: bash ./scripts/tests/test-web-workflow.test.sh
 
   e2e:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: playwright (test:e2e, runtime real)
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 40

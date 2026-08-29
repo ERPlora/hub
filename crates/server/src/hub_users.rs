@@ -82,7 +82,7 @@ fn ok(data: impl serde::Serialize) -> Response {
 /// Runtime de la organización dueña de este hub (ADR-0005: en el tier cloud compartido hay un pool
 /// por org). Mismo criterio que `settings.rs`/`profile.rs`: la identidad es el `hub_id` del
 /// **despliegue**, nunca una cabecera del cliente.
-async fn runtime(st: &AppState) -> Result<std::sync::Arc<tokio::sync::Mutex<Runtime>>, Response> {
+async fn runtime(st: &AppState) -> Result<crate::state::SharedRuntime, Response> {
     st.runtime_for(&st.hub_id())
         .await
         .map_err(crate::tenant_rejected)
@@ -94,7 +94,7 @@ pub async fn list_users(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -110,7 +110,7 @@ pub async fn list_roles(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -146,7 +146,7 @@ pub async fn set_role_activation(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(user) => user,
         Err(e) => return unauthorized(e),
@@ -175,7 +175,7 @@ pub async fn create_user(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(user) => user,
         Err(e) => return unauthorized(e),
@@ -216,7 +216,7 @@ pub async fn update_user(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(user) => user,
         Err(e) => return unauthorized(e),
@@ -247,7 +247,7 @@ pub async fn deactivate_user(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(user) => user,
         Err(e) => return unauthorized(e),
