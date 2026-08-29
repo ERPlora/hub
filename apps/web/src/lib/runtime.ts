@@ -363,6 +363,10 @@ export interface InstallRequestResult {
   module_id: string;
   version: string;
   status: string;
+  /** hub#1130: ids que el cierre de dependencias (ADR-0060) instaló junto al pedido, y que NO
+   *  estaban instalados antes de esta llamada. Siempre presente — vacío, nunca ausente, cuando
+   *  no arrastró nada — para que quien la lea no tenga que distinguir dos formas. */
+  also_installed: string[];
 }
 
 /** Un módulo del plan que hay que COMPRAR antes de poder instalar (ADR-0060). */

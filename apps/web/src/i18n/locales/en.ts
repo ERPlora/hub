@@ -830,6 +830,10 @@ export default {
     alreadyInstalled: '{name} is already installed.',
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
+    // hub#1130: the install-plan closure (ADR-0060) dragged dependencies in — the owner asked for
+    // ONE app and got several; naming them in the SAME confirmation is the reverse of hub#1101's
+    // `409 has_dependents`, which already names what an uninstall would break.
+    installSuccessWithDependencies: '{name} installed successfully. Also installed: {names}.',
     installError: 'Could not start installation of {name}.',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',

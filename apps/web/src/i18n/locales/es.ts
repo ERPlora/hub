@@ -766,6 +766,10 @@ export default {
     alreadyInstalled: '{name} ya está instalado.',
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',
+    // hub#1130: el cierre del plan de instalación (ADR-0060) arrastró dependencias — el dueño pidió
+    // UNA app y le llegaron varias; nombrarlas en la MISMA confirmación es el reverso del `409
+    // has_dependents` de hub#1101, que ya nombra lo que rompería un desinstalar.
+    installSuccessWithDependencies: '{name} instalado correctamente. También se instaló: {names}.',
     installError: 'No se pudo iniciar la instalación de {name}.',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
