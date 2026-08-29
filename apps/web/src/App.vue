@@ -345,10 +345,49 @@ async function gateAndRefresh(): Promise<void> {
       })();
     });
   }
+  // hub#1317 (revisión de hub#1311): activar/desactivar/desinstalar no emitían NADA por `/ws` —
+  // el mismo agujero que hub#631 cerró solo para `module.installed`. Otra pestaña/dispositivo del
+  // mismo hub se quedaba con la nav de ayer hasta recargar (activar `modifiers` desde el back-office
+  // no llegaba al TPV abierto en la caja). Misma reacción que instalar: entitlement puede cambiar
+  // lo que un módulo recién (des)activado puede mostrar, y la nav puede haber perdido/ganado una
+  // entrada entera.
+  if (!moduleActivatedUnsub) {
+    moduleActivatedUnsub = getClient().on('module.activated', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
+  if (!moduleDeactivatedUnsub) {
+    moduleDeactivatedUnsub = getClient().on('module.deactivated', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
+  if (!moduleUninstalledUnsub) {
+    moduleUninstalledUnsub = getClient().on('module.uninstalled', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
 }
 
-/** Desuscripción de `module.installed` (una sola suscripción viva; App.vue no se desmonta). */
+/**
+ * Desuscripción de los eventos de ciclo de vida de módulo (una sola suscripción viva por evento;
+ * App.vue no se desmonta). `module.installed` es de antes de hub#1317; las otras tres, de hub#1317.
+ */
 let moduleInstalledUnsub: (() => void) | null = null;
+let moduleActivatedUnsub: (() => void) | null = null;
+let moduleDeactivatedUnsub: (() => void) | null = null;
+let moduleUninstalledUnsub: (() => void) | null = null;
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();
 });
