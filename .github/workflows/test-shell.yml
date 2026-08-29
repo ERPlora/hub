@@ -69,7 +69,9 @@ jobs:
     # El único workflow del repo que la PR del interruptor (#837) dejó fuera. No tiene nada de
     # especial: instala él mismo sus deps GTK con `sudo apt-get`, cosa que el usuario `runner`
     # puede hacer en `ci-runner-1`.
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # amd64 ONLY: the Android build-tools this job installs (aapt2 & co.) ship x86_64 Linux binaries
+    # only, so `CI_BUILD_RUNS_ON` keeps it off any arm64 runner in the org.
+    runs-on: ${{ fromJSON(vars.CI_BUILD_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
 
     env:
