@@ -1516,6 +1516,30 @@ case "$ctrl" in *context=local-gate/hub-tests*) ;; *) errs="$errs CONTROL-no-ate
     && ok "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua (control: sin skip SI atestigua)" \
     || bad "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua" "$errs"
 
+# 8. La etapa web recibe los DSN del banco de e2e. `apps/web/tests/e2e/AssistantGrounded.spec.ts`
+#    cae por defecto en `localhost:5434`, un Postgres que en local NO existe: sin exportarlos, el
+#    playwright de cada push que toque web moriria en el arranque del runtime.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_WEB_CMD='printf "%s|%s\n" "${HUB_E2E_DATABASE_URL:-}" "${E2E_DATABASE_URL:-}" > '"$repo/DSN")
+got=$(cat "$repo/DSN" 2>/dev/null)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+case "$got" in
+    *hub_e2e_web*\|*hub_e2e_assistant*) ;;
+    *) errs="$errs dsn='$got'" ;;
+esac
+case "$got" in *5434*) errs="$errs apunta-al-5434-que-no-existe" ;; esac
+[ -z "$errs" ] \
+    && ok "web: la etapa recibe HUB_E2E_DATABASE_URL y E2E_DATABASE_URL del Postgres del gate" \
+    || bad "web: la etapa recibe HUB_E2E_DATABASE_URL y E2E_DATABASE_URL del Postgres del gate" "$errs"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
