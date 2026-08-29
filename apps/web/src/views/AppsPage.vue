@@ -699,8 +699,8 @@ function notifyGrantFailed(name: string): void {
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 let unsubProgress: (() => void) | null = null;
-// hub#1317: activar/desactivar/desinstalar (a diferencia de instalar) no emitían nada de por sí —
-// otra pestaña/dispositivo del mismo hub se quedaba con esta lista tal cual estaba hasta recargar.
+// hub#1317: activate/deactivate/uninstall (unlike install) emitted nothing of their own —
+// another tab/device of the same hub stayed on this list exactly as it was until it reloaded.
 let unsubActivated: (() => void) | null = null;
 let unsubDeactivated: (() => void) | null = null;
 let unsubUninstalled: (() => void) | null = null;
@@ -1285,10 +1285,10 @@ onMounted(() => {
     if (!root) return;
     setProgress(root, p?.module_id ?? root, p?.phase ?? '');
   });
-  // hub#1317 (revisión de hub#1311): activar/desactivar/desinstalar no emitían NADA por `/ws` —
-  // el mismo agujero que hub#631 cerró solo para `module.installed`. Sin toast aquí a propósito:
-  // la pestaña que HIZO la acción ya se lo dice ella misma (`toggleModule`/`removeModule`, más
-  // arriba en este fichero); esta suscripción es para las que NO la hicieron.
+  // hub#1317 (review of hub#1311): activate/deactivate/uninstall emitted NOTHING over `/ws` —
+  // the same hole hub#631 closed only for `module.installed`. No toast here on purpose: the tab
+  // that DID the action already tells itself (`toggleModule`/`removeModule`, further up this
+  // file); this subscription is for the ones that did NOT.
   unsubActivated = client.on('module.activated', () => {
     void loadCatalog();
     void loadInstalled();
