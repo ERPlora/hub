@@ -123,3 +123,22 @@ export function publicationOf(
   if (listedIds.has(id)) return 'listed';
   return known.get(id) ?? null;
 }
+
+// --- What an install dragged in, named (ADR-0060 closure, hub#1130) ---------------------------
+
+/**
+ * Names the modules an install-plan/manifest resolution dragged in as dependencies, in the order
+ * `request-install` reported them (its own topological/installation order).
+ *
+ * The response only ever carries ids (`also_installed: string[]`) — the owner asked to install
+ * "Verifactu", not "invoice"/"sales"/"inventory", so the notice must read by name. A dependency
+ * the catalogue does not (yet) know about — not loaded, or a manifest id with no catalogue entry —
+ * falls back to its own id: dropping it from the notice would hide that something was installed.
+ */
+export function alsoInstalledNames(
+  alsoInstalled: readonly string[],
+  catalog: ReadonlyArray<{ id: string; name: string }>,
+): string[] {
+  const nameById = new Map(catalog.map((m) => [m.id, m.name]));
+  return alsoInstalled.map((id) => nameById.get(id) ?? id);
+}

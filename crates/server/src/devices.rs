@@ -135,7 +135,7 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 async fn runtime(
     st: &AppState,
-) -> Result<std::sync::Arc<tokio::sync::Mutex<erplora_runtime::Runtime>>, Response> {
+) -> Result<crate::state::SharedRuntime, Response> {
     st.runtime_for(&st.hub_id())
         .await
         .map_err(crate::tenant_rejected)
@@ -149,7 +149,7 @@ pub async fn list_devices(State(st): State<AppState>, headers: HeaderMap) -> Res
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -189,7 +189,7 @@ pub async fn revoke_device(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -244,7 +244,7 @@ pub async fn rename_device(
         Ok(arc) => arc,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }

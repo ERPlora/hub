@@ -45,7 +45,7 @@ async fn current_user_id(
     headers: &HeaderMap,
 ) -> Result<
     (
-        std::sync::Arc<tokio::sync::Mutex<erplora_runtime::Runtime>>,
+        crate::state::SharedRuntime,
         String,
     ),
     Response,
@@ -55,7 +55,7 @@ async fn current_user_id(
         .await
         .map_err(crate::tenant_rejected)?;
     let user_id = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         // Incluso en AuthMode::Dev, si el shell trae una sesión local válida (login PIN/cloud),
         // úsala. El modo Dev normalmente confía en X-User-Id, pero runtimeHeaders no suplanta esa
         // cabecera y la sesión sigue siendo la identidad real del usuario visible en el shell.
@@ -96,7 +96,7 @@ pub async fn get_profile(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Ok(value) => value,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.user_profile(&user_id).await {
         Ok(profile) => {
             let permissions = rt.session_permissions(&profile.role);
@@ -115,7 +115,7 @@ pub async fn put_profile(
         Ok(value) => value,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.update_user_profile(&user_id, &input).await {
         Ok(profile) => {
             let permissions = rt.session_permissions(&profile.role);
@@ -138,7 +138,7 @@ pub async fn get_avatar(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Err(response) => return response,
     };
     let profile = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         match rt.user_profile(&user_id).await {
             Ok(profile) => profile,
             Err(e) => return crate::err_response(e),
@@ -218,7 +218,7 @@ pub async fn upload_avatar(
         return error(StatusCode::BAD_REQUEST, "falta el campo avatar");
     };
     let previous = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.user_profile(&user_id)
             .await
             .ok()
@@ -246,7 +246,7 @@ pub async fn upload_avatar(
     }
 
     let saved = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.set_user_avatar(&user_id, &relative).await
     };
     match saved {
@@ -255,7 +255,7 @@ pub async fn upload_avatar(
                 let _ = tokio::fs::remove_file(st.config.media_dir.join(old)).await;
             }
             let permissions = {
-                let rt = arc.lock().await;
+                let rt = arc.read().await;
                 rt.session_permissions(&profile.role)
             };
             Json(profile_json(profile, permissions)).into_response()
@@ -273,14 +273,14 @@ pub async fn delete_avatar(State(st): State<AppState>, headers: HeaderMap) -> Re
         Err(response) => return response,
     };
     let previous = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         match rt.user_profile(&user_id).await {
             Ok(profile) => profile.avatar_path,
             Err(e) => return crate::err_response(e),
         }
     };
     let profile = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         match rt.set_user_avatar(&user_id, "").await {
             Ok(profile) => profile,
             Err(e) => return crate::err_response(e),
@@ -290,7 +290,7 @@ pub async fn delete_avatar(State(st): State<AppState>, headers: HeaderMap) -> Re
         let _ = tokio::fs::remove_file(st.config.media_dir.join(relative)).await;
     }
     let permissions = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.session_permissions(&profile.role)
     };
     Json(profile_json(profile, permissions)).into_response()

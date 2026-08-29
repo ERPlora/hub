@@ -30,7 +30,9 @@ use std::sync::{Arc, RwLock};
 
 use erplora_db::PgAdapter;
 use erplora_runtime::Runtime;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock as RuntimeLock;
+
+use crate::state::SharedRuntime;
 
 /// Identificador de organización (frontera de datos en ERPlora: una BD por org, §2.5). Newtype
 /// sobre `String` para no confundirlo con un `hub_id` (varios hubs comparten la BD de una org).
@@ -120,13 +122,13 @@ pub type RuntimeFactory = Arc<
 
 /// Mapa de runtimes por organización + resolución `hub_id → org → runtime`.
 ///
-/// Cada entrada es un `Arc<Mutex<Runtime>>` (mismo patrón que el `AppState` single-tenant: el
-/// `Runtime` no es `Sync` para mutación). El `Mutex` es por-org, así que orgs distintas no se
+/// Cada entrada es un [`SharedRuntime`] (mismo patrón que el `AppState` single-tenant: lectores en
+/// paralelo, escritor exclusivo — hub#978). El lock es por-org, así que orgs distintas no se
 /// bloquean entre sí. El mapa va tras un `RwLock` (lecturas concurrentes baratas: el caso común es
 /// "el pool ya existe").
 pub struct TenantRouter {
     resolver: Arc<dyn OrgResolver>,
-    pools: RwLock<HashMap<OrgId, Arc<Mutex<Runtime>>>>,
+    pools: RwLock<HashMap<OrgId, SharedRuntime>>,
     factory: RuntimeFactory,
     max_pools: usize,
 }
@@ -165,7 +167,7 @@ impl TenantRouter {
     /// `hub_id` no esté registrado jamás toca una BD. Como cada org tiene su propio runtime/pool, un
     /// `hub_id` de la org A solo puede resolver al runtime de A: el acceso cruzado es imposible por
     /// construcción (no hay ruta de A al pool de B).
-    pub async fn resolve_runtime(&self, hub_id: &str) -> Result<Arc<Mutex<Runtime>>, TenantError> {
+    pub async fn resolve_runtime(&self, hub_id: &str) -> Result<SharedRuntime, TenantError> {
         let desc = self
             .resolver
             .resolve(hub_id)
@@ -184,7 +186,7 @@ impl TenantRouter {
         // Camino lento: crear el pool de la org (escritura exclusiva). Re-chequea por si otra tarea
         // lo creó mientras esperábamos el lock (doble-check), y aplica el límite de pools.
         let rt = (self.factory)(&desc).await?;
-        let rt = Arc::new(Mutex::new(rt));
+        let rt = Arc::new(RuntimeLock::new(rt));
         let mut map = self.pools.write().expect("pools RwLock envenenado");
         if let Some(existing) = map.get(&desc.org_id) {
             return Ok(existing.clone());
@@ -263,8 +265,8 @@ mod tests {
     }
 
     /// Crea la tabla `t` (con `hub_id`) en el runtime y registra una fila marcada con `marker`.
-    async fn seed(rt: &Arc<Mutex<Runtime>>, hub_id: &str, marker: &str) {
-        let rt = rt.lock().await;
+    async fn seed(rt: &SharedRuntime, hub_id: &str, marker: &str) {
+        let rt = rt.read().await;
         let db = rt.db_for_test();
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS t (id TEXT PRIMARY KEY, hub_id TEXT, marker TEXT);",
@@ -283,8 +285,8 @@ mod tests {
         .unwrap();
     }
 
-    async fn rows_for(rt: &Arc<Mutex<Runtime>>, hub_id: &str) -> Vec<String> {
-        let rt = rt.lock().await;
+    async fn rows_for(rt: &SharedRuntime, hub_id: &str) -> Vec<String> {
+        let rt = rt.read().await;
         let db = rt.db_for_test();
         let mut p = Map::new();
         p.insert("hub_id".into(), json!(hub_id));
@@ -365,6 +367,6 @@ mod tests {
         let ctx = RequestContext::new("hub-a1".to_string(), "u1".to_string(), Vec::<String>::new());
         assert_eq!(ctx.hub_id, "hub-a1");
         // El runtime resuelto es el de la org A (su hub_id de despliegue).
-        assert_eq!(rt_a.lock().await.hub_id(), "org-a");
+        assert_eq!(rt_a.read().await.hub_id(), "org-a");
     }
 }

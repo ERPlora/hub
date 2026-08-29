@@ -85,7 +85,7 @@ pub(crate) mod test_support {
         module: &str,
         permission: &str,
         sql: &str,
-        emit: Vec<String>,
+        emit: Vec<crate::manifest::EmitDef>,
     ) -> RegisteredCommand {
         RegisteredCommand {
             module_id: module.to_string(),

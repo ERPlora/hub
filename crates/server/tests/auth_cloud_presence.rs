@@ -210,7 +210,7 @@ async fn cloud_user_exists(state: &AppState, cloud_user_id: &str) -> bool {
 /// Rol LOCAL del `hub_user` vinculado a `cloud_user_id` (o `None` si no existe). Introspección
 /// directa de la BD del runtime para verificar el bootstrap «primer usuario = owner».
 async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String> {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let mut p = erplora_db::Params::new();
     p.insert("cuid".to_string(), json!(cloud_user_id));
     let res = rt
@@ -229,7 +229,7 @@ async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String
 /// How many `hub_user` rows are linked to `cloud_user_id`. Re-evaluating the role floor must raise
 /// the row the user already has, never provision a second one alongside it.
 async fn cloud_user_rows(state: &AppState, cloud_user_id: &str) -> usize {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let mut p = erplora_db::Params::new();
     p.insert("cuid".to_string(), json!(cloud_user_id));
     rt.db_for_test()
@@ -244,7 +244,7 @@ async fn cloud_user_rows(state: &AppState, cloud_user_id: &str) -> usize {
 /// membership in the SaaS into `is_active = 0` locally, so this is what "the door is shut" looks
 /// like in the database.
 async fn cloud_user_is_active(state: &AppState, cloud_user_id: &str) -> bool {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let mut p = erplora_db::Params::new();
     p.insert("cuid".to_string(), json!(cloud_user_id));
     let res = rt
@@ -275,7 +275,7 @@ fn authed_get(path: &str, session: &str) -> Request<Body> {
 /// How many `hub_user` rows carry `email`. The invited row must be REUSED by the login that links
 /// it, never left behind next to a freshly provisioned twin.
 async fn rows_with_email(state: &AppState, email: &str) -> usize {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let mut p = erplora_db::Params::new();
     p.insert("email".to_string(), json!(email));
     rt.db_for_test()
@@ -316,7 +316,7 @@ async fn seeded_creator_is_linked_by_email_keeping_its_role() {
     // El provisioning del SaaS sembró al owner (aquí lo simulamos con el mismo seam que usa `serve`).
     state
         .runtime
-        .lock()
+        .read()
         .await
         .seed_owner("boss@bar.com")
         .await
@@ -463,7 +463,7 @@ async fn the_cloud_floor_never_writes_owner_over_the_seeded_creator() {
     let (router, state, temp) = fixture().await;
     state
         .runtime
-        .lock()
+        .read()
         .await
         .seed_owner("boss@bar.com")
         .await
@@ -536,7 +536,7 @@ async fn an_invited_admin_does_not_land_as_an_employee() {
     // The owner had already given them a way in, with the role they had at the time.
     state
         .runtime
-        .lock()
+        .read()
         .await
         .create_login_user("socia@bar.com", "employee")
         .await
@@ -757,7 +757,7 @@ async fn editing_a_revoked_user_without_deciding_about_the_door_keeps_the_revoca
 
     // An admin tidies up the name from Personal. They said nothing about the door.
     let user_id = {
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         let id = rt
             .list_hub_users()
             .await
@@ -802,7 +802,7 @@ async fn a_user_the_hub_itself_deactivated_is_not_let_back_in_by_a_token() {
     // to the SaaS fails. Rejected with a stable code, and still without a duplicate row.
     let (router, state, temp) = fixture().await;
     {
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         rt.create_login_user("ana@bar.com", "manager").await.unwrap();
         assert!(rt.deactivate_login_user("ana@bar.com").await.unwrap());
     }

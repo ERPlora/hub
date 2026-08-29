@@ -124,13 +124,82 @@ describe('Personal traduce el rechazo del core (hub#1190)', () => {
     expect(form.text()).toContain(es.employeeForm.errors.pin_in_use);
   });
 
-  it('un fallo mudo no inventa una frase: se queda con lo que haya', async () => {
-    runtimeRefusing({ code: 'db', message: 'the request could not be completed' });
+  it('un código de rechazo que nadie traduce se queda con lo que haya (no se inventa una frase)', async () => {
+    // Contrato de `platformFailureMessage`/`invalidFieldMessage`: un código FUERA de las tres
+    // familias conocidas conserva la frase que vino, que dice más que un genérico inventado.
+    runtimeRefusing({ code: 'flow.grant_denied', message: 'a flow refused it, unrelated to this form' });
     const form = await mountForm();
     Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
     await form.vm.onSave();
     await flushPromises();
 
-    expect(form.text()).toContain('the request could not be completed');
+    expect(form.text()).toContain('a flow refused it, unrelated to this form');
+  });
+});
+
+describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', () => {
+  // 🔴 El bug: antes de este PR las seis, `module_not_installed`, `module_inactive` y
+  // `read_unavailable` caían todas al `message` en inglés del runtime.
+  const ENGLISH_PLUMBING = 'the request could not be completed — the hub recorded the details';
+
+  it.each(['db', 'io', 'wasm', 'native', 'schema', 'manifest'] as const)(
+    'el código de plontería "%s" pinta la MISMA frase traducida, nunca la línea inglesa redactada',
+    async (code) => {
+      runtimeRefusing({ code, message: ENGLISH_PLUMBING });
+      const form = await mountForm();
+      Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
+      await form.vm.onSave();
+      await flushPromises();
+
+      expect(form.text()).not.toContain(ENGLISH_PLUMBING);
+      expect(form.text()).toContain(es.platformFailure.unavailable);
+    },
+  );
+
+  it('nombra la app que falta para `module_not_installed`', async () => {
+    runtimeRefusing({ code: 'module_not_installed', module: 'taxes', message: 'módulo no instalado: `taxes`' });
+    const form = await mountForm();
+    Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
+    await form.vm.onSave();
+    await flushPromises();
+
+    expect(form.text()).not.toContain('módulo no instalado');
+    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+  });
+
+  it('nombra la app desactivada para `module_inactive` — frase DISTINTA de "falta"', async () => {
+    runtimeRefusing({ code: 'module_inactive', module: 'taxes', message: 'módulo desactivado: `taxes`' });
+    const form = await mountForm();
+    Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
+    await form.vm.onSave();
+    await flushPromises();
+
+    expect(form.text()).toContain(es.platformFailure.moduleInactive.replace('{app}', 'taxes'));
+  });
+
+  it('nombra la app que falta como dependencia para `missing_dependency`', async () => {
+    // `error_payload` normaliza `dep` dentro de `module` (nunca el que se está instalando).
+    runtimeRefusing({ code: 'missing_dependency', module: 'inventory', message: 'falta dependencia: `inventory`' });
+    const form = await mountForm();
+    Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
+    await form.vm.onSave();
+    await flushPromises();
+
+    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'inventory'));
+  });
+
+  it('deriva la app de `read_unavailable` desde `query` cuando no viene `module`', async () => {
+    runtimeRefusing({
+      code: 'read_unavailable',
+      query: 'taxes.rules.list',
+      message: 'a required read (`taxes.rules.list`) could not be resolved',
+    });
+    const form = await mountForm();
+    Object.assign(form.vm.form, { name: 'Marta Ruiz', role: 'employee', local: false, email: 'marta@example.com' });
+    await form.vm.onSave();
+    await flushPromises();
+
+    expect(form.text()).not.toContain('rules.list');
+    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
   });
 });

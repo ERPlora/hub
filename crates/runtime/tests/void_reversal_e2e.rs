@@ -12,6 +12,14 @@
 //! SIEMBRA directamente —no vía `sales.complete_sale`— para aislar el test de trabajo en
 //! vuelo del módulo `sales` (ajeno). El disparo real es `sales.void` (solo UPDATE+emit) y el
 //! relay del Outbox; las aserciones leen por las queries públicas reales.
+//!
+//! **hub#1264, slice 4 (`cash_register`, ERPlora/cash_register#67):** the half of this file that
+//! asserts `cash_register` behaviour (`_reverse_sale`: compensating refund, reconciliation, no-op
+//! on card) already lives in `cash_register/tests/reverse_on_void.hub.test.py`. The file is NOT
+//! deleted or trimmed here: its 4 tests interleave that assertion with `inventory`'s
+//! (`_restock_on_void`, stock restored) INSIDE the same functions — it cannot be split without
+//! designing the battery that belongs to `inventory`, out of this slice's scope. Left for whoever
+//! takes the `inventory` slice, with the precedent already written in `cash_register`.
 use std::path::PathBuf;
 
 use erplora_db::{Params, testutil::fresh_db};

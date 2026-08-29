@@ -40,7 +40,7 @@ pub async fn get_settings(State(st): State<AppState>, headers: HeaderMap) -> Res
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -71,7 +71,7 @@ pub async fn put_settings(
     // El guard del runtime se suelta ANTES de hablar con el SaaS: una llamada de red con el
     // mutex del hub en la mano bloquearía la caja entera mientras el control plane tarda.
     let mut settings = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
             Ok(u) => u,
             Err(e) => return unauthorized(e),
@@ -166,7 +166,7 @@ pub async fn get_module_capabilities(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -195,7 +195,7 @@ pub async fn put_module_capabilities(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(u) => u,
         Err(e) => return unauthorized(e),
@@ -225,7 +225,7 @@ pub async fn get_business_certificate(State(st): State<AppState>, headers: Heade
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -264,7 +264,7 @@ pub async fn put_business_certificate(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(u) => u,
         Err(e) => return unauthorized(e),
@@ -288,7 +288,7 @@ pub async fn delete_business_certificate(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -473,7 +473,7 @@ pub async fn publish_fiscal_identity(State(st): State<AppState>, headers: Header
         Err(e) => return crate::tenant_rejected(e),
     };
     let settings = {
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -517,7 +517,7 @@ pub async fn get_responsible_declaration(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }

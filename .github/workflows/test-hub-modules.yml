@@ -70,6 +70,7 @@ on:
   # Las seis superficies del kernel (ver la cabecera). `crates/runtime/**` ya cubre el antiguo
   # `crates/runtime/src/e2e_support.rs`, que por eso deja de listarse aparte.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/test-hub-modules.yml'
       - 'crates/runtime/**'
@@ -93,6 +94,10 @@ permissions:
 
 jobs:
   module-e2e:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: e2e con módulos reales
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45

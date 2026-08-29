@@ -228,7 +228,7 @@ pub async fn add_member(
     }
     // Gate admin + alta local bajo el MISMO lock; se suelta ANTES de la I/O de red al SaaS.
     let user = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return crate::unauthorized(e);
         }
@@ -254,7 +254,7 @@ pub async fn remove_member(
 ) -> Response {
     let email = email.trim().to_string();
     let existed = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return crate::unauthorized(e);
         }
@@ -274,7 +274,7 @@ pub async fn list_members(
     State(st): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return crate::unauthorized(e);
     }

@@ -181,7 +181,8 @@ import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  catalogActionFor, catalogRowState, isModuleInstalled, modulesWithUnknownPublication, publicationOf,
+  alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled,
+  modulesWithUnknownPublication, publicationOf,
   type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
@@ -909,7 +910,7 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     // `version` viene de `chooseVersion`: la elegida, o `latest` cuando no había nada que elegir
     // (el runtime la resuelve). Ya NO se usa la del catálogo Cloud: el catálogo dice qué versión
     // publica el marketplace, no cuál puede instalar ESTE hub.
-    await requestInstall(mod.id, version);
+    const result = await requestInstall(mod.id, version);
     // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si
     // falla no rompe la instalación — pero YA NO SE CALLA. Un fallo aquí deja el módulo instalado
     // y sin permisos, que es exactamente el aterrizaje en «no tengo permiso» de pm#132; el toast
@@ -925,6 +926,13 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     if (row) row.installed = true;
     if (grantFailed) {
       notifyGrantFailed(mod.name);
+    } else if (result.also_installed.length) {
+      // hub#1130: the install-plan closure (ADR-0060) dragged dependencies in — the owner asked
+      // for ONE app and got several. Naming them in the SAME confirmation (never a second modal,
+      // market: Odoo/Shopify) is the reverse of hub#1101's `409 has_dependents`, which already
+      // names what an uninstall would break.
+      const names = alsoInstalledNames(result.also_installed, modules.value).join(', ');
+      notify(t('apps.installSuccessWithDependencies', { name: mod.name, names }), 'success', 0);
     } else {
       notify(t('apps.installSuccess', { name: mod.name }), 'success');
     }

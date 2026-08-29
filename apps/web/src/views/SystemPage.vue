@@ -1164,7 +1164,12 @@ onMounted(() => {
 }
 .event-row__error {
   font-size: 0.82em;
-  color: var(--ion-color-danger, #eb445a);
+  /* hub#1298: `#eb445a` was Ionic's OLD default danger red (~3.81:1 on white, under WCAG AA);
+     the pinned @ionic/core@8.8.9 ships `#c5000f` (6.21:1), same fallback SetupBlockingStrip.vue
+     already uses. The custom property is always defined via Ionic's own core.css, so this
+     fallback never actually rendered — but a stale literal here is exactly what made the
+     contrast issue look real when someone read this file instead of the rendered page. */
+  color: var(--ion-color-danger, #c5000f);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

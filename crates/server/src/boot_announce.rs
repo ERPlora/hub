@@ -75,7 +75,7 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     }
 
     let mut usage = {
-        let runtime = state.runtime.lock().await;
+        let runtime = state.runtime.read().await;
         let now = chrono::Utc::now().to_rfc3339();
         daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now).await
     };

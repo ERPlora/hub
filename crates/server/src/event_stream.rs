@@ -346,7 +346,7 @@ pub async fn authenticate(st: &AppState, credential: Option<&str>) -> StreamAuth
         Ok(rt) => rt,
         Err(e) => return StreamAuth::Unauthenticated(e.to_string()),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
 
     let resolved = if credential.starts_with(TICKET_PREFIX) {
         match st.stream_tickets.redeem(credential, &hub_id) {
@@ -406,7 +406,7 @@ pub async fn mint_ticket(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return (
             StatusCode::UNAUTHORIZED,
@@ -759,7 +759,7 @@ mod tests {
     /// Creates a key in `st` and returns its token.
     async fn key_with(st: &AppState, access: ApiKeyAccess) -> String {
         let arc = st.runtime_for(&st.hub_id()).await.unwrap();
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.create_api_key(
             "Integration",
             &ApiKeyScope::blanket(access),
@@ -943,7 +943,7 @@ mod tests {
         let id = erplora_runtime::api_keys::parse_token(&token).unwrap().0;
         {
             let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.lock().await;
+            let rt = arc.read().await;
             rt.revoke_api_key(&id).await.unwrap();
         }
         let mut conn = StreamConnection::default();
@@ -1104,7 +1104,7 @@ mod tests {
         let f = fixture().await;
         let key_id = {
             let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.lock().await;
+            let rt = arc.read().await;
             rt.ensure_app_api_key().await.unwrap()
         };
         let ticket = f.st.stream_tickets.mint(&f.st.hub_id(), &key_id);

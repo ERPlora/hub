@@ -90,7 +90,8 @@ async fn enable_cash_register(rt: &Runtime, ctx: &erplora_runtime::RequestContex
     .expect("cash_register.settings.update");
 }
 
-/// Opens a register session and returns its id (the shape `cash_register_e2e` already exercises).
+/// Opens a register session and returns its id (the shape `cash_register`'s own battery
+/// `tests/session.hub.test.py` exercises against the real kernel — hub#1264, slice 4).
 async fn open_session(rt: &Runtime, ctx: &erplora_runtime::RequestContext, opening: i64) -> String {
     rt.execute_command(
         "cash_register.session.open",

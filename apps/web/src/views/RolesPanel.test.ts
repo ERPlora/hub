@@ -22,7 +22,7 @@ const setRoleActivation = vi.fn();
  * Espejo del error real del cliente: lo que distingue un rechazo CON motivo de un fallo mudo.
  * Va por `vi.hoisted` porque el factory de `vi.mock` se iza por encima de este fichero.
  */
-const { RoleActivationError } = vi.hoisted(() => ({
+const { RoleActivationError, HubUsersError } = vi.hoisted(() => ({
   RoleActivationError: class RoleActivationError extends Error {
     readonly code?: string;
     constructor(message: string, code?: string) {
@@ -31,12 +31,17 @@ const { RoleActivationError } = vi.hoisted(() => ({
       this.code = code;
     }
   },
+  // hub#1258: `lib/platform-failure.ts` checks `instanceof HubUsersError` too (Personal's own
+  // error class) — a full module mock has to export something under that name, or importing it
+  // throws before any test in this file runs. RolesPanel itself never touches it.
+  HubUsersError: class HubUsersError extends Error {},
 }));
 
 vi.mock('../lib/hub-users', () => ({
   listHubRoles: (...a: unknown[]) => listHubRoles(...a),
   setRoleActivation: (...a: unknown[]) => setRoleActivation(...a),
   RoleActivationError,
+  HubUsersError,
 }));
 
 const { isAdmin } = vi.hoisted(() => ({ isAdmin: { value: true } }));

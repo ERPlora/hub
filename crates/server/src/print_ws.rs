@@ -221,7 +221,7 @@ pub(crate) async fn handle_frame(st: &AppState, conn: &mut DrainConnection, raw:
         Ok(rt) => rt,
         Err(e) => return fatal("tenant_rejected", e.to_string()),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
 
     match frame {
         ClientFrame::Hello { session, device_id } => {
@@ -448,7 +448,7 @@ mod tests {
 
     async fn register(st: &AppState, device_id: &str, role: &str) {
         let arc = st.runtime_for(&st.hub_id()).await.unwrap();
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.register_print_host(device_id, role, "Till", "u1")
             .await
             .unwrap();
@@ -456,7 +456,7 @@ mod tests {
 
     async fn enqueue(st: &AppState, job_id: &str, role: &str) {
         let arc = st.runtime_for(&st.hub_id()).await.unwrap();
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.enqueue_print_job(&NewPrintJob {
             job_id: job_id.into(),
             role: role.into(),
@@ -470,7 +470,7 @@ mod tests {
 
     async fn status_of(st: &AppState, job_id: &str) -> String {
         let arc = st.runtime_for(&st.hub_id()).await.unwrap();
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         rt.print_queue(None, None, 500)
             .await
             .unwrap()
@@ -592,7 +592,7 @@ mod tests {
         );
 
         let arc = neighbour.runtime_for(&neighbour.hub_id()).await.unwrap();
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         assert_eq!(
             rt.print_hosts().await.unwrap().len(),
             1,
@@ -933,7 +933,7 @@ mod tests {
         let mut conn = connected(&f, "till-1").await;
         {
             let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.lock().await;
+            let rt = arc.read().await;
             rt.unregister_print_host("till-1", None).await.unwrap();
         }
 
@@ -952,7 +952,7 @@ mod tests {
         let mut conn = connected(&f, "till-1").await;
         {
             let arc = f.st.runtime_for(&f.st.hub_id()).await.unwrap();
-            let rt = arc.lock().await;
+            let rt = arc.read().await;
             rt.unregister_print_host("till-1", Some("receipt"))
                 .await
                 .unwrap();

@@ -31,16 +31,18 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 workflow="$repo_root/.github/workflows/canonical-mirrors.yml"
 caller="$repo_root/.github/workflows/actionlint.yml"
+verdict="$repo_root/scripts/canonical-mirrors-verdict.sh"
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --workflow) workflow="$2"; shift 2 ;;
         --caller) caller="$2"; shift 2 ;;
-        *) printf 'usage: %s [--workflow <path>] [--caller <path>]\n' "$0" >&2; exit 2 ;;
+        --verdict) verdict="$2"; shift 2 ;;
+        *) printf 'usage: %s [--workflow <path>] [--caller <path>] [--verdict <path>]\n' "$0" >&2; exit 2 ;;
     esac
 done
 
-for f in "$workflow" "$caller"; do
+for f in "$workflow" "$caller" "$verdict"; do
     if [ ! -f "$f" ]; then
         printf 'FAIL: no such workflow: %s\n' "$f" >&2
         exit 1
@@ -54,7 +56,14 @@ if ! python3 -c 'import yaml' 2>/dev/null; then
     exit 1
 fi
 
-WORKFLOW="$workflow" CALLER="$caller" python3 - <<'PY'
+# The hand-ported list sources the verdict refuses to classify (hub#1296): asked of the script
+# itself, so the contract below compares the REAL list, not a copy of it.
+parsed_sources=$(bash "$verdict" --print-parsed-sources) || {
+    printf 'FAIL: %s --print-parsed-sources failed\n' "$verdict" >&2
+    exit 1
+}
+
+WORKFLOW="$workflow" CALLER="$caller" VERDICT="$verdict" PARSED_SOURCES="$parsed_sources" python3 - <<'PY'
 import os
 import sys
 
@@ -62,6 +71,8 @@ import yaml
 
 path = os.environ["WORKFLOW"]
 caller_path = os.environ["CALLER"]
+verdict_path = os.environ["VERDICT"]
+parsed_sources = [s for s in os.environ["PARSED_SOURCES"].splitlines() if s.strip()]
 
 with open(path, encoding="utf-8") as fh:
     doc = yaml.safe_load(fh)
@@ -177,6 +188,74 @@ check(
 )
 
 
+# ── 3b · The copy FOLLOWS the hub; it does not block it (hub#1296) ───────────────────
+#
+# The toolkit's action compares byte for byte, which is red BY CONSTRUCTION on any hub PR that
+# adds contract. So its outcome is not the verdict: the hub-side `canonical-mirrors-verdict.sh`
+# re-reads it — behind an additive change is a warning, a retirement or a hand-edited copy is a
+# failure. Three things make that work, and each one missing puts the canonical back behind the
+# copy (or opens the door): the action must not end the job (`continue-on-error`), the verdict
+# must run AFTER it with its outcome, and the checkout must carry history (the verdict tells a
+# lagging copy from a tampered one by looking for the copy's content in the hub's own past).
+checkouts = [s for s in steps if "actions/checkout" in str(s.get("uses", ""))]
+check(
+    "the checkout carries the hub's history (`fetch-depth: 0`)",
+    any(str((s.get("with") or {}).get("fetch-depth")) == "0" for s in checkouts),
+    "without history every lagging copy reads as DIVERGENT and the PR is red by construction again",
+)
+mirror = mirror_steps[0] if mirror_steps else {}
+check(
+    "the toolkit's action step does not end the job by itself (`continue-on-error: true`)",
+    mirror.get("continue-on-error") is True,
+    "its byte-for-byte failure has to reach the verdict, which is what decides",
+)
+mirror_id = str(mirror.get("id") or "")
+check("the toolkit's action step has an `id` the verdict can read", bool(mirror_id))
+
+VERDICT = "scripts/canonical-mirrors-verdict.sh"
+verdict_steps = [s for s in steps if VERDICT in str(s.get("run", ""))]
+check(
+    f"a step runs `{VERDICT}`",
+    len(verdict_steps) == 1,
+    f"{len(verdict_steps)} steps run it — the toolkit's outcome is thrown away without it",
+)
+if verdict_steps and mirror_steps:
+    check(
+        "the verdict runs AFTER the toolkit's action",
+        steps.index(verdict_steps[0]) > steps.index(mirror_steps[0]),
+        "it re-reads the action's outcome, so it cannot come first",
+    )
+    verdict_step = verdict_steps[0]
+    whole = str(verdict_step.get("run", "")) + " " + str(verdict_step.get("env") or {})
+    check(
+        f"the verdict receives the action's outcome (`steps.{mirror_id or '<id>'}.outcome`)",
+        bool(mirror_id) and f"steps.{mirror_id}.outcome" in whole,
+        "without it a failure of a hand-ported list would be downgraded along with a lagging copy",
+    )
+    check(
+        "the verdict is NOT gated on the action's success (`if:` would skip it on the very failure it exists for)",
+        "if" not in verdict_step or "success()" not in str(verdict_step.get("if", "")),
+        f"if: {verdict_step.get('if')!r}",
+    )
+
+# The list sources the verdict cannot classify are the ones the toolkit parses, and those are
+# in the `paths` filter already. Keep the two in step: a source in the filter that the verdict
+# does not know is a toolkit failure the verdict would downgrade; a source the verdict knows
+# that is not in the filter is a change the mirrors never run for.
+VENDORED_OR_NOT_A_LIST = {
+    "schemas/module.schema.json",
+    "contracts/kernel/**",
+    "apps/web/src/**/*.vue",
+    ".github/workflows/canonical-mirrors.yml",
+}
+listed_sources = sorted(set(blocks["pull_request"].get("paths") or []) - VENDORED_OR_NOT_A_LIST)
+check(
+    f"`{os.path.basename(verdict_path)} --print-parsed-sources` names exactly the hand-ported sources of the filter",
+    listed_sources == sorted(parsed_sources),
+    f"filter has {listed_sources}, the verdict knows {sorted(parsed_sources)}",
+)
+
+
 # ── 4 · This contract test RUNS somewhere ────────────────────────────────────────────
 #
 # The sin it exists to punish, applied to itself. It lives in `actionlint.yml` and not inside
@@ -202,6 +281,20 @@ check(
     SELF in caller_paths,
     f"paths are {caller_paths} — a PR touching only the test would not execute it",
 )
+
+# The verdict's own tests (hub#1296), by the same rule: a test nobody runs is a shopping list.
+VERDICT_TEST = "scripts/tests/canonical-mirrors-verdict.test.sh"
+check(
+    f"`{os.path.basename(caller_path)}` runs the verdict's tests (`{VERDICT_TEST}`)",
+    any(VERDICT_TEST in str(s.get("run", "")) for s in caller_steps),
+    "the classifier decides what merges; its cases have to run on every PR that can change it",
+)
+for wanted in (VERDICT_TEST, VERDICT):
+    check(
+        f"`{os.path.basename(caller_path)}` fires when `{wanted}` changes",
+        wanted in caller_paths,
+        f"paths are {caller_paths} — a PR touching only it would not run its tests",
+    )
 
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)
