@@ -298,6 +298,14 @@ export async function ensureMediaCookie(): Promise<boolean> {
   }
 }
 
+/**
+ * WS events by which the runtime announces that WHICH modules are active just changed for the whole
+ * hub (hub#1317): every other tab and device hears them, not only the one that acted.
+ * `module.installed` is deliberately not in the list — it is subscribed on its own, next to the
+ * comment that explains why the install pipeline predates the other three.
+ */
+const MODULE_LIFECYCLE_EVENTS = ['module.activated', 'module.deactivated', 'module.uninstalled'] as const;
+
 /** Singleton del cliente SDK (HTTP RPC + WS eventos) apuntado al runtime local. */
 export function getClient(): ErploraClient {
   if (!_client) {
@@ -358,13 +366,22 @@ export function getClient(): ErploraClient {
     // ("not known yet") and the SDK falls back to asking the transport, as before. On a cold boot
     // there is no session yet and the seed asks nothing — login re-seeds through `setHubSession`.
     void refreshActiveModuleIds();
-    // `module.installed` (ARQUITECTURA.md §2.2/§4) is the only module lifecycle WS event that
-    // exists today; activate/deactivate/uninstall emit none of their own, so those three refresh
-    // synchronously when `moduleAction` resolves (in THIS tab — another tab only learns of them on
-    // its next refresh, see the note on `refreshActiveModuleIds`).
+    // `module.installed` (ARQUITECTURA.md §2.2/§4) is what the runtime has always broadcast when
+    // the install pipeline finishes.
     _client.on('module.installed', () => {
       void refreshActiveModuleIds();
     });
+    // …and since hub#1317 activate/deactivate/uninstall broadcast their own event too, with the
+    // same envelope and the same scope. They belong here for the same reason (hub#1336):
+    // `moduleAction` only refreshes the set in the tab that ACTED, so without this the till open on
+    // the counter keeps short-circuiting optional queries against the set it last knew — a module
+    // activated from the back office stays invisible to it until someone reloads, which is the
+    // symmetric half of the hole hub#1211 closed for install.
+    for (const event of MODULE_LIFECYCLE_EVENTS) {
+      _client.on(event, () => {
+        void refreshActiveModuleIds();
+      });
+    }
   }
   return _client;
 }
@@ -559,8 +576,9 @@ export function publishActiveModuleIds(ids: ReadonlySet<string> | null | undefin
  * Re-asks the runtime which modules are ACTIVE and republishes the set (hub#1211). Called once at
  * client construction, on every login (`setHubSession`, the funnel all five ways in go through —
  * `main.ts` builds the client on a cold boot BEFORE anyone signs in, and login is a route change,
- * not a reload) and after every install (`module.installed` WS event) / activate / deactivate /
- * uninstall — the exact same moments the shell already refreshes its own nav and module list.
+ * not a reload) and after every install / activate / deactivate / uninstall — in the tab that acted
+ * (`moduleAction`) and, through the four lifecycle WS events, in every OTHER tab and device of the
+ * hub (hub#1336). The exact same moments the shell already refreshes its own nav and module list.
  *
  * Never asks before there IS a session, same rule as `ensureMediaCookie`: that request could only
  * be a 401, which is console noise of the exact kind this exists to remove and feeds the central
