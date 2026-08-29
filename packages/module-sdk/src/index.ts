@@ -607,6 +607,11 @@ const PLATFORM_FAILURES: Record<string, (app: string) => Bilingual> = {
   wasm: () => PLUMBING,
   native: () => PLUMBING,
   schema: () => PLUMBING,
+  // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
+  // redacted by `may_reach_the_client` exactly like its five siblings above — this table just
+  // never had to answer it before the shell's own copy (`apps/web/src/lib/platform-failure.ts`,
+  // hub#1258) started covering `manifest` over vue-i18n keys instead of here.
+  manifest: () => PLUMBING,
   other: () => PLUMBING,
   // The bucket every unmapped runtime error fell into before hub#1074, and what an older hub still
   // answers. Its message is plumbing by definition — that is what put driver text on a till.

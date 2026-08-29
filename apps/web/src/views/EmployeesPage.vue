@@ -489,7 +489,7 @@ function rejectionMessage(error: unknown, fallback = t('employees.saveError')): 
   if (key) return t(`employeeForm.errors.${key}`);
   const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });
   if (translated) return translated;
-  const platform = platformFailureMessage(error, t, te);
+  const platform = platformFailureMessage(error, locale.value);
   if (platform) return platform;
   return error instanceof Error ? error.message : fallback;
 }

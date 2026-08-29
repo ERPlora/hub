@@ -208,7 +208,7 @@ import { onBadgeScan } from '../lib/badge-scanner';
 import { nfcBadgeReady } from '../lib/nfc-badge';
 import { toast } from '../lib/toast';
 
-const { t, te } = useI18n();
+const { t, te, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
@@ -463,7 +463,7 @@ async function onSave(): Promise<void> {
     const message = key
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
-        platformFailureMessage(error, t, te) ??
+        platformFailureMessage(error, locale.value) ??
         (error instanceof Error ? error.message : t('employees.saveError')));
     const refusal = fieldRefusalOf(error);
     if (!key && refusal && ANCHORED_FIELDS.includes(refusal.field)) {
