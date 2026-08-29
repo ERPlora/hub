@@ -1524,6 +1524,10 @@ pub fn app(state: AppState) -> Router {
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
+        // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
+        // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
+        // marketplace ha retirado — que es justo el que «Mis apps» tiene que poder marcar.
+        .route("/api/marketplace/modules/:id", get(proxy_marketplace_module))
         // Which build of the installable app the Cloud publishes (hub#400). The page cannot ask
         // erplora.com itself: `connect-src 'self' ipc:` kills it, and silently.
         .route("/api/app/release", get(proxy_app_release))
@@ -2322,6 +2326,18 @@ async fn update_module(
             return unauthorized(e);
         }
     }
+    // Mismo motivo que en `proxy_marketplace_module` (hub#1134): este id acaba dentro de las URLs
+    // del Cloud (`versions/`, `download/`) que se firman con el token de máquina.
+    if !module_id_is_safe(&module_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "module.invalid_id", "message": "invalid module id" },
+            })),
+        )
+            .into_response();
+    }
     let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
         return (
             StatusCode::UNAUTHORIZED,
@@ -2573,6 +2589,18 @@ async fn list_module_versions(
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
+    }
+    // Mismo motivo que en `proxy_marketplace_module` (hub#1134): este id acaba dentro de la URL del
+    // Cloud que se firma con el token de máquina.
+    if !module_id_is_safe(&module_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "module.invalid_id", "message": "invalid module id" },
+            })),
+        )
+            .into_response();
     }
 
     // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
@@ -3125,6 +3153,61 @@ async fn proxy_app_release(State(st): State<AppState>, headers: HeaderMap) -> Re
     }
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     proxy_public_cloud_get(&st, &headers, cloud.app_release()).await
+}
+
+/// `GET /api/marketplace/modules/:id` — lo que el marketplace dice de UN módulo, tal cual (hub#1134).
+///
+/// **Por qué no vale el catálogo**: el listado del marketplace sólo sirve `publication_status =
+/// 'listed'`, así que un módulo RETIRADO (ADR-0380) que este hub ya tiene sencillamente no sale en
+/// él — y ese es exactamente el que «Mis apps» tiene que poder distinguir de uno sano. La puerta de
+/// detalle sí contesta por él, y contesta al token de máquina del propio hub.
+///
+/// El cuerpo viaja **sin tocar**: `publication_status` lo lee la pantalla; aquí no se interpreta
+/// nada. Un Cloud que no contesta es un 502, nunca un estado inventado — «no lo sé» y «se sigue
+/// ofreciendo» son hechos distintos y la pantalla no pinta ninguno de los dos por el otro.
+async fn proxy_marketplace_module(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    {
+        let rt = st.runtime.lock().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    // El id se incrusta en una ruta del Cloud FIRMADA con el token de máquina, así que se comprueba
+    // antes de llegar ahí: axum ya lo ha percent-decodificado, y un `..` por el medio sacaría al
+    // proxy del marketplace hacia cualquier otro endpoint del Cloud con la credencial del hub.
+    if !module_id_is_safe(&module_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "module.invalid_id", "message": "invalid module id" },
+            })),
+        )
+            .into_response();
+    }
+    let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
+    let placeholder = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token: String::new(),
+    };
+    proxy_cloud_get(&st, &headers, cloud.module_detail(&placeholder, &module_id)).await
+}
+
+/// ¿Se puede meter este id en una ruta del Cloud sin salirse de ella? (hub#1134)
+///
+/// El alfabeto de un slug de módulo y nada más: sin `/`, sin `.`, sin `%`, y nunca vacío. Todo lo
+/// que llega por `:id` y acaba dentro de una URL del Cloud pasa por aquí — una regla en un sitio,
+/// no una comprobación distinta por handler.
+fn module_id_is_safe(module_id: &str) -> bool {
+    !module_id.is_empty()
+        && module_id.len() <= 128
+        && module_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 async fn proxy_marketplace_catalog(

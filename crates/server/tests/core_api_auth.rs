@@ -71,6 +71,9 @@ async fn core_diagnostics_and_module_metadata_require_a_user_session() {
         "/api/system/update-history",
         "/api/entitlement",
         "/api/marketplace/catalog",
+        // hub#1134: qué ofrece hoy el marketplace de UN módulo. Sale con el token de máquina del
+        // hub, así que la puerta es la misma que la del catálogo: sesión de usuario o nada.
+        "/api/marketplace/modules/inventory",
         "/api/app/release",
         "/api/blueprints/catalog",
         "/api/blueprints/example/download",

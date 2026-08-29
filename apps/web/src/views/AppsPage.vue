@@ -34,6 +34,18 @@
         </ion-button>
       </ok-inline-feedback>
 
+      <!-- Un distintivo por sí solo no explica nada (hub#1134): esta es la línea que dice qué
+           significa «retirado» — sigue funcionando, sigue actualizándose, ya no se ofrece. Mismo
+           patrón que el aviso de plugin cerrado de WordPress: chip en la fila, explicación arriba. -->
+      <ok-inline-feedback
+        v-if="tab === 'mine' && retiredInstalled.length > 0"
+        data-test="apps-retired-notice"
+        tone="warning"
+        class="mb-3"
+      >
+        {{ t('apps.retiredNotice', { apps: retiredAppNames }) }}
+      </ok-inline-feedback>
+
       <!-- Mis módulos: instalados SEGÚN EL RUNTIME (fuente de verdad local) + ciclo de vida. -->
       <ok-data-table
         v-show="tab === 'mine'"
@@ -162,13 +174,16 @@ import {
   clientInjectionKey, getClient, requestInstall,
   listInstalledModules, activateModule, deactivateModule, uninstallModule,
   getModuleCapabilities, putModuleCapabilities, InstallBlockedError, ModuleActionError,
-  updateModule, listModuleUpdates, listModuleVersions,
+  updateModule, listModuleUpdates, listModuleVersions, modulePublicationStatus,
   type InstalledModule, type ModuleCapability
 } from '../lib/runtime';
 import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
-import { catalogActionFor, catalogRowState, isModuleInstalled, type CatalogRowState } from '../lib/apps-catalog';
+import {
+  catalogActionFor, catalogRowState, isModuleInstalled, modulesWithUnknownPublication, publicationOf,
+  type CatalogRowState, type PublicationStatus,
+} from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
 import { capabilitiesToConsent } from '../lib/module-capabilities';
 import { moduleFailureMessage } from '../lib/module-failure-message';
@@ -306,6 +321,26 @@ function setUpdating(id: string, busy: boolean): void {
 }
 
 // --- Celdas ricas: pill de tinte suave con tokens Ionic (cruzan el shadow de la tabla) ---
+/**
+ * Nombre del módulo + el distintivo de su estado de publicación (hub#1134).
+ *
+ * El distintivo va PEGADO AL NOMBRE, que es donde lo pone el mercado (el «deprecated» de Shopify,
+ * el de Odoo): es un hecho sobre la app, no sobre si está encendida — que es lo que dice la columna
+ * de estado, y una app retirada puede estar perfectamente activa.
+ *
+ * Sólo `retired` se pinta. `unlisted` se sigue instalando por referencia directa (ADR-0380), así
+ * que en un hub que ya lo tiene no hay nada de lo que avisar.
+ */
+function nameCell(name: string, publication: PublicationStatus | null): Node {
+  const wrap = document.createElement('span');
+  wrap.style.cssText = 'display:inline-flex;align-items:center;gap:8px';
+  const label = document.createElement('span');
+  label.textContent = name;
+  wrap.append(label);
+  if (publication === 'retired') wrap.append(badgeCell(t('apps.publicationRetired'), 'warning'));
+  return wrap;
+}
+
 function badgeCell(text: string, tone: 'success' | 'medium' | 'primary' | 'danger' | 'warning'): Node {
   const span = document.createElement('span');
   span.textContent = text;
@@ -354,6 +389,78 @@ function stateCell(row: Row): Node {
 // (`mark_installed` es best-effort), así que lo cruzamos con la lista local para no mostrar
 // "Disponible" (ni el botón Instalar activo) en un módulo ya instalado. (Bug demo 2026-07-12.)
 const installedIds = computed<Set<string>>(() => new Set(installedModules.value.map((m) => m.id)));
+
+// Los ids que el CATÁLOGO trae hoy. Estar ahí ya es la respuesta: la lista del marketplace sólo
+// sirve `publication_status='listed'` (lo filtra el SaaS en su acción `list`), así que un módulo
+// que vuelve en el catálogo está `listed` por construcción y preguntar por él otra vez es coste
+// puro.
+const catalogIds = computed<Set<string>>(() => new Set(modules.value.map((m) => m.id)));
+
+/**
+ * Qué OFRECE hoy el marketplace de cada módulo instalado (ADR-0380, hub#1134).
+ *
+ * Sólo guarda lo que hubo que preguntar —lo que el catálogo NO listó—, y `null` cuando no se pudo
+ * preguntar: «no lo sé» no es «retirado» ni «al día», y ninguno de los dos se pinta por el otro.
+ */
+const publicationStatuses = ref<Map<string, PublicationStatus | null>>(new Map());
+
+/**
+ * Pregunta por los pocos módulos instalados que el catálogo no listó (hub#1134).
+ *
+ * 🔴 El modo de fallo que cierra es el *closed plugin* de WordPress.org que cita ADR-0380: el
+ * módulo se retira, el hub se queda con él —a propósito: `retired` cierra la OFERTA, nunca el
+ * suministro— y la pantalla lo pinta como si estuviera al día, porque no hay actualización que
+ * ofrecer. Nadie se entera nunca. `online_booking`, `cart_checkout`, `payments` e `invoice_series`
+ * son ese caso en producción hoy.
+ *
+ * **Cuesta CERO llamadas en un hub sano**: el catálogo responde por todo lo que lista, y sólo lo
+ * que falta de él llega hasta aquí. Es lo que permite que esto cuelgue del mismo refresco que ya
+ * dispara `focus` sin convertirlo en 25 peticiones al Cloud.
+ *
+ * Con el catálogo caído no se pregunta NADA: sin catálogo no hay nada listado, y «no listado»
+ * pasaría a significar «pregunta por todas tus apps» para concluir lo que ya se sabía.
+ */
+async function loadPublicationStatuses(): Promise<void> {
+  if (catalogState.value !== 'ready') return;
+  const pending = modulesWithUnknownPublication(
+    installedModules.value.map((m) => m.id),
+    catalogIds.value,
+    publicationStatuses.value,
+  );
+  if (pending.length === 0) return;
+  const answers = await Promise.all(
+    pending.map(async (id) => {
+      const status = await modulePublicationStatus(id).catch((error: unknown) => {
+        // Un fallo se VE (regla de entrega): la fila se queda sin distintivo, y el motivo queda en
+        // la consola en vez de desaparecer.
+        console.warn(`[apps] no se pudo leer el estado de publicación de ${id}`, error);
+        return null;
+      });
+      return [id, status] as const;
+    }),
+  );
+  const next = new Map(publicationStatuses.value);
+  for (const [id, status] of answers) next.set(id, status);
+  publicationStatuses.value = next;
+}
+
+// Se resuelve cuando las DOS mitades están: el catálogo dice qué se sigue ofreciendo y el runtime
+// dice qué tiene este hub. Reemplazar el mapa (no mutarlo) es lo que hace reaccionar a las filas.
+watch(
+  [catalogState, installedModules, modules],
+  () => {
+    void loadPublicationStatuses();
+  },
+  { immediate: true },
+);
+
+/** Los módulos instalados que el marketplace ya no ofrece — los que llevan aviso y distintivo. */
+const retiredInstalled = computed<InstalledModule[]>(() =>
+  installedModules.value.filter(
+    (m) => publicationOf(m.id, catalogIds.value, publicationStatuses.value) === 'retired',
+  ),
+);
+const retiredAppNames = computed(() => retiredInstalled.value.map((m) => m.name).join(', '));
 
 const filteredModules = computed<Row[]>(() => {
   const base = tab.value === 'paid' ? modules.value.filter((m) => m.paid) : modules.value;
@@ -434,13 +541,22 @@ const installedRows = computed<Row[]>(() =>
     ...m,
     update: pendingUpdate(m.id, moduleUpdates.value),
     updating: updatingIds.value.has(m.id),
+    // ADR-0380 (hub#1134): si el marketplace lo sigue ofreciendo. `null` = no se pudo preguntar.
+    publicationStatus: publicationOf(m.id, catalogIds.value, publicationStatuses.value),
   })) as unknown as Row[],
 );
 
 // --- Columnas + acciones ---
 // `computed` para que cabeceras/labels/celdas se recalculen al cambiar de idioma en caliente.
 const mineColumns = computed<DataTableColumn[]>(() => [
-  { key: 'name', header: t('apps.colModule') },
+  {
+    key: 'name',
+    header: t('apps.colModule'),
+    // `searchKeys: ['name']` sigue leyendo el valor CRUDO de la fila, así que el distintivo no
+    // entra en la búsqueda: se pinta, no se indexa.
+    render: (r) =>
+      nameCell(String(r.name ?? ''), (r.publicationStatus as PublicationStatus | null) ?? null),
+  },
   {
     key: 'version',
     header: t('apps.colVersion'),

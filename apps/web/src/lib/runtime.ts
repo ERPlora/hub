@@ -27,6 +27,7 @@ import { STRICT_PIN_POLICY } from './pin-policy';
 import { askForApproval } from './elevation';
 import { setRuntimeClientKind } from './device';
 import type { ModuleUpdateInfo, ModuleVersions } from './module-updates';
+import { publicationStatusOf, type PublicationStatus } from './apps-catalog';
 
 /**
  * Base URL del runtime local del Hub. Config-driven (VITE_RUNTIME_URL).
@@ -669,6 +670,37 @@ export async function listModuleVersions(moduleId: string): Promise<ModuleVersio
   if (!res.ok) return empty;
   const env = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: ModuleVersions };
   return env.ok && env.data ? env.data : empty;
+}
+
+/**
+ * Whether the marketplace still OFFERS one module (`GET /api/marketplace/modules/{id}`, hub#1134).
+ *
+ * The runtime proxies the Cloud's module record with the hub's machine token and hands it over
+ * untouched; the only field this screen reads out of it is `publication_status` (ADR-0380). It is
+ * the DETAIL door on purpose: the catalogue lists `listed` modules only, so it is the one door that
+ * still answers for a module this hub runs and the marketplace has retired.
+ *
+ * `null` = "I could not ask" — no credential, no network, a Cloud that answered something else.
+ * It is never `listed`: silence and "still on the shelf" are different facts, and the caller
+ * paints neither of them.
+ */
+export async function modulePublicationStatus(moduleId: string): Promise<PublicationStatus | null> {
+  try {
+    const res = await runtimeFetch(
+      `${RUNTIME_URL}/api/marketplace/modules/${encodeURIComponent(moduleId)}`,
+      { headers: runtimeHeaders() },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    const raw = body?.publication_status;
+    // An answer that does not carry the field comes from a SaaS older than saas#1542. That is
+    // "I do not know", not "listed": inventing the healthy state here would be indistinguishable
+    // from having asked and been told.
+    return raw === undefined || raw === null ? null : publicationStatusOf(raw);
+  } catch (error) {
+    console.warn(`[runtime] publication status of ${moduleId} could not be read`, error);
+    return null;
+  }
 }
 
 export const activateModule = (id: string): Promise<void> => moduleAction(id, 'activate');
