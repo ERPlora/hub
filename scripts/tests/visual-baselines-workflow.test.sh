@@ -149,12 +149,32 @@ else
     ok "regenera con HUB_UPDATE_BASELINES=1 + --update-snapshots=all, filtra a *Visual.spec.ts y sube el artefacto"
 fi
 
-# ── 6. actionlint.yml runs this very contract (the same wiring test-web-workflow.test.sh has) ─
-if [ -f "$caller" ] && grep -q 'visual-baselines-workflow.test.sh' "$caller"; then
-    ok "actionlint.yml ejecuta este contrato en cada PR que toque .github/workflows/**"
+# ── 6. actionlint.yml RUNS this contract, and fires when only this file changes ─────────────
+#
+# TWO different properties — "a step executes it" and "a change to it triggers the workflow" —
+# asserted one after the other, so whichever one breaks is the one named in the failure.
+#
+# A single `grep -q '<this file>' actionlint.yml` (what this check did until the merge of develop
+# into hub#1325) is a FALSE GREEN: the caller names this script TWICE — once in its `paths:`
+# filter and once in the step that runs it — so deleting the step still matched the `paths:` entry
+# and the check stayed on ✓. Proven by mutation: with the `run:` step removed, the old check
+# reported 6 passed / 0 failed. Same rule the checks above already follow (concurrency,
+# `--update-snapshots=all`): assert the LINE that does the work, never any mention of it.
+# `canonical-mirrors-workflow.test.sh` splits the same pair of properties for its own caller.
+# Tolerated spellings of the working line: block form (`bash ./x`) or inline (`run: bash x`),
+# with or without `./`; the `paths:` entry with single, double or no quotes. Anything else is red.
+SELF='scripts/tests/visual-baselines-workflow.test.sh'
+if [ ! -f "$caller" ]; then
+    bad "actionlint.yml runs ${SELF}" \
+        "the caller was not found at ${caller}"
+elif ! grep -qE "^[[:space:]]*(run:[[:space:]]*)?bash (\\./)?${SELF//./\\.}[[:space:]]*$" "$caller"; then
+    bad "actionlint.yml runs ${SELF}" \
+        "no step invokes it (\`bash ./${SELF}\`): without that step, a PR that breaks visual-baselines.yml goes unnoticed until the first real dispatch — and naming the file in \`paths:\` alone does NOT run it"
+elif ! grep -qE "^[[:space:]]*- [\"']?${SELF//./\\.}[\"']?[[:space:]]*$" "$caller"; then
+    bad "actionlint.yml fires when only ${SELF} changes" \
+        "the file is missing from the \`paths:\` filter: a PR touching only this test would not execute it"
 else
-    bad "actionlint.yml ejecuta scripts/tests/visual-baselines-workflow.test.sh" \
-        "sin ese paso, una PR que rompa visual-baselines.yml no lo notaría nadie hasta el primer dispatch real"
+    ok "actionlint.yml runs this contract (real step) and fires when only this test changes (paths)"
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
