@@ -40,6 +40,11 @@ on:
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
       - 'scripts/tests/canonical-mirrors-workflow.test.sh'
+      # Contrato del lookup compartido de alertas (hub#1246): sin esto, una PR que solo tocara
+      # `scripts/ci/alert-issue.sh` o uno de sus dos tests no ejecutaría ninguno de los dos.
+      - 'scripts/ci/alert-issue.sh'
+      - 'scripts/tests/alert-issue.test.sh'
+      - 'scripts/tests/alert-issue-workflows.test.sh'
   workflow_dispatch:
 
 permissions:
@@ -113,3 +118,21 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/canonical-mirrors-workflow.test.sh
+
+      # ── Contrato del lookup compartido de alertas (hub#1246) ─────────────────────────
+      # `scripts/ci/alert-issue.sh` reemplaza el `gh issue list --search` (índice que va por
+      # detrás de la realidad) por REST + filtro local en los tres workflows con paso de
+      # alerta. Sin este paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que
+      # reintrodujera `--search` en cualquiera de los tres, o rompiera el propio script, no
+      # ejecutaría ninguno de sus dos tests — exactamente el hueco que `canonical-mirrors.yml`
+      # ya sufrió una vez (hub#1260) por un filtro `paths` sin ensanchar.
+      - name: Contrato de scripts/ci/alert-issue.sh (hub#1246)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/alert-issue.test.sh
+
+      # pyyaml ya está instalado por el paso de arriba.
+      - name: Contrato de los pasos de alerta de test-hub/image-freshness/test-hub-modules (hub#1246)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/alert-issue-workflows.test.sh
