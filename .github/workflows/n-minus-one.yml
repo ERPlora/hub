@@ -51,8 +51,11 @@ on:
 permissions:
   contents: read
 
+# Repo-wide group (no ref): the script binds ONE fixed host port (`--bind 0.0.0.0:8788`, and N-1
+# runs with `--network host`), and `ci-runner-1`/`ci-runner-1b` share a single Docker host — two
+# runs from different refs at once would fight over that port and paint a false RED.
 concurrency:
-  group: n-minus-one-${{ github.ref }}
+  group: n-minus-one
   cancel-in-progress: true
 
 jobs:

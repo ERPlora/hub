@@ -52,6 +52,12 @@ set -uo pipefail
 # job, que no tiene red hacia el marketplace para instalar nada real.
 CORE_QUERIES="hub.users.list hub.roles.list hub.setup.status hub.fiscal.limits hub.approvals.list"
 
+# Neither binary may ever point at production (hub#1279): `HubConfig::from_env` defaults
+# `HUB_CLOUD_API_URL` to https://erplora.com when the variable is absent. Nothing in this job
+# needs the Cloud (no machine token ⇒ no marketplace, no heartbeat, no error sink), so both N and
+# N-1 get the same explicit closed-loopback stub — port 9 is `discard`, nothing listens there.
+CLOUD_API_URL_STUB="http://127.0.0.1:9"
+
 repo_dir="."
 image="ghcr.io/erplora/hub"
 database_url=""
@@ -163,7 +169,7 @@ apply_branch_migrations_default() {
         return 1
     fi
     log "n-minus-one: booting N briefly to apply its migrations against a clean Postgres"
-    HUB_DATABASE_URL="$dsn" HUB_AUTH=dev HUB_BIND="$bind" "$bin" >&2 &
+    HUB_DATABASE_URL="$dsn" HUB_AUTH=dev HUB_BIND="$bind" HUB_CLOUD_API_URL="$CLOUD_API_URL_STUB" "$bin" >&2 &
     local pid=$!
     if ! wait_ready; then
         echo "n-minus-one: N (this branch) never reached /readyz=UP against a clean Postgres — its migrations did not finish applying." >&2
@@ -179,7 +185,7 @@ apply_branch_migrations_default() {
 
 apply_branch_migrations() { # $1 = dsn
     if [ -n "$apply_migrations_cmd" ]; then
-        "$apply_migrations_cmd" "$1"
+        HUB_CLOUD_API_URL="$CLOUD_API_URL_STUB" "$apply_migrations_cmd" "$1"
         return $?
     fi
     apply_branch_migrations_default "$1"
@@ -189,6 +195,7 @@ apply_branch_migrations() { # $1 = dsn
 start_n1_container() { # $1 = image ref, $2 = dsn
     "$docker_cmd" run -d --rm --network host \
         -e HUB_DATABASE_URL="$2" -e HUB_AUTH=dev -e HUB_BIND="$bind" \
+        -e HUB_CLOUD_API_URL="$CLOUD_API_URL_STUB" \
         "$1"
 }
 
