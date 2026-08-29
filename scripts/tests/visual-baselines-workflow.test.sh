@@ -161,14 +161,16 @@ fi
 # reported 6 passed / 0 failed. Same rule the checks above already follow (concurrency,
 # `--update-snapshots=all`): assert the LINE that does the work, never any mention of it.
 # `canonical-mirrors-workflow.test.sh` splits the same pair of properties for its own caller.
+# Tolerated spellings of the working line: block form (`bash ./x`) or inline (`run: bash x`),
+# with or without `./`; the `paths:` entry with single, double or no quotes. Anything else is red.
 SELF='scripts/tests/visual-baselines-workflow.test.sh'
 if [ ! -f "$caller" ]; then
     bad "actionlint.yml runs ${SELF}" \
         "the caller was not found at ${caller}"
-elif ! grep -qE "^[[:space:]]*bash \\./${SELF//./\\.}[[:space:]]*$" "$caller"; then
+elif ! grep -qE "^[[:space:]]*(run:[[:space:]]*)?bash (\\./)?${SELF//./\\.}[[:space:]]*$" "$caller"; then
     bad "actionlint.yml runs ${SELF}" \
         "no step invokes it (\`bash ./${SELF}\`): without that step, a PR that breaks visual-baselines.yml goes unnoticed until the first real dispatch — and naming the file in \`paths:\` alone does NOT run it"
-elif ! grep -qE "^[[:space:]]*- '?${SELF//./\\.}'?[[:space:]]*$" "$caller"; then
+elif ! grep -qE "^[[:space:]]*- [\"']?${SELF//./\\.}[\"']?[[:space:]]*$" "$caller"; then
     bad "actionlint.yml fires when only ${SELF} changes" \
         "the file is missing from the \`paths:\` filter: a PR touching only this test would not execute it"
 else
