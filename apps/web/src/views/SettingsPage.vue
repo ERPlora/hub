@@ -1073,7 +1073,7 @@ async function saveTaxSettings(): Promise<void> {
     business_legal_name: hubSettings.value?.business_legal_name ?? '',
     business_address: hubSettings.value?.business_address ?? '',
   };
-  await persistHubSettings(
+  const saved = await persistHubSettings(
     {
       business_tax_id: businessTaxId.value.trim(),
       business_legal_name: businessLegalName.value.trim(),
@@ -1085,6 +1085,14 @@ async function saveTaxSettings(): Promise<void> {
       businessAddress.value = prev.business_address;
     },
   );
+  // hub#1306 — guardar la identidad la PUBLICA en el SaaS, que es lo que le permite nombrar al
+  // obligado en el otorgamiento del Anexo I. La publicación es best-effort (el guardado ya está
+  // hecho y un SaaS caído no puede costárselo al cliente), pero callarla es lo que convertía la
+  // página del otorgamiento en un callejón sin salida: guardaba el NIF, leía «Guardado», iba al
+  // dashboard y encontraba «pon antes tus datos fiscales» — lo que acababa de hacer. Se dice.
+  if (saved && hubSettings.value?.fiscal_identity_publish_error) {
+    await toastError(t('settings.shareWithErploraError'));
+  }
 }
 
 // ── Estado: Certificado fiscal del negocio (server-side /api/business/certificate) ──

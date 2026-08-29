@@ -325,6 +325,7 @@ import {
   downloadRepresentationGrantModel,
   getRepresentationGrant,
   postRepresentationGrant,
+  publishFiscalIdentity,
   type RepresentationGrantStatusValue,
 } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
@@ -554,6 +555,18 @@ function showFailure(e: unknown) {
  * atrapado en el SaaS sin vuelta (mismo motivo y mismo remedio que `management-link.ts`).
  */
 async function openDashboard() {
+  // La página de allí NOMBRA al obligado, y solo lo conoce si este hub se lo ha publicado
+  // (hub#1306): la identidad de negocio vive en `hub_settings` y el SaaS no entra en el hub
+  // (ADR-0201, decisión 5). Sin publicar, el cliente aterriza en un muro —«pon antes tus datos
+  // fiscales»— que ya rellenó aquí. Así que se publica ANTES de mandarlo, no después.
+  try {
+    await publishFiscalIdentity();
+  } catch {
+    // Se abre igual: puede haberse publicado antes y allí ya saberlo, y cerrarle esta vía por un
+    // fallo de sincronización le quitaría la única alternativa a esta pantalla. Pero no muda —
+    // si la página le pide los datos fiscales, esto es lo que se lo explica.
+    errorKey.value = 'grant.errors.identity_not_shared';
+  }
   const url = `${config.cloudApiUrl}/dashboard/hubs/${encodeURIComponent(config.hubId)}/fiscal/representation-grant/`;
   try {
     await openExternal(url);

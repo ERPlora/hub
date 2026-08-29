@@ -559,6 +559,8 @@ export default {
       invalid_via: 'That route is not one we can file through.',
       cloud_rejected: 'ERPlora could not handle this right now. Try again in a few minutes.',
       hub_not_enrolled: 'This hub is not connected to ERPlora yet.',
+      identity_not_shared:
+        'We could not tell ERPlora who the taxpayer is. If the page asks for your tax details, save them again in Settings → Business.',
       open_external_failed: 'We could not open your browser.',
       unknown: 'It did not work. Try again.',
     },
