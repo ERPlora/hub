@@ -35,6 +35,18 @@ repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/erplora-kernel-e2e-targets-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
 
+# The workflow that RUNS this file on a pull request. `--caller` lets the last section be pointed
+# at a MUTATED copy to prove it catches the positive — the knob `visual-baselines-workflow.test.sh`
+# and `canonical-mirrors-workflow.test.sh` already expose for their own callers.
+caller="$repo_root/.github/workflows/actionlint.yml"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --caller) caller="$2"; shift 2 ;;
+        *) printf 'usage: %s [--caller <path>]\n' "$0" >&2; exit 2 ;;
+    esac
+done
+
 passed=0
 
 fail() {
@@ -209,16 +221,61 @@ ok
 # ── 8 · The REAL manifest matches the REAL tree ──────────────────────────────────────────
 # The cases above prove the mechanism; this one is the guard actually standing. It is what turns
 # `develop` green again, and what a future hub#1264 slice will trip if it forgets the list.
-if [ -d "$repo_root/crates/runtime/tests" ]; then
-    real_out=$("$script" 2>"$tmp_dir/real-err")
-    real_status=$?
-    [ "$real_status" -eq 0 ] || fail "hub#1359: the checked-in manifest does not match crates/runtime/tests:
+#
+# It is NOT wrapped in `if [ -d … ]` any more (hub#1369): a case that skips itself when its
+# subject is missing is an open guard — the suite would still print PASS, two cases lighter, and
+# nobody reads the count. The directory is part of this repo, so its absence is a failure.
+[ -d "$repo_root/crates/runtime/tests" ] \
+    || fail "hub#1359: $repo_root/crates/runtime/tests is missing — the case that compares the real
+manifest with the real tree cannot be skipped: skipping it is how a guard passes without guarding"
+ok
+real_out=$("$script" 2>"$tmp_dir/real-err")
+real_status=$?
+[ "$real_status" -eq 0 ] || fail "hub#1359: the checked-in manifest does not match crates/runtime/tests:
 $(cat "$tmp_dir/real-err")"
-    ok
-    real_count=$(printf '%s\n' "$real_out" | grep -c .)
-    [ "$real_count" -ge 1 ] || fail "hub#1359: the real run resolved no targets at all"
-    ok
-    printf 'note: the checked-in manifest declares %s kernel e2e target(s)\n' "$real_count"
+ok
+real_count=$(printf '%s\n' "$real_out" | grep -c .)
+[ "$real_count" -ge 1 ] || fail "hub#1359: the real run resolved no targets at all"
+ok
+printf 'note: the checked-in manifest declares %s kernel e2e target(s)\n' "$real_count"
+
+# ── 9 · The guard actually RUNS on the pull requests that can break it ───────────────────
+# A guard nobody executes is a comment. Three properties, asserted one after another so the
+# failure names the one that broke:
+#
+#   a) a STEP of actionlint.yml invokes this file. Asserting any mention would be a false green:
+#      the caller names this script twice — in `paths:` and in the `run:` — so deleting the step
+#      still matches the `paths:` entry. That exact false green shipped once (hub#1250/#1325) and
+#      is open again in a sibling contract (hub#1365).
+#   b) this test file is in the caller's `paths:`, or a PR that only touched the test would not
+#      run it.
+#   c) `crates/runtime/tests/**` is in the caller's `paths:` — the property this section was
+#      written for (hub#1369, from the post-merge review of hub#1360). The list can only be
+#      broken by a PR that adds or deletes a kernel e2e, and such a PR need not touch a single
+#      path the caller currently watches.
+#      Until now `test-hub-modules.yml` covered that case with its own `pull_request` trigger on
+#      `crates/runtime/**`, but hub#1362 removes that trigger (the module e2e move to the pre-push
+#      gate) — and the gate resolves its targets with `cargo test --workspace`, never through
+#      `kernel-e2e-targets.sh`. Without this entry, a hub#1264 slice that deletes the `.rs` and
+#      forgets the `.txt` line meets NO guard before merge, and `develop` goes red for the whole
+#      fleet on the push — the very failure hub#1359 abolished.
+SELF='scripts/tests/kernel-e2e-targets.test.sh'
+TESTS_GLOB='crates/runtime/tests/**'
+if [ ! -f "$caller" ]; then
+    fail "hub#1369: the caller was not found at $caller"
+elif ! grep -qE "^[[:space:]]*(run:[[:space:]]*)?bash (\./)?${SELF//./\\.}[[:space:]]*$" "$caller"; then
+    fail "hub#1369: no step of $caller invokes \`bash ./${SELF}\` — naming the file in a comment
+or in \`paths:\` does NOT run it, and without the step this whole contract is decoration"
+elif ! grep -qE "^[[:space:]]*- [\"']?${SELF//./\\.}[\"']?[[:space:]]*\$" "$caller"; then
+    fail "hub#1369: ${SELF} is missing from the \`paths:\` filter of $caller — a PR touching only
+this test would not execute it"
+elif ! grep -qE "^[[:space:]]*- [\"']?crates/runtime/(tests/)?\*\*[\"']?[[:space:]]*\$" "$caller"; then
+    fail "hub#1369: ${TESTS_GLOB} is missing from the \`paths:\` filter of $caller — a hub#1264
+slice that deletes a kernel e2e without editing scripts/ci/kernel-e2e-targets.txt would run NO
+guard at pull-request time (hub#1362 takes test-hub-modules.yml out of \`pull_request\`, and the
+pre-push gate runs \`cargo test --workspace\`, which never consults the list). It would merge
+green and turn develop red on the push — the failure hub#1359 abolished"
 fi
+ok
 
 printf 'PASS: %s kernel-e2e-targets cases\n' "$passed"
