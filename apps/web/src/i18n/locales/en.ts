@@ -1754,4 +1754,24 @@ export default {
       duplicate: 'This hub already has that value.',
     },
   },
+  // What the core says when it refuses at the PLATFORM level (hub#1258) — the family that is
+  // nobody's business rule: `db`/`io`/`wasm`/`native`/`schema`/`manifest` are the six codes
+  // `error_payload` redacts to one fixed English line (hub#1074), and `module_not_installed`/
+  // `module_inactive`/`missing_dependency`/`read_unavailable` are the four whose remedy names an
+  // app. Personal and Settings → Roles used to fall through to that redacted line, or to an
+  // authored sentence that never went through i18n. Mirrors `platformFailureMessage` in
+  // `packages/module-sdk/src/index.ts` (hub#1102) — see `lib/platform-failure.ts` for why this is a
+  // separate catalogue instead of reusing that one.
+  platformFailure: {
+    unavailable:
+      'The operation could not be completed. Try again, and tell an administrator if it keeps happening.',
+    moduleMissing:
+      'The app “{app}” is missing and this action needs it. Ask an administrator to install it from Apps.',
+    moduleMissingGeneric:
+      'An app this action needs is not installed. Ask an administrator to install it from Apps.',
+    moduleInactive:
+      'The app “{app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.',
+    moduleInactiveGeneric:
+      'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
+  },
 } as const;

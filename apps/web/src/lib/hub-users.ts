@@ -143,7 +143,13 @@ interface Envelope<T> {
   ok?: boolean;
   data?: T;
   // hub#1190: `field`/`reason` travel beside the code on an `invalid_field` refusal (ADR-0398 §6).
-  error?: { message?: string; code?: string; field?: string; reason?: string } | string;
+  // hub#1258: `module`/`query` travel beside the code on a PLATFORM refusal — `error_payload`
+  // (`crates/server/src/lib.rs`) sets `module` for `module_not_installed`/`module_inactive`/
+  // `missing_dependency` and `query` for `read_unavailable`, the same fields the SDK's
+  // `platformFailureMessage` (hub#1102) reads to name the app in its own sentence.
+  error?:
+    | { message?: string; code?: string; field?: string; reason?: string; module?: string; query?: string }
+    | string;
 }
 
 /**
@@ -159,6 +165,11 @@ export class HubUsersError extends Error {
     // so the screen translates by code instead of painting the runtime's English sentence.
     readonly field?: string,
     readonly reason?: string,
+    // hub#1258: `module`/`query` of a PLATFORM refusal (`module_not_installed`, `module_inactive`,
+    // `missing_dependency`, `read_unavailable`), so the screen names the app instead of parsing it
+    // out of a sentence — same rule as `field`/`reason` above.
+    readonly module?: string,
+    readonly query?: string,
   ) {
     super(message);
     this.name = 'HubUsersError';
@@ -186,9 +197,17 @@ function errorFieldReason(body: unknown): [string | undefined, string | undefine
   return [error.field, error.reason];
 }
 
+/** `module` and `query` of the envelope when a PLATFORM refusal names one (hub#1258). */
+function errorModuleQuery(body: unknown): [string | undefined, string | undefined] {
+  const error = (body as Envelope<unknown> | undefined)?.error;
+  if (typeof error === 'string' || !error) return [undefined, undefined];
+  return [error.module, error.query];
+}
+
 function failed(body: unknown, fallback: string): HubUsersError {
   const [field, reason] = errorFieldReason(body);
-  return new HubUsersError(errorMessage(body, fallback), errorCode(body), field, reason);
+  const [module, query] = errorModuleQuery(body);
+  return new HubUsersError(errorMessage(body, fallback), errorCode(body), field, reason, module, query);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -229,13 +248,25 @@ export class RoleActivationError extends Error {
   /** hub#1190: `field`/`reason` of an `invalid_field` refusal, so the panel translates by code. */
   readonly field?: string;
   readonly reason?: string;
+  /** hub#1258: `module`/`query` of a PLATFORM refusal — same rule as `field`/`reason` above. */
+  readonly module?: string;
+  readonly query?: string;
 
-  constructor(message: string, code?: string, field?: string, reason?: string) {
+  constructor(
+    message: string,
+    code?: string,
+    field?: string,
+    reason?: string,
+    module?: string,
+    query?: string,
+  ) {
     super(message);
     this.name = 'RoleActivationError';
     this.code = code;
     this.field = field;
     this.reason = reason;
+    this.module = module;
+    this.query = query;
   }
 }
 
@@ -254,7 +285,7 @@ export async function setRoleActivation(key: string, active: boolean): Promise<H
   const env = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     data?: HubRole[];
-    error?: { code?: string; message?: string; field?: string; reason?: string };
+    error?: { code?: string; message?: string; field?: string; reason?: string; module?: string; query?: string };
   };
   if (!res.ok || env.ok === false) {
     throw new RoleActivationError(
@@ -262,6 +293,8 @@ export async function setRoleActivation(key: string, active: boolean): Promise<H
       env.error?.code,
       env.error?.field,
       env.error?.reason,
+      env.error?.module,
+      env.error?.query,
     );
   }
   return Array.isArray(env.data) ? env.data : [];
