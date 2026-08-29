@@ -270,4 +270,64 @@ grep -q -- "$ROUTES" "$tmp_dir/gh-summary" || fail 'the step summary names the l
 grep -q -- "$ENGINE" "$tmp_dir/gh-summary" || fail 'the step summary names the synced file too'
 ok
 
+# ── 16 · A merge ref TREESAME to the PR side still sees the base branch's history ────
+# On a pull request HEAD is the merge of the base branch into the PR. When the PR already carried
+# the base's hunk (a cherry-pick, the same route added twice), the merge takes the PR's blob whole
+# and `git rev-list <ref> -- <path>` — default history simplification — follows ONLY that parent:
+# the base branch's version of the file, which is exactly what the toolkit copied, would come out
+# as "content the hub never had" and the canonical would go red with a lie. `--full-history` is
+# what keeps every reachable version in view.
+new_hub; toolkit_in_sync
+git_q -C "$hub" checkout -q -b pr
+write_hub "$ROUTES" $'# routes\nGET     /api/c    auth:session\nGET     /api/a    auth:none\nGET     /api/b    auth:session\nGET     /api/d    auth:none\n'
+hub_commit 'pr: +GET /api/c at the top, +GET /api/d at the bottom'
+git_q -C "$hub" checkout -q develop
+write_hub "$ROUTES" $'# routes\nGET     /api/c    auth:session\nGET     /api/a    auth:none\nGET     /api/b    auth:session\n'
+hub_commit 'develop: +GET /api/c at the top'
+cp "$hub/$ROUTES" "$toolkit/$ROUTES"   # the copy was synced from develop
+git_q -C "$hub" merge -q --no-edit pr || fail 'the merge in case 16 must be clean (identical top hunk)'
+[ "$(git -C "$hub" rev-parse HEAD:$ROUTES)" = "$(git -C "$hub" rev-parse pr:$ROUTES)" ] ||
+    fail 'case 16 needs the merge ref TREESAME to the PR side'
+run --toolkit-outcome failure
+expect_status 0 'a copy synced from the base branch is BEHIND on a merge ref TREESAME to the PR side, not divergent (hub#1296)'
+expect_out "::warning file=$ROUTES" 'the lagging copy is named in a warning'
+expect_not_out 'diverge' 'a version the base branch had is not "content the hub never had"'
+expect_output_var verdict behind 'the merge-ref case reports verdict=behind'
+ok
+
+# ── 17 · Toolkit failed, copy behind, and the change ADDS a file to contracts/kernel/ → red ──
+# The SET of files under `contracts/kernel/` is a hand-ported list in the toolkit
+# (`KERNEL_CONTRACT_FILES` + `KERNEL_CONTRACT_NOT_MIRRORED`, module-toolkit#115/#121), and its
+# `sync-mirrors` copies only what that list names. A sixth surface is therefore a change this
+# verdict cannot classify — the same rule as the Rust sources — and a lagging copy elsewhere
+# must not downgrade it to a warning: "nothing is downgraded blind".
+new_hub; toolkit_in_sync
+write_hub "$ROUTES" "$routes_v2"
+write_hub 'contracts/kernel/events.snapshot' $'# events\n'
+hub_commit 'c2: +GET /api/c +a sixth frozen surface'
+run --toolkit-outcome failure
+expect_status 1 'a new file under contracts/kernel/ changes the set the toolkit enumerates by hand: red, even with another copy behind'
+expect_out 'contracts/kernel/events.snapshot' 'the new file is named'
+expect_out 'Depends-On' 'the error points at the pair rule'
+ok
+
+# ── 18 · The sixth surface alone (nothing behind) is named, not just "another reason" ────
+new_hub; toolkit_in_sync
+write_hub 'contracts/kernel/events.snapshot' $'# events\n'
+hub_commit 'c2: a sixth frozen surface'
+run --toolkit-outcome failure
+expect_status 1 'a sixth surface with every copy in sync is still red'
+expect_out 'contracts/kernel/events.snapshot' 'the new file is named so nobody hunts through the toolkit log'
+ok
+
+# ── 19 · Editing prose the toolkit does not mirror is NOT a set change → still a warning ──
+new_hub; toolkit_in_sync
+write_hub 'contracts/kernel/README.md' $'# kernel\nv1\n'; hub_commit 'c2: the README the toolkit does not mirror'
+write_hub 'contracts/kernel/README.md' $'# kernel\nv2\n'; write_hub "$ROUTES" "$routes_v2"
+hub_commit 'c3: +GET /api/c, README edited'
+run --toolkit-outcome failure
+expect_status 0 'a modified README.md (not mirrored, module-toolkit#121) is not a change of the set: the lagging copy stays a warning'
+expect_not_out 'README.md' 'the README is not named as a set change'
+ok
+
 printf 'PASS: %d canonical-mirrors verdict cases\n' "$passed"

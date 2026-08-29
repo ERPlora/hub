@@ -34,8 +34,10 @@
 # its outcome in (`--toolkit-outcome`). A failure with nothing BEHIND is a failure for ANOTHER
 # reason — a hand-ported list (`BRIDGE_FUNCTIONS`, `RETIRED_FIELDS`, `CORE_QUERIES`,
 # `GRANDFATHERED`), a broken reader — and stays red. So does a failure on a change that touched
-# the SOURCES of those lists: this script cannot tell an addition from a retirement inside Rust,
-# so it does not pretend to, and the pair rule applies as before.
+# the SOURCES of those lists — this script cannot tell an addition from a retirement inside Rust,
+# so it does not pretend to — or that ADDED or DROPPED a file under `contracts/kernel/`: the set
+# of that directory is itself a hand-ported list in the toolkit (`KERNEL_CONTRACT_FILES`). The
+# pair rule applies to both, as before.
 #
 # Usage:
 #   canonical-mirrors-verdict.sh --hub <checkout> --toolkit <checkout>
@@ -160,6 +162,12 @@ vendored=$(TOOLKIT_SYNC_SCRIPT="$toolkit/scripts/sync-hub-mirrors.mjs" node --in
 rm -f "${TMPDIR:-/tmp}/mirrors-verdict-import.$$"
 
 # Whether a blob ever sat at `path` in the history reachable from `ref`.
+#
+# `--full-history` is not optional. On a pull request `ref` is the merge of the base branch into
+# the PR; when the PR already carried the base's hunk (a cherry-pick, the same route added twice)
+# that merge is TREESAME to the PR side and the default simplification of `rev-list -- <path>`
+# follows ONLY that parent — the base branch's version of the file, which is exactly what the
+# toolkit copied, would come out as "never in the hub" and the canonical would go red with a lie.
 in_hub_history() { # $1=blob $2=path
     local commit blob_at
     while read -r commit; do
@@ -169,7 +177,7 @@ in_hub_history() { # $1=blob $2=path
             return 0
         fi
     done <<EOF
-$(git -C "$hub" rev-list "$ref" -- "$2")
+$(git -C "$hub" rev-list --full-history "$ref" -- "$2")
 EOF
     return 1
 }
@@ -255,17 +263,34 @@ case "$toolkit_outcome" in
     '' | success)
         ;;
     failure)
+        # What this change touched that the toolkit ports BY HAND — named first, whether or not a
+        # copy is behind, so the red says which file and not "read the log". Two kinds:
+        #   · the Rust/TS sources of the hand-ported lists (`PARSED_LIST_SOURCES`);
+        #   · the SET of files under `contracts/kernel/`: the toolkit enumerates it by hand
+        #     (`KERNEL_CONTRACT_FILES` + `KERNEL_CONTRACT_NOT_MIRRORED`, module-toolkit#115/#121),
+        #     asserts the hub's directory against it and copies only what it names — so a sixth
+        #     surface is a change of that list, not a copy that can catch up on its own.
+        #     Additions and deletions only (`--no-renames` so a rename counts as both): editing
+        #     the README the toolkit deliberately does not mirror is not a change of the set.
+        touched=''
+        if git -C "$hub" rev-parse --verify --quiet "${base}^{commit}" > /dev/null; then
+            # Word-splitting is the point: one pathspec per line of the list.
+            # shellcheck disable=SC2086
+            touched=$(git -C "$hub" diff --name-only "$base" "$ref" -- $PARSED_LIST_SOURCES)
+            kernel_set=$(git -C "$hub" diff --name-only --no-renames --diff-filter=AD "$base" "$ref" -- 'contracts/kernel/')
+            if [ -n "$kernel_set" ]; then
+                touched="${touched}${touched:+
+}${kernel_set}"
+            fi
+        fi
+        if [ -n "$touched" ]; then
+            die "the toolkit's mirrors failed and this change also touches $(printf '%s' "$touched" | tr '\n' ' '), whose toolkit mirrors are hand-ported lists this verdict cannot classify (the set of \`contracts/kernel/\` is one of them) — $pair_hint"
+        fi
         if [ "$behind" -eq 0 ]; then
             die "the toolkit's mirrors failed for another reason than a lagging copy (every vendored file is in sync): a hand-ported list or its reader — read the toolkit step's log"
         fi
         git -C "$hub" rev-parse --verify --quiet "${base}^{commit}" > /dev/null ||
             die "the toolkit's mirrors failed and \`$base\` does not resolve, so which sources this change touched is unknown — checking out with history (fetch-depth: 0) is what makes this decidable"
-        # Word-splitting is the point: one pathspec per line of the list.
-        # shellcheck disable=SC2086
-        touched=$(git -C "$hub" diff --name-only "$base" "$ref" -- $PARSED_LIST_SOURCES)
-        if [ -n "$touched" ]; then
-            die "the toolkit's mirrors failed and this change also touches $(printf '%s' "$touched" | tr '\n' ' '), whose toolkit mirrors are hand-ported lists this verdict cannot classify — $pair_hint"
-        fi
         annotate notice '' "the toolkit's mirrors failed only because its copies are behind an additive change: not a reason to block the canonical (hub#1296)"
         ;;
     *)
