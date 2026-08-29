@@ -863,6 +863,22 @@ pub struct RequestContext {
     /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
     /// muestren el estado SIN leer la tabla de sistema directamente.
     pub has_certificate: bool,
+    /// **Este hub es una DEMO efímera** (`Registry::demo_hub`, sellado en el arranque desde
+    /// `HUB_DEMO` — ADR-0197, hub#1135). El dispatcher lo copia aquí junto a la identidad de
+    /// negocio, EXACTAMENTE el mismo patrón que [`Self::has_certificate`]: una condición del hub
+    /// que un módulo necesita para pintar (verifactu#40 — no ofrecer «Producción» en una demo que
+    /// `enforce_fiscal_environment_pin` va a negar siempre), sondeada por el runtime y expuesta
+    /// como 0/1 para que el SQL nunca lea una tabla de sistema.
+    ///
+    /// Es una COPIA de solo lectura para `system_params`, nunca la fuente de la verdad: el
+    /// cierre fiscal (`fiscal_environment_pin`, `fiscal_profile::determine_fiscal_mode`…) sigue
+    /// leyendo `Registry::demo_hub` DIRECTAMENTE, no este campo — por la misma razón que
+    /// `Registry::demo_hub` documenta: un `ctx` es una etiqueta que una puerta nueva podría
+    /// olvidar estampar, y el cierre no se puede permitir ese fallo abierto. Este campo solo
+    /// existe para que `system_params` tenga algo que leer; jamás lo escribe un caller —
+    /// `system_params` lo sobrescribe con el valor de `ctx` después de clonar el payload, igual
+    /// que `hub_id` o `has_certificate`.
+    pub is_demo_hub: bool,
     /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
     /// inyecta el dispatcher junto a la identidad de negocio.
     ///
@@ -1022,6 +1038,7 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            is_demo_hub: false,
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
             fiscal_providers: Vec::new(),
@@ -1168,6 +1185,14 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Copia con la marca de DEMO efímera del hub (hub#1135). Lo rellena el dispatcher junto a
+    /// `with_business`/`with_certificate`, leyendo `Registry::demo_hub` — nunca el caller. Builder
+    /// para no romper los `new(...)`/tests existentes.
+    pub fn with_demo_hub(mut self, is_demo: bool) -> Self {
+        self.is_demo_hub = is_demo;
         self
     }
 

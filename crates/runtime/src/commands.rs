@@ -231,6 +231,11 @@ pub(crate) async fn execute_at(
             // default era un duplicado que podía pudrirse (taxes#40 lo demostró).
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
+            // La marca de DEMO efímera (ADR-0197, hub#1135): copiada de `Registry::demo_hub`,
+            // nunca del caller — MISMO patrón que `with_certificate` justo arriba, para que
+            // `system_params` exponga `:is_demo_hub` sin que ningún módulo tenga que sondear el
+            // registry por su cuenta.
+            .with_demo_hub(registry.demo_hub)
             // Which AEAT this hub files to (ADR-0360, hub#1087): from the profile, next to the
             // mode it feeds. The certificate arm of `enforce_fiscal_precondition` reads it —
             // in `testing` there is nothing to authorize.

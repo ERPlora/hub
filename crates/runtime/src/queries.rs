@@ -176,7 +176,11 @@ pub async fn execute_page(
                     .unwrap_or_else(|_| "UTC".to_string()),
             )
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
-            .with_certificate(has_cert);
+            .with_certificate(has_cert)
+            // La marca de DEMO efímera (ADR-0197, hub#1135), MISMO patrón que `with_certificate`:
+            // copiada de `Registry::demo_hub`, nunca del caller, para que TODA query (no solo los
+            // commands) vea `:is_demo_hub` en vivo.
+            .with_demo_hub(registry.demo_hub);
         &enriched_ctx
     } else {
         ctx
