@@ -308,6 +308,100 @@ async fn a_discard_without_a_body_still_closes_the_row() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
+/// A dead-letter closed by hand a NEIGHBOUR hub owns. In production ADR-0201 gives each hub its
+/// own database, but the row contract (`hub_id` on every row) is what the door actually enforces,
+/// so the test puts a foreign row where a leak would show.
+async fn seed_foreign_discarded(db: &dyn DatabaseAdapter) {
+    let mut p = Params::new();
+    p.insert("at".into(), json!("2026-08-09T10:00:00+00:00"));
+    db.execute(
+        "INSERT INTO _event_outbox \
+         (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, status, \
+          attempts, next_attempt_at, last_error, created_at, discarded_at, discarded_by, \
+          discard_reason) \
+         VALUES ('evt-theirs-closed', 'hub-someone-else', 'u', '[]', 'flow.reminder.due', 'flows', \
+                 '{}', 0, 'discarded', 7, :at, 'host.notify: the hub is not enrolled', :at, :at, \
+                 'hub_user:neighbour-admin', 'el motivo del vecino')",
+        &p,
+    )
+    .await
+    .unwrap();
+}
+
+/// **The reason survives the close and a screen can read it back** (hub#1117).
+///
+/// Discarding with a reason worked and stored all three parts of the stamp; no route projected any
+/// of them. `…/dead` filters `status='dead'`, so closing a row took it out of the only listing
+/// there was, and `…/{id}/trace` returns the status without who/when/why. The tray's own promise —
+/// «el hub guarda quién cerró cada uno, cuándo y por qué durante noventa días» — was checkable only
+/// with `psql`, which is the same as not being checkable.
+///
+/// This is the whole round trip over HTTP: close a row with a reason, then READ it back from a
+/// different request, the way `ERPlora/flows#47` draws its «Cerradas (últimos 90 días)» after a
+/// reload — the section it has today lives in the component's `@state` and dies with it.
+#[tokio::test]
+async fn the_discarded_listing_reads_back_the_whole_stamp_hub1117() {
+    let f = fixture().await;
+    seed_foreign_discarded(&f.db.adapter().await).await;
+
+    // Nothing has been closed in THIS hub yet — and the neighbour's closed row is already there.
+    let before =
+        body_json(send(&f.router, request("GET", "/api/hub/events/discarded", Some(&f.admin))).await)
+            .await;
+    assert_eq!(
+        before["data"].as_array().unwrap().len(),
+        0,
+        "a neighbour's closed row is never ours, not even when the listing is otherwise empty"
+    );
+
+    let discarded = send(
+        &f.router,
+        json_request(
+            "POST",
+            &format!("/api/hub/events/{DEAD_ID}/discard"),
+            Some(&f.admin),
+            json!({ "reason": "duplicada: la factura se registró a mano" }),
+        ),
+    )
+    .await;
+    assert_eq!(discarded.status(), StatusCode::OK);
+
+    // It left the queue that asks for attention…
+    let dead = body_json(send(&f.router, request("GET", "/api/hub/events/dead", Some(&f.admin))).await).await;
+    assert_eq!(dead["data"].as_array().unwrap().len(), 0, "closing it drains the queue");
+
+    // …and a SEPARATE request reads the whole stamp back. No `psql`, no reload of the component.
+    let body =
+        body_json(send(&f.router, request("GET", "/api/hub/events/discarded", Some(&f.admin))).await)
+            .await;
+    assert_eq!(body["ok"], true);
+    let rows = body["data"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "only this hub's closed row");
+    assert_eq!(rows[0]["id"], DEAD_ID);
+    assert_eq!(rows[0]["event_name"], "sale.closed");
+    assert_eq!(
+        rows[0]["discard_reason"], "duplicada: la factura se registró a mano",
+        "WHY — the half only the person closing the row knew"
+    );
+    assert_eq!(
+        rows[0]["discarded_by"], format!("hub_user:{}", f.admin_id),
+        "WHO — the resolved session"
+    );
+    assert!(
+        rows[0]["discarded_at"].as_str().is_some_and(|s| !s.is_empty()),
+        "WHEN — and it is also the row's ninety-day clock"
+    );
+    assert!(
+        rows[0]["last_error"].as_str().is_some_and(|s| s.contains("permission_denied")),
+        "why it died in the first place travels too"
+    );
+    // The listing of a CLOSED row is the stamp, not the cargo: the payload is what an operator
+    // still deciding needs, and this decision is made. `…/dead` remains the read that carries it.
+    assert!(rows[0].get("payload").is_none(), "a closed row's payload is not part of this read");
+
+    std::fs::remove_dir_all(f.temp).ok();
+}
+
 /// The door: anonymous is 401, a logged-in NON-admin is 403 (authenticated, just not allowed), and
 /// a valid API key is refused outright — the key only ever speaks `/api/v1`.
 #[tokio::test]
@@ -322,6 +416,9 @@ async fn only_an_owner_or_admin_session_operates_the_queue() {
         // The trace draws what every automation of this hub did — the shape of the business. Same
         // door (hub#666).
         ("GET", format!("/api/hub/events/{DEAD_ID}/trace")),
+        // The closed rows carry who decided what, and why (hub#1117). An audit listing is not a
+        // laxer read than the queue it audits.
+        ("GET", "/api/hub/events/discarded".to_string()),
     ];
 
     for (method, uri) in &routes {

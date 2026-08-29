@@ -652,10 +652,14 @@ fn detalle_de_entrada(e: &Json) -> Result<Detalle, VerifactuError> {
     })
 }
 
-fn desglose(record: &Json) -> Result<String, VerifactuError> {
+/// Reads an invoice `tax_breakdown` into its breakdown lines, accepting BOTH generations of the
+/// contract described above. An empty or unreadable breakdown is NOT an error here: it is zero
+/// lines, and the caller decides what stands in for them (`desglose` the row's own rate,
+/// `breakdown_rates` nothing). What does fail is a line that declares amounts nobody can read —
+/// that is the record that cannot be declared (hub#324).
+fn detalles_del_desglose(tax_breakdown: &str) -> Result<Vec<Detalle>, VerifactuError> {
     let mut lines: Vec<Detalle> = Vec::new();
-
-    match serde_json::from_str::<Json>(&s(record, "tax_breakdown")) {
+    match serde_json::from_str::<Json>(tax_breakdown) {
         // Formato nuevo: una entrada por clave fiscal completa.
         Ok(Json::Array(entries)) => {
             for e in &entries {
@@ -678,6 +682,24 @@ fn desglose(record: &Json) -> Result<String, VerifactuError> {
         }
         _ => {}
     }
+    Ok(lines)
+}
+
+/// The TAX RATES (%) a `tax_breakdown` declares, one per breakdown line and in the order they
+/// come. An empty or unreadable breakdown, or one whose amounts cannot be read → no declared
+/// rates; the caller decides what to do with that gap.
+///
+/// It exists so that the row's `tax_rate` column reads the breakdown through the SAME parser the
+/// XML is built from, instead of through a copy that understood only one of the two generations
+/// (hub#1198).
+pub(crate) fn breakdown_rates(tax_breakdown: &str) -> Vec<f64> {
+    detalles_del_desglose(tax_breakdown)
+        .map(|lines| lines.iter().map(|d| d.rate).collect())
+        .unwrap_or_default()
+}
+
+fn desglose(record: &Json) -> Result<String, VerifactuError> {
+    let mut lines = detalles_del_desglose(&s(record, "tax_breakdown"))?;
     if lines.is_empty() {
         // Facturas anteriores al campo (`'{}'`), o un desglose ilegible: el tipo efectivo de una
         // factura de tipo único ES su tipo real, y `Desglose` no puede quedarse sin detalle.

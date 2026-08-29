@@ -182,6 +182,11 @@ const KNOWN: &[Setting] = &[
 /// Locales soportados por el hub (espejo del contrato del frontend, ADR-0055).
 const SUPPORTED_LOCALES: &[&str] = &["es", "en"];
 
+/// El idioma por defecto del papel y de la UI. Es `es` y no `en` a propósito: el inglés es el
+/// idioma FUENTE de las cadenas (ADR-0055/0199), pero el papel que imprime hoy toda la flota está
+/// en español, y un default distinto lo movería en cada cocina a la vez.
+const DEFAULT_LANGUAGE: &str = "es";
+
 fn find(key: &str) -> Option<&'static Setting> {
     KNOWN.iter().find(|s| s.key == key)
 }
@@ -343,6 +348,36 @@ pub async fn pin_length_of(db: &dyn DatabaseAdapter, hub_id: &str) -> i64 {
     stored
         .filter(|n| crate::pin_policy::PIN_LENGTHS.contains(n))
         .unwrap_or(crate::pin_policy::DEFAULT_PIN_LENGTH)
+}
+
+/// **El idioma del negocio** (hub#1159): la clave `language`, o `es` si no está declarada.
+///
+/// Es lo que decide en qué idioma sale el PAPEL — el renderizador ESC/POS lleva su propio
+/// catálogo de etiquetas y elige columna con esto ([`crate::print_queue::enqueue`] lo sella en
+/// cada documento). Tolerante como el resto del módulo: una fila corrupta, un idioma que ya no
+/// soportamos o una tabla que aún no existe degradan al default en vez de dejar sin comanda a una
+/// cocina en hora punta.
+pub async fn language_of(db: &dyn DatabaseAdapter, hub_id: &str) -> String {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("key".into(), json!("language"));
+    let stored = match db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
+        .await
+    {
+        Ok(res) => res
+            .rows
+            .first()
+            .and_then(|r| r["value"].as_str())
+            .map(|s| s.trim().to_ascii_lowercase()),
+        Err(_) => None,
+    };
+    stored
+        .filter(|l| SUPPORTED_LOCALES.contains(&l.as_str()))
+        .unwrap_or_else(|| DEFAULT_LANGUAGE.to_string())
 }
 
 /// La zona horaria del negocio: la clave `timezone` si está declarada y vale, si no la deducida de

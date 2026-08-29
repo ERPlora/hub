@@ -1,6 +1,6 @@
 // Contrato UI del panel «Importar configuración» — pestaña Datos de Ajustes
 // (ADR-0113 §4, architecture/hub/export-import.md; decisión del humano 2026-07-12:
-// import/export viven JUNTOS en /settings?tab=data, ya no hay página /import).
+// import/export viven JUNTOS en /settings#data, ya no hay página /import).
 //
 // Tres pasos: (1) elegir fuente — zip local; «desde la nube» aún no existe (el registro de
 // blueprints del SaaS es una tanda posterior) → botón deshabilitado con nota "próximamente" —,
@@ -24,11 +24,13 @@ interface Session {
 /** Sesión REAL del runtime vía `/api/auth/pin` (usuario Demo / PIN 0000 del seed de dev). */
 async function loginByPin(): Promise<Session> {
   const api = await pwRequest.newContext();
-  // Names the device the dev seed marked as trusted (`demo-trusted-device`). Device-trust is armed
-  // by default since hub#330: a PIN login that identifies no device is refused, which is exactly
-  // what a browser on a fresh till gets — so naming it here is the real contract, not a workaround.
+  // The device identifies itself, exactly as the browser of a real till does (hub#330: a PIN login
+  // that identifies no device is refused). The bank disarms the trust gate with
+  // `HUB_DEVICE_TRUST=off` (see `playwright.config.ts`) because the id a browser mints is random
+  // and there is nothing to pre-trust in an ephemeral bank — it used to buy that with `HUB_DEMO=1`,
+  // which turned the whole hub into a demo and broke the export round trip (hub#1249).
   const res = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '0000', device_id: 'e2e-browser-device' },
   });
   expect(res.ok(), `login PIN falló: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = await res.json();
@@ -54,10 +56,13 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
   }) => {
     await withSession(page, await loginByPin());
 
-    await page.goto('/settings?tab=data');
+    // Deep-link a la pestaña Datos por HASH. Era `?tab=data`; `SettingsPage.vue` resuelve la
+    // pestaña desde `route.hash` y reescribe la URL a `#<tab>`, así que la query ya no
+    // seleccionaba nada y estos specs llevaban rotos sin que nadie los corriera (hub#1240).
+    await page.goto('/settings#data');
 
     // El hub vacío es quien más necesita importar: navega a /settings sin desvíos.
-    await expect(page).toHaveURL(/\/settings\?tab=data$/);
+    await expect(page).toHaveURL(/\/settings#data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
 
     // Rediseño 2026-07-17: la card «subir desde archivo» SIEMPRE está a la vista (ya no un botón).
@@ -69,6 +74,13 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await expect(page.getByTestId('import-cloud-loading')).toHaveCount(0);
   });
 
+  // Regression test for ERPlora/hub#1249 — el round-trip export→import PERDÍA los usuarios.
+  //
+  // No era el motor: era el BANCO. Este runtime arrancaba como hub de dev + demo, y en un hub que
+  // el core no considera un negocio real el export fuerza `purpose: template` (hub#377, ADR-0195),
+  // que excluye las identidades del zip. El manifest llegaba con ajustes y media, sin usuarios, y
+  // nadie se enteraba. El banco es ahora un hub real (`playwright.config.ts`), así que esta prueba
+  // vuelve a decir lo que dice su nombre: la copia de un hub se puede volver a importar ENTERA.
   test('inspeccionar un zip muestra el manifest y al importar sale el informe', async ({ page }) => {
     const session = await loginByPin();
 
@@ -94,7 +106,7 @@ test.describe('importar configuración (Ajustes → Datos)', () => {
     await api.dispose();
 
     await withSession(page, session);
-    await page.goto('/settings?tab=data');
+    await page.goto('/settings#data');
 
     // Paso 2: subir el zip → inspect → resumen del manifest + secciones DETECTADAS. Fiscal no
     // viajó (OFF en el export) → su checkbox NO aparece.

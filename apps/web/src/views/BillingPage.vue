@@ -150,6 +150,7 @@ import {
 } from '../lib/cloud';
 import { cloudApiUrlReady, config } from '../lib/config';
 import { formatAmount } from '../lib/money';
+import { formatDate } from '../lib/format-datetime';
 
 type BillingTab = 'invoices' | 'subscriptions' | 'payments';
 type BillingLoadState = 'loading' | 'ready' | 'auth-required' | 'error';
@@ -248,14 +249,14 @@ function onTabChange(ev: Event): void {
 
 // --- Formatters ---
 function fmtDate(iso: string): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return (
+    formatDate(iso, {
+      locale: locale.value,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }) ?? '—'
+  );
 }
 
 // Formateo con la moneda DE LA FACTURA (las facturas del Cloud traen su propia divisa); sin divisa

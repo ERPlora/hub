@@ -167,6 +167,47 @@ impl CompiledSchema {
     }
 }
 
+/// The FIELD NAMES a [`CompiledSchema::validate`] detail names — hub#1094.
+///
+/// The Settings screen the shell generates for any module swallowed its 422: the person pressed
+/// «Save», the runtime answered `invalid_payload`, and the screen stayed exactly as it was. To mark
+/// the controls the runtime refused, the screen needs the names — and in this house such a list
+/// travels as a FIELD of the error envelope, never parsed out of the sentence by the client (the
+/// rule `permission` in hub#360 and `dependents` in hub#1101 already follow).
+///
+/// So the split lives here, right under the `format!` that produces the detail: producer and reader
+/// are two halves of ONE format, and keeping them apart is how a format changes and the far end
+/// quietly stops understanding it. The tests feed real `validate()` output through this to pin both.
+///
+/// Rules, all deliberately conservative:
+/// - Only chunks that begin with a JSON Pointer (`/…`) count. The ~25 doors that raise
+///   `InvalidPayload` by hand write free prose with no pointer, and prose must yield NOTHING rather
+///   than an invented field name.
+/// - A violation of the object itself (a missing `required` key) carries an EMPTY instance path and
+///   so names no field. An empty name would mark no control and make the refusal look understood.
+/// - A nested pointer names its ROOT property: that is the control the form paints.
+/// - Order of first appearance, no duplicates — two violations of one field are one bad field.
+pub fn invalid_payload_fields(detail: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for chunk in detail.split("; ") {
+        let Some(pointer) = chunk.strip_prefix('/') else {
+            continue;
+        };
+        // `{path}: {e}` — the pointer ends at the first `: ` the formatter wrote.
+        let pointer = pointer.split_once(": ").map(|(p, _)| p).unwrap_or(pointer);
+        let Some(root) = pointer.split('/').next().filter(|s| !s.is_empty()) else {
+            continue;
+        };
+        // RFC 6901: `~1` is a literal `/` and `~0` a literal `~`. Undo in that order or a name
+        // containing `~1` would come back mangled.
+        let name = root.replace("~1", "/").replace("~0", "~");
+        if !out.contains(&name) {
+            out.push(name);
+        }
+    }
+    out
+}
+
 /// El tipo numérico que una propiedad de schema declara (hub#1092). `None` = no declara
 /// `number`/`integer` (o declara otra cosa): el bind sigue tipado por el valor, como siempre.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -918,6 +959,20 @@ pub struct RequestContext {
     /// route able to stamp it could file its events under somebody else's execution, which makes
     /// the whole audit trail worth exactly nothing.
     parent_event_id: String,
+    /// Ids of installed modules the SaaS entitlement no longer grants this hub (hub#1175):
+    /// retired or revoked, per the hybrid revalidation that lives in `erplora-server`
+    /// (`crate::entitlement` there, `RevalidationState::blocked_modules`). The runtime has no way
+    /// to know this on its own — it has no view of the SaaS's signed claims, only of what is
+    /// installed and active in THIS hub's own tables — so the server stamps the set on the way
+    /// in, the same shape as [`Self::permissions`]. Empty by default: every context nobody
+    /// populated (dev mode, tests, a machine principal, `erplora-server` builds that predate this
+    /// field) keeps seeing every installed module unfiltered, exactly like today.
+    ///
+    /// `pub`, not `pub(crate)`: unlike [`Self::automation`] this carries no privilege — a caller
+    /// that lied and claimed nothing is blocked would only get back the pre-hub#1175 behaviour
+    /// (an item that points at a route the dispatcher's own entitlement gate still refuses), never
+    /// an escalation.
+    pub blocked_modules: HashSet<String>,
 }
 
 /// Identity of the flow behind an automation request: which flow, and which of its runs.
@@ -976,6 +1031,7 @@ impl RequestContext {
             approved_by: None,
             automation: None,
             parent_event_id: String::new(),
+            blocked_modules: HashSet::new(),
         }
     }
 
@@ -1145,6 +1201,95 @@ pub(crate) fn new_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── hub#1094: invalid_payload_fields ───────────────────────────────────────────────────
+    //
+    // The Settings screen the shell generates for ANY module swallowed the 422: the user pressed
+    // «Save», the request came back `invalid_payload` and the screen stayed exactly as it was. To
+    // say WHICH field the runtime refused, the screen needs the field NAMES — and the house rule
+    // is that such a list travels as a FIELD of the envelope, never parsed out of the sentence by
+    // the client (same as `permission` in hub#360 and `dependents` in hub#1101).
+    //
+    // So the split lives HERE, one function below the `format!` that produces the detail. Producer
+    // and reader are adjacent on purpose: they are the two halves of one format, and a test that
+    // feeds `validate()`'s real output through it cannot drift apart in silence.
+
+    /// The round trip that matters: what `CompiledSchema::validate` really emits, parsed back.
+    #[test]
+    fn field_names_survive_the_round_trip_from_a_real_validation_failure() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "auto_bump_delay_seconds": { "type": "integer" },
+                "default_order_type": { "type": "string", "enum": ["dine_in", "takeaway"] },
+            },
+            "required": ["auto_bump_delay_seconds", "default_order_type"],
+        }));
+        // Exactly the payload the generic form sends for a module that declares `required`
+        // properties with no `default`: nulls and empty strings (hub#1094 causa 3).
+        let detail = schema
+            .validate(&serde_json::json!({
+                "auto_bump_delay_seconds": null,
+                "default_order_type": "",
+            }))
+            .expect_err("este payload NO cumple el schema");
+
+        let mut fields = invalid_payload_fields(&detail);
+        fields.sort();
+        assert_eq!(
+            fields,
+            vec!["auto_bump_delay_seconds", "default_order_type"]
+        );
+    }
+
+    /// A violation of the object ITSELF (a missing required key) has an empty instance path, so it
+    /// names no field. It must not become a phantom entry: an empty name would mark no control on
+    /// screen and the message would look like it had been understood when it had not.
+    #[test]
+    fn a_violation_with_no_instance_path_names_no_field() {
+        let schema = compiled(serde_json::json!({
+            "type": "object",
+            "properties": { "warning_time_minutes": { "type": "integer" } },
+            "required": ["warning_time_minutes"],
+        }));
+        let detail = schema
+            .validate(&serde_json::json!({}))
+            .expect_err("falta una propiedad obligatoria");
+
+        assert!(
+            invalid_payload_fields(&detail).is_empty(),
+            "sin ruta de instancia no hay campo que nombrar, got {detail}"
+        );
+    }
+
+    /// The refusals of the OTHER 25 doors that raise `InvalidPayload` by hand are free prose with
+    /// no pointer in them (`device_mode`, `pin_policy`, `roles`…). They must yield nothing rather
+    /// than a made-up field name.
+    #[test]
+    fn a_hand_written_refusal_without_pointers_yields_no_fields() {
+        assert!(invalid_payload_fields("modo de dispositivo desconocido: `kiosko`").is_empty());
+    }
+
+    /// Nested pointers name their ROOT property: that is the control the form paints, and the one
+    /// the screen can mark. Duplicates collapse — two violations of one field are one bad field.
+    #[test]
+    fn a_nested_pointer_names_the_root_property_once() {
+        assert_eq!(
+            invalid_payload_fields("/lines/0/qty: null is not of type \"integer\"; /lines/1/qty: null is not of type \"integer\""),
+            vec!["lines"],
+        );
+    }
+
+    /// RFC 6901: a property whose name carries `/` or `~` arrives escaped (`~1`, `~0`) in the
+    /// pointer. The screen keys its controls by the RAW property name, so the escape has to be
+    /// undone — and in the right order, or `a~1b` would come back as `a/b` twice removed.
+    #[test]
+    fn an_escaped_property_name_comes_back_unescaped() {
+        assert_eq!(
+            invalid_payload_fields("/rate~1kg: null is not of type \"number\"; /tilde~0x: bad"),
+            vec!["rate/kg", "tilde~x"],
+        );
+    }
 
     // ── hub#1092: coerce_declared_number_shapes ─────────────────────────────────────────────
 

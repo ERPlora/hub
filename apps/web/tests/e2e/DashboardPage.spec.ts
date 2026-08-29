@@ -4,7 +4,7 @@
 // exportar el hub). DECISIÓN del humano (2026-07-12): es un widget DEL BOARD, igual que los de
 // módulo — entra en el catálogo de <ok-widget-board> y en todos los presets (activo por defecto
 // sin estado guardado), y el picker permite ocultarlo como a cualquier otro. Sus CTAs llevan a
-// la pestaña «Datos» de Ajustes (/settings?tab=data), donde viven importar y exportar juntos.
+// la pestaña «Datos» de Ajustes (/settings#data), donde viven importar y exportar juntos.
 //
 // CONTRATO (2026-07-12, retirada de /first-run): un hub VACÍO entra DIRECTO al dashboard. Ya no
 // hay guard que desvíe a una pantalla de primer arranque — la puesta en marcha vive en core
@@ -22,11 +22,13 @@ interface Session {
 /** Sesión REAL del runtime vía `/api/auth/pin` (usuario Demo / PIN 0000 del seed de dev). */
 async function loginByPin(): Promise<Session> {
   const api = await pwRequest.newContext();
-  // Names the device the dev seed marked as trusted (`demo-trusted-device`). Device-trust is armed
-  // by default since hub#330: a PIN login that identifies no device is refused, which is exactly
-  // what a browser on a fresh till gets — so naming it here is the real contract, not a workaround.
+  // The device identifies itself, exactly as the browser of a real till does (hub#330: a PIN login
+  // that identifies no device is refused). The bank disarms the trust gate with
+  // `HUB_DEVICE_TRUST=off` (see `playwright.config.ts`) because the id a browser mints is random
+  // and there is nothing to pre-trust in an ephemeral bank — it used to buy that with `HUB_DEMO=1`,
+  // which turned the whole hub into a demo and broke the export round trip (hub#1249).
   const res = await api.post(`${RUNTIME}/api/auth/pin`, {
-    data: { name: 'Demo', pin: '0000', device_id: 'demo-trusted-device' },
+    data: { name: 'Demo', pin: '0000', device_id: 'e2e-browser-device' },
   });
   expect(res.ok(), `login PIN falló: ${res.status()} ${await res.text()}`).toBeTruthy();
   const body = await res.json();
@@ -72,7 +74,9 @@ test.describe('widget core de export/import en la home', () => {
 
     // El CTA → pestaña Datos de Ajustes, que aterriza en la sección de importar.
     await board.getByTestId('dashboard-blueprint-cta').click();
-    await expect(page).toHaveURL(/\/settings\?tab=data$/);
+    // La pestaña se selecciona por HASH (`SettingsPage.vue` lee `route.hash` y reescribe la
+    // URL): el `?tab=data` de antes ya no abría nada, y este spec llevaba rojo sin correr.
+    await expect(page).toHaveURL(/\/settings#data$/);
     await expect(page.getByTestId('import-lead')).toBeVisible();
   });
 });

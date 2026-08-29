@@ -111,10 +111,10 @@
               label-placement="floating"
               inputmode="numeric"
               :label="t('employeeForm.pin')"
-              :helper-text="form.local ? t('employeeForm.localPinHelp') : t('employeeForm.accountPinHelp')"
-              :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`) : ''"
+              :helper-text="form.local ? t('employeeForm.localPinHelp', { n: hubPinLength }) : t('employeeForm.accountPinHelp', { n: hubPinLength })"
+              :error-text="pinIssue ? t(`employeeForm.errors.${pinIssue}`, { n: hubPinLength }) : ''"
               :class="{ 'ion-invalid ion-touched': Boolean(pinIssue) }"
-              :maxlength="8"
+              :maxlength="hubPinLength"
             />
             <ion-button
               type="submit"
@@ -214,10 +214,13 @@ import {
   type HubRole,
   type HubUser,
 } from '../lib/hub-users';
+import { invalidFieldMessage } from '../lib/invalid-field';
+import { hubPinLength } from '../lib/pin-length';
 import { isAdmin, user } from '../lib/session';
 import { toast } from '../lib/toast';
+import { formatDate } from '../lib/format-datetime';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 
 type Row = Record<string, unknown>;
 interface DataTableColumn {
@@ -307,12 +310,14 @@ const pinIssue = computed(() =>
 );
 
 function fmtDate(iso: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return (
+    formatDate(iso, {
+      locale: locale.value,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }) ?? '—'
+  );
 }
 
 /** Etiqueta traducida de un rol conocido; los que aporta un módulo se muestran tal cual. */
@@ -469,11 +474,20 @@ async function createUser(): Promise<void> {
   }
 }
 
-/** Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso. */
-function rejectionMessage(error: unknown): string {
+/**
+ * Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso.
+ *
+ * Tres escalones, en este orden (hub#1190): motivo de NEGOCIO del core (`hub.users.*`, hub#355) →
+ * campo rechazado (`invalid_field` + `field`/`reason`, ADR-0398 §6) → la frase que vino. El
+ * `message` del runtime está en inglés a propósito (regla del idioma del código); enseñarlo tal
+ * cual es lo que ponía «the name is required» delante de una encargada.
+ */
+function rejectionMessage(error: unknown, fallback = t('employees.saveError')): string {
   const key = hubUserErrorKey(error);
   if (key) return t(`employeeForm.errors.${key}`);
-  return error instanceof Error ? error.message : t('employees.saveError');
+  const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });
+  if (translated) return translated;
+  return error instanceof Error ? error.message : fallback;
 }
 
 async function deactivateUser(row: Row): Promise<void> {
@@ -499,7 +513,9 @@ async function deactivateUser(row: Row): Promise<void> {
     await load();
     void toast(t('employees.deactivated'), 'success');
   } catch (error) {
-    void toast(error instanceof Error ? error.message : t('employees.deleteError'), 'danger');
+    // hub#1190: la baja pasa por la misma puerta y se dice en el mismo idioma. Su frase genérica
+    // sigue siendo la de la baja, no la del guardado.
+    void toast(rejectionMessage(error, t('employees.deleteError')), 'danger');
   }
 }
 

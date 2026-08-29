@@ -202,26 +202,35 @@ fn int_field(v: &Json, k: &str, default: i64) -> i64 {
     }
 }
 
-/// Deriva el **TipoImpositivo** (% IVA) para el DesgloseIVA del registro VeriFactu a partir del
-/// desglose real de la factura. El registro lleva un **único** `tax_rate` (un solo bloque de
-/// desglose), así que:
-/// - Si el `tax_breakdown` de la factura (JSON `{"21.00":{base,tax}, …}`, importes en céntimos)
-///   tiene **un único tipo** → se usa ESE tipo exacto (lo correcto y el caso normal del POS).
-/// - Si tiene **varios tipos** (factura mixta 21%+10%) o está vacío/inválido → se cae al **tipo
-///   efectivo** `tax/base*100` redondeado a 2 decimales.
+/// Derives the **TipoImpositivo** (VAT %) of the record's `tax_rate` COLUMN from the invoice's
+/// real breakdown. The row carries a single rate, so:
+/// - If the breakdown declares **one single rate** → THAT exact rate is used (the normal POS case).
+/// - If it declares **several distinct rates** (mixed invoice 21 %+10 %) or none at all (empty,
+///   unreadable, amounts that cannot be read) → **effective rate** `tax/base*100` at 2 decimals.
 ///
-/// El desglose multi-tipo REAL (varias líneas DesgloseIVA en el XML) queda pendiente de diseño del
-/// humano (TODO §G / decision-log). Antes esto era fijo 21% — incorrecto en facturas a 10% (QA 2026-06-25).
+/// The breakdown is read through `aeat::breakdown_rates`, the SAME parser the XML is built from:
+/// it understands both generations of the contract with `invoice` — the old rate-keyed map
+/// (`{"21.00":{base,tax}}`) and the live array with one entry per full tax key (ADR-0186). Reading
+/// it through a private copy that only saw the map made EVERY real ticket fall through to the
+/// effective rate, and with `invoice`'s per-line rounding the effective rate is not a Spanish rate:
+/// 4 lines of 0,50 € at 21 % (base 200 / quota 44) were stored as 22,0 % (hub#1198). The XML never
+/// depended on this — `aeat::desglose` emits one line per real rate — but the column the KPIs
+/// group by did, and so did the module's row rule (`ck_verifactu_record_quota_matches_row_rate`),
+/// which with the effective rate balanced by construction and therefore measured nothing.
+///
+/// **Mixed: the effective rate stays on purpose.** There is no «the rate» of such a row, and
+/// taking the first entry's would invent a fiscal fact. The whole breakdown travels to the XML
+/// anyway. Several entries declaring the SAME rate (the same tax key repeated, or an equivalence
+/// surcharge, which travels in its own pair) do have a single rate, and that one is stored.
 fn derive_tax_rate(tax_breakdown: &str, base_cents: f64, tax_cents: f64) -> f64 {
-    if let Ok(Json::Object(map)) = serde_json::from_str::<Json>(tax_breakdown) {
-        if map.len() == 1 {
-            if let Some(rate) = map.keys().next().and_then(|k| k.trim().parse::<f64>().ok()) {
-                return rate;
-            }
+    let declared = aeat::breakdown_rates(tax_breakdown);
+    if let Some(first) = declared.first() {
+        if declared.iter().all(|rate| rate == first) {
+            return *first;
         }
     }
-    // Fallback (multi-tipo o sin desglose): tipo efectivo redondeado a 2 decimales. La división
-    // conserva el signo en rectificativas (base y cuota negativas → ratio positivo).
+    // Fallback (multi-rate or no readable breakdown): effective rate rounded to 2 decimals. The
+    // division keeps the sign in rectifying invoices (negative base and quota → positive ratio).
     if base_cents != 0.0 {
         (tax_cents / base_cents * 10_000.0).round() / 100.0
     } else {
@@ -268,6 +277,27 @@ fn params(pairs: Json) -> Params {
 
 fn op(command: &str, p: Json) -> Operation {
     Operation::sql(command, params(p))
+}
+
+/// `details` de una fila de auditoría, con su **clave de mensaje estable** delante (hub#1178).
+///
+/// Todo el corpus de `verifactu_event.message` que escribe este motor nace en español y en duro, y
+/// la pantalla **Eventos** del módulo lo pinta tal cual: un hub que no esté en castellano lee su
+/// auditoría fiscal en castellano igual. El canal para arreglarlo es el que hub#1103 abrió con
+/// `details.scope` — **un código estable dentro de `details`**, con los datos que la frase necesita
+/// al lado — y el catálogo `en`+`es` en quien la pinta (ADR-0055: el inglés es la fuente).
+///
+/// `message` sigue viajando y sigue en español **a propósito**: es lo que la pantalla lee HOY, y
+/// cambiarlo antes de que exista el catálogo pondría inglés delante de un usuario español — que es
+/// exactamente el defecto de hub#1190. Deja de importar el día que el módulo componga la frase.
+fn details_for(message_key: &str, extra: Json) -> String {
+    let mut details = json!({ "message_key": message_key });
+    if let (Some(target), Some(source)) = (details.as_object_mut(), extra.as_object()) {
+        for (key, value) in source {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    details.to_string()
 }
 
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
@@ -1190,8 +1220,9 @@ async fn ingest_invoice(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             // `build_record_output` espera céntimos y divide /100 al formatear para la AEAT/QR.
             // NO convertir aquí (el `* 100.0` previo declaraba importes ×100 a la AEAT — QA 2026-06-25).
             base_amount: num_field(&inv, "base_amount", 0.0),
-            // Tipo EFECTIVO de la factura. Es la columna de la fila y el fallback de facturas sin
-            // desglose; el XML ya NO lo usa en factura mixta (emite una línea por tipo real).
+            // The row's COLUMN rate: the one the breakdown declares when it is unique, and the
+            // effective one only when there is none (mixed, or no readable breakdown). The XML
+            // uses it only as the no-breakdown fallback: `aeat::desglose` emits one line per rate.
             tax_rate: derive_tax_rate(
                 &str_field(&inv, "tax_breakdown"),
                 num_field(&inv, "base_amount", 0.0),
@@ -1481,11 +1512,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                 "event_type": "record_created",
                 "severity": "info",
                 "message": format!("Registro {} #{sequence_number} de {} creado", r.record_type, r.invoice_number),
-                "details": json!({
+                "details": details_for("verifactu.record_created", json!({
+                    "record_type": r.record_type,
+                    "invoice_number": r.invoice_number,
                     "sequence_number": sequence_number,
                     "record_hash": record_hash,
                     "is_first_record": is_first,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -1506,12 +1539,13 @@ async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -
                      destinatario la AEAT rechaza el tipo declarado (error 1189)",
                     r.invoice_number, r.downgraded_from, r.invoice_type
                 ),
-                "details": json!({
+                "details": details_for("verifactu.invoice_type_downgraded", json!({
+                    "invoice_number": r.invoice_number,
                     "declared": r.downgraded_from,
                     "effective": r.invoice_type,
                     "reason": REASON_MISSING_RECIPIENT,
                     "sequence_number": sequence_number,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -1860,7 +1894,7 @@ async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("XML no conforme al esquema de la AEAT; no se ha transmitido: {reason}"),
-                        "details": json!({ "validation_error": reason }).to_string(),
+                        "details": details_for("verifactu.xsd_invalid", json!({ "validation_error": reason })),
                         "timestamp": ctx.now,
                     }),
                 ),
@@ -1990,7 +2024,12 @@ async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("Fallo de transmisión AEAT ({environment}); reintento en {backoff_minutes} min"),
-                        "details": json!({ "error": reason.clone(), "attempts": retry.attempts }).to_string(),
+                        "details": details_for("verifactu.transmission_retry", json!({
+                            "environment": environment,
+                            "backoff_minutes": backoff_minutes,
+                            "error": reason.clone(),
+                            "attempts": retry.attempts,
+                        })),
                         "timestamp": ctx.now,
                     }),
                 ),
@@ -2160,12 +2199,11 @@ async fn refuse_transmission(
                     "event_type": "transmission_failure",
                     "severity": "error",
                     "message": format!("No se ha transmitido a la AEAT: {reason}"),
-                    "details": json!({
+                    "details": details_for("verifactu.not_transmitted", json!({
                         "reason": refusal.code,
                         "error": reason,
                         "attempts": retry.attempts,
-                    })
-                    .to_string(),
+                    })),
                     "timestamp": ctx.now,
                 }),
             ),
@@ -2244,14 +2282,15 @@ fn response_ops(
                     Some(n) => format!("AEAT ({environment}): {} {} — {n}", resp.estado_envio, resp.estado_registro),
                     None => format!("AEAT ({environment}): {} {}", resp.estado_envio, resp.estado_registro),
                 },
-                "details": json!({
+                "details": details_for("verifactu.aeat_verdict", json!({
+                    "environment": environment,
                     "estado_envio": resp.estado_envio,
                     "estado_registro": resp.estado_registro,
                     "csv": resp.csv,
                     "codigo_error": resp.codigo_error,
                     "descripcion_error": resp.descripcion_error,
                     "note": note,
-                }).to_string(),
+                })),
                 "timestamp": now,
             }),
         ),
@@ -2574,7 +2613,7 @@ async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Resul
             "event_type": "contingency_processed",
             "severity": if failed > 0 { "warning" } else { "info" },
             "message": format!("Cola de contingencia procesada: {successful} enviados, {failed} con error"),
-            "details": json!({ "successful": successful, "failed": failed }).to_string(),
+            "details": details_for("verifactu.contingency_processed", json!({ "successful": successful, "failed": failed })),
             "timestamp": ctx.now,
         }),
     ));
@@ -2760,7 +2799,12 @@ async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Result<Output> 
             } else {
                 "Prueba VeriFactu: certificado no válido".to_string()
             },
-            "details": details.to_string(),
+            // hub#1178: dos hechos distintos, dos claves — «la prueba corrió» y «el certificado no
+            // vale» piden cosas distintas de quien lo lee.
+            "details": details_for(
+                if cert_ok { "verifactu.diagnostic_ran" } else { "verifactu.diagnostic_certificate_invalid" },
+                details,
+            ),
             "timestamp": ctx.now,
         }),
     )))
@@ -3054,7 +3098,11 @@ async fn validate_chain(input: &Json, host: &dyn NativeHost) -> Result<Output> {
             "event_type": event_type,
             "severity": severity,
             "message": message,
-            "details": details.to_string(),
+            // hub#1178: la clave sigue al veredicto, como ya hacía `event_type`.
+            "details": details_for(
+                if valid { "verifactu.chain_validated" } else { "verifactu.chain_broken" },
+                details,
+            ),
             "timestamp": ctx.now,
         }),
     )))
@@ -3098,7 +3146,7 @@ async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> Result<Outpu
             "event_type": "aeat_queried",
             "severity": "info",
             "message": format!("Consulta AEAT: {limit} registro(s) recuperados para {issuer_nif}"),
-            "details": json!({ "count": limit, "issuer_nif": issuer_nif }).to_string(),
+            "details": details_for("verifactu.aeat_queried", json!({ "count": limit, "issuer_nif": issuer_nif })),
             "timestamp": ctx.now,
         }),
     ));
@@ -3184,12 +3232,13 @@ async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Result<Output
                 "event_type": "chain_recovered",
                 "severity": "warning",
                 "message": format!("Cadena recuperada desde la AEAT para {issuer_nif}: huella {}…", short(&record_hash)),
-                "details": json!({
+                "details": details_for("verifactu.chain_recovered_from_aeat", json!({
                     "source": "aeat",
+                    "issuer_nif": issuer_nif,
                     "record_hash": record_hash,
                     "sequence_number": seq,
                     "found": limit,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         ));
@@ -3267,14 +3316,116 @@ async fn recover_manual(input: &Json, host: &dyn NativeHost) -> Result<Output> {
                 "event_type": "chain_recovered",
                 "severity": "warning",
                 "message": format!("Cadena continuada manualmente para {issuer_nif}: huella {}…", short(&record_hash)),
-                "details": json!({
+                "details": details_for("verifactu.chain_continued_manually", json!({
                     "source": "manual",
+                    "issuer_nif": issuer_nif,
                     "record_hash": record_hash,
                     "sequence_number": seq,
-                }).to_string(),
+                })),
                 "timestamp": ctx.now,
             }),
         )))
+}
+
+#[cfg(test)]
+mod audit_message_keys {
+    //! Cada fila de auditoría del motor fiscal lleva un CÓDIGO, no solo una frase (hub#1178).
+    //!
+    //! Todo el corpus de `verifactu_event.message` nace en español y en duro, y la pantalla
+    //! **Eventos** del módulo lo pinta tal cual: un hub en catalán, gallego o inglés lee su
+    //! auditoría fiscal en castellano. Va contra ADR-0055/0199 y es la misma familia que hub#1190
+    //! (la pantalla no puede traducir lo que llega como prosa).
+    //!
+    //! El canal decidido es el que hub#1103 ya empezó con `details.scope`: **un código estable
+    //! dentro de `details`** (`message_key`, espacio `verifactu.`) más los datos que la frase
+    //! necesita, y el catálogo `en`+`es` en quien la pinta. `message` se queda como el respaldo
+    //! honesto que hoy se lee — cambiarlo a inglés ANTES de que el módulo traduzca pondría inglés
+    //! delante de un usuario español, que es justo el defecto de hub#1190.
+    //!
+    //! Esta guarda es de patrón, no de punto: barre el FUENTE. Un evento nuevo escrito sin su
+    //! clave falla aquí, en vez de descubrirse cuando alguien abra el hub en otro idioma.
+
+    /// Este mismo fichero. La verdad sobre qué eventos escribe el motor.
+    const SOURCE: &str = include_str!("lib.rs");
+
+    /// The command every audit row goes through.
+    const INSERT_EVENT: &str = "\"verifactu._insert_event\"";
+
+    #[test]
+    fn every_verifactu_event_carries_a_stable_message_key_hub1178() {
+        let sites: Vec<usize> = SOURCE
+            .match_indices(INSERT_EVENT)
+            .map(|(at, _)| at)
+            .filter(|at| SOURCE[..*at].rfind("mod audit_message_keys").is_none())
+            .collect();
+        assert!(
+            sites.len() >= 12,
+            "el barrido encontró solo {} sitios de `verifactu._insert_event`: ha dejado de casar \
+             con la forma del fichero",
+            sites.len()
+        );
+
+        for at in sites {
+            // El payload del evento va desde el nombre del command hasta su `timestamp`, que es la
+            // última clave de todos ellos.
+            let rest = &SOURCE[at..];
+            let end = rest
+                .find("\"timestamp\"")
+                .expect("todo evento persiste su instante");
+            let payload = &rest[..end];
+            let line = SOURCE[..at].lines().count();
+            assert!(
+                payload.contains(&format!("details_{}(", "for")),
+                "el evento de la línea {line} escribe su `details` sin clave de mensaje: la \
+                 pantalla de Eventos solo podrá repetir la frase castellana del motor (hub#1178)"
+            );
+        }
+    }
+
+    /// Y la clave que se escribe es de VERDAD un código estable, no una frase disfrazada.
+    #[test]
+    fn a_message_key_is_a_stable_code_in_the_verifactu_namespace_hub1178() {
+        // La aguja se compone en tiempo de ejecución para que ESTE fichero no la contenga
+        // literalmente: si no, el barrido se contaría a sí mismo.
+        let needle = format!("details_{}(", "for");
+        // De cada llamada se leen TODAS las claves de su primer argumento: dos de los eventos
+        // eligen la suya según el veredicto (`if valid { … } else { … }`), y las dos cuentan.
+        let mut keys: Vec<&str> = Vec::new();
+        for (at, _) in SOURCE.match_indices(needle.as_str()) {
+            let rest = &SOURCE[at + needle.len()..];
+            // El primer argumento acaba donde empieza el segundo: o el `json!` de los datos, o la
+            // variable `details` que dos de los sitios ya tenían construida. Se toma el que llegue
+            // antes; sin ninguno, un tramo corto acotado.
+            let arg_end = [rest.find("json!"), rest.find("details,")]
+                .into_iter()
+                .flatten()
+                .min()
+                .unwrap_or(rest.len().min(400));
+            let mut slice = &rest[..arg_end];
+            while let Some(open) = slice.find('"') {
+                let after = &slice[open + 1..];
+                let close = match after.find('"') {
+                    Some(i) => i,
+                    None => break,
+                };
+                keys.push(&after[..close]);
+                slice = &after[close + 1..];
+            }
+        }
+        assert!(keys.len() >= 12, "solo {} claves encontradas", keys.len());
+        for key in keys {
+            assert!(
+                key.starts_with("verifactu."),
+                "`{key}` no está en el espacio de nombres del módulo"
+            );
+            assert!(
+                key[10..]
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'),
+                "`{key}` no es un código estable (se esperaba `verifactu.<snake_case>`)"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3342,9 +3493,9 @@ mod tests {
 
     #[test]
     fn mixto_o_vacio_cae_al_tipo_efectivo() {
-        // Mixto 21%+10%: el registro es de tipo único → efectivo (no es un tipo real, limitación
-        // documentada; el desglose multi-línea queda para el humano).
-        let mixto = r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
+        // Mixed 21%+10% in the old map: the row is single-rate → effective. The XML does emit one
+        // line per real rate (`aeat::desglose`), so nothing declared is lost.
+        let mixto =r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
         let r = derive_tax_rate(mixto, 11000.0, 2200.0); // 2200/11000 = 20%
         assert_eq!(r, 20.0);
         // Desglose vacío (facturas antiguas '{}'): efectivo desde base/cuota.
@@ -3365,6 +3516,57 @@ mod tests {
         assert_eq!(derive_tax_rate(tb, -10000.0, -2100.0), 21.0);
         // Sin desglose, efectivo de negativos: (-210)/(-1000) → 21%.
         assert_eq!(derive_tax_rate("{}", -1000.0, -210.0), 21.0);
+    }
+
+    /// Regression test for ERPlora/hub#1198.
+    ///
+    /// The live `tax_breakdown` that `invoice` writes is the ARRAY generation (one entry per full
+    /// tax key, per the breakdown contract of `aeat::desglose`), not the old rate-keyed map. The
+    /// row used to read only the map, so every real ticket fell through to the effective rate —
+    /// and with `invoice`'s per-line rounding the effective rate is not a Spanish rate at all
+    /// (4 lines of 0,50 € at 21 % → base 200 / quota 44 → 22,0 %).
+    #[test]
+    fn derive_tax_rate_reads_the_array_breakdown_hub1198() {
+        // The exact ticket of the issue: one fiscal key at 21 %, quota rounded up per line.
+        let real_ticket = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#;
+        assert_eq!(derive_tax_rate(real_ticket, 200.0, 44.0), 21.0);
+
+        // Reduced rate, exact amounts: same reading, no rounding involved.
+        let reduced = r#"[{"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":1100,"quota":110}]"#;
+        assert_eq!(derive_tax_rate(reduced, 1100.0, 110.0), 10.0);
+
+        // Equivalence surcharge: it travels in its own pair, so the effective rate (2620/10000 =
+        // 26,2 %) is not a rate anybody charged. The declared one is.
+        let surcharge = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
+        assert_eq!(derive_tax_rate(surcharge, 10000.0, 2620.0), 21.0);
+
+        // Several entries that all declare the SAME rate (same rate, different regime) still have
+        // one rate — the row can state it without inventing anything.
+        let same_rate_twice = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100},
+                                  {"tax":"vat","regime":"51","class":"subject","rate":21.0,"base":5000,"quota":1050}]"#;
+        assert_eq!(derive_tax_rate(same_rate_twice, 15000.0, 3150.0), 21.0);
+
+        // A rectifying record keeps the sign of the amounts and the declared rate stays positive.
+        let rectificativa = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-10000,"quota":-2100}]"#;
+        assert_eq!(derive_tax_rate(rectificativa, -10000.0, -2100.0), 21.0);
+    }
+
+    /// hub#1198 — two DIFFERENT declared rates leave the row without «the» rate of the invoice, so
+    /// the effective rate stands (deliberate: picking the first entry would invent a fiscal fact).
+    /// The XML does not depend on this — `aeat::desglose` emits one line per real rate.
+    #[test]
+    fn derive_tax_rate_falls_back_to_the_effective_rate_on_a_mixed_array_hub1198() {
+        let mixed = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100},
+                        {"tax":"vat","regime":"01","class":"subject","rate":10.0,"base":1000,"quota":100}]"#;
+        assert_eq!(derive_tax_rate(mixed, 11000.0, 2200.0), 20.0);
+
+        // An array whose amounts cannot be read is not a breakdown: nothing is declared, so the
+        // effective rate is all that is left (and `aeat::desglose` refuses the record anyway).
+        let unreadable = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"quota":2100}]"#;
+        assert_eq!(derive_tax_rate(unreadable, 10000.0, 2100.0), 21.0);
+
+        // An empty array declares nothing either.
+        assert_eq!(derive_tax_rate("[]", 1000.0, 100.0), 10.0);
     }
 }
 

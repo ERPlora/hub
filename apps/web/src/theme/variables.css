@@ -29,7 +29,11 @@
   --ion-card-background: #ffffff;
   --ion-border-color: #e7e9ee;
 
-  --ion-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* System stack on purpose: the Hub ships no web font (it runs offline, under CSP). Naming
+     one that nothing loads is exactly hub#1166 — the theme promised "Inter" and the screen
+     painted system-ui. A brand typeface may be added here only together with the @font-face
+     that serves it; font-family-promise.hub1166.test.ts enforces that. */
+  --ion-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* Escala de pasos (grises) — completa para sombras/superficies coherentes */
   --ion-color-step-50: #f3f4f6;

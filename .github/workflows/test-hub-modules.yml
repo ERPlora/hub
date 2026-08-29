@@ -14,16 +14,33 @@
 # Este workflow se trae el catálogo de módulos (~27 repos) por su estado PUBLICADO (`main`) y
 # corre esos targets más el `--lib` del runtime.
 #
-# ── Por qué `schedule` y NO `pull_request` en general ────────────────────────
-# El rojo de hub#1215 lo causó una RELEASE DE MÓDULO (`invoice` v1.2.27, ADR-0405),
-# no un commit del hub. Un trigger por push jamás lo habría cazado: el hub no se
-# movió. Lo que hace falta es una pasada PERIÓDICA contra lo publicado.
+# ── Los TRES disparadores, y por qué hacen falta los tres (hub#1239) ─────────
+# La ADR «El Hub se CIERRA como KERNEL» (2026-08-27) convierte esta pasada en la
+# condición de mergeo de una PR `kind:contract`: es el «crater/runbot» del hub —
+# los 27 módulos PUBLICADOS se prueban contra el runtime nuevo ANTES de mergear.
+# El contrato completo: `architecture/hub/kernel-contract.md`.
 #
-# Y no se pone en cada `pull_request` a propósito: el cuello de la flota es el gate
-# (hub#1207) y este job comparte la ÚNICA máquina de `ci-runner-1` con la suite
-# larga. Duplicar el coste por PR compraría poca señal —los módulos no cambian
-# entre dos PRs del hub— a cambio de frenar a todo el mundo. El filtro `paths` de
-# abajo lo limita a las PRs que tocan este mecanismo (esta pasada incluida).
+#   · `pull_request` con `paths` = las SEIS superficies que la ADR congela
+#     (`crates/runtime`, `crates/server`, `schemas`, `crates/db`, `crates/guest-sdk`,
+#     `crates/wasm-host`). Antes eran DOS rutas, así que un cambio de runtime
+#     mergeaba sin que ningún módulo publicado se hubiera ejecutado contra él.
+#     ⚠️ Esto cuesta: el job comparte las dos ranuras de `ci-runner-1` con la suite
+#     larga (hub#1207). Es un coste ACEPTADO a cambio de la regla de Linux —el
+#     kernel no rompe a un módulo publicado, nunca—; si una PR no toca esas rutas,
+#     no lo paga.
+#
+#   · `schedule` diario: el rojo de hub#1215 lo causó una RELEASE DE MÓDULO
+#     (`invoice` v1.2.27, ADR-0405), no un commit del hub, y ningún trigger por
+#     push lo habría cazado — el hub no se movió.
+#
+#   · `repository_dispatch: [module-published]`: el `release.yml` del módulo avisa
+#     al publicar, así el rojo sale EN EL MOMENTO de publicar y con el nombre del
+#     culpable en el título del run, en vez de a las horas y en el push de otro.
+#     (El emisor está pendiente: module-toolkit, el workflow de release reutilizable.)
+#
+# Y en los tres casos el fallo es RUIDOSO: hasta hub#1239 este job fallaba MUDO —
+# nadie mira un cron, y hub#1215 aguantó un día entero en rojo con Actions en verde.
+# El paso de la issue de alerta es el mismo patrón idempotente de `test-hub.yml`.
 #
 # ⚠️ TERCERA copia de la config de Postgres del repo (las otras: `test-hub.yml` y
 # `.githooks/pre-push`). Si una cambia de imagen o de ajustes, las tres. Esa deriva
@@ -32,19 +49,43 @@
 
 name: Hub module e2e (módulos reales)
 
+# El disparo por `repository_dispatch` viene de la release de UN módulo concreto, y sin esto
+# el run se titula igual que la pasada nocturna: hay que abrirlo para saber a qué versión de
+# qué módulo culpa. El payload va también al summary del job (paso de abajo).
+run-name: >-
+  ${{ github.event_name == 'repository_dispatch'
+      && format('módulo publicado — {0} v{1}', github.event.client_payload.module, github.event.client_payload.version)
+      || format('e2e con módulos reales — {0}', github.ref_name) }}
+
 on:
   push:
     branches: [main, develop]
   schedule:
     - cron: '17 4 * * *'   # diario, fuera de la hora en punto (pico de carga de GitHub)
   workflow_dispatch:
+  # Lo dispara el `release.yml` de cada módulo al publicar (hub#1239). Cae siempre sobre la rama
+  # POR DEFECTO del repo (`main`) — así se lee: «lo publicado contra lo desplegado».
+  repository_dispatch:
+    types: [module-published]
+  # Las seis superficies del kernel (ver la cabecera). `crates/runtime/**` ya cubre el antiguo
+  # `crates/runtime/src/e2e_support.rs`, que por eso deja de listarse aparte.
   pull_request:
     paths:
       - '.github/workflows/test-hub-modules.yml'
-      - 'crates/runtime/src/e2e_support.rs'
+      - 'crates/runtime/**'
+      - 'crates/server/**'
+      - 'schemas/**'
+      - 'crates/db/**'
+      - 'crates/guest-sdk/**'
+      - 'crates/wasm-host/**'
 
+# El grupo NO puede ser solo `github.ref` desde que existe el dispatch: los avisos de dos módulos
+# distintos llegan sobre la MISMA rama por defecto, y con un grupo común el segundo cancelaría la
+# verificación del primero — que es justo la señal que se quería. Un módulo, un grupo.
 concurrency:
-  group: test-hub-modules-${{ github.ref }}
+  group: >-
+    test-hub-modules-${{ github.event_name == 'repository_dispatch'
+      && format('published-{0}', github.event.client_payload.module) || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -55,6 +96,9 @@ jobs:
     name: e2e con módulos reales
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: write   # abrir/refrescar la issue de alerta cuando esto falla (hub#1239)
 
     services:
       postgres:
@@ -85,6 +129,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Un aviso sin `module` correría como una pasada nocturna anónima: el run no diría a quién
+      # culpar y la issue de alerta tampoco. Se rechaza en voz alta, que es barato (el emisor lo
+      # ve en su propia release) y deja el contrato del payload escrito en un solo sitio.
+      - name: Aviso de módulo publicado — validar y publicar el payload
+        if: github.event_name == 'repository_dispatch'
+        env:
+          MODULE: ${{ github.event.client_payload.module }}
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MODULE}" ]; then
+            # Comillas SIMPLES: con dobles, las comillas invertidas de abajo serían sustitución
+            # de comandos y bash intentaría EJECUTAR el nombre del evento.
+            echo '::error::repository_dispatch (module-published) sin client_payload.module.'
+            echo 'El emisor (el release.yml del módulo) tiene que mandar al menos:'
+            echo '  {"event_type":"module-published","client_payload":{"module":"sales","version":"2.16.39"}}'
+            exit 1
+          fi
+          {
+            echo "### Módulo publicado: \`${MODULE}\` v${VERSION:-?}"
+            echo
+            echo "Esta pasada comprueba el catálogo PUBLICADO contra \`${GITHUB_REF_NAME}\`"
+            echo "tras la release de ese módulo (hub#1239)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
@@ -98,6 +167,13 @@ jobs:
       # llega como cadena VACÍA, no como error — el mismo modo de fallo que dejó
       # `CI_RUNNER_LABEL` vacía y mandó jobs a `ubuntu-latest` en verde. Por eso se
       # comprueba explícitamente antes de usarlo.
+      #
+      # El clonado en sí NO vive aquí: lo hace `scripts/materialize-published-modules.sh`,
+      # el MISMO script que el gate local invoca desde `.githooks/pre-push` (hub#1153). Antes
+      # el bucle de clonado, el suelo de ≥25 y el fallo ruidoso estaban escritos dentro de
+      # este `run:`, así que el gate local no tenía forma de reutilizarlos y medía contra el
+      # checkout aparcado de `modules-workspace`. Una sola copia: la deriva entre copias de
+      # la misma lógica ya tumbó `main` una vez con la config de Postgres (hub#647).
       - name: Traer el catálogo de módulos por su estado PUBLICADO (main)
         env:
           MODULES_DEPLOY_KEYS: ${{ secrets.MODULES_DEPLOY_KEYS }}
@@ -111,18 +187,20 @@ jobs:
             exit 1
           fi
 
-          KEYS="$HOME/.erplora-module-keys"
-          mkdir -p "$KEYS" && chmod 700 "$KEYS"
-          printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
-          chmod 600 "$KEYS"/*
-
           # La lista de módulos SALE DEL PROPIO PAQUETE DE CLAVES, no de una lista escrita aquí:
           # cada módulo necesita su deploy key de todas formas, así que el paquete es la única
           # fuente que no puede quedarse corta. Una lista a mano sí: la primera versión traía 13 de
           # los 27 y `module_manifest_contract` lo cazó — pero solo porque exige un MÍNIMO (≥20).
           # Un módulo nuevo que faltase sin bajar de ese umbral no se habría probado, en silencio.
-          MODS=$(cd "$KEYS" && ls)
-          echo "módulos en el paquete de claves: $(printf '%s\n' "$MODS" | wc -l | tr -d ' ')"
+          # Quien lee el paquete es el script; aquí solo se desempaqueta.
+          KEYS="$HOME/.erplora-module-keys"
+          rm -rf "$KEYS"
+          mkdir -p "$KEYS" && chmod 700 "$KEYS"
+          printf '%s' "$MODULES_DEPLOY_KEYS" | base64 -d | tar xz -C "$KEYS"
+          chmod 600 "$KEYS"/*
+
+          mkdir -p ~/.ssh
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
           # 🔴 En `$RUNNER_TEMP`, que se vacía en cada job — NUNCA junto al checkout.
           #
@@ -137,46 +215,28 @@ jobs:
           #      y eso es carísimo de diagnosticar.
           DEST="$RUNNER_TEMP/modules-workspace/modules"
           rm -rf "$DEST"
-          mkdir -p "$DEST"
 
           # Y se limpia lo YA filtrado por la versión anterior en este runner, que si no se queda
           # ahí envenenando a `test-hub.yml` para siempre.
           rm -rf "$GITHUB_WORKSPACE/../modules-workspace"
 
-          mkdir -p ~/.ssh
-          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-
-          for m in $MODS; do
-            # Cada módulo tiene SU clave: una deploy key sirve para un solo repo, así que
-            # el permiso es el mínimo (lectura de ese repo y nada más).
-            GIT_SSH_COMMAND="ssh -i $KEYS/$m -o IdentitiesOnly=yes -o BatchMode=yes" \
-              git clone --depth 1 --branch main --quiet \
-              "git@github.com:ERPlora/$m.git" "$DEST/$m"
-            printf '  %-16s %s\n' "$m" "$(python3 -c "import json;print(json.load(open('$DEST/$m/module.json'))['version'])")"
-          done
-
-          # El `dist/` va COMMITEADO en cada repo de módulo, así que no hay nada que
-          # compilar aquí — lo que se prueba es exactamente lo que se publica.
-          missing=0
-          for m in $MODS; do
-            [ -f "$DEST/$m/module.json" ] || { echo "::error::falta $m/module.json"; missing=1; }
-          done
-          [ "$missing" -eq 0 ] || exit 1
-
-          # El catálogo publicado son ~27 módulos. `module_manifest_contract` exige ≥20, así que
-          # por sí solo NO caza que falten unos pocos: la primera versión de este job clonaba 13 y
-          # habría pasado de haber sido 21. Este suelo es el que convierte «faltan módulos» en un
-          # fallo del job y no en una cobertura silenciosamente recortada.
-          n=$(find "$DEST" -mindepth 2 -maxdepth 2 -name module.json | wc -l | tr -d ' ')
-          echo "módulos clonados con manifiesto: $n"
-          if [ "$n" -lt 25 ]; then
-            echo "::error::solo $n módulos con module.json (esperados ~27). Si se publicó un módulo"
-            echo "nuevo, hay que añadir su deploy key al paquete MODULES_DEPLOY_KEYS (hub#1216)."
+          # El `dist/` va COMMITEADO en cada repo de módulo, así que no hay nada que compilar —
+          # lo que se prueba es exactamente lo que se publica. El suelo de ≥25 manifests y el
+          # fallo ruidoso por módulo inalcanzable los aplica el script (`--floor 25`): el catálogo
+          # publicado son ~27 módulos y `module_manifest_contract` exige ≥20, así que por sí solo
+          # NO caza que falten unos pocos.
+          # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
+          # Actions, y el script también lo corre el gate local, donde solo sería ruido.
+          if ! RESOLVED=$(bash scripts/materialize-published-modules.sh \
+              --dest "$DEST" --keys "$KEYS" --floor 25); then
+            echo "::error::no se pudo materializar el catálogo PUBLICADO (el detalle, arriba en"
+            echo "este mismo paso). Si se publicó un módulo nuevo, hay que añadir su deploy key"
+            echo "al paquete MODULES_DEPLOY_KEYS (hub#1216)."
             exit 1
           fi
 
           rm -rf "$KEYS"
-          echo "ERPLORA_MODULES_DIR=$(cd "$DEST" && pwd)" >> "$GITHUB_ENV"
+          echo "ERPLORA_MODULES_DIR=$RESOLVED" >> "$GITHUB_ENV"
 
       - name: Raise Postgres lock limits (hub#526) + export dynamic port (hub#898)
         run: |
@@ -240,6 +300,7 @@ jobs:
       # `--no-fail-fast` porque `cargo test` corta en el primer binario que falla y
       # esconde el resto.
       - name: cargo test — los targets que necesitan módulos
+        id: tests
         run: |
           set -euo pipefail
           targets=$(grep -rl "require_modules_workspace" crates/runtime/tests/ \
@@ -253,8 +314,95 @@ jobs:
           # sobre `tests/` no ve — `installer::every_published_manifest_*` valida el catálogo entero
           # y solo corre con módulos. Se colaron fuera de la cuenta inicial de «238 en 36 targets»,
           # y son justo los que cazaron el catálogo incompleto.
-          # shellcheck disable=SC2086
-          cargo test -p erplora-runtime --lib $args --no-fail-fast
+          # El log se guarda para que la issue de alerta pueda NOMBRAR los targets rotos: un aviso
+          # que solo enlaza el run devuelve al lector al log, que es de donde venía. `PIPESTATUS`
+          # porque `tee` se traga el código de salida de cargo.
+          set +e
+          # shellcheck disable=SC2086  # `$args` es una lista de `--test x` a propósito
+          cargo test -p erplora-runtime --lib $args --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/module-e2e.log"
+          rc=${PIPESTATUS[0]}
+          set -e
+          exit "$rc"
+
+      # Sin esto el fallo es MUDO: nadie mira un cron y hub#1215 aguantó un día entero en rojo con
+      # Actions en verde. Mismo patrón idempotente que `test-hub.yml` (hub#572) e `image-freshness`
+      # (hub#652): UNA issue abierta que se refresca con un comentario, nunca una por run.
+      #
+      # No se dispara en `pull_request`: ahí el rojo ya es visible como check de la PR, y una issue
+      # por cada PR roja sería ruido. Se dispara en lo que nadie mira: el cron, el push y el aviso
+      # de un módulo recién publicado.
+      #
+      # Anclado al `outcome` del propio paso de tests para que un fallo de ENTORNO (disco, clonado,
+      # contenedor de servicio) no falsifique un veredicto de «los módulos están rotos»; y
+      # `failure()` excluye la cancelación, que aquí pasa a diario.
+      - name: Abrir o refrescar la issue de alerta (hub#1239)
+        if: >-
+          failure() && steps.tests.outcome == 'failure' &&
+          (github.event_name == 'schedule' || github.event_name == 'repository_dispatch' ||
+           github.event_name == 'push')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TRIGGER: ${{ github.event_name }}
+          MODULE: ${{ github.event.client_payload.module }}
+          MODULE_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+
+          # Qué targets fallaron, sacados del log: cargo imprime `Running tests/<x>.rs (…)` antes
+          # de cada binario y `test <nombre> ... FAILED` por cada caso, así que se van asociando.
+          #
+          # `[ -s ]` first: the tests step can die BEFORE `tee` creates the log (the `>= 30 targets`
+          # guard, the grep pipeline). awk on an absent file exits 2 and, under `set -e`, that
+          # would kill THIS step before the issue opens — the mute red it exists to abolish.
+          FAILING_TARGETS=""
+          if [ -s "$RUNNER_TEMP/module-e2e.log" ]; then
+            FAILING_TARGETS=$(awk '
+              /^ *Running / { t=$0; sub(/^ *Running /, "", t); sub(/ \(target.*/, "", t); cur=t }
+              / \.\.\. FAILED$/ { if (cur != "") n[cur]++ }
+              END { for (k in n) printf "- `%s` — %d test(s)\n", k, n[k] }
+            ' "$RUNNER_TEMP/module-e2e.log" | sort)
+          fi
+          if [ -z "$FAILING_TARGETS" ]; then
+            # Compiló mal, o murió antes de ejecutar un solo caso: se dice, no se calla.
+            FAILING_TARGETS="- (ningún test individual marcado \`FAILED\`: la suite murió antes de ejecutarlos — mira el log del run)"
+          fi
+
+          origin="disparo \`${TRIGGER}\`"
+          if [ "$TRIGGER" = "repository_dispatch" ]; then
+            origin="la publicación de \`${MODULE}\` v${MODULE_VERSION:-?}"
+          fi
+
+          # The title is the idempotency key: stable, matched EXACTLY, and colon-free.
+          title="Los módulos publicados ROMPEN contra develop"
+          body="Detectado por \`test-hub-modules.yml\` — ${origin} (hub#1239).
+
+          - rama probada: \`${GITHUB_REF_NAME}\` — commit \`${GITHUB_SHA}\`
+          - run que falló: ${RUN_URL}
+
+          **Targets rotos:**
+
+          ${FAILING_TARGETS}
+
+          Este job clona los ~27 módulos por su estado PUBLICADO (\`main\`) y los corre contra este runtime, que es la regla del kernel: **el hub no rompe a un módulo publicado, nunca** (ADR «El Hub se CIERRA como KERNEL»). Así que hay dos salidas, y solo dos: se revierte el cambio del hub, o —si el contrato tenía que cambiar de verdad— se convierte en una PR \`kind:contract\` y el módulo se adapta DESPUÉS (orden core → flota → módulo).
+
+          Mientras esto siga rojo, ninguna PR \`kind:contract\` puede mergear.
+
+          Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando el catálogo vuelva a verde."
+
+          # List and match locally, never `--search`: that reads GitHub's search index, which
+          # lags behind reality (it returned ZERO with open issues on 2026-08-16). Two failures
+          # minutes apart — push develop then push main, two module releases — would open two
+          # issues. The REST list is consistent; `gh` runs the jq filter itself.
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
+            --json number,title \
+            --jq '[.[] | select(.title == "Los módulos publicados ROMPEN contra develop")][0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refrescando la issue de alerta abierta #$existing"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
 
       # `always()`: si el job se cancela a media suite (`cancel-in-progress` lo hace a diario), el
       # residuo se quedaría en el runner envenenando al vecino. La limpieza no puede depender de

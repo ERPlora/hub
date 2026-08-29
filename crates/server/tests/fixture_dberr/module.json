@@ -1,0 +1,57 @@
+{
+  "id": "dberr",
+  "name": "DB error fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "dberr.note.read",
+    "dberr.note.write"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ]
+  },
+  "navigation": [],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "dberr.notes.list": {
+      "permission": "dberr.note.read",
+      "sql": "queries/notes_list.sql"
+    },
+    "dberr.notes.broken": {
+      "permission": "dberr.note.read",
+      "sql": "queries/notes_broken.sql"
+    },
+    "dberr.notes.paged": {
+      "permission": "dberr.note.read",
+      "sql": "queries/notes_list.sql",
+      "list": { "sort": ["id"], "default_sort": "id" }
+    }
+  },
+  "commands": {
+    "dberr.notes.create": {
+      "permission": "dberr.note.write",
+      "transaction": true,
+      "sql": [
+        "commands/notes_create.sql"
+      ]
+    },
+    "dberr.notes.reject": {
+      "permission": "dberr.note.write",
+      "transaction": true,
+      "sql": [
+        "commands/notes_touch.sql"
+      ],
+      "expect_rows": {
+        "op": "min",
+        "n": 1,
+        "error": "dberr.no_such_note",
+        "message": "That note is not here any more"
+      }
+    }
+  }
+}

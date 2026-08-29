@@ -106,6 +106,18 @@ export default {
     quotaTitle: 'You have used all your assistant messages',
     quotaUsed: 'Plan {tier} — {used} of {limit} messages this month.',
     quotaCta: 'See plans',
+    // hub#1183 — knowing the limit only once it is spent is knowing it at the worst possible
+    // moment. From 80% on, the drawer says what is left and when it comes back.
+    quotaRemaining: 'Plan {tier} — {remaining} of {limit} messages left this month.',
+    quotaResets: 'They come back on {date}.',
+    // hub#1259 — contracting the plan is the admin door (hub#1254). A cashier who presses this
+    // button only gets a 403 and a generic error: worse than not seeing it, and worse than
+    // reading who to ask.
+    quotaAskAdmin: 'Ask the owner of the business to upgrade the assistant plan.',
+    plansTitle: 'Choose a plan',
+    plansConfirm: 'Go to payment',
+    planOption: '{name} — {price} €/month',
+    plansUnavailable: 'There are no plans to upgrade to right now.',
     attach: 'Attach file',
     attachRemove: 'Remove attachment',
     attachImage: 'image',
@@ -233,6 +245,10 @@ export default {
       body: 'Pick the closest one and we set up its apps and its catalogue in one go. You will still have to add your own details afterwards.',
       use: 'Use this one',
       more: 'See all templates',
+      // The way out of the offer (hub#1120). The card outlives the business being empty, so
+      // it has to be closable from the offer itself — «not now», never «no thanks»: the
+      // catalogue is still one tap away in Settings › Data.
+      dismiss: 'Not now',
       working: 'Setting up «{name}»…',
       readyTitle: 'Your apps and your catalogue are in',
       readyBody: 'What is left is what only you can answer: the details of your business. You have them on the list below.',
@@ -353,6 +369,9 @@ export default {
     // (hub#375); «System connected/disconnected» is gone on purpose — it was a verdict about
     // everything drawn from a probe that only ever knew about the printer host.
     openSystem: 'View system',
+    // hub#1197 — on a phone the grid folds after two rows; this is the tile that leads to the rest,
+    // the same catalogue ＋ Add apps already opens (`/apps`).
+    appsViewAll: 'View all apps',
   },
   profile: {
     title: 'My profile',
@@ -478,22 +497,73 @@ export default {
   // diciendo dos cosas. Y va en español pase lo que pase: es un instrumento dirigido a la AEAT.
   grant: {
     intro:
-      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that, and this is it. Read it, sign it and attach a copy of your ID.',
-    stateVigente: 'Signed on {date}. ERPlora may file on your behalf.',
+      'ERPlora files your invoicing records with the tax authority ON YOUR BEHALF. Spanish law needs your signed consent for that: the official form of the colaboración social agreement. You download it, sign it away from this screen, and upload it back.',
+    stateVigente: 'Approved on {date}. ERPlora may file on your behalf.',
+    statePendiente:
+      'Uploaded on {date}. We are checking it and will email you within 24-72 hours.',
+    stateRejected: 'Sent back on {date}. Fix what is noted below and upload it again.',
     stateRevoked: 'Revoked on {date}. ERPlora cannot file on your behalf.',
     stateAbsent: 'Not signed yet. Your business cannot go live until it is.',
     stateUnknown: 'Checking with ERPlora…',
+    stateUnreachable: 'We could not reach ERPlora, so we cannot tell you where this stands.',
+    step1Title: '1 · Get the official form',
+    step1Hint:
+      'We fill it in with your details. Its wording is set by the tax authority and cannot be changed.',
+    step2Title: '2 · Upload the signed form',
+    step2Hint: 'A person at ERPlora checks it and emails you within 24-72 hours.',
+    partyObligado: 'Your business',
+    partySigner: 'The person signing',
     obligadoNif: 'Taxpayer ID (your business)',
     obligadoName: 'Legal name (your business)',
+    municipio: 'Town or city',
+    via: 'Street',
+    numero: 'Number',
     signerNif: 'ID number of the person signing',
     signerName: 'Full name of the person signing',
-    signatureTitle: 'Signature',
-    signatureHint:
-      'Draw your signature. For a company, the legal representative signs — and the ID copy below is theirs, not the company\u2019s.',
-    signatureClear: 'Clear signature',
+    downloadModel: 'Download the form',
+    howToByHand:
+      'By hand: print it, sign it, stamp it with the company seal if your business is a company, and scan it back to PDF.',
+    howToElectronic:
+      'Electronically: sign the PDF with AutoFirma using your own qualified certificate. A drawn signature is not accepted.',
+    privacyTitle: 'Data protection — the essentials (art. 13 GDPR)',
+    privacyController:
+      'Controller: ERPLORA CLOUD SL (B27593136). We hold these documents as your representative.',
+    privacyPurpose:
+      'Purpose and basis: to file your invoicing records with the Spanish tax authority on your behalf, under the grant you sign and our legal duties. We keep them while the grant lasts and for the tax retention periods.',
+    privacyRights:
+      "Your rights: access, rectification, erasure, objection and portability at privacy{'@'}erplora.com.",
+    documentType: 'Identity document',
+    documentTypeDni: 'DNI (Spanish national ID)',
+    documentTypeNie: 'NIE (foreign resident ID)',
+    signedDocumentChoose: 'Attach the signed form (PDF)',
     dniChoose: 'Attach a copy of the ID',
-    confirm: 'I have read the grant above and I sign it.',
-    submit: 'Sign and send',
+    signatureSampleWhy:
+      'A NIE often carries no printed signature, so we need a sheet with your handwritten signature to compare it against.',
+    signatureSampleChoose: 'Attach a signature sample',
+    representationProofWhy:
+      'Your business is a company, so we need the document that names the person allowed to sign for it.',
+    representationProofChoose: 'Attach the proof of representation',
+    submit: 'Send for review',
+    preferComputer: 'I would rather do this from my computer',
+    errors: {
+      obligado_nif_required: 'Your business needs a taxpayer ID before you can do this.',
+      signer_required: 'Fill in the name and ID number of the person signing.',
+      document_type_invalid: 'Pick the kind of identity document.',
+      signed_document_required: 'Attach the signed form.',
+      signed_document_not_pdf: 'The signed form has to be a PDF — scan it or sign it with AutoFirma.',
+      dni_copy_required: 'Attach a copy of the identity document.',
+      signature_sample_required: 'With a NIE we also need a sample of your handwritten signature.',
+      representation_proof_required:
+        'Attach the document that proves you may sign for the company.',
+      document_too_large: 'Each file has to be under 10 MB.',
+      invalid_via: 'That route is not one we can file through.',
+      cloud_rejected: 'ERPlora could not handle this right now. Try again in a few minutes.',
+      hub_not_enrolled: 'This hub is not connected to ERPlora yet.',
+      identity_not_shared:
+        'We could not tell ERPlora who the taxpayer is. If the page asks for your tax details, save them again in Settings → Business.',
+      open_external_failed: 'We could not open your browser.',
+      unknown: 'It did not work. Try again.',
+    },
   },
   settings: {
     hubWide: 'General settings',
@@ -642,6 +712,39 @@ export default {
     permissionGranted: '{cap} granted to {app}.',
     permissionRevoked: '{cap} revoked from {app}.',
     permissionSaveError: 'Could not change the permission.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Responsible declaration',
+    declarationDesc:
+      'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
+    declarationRead: 'Read the signed declaration',
+    declarationDataTitle: 'Identifying data of this system',
+    declarationPending:
+      'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
+    declarationError: 'Could not load the responsible declaration.',
+    declarationNombreRazon: 'Producer',
+    declarationNIF: 'Producer tax id',
+    declarationNombreSistemaInformatico: 'System name',
+    declarationIdSistemaInformatico: 'System code',
+    declarationVersion: 'Installed version',
+    declarationNumeroInstalacion: 'Installation number',
+    declarationTipoUsoPosibleSoloVerifactu: 'VERI*FACTU only',
+    declarationTipoUsoPosibleMultiOT: 'Can serve several taxpayers',
+    declarationIndicadorMultiplesOT: 'Serving several taxpayers',
+    // hub#1174 — what STOPS WORKING while the switch is off. Default-deny (ADR-0079) is right; an
+    // invisible consequence is not. One sentence per capability id; the catalogue in
+    // `lib/module-capabilities.ts` names the key and the card only translates it. The action that
+    // fixes it is the toggle in the same row (hub#800 §3).
+    capabilityBreaks: {
+      network: 'Without this, the app cannot go online: whatever it syncs, sends or checks over the internet stays undone.',
+      certificate: 'Without this, your invoices are not signed and never reach the tax authority.',
+      printer: 'Without this, receipts and kitchen orders pile up in the print queue and nothing comes out.',
+      notify: 'Without this, no reminder or confirmation reaches your customers by email, SMS or WhatsApp.',
+      manage_flows: 'Without this, the app cannot create or edit your automations, so the ones it needs never run.',
+      // A capability this shell does not know yet: say something true rather than nothing.
+      unknown: 'Without this, the part of the app that needs this permission will not work.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT. The runtime
   // sends facts (`role`, `waiting`, `liveHosts`); the sentence the owner reads lives here — the
@@ -785,6 +888,11 @@ export default {
     consentCancel: 'Cancel',
     installedButNoPermissions: '"{name}" was installed, but its permissions could not be granted. It will not work without them: turn them on in Settings → Permissions.',
     goToPermissions: 'Go to Permissions',
+    // ADR-0380 (hub#1134). The marketplace closed the OFFER, never the supply: the app keeps
+    // working and keeps updating. Both strings say that, because a chip that only says «Retired»
+    // reads as «broken» and the first thing anybody would do is uninstall a healthy app.
+    publicationRetired: 'Retired',
+    retiredNotice: 'No longer in the catalog: {apps}. They keep working here and keep receiving updates — they are just not offered any more, so you will not find them to install somewhere else.',
   },
   employees: {
     searchEmployee: 'Search user…',
@@ -962,7 +1070,7 @@ export default {
     email: 'Email',
     role: 'Role',
     pin: 'Local PIN',
-    pinHelp: 'Between 4 and 8 digits. Leave blank to sign in with an online account.',
+    pinHelp: '{n} digits. Leave blank to sign in with an online account.',
     pinSetHelp: 'Type a new PIN to change it; leave blank to keep the current one.',
     clearPin: 'Remove PIN',
     // hub#658 — the badge, sibling of the PIN. Both words matter: «badge» is what the sector calls
@@ -982,11 +1090,11 @@ export default {
     localUser: 'Local user',
     localUserHelp:
       'Works this hub with a PIN only: no email and no ERPlora account. Turn it off to give them an account later, keeping their history.',
-    localPinHelp: 'Between 4 and 8 digits. Required: it is how this person signs in.',
+    localPinHelp: '{n} digits. Required: it is how this person signs in.',
     accountEmailHelp:
       'We email them an invitation to this hub. They choose their own password — you never see it.',
     accountPinHelp:
-      'Optional: between 4 and 8 digits. Only needed if they also work a shared till in this hub.',
+      'Optional: {n} digits. Only needed if they also work a shared till in this hub.',
     // Motivo del rechazo del alta, por su código estable del runtime (`hub.users.*`).
     errors: {
       local_needs_pin: 'A local user signs in with a PIN: without one, nobody could use this account.',
@@ -995,7 +1103,7 @@ export default {
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
       invalid_email: 'Enter a valid email.',
-      pin_length: 'The PIN must be between 4 and 8 digits.',
+      pin_length: 'The PIN must be {n} digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
       pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
@@ -1006,6 +1114,15 @@ export default {
       // hub#658 — the badge may never be somebody's ONLY way in: a lost card would lock them out
       // of their own till (Square does not allow it either, and Lightspeed L-Series is why).
       badge_without_fallback: 'A badge cannot be their only way in: a lost card would lock them out. Keep their PIN, give them an account, or remove the badge as well.',
+      // hub#1214 — the OTHER half of an alta/baja: the record is saved on this hub, but who can
+      // sign in is administered in the Cloud (ADR-0157 §7). Four codes and not one bucket, because
+      // each asks something different of whoever is saving: wait, fix the address, retry, or call
+      // support. Before this, the raw body of the Cloud («el SaaS respondió 429: {"detail":…}») was
+      // painted here verbatim.
+      cloud_rate_limited: 'Too many changes in a short time, so the invitation has not gone out yet. Wait a few minutes and save again — nothing else was lost.',
+      cloud_rejected: 'The invitation for that email could not be created. Check the address and try again; if it keeps failing, contact support.',
+      cloud_unreachable: 'We could not reach ERPlora to send the invitation. The user is saved here: try saving again in a moment.',
+      not_enrolled: 'This hub cannot send invitations yet. The user is saved here; contact support so they can finish setting it up.',
     },
     activeUser: 'Active user',
     required: 'Required field',
@@ -1237,7 +1354,7 @@ export default {
     // ADR-0154: shown when this device's session was taken over by a sign-in on another device
     // (single active device plan). Surfacing it needs the runtime-session-401 interceptor (see PR).
     sessionTakenOver: 'Session opened on another device',
-    setupChoosePin: 'Choose a 4-digit PIN',
+    setupChoosePin: 'Choose a {n}-digit PIN',
     setupConfirmPin: 'Confirm your PIN',
     setupMismatch: 'The PINs do not match, please try again',
     setupSaveError: 'The PIN could not be saved. Please try again.',
@@ -1336,6 +1453,7 @@ export default {
     purposeBackupDesc: 'Private copy to restore or move this business. Includes your people and their access.',
     purposeTemplate: 'Template to share',
     purposeTemplateDesc: 'To publish or hand to another business. Never includes people, PINs or tax certificates.',
+    purposeLocked: 'This is a demo or a test installation, so it can only export templates: people, PINs and tax details never travel in its file.',
     sectionUsers: 'Users',
     sectionUsersDesc: 'Employees, roles and permissions',
     sectionSettings: 'Settings',
@@ -1389,6 +1507,9 @@ export default {
     catalogEmpty: 'No templates published for your business yet.',
     catalogForbidden: 'Only an administrator can browse and import templates.',
     catalogUnavailable: 'Templates could not be loaded right now. You can still import a file.',
+    // hub#1120 — the way back from a catalogue that could not be read (a 429 from the SaaS lasts
+    // minutes; this screen used to last longer, because it only ever asked once).
+    catalogRetry: 'Try again',
     inspecting: 'Reading the file…',
     inspectErrorTitle: 'Could not read the file',
     manifestName: 'Name',
@@ -1511,6 +1632,11 @@ export default {
     blockedHint: 'This module is disabled because its subscription is no longer active for this hub. Your local data is safe and comes back as soon as the subscription does — manage it from your ERPlora account at erplora.com.',
     protectedTitle: 'Open the cash drawer first',
     protectedHint: 'This screen is locked while the cash drawer is closed. Open a register session to start selling — the screen reloads on its own the moment the drawer opens.',
+    emptyTitle: 'Nothing to show here yet',
+    emptyHint: 'This module is installed but has no screens to open right now. Check it is active in Apps, or open another one from the menu.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'This app is not available for this hub.',
   },
   moduleSettings: {
     tab: 'Settings',
@@ -1521,6 +1647,8 @@ export default {
     saveError: 'Could not save settings.',
     adminOnly: 'Only an administrator can change these settings.',
     textPlaceholder: 'Type here…',
+    invalidFields: 'Check the fields marked below and save again.',
+    fieldInvalid: 'This value is not accepted.',
   },
   modulePlan: {
     tab: 'Plan',
@@ -1571,5 +1699,59 @@ export default {
     // whole point — this is the one sentence that turns "it does not work" into a next step.
     unavailable:
       'This device cannot reach printers from the browser. Install the ERPlora app on the device that is connected to the printer and open your business from there.',
+  },
+  // What the CORE says when it refuses ONE field (hub#1190, ADR-0398 §6).
+  //
+  // The runtime answers `{code:"invalid_field", field, reason, message}` and the `message` is the
+  // English source written for a log. These are the sentences a person reads instead. Keyed by
+  // DATA — the pair first, the reason alone as the fallback — because the pair is what the screen
+  // has, and parsing the sentence is what ADR-0055 forbids.
+  //
+  // A reason with no entry here is NOT invented: the screen keeps the runtime's own sentence,
+  // which names the role, the length or the accepted values (same rule as `platformFailureMessage`,
+  // hub#1102).
+  invalidField: {
+    byField: {
+      name: {
+        required: 'Type the name.',
+        too_long: 'That name is too long: use 150 characters or fewer.',
+        duplicate:
+          'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
+      },
+      role: {
+        required: 'Pick a role.',
+        too_long: 'That role name is too long: use 50 characters or fewer.',
+      },
+      pin: { format: 'The PIN is {length} digits, numbers only.' },
+      badge: {
+        length: 'The badge must be between 4 and 64 characters.',
+        format: 'The badge only accepts letters, digits, “-” and “_”.',
+      },
+      email: { format: 'That email address is not valid.' },
+      role_key: {
+        required: 'Pick a role.',
+        immutable:
+          'This role comes with the hub: it is always on and cannot be switched off.',
+        unknown:
+          'No installed app declares this role. Install the app that brings it, or pick another role.',
+        inactive:
+          'This role is switched off in this hub. Switch it on in Settings → Roles before assigning it.',
+      },
+      language: { unknown: 'That language is not available in this hub.' },
+      theme_mode: { unknown: 'That appearance is not one this hub offers.' },
+      theme_palette: { unknown: 'That colour scheme is not one this hub offers.' },
+    },
+    // Fallback by reason alone: covers a field that gains a refusal before this table does, which
+    // is how the last sixteen fixes of this family started.
+    byReason: {
+      required: 'This field is required.',
+      too_long: 'This value is too long.',
+      length: 'This value does not have the length this hub expects.',
+      format: 'This value does not have the shape this hub expects.',
+      unknown: 'This hub does not accept that value.',
+      immutable: 'This value cannot be changed.',
+      inactive: 'This value is switched off in this hub.',
+      duplicate: 'This hub already has that value.',
+    },
   },
 } as const;

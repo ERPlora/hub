@@ -8,7 +8,7 @@
 //     hands them a breakdown of ours as a chore;
 //   - the counter is the query's, not the number of rows that fit in the card;
 //   - a hub with nothing pending shows the finished state, and an empty list does not blow up.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
@@ -17,8 +17,23 @@ import { createI18n } from 'vue-i18n';
 // workaround as ImportPanel.test.ts / files-actions.test.ts).
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
+// hub#1197 — the card folds tighter on a phone. `isPhoneViewport` is the shell's ONE reactive
+// answer to "is this a phone?" (`lib/viewport.ts`, same pattern `AppTopbar.compact.test.ts` mocks
+// for the topbar's own breakpoint); mocked here so each test can move it without touching a real
+// `matchMedia`.
+const { isPhoneViewport } = await vi.hoisted(async () => {
+  const { ref } = await import('vue');
+  return { isPhoneViewport: ref(false) };
+});
+vi.mock('../lib/viewport', () => ({ isPhoneViewport }));
+
 import SetupChecklistCard from './SetupChecklistCard.vue';
-import { parseSetupStatus, type SetupStatus } from '../lib/setup-status';
+import {
+  MAX_VISIBLE_ROWS,
+  PHONE_MAX_VISIBLE_ROWS,
+  parseSetupStatus,
+  type SetupStatus,
+} from '../lib/setup-status';
 // REAL catalogues: English is the source language and Spanish is NOT optional (binding rule of
 // 2026-08-04). A card with half its strings untranslated ships as half-Spanish.
 import enCatalogue from '../i18n/locales/en';
@@ -95,6 +110,10 @@ interface CardProps {
   status: SetupStatus | null;
   alreadyOnScreen?: readonly string[];
 }
+
+beforeEach(() => {
+  isPhoneViewport.value = false;
+});
 
 function mountCard(props: CardProps) {
   return mount(SetupChecklistCard, {
@@ -357,6 +376,45 @@ describe('what folds and what shows', () => {
     const w = mountCard({ status: status([item('taxes.setup')]) });
 
     expect(w.find('[data-testid="setup-toggle"]').exists()).toBe(false);
+  });
+});
+
+// hub#1197 — at 390px the desktop fold (5 rows) was, by itself, most of a screen and a half. The
+// card folds tighter on a phone: progress + a couple of items that need the owner right now, «view
+// all» one tap away — same trade Square/Shopify's mobile onboarding makes, and the same door
+// (`setup-toggle`) desktop already had.
+describe('the phone fold (hub#1197)', () => {
+  const nine = Array.from({ length: 9 }, (_, n) => item(`m${n}.setup`));
+
+  it('shows only PHONE_MAX_VISIBLE_ROWS on a phone, not the desktop MAX_VISIBLE_ROWS', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard({ status: status(nine) });
+
+    expect(w.findAll('[data-testid^="setup-item-"]')).toHaveLength(PHONE_MAX_VISIBLE_ROWS);
+    expect(PHONE_MAX_VISIBLE_ROWS).toBeLessThan(MAX_VISIBLE_ROWS);
+  });
+
+  it('off the phone the card keeps the desktop default', () => {
+    isPhoneViewport.value = false;
+    const w = mountCard({ status: status(nine) });
+
+    expect(w.findAll('[data-testid^="setup-item-"]')).toHaveLength(MAX_VISIBLE_ROWS);
+  });
+
+  it('«view all» still opens the WHOLE list on a phone, not just the desktop cap', async () => {
+    isPhoneViewport.value = true;
+    const w = mountCard({ status: status(nine) });
+
+    await w.find('[data-testid="setup-toggle"]').trigger('click');
+
+    expect(w.findAll('[data-testid^="setup-item-"]')).toHaveLength(9);
+  });
+
+  it('the counter never shrinks with the fold — it stays the query\'s', () => {
+    isPhoneViewport.value = true;
+    const w = mountCard({ status: status(nine) });
+
+    expect(w.find('[data-testid="setup-progress"]').text()).toContain('9');
   });
 });
 

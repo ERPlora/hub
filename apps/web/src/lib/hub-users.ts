@@ -142,7 +142,8 @@ export interface HubUserPatch {
 interface Envelope<T> {
   ok?: boolean;
   data?: T;
-  error?: { message?: string; code?: string } | string;
+  // hub#1190: `field`/`reason` travel beside the code on an `invalid_field` refusal (ADR-0398 §6).
+  error?: { message?: string; code?: string; field?: string; reason?: string } | string;
 }
 
 /**
@@ -151,7 +152,14 @@ interface Envelope<T> {
  * contra el código (ver [`hubUserErrorKey`]).
  */
 export class HubUsersError extends Error {
-  constructor(message: string, readonly code?: string) {
+  constructor(
+    message: string,
+    readonly code?: string,
+    // hub#1190: `field` and `reason` of an `invalid_field` refusal (ADR-0398 §6), carried as DATA
+    // so the screen translates by code instead of painting the runtime's English sentence.
+    readonly field?: string,
+    readonly reason?: string,
+  ) {
     super(message);
     this.name = 'HubUsersError';
   }
@@ -171,8 +179,16 @@ function errorCode(body: unknown): string | undefined {
   return typeof error === 'string' ? undefined : error?.code;
 }
 
+/** `field` and `reason` of the envelope when the refusal names one (hub#1190). */
+function errorFieldReason(body: unknown): [string | undefined, string | undefined] {
+  const error = (body as Envelope<unknown> | undefined)?.error;
+  if (typeof error === 'string' || !error) return [undefined, undefined];
+  return [error.field, error.reason];
+}
+
 function failed(body: unknown, fallback: string): HubUsersError {
-  return new HubUsersError(errorMessage(body, fallback), errorCode(body));
+  const [field, reason] = errorFieldReason(body);
+  return new HubUsersError(errorMessage(body, fallback), errorCode(body), field, reason);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -210,11 +226,16 @@ export async function listHubRoles(): Promise<HubRole[]> {
  */
 export class RoleActivationError extends Error {
   readonly code?: string;
+  /** hub#1190: `field`/`reason` of an `invalid_field` refusal, so the panel translates by code. */
+  readonly field?: string;
+  readonly reason?: string;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, field?: string, reason?: string) {
     super(message);
     this.name = 'RoleActivationError';
     this.code = code;
+    this.field = field;
+    this.reason = reason;
   }
 }
 
@@ -233,12 +254,14 @@ export async function setRoleActivation(key: string, active: boolean): Promise<H
   const env = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     data?: HubRole[];
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; field?: string; reason?: string };
   };
   if (!res.ok || env.ok === false) {
     throw new RoleActivationError(
       env.error?.message ?? `roles/${key} → ${res.status}`,
       env.error?.code,
+      env.error?.field,
+      env.error?.reason,
     );
   }
   return Array.isArray(env.data) ? env.data : [];
@@ -307,17 +330,45 @@ const ADMIN_ROLES = ['owner', 'admin'];
 const HUB_USERS_ERROR_PREFIX = 'hub.users.';
 
 /**
+ * Los códigos con los que el runtime cuenta que **no pudo sincronizar el acceso con el Cloud**
+ * (hub#1214), que es la otra mitad de un alta/baja: la ficha local se guarda en este hub, pero
+ * quién puede ENTRAR lo administra el SaaS (ADR-0157 §7).
+ *
+ * Van sin prefijo —son códigos de plataforma, no del namespace `hub.users.*`— y cada uno pide algo
+ * distinto de quien administra, que es justo por lo que no se aplanan a «no se pudo guardar»:
+ *
+ *  - `cloud_rate_limited` → espera y vuelve a intentarlo; no hay nada que corregir.
+ *  - `cloud_rejected` → el Cloud rechaza el cambio: hay algo que corregir (normalmente el email).
+ *  - `cloud_unreachable` → no contestó; se reintenta.
+ *  - `not_enrolled` → este hub no está enrolado; lo resuelve soporte, no quien está guardando.
+ *
+ * Hasta hub#1214 el runtime mandaba aquí el **cuerpo crudo del SaaS**
+ * (`el SaaS respondió 429: {"detail":"Request was throttled…"}`) y la pantalla lo pintaba tal cual.
+ */
+export const ACCESS_SYNC_ERRORS = [
+  'cloud_rate_limited',
+  'cloud_rejected',
+  'cloud_unreachable',
+  'not_enrolled',
+] as const;
+
+/**
  * Clave i18n del motivo de un rechazo del runtime (`hub.users.pin_in_use` → `pin_in_use`), o
  * `undefined` si el error no trae uno (fallo de red, 401 del gate, un error del navegador).
  *
  * Es lo que permite enseñar el motivo **traducido**: el runtime responde en inglés a propósito
  * (regla del código en inglés) y el Hub se ve en español.
+ *
+ * Dos familias, una sola clave: los rechazos de NEGOCIO del core (`hub.users.*`, que se leen sin su
+ * prefijo) y los de **sincronización del acceso** ([`ACCESS_SYNC_ERRORS`], hub#1214), que ya llegan
+ * con el nombre de su clave. Un código que no sea de ninguna de las dos devuelve `undefined` a
+ * propósito: la pantalla se queda entonces con la frase que vino, que dice más que un genérico.
  */
 export function hubUserErrorKey(error: unknown): string | undefined {
   const code = error instanceof HubUsersError ? error.code : undefined;
-  return code?.startsWith(HUB_USERS_ERROR_PREFIX)
-    ? code.slice(HUB_USERS_ERROR_PREFIX.length)
-    : undefined;
+  if (!code) return undefined;
+  if (code.startsWith(HUB_USERS_ERROR_PREFIX)) return code.slice(HUB_USERS_ERROR_PREFIX.length);
+  return (ACCESS_SYNC_ERRORS as readonly string[]).includes(code) ? code : undefined;
 }
 
 /**

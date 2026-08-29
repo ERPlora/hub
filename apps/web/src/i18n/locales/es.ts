@@ -104,6 +104,13 @@ export default {
     quotaTitle: 'Has usado todos tus mensajes del asistente',
     quotaUsed: 'Plan {tier} — {used} de {limit} mensajes este mes.',
     quotaCta: 'Ver planes',
+    quotaRemaining: 'Plan {tier} — te quedan {remaining} de {limit} mensajes este mes.',
+    quotaResets: 'Se renuevan el {date}.',
+    quotaAskAdmin: 'Pídele al responsable del negocio que amplíe el plan del asistente.',
+    plansTitle: 'Elige un plan',
+    plansConfirm: 'Ir al pago',
+    planOption: '{name} — {price} €/mes',
+    plansUnavailable: 'Ahora mismo no hay planes a los que ampliar.',
     attach: 'Adjuntar archivo',
     attachRemove: 'Quitar adjunto',
     attachImage: 'imagen',
@@ -231,6 +238,7 @@ export default {
       body: 'Elige el que más se parezca al tuyo y te dejamos sus apps y su catálogo listos de una vez. Después tendrás que poner tus propios datos.',
       use: 'Usar esta',
       more: 'Ver todas las plantillas',
+      dismiss: 'Ahora no',
       working: 'Preparando «{name}»…',
       readyTitle: 'Ya tienes tus apps y tu catálogo',
       readyBody: 'Lo que queda es lo que solo puedes contestar tú: los datos de tu negocio. Los tienes en la lista de abajo.',
@@ -336,6 +344,9 @@ export default {
     // (hub#375); «Sistema conectado/desconectado» se ha ido a propósito: era un veredicto sobre
     // todo sacado de una sonda que solo sabía del equipo de la impresora.
     openSystem: 'Ver sistema',
+    // hub#1197 — en móvil la rejilla se pliega a las dos filas; esta es la baldosa que lleva al
+    // resto, el mismo catálogo que ya abre ＋ Añadir apps (`/apps`).
+    appsViewAll: 'Ver todas las apps',
   },
   profile: {
     title: 'Mi perfil',
@@ -448,22 +459,73 @@ export default {
   // Ver la nota del bloque equivalente en `en.ts`.
   grant: {
     intro:
-      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado para eso, y esto es ese consentimiento. Léelo, fírmalo y adjunta una copia del DNI.',
-    stateVigente: 'Firmado el {date}. ERPlora puede remitir en tu nombre.',
+      'ERPlora remite tus registros de facturación a la Agencia Tributaria EN TU NOMBRE. La ley exige tu consentimiento firmado: el modelo oficial del acuerdo de colaboración social. Lo descargas, lo firmas fuera de esta pantalla y lo vuelves a subir.',
+    stateVigente: 'Aprobado el {date}. ERPlora puede remitir en tu nombre.',
+    statePendiente: 'Subido el {date}. Lo estamos revisando y te avisamos por email en 24-72 horas.',
+    stateRejected: 'Devuelto el {date}. Corrige lo que se indica abajo y vuelve a subirlo.',
     stateRevoked: 'Revocado el {date}. ERPlora no puede remitir en tu nombre.',
     stateAbsent: 'Sin firmar. Tu negocio no puede pasar a producción hasta que lo firmes.',
     stateUnknown: 'Consultando con ERPlora…',
+    stateUnreachable: 'No hemos podido contactar con ERPlora, así que no podemos decirte cómo va.',
+    step1Title: '1 · Consigue el modelo oficial',
+    step1Hint:
+      'Te lo rellenamos con tus datos. Su texto lo fija la Agencia Tributaria y no se puede modificar.',
+    step2Title: '2 · Sube el modelo firmado',
+    step2Hint: 'Lo revisa una persona de ERPlora y te avisa por email en 24-72 horas.',
+    partyObligado: 'Tu negocio',
+    partySigner: 'Quien firma',
     obligadoNif: 'NIF del obligado (tu negocio)',
     obligadoName: 'Razón social (tu negocio)',
+    municipio: 'Municipio',
+    via: 'Vía pública',
+    numero: 'Número',
     signerNif: 'NIF/NIE de quien firma',
     signerName: 'Nombre y apellidos de quien firma',
-    signatureTitle: 'Firma',
-    signatureHint:
-      'Dibuja tu firma. En una empresa firma el representante legal — y la copia del DNI de abajo es la SUYA, no la de la sociedad.',
-    signatureClear: 'Borrar firma',
-    dniChoose: 'Adjuntar copia del DNI/NIE',
-    confirm: 'He leído el otorgamiento de arriba y lo firmo.',
-    submit: 'Firmar y enviar',
+    downloadModel: 'Descargar el modelo',
+    howToByHand:
+      'A mano: imprímelo, fírmalo, ponle el sello de la entidad si tu negocio es una sociedad, y escanéalo a PDF.',
+    howToElectronic:
+      'Electrónicamente: firma el PDF con AutoFirma usando tu propio certificado cualificado. Una firma dibujada no vale.',
+    privacyTitle: 'Protección de datos — información básica (art. 13 RGPD)',
+    privacyController:
+      'Responsable: ERPLORA CLOUD SL (B27593136). Custodiamos estos documentos como representante tuyo.',
+    privacyPurpose:
+      'Finalidad y base: remitir en tu nombre los registros de facturación a la Agencia Tributaria, al amparo del otorgamiento que firmas y de nuestras obligaciones legales. Los conservamos mientras dure la representación y durante los plazos tributarios.',
+    privacyRights:
+      "Tus derechos: acceso, rectificación, supresión, oposición y portabilidad en privacy{'@'}erplora.com.",
+    documentType: 'Documento de identidad',
+    documentTypeDni: 'DNI',
+    documentTypeNie: 'NIE',
+    signedDocumentChoose: 'Adjuntar el modelo firmado (PDF)',
+    dniChoose: 'Adjuntar copia del documento de identidad',
+    signatureSampleWhy:
+      'Muchos NIE no llevan firma impresa, así que necesitamos una hoja con tu firma manuscrita para poder compararla.',
+    signatureSampleChoose: 'Adjuntar muestra de firma',
+    representationProofWhy:
+      'Tu negocio es una sociedad, así que necesitamos el documento que acredita quién puede firmar por ella.',
+    representationProofChoose: 'Adjuntar el justificante de representación',
+    submit: 'Enviar a revisión',
+    preferComputer: 'Prefiero hacerlo desde el ordenador',
+    errors: {
+      obligado_nif_required: 'Tu negocio necesita un NIF antes de poder hacer esto.',
+      signer_required: 'Rellena el nombre y el NIF de quien firma.',
+      document_type_invalid: 'Elige el tipo de documento de identidad.',
+      signed_document_required: 'Adjunta el modelo firmado.',
+      signed_document_not_pdf:
+        'El modelo firmado tiene que ser un PDF — escanéalo o fírmalo con AutoFirma.',
+      dni_copy_required: 'Adjunta una copia del documento de identidad.',
+      signature_sample_required: 'Con NIE necesitamos además una muestra de tu firma manuscrita.',
+      representation_proof_required:
+        'Adjunta el documento que acredita que puedes firmar por la sociedad.',
+      document_too_large: 'Cada fichero tiene que ocupar menos de 10 MB.',
+      invalid_via: 'Esa vía no es una por la que podamos remitir.',
+      cloud_rejected: 'ERPlora no ha podido atenderlo ahora mismo. Inténtalo en unos minutos.',
+      hub_not_enrolled: 'Este hub todavía no está conectado con ERPlora.',
+      identity_not_shared:
+        'No hemos podido decirle a ERPlora quién es el obligado. Si la página te pide tus datos fiscales, guárdalos otra vez en Ajustes → Negocio.',
+      open_external_failed: 'No hemos podido abrir tu navegador.',
+      unknown: 'No ha funcionado. Vuelve a intentarlo.',
+    },
   },
   settings: {
     hubWide: 'Ajustes generales',
@@ -605,6 +667,35 @@ export default {
     permissionGranted: '{cap} concedido a {app}.',
     permissionRevoked: '{cap} revocado a {app}.',
     permissionSaveError: 'No se pudo cambiar el permiso.',
+    // Responsible declaration inside the product (art. 13.2 RRSIF — hub#528). The element names
+    // (`NombreRazon`, `IdSistemaInformatico`…) are NOT translated: they are the ones of the
+    // invoicing record and the screen exists to be read next to one.
+    declarationTitle: 'Declaración responsable',
+    declarationDesc:
+      'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
+    declarationRead: 'Leer la declaración firmada',
+    declarationDataTitle: 'Datos identificativos de este sistema',
+    declarationPending:
+      'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
+    declarationError: 'No se ha podido cargar la declaración responsable.',
+    declarationNombreRazon: 'Productor',
+    declarationNIF: 'NIF del productor',
+    declarationNombreSistemaInformatico: 'Nombre del sistema',
+    declarationIdSistemaInformatico: 'Código del sistema',
+    declarationVersion: 'Versión instalada',
+    declarationNumeroInstalacion: 'Número de instalación',
+    declarationTipoUsoPosibleSoloVerifactu: 'Solo VERI*FACTU',
+    declarationTipoUsoPosibleMultiOT: 'Puede dar servicio a varios obligados',
+    declarationIndicadorMultiplesOT: 'Da servicio a varios obligados',
+    // hub#1174 — qué DEJA DE FUNCIONAR mientras el interruptor está apagado.
+    capabilityBreaks: {
+      network: 'Sin esto, la app no puede salir a internet: lo que sincroniza, envía o comprueba en línea se queda sin hacer.',
+      certificate: 'Sin esto, tus facturas no se firman y no llegan a Hacienda.',
+      printer: 'Sin esto, los tiques y las comandas se quedan en la cola de impresión y no sale ninguno.',
+      notify: 'Sin esto, no llega ningún recordatorio ni confirmación a tus clientes por email, SMS o WhatsApp.',
+      manage_flows: 'Sin esto, la app no puede crear ni editar tus automatizaciones, así que las que necesita no se ejecutan.',
+      unknown: 'Sin esto, la parte de la app que necesita este permiso no funcionará.',
+    },
   },
   // Print coverage (hub#800): who is printing each kind of ticket, and who is NOT.
   print: {
@@ -718,6 +809,8 @@ export default {
     consentCancel: 'Cancelar',
     installedButNoPermissions: '«{name}» se instaló, pero no se pudieron conceder sus permisos. Sin ellos no funcionará: actívalos en Ajustes → Permisos.',
     goToPermissions: 'Ir a Permisos',
+    publicationRetired: 'Retirada',
+    retiredNotice: 'Ya no están en el catálogo: {apps}. Aquí siguen funcionando y siguen recibiendo actualizaciones — simplemente ya no se ofrecen, así que no las encontrarás para instalarlas en otro sitio.',
   },
   employees: {
     searchEmployee: 'Buscar usuario…',
@@ -891,7 +984,7 @@ export default {
     email: 'Email',
     role: 'Rol',
     pin: 'PIN local',
-    pinHelp: 'Entre 4 y 8 dígitos. En blanco, entra con su cuenta online.',
+    pinHelp: '{n} dígitos. En blanco, entra con su cuenta online.',
     pinSetHelp: 'Escribe un PIN nuevo para cambiarlo; déjalo en blanco y se queda como está.',
     clearPin: 'Retirar el PIN',
     badge: 'Placa',
@@ -907,11 +1000,11 @@ export default {
     localUser: 'Usuario local',
     localUserHelp:
       'Trabaja en este hub solo con un PIN: sin email y sin cuenta de ERPlora. Desmárcalo para darle una cuenta más adelante, sin perder su historial.',
-    localPinHelp: 'Entre 4 y 8 dígitos. Obligatorio: es cómo entra esta persona.',
+    localPinHelp: '{n} dígitos. Obligatorio: es cómo entra esta persona.',
     accountEmailHelp:
       'Le mandamos por email una invitación a este hub. La contraseña la elige él: tú no la ves nunca.',
     accountPinHelp:
-      'Opcional: entre 4 y 8 dígitos. Solo si además atiende una caja compartida de este hub.',
+      'Opcional: {n} dígitos. Solo si además atiende una caja compartida de este hub.',
     errors: {
       local_needs_pin: 'Un usuario local entra con un PIN: sin él, nadie podría usar esta ficha.',
       account_needs_email: 'Un usuario de cuenta entra con su cuenta de ERPlora, así que el email es obligatorio. Marca «Usuario local» para dar de alta a quien trabaja en este hub con un PIN.',
@@ -919,7 +1012,7 @@ export default {
       email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
       role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
       invalid_email: 'Introduce un email válido.',
-      pin_length: 'El PIN debe tener entre 4 y 8 dígitos.',
+      pin_length: 'El PIN debe tener {n} dígitos.',
       pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
       pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',
       local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
@@ -928,6 +1021,11 @@ export default {
       badge_shape: 'Una placa tiene entre 4 y 64 caracteres: letras, dígitos, «-» y «_».',
       badge_in_use: 'Esa placa ya la lleva otro usuario activo. La placa dice quién está en la caja, así que no la pueden compartir dos personas.',
       badge_without_fallback: 'La placa no puede ser su única vía de entrada: si pierde la tarjeta se queda fuera. Consérvale el PIN, dale una cuenta, o retira también la placa.',
+      // hub#1214 — ver la nota en `en.ts`.
+      cloud_rate_limited: 'Demasiados cambios en poco tiempo: la invitación todavía no ha salido. Espera unos minutos y vuelve a guardar — no se ha perdido nada más.',
+      cloud_rejected: 'No se ha podido crear la invitación para ese email. Revisa la dirección y vuelve a intentarlo; si sigue fallando, avisa a soporte.',
+      cloud_unreachable: 'No hemos podido conectar con ERPlora para enviar la invitación. El usuario queda guardado aquí: vuelve a guardar dentro de un momento.',
+      not_enrolled: 'Este hub todavía no puede enviar invitaciones. El usuario queda guardado aquí; avisa a soporte para que termine de configurarlo.',
     },
     activeUser: 'Usuario activo',
     required: 'Campo obligatorio',
@@ -1152,7 +1250,7 @@ export default {
     // ADR-0154: se muestra cuando la sesión de este dispositivo fue desalojada por un login en
     // otro dispositivo (plan de un solo dispositivo activo). Requiere el interceptor 401 (ver PR).
     sessionTakenOver: 'Sesión abierta en otro dispositivo',
-    setupChoosePin: 'Elige un PIN de 4 dígitos',
+    setupChoosePin: 'Elige un PIN de {n} dígitos',
     setupConfirmPin: 'Confirma tu PIN',
     setupMismatch: 'Los PIN no coinciden, inténtalo de nuevo',
     setupSaveError: 'No se pudo guardar el PIN. Vuelve a intentarlo.',
@@ -1250,6 +1348,7 @@ export default {
     purposeBackupDesc: 'Copia privada para restaurar o mudar este negocio. Incluye a tu gente y sus accesos.',
     purposeTemplate: 'Plantilla para compartir',
     purposeTemplateDesc: 'Para publicar o dar a otro negocio. Nunca incluye personas, PIN ni certificados fiscales.',
+    purposeLocked: 'Esta es una instalación de demostración o de pruebas, así que solo puede exportar plantillas: las personas, los PIN y los datos fiscales nunca viajan en su archivo.',
     sectionUsers: 'Usuarios',
     sectionUsersDesc: 'Empleados, roles y permisos',
     sectionSettings: 'Ajustes',
@@ -1301,6 +1400,7 @@ export default {
     catalogEmpty: 'Todavía no hay plantillas publicadas para tu negocio.',
     catalogForbidden: 'Solo un administrador puede ver e importar plantillas.',
     catalogUnavailable: 'No se han podido cargar las plantillas ahora mismo. Puedes importar un archivo igualmente.',
+    catalogRetry: 'Reintentar',
     inspecting: 'Leyendo el fichero…',
     inspectErrorTitle: 'No se pudo leer el fichero',
     manifestName: 'Nombre',
@@ -1387,6 +1487,11 @@ export default {
     blockedHint: 'Este módulo está deshabilitado porque su suscripción ya no está activa para este hub. Tus datos locales están a salvo y vuelven en cuanto vuelva la suscripción — se gestiona desde tu cuenta de ERPlora, en erplora.com.',
     protectedTitle: 'Abre la caja primero',
     protectedHint: 'Esta pantalla está bloqueada mientras la caja esté cerrada. Abre una sesión de caja para empezar a vender — la pantalla se recarga sola en cuanto se abre la caja.',
+    emptyTitle: 'Aquí todavía no hay nada',
+    emptyHint: 'Este módulo está instalado pero ahora mismo no tiene ninguna pantalla que abrir. Comprueba que está activo en Apps, o abre otro desde el menú.',
+    // hub#1175 — the router says why it sent you back: a module id nobody's entitlement ever
+    // named (a stale bookmark, a typo, a module this hub never installed) has no screen to open.
+    notAvailableToast: 'Esta app no está disponible para este hub.',
   },
   moduleSettings: {
     tab: 'Ajustes',
@@ -1397,6 +1502,8 @@ export default {
     saveError: 'No se pudieron guardar los ajustes.',
     adminOnly: 'Solo un administrador puede cambiar estos ajustes.',
     textPlaceholder: 'Escribe aquí…',
+    invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
+    fieldInvalid: 'Este valor no se admite.',
   },
   modulePlan: {
     tab: 'Plan',
@@ -1445,5 +1552,48 @@ export default {
     // la app es lo importante: es la frase que convierte «no funciona» en un paso siguiente.
     unavailable:
       'Desde el navegador, este dispositivo no puede llegar a las impresoras. Instala la app de ERPlora en el dispositivo conectado a la impresora y abre tu negocio desde ahí.',
+  },
+  // Lo que dice el CORE cuando rechaza UN campo (hub#1190, ADR-0398 §6). Traducción de
+  // `invalidField` de `en.ts` — el inglés es la fuente (ADR-0055).
+  invalidField: {
+    byField: {
+      name: {
+        required: 'Escribe el nombre.',
+        too_long: 'Ese nombre es demasiado largo: usa 150 caracteres o menos.',
+        duplicate:
+          'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
+      },
+      role: {
+        required: 'Elige un rol.',
+        too_long: 'Ese nombre de rol es demasiado largo: usa 50 caracteres o menos.',
+      },
+      pin: { format: 'El PIN es de {length} dígitos, solo números.' },
+      badge: {
+        length: 'La placa debe tener entre 4 y 64 caracteres.',
+        format: 'La placa solo admite letras, dígitos, «-» y «_».',
+      },
+      email: { format: 'Ese correo electrónico no es válido.' },
+      role_key: {
+        required: 'Elige un rol.',
+        immutable: 'Este rol viene con el hub: está siempre activo y no se puede apagar.',
+        unknown:
+          'Ninguna app instalada declara este rol. Instala la app que lo trae o elige otro rol.',
+        inactive:
+          'Este rol está apagado en este hub. Enciéndelo en Ajustes → Roles antes de asignarlo.',
+      },
+      language: { unknown: 'Ese idioma no está disponible en este hub.' },
+      theme_mode: { unknown: 'Ese aspecto no es uno de los que ofrece este hub.' },
+      theme_palette: { unknown: 'Esa combinación de colores no es una de las que ofrece este hub.' },
+    },
+    byReason: {
+      required: 'Este campo es obligatorio.',
+      too_long: 'Este valor es demasiado largo.',
+      length: 'Este valor no tiene la longitud que espera este hub.',
+      format: 'Este valor no tiene la forma que espera este hub.',
+      unknown: 'Este hub no acepta ese valor.',
+      immutable: 'Este valor no se puede cambiar.',
+      inactive: 'Este valor está apagado en este hub.',
+      duplicate: 'Este hub ya tiene ese valor.',
+    },
   },
 } as const;

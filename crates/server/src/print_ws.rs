@@ -730,10 +730,26 @@ mod tests {
         let job = send(&f.st, &mut conn, json!({"type":"claim","role":"receipt"})).await;
         assert_eq!(job.frame["type"], "job");
         assert_eq!(job.frame["jobId"], "j1");
+        // hub#1159: the queue now stamps the hub's language on enqueue, so the device can print
+        // the paper in it. The assertion is NOT relaxed to "contains what the producer sent" —
+        // that would let a future change smuggle a second field in unnoticed. It stays exact:
+        // everything the producer sent, arriving whole, PLUS the one stamp and nothing else.
+        let document = &job.frame["document"];
         assert_eq!(
-            job.frame["document"],
-            json!({ "receipt_id": "j1" }),
+            document["receipt_id"],
+            json!("j1"),
             "the STRUCTURED document travels to the host that claimed it, and only there"
+        );
+        assert_eq!(
+            document["locale"],
+            json!("es"),
+            "the queue stamps the hub's language once, for every producer (hub#1159)"
+        );
+        assert_eq!(
+            document.as_object().map(|d| d.len()),
+            Some(2),
+            "the stamp is the ONLY thing the queue adds — anything else reaching the host is \
+             something the producer never sent: {document:?}"
         );
         assert_eq!(
             job.frame["documentType"], "receipt",

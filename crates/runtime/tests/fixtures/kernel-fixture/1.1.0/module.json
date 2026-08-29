@@ -1,0 +1,91 @@
+{
+  "id": "kfx",
+  "name": "Kernel Conformance Fixture",
+  "version": "1.1.0",
+  "permissions": ["kfx.read", "kfx.write", "kfx.bulk"],
+  "role_permissions": {
+    "admin": ["*"],
+    "manager": ["kfx.write"],
+    "employee": ["kfx.read"]
+  },
+  "ui": { "entry": "dist/kfx.esm.js" },
+  "navigation": [
+    {
+      "id": "items",
+      "label": "Items",
+      "icon": "ion:list-outline",
+      "component": "kfx-items",
+      "permission": "kfx.read",
+      "chrome": ["fullscreen"]
+    }
+  ],
+  "provides_slots": [
+    {
+      "slot": "kfx.items.aside",
+      "component": "kfx-aside",
+      "permission": "kfx.read",
+      "priority": 10,
+      "tab_label": "Items"
+    }
+  ],
+  "errors": {
+    "kfx.not_found": {},
+    "kfx.empty_batch": {},
+    "kfx.retired": { "deprecated": "1.1.0" }
+  },
+  "migrations": {
+    "postgres": [
+      { "file": "migrations/postgres/001_init.sql", "kind": "expand", "since": "1.0.0" },
+      { "file": "migrations/postgres/002_retire_legacy.sql", "kind": "contract", "since": "1.1.0" },
+      { "file": "migrations/postgres/003_trim_names.sql", "kind": "backfill", "since": "1.1.0" }
+    ]
+  },
+  "queries": {
+    "kfx.items.list": {
+      "permission": "kfx.read",
+      "sql": "queries/items_list.sql",
+      "list": {
+        "search": ["name"],
+        "sort": ["name", "created_at"],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": { "name": { "op": "like" } },
+        "page_size": 2
+      }
+    }
+  },
+  "commands": {
+    "kfx.item.create": {
+      "permission": "kfx.write",
+      "transaction": true,
+      "sql": ["commands/item_create.sql"],
+      "emit": ["kfx.item.created"]
+    },
+    "kfx.item.archive": {
+      "permission": "kfx.write",
+      "transaction": true,
+      "sql": ["commands/item_archive.sql"],
+      "expect_rows": { "op": "min", "n": 1, "error": "kfx.not_found" }
+    },
+    "kfx.items.bulk": {
+      "permission": "kfx.bulk",
+      "transaction": true,
+      "handler": { "type": "wasm", "file": "handler.wasm", "function": "handle" },
+      "emit": ["kfx.items.bulked"]
+    },
+    "kfx._insert_item": {
+      "permission": "kfx.bulk",
+      "transaction": true,
+      "sql": ["commands/insert_item.sql"]
+    },
+    "kfx._log_created": {
+      "permission": "",
+      "transaction": true,
+      "sql": ["commands/log_created.sql"]
+    }
+  },
+  "events": {
+    "emits": ["kfx.item.created", "kfx.items.bulked"],
+    "listen": { "kfx.item.created": { "command": "kfx._log_created" } }
+  }
+}

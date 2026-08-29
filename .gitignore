@@ -42,3 +42,19 @@ erplora-inspect.mjs
 # Son worktrees registrados con su rama, NO ficheros del repo: se podan con
 # `git worktree remove`, nunca borrándolos a mano.
 .wt-*/
+
+# Salida de una corrida de Playwright: trazas, capturas del fallo y `.last-run.json`. Es evidencia
+# EFÍMERA de una ejecución concreta — en CI se sube como artefacto (test-web.yml, hub#1240), no se
+# versiona. `apps/web/test-results/.last-run.json` llegó a estar trackeado y decía «passed» de una
+# corrida de hace meses, en un repo donde la suite no la corría nadie.
+apps/web/test-results/
+apps/web/playwright-report/
+
+# Baselines de `toHaveScreenshot` generadas en macOS. Las del repo se generan DONDE CORREN (el
+# runner Linux: test-web.yml → workflow_dispatch → update_baselines); una hecha en un Mac no casa
+# jamás con la de Linux, así que commitearla solo puede confundir a quien la vea en el diff.
+apps/web/tests/e2e/**/*-darwin.png
+
+# Nested guest of the kernel conformance fixture (hub#1238): cargo writes its lock, the build
+# stamp ignores it on purpose, and it is not part of the fixture.
+crates/runtime/tests/fixtures/kernel-fixture/handler/Cargo.lock

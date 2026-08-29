@@ -314,11 +314,13 @@ impl CloudClient {
         self.get("/api/v1/hub/device/fiscal/certificate/", auth)
     }
 
-    /// **El otorgamiento de representación firmado** (hub#817 / saas#1438).
+    /// **El otorgamiento de representación firmado** (hub#817 / saas#1438, hub#1293).
     ///
-    /// `POST` archiva el Anexo I firmado + la copia del DNI (multipart, lo monta el server);
-    /// `GET` contesta su estado (vigente / revocado / ausente + fecha) y **nunca** los documentos.
-    /// Misma URL para los dos verbos, así que el builder es uno.
+    /// `POST` sube el modelo oficial YA FIRMADO fuera (a mano o con AutoFirma) + la copia del
+    /// documento de identidad + la muestra de firma y el justificante de representación cuando
+    /// hacen falta; `GET` contesta su estado (`pendiente` / `vigente` / `rechazado` / `revocado` /
+    /// ausente + fecha) y **nunca** los documentos. Misma URL para los dos verbos, así que el
+    /// builder es uno.
     ///
     /// Credencial de **máquina**, como sus vecinas: la persona que firma en el mostrador no tiene
     /// un JWT del SaaS vivo (ADR-0003), y el `cloud_api_token` no cruza al navegador — la pantalla
@@ -328,6 +330,23 @@ impl CloudClient {
             method: "POST",
             url: format!(
                 "{}/api/v1/hub/device/fiscal/representation-grant/",
+                self.base_url
+            ),
+            headers: auth.headers(),
+        }
+    }
+
+    /// **El modelo oficial del otorgamiento, pre-relleno** (hub#1293).
+    ///
+    /// `POST …/representation-grant/model/` con los datos de las dos partes → `application/pdf`.
+    /// El texto del modelo (p. 11 del acuerdo de colaboración social 017) «no podrá ser
+    /// modificado», así que vive en UN sitio, el SaaS, y el Hub solo trae los bytes: dos copias del
+    /// mismo documento legal son dos documentos que acaban diciendo cosas distintas.
+    pub fn representation_grant_model(&self, auth: &Auth) -> PreparedRequest {
+        PreparedRequest {
+            method: "POST",
+            url: format!(
+                "{}/api/v1/hub/device/fiscal/representation-grant/model/",
                 self.base_url
             ),
             headers: auth.headers(),
@@ -497,6 +516,17 @@ impl CloudClient {
             &format!("/api/v1/marketplace/modules/{module_id}/versions/"),
             auth,
         )
+    }
+
+    /// Lo que el marketplace dice de UN módulo (`GET /api/v1/marketplace/modules/{module_id}/`).
+    ///
+    /// Es la puerta de DETALLE, no la del catálogo, y esa diferencia es el motivo de existir
+    /// (hub#1134): el listado sólo sirve lo que se sigue OFRECIENDO —`publication_status='listed'`,
+    /// filtrado por el SaaS en su acción `list`—, así que un módulo que este hub corre y el
+    /// marketplace ha RETIRADO (ADR-0380) no sale ahí. `retrieve` parte del queryset base y admite
+    /// el token de máquina (`MACHINE_OK_ACTIONS`), así que es la única que sigue contestando por él.
+    pub fn module_detail(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
+        self.get(&format!("/api/v1/marketplace/modules/{module_id}/"), auth)
     }
 
     /// **Flujo real de instalación, paso 2** — descarga el ZIP binario de una versión.

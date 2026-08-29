@@ -386,6 +386,15 @@ export class ErploraError extends Error {
      * A flat `permission_denied` leaves it `undefined` on purpose: it is not an offer to elevate.
      */
     public readonly permission?: string,
+    /**
+     * The fields the payload schema refused, present only on `invalid_payload` (hub#1094): the
+     * runtime splits them off the detail (`registry::invalid_payload_fields`) so the screen can
+     * MARK those controls. Read the field, never parse the message — the message is prose and
+     * translatable, the list is not. `undefined` on every refusal that names no field. A typed
+     * `invalid_field` refusal of the core (one `field` + a stable `reason`, hub#1070) lands here
+     * too, as a one-element list.
+     */
+    public readonly fields?: readonly string[],
   ) {
     super(message);
     this.name = 'ErploraError';
@@ -517,13 +526,165 @@ export class UnknownOutcomeError extends ErploraError {
 interface Envelope {
   ok: boolean;
   data?: unknown;
-  error?: { code: string; message: string; permission?: string };
+  error?: PlatformFailure & { message: string; permission?: string; fields?: string[]; field?: string };
+}
+
+// ── hub#1102: a PLATFORM failure is not a sentence a module wrote ────────────────────────────
+//
+// With `taxes` uninstalled, the pay dialog of the till showed «required read `taxes.rules.list` is
+// unavailable — the command was aborted (hub#701)»: English, backticks, an internal query name and
+// a GitHub issue number, in front of a customer. `erp-pos-touch` was doing the ordinary thing —
+// `this.error = e.message` — and so does every one of the 25 modules, which is why this belongs
+// here and not in `sales`: fixing it there fixes it once and misses the other 24.
+//
+// The runtime half is hub#1074: the plumbing stopped travelling as prose and what reaches the wire
+// is a stable `code` plus the app as a FIELD. This is the other half. Two rules hold it honest:
+//
+//  1. only PLATFORM codes are rewritten. A module's domain refusal (`inventory.insufficient_stock`,
+//     ADR-0205/hub#139) is the module saying something true about the request, and overwriting it
+//     would silence exactly the channel that works;
+//  2. an unrecognised code keeps whatever the runtime sent. A sentence we invented for a code we do
+//     not know says strictly less than the one that arrived.
+
+/** The fields of an error envelope this SDK reads. Everything is optional: older runtimes. */
+export interface PlatformFailure {
+  code?: string;
+  /** The app a refusal is ABOUT (`module_not_installed`, `module_inactive`, `missing_dependency`). */
+  module?: string;
+  /** The `required` read that could not be resolved (`read_unavailable`). */
+  query?: string;
+  /** The refused field of an `invalid_field` (hub#1070/#1185): `name`, `role_key`, `language`… */
+  field?: string;
+  /** WHY it was refused: `required` · `too_long` · `format` · `length` · `unknown` · `immutable`
+   *  · `inactive`. A small closed set, so a screen branches on it instead of reading the prose. */
+  reason?: string;
+}
+
+/** A localized sentence, `en` source + `es` translation (ADR-0055). */
+type Bilingual = { en: string; es: string };
+
+/**
+ * The app id a sentence should send the user after, or `''` when the runtime named none.
+ *
+ * The RAW id on purpose, exactly like `appLabel` in the shell: the human name lives in the
+ * marketplace catalogue, which this SDK cannot reach, and prettifying `cash_register` into
+ * «Cash Register» would invent a name the owner will not find in Apps either.
+ */
+function appOf(failure: PlatformFailure): string {
+  if (failure.module) return failure.module;
+  // `read_unavailable` names the query (`taxes.rules.list`); its owner is the first segment.
+  return failure.query?.split('.')[0] ?? '';
+}
+
+/** «The operation did not happen and there is nothing you can do about it here.» */
+const PLUMBING: Bilingual = {
+  en: 'The operation could not be completed. Try again, and tell an administrator if it keeps happening.',
+  es: 'No se pudo completar la operación. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+};
+
+/**
+ * The codes a person can meet at a counter, and what to tell them.
+ *
+ * The plumbing family is every code whose message hub#1074 now redacts to a fixed English line
+ * written for the log: it is the same event to whoever is standing there, so it is one sentence.
+ * The missing/inactive app family is NOT folded into it — «install it» and «switch it back on» are
+ * different actions, and a screen that cannot tell them apart sends the owner to the wrong place.
+ */
+const PLATFORM_FAILURES: Record<string, (app: string) => Bilingual> = {
+  read_unavailable: (app) => missingApp(app),
+  module_not_installed: (app) => missingApp(app),
+  missing_dependency: (app) => missingApp(app),
+  module_inactive: (app) => ({
+    en: app
+      ? `The app “${app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.`
+      : 'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
+    es: app
+      ? `La app «${app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.`
+      : 'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
+  }),
+  db: () => PLUMBING,
+  io: () => PLUMBING,
+  wasm: () => PLUMBING,
+  native: () => PLUMBING,
+  schema: () => PLUMBING,
+  other: () => PLUMBING,
+  // The bucket every unmapped runtime error fell into before hub#1074, and what an older hub still
+  // answers. Its message is plumbing by definition — that is what put driver text on a till.
+  error: () => PLUMBING,
+};
+
+// 🔴 `invalid_field` (hub#1070/#1185) is deliberately NOT in the table above.
+//
+// It is produced only by the CORE's own doors — staff, the role catalogue, one's own profile —
+// which are screens of the shell (`apps/web`), not surfaces a module's Web Component ever calls.
+// And a sentence this SDK could build out of `field` + `reason` («the field “role_key” is not
+// valid») says strictly LESS than the `detail` the runtime already sends, which names the role,
+// the length or the accepted values. Rule 2 above applies to it like to any other unknown code:
+// the sentence that arrived wins.
+//
+// What this SDK does do is carry `field` and `reason` on {@link PlatformFailure}, so a screen that
+// wants to translate them branches on data instead of parsing prose. Translating them into the
+// user's language belongs to the shell that owns those forms — see hub#1190.
+
+function missingApp(app: string): Bilingual {
+  return {
+    en: app
+      ? `The app “${app}” is missing and this action needs it. Ask an administrator to install it from Apps.`
+      : 'An app this action needs is not installed. Ask an administrator to install it from Apps.',
+    es: app
+      ? `Falta la app «${app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.`
+      : 'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
+  };
+}
+
+/**
+ * What to tell a person about a PLATFORM failure, or `null` when this is not one (hub#1102).
+ *
+ * `null` is the answer for a module's own domain code and for anything unrecognised — the caller
+ * then keeps the sentence the runtime sent, which is the honest default.
+ */
+export function platformFailureMessage(
+  failure: PlatformFailure,
+  locale = 'es',
+): string | null {
+  const entry = failure.code ? PLATFORM_FAILURES[failure.code] : undefined;
+  if (!entry) return null;
+  const sentence = entry(appOf(failure));
+  return locale.toLowerCase().startsWith('en') ? sentence.en : sentence.es;
+}
+
+/**
+ * The language the shell is running in, read the same way {@link ErploraClient.locale} reads it.
+ *
+ * Module-level and not a client method because {@link unwrap} runs in the TRANSPORT, below any
+ * client: a refusal has to be readable on every path — `query`, `command`, and a module holding a
+ * transport directly — and threading a locale through all of them to reach one string is how half
+ * the paths end up in English.
+ */
+function activeLocale(): string {
+  try {
+    return localStorage.getItem('erplora.locale') || 'es';
+  } catch {
+    return 'es';
+  }
 }
 
 function unwrap(env: Envelope): unknown {
   if (!env.ok) {
     const e = env.error;
-    throw new ErploraError(e?.code ?? 'error', e?.message ?? 'unknown error', e?.permission);
+    // hub#1102: a platform failure is told in the user's language and in business words; a module's
+    // own refusal (and any code we do not know) keeps the sentence it arrived with.
+    const spoken = e ? platformFailureMessage(e, activeLocale()) : null;
+    throw new ErploraError(
+      e?.code ?? 'error',
+      spoken ?? (e?.message || 'unknown error'),
+      e?.permission,
+      // hub#1094: absent stays absent. An empty array would read as «the runtime looked and found
+      // no bad field», which is a different statement from «this refusal is not about fields».
+      // The core's typed refusals (`invalid_field`, hub#1070/#1185) name ONE field in the singular:
+      // it folds in here so there is a single reader for «which fields were refused».
+      e?.fields?.length ? e.fields : e?.field ? [e.field] : undefined,
+    );
   }
   return env.data;
 }
@@ -1442,6 +1603,34 @@ export interface DiscardResult {
   discard_reason?: string;
 }
 
+/**
+ * **One dead-letter somebody CLOSED**, with the whole stamp the close left behind (hub#1117).
+ *
+ * The sibling of {@link DeadEvent}, and deliberately not the same shape. A dead-letter is a
+ * decision waiting to be made, so it travels with its payload — that is what tells a lost invoice
+ * from noise. A closed row is a decision already made, and what is asked of it afterwards is «who
+ * closed this, when and why», never «what did it carry»: **no payload travels here**.
+ *
+ * The three parts of the stamp arrive together because an audit record is the three together.
+ * «Somebody closed this» was already stored before hub#955 and it is the half that needed no
+ * storing; the reason is the half only the person closing the row knew.
+ */
+export interface DiscardedEvent {
+  id: string;
+  event_name: string;
+  /** The **emitting** module (attribution), as in {@link DeadEvent}. */
+  module_id: string;
+  /** Why it died in the first place — the half of the story the hub knows on its own. */
+  last_error: string;
+  created_at: string;
+  /** When it was closed. Also the row's retention clock: ninety days from here it is pruned. */
+  discarded_at: string;
+  /** `hub_user:<id>` — the resolved session, never anything the caller sent. */
+  discarded_by: string;
+  /** Why a person closed it, **as stored** (trimmed and capped). `''` when none was given. */
+  discard_reason: string;
+}
+
 /** One link of a correlation chain (hub#666). No payload: the chain is for walking, not inspecting. */
 export interface CorrelatedEvent {
   id: string;
@@ -1477,17 +1666,17 @@ export interface EventTrace {
  *
  * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor is
  * built from — {@link list} fills its «when this happens» dropdown, {@link shape} its data picker,
- * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total` — plus the six gestures
+ * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total` — plus the seven gestures
  * that make a failure recoverable ({@link dead}, {@link deadCount}, {@link retry}, {@link discard},
- * {@link retryAll}, {@link trace}), which is the tray `ERPlora/flows#20` draws.
+ * {@link discarded}, {@link retryAll}, {@link trace}), which is the tray `ERPlora/flows#20` draws.
  *
- * **All eight sit behind the same two gates** (ADR-0312, hub#953): a human owner/admin session the
+ * **All nine sit behind the same two gates** (ADR-0312, hub#953): a human owner/admin session the
  * runtime checks, plus `manage_flows` declared in the calling module's `module.json` and granted by
  * the owner. The gate matters MORE for the dead-letter half than for the catalogue: a dead-letter
  * carries the whole payload, and {@link retry} re-runs another module's command with THAT module's
  * authority (hub#686). Without it, one installed module could drive another's automations.
  *
- * Eight methods, eight routes, no method that takes a path — the same discipline as
+ * Nine methods, nine routes, no method that takes a path — the same discipline as
  * {@link FlowsApi}, pinned by the same test file.
  */
 export class EventsApi {
@@ -1600,6 +1789,30 @@ export class EventsApi {
       path: `${EVENTS_BASE_PATH}/${event}/discard`,
       ...(reason === undefined ? {} : { body: { reason } }),
     }) as Promise<DiscardResult>;
+  }
+
+  /**
+   * `GET /api/hub/events/discarded` — **what was closed by hand**, newest closure first, with the
+   * whole stamp: who, when and WHY (hub#1117).
+   *
+   * The read half of {@link discard}. All three parts had been stored since hub#955 and nothing
+   * projected any of them: {@link dead} filters `dead`, so closing a row took it out of the only
+   * listing there was, and {@link trace} returns the status without the stamp. A tray could show
+   * «cerrado porque…» only for as long as the component that closed it stayed mounted — the
+   * promise «durante noventa días» was checkable with `psql` and nowhere else.
+   *
+   * The ninety days need no argument here: retention is a hard delete, so a row past the window is
+   * simply not in the answer. No id and no filter, like {@link retryAll} — the hub answers about
+   * ITS OWN closed rows, and no argument exists that could name another tenant's.
+   *
+   * **No payload**, unlike {@link dead}: this is an audit read of a decision already made. The
+   * tray `ERPlora/flows#47` draws is built on it.
+   */
+  async discarded(): Promise<DiscardedEvent[]> {
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/discarded`,
+    }) as Promise<DiscardedEvent[]>;
   }
 
   /**

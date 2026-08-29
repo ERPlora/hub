@@ -25,6 +25,8 @@ on:
       - "scripts/prepush-gate.test.sh"
       - "scripts/install-hooks.sh"
       - "scripts/install-hooks.test.sh"
+      - "scripts/materialize-published-modules.sh"
+      - "scripts/materialize-published-modules.test.sh"
       - ".github/workflows/test-gate.yml"
   pull_request:
     paths:
@@ -32,6 +34,8 @@ on:
       - "scripts/prepush-gate.test.sh"
       - "scripts/install-hooks.sh"
       - "scripts/install-hooks.test.sh"
+      - "scripts/materialize-published-modules.sh"
+      - "scripts/materialize-published-modules.test.sh"
       - ".github/workflows/test-gate.yml"
   workflow_dispatch:
 
@@ -44,7 +48,7 @@ permissions:
 
 jobs:
   test:
-    name: scripts/prepush-gate.test.sh + install-hooks.test.sh
+    name: prepush-gate + install-hooks + materialize-published-modules
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
 
@@ -78,3 +82,10 @@ jobs:
 
       - name: Instalador del hook (scripts/install-hooks.test.sh)
         run: bash ./scripts/install-hooks.test.sh
+
+      # hub#1153: el gate local ya no mide contra el checkout aparcado de `modules-workspace`,
+      # sino contra el catálogo PUBLICADO que materializa este script — el mismo que usa
+      # `test-hub-modules.yml`. Sus casos corren sobre repos bare locales (`file://`): sin red,
+      # sin GitHub y sin deploy keys.
+      - name: Catálogo publicado (scripts/materialize-published-modules.test.sh)
+        run: bash ./scripts/materialize-published-modules.test.sh

@@ -39,6 +39,7 @@ pub mod import_sql;
 pub mod installer;
 pub mod loader;
 pub mod manifest;
+pub mod manifest_warning_grandfather;
 pub mod migration_guard;
 pub mod migrations;
 pub mod module_package;
@@ -108,10 +109,15 @@ pub struct ModuleInfo {
     pub depends_on: Vec<String>,
     /// What this core did not understand of the module's manifest and installed anyway (hub#521).
     ///
-    /// Empty for every module that fits the contract, which is all 24 published ones bar the two
-    /// carrying a retired `validates`. It travels here — and not only to a log — because "the hub
-    /// ignores it in silence" is not fixed by writing the silence down somewhere nobody looks:
-    /// whoever is staring at a module that half works has to be able to ASK.
+    /// Empty for every module that fits the contract. What the published catalogue is still
+    /// allowed to warn about is enumerated, pair by pair, in
+    /// [`crate::manifest_warning_grandfather::GRANDFATHERED_MANIFEST_WARNINGS`], and two tests in
+    /// `installer` pin the catalogue to exactly that list so it can only shrink (hub#1243) — the
+    /// count used to live in this comment and went stale twice.
+    ///
+    /// It travels here — and not only to a log — because "the hub ignores it in silence" is not
+    /// fixed by writing the silence down somewhere nobody looks: whoever is staring at a module
+    /// that half works has to be able to ASK.
     pub manifest_warnings: Vec<crate::manifest::ManifestWarning>,
     /// Domain error codes the module declares (ADR-0398), sorted by code. Empty when the module
     /// has no `errors` catalog yet — consumers (hub tests, the UI) read this instead of prose.
@@ -2128,6 +2134,15 @@ impl Runtime {
         outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
     }
 
+    /// Dead-letters of this hub an operator CLOSED, newest closure first (hub#1117) — the read
+    /// half of [`Self::discard_dead_event`]. Who closed each row, when and WHY, which had been
+    /// written in full since hub#955 and projected by nothing: closing a row took it out of
+    /// `list_dead`, the only listing there was. No payload travels: the decision is made, and what
+    /// is asked of a closed row afterwards is the stamp, not the cargo.
+    pub async fn list_discarded_events(&self, limit: i64) -> Result<Vec<outbox::DiscardedEvent>> {
+        outbox::list_discarded(self.db.as_ref(), &self.hub_id, limit).await
+    }
+
     /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). Three answers,
     /// because a row that CANNOT be replayed is neither a success nor a missing id
     /// ([`outbox::RetryOutcome`], hub#827).
@@ -2957,7 +2972,12 @@ impl Runtime {
 /// Inyecta los parámetros del sistema en el payload del llamador: `hub_id`, `current_user_id`,
 /// `now` y `new_id`. Siempre disponibles para el SQL del módulo y no falsificables desde la UI
 /// (ARQUITECTURA.md §2.5, §2.9).
-pub(crate) fn system_params(base: &Params, ctx: &RequestContext) -> Params {
+///
+/// `pub` porque **es contrato del kernel** (hub#1235): los nombres que devuelve son los `:name`
+/// contra los que está escrito el SQL de los 27 módulos publicados, y
+/// `tests/kernel_contract_engine.rs` los congela llamando a esta misma función — nunca a una copia
+/// de su lista, que es como se desincronizaría.
+pub fn system_params(base: &Params, ctx: &RequestContext) -> Params {
     let mut p = base.clone();
     p.insert("hub_id".into(), Json::String(ctx.hub_id.clone()));
     p.insert("current_user_id".into(), Json::String(ctx.user_id.clone()));

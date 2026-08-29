@@ -62,6 +62,13 @@ export interface HubSettings {
    *  propósito — es lo que permite que el teclado envíe al último dígito en vez de pedir un
    *  «Aceptar» que el cajero pulsaría decenas de veces al día. Lo normaliza `lib/pin-length`. */
   pin_length: number;
+  /** **NO es un ajuste: es el parte del último `PUT`** (hub#1306). Guardar la identidad de negocio
+   *  la PUBLICA en el SaaS —es lo que le permite nombrar al obligado en el otorgamiento del Anexo
+   *  I—, y esa publicación es best-effort: los ajustes ya están escritos, así que un SaaS caído no
+   *  puede costarle el guardado al cliente. El runtime contesta `200` y entrega el fallo como
+   *  código ESTABLE (`cloud_rejected`, `cloud_unreachable`) en esta clave. Ausente = no hubo nada
+   *  que contar. Vive con la respuesta, no con el hub: cada `GET`/`PUT` la reescribe. */
+  fiscal_identity_publish_error?: string;
 }
 
 /**
@@ -84,8 +91,22 @@ export const hubSettings = ref<HubSettings | null>(null);
  * entrega a los handlers como `context.timezone` / `:timezone`.
  */
 export function hubTimezone(): string {
+  return publishedHubTimezone() ?? 'UTC';
+}
+
+/**
+ * La zona ya PUBLICADA, o `null` si el boot todavía no la ha sembrado (hub#1212).
+ *
+ * Es la misma lectura que `hubTimezone()` sin su degradación, y existe porque `UTC` y «aún no lo
+ * sé» son dos respuestas distintas que `hubTimezone()` no puede separar. Quien pinta fechas
+ * (`lib/format-datetime.ts`) necesita distinguirlas: antes del boot, `UTC` sería una hora mal en
+ * España diez meses al año, así que ahí cae al huso del navegador —lo que ya se veía— en vez de
+ * afirmar un reloj que nadie ha dicho. El contrato de `hubTimezone()` no cambia: el SDK de los
+ * módulos sigue leyendo `UTC` como último recurso.
+ */
+export function publishedHubTimezone(): string | null {
   const published = (globalThis as { __erploraTimezone?: string }).__erploraTimezone;
-  return typeof published === 'string' && published.trim() ? published.trim() : 'UTC';
+  return typeof published === 'string' && published.trim() ? published.trim() : null;
 }
 
 /**
@@ -141,6 +162,12 @@ function setHubSettings(raw: unknown): HubSettings {
     // teclado con una longitud que el runtime va a rechazar sería fallar en caja, con cola.
     pin_length: r.pin_length === 4 || r.pin_length === 6 ? r.pin_length : 4,
   };
+  // El parte de la publicación de la identidad fiscal (hub#1306) viaja CON la respuesta, no con el
+  // hub: se copia tal cual cuando viene y se deja fuera cuando no, para que un veredicto viejo no
+  // haga avisar de un guardado que sí publicó.
+  if (typeof r.fiscal_identity_publish_error === 'string' && r.fiscal_identity_publish_error.trim()) {
+    next.fiscal_identity_publish_error = r.fiscal_identity_publish_error.trim();
+  }
   hubSettings.value = next;
   // La paleta global se refleja en el shell al momento (theme.ts decide si hay override local).
   setHubPalette(next.theme_palette);

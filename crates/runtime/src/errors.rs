@@ -275,7 +275,10 @@ pub enum RuntimeError {
     /// degrade with a silent empty catalog. The canonical case is the tax catalog: without it a
     /// handler cannot tell «this category has no rule» from «the catalog never arrived», and
     /// guessing the rate is exactly what sales#21 prohibits.
-    #[error("required read `{query}` is unavailable — the command was aborted (hub#701)")]
+    /// The sentence names the query and NOTHING else: no issue number, no advice. The screen
+    /// translates the stable code `read_unavailable` and reads `query` as a field (hub#1102) —
+    /// this text is the fallback a log keeps, not what a cashier is shown.
+    #[error("a required read (`{query}`) could not be resolved, so the command was aborted")]
     ReadUnavailable { query: String },
     /// A `protects` guard declared by one module over another refused the command (hub#775).
     ///
@@ -363,6 +366,19 @@ pub enum RuntimeError {
     /// [`DemoLock`] for what each subject protects.
     #[error("{lock}")]
     DemoLocked { lock: DemoLock },
+    /// The hub's money columns are declared in BOTH units at once — some `INTEGER` (cents), some
+    /// `NUMERIC` (euros) — so the euros→cents backfill has no verdict to take (hub#1209).
+    ///
+    /// It is refused rather than guessed because both guesses corrupt real money, in opposite
+    /// directions: reading it as cents seeds the marker and strands the euro columns in euros
+    /// forever (the marker turns every re-run into a no-op), and reading it as euros runs
+    /// `ROUND(col*100)` over columns that were already in cents. A half-migrated hub is an
+    /// anomaly a person has to look at, not a case to resolve by coin flip.
+    ///
+    /// `cents` and `euros` carry the offending `table.column` names — ops acts on them directly,
+    /// so they are never parsed back out of the sentence.
+    #[error("the money columns of this hub are declared in BOTH units, so the euros→cents backfill refuses to guess: cents (integer) → {cents}; euros (decimal) → {euros}")]
+    MoneyUnitAmbiguous { cents: String, euros: String },
     /// Error genérico que no encaja en una variante específica (p. ej. fallo del hasher argon2id
     /// al fijar un PIN, hub#15). Mensaje libre.
     #[error("{0}")]

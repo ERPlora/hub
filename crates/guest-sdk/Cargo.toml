@@ -3,6 +3,18 @@ name = "erplora-guest-sdk"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+# Se consume por GIT TAG, nunca por un registro (hub#1236):
+#
+#   erplora-guest-sdk = { git = "https://github.com/ERPlora/hub", tag = "vX.Y.Z" }
+#
+# Hasta hub#1236 el handler de cada módulo lo alcanzaba por
+# `path = "../../../../hub/crates/guest-sdk"`: una ruta que solo existe en el portátil de quien
+# tiene los dos repos hermanos clonados, y que en un runner no existe — por eso el wasm del
+# handler no se podía compilar en CI (`handler WASM SIN VERIFICAR`, ADR-0287 D5).
+#
+# 🔴 `publish = false` a propósito: el tag es la vía, y `cargo publish` mandaría al registro
+# PÚBLICO de crates.io el SDK de un repo privado. En crates.io una versión no se retira.
+publish = false
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -14,3 +26,8 @@ rust_decimal = { version = "1", default-features = false, features = ["serde"] }
 
 [dev-dependencies]
 rust_decimal_macros = "1"
+
+# Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
+# queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
+[lints]
+workspace = true

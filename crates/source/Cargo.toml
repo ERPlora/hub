@@ -27,3 +27,8 @@ zip = "2"
 # Firma ed25519 de prueba para los tests de verificación de firma (hub#239): generan un par
 # efímero y firman el zip del módulo para ejercitar Enforce/DevTrust.
 ring = "0.17"
+
+# Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
+# queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
+[lints]
+workspace = true

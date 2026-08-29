@@ -396,7 +396,79 @@
               class="mt-2"
               :obligado-nif="businessTaxId"
               :obligado-name="businessLegalName"
+              :obligado-address="businessAddress"
             />
+          </ion-card-content>
+        </ion-card>
+
+        <!-- The responsible declaration INSIDE the product (art. 13.2 RRSIF — hub#528): the rule
+             requires it to appear «de modo visible en el propio sistema informático en cada una de
+             sus versiones». The public half (the erplora.com archive, handed to the customer and
+             the reseller at purchase) already existed; this is the one the business shows from ITS
+             OWN till when asked. It goes last in this tab, after the fiscal identity, the
+             certificate and the grant: those are the four things an inspection looks at, and this
+             is the only one that is not filled in — only read.
+             The data comes from `GET /api/system/declaration`, which projects the SAME
+             `SistemaInformatico` block that travels in every record. Never constants: a screen
+             with a hand-copied identity looks the same as this one until the day they diverge, and
+             then the till certifies one thing and the tax agency receives another. -->
+        <ion-card class="mt-3 responsible-declaration">
+          <ion-card-content>
+            <ion-label>
+              <h2>{{ t('settings.declarationTitle') }}</h2>
+              <p>{{ t('settings.declarationDesc') }}</p>
+            </ion-label>
+
+            <p v-if="declarationError" class="responsible-declaration-error mt-2">
+              {{ t('settings.declarationError') }}
+            </p>
+
+            <template v-else-if="declaration">
+              <a
+                class="responsible-declaration-link mt-2"
+                :href="declaration.declarationUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ t('settings.declarationRead') }}
+              </a>
+
+              <h3 class="text-base font-semibold mt-4 mb-1">
+                {{ t('settings.declarationDataTitle') }}
+              </h3>
+              <!-- Without the manufacturer's facts there is no block to show, and the gap is not
+                   filled: the fiscal engine does not build the envelope in that state either. What
+                   this hub knows about itself (version and installation) is still shown. -->
+              <p
+                v-if="!declaration.sistemaInformatico"
+                class="responsible-declaration-pending mt-1"
+              >
+                {{ t('settings.declarationPending') }}
+              </p>
+              <ion-list lines="none">
+                <ion-item
+                  v-for="row in declarationRows"
+                  :key="row.field"
+                  class="responsible-declaration-field"
+                >
+                  <!-- Label → VALUE → element name, stacked in one column. The value does NOT go
+                       in `slot="end"`: the longest one is a 36-character UUID and at 390 px it sat
+                       on top of the element name, which wraps too. Stacked, it reads the same at
+                       the three widths and the value being shown stays whole. -->
+                  <ion-label>
+                    <h2>{{ row.label }}</h2>
+                    <p class="responsible-declaration-value">{{ row.value }}</p>
+                    <!-- The LITERAL name of the invoicing record element: it is what an inspection
+                         asks for, and it is not translated. -->
+                    <p class="responsible-declaration-element">{{ row.field }}</p>
+                  </ion-label>
+                </ion-item>
+              </ion-list>
+            </template>
+
+            <div v-else class="flex justify-center py-4">
+              <ion-spinner name="dots" />
+            </div>
           </ion-card-content>
         </ion-card>
       </template>
@@ -501,6 +573,23 @@
                 <ion-label>
                   <h2>{{ cap.label }}</h2>
                   <p>{{ cap.description }}</p>
+                  <!-- hub#1174: la descripción dice qué PERMITE; mientras el interruptor está
+                       apagado hace falta decir qué se ROMPE. La frase vive en el catálogo de
+                       capabilities (una sola verdad, por id) y aquí solo se traduce. La acción que
+                       lo arregla es el toggle de esta misma fila (hub#800 §3).
+                       `color="medium"`, no "warning": el amarillo de Ionic (#ffc409) da ~1.6:1 de
+                       contraste sobre blanco — ni con el shade (#e0ac08, ~2.1:1) llega al 4.5:1 de
+                       WCAG AA para texto normal, y esta frase hay que LEERLA. El acento de aviso
+                       se queda en el icono (patrón de iOS/Android, Shopify, Square). -->
+                  <ion-note
+                    v-if="!cap.granted"
+                    color="medium"
+                    class="cap-breaks"
+                    :data-testid="`cap-breaks-${cap.id}`"
+                  >
+                    <HubIcon name="warning-outline" class="cap-breaks-icon" />
+                    {{ t(capabilityBreaksKey(cap.id)) }}
+                  </ion-note>
                 </ion-label>
                 <ion-toggle
                   :checked="cap.granted"
@@ -561,7 +650,18 @@ import { isTauri } from '../lib/device';
 // hub#761: la plantilla del tique la configura el módulo `printing`; el shell solo resuelve a
 // dónde llevar, y si la app falta lo dice en vez de enseñar un botón mudo.
 import { receiptTemplateTarget } from '../lib/receipt-template';
+// hub#528 (art. 13.2 RRSIF): the responsible declaration of the installed version, read from the
+// runtime — which projects the same `SistemaInformatico` block that travels in every record.
+import {
+  DECLARATION_FIELDS,
+  fetchResponsibleDeclaration,
+  type DeclarationField,
+  type SystemDeclaration,
+} from '../lib/responsible-declaration';
 import { moduleNav } from '../lib/nav';
+// hub#1174: la consecuencia de un permiso denegado se nombra UNA vez, en el catálogo de
+// capabilities, y esta pantalla solo la traduce — nunca la escribe.
+import { capabilityBreaksKey } from '../lib/module-capabilities';
 import { useI18n } from 'vue-i18n';
 import {
   IonFooter,
@@ -621,6 +721,7 @@ import {
   type BusinessCertificate,
 } from '../lib/runtime';
 import { zoneClock, zoneOptions } from '../lib/timezone';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, te } = useI18n();
 
@@ -972,7 +1073,7 @@ async function saveTaxSettings(): Promise<void> {
     business_legal_name: hubSettings.value?.business_legal_name ?? '',
     business_address: hubSettings.value?.business_address ?? '',
   };
-  await persistHubSettings(
+  const saved = await persistHubSettings(
     {
       business_tax_id: businessTaxId.value.trim(),
       business_legal_name: businessLegalName.value.trim(),
@@ -984,6 +1085,14 @@ async function saveTaxSettings(): Promise<void> {
       businessAddress.value = prev.business_address;
     },
   );
+  // hub#1306 — guardar la identidad la PUBLICA en el SaaS, que es lo que le permite nombrar al
+  // obligado en el otorgamiento del Anexo I. La publicación es best-effort (el guardado ya está
+  // hecho y un SaaS caído no puede costárselo al cliente), pero callarla es lo que convertía la
+  // página del otorgamiento en un callejón sin salida: guardaba el NIF, leía «Guardado», iba al
+  // dashboard y encontraba «pon antes tus datos fiscales» — lo que acababa de hacer. Se dice.
+  if (saved && hubSettings.value?.fiscal_identity_publish_error) {
+    await toastError(t('settings.shareWithErploraError'));
+  }
 }
 
 // ── Estado: Certificado fiscal del negocio (server-side /api/business/certificate) ──
@@ -1001,8 +1110,8 @@ const certBusy = ref<boolean>(false);
 const certUploadedLabel = computed<string>(() => {
   const raw = cert.value.uploaded_at;
   if (!raw) return '';
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? raw : d.toLocaleString();
+  // Sin `locale` explícito: esta pantalla no lo destructura y el helper cae al locale activo.
+  return formatDateTime(raw) ?? raw;
 });
 
 // Lee el estado del certificado al abrir Ajustes (best-effort; degrada a "Sin certificado").
@@ -1078,6 +1187,65 @@ async function removeCert(): Promise<void> {
     certBusy.value = false;
   }
 }
+
+// ── Responsible declaration (hub#528, art. 13.2 RRSIF) ──────────────────────────────────────
+// Read on entering the Business tab, the way print coverage is read on entering Receipts: the
+// manufacturer's facts arrive on the heartbeat and may not be there yet on a freshly started hub,
+// so a read latched forever would keep showing «data pending» after it has already arrived.
+const declaration = ref<SystemDeclaration | null>(null);
+const declarationError = ref<boolean>(false);
+
+/** Readable label of each element; the element name is painted next to it, untranslated. */
+const DECLARATION_LABELS = computed<Record<DeclarationField, string>>(() => ({
+  NombreRazon: t('settings.declarationNombreRazon'),
+  NIF: t('settings.declarationNIF'),
+  NombreSistemaInformatico: t('settings.declarationNombreSistemaInformatico'),
+  IdSistemaInformatico: t('settings.declarationIdSistemaInformatico'),
+  Version: t('settings.declarationVersion'),
+  NumeroInstalacion: t('settings.declarationNumeroInstalacion'),
+  TipoUsoPosibleSoloVerifactu: t('settings.declarationTipoUsoPosibleSoloVerifactu'),
+  TipoUsoPosibleMultiOT: t('settings.declarationTipoUsoPosibleMultiOT'),
+  IndicadorMultiplesOT: t('settings.declarationIndicadorMultiplesOT'),
+}));
+
+/**
+ * The rows that are painted, in XSD order so they can be read next to a record. Without the
+ * manufacturer's block the two this hub declares by itself remain (version and installation):
+ * they are its own and they are true, and hiding them would turn a missing fact into an empty screen.
+ */
+const declarationRows = computed(() => {
+  const current = declaration.value;
+  if (!current) return [];
+  const block: Partial<Record<DeclarationField, string>> = current.sistemaInformatico ?? {
+    Version: current.version,
+    NumeroInstalacion: current.numeroInstalacion,
+  };
+  return DECLARATION_FIELDS.filter((field) => !!block[field]).map((field) => ({
+    field,
+    label: DECLARATION_LABELS.value[field],
+    value: block[field] as string,
+  }));
+});
+
+async function loadResponsibleDeclaration(): Promise<void> {
+  try {
+    declaration.value = await fetchResponsibleDeclaration();
+    declarationError.value = false;
+  } catch {
+    // «Could not load» is its own state: never an empty card that reads as «this system declares
+    // nothing» on the very screen that is shown to an inspection (hub#375).
+    declaration.value = null;
+    declarationError.value = true;
+  }
+}
+
+watch(
+  tab,
+  (current) => {
+    if (current === 'tax') void loadResponsibleDeclaration();
+  },
+  { immediate: true },
+);
 
 // ── Print coverage (hub#800): the read model of `GET /api/print/hosts` for the Receipts tab ──
 // Reloaded EVERY time the tab is entered, not latched like the permissions below: whether the
@@ -1206,5 +1374,55 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+
+/* Responsible declaration (hub#528). The value is what gets read, so it stands out over the label
+   and over the element name; qualified with `ion-label` because Ionic paints a label's `p` in
+   secondary grey and here the hierarchy is the opposite. Wraps wherever needed: the longest value
+   is `NumeroInstalacion`, a 36-character UUID, and a value shown to an inspection has to be read
+   WHOLE on the phone at the counter. */
+ion-label p.responsible-declaration-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--ion-text-color);
+  font-weight: 600;
+}
+
+/* Link to the signed text: it reads as a link (which is what it is), not as a mute button. */
+.responsible-declaration-link {
+  display: inline-block;
+  color: var(--ion-color-primary);
+  text-decoration: underline;
+}
+
+/* The two states that are NOT the full card. Neither is painted green: a failed read and data
+   that has not arrived yet are different things, and both are said. */
+.responsible-declaration-pending,
+.responsible-declaration-error {
+  color: var(--ion-color-medium-shade);
+}
+
+/* The literal name of the record element (`IdSistemaInformatico`…): read as technical data, in
+   monospace, so it can be checked character by character against an XML. */
+.responsible-declaration-element {
+  font-family: var(--ion-font-family-monospace, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+/* hub#1174: el aviso de «qué se rompe» de un permiso denegado. Mismo patrón que la nota fiscal de
+   ExportPanel: icono + frase, dentro de la propia tarjeta del permiso. */
+.cap-breaks {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  /* La frase es larga a propósito; en móvil tiene que envolver, no recortarse. */
+  white-space: normal;
+}
+.cap-breaks-icon {
+  flex: none;
+  margin-top: 0.1rem;
+  /* El texto lee en `--ion-color-medium` (AA); el icono se queda con el acento de aviso. */
+  color: var(--ion-color-warning-shade, var(--ion-color-warning));
 }
 </style>

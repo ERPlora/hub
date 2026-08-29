@@ -32,8 +32,9 @@
 //!
 //! The other two tests guard the shape of the list itself: a duplicate entry would convert the same
 //! column twice (`ROUND(col*100)` applied twice = ×10 000 — money corruption, not a typo), and the
-//! ORDER is load-bearing because the first money column that exists decides the verdict for the
-//! whole hub.
+//! head of the list is still a live money column even though, since hub#1209, its POSITION decides
+//! nothing: the verdict is now a consensus over every money column present, checked against a
+//! seeded database in `money_backfill_mixed_hub.rs`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -239,22 +240,43 @@ fn no_money_column_is_listed_twice() {
     );
 }
 
-/// 🔴 The ORDER of `MONEY_COLUMNS` is load-bearing and this pins it.
+/// 🔴 The ORDER of `MONEY_COLUMNS` is NO LONGER load-bearing, and this pins THAT (ERPlora/hub#1209).
 ///
-/// `seed_marker_if_cents()` and `run()` both settle the verdict for the WHOLE hub with the first
-/// money column that exists in the database, and return as soon as they find one. Reordering the
-/// list — "let me group these by module", "let me alphabetise" — therefore moves the criterion that
-/// decides whether a customer's money gets multiplied by 100, and nothing else would go red.
+/// The ratchet that used to live here (`the_first_money_column_decides_and_is_pinned`) froze the
+/// head of the list, because `seed_marker_if_cents()` and `run()` settled the verdict for the WHOLE
+/// hub with the first money column that existed and returned right there. It guarded a symptom: it
+/// made a reorder declare itself, but it could not stop a half-migrated hub from getting a verdict
+/// by coin flip. hub#1209 removed the cause — `detect_money_unit()` classifies EVERY money column
+/// present and demands unanimity — so the head of the list decides nothing any more, and freezing
+/// it would only be a chore that fails on a legitimate edit.
+///
+/// What replaces it is the property itself, checked against a real database in
+/// `money_backfill_mixed_hub.rs`: the same anomaly seeded with the units at the head and the tail
+/// SWAPPED gets the same verdict (refused), where before it got the two opposite catastrophes.
+/// This test keeps the list honest from the offline side: the entry that used to be pinned is still
+/// a live money table, so retiring the pin did not quietly retire the column with it.
 #[test]
-fn the_first_money_column_decides_and_is_pinned() {
-    let (table, columns) = MONEY_COLUMNS[0];
-    assert_eq!(
-        (table, columns[0]),
-        ("appointments_appointment", "service_price"),
-        "🔴 The head of `MONEY_COLUMNS` changed. That is not a cosmetic reorder: the first money \
-         column that EXISTS in the hub decides, alone, whether the schema is read as euros (and \
-         every money column gets multiplied by 100) or as cents. If the new head is deliberate, \
-         update this test and say in the PR why the new decider is at least as trustworthy as the \
-         old one (hub#1144)."
+fn the_order_no_longer_decides_but_the_old_head_is_still_inventoried_hub1209() {
+    let inventoried: BTreeSet<(&str, &str)> = MONEY_COLUMNS
+        .iter()
+        .flat_map(|(table, columns)| columns.iter().map(move |c| (*table, *c)))
+        .collect();
+
+    assert!(
+        inventoried.contains(&("appointments_appointment", "service_price")),
+        "🔴 `appointments_appointment.service_price` left `MONEY_COLUMNS`. It used to be pinned as \
+         the head that decided the verdict; hub#1209 removed that role, but the column is still \
+         real money and must still be converted. If the module genuinely retired it, remove this \
+         assertion in the same PR that removes the entry and say so."
+    );
+
+    // The verdict must not be reachable from list position any more: nothing in the runtime may
+    // read `MONEY_COLUMNS[0]` as a decision. Guarded for real (seeded database, both orders) by
+    // `money_backfill_mixed_hub.rs`; this is the cheap offline half of the same rule.
+    let source = include_str!("../src/money_backfill.rs");
+    assert!(
+        !source.contains("MONEY_COLUMNS[0]"),
+        "🔴 `money_backfill.rs` reads `MONEY_COLUMNS[0]`. The whole point of hub#1209 is that no \
+         single position in this list decides whether a customer's money is multiplied by 100."
     );
 }

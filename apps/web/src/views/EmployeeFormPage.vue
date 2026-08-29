@@ -85,7 +85,7 @@
               mode="md"
               fill="outline"
               inputmode="numeric"
-              :maxlength="8"
+              :maxlength="hubPinLength"
               :helper-text="pinHelp"
               :error-text="pinError"
               :class="{ 'ion-invalid ion-touched': Boolean(issueOn(PIN_ISSUES)) }"
@@ -201,11 +201,13 @@ import {
   type HubUser,
   type HubUserPatch,
 } from '../lib/hub-users';
+import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
+import { hubPinLength } from '../lib/pin-length';
 import { onBadgeScan } from '../lib/badge-scanner';
 import { nfcBadgeReady } from '../lib/nfc-badge';
 import { toast } from '../lib/toast';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
@@ -229,6 +231,15 @@ const loading = ref(true);
 const saving = ref(false);
 const loadError = ref(false);
 const saveError = ref('');
+/**
+ * El rechazo del último guardado, **anclado al campo** que lo causó (hub#1190).
+ *
+ * El core responde `invalid_field` con `field` y `reason` como datos (ADR-0398 §6), así que la
+ * frase sale del catálogo del shell y se pinta debajo del input que se arregla — que es donde la
+ * ponen Odoo, Shopify y Business Central. Un banner al principio del formulario obliga a adivinar
+ * qué campo era. Lo que el formulario no tiene (un campo que esta pantalla no pinta) cae al banner.
+ */
+const fieldRejection = ref<{ field: string; message: string } | null>(null);
 const submitted = ref(false);
 const dirty = ref(false);
 let snapshot = '';
@@ -252,6 +263,13 @@ const altaIssue = computed(() => {
     : accountUserIssue({ email: form.email, role: form.role, pin: form.pin }, users.value);
 });
 
+/**
+ * Los campos que este formulario PINTA con su propio hueco de error (hub#1190). Un rechazo de
+ * cualquier otro campo (el `role`, que es un `ion-select` sin `error-text`) va al banner: anclarlo
+ * a un control que no lo enseña sería esconderlo.
+ */
+const ANCHORED_FIELDS = ['name', 'email', 'pin', 'badge'];
+
 /** Qué campo se lleva cada motivo, para que el error salga donde se arregla. */
 const NAME_ISSUES = ['name_taken'];
 const EMAIL_ISSUES = ['account_needs_email', 'invalid_email', 'email_taken', 'local_has_email'];
@@ -271,25 +289,33 @@ function issueOn(field: string[]): string {
   return !submitted.value && ISSUES_THAT_WAIT_FOR_SUBMIT.includes(issue) ? '' : issue;
 }
 
+/** Lo que el SERVIDOR rechazó de este campo en el último guardado, o `''` (hub#1190). */
+function rejectionOn(field: string): string {
+  return fieldRejection.value?.field === field ? fieldRejection.value.message : '';
+}
+
 const nameError = computed(() => {
   if (submitted.value && !form.name.trim()) return t('employeeForm.required');
   const issue = issueOn(NAME_ISSUES);
-  return issue ? t(`employeeForm.errors.${issue}`) : '';
+  return issue ? t(`employeeForm.errors.${issue}`) : rejectionOn('name');
 });
 const emailError = computed(() => {
   const issue = issueOn(EMAIL_ISSUES);
   if (issue) return t(`employeeForm.errors.${issue}`);
-  return submitted.value && !emailValid.value ? t('employeeForm.invalidEmail') : '';
+  if (submitted.value && !emailValid.value) return t('employeeForm.invalidEmail');
+  return rejectionOn('email');
 });
 const pinError = computed(() => {
   const issue = issueOn(PIN_ISSUES);
-  return issue ? t(`employeeForm.errors.${issue}`) : '';
+  // hub#1302: `pin_length` needs the digit count THIS hub asks for — harmless for the other two
+  // PIN_ISSUES keys, which do not interpolate `{n}` at all.
+  return issue ? t(`employeeForm.errors.${issue}`, { n: hubPinLength.value }) : rejectionOn('pin');
 });
 const BADGE_SHAPE = /^[A-Za-z0-9\-_]{4,64}$/;
 const badgeError = computed(() =>
   form.badge.trim() && !BADGE_SHAPE.test(form.badge.trim())
     ? t('employeeForm.errors.badge_shape')
-    : '',
+    : rejectionOn('badge'),
 );
 // «Acércala» solo donde acercarla funciona (hub#988). `nfcBadgeReady` se enciende cuando el shell
 // ha atendido una lectura de verdad, no por estar dentro de la app: en un escritorio instalado la
@@ -301,10 +327,13 @@ const badgeHelp = computed(() => {
   return hasBadge.value ? t('employeeForm.badgeSetHelp') : t('employeeForm.badgeHelp');
 });
 const pinHelp = computed(() => {
-  if (isLocal.value) return t('employeeForm.localPinHelp');
+  // hub#1302: `pinHelp`/`localPinHelp`/`accountPinHelp` state a digit count, which is this hub's
+  // `pin_length` (4 or 6, hub#974), never a fixed number — `pinSetHelp` below mentions none.
+  const n = { n: hubPinLength.value };
+  if (isLocal.value) return t('employeeForm.localPinHelp', n);
   if (hasPin.value) return t('employeeForm.pinSetHelp');
   // En el alta de cuenta el PIN es un extra —entra con su cuenta—, no la vía de acceso.
-  return isEdit.value ? t('employeeForm.pinHelp') : t('employeeForm.accountPinHelp');
+  return isEdit.value ? t('employeeForm.pinHelp', n) : t('employeeForm.accountPinHelp', n);
 });
 const canSubmit = computed(
   () => Boolean(form.name.trim() && emailValid.value) && !altaIssue.value && !badgeError.value,
@@ -386,6 +415,7 @@ async function onSave(): Promise<void> {
   if (!canSubmit.value) return;
   saving.value = true;
   saveError.value = '';
+  fieldRejection.value = null;
   const name = form.name.trim();
   const email = form.email.trim();
   const pin = form.pin.trim();
@@ -421,12 +451,22 @@ async function onSave(): Promise<void> {
     void toast(isEdit.value ? t('employees.updated') : t('employees.created'), 'success');
     await router.replace('/employees');
   } catch (error) {
+    // Orden: motivo de NEGOCIO del core (`hub.users.*`, hub#355) → campo rechazado traducido
+    // (hub#1190) → la frase que vino. El `message` del runtime está en INGLÉS a propósito (regla
+    // del idioma del código): pintarlo tal cual es lo que dejaba «the name is required» delante de
+    // una encargada. Se conserva como ÚLTIMO recurso porque dice más que cualquier genérico
+    // inventado (misma regla que `platformFailureMessage`, hub#1102).
     const key = hubUserErrorKey(error);
-    saveError.value = key
+    const message = key
       ? t(`employeeForm.errors.${key}`)
-      : error instanceof Error
-        ? error.message
-        : t('employees.saveError');
+      : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
+        (error instanceof Error ? error.message : t('employees.saveError')));
+    const refusal = fieldRefusalOf(error);
+    if (!key && refusal && ANCHORED_FIELDS.includes(refusal.field)) {
+      fieldRejection.value = { field: refusal.field, message };
+    } else {
+      saveError.value = message;
+    }
   } finally {
     saving.value = false;
   }

@@ -136,27 +136,70 @@ pub struct AddMemberReq {
     pub role: String,
 }
 
+/// El SaaS no acepta el alta/baja por una razón de NEGOCIO (email ya invitado, rol que no puede
+/// conceder…). Lo que toca es corregir lo que se escribió y volver a guardar.
+pub const CLOUD_REJECTED: &str = "cloud_rejected";
+/// El SaaS no contesta (red, DNS, timeout): no hay nada que corregir, se reintenta.
+pub const CLOUD_UNREACHABLE: &str = "cloud_unreachable";
+/// El hub no está enrolado: sin credencial de máquina no puede administrar el acceso en el SaaS.
+pub const NOT_ENROLLED: &str = "not_enrolled";
+
 /// Mapea un [`MembersError`] a la respuesta HTTP del handler admin. El alta/baja **local** ya se
 /// aplicó (idempotente); esto reporta que la parte SaaS falló, con un status honesto.
+///
+/// 🔴 hub#1214 — lo que sale por aquí es **código estable + frase redactada**, nunca el
+/// `Display` del error: ese `Display` lleva dentro el **cuerpo crudo del SaaS**, y así es como
+/// `el SaaS respondió 429: {"detail":"Request was throttled…"}` —inglés de DRF dentro de una
+/// frase en español— acabó pintado en una pantalla en español (visto en prod, v1.1.9). Misma
+/// política que el dispatcher desde hub#1074/#1186: la fontanería (aquí, la de OTRO sistema) va al
+/// log del runtime; al navegador va un código que la pantalla traduce (ADR-0055).
+///
+/// El código viaja **dentro** de `error` (`{"ok":false,"error":{"code":…}}`), que es el envelope
+/// del resto del runtime (`schemas/envelope.schema.json`): como hermano de `error`, una pantalla
+/// que lee `error.code` no encontraba nada y caía a la prosa.
 pub(crate) fn members_error_response(e: MembersError) -> Response {
-    let (code, kind) = match &e {
+    let (status, code) = match &e {
         // Bootstrap incompleto: el hub no está enrolado → no puede administrar el acceso en el SaaS.
-        MembersError::NoMachineToken => (StatusCode::CONFLICT, "not_enrolled"),
-        MembersError::Transport(_) => (StatusCode::BAD_GATEWAY, "cloud_unreachable"),
+        MembersError::NoMachineToken => (StatusCode::CONFLICT, NOT_ENROLLED),
+        MembersError::Transport(_) => (StatusCode::BAD_GATEWAY, CLOUD_UNREACHABLE),
+        // Un 429 NO es un rechazo de negocio: «espera y reintenta» y «arregla lo que has escrito»
+        // son acciones opuestas para quien administra, así que llevan códigos distintos. Es el
+        // mismo código que ya emite el proxy de entitlement (`entitlement::CLOUD_RATE_LIMITED`).
+        MembersError::Cloud(429, _) => (
+            StatusCode::TOO_MANY_REQUESTS,
+            crate::entitlement::CLOUD_RATE_LIMITED,
+        ),
         // Reenvía un 4xx del SaaS como 4xx (p. ej. email ya invitado); cualquier otro → 502.
         MembersError::Cloud(status, _) => (
             StatusCode::from_u16(*status)
                 .ok()
                 .filter(StatusCode::is_client_error)
                 .unwrap_or(StatusCode::BAD_GATEWAY),
-            "cloud_rejected",
+            CLOUD_REJECTED,
         ),
     };
+    // El detalle —status y cuerpo del SaaS— SÍ se conserva, pero donde se puede leer sin
+    // publicarlo: el log del runtime. Un fallo que no se ve no existe.
+    tracing::warn!(code, error = %e, "no se pudo sincronizar el acceso con el SaaS");
     (
-        code,
-        Json(json!({ "ok": false, "code": kind, "error": e.to_string() })),
+        status,
+        Json(json!({ "ok": false, "error": { "code": code, "message": redacted_message(code) } })),
     )
         .into_response()
+}
+
+/// Frase de respaldo de cada código. Está en **inglés** y es fija a propósito (misma regla que
+/// `error_payload`, hub#1074): la que ve el usuario la escribe la pantalla traduciendo el código
+/// (ADR-0055), y esta solo sirve para un cliente antiguo y para el log.
+fn redacted_message(code: &str) -> &'static str {
+    match code {
+        NOT_ENROLLED => "this hub is not enrolled: it cannot administer access in the Cloud",
+        CLOUD_UNREACHABLE => "the Cloud did not answer while syncing access",
+        crate::entitlement::CLOUD_RATE_LIMITED => {
+            "the Cloud is rate-limiting this hub; access could not be synced"
+        }
+        _ => "the Cloud refused the access change",
+    }
 }
 
 /// `POST /api/members` — **alta** de un usuario-login (email + rol). Gate **owner/admin**
@@ -171,9 +214,15 @@ pub async fn add_member(
     let email = req.email.trim().to_string();
     let role = req.role.trim().to_string();
     if email.is_empty() || role.is_empty() {
+        // Mismo envelope y misma regla que el resto de la puerta (hub#1214): código estable dentro
+        // de `error`, frase en inglés de respaldo. Antes salía una frase española suelta, fuera del
+        // envelope, que ninguna pantalla podía traducir.
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({ "ok": false, "error": "email y role son obligatorios" })),
+            Json(json!({ "ok": false, "error": {
+                "code": "invalid_payload",
+                "message": "email and role are required",
+            }})),
         )
             .into_response();
     }

@@ -24,7 +24,12 @@
 //!
 //! No es un parser de SQL, y no pretende serlo: es un **lint** sobre el texto de la migración. La
 //! validación fina —índices sin `CONCURRENTLY`, `NOT NULL` sin default, defaults volátiles— es
-//! trabajo de [Squawk](https://squawkhq.com/), que va en su propia iteración. Estas dos reglas son
+//! trabajo de [Squawk](https://squawkhq.com/), que va en su propia iteración.
+//!
+//! Y de ahí sale la regla de hub#1149: **lo que este lint no puede leer, no entra**. El cuerpo de
+//! un `DO`/`CREATE FUNCTION` es opaco —dentro cabe un `EXECUTE` que arma la sentencia en tiempo de
+//! ejecución— así que el guard no finge entenderlo: lo rechaza y dice por dónde se pasa. Medido
+//! antes de escribirlo: cero de las 155 migraciones publicadas usa un cuerpo procedimental. Estas dos reglas son
 //! las que Squawk **no** puede conocer, porque son nuestras.
 
 use std::collections::HashSet;
@@ -57,8 +62,14 @@ pub enum GuardError {
     KindMismatch { kind: Kind, found: String },
     /// Un `contract` destruye FILAS. No hay traducción posible: se rechaza (hub#1145).
     RowDestruction { verb: &'static str },
+    /// Un `contract` que RESHAPEa (rename / cambio de tipo) sin decir desde qué versión es
+    /// seguro retirarlo: la ventana N/N-1 no se puede revisar si nadie la declara (hub#1163).
+    ContractWithoutVersion { verb: String },
     /// Un `DROP` que nombra varias cosas en una sentencia. La traducción es 1:1 o no es (hub#1145).
     DropsMoreThanOne { what: &'static str, statement: String },
+    /// Un cuerpo procedimental (`DO`, `CREATE FUNCTION`/`PROCEDURE`). El guard es un lint sobre el
+    /// TEXTO y ahí dentro no hay texto que leer: no se inspecciona, no entra (hub#1149).
+    NotInspectable { construct: &'static str },
 }
 
 impl std::fmt::Display for GuardError {
@@ -76,7 +87,9 @@ impl std::fmt::Display for GuardError {
             GuardError::KindMismatch { kind, found } => write!(
                 f,
                 "la migración se declara `{kind:?}` pero contiene `{found}`. Si es intencionado, \
-                 declárala `contract` (y llevará `since`); si no, sobra."
+                 declárala `contract` (con su `since` en el manifest, y una línea \
+                 `-- contract: <versión>` si lo que hace es renombrar o cambiar un tipo); si no, \
+                 sobra."
             ),
             GuardError::RowDestruction { verb } => write!(
                 f,
@@ -85,6 +98,20 @@ impl std::fmt::Display for GuardError {
                  `_deprecated_*`; de las filas no hay nada que apartar. Si de verdad hay que \
                  limpiarlas, va en una migración `backfill`, que es donde el DML tiene su sitio y \
                  donde se ve que no admite vuelta atrás."
+            ),
+            GuardError::NotInspectable { construct } => write!(
+                f,
+                "la migración contiene un `{construct}`, y el cuerpo de un bloque procedimental es \
+                 opaco para esta puerta: dentro cabe un `EXECUTE` que arma la sentencia en tiempo \
+                 de ejecución, así que no se puede afirmar ni qué tablas toca ni si destruye filas. \
+                 Escribe la migración como sentencias SQL sueltas, que es lo que sí se puede leer."
+            ),
+            GuardError::ContractWithoutVersion { verb } => write!(
+                f,
+                "la migración se declara `contract` y contiene `{verb}`, que deja de servir a la \
+                 versión ANTERIOR del hub: con `start-first` las dos sirven a la vez contra la \
+                 misma base. Di desde qué versión es seguro con una línea `-- contract: <versión>` \
+                 —la versión del módulo que dejó de usar lo que esto retira—."
             ),
             GuardError::DropsMoreThanOne { what, statement } => write!(
                 f,
@@ -97,6 +124,70 @@ impl std::fmt::Display for GuardError {
 }
 
 impl std::error::Error for GuardError {}
+
+/// The verbs that take a migration OUT of `expand` — the catalogue frozen in
+/// `contracts/kernel/engine.snapshot`.
+///
+/// Two families, and the second is the one hub#1163 was missing:
+///
+///  - **destroys DATA** (`DROP …`, `TRUNCATE`, `DELETE FROM`, `SET NOT NULL`): there is no way
+///    back, so it cannot be additive.
+///  - **destroys the PREVIOUS BINARY** ([`RESHAPE_VERBS`]): a rename or a type change touches no
+///    row, and is exactly what breaks N-1. With `start-first` + `dnsrr` the old task and the new
+///    one serve at the same time against the same database, and `failure_action: rollback` gives
+///    back a hub that has already run the migrations of N — against a schema no rollback undoes,
+///    because reverting runs no SQL (ADR-0269).
+///
+/// Every entry has a positive control in the tests: a statement that trips it BY THIS NAME.
+pub const NOT_EXPAND: &[&str] = &[
+    "ALTER COLUMN ... TYPE",
+    "DELETE FROM",
+    "DROP COLUMN",
+    "DROP CONSTRAINT",
+    "DROP TABLE",
+    "RENAME COLUMN",
+    "RENAME TO",
+    "SET NOT NULL",
+    "TRUNCATE",
+];
+
+/// The subset of [`NOT_EXPAND`] that breaks N-1 without destroying a single row.
+///
+/// It is its own list for two reasons: it is what [`RESHAPE_GRANDFATHERED`] excuses (and nothing
+/// else), and it is what a `contract` has to name a version for.
+pub const RESHAPE_VERBS: &[&str] = &["ALTER COLUMN ... TYPE", "RENAME COLUMN", "RENAME TO"];
+
+/// The already-published `expand` migrations that reshape a column, from BEFORE hub#1163.
+///
+/// Same reasoning as [`GRANDFATHERED`] and the same rule: **it may only SHRINK.** These twelve
+/// files are installed across the fleet and are re-run in full on every FRESH install; refusing
+/// them now would undo nothing — it would simply stop eight modules from installing.
+///
+/// Generated by running this guard over the `origin/main` of the published module repos
+/// (2026-08-28): 153 migrations scanned, these 12 refused and no others. The frozen copies live
+/// in `tests/fixtures/published_reshapes/`, and `published_reshapes_still_install.rs` is what
+/// keeps the list honest in both directions. The pass is for the RESHAPE and per FILE: the same
+/// module's next migration inherits nothing, and a `DROP` in a listed file is still refused.
+pub const RESHAPE_GRANDFATHERED: &[(&str, &str)] = &[
+    ("cart_checkout", "migrations/postgres/003_quantity_fixed_point.sql"),
+    ("inventory", "migrations/postgres/002_tax_rate_id.sql"),
+    ("inventory", "migrations/postgres/004_tax_category_key.sql"),
+    ("inventory", "migrations/postgres/005_stock_ledger.sql"),
+    ("inventory", "migrations/postgres/006_quantity_fixed_point.sql"),
+    ("invoice", "migrations/postgres/004_quantity_fixed_point.sql"),
+    ("kitchen", "migrations/postgres/004_dispatch_snapshot.sql"),
+    ("kitchen", "migrations/postgres/005_quantity_fixed_point.sql"),
+    ("pricing", "migrations/postgres/005_quantity_fixed_point.sql"),
+    ("sales", "migrations/postgres/014_quantity_fixed_point.sql"),
+    ("services", "migrations/postgres/005_tax_category_key.sql"),
+    ("services", "migrations/postgres/006_quantity_fixed_point.sql"),
+];
+
+fn is_reshape_grandfathered(module_id: &str, filename: &str) -> bool {
+    RESHAPE_GRANDFATHERED
+        .iter()
+        .any(|(m, f)| *m == module_id && *f == filename)
+}
 
 /// Lo que YA está publicado y no cumpliría el contrato de hoy.
 ///
@@ -134,8 +225,9 @@ pub enum Plan {
     ///
     /// 🔴 Esto NO es una optimización, es una regla de seguridad: partir por `;` y recomponer
     /// **corrompe SQL válido**. El primer intento lo hacía y reventó cinco e2e con
-    /// `syntax error at or near "flags"` — el splitter no entiende dollar-quoting (`$$…$$`), y
-    /// recomponer lo que no se ha entendido del todo destroza la migración.
+    /// `syntax error at or near "flags"`, porque recomponer lo que no se ha entendido del todo
+    /// destroza la migración. Desde hub#1149 el splitter sí entiende dollar-quoting, pero la regla
+    /// no cambia: se entiende para **decidir**, no para reescribir.
     ///
     /// Inspeccionar puede ser imperfecto (se escapa algo, y el peor caso es no cazarlo).
     /// **Reescribir no puede**: el peor caso es romper un módulo que estaba bien.
@@ -192,9 +284,20 @@ pub fn check(
     }
 
     let statements: Vec<String> = split_statements(sql);
+    // Se lee del texto CRUDO —es un comentario, y `strip_comments` se lo lleva— y una sola vez:
+    // la marca es del FICHERO, no de la sentencia.
+    let contract_version_declared = declares_contract_version(sql);
 
     let mut out = Vec::with_capacity(statements.len());
     for statement in statements {
+        // 🔴 Lo que no se puede LEER, no entra (hub#1149). Esto es un lint sobre el texto y el
+        // cuerpo de un bloque procedimental es opaco: dentro cabe `EXECUTE format('DROP TABLE
+        // %I', …)`, donde ni el verbo ni la tabla son tokens. Va lo PRIMERO a propósito — si no,
+        // el error que ve el autor sería un `KindMismatch` sobre un `DELETE` que el guard cree
+        // haber entendido, y lo que hay que decirle es que ahí no se puede afirmar nada.
+        if let Some(construct) = procedural_construct(&statement) {
+            return Err(GuardError::NotInspectable { construct });
+        }
         for table in tables_touched(&statement) {
             if table.starts_with("hub_") || table.starts_with('_') {
                 return Err(GuardError::ReservedNamespace { table });
@@ -210,7 +313,14 @@ pub fn check(
         match kind {
             Kind::Expand => {
                 if let Some(found) = destructive_verb(&statement) {
-                    return Err(GuardError::KindMismatch { kind, found });
+                    // El pase de `RESHAPE_GRANDFATHERED` es para el RESHAPE y para nada más: un
+                    // `DROP` en un fichero de la lista se sigue rechazando, y el fichero siguiente
+                    // del mismo módulo no hereda nada.
+                    let excused = RESHAPE_VERBS.contains(&found.as_str())
+                        && is_reshape_grandfathered(module_id, filename);
+                    if !excused {
+                        return Err(GuardError::KindMismatch { kind, found });
+                    }
                 }
                 out.push(statement);
             }
@@ -227,6 +337,15 @@ pub fn check(
                 // salía por aquí **tal cual** y se ejecutaba de verdad.
                 if let Some(verb) = row_destroying_verb(&statement) {
                     return Err(GuardError::RowDestruction { verb });
+                }
+                // 🔑 La escotilla del reshape es ESTA, y solo aquí (hub#1163): un `contract` puede
+                // renombrar o cambiar un tipo, pero tiene que decir desde qué versión es seguro.
+                // Un `contract` que solo retira ESTRUCTURA no la necesita — el runtime la aparta a
+                // `_deprecated_*` y las 4 publicadas son exactamente eso.
+                if let Some(verb) = reshape_verb(&strip_comments(&statement).to_uppercase()) {
+                    if !contract_version_declared {
+                        return Err(GuardError::ContractWithoutVersion { verb: verb.to_string() });
+                    }
                 }
                 out.push(set_aside_instead_of_dropping(&statement)?);
             }
@@ -378,6 +497,31 @@ fn leading_prose(statement: &str) -> (&str, &str) {
     statement.split_at(i)
 }
 
+/// Does the migration declare the version from which its `contract` is safe? (hub#1163)
+///
+/// The line is `-- contract: <version>` and it has to name a VERSION — digits and dots, the shape
+/// of the module versions the manifest already uses in `since`. `-- contract:` on its own, or
+/// followed by prose, is the author saying nothing while looking like they said something.
+///
+/// 🔴 It is read ONLY under `Kind::Contract`. hub#1137 already cost real data by letting a comment
+/// change what the guard did with the SQL under it: the hatch is the declared `kind`, which a
+/// reviewer sees in the manifest — this marker only says WHEN, never WHETHER.
+fn declares_contract_version(sql: &str) -> bool {
+    sql.lines().any(|line| {
+        let Some(rest) = line.trim().strip_prefix("--") else {
+            return false;
+        };
+        let Some(version) = rest.trim_start().strip_prefix("contract:") else {
+            return false;
+        };
+        let version = version.trim();
+        let version = version.strip_suffix("*/").unwrap_or(version).trim();
+        !version.is_empty()
+            && version.starts_with(|c: char| c.is_ascii_digit())
+            && version.chars().all(|c| c.is_ascii_digit() || c == '.')
+    })
+}
+
 /// Devuelve (`"IF EXISTS "` si lo llevaba, resto). Se conserva: un `contract` que se reintenta —
 /// porque el arranque anterior murió a medias— no puede reventar por apartar algo ya apartado.
 fn strip_if_exists(rest: &str) -> (&'static str, &str) {
@@ -402,6 +546,52 @@ fn destructive_verb(statement: &str) -> Option<String> {
     // aditivo (la tabla es nueva), y por eso solo cuenta en un `ALTER`.
     if upper.trim_start().starts_with("ALTER TABLE") && upper.contains("SET NOT NULL") {
         return Some("SET NOT NULL".to_string());
+    }
+    reshape_verb(&upper).map(str::to_string)
+}
+
+/// The verb that breaks N-1 without destroying a row, if the statement carries one (hub#1163).
+///
+/// Takes the SQL **already stripped of comments and upper-cased**, and compares WHOLE TOKENS —
+/// never substrings. `contains("RENAME TO")` is caught out by a column called `rename_to`, and a
+/// false positive here leaves a module uninstalled, which is the expensive direction. Same
+/// criterion as [`row_destroying_verb`], for the same reason.
+///
+/// `ALTER COLUMN` only counts when the action is a TYPE change (`… TYPE`, `… SET DATA TYPE`):
+/// `SET DEFAULT`, `DROP DEFAULT` and `DROP NOT NULL` widen what the previous binary may write,
+/// they do not narrow it. `SET NOT NULL` is the exception, and it is handled by its caller.
+///
+/// `RENAME CONSTRAINT` stays out on purpose: it moves no data and no query names a constraint.
+///
+/// 🔴 The keyword `COLUMN` is **optional** in Postgres in both verbs (`RENAME a TO b`,
+/// `ALTER a TYPE …`), so both forms are read. A guard you get past by leaving a word out is not
+/// a guard, and nobody leaves it out on purpose — which is exactly why it would have slipped.
+fn reshape_verb(cleaned_upper: &str) -> Option<&'static str> {
+    let tokens: Vec<&str> = cleaned_upper.split_whitespace().map(bare_token).collect();
+    for (i, token) in tokens.iter().enumerate() {
+        if *token == "RENAME" {
+            match tokens.get(i + 1) {
+                Some(&"COLUMN") => return Some("RENAME COLUMN"),
+                Some(&"TO") => return Some("RENAME TO"),
+                // A constraint is not part of the surface a query names: it stays out.
+                Some(&"CONSTRAINT") => {}
+                // `RENAME <columna> TO <columna>`: la palabra `COLUMN` es opcional, y omitirla no
+                // lo hace menos rompedor para N-1.
+                Some(_) if tokens.get(i + 2) == Some(&"TO") => return Some("RENAME COLUMN"),
+                _ => {}
+            }
+        }
+        if *token == "ALTER" {
+            // `ALTER [COLUMN] <nombre> <acción>`: con la palabra, la acción empieza tres tokens
+            // más allá; sin ella, dos. El `ALTER` de cabecera (`ALTER TABLE <tabla> …`) no casa
+            // por sí mismo: en su posición la «acción» es el nombre de la tabla.
+            let with_keyword = tokens.get(i + 1) == Some(&"COLUMN");
+            let action_at = if with_keyword { i + 3 } else { i + 2 };
+            let action = &tokens[action_at.min(tokens.len())..];
+            if action.first() == Some(&"TYPE") || action.starts_with(&["SET", "DATA", "TYPE"]) {
+                return Some("ALTER COLUMN ... TYPE");
+            }
+        }
     }
     None
 }
@@ -467,6 +657,63 @@ fn strip_comments(sql: &str) -> String {
     out
 }
 
+/// La construcción procedimental que la sentencia abre, si abre alguna (hub#1149).
+///
+/// Solo `DO` y `CREATE [OR REPLACE] FUNCTION`/`PROCEDURE`: las tres formas que meten un cuerpo
+/// que esta puerta no puede leer. Un `$…$` suelto **no** cuenta — `VALUES ($$hola$$)` es un
+/// literal perfectamente legible, y rechazarlo sería un falso positivo, que aquí significa dejar
+/// un módulo sin instalar.
+///
+/// Se mira sobre el SQL **sin comentarios** y por tokens enteros: una columna `do_not_ship` o un
+/// comentario que diga «function» no abren nada.
+fn procedural_construct(statement: &str) -> Option<&'static str> {
+    let cleaned = strip_comments(statement).to_uppercase();
+    let tokens: Vec<&str> = cleaned.split_whitespace().map(bare_token).collect();
+
+    if tokens.first() == Some(&"DO") {
+        return Some("DO");
+    }
+    if tokens.first() == Some(&"CREATE") {
+        let mut j = 1;
+        while matches!(tokens.get(j), Some(&"OR") | Some(&"REPLACE")) {
+            j += 1;
+        }
+        match tokens.get(j) {
+            Some(&"FUNCTION") => return Some("CREATE FUNCTION"),
+            Some(&"PROCEDURE") => return Some("CREATE PROCEDURE"),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Longitud del delimitador `$…$` que empieza en `at`, si de verdad lo es (hub#1149).
+///
+/// Un tag de Postgres es `$`, un identificador opcional (letra o `_` primero; después también
+/// dígitos) y otro `$`. Comprobarlo es lo que separa `$$`/`$body$` —que abren un cuerpo— de un
+/// `$1` o de un `$` suelto en un texto, que no abren nada.
+fn dollar_tag_len(chars: &[char], at: usize) -> Option<usize> {
+    if chars.get(at) != Some(&'$') {
+        return None;
+    }
+    let mut j = at + 1;
+    while let Some(&c) = chars.get(j) {
+        if c == '$' {
+            return Some(j + 1 - at);
+        }
+        let is_first = j == at + 1;
+        if !(c.is_alphabetic() || c == '_' || (!is_first && c.is_ascii_digit())) {
+            return None;
+        }
+        j += 1;
+    }
+    None
+}
+
+fn starts_with_tag(chars: &[char], at: usize, tag: &[char]) -> bool {
+    chars.len() >= at + tag.len() && chars[at..at + tag.len()] == *tag
+}
+
 fn tables_touched(statement: &str) -> Vec<String> {
     let statement = &strip_comments(statement);
     let mut found = Vec::new();
@@ -495,6 +742,15 @@ fn tables_touched(statement: &str) -> Vec<String> {
                 j += 1;
                 continue;
             }
+            // 🔑 `SET` tras un ancla NUNCA es una tabla (hub#1109). En `UPDATE <tabla> SET …` el
+            // token siguiente es la tabla y el ancla acierta; en `ON CONFLICT … DO UPDATE SET …`
+            // no hay tabla que anclar —va `SET`, palabra reservada— y esto concluía que el módulo
+            // tocaba una tabla llamada `set`. Rechazaba así el upsert al INSTALAR, que es la forma
+            // canónica de sembrar datos de referencia idempotentes. Mismo criterio que las otras
+            // dos puertas: `validate-sql.mjs` y el espejo del toolkit (module-toolkit#72).
+            if next_upper == "SET" {
+                break;
+            }
             let name = next
                 .trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
                 .to_lowercase();
@@ -513,55 +769,98 @@ fn tables_touched(statement: &str) -> Vec<String> {
 /// mitad de comentario, el trozo perdía su `--`, y «table is» se leía como una tabla `is` que
 /// «no pertenece a printing» — un módulo publicado y correcto que no se instalaba.
 ///
+/// Y respeta el **dollar-quoting** (`$$ … $$`, `$tag$ … $tag$`) desde hub#1149: sin eso el `;`
+/// de dentro de un cuerpo lo partía y los inspectores decidían sobre trozos de algo que ya no era
+/// la sentencia que Postgres iba a ejecutar. Un `$` que no abre un tag válido —`$1`, un precio—
+/// sigue siendo texto corriente.
+///
 /// El comentario se conserva en la sentencia (se copia tal cual): quitarlo es cosa de
 /// [`strip_comments`], en el momento de inspeccionar.
 fn split_statements(sql: &str) -> Vec<String> {
+    let chars: Vec<char> = sql.chars().collect();
     let mut out = Vec::new();
     let mut current = String::new();
-    let mut in_string = false;
-    let mut chars = sql.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if in_string {
-            current.push(ch);
-            if ch == '\'' {
-                in_string = false;
-            }
-            continue;
-        }
+    let mut i = 0;
+
+    while i < chars.len() {
+        let ch = chars[i];
         match ch {
             '\'' => {
-                in_string = true;
                 current.push(ch);
-            }
-            '-' if chars.peek() == Some(&'-') => {
-                current.push(ch);
-                for next in chars.by_ref() {
-                    current.push(next);
-                    if next == '\n' {
+                i += 1;
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if c == '\'' {
                         break;
                     }
                 }
             }
-            '/' if chars.peek() == Some(&'*') => {
-                current.push(ch);
+            '-' if chars.get(i + 1) == Some(&'-') => {
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if c == '\n' {
+                        break;
+                    }
+                }
+            }
+            '/' if chars.get(i + 1) == Some(&'*') => {
+                current.push('/');
+                current.push('*');
+                i += 2;
                 let mut prev = ' ';
-                for next in chars.by_ref() {
-                    current.push(next);
-                    if prev == '*' && next == '/' {
+                while i < chars.len() {
+                    let c = chars[i];
+                    current.push(c);
+                    i += 1;
+                    if prev == '*' && c == '/' {
                         break;
                     }
-                    prev = next;
+                    prev = c;
                 }
             }
+            // 🔑 Dollar-quoting (hub#1149). Sin esto, el `;` de dentro de un `DO $$ … $$` partía
+            // el bloque y los inspectores miraban trozos de algo que ya no era la sentencia que
+            // Postgres iba a ejecutar. El cuerpo se copia **verbatim**, tal cual: aquí no se
+            // reescribe nada, solo se decide dónde acaba la sentencia.
+            '$' => match dollar_tag_len(&chars, i) {
+                Some(len) => {
+                    let tag: Vec<char> = chars[i..i + len].to_vec();
+                    current.extend(tag.iter());
+                    i += len;
+                    while i < chars.len() {
+                        if starts_with_tag(&chars, i, &tag) {
+                            current.extend(tag.iter());
+                            i += tag.len();
+                            break;
+                        }
+                        current.push(chars[i]);
+                        i += 1;
+                    }
+                }
+                // Un `$` que no abre un tag es texto: `$1`, un precio, un nombre raro.
+                None => {
+                    current.push(ch);
+                    i += 1;
+                }
+            },
             ';' => {
                 if !current.trim().is_empty() {
                     out.push(current.trim().to_string());
                 }
                 current.clear();
+                i += 1;
             }
-            _ => current.push(ch),
+            _ => {
+                current.push(ch);
+                i += 1;
+            }
         }
     }
+
     if !current.trim().is_empty() {
         out.push(current.trim().to_string());
     }
@@ -1038,6 +1337,432 @@ mod tests {
         assert!(
             matches!(refused, Err(GuardError::KindMismatch { .. })),
             "el pase es por FICHERO, no por módulo: {refused:?}"
+        );
+    }
+
+    // ── Un upsert sobre tabla propia se INSTALA (hub#1109) ───────────────────────────
+
+    /// 🔴 `tables_touched` anclaba **todo** `UPDATE`. En un `UPDATE <tabla> SET …` el token que
+    /// sigue es la tabla y acierta; en `ON CONFLICT … DO UPDATE SET …` no hay tabla detrás del
+    /// `UPDATE` —va `SET`, palabra reservada— y el guard concluía que el módulo tocaba una tabla
+    /// llamada `set`, que no es suya. La puerta de INSTALACIÓN rechazaba así el upsert, que es la
+    /// forma canónica de sembrar datos de referencia idempotentes.
+    ///
+    /// Importaba porque el espejo del toolkit ya no marcaba el falso positivo (module-toolkit#72):
+    /// el gate daba VERDE a un upsert que ningún hub instalaba — módulo publicado verde, módulo
+    /// que no instala, y el cliente quien lo descubre.
+    #[test]
+    fn an_upsert_on_its_own_table_installs() {
+        let sql = "INSERT INTO taxes_category_label (key, lang, label, description) \
+                   VALUES ('food', 'es', 'Alimentacion', 'Tipo reducido') \
+                   ON CONFLICT (key, lang) DO UPDATE \
+                   SET label = EXCLUDED.label, description = EXCLUDED.description";
+
+        for kind in [Kind::Expand, Kind::Backfill] {
+            let plan = check("taxes", "migrations/postgres/005_category_labels.sql", sql, kind)
+                .unwrap_or_else(|e| panic!("un upsert sobre la tabla del propio módulo instala ({kind:?}): {e}"));
+            assert_eq!(plan, Plan::AsWritten, "y se aplica tal cual ({kind:?})");
+        }
+    }
+
+    /// 🔴 **El ancla sigue cazando el positivo.** Arreglar el falso positivo no puede abrir la
+    /// puerta: un `UPDATE` de verdad sobre la tabla de otro módulo se rechaza igual.
+    #[test]
+    fn an_update_on_another_modules_table_is_still_refused() {
+        let refused = check("taxes", "migrations/postgres/006_x.sql", "UPDATE sales_sale SET total = 0", Kind::Backfill)
+            .expect_err("la tabla de otro modulo no se toca");
+
+        assert!(
+            matches!(&refused, GuardError::ForeignTable { table, .. } if table == "sales_sale"),
+            "tenia que rechazarse por tabla ajena: {refused}"
+        );
+    }
+
+    // ── Lo que no se puede LEER no entra (hub#1149) ──────────────────────────────────
+
+    /// 🔴 `split_statements` no entendía **dollar-quoting**, así que el `;` de dentro de un
+    /// `DO $$ … $$` partía el bloque y los inspectores miraban trozos de algo que ya no era la
+    /// sentencia que Postgres iba a ejecutar. Es la pieza que rompe primero.
+    #[test]
+    fn a_dollar_quoted_body_is_one_statement() {
+        for sql in [
+            "DO $$\nBEGIN\n  DELETE FROM sales_line WHERE legacy = 'yes';\nEND\n$$;",
+            "CREATE FUNCTION sales_touch() RETURNS trigger AS $body$\nBEGIN\n  DELETE FROM sales_line;\n  RETURN NEW;\nEND\n$body$ LANGUAGE plpgsql;",
+        ] {
+            let statements = split_statements(sql);
+            assert_eq!(
+                statements.len(),
+                1,
+                "el cuerpo entre `$…$` es UNA sentencia, no {}: {statements:?}",
+                statements.len()
+            );
+        }
+    }
+
+    /// 🔴 **El agujero de la issue.** El guard es un lint sobre el TEXTO y no puede afirmar nada
+    /// de un cuerpo procedimental: dentro cabe `EXECUTE format('DROP TABLE %I', …)`, donde ni el
+    /// verbo ni la tabla son tokens que leer. Así que no se inspecciona: se rechaza — «lo que no
+    /// se puede apartar, no entra». Medido antes de escribirlo: **cero** de las 155 migraciones
+    /// publicadas en los 27 repos usa un cuerpo procedimental, así que el radio de explosión es 0.
+    #[test]
+    fn a_procedural_body_does_not_enter_a_module_migration() {
+        for sql in [
+            "DO $$\nBEGIN\n  DELETE FROM sales_line WHERE legacy = 'yes';\nEND\n$$",
+            "DO $limpia$ BEGIN EXECUTE 'DELETE FROM sales_line'; END $limpia$",
+            "CREATE FUNCTION sales_touch() RETURNS trigger AS $$ BEGIN RETURN NEW; END $$ LANGUAGE plpgsql",
+            "CREATE OR REPLACE FUNCTION sales_touch() RETURNS trigger AS $$ BEGIN RETURN NEW; END $$ LANGUAGE plpgsql",
+            "CREATE PROCEDURE sales_clean() LANGUAGE plpgsql AS $$ BEGIN DELETE FROM sales_line; END $$",
+        ] {
+            for kind in [Kind::Expand, Kind::Backfill, Kind::Contract] {
+                let refused = check("sales", "migrations/postgres/020_x.sql", sql, kind)
+                    .err()
+                    .unwrap_or_else(|| panic!("`{sql}` no es inspeccionable y no puede entrar ({kind:?})"));
+                assert!(
+                    matches!(refused, GuardError::NotInspectable { .. }),
+                    "`{sql}` tenia que rechazarse por no inspeccionable ({kind:?}): {refused}"
+                );
+            }
+        }
+    }
+
+    /// El error dice **qué** construcción y **por dónde** se sale, que es lo que separa un guard
+    /// de un muro: un módulo sin instalar y sin explicación es el fallo caro.
+    #[test]
+    fn the_refusal_names_the_construct_and_the_way_out() {
+        let refused = check("sales", "migrations/postgres/020_x.sql", "DO $$ BEGIN PERFORM 1; END $$", Kind::Expand)
+            .expect_err("no inspeccionable");
+        let message = refused.to_string();
+
+        assert!(message.contains("DO"), "nombra la construccion: {message}");
+        assert!(message.to_lowercase().contains("sql"), "y dice por donde SI se pasa: {message}");
+    }
+
+    /// 🔴 **Control de falsos positivos**, que aquí valen un módulo sin instalar. Un `$$` dentro
+    /// de un literal o de un comentario **no** abre un cuerpo procedimental, y una migración
+    /// normal con un `$` suelto sigue pasando.
+    #[test]
+    fn words_that_only_look_like_a_dollar_quote_are_not_one() {
+        for sql in [
+            "INSERT INTO sales_line (label) VALUES ('$$ no es un cuerpo $$')",
+            "-- el coste va en $$ y no abre nada\nCREATE TABLE sales_line (id BIGINT)",
+            "CREATE TABLE sales_line (id BIGINT, note TEXT DEFAULT 'precio en $')",
+        ] {
+            check("sales", "migrations/postgres/021_x.sql", sql, Kind::Expand)
+                .unwrap_or_else(|e| panic!("`{sql}` es SQL correcto y tiene que pasar: {e}"));
+        }
+    }
+
+    /// Las migraciones de **sistema** son nuestras, se leen en una PR y no pasan por [`check`]:
+    /// ahí un cuerpo procedimental sí cabe. Sin este control, la regla se habría llevado por
+    /// delante la puerta de al lado.
+    #[test]
+    fn a_system_migration_may_still_use_a_procedural_body() {
+        kind_matches("DO $$ BEGIN PERFORM 1; END $$", Kind::Expand)
+            .expect("las de sistema son nuestras y se revisan en una PR");
+    }
+
+    // ── N/N-1: reshaping a column is not `expand` (hub#1163) ────────────────────────
+
+    /// Regression test for ERPlora/hub#1163.
+    ///
+    /// 🔴 **This is the verb that takes the fleet down, not a screen.** With `start-first` and
+    /// `endpointSpecSwarm: dnsrr` the new task and the old one serve at the same time against the
+    /// SAME database, and `failure_action: rollback` gives back a hub that has ALREADY run the
+    /// migrations of N. Rename a column and every query of N-1 that names it starts failing —
+    /// against a schema no rollback undoes, because reverting does not run SQL (ADR-0269).
+    ///
+    /// It passed as `expand` because `destructive_verb` only knew the verbs that destroy DATA.
+    /// A rename destroys no data at all: it destroys the PREVIOUS BINARY.
+    #[test]
+    fn rename_column_is_not_expand_hub1163() {
+        let refused = expand("ALTER TABLE sales_sale RENAME COLUMN tax_rate TO tax_category_key");
+
+        let GuardError::KindMismatch { found, .. } = refused.expect_err("un rename rompe N-1")
+        else {
+            panic!("tenía que ser un KindMismatch");
+        };
+        assert_eq!(found, "RENAME COLUMN");
+    }
+
+    /// Regression test for ERPlora/hub#1163. `ALTER TABLE … RENAME TO` is the same hole one level
+    /// up: the whole table disappears from under N-1.
+    #[test]
+    fn rename_table_is_not_expand_hub1163() {
+        let refused = expand("ALTER TABLE sales_sale RENAME TO sales_ticket");
+
+        let GuardError::KindMismatch { found, .. } = refused.expect_err("un rename rompe N-1")
+        else {
+            panic!("tenía que ser un KindMismatch");
+        };
+        assert_eq!(found, "RENAME TO");
+    }
+
+    /// Regression test for ERPlora/hub#1163.
+    ///
+    /// The money migrations are the live proof: `ALTER COLUMN quantity TYPE BIGINT USING
+    /// (quantity * 1000000)` leaves N-1 writing `1` where the schema now means one millionth.
+    /// It is not a syntax error and it is not a crash — it is silently wrong data, which is worse.
+    #[test]
+    fn alter_column_type_is_not_expand_hub1163() {
+        for sql in [
+            "ALTER TABLE sales_sale ALTER COLUMN quantity TYPE BIGINT USING (quantity * 1000000)",
+            "ALTER TABLE sales_sale ALTER COLUMN quantity SET DATA TYPE BIGINT",
+        ] {
+            let refused = expand(sql);
+
+            let GuardError::KindMismatch { found, .. } =
+                refused.expect_err("cambiar el tipo rompe N-1")
+            else {
+                panic!("tenía que ser un KindMismatch: `{sql}`");
+            };
+            assert_eq!(found, "ALTER COLUMN ... TYPE", "`{sql}`");
+        }
+    }
+
+    /// The other `ALTER COLUMN` actions are NOT reshapes and must keep passing: `SET DEFAULT` /
+    /// `DROP NOT NULL` widen what N-1 may write, they do not narrow it. A false positive here
+    /// leaves a module uninstalled, which is the expensive direction.
+    #[test]
+    fn the_additive_alter_column_actions_still_pass_hub1163() {
+        for sql in [
+            "ALTER TABLE sales_sale ALTER COLUMN note SET DEFAULT ''",
+            "ALTER TABLE sales_sale ALTER COLUMN note DROP DEFAULT",
+            "ALTER TABLE sales_sale ALTER COLUMN note DROP NOT NULL",
+            "ALTER TABLE sales_sale ADD COLUMN renamed_at TEXT",
+            "CREATE TABLE sales_type (id BIGINT, rename_to TEXT)",
+        ] {
+            expand(sql).unwrap_or_else(|e| panic!("`{sql}` es aditivo y tiene que pasar: {e}"));
+        }
+    }
+
+    /// Regression test for ERPlora/hub#1163.
+    ///
+    /// 🔴 **`COLUMN` is OPTIONAL in Postgres**, in both verbs: `ALTER TABLE t RENAME a TO b` and
+    /// `ALTER TABLE t ALTER a TYPE BIGINT` are the very same reshapes, written the short way. A
+    /// guard you get past by omitting a keyword is not a guard — and nobody omits it on purpose,
+    /// which is what makes this the form that would have slipped through.
+    #[test]
+    fn the_implicit_column_forms_are_not_expand_either_hub1163() {
+        for (sql, expected) in [
+            (
+                "ALTER TABLE sales_sale RENAME tax_rate TO tax_category_key",
+                "RENAME COLUMN",
+            ),
+            (
+                "ALTER TABLE sales_sale ALTER quantity TYPE BIGINT USING (quantity * 1000000)",
+                "ALTER COLUMN ... TYPE",
+            ),
+            (
+                "ALTER TABLE sales_sale ALTER quantity SET DATA TYPE BIGINT",
+                "ALTER COLUMN ... TYPE",
+            ),
+        ] {
+            let refused = expand(sql);
+
+            let GuardError::KindMismatch { found, .. } =
+                refused.expect_err("omitir `COLUMN` no lo hace aditivo")
+            else {
+                panic!("tenía que ser un KindMismatch: `{sql}`");
+            };
+            assert_eq!(found, expected, "`{sql}`");
+        }
+    }
+
+    /// …and the negative control of that same widening: `RENAME CONSTRAINT` is OUT on purpose —
+    /// it moves no data and no query names a constraint — and the implicit-`COLUMN` form must not
+    /// drag it in. `SET DEFAULT` written short stays additive too.
+    #[test]
+    fn the_implicit_form_does_not_drag_in_what_is_additive_hub1163() {
+        for sql in [
+            "ALTER TABLE sales_sale RENAME CONSTRAINT sales_sale_fk TO sales_sale_fkey",
+            "ALTER TABLE sales_sale ALTER note SET DEFAULT \'\'",
+            "ALTER TABLE sales_sale ALTER note DROP NOT NULL",
+        ] {
+            expand(sql).unwrap_or_else(|e| panic!("`{sql}` es aditivo y tiene que pasar: {e}"));
+        }
+    }
+
+    /// 🔴 Every verb in [`NOT_EXPAND`] has to be REACHABLE, named exactly as the catalogue names
+    /// it. Without this the constant is prose: it could list a verb no statement ever trips, and
+    /// `engine.snapshot` would freeze a promise the guard does not keep.
+    #[test]
+    fn every_not_expand_verb_is_reachable_by_its_own_name_hub1163() {
+        let samples: &[(&str, &str)] = &[
+            (
+                "ALTER COLUMN ... TYPE",
+                "ALTER TABLE sales_sale ALTER COLUMN qty TYPE BIGINT",
+            ),
+            ("DELETE FROM", "DELETE FROM sales_sale WHERE id = 1"),
+            ("DROP COLUMN", "ALTER TABLE sales_sale DROP COLUMN total"),
+            (
+                "DROP CONSTRAINT",
+                "ALTER TABLE sales_sale DROP CONSTRAINT sales_sale_fk",
+            ),
+            ("DROP TABLE", "DROP TABLE sales_sale"),
+            (
+                "RENAME COLUMN",
+                "ALTER TABLE sales_sale RENAME COLUMN a TO b",
+            ),
+            ("RENAME TO", "ALTER TABLE sales_sale RENAME TO sales_ticket"),
+            (
+                "SET NOT NULL",
+                "ALTER TABLE sales_sale ALTER COLUMN note SET NOT NULL",
+            ),
+            ("TRUNCATE", "TRUNCATE sales_sale"),
+        ];
+        for verb in NOT_EXPAND {
+            let (_, sql) = samples
+                .iter()
+                .find(|(name, _)| name == verb)
+                .unwrap_or_else(|| {
+                    panic!("`{verb}` está en NOT_EXPAND y no tiene control positivo")
+                });
+            assert_eq!(
+                destructive_verb(sql).as_deref(),
+                Some(*verb),
+                "`{sql}` tenía que salir como `{verb}`"
+            );
+        }
+        assert_eq!(
+            samples.len(),
+            NOT_EXPAND.len(),
+            "sobra o falta un control positivo: NOT_EXPAND tiene {} verbos",
+            NOT_EXPAND.len()
+        );
+    }
+
+    // ── The hatch is `kind: contract`, and it has to name its version ───────────────
+
+    /// 🔴 **A comment is not a hatch.** hub#1137 already cost real data: prose above a `DROP`
+    /// defeated the translation. So `-- contract: 1.4.0` inside a migration DECLARED `expand`
+    /// changes nothing — the hatch is the declared `kind`, which is reviewable in the manifest,
+    /// not a line of text anybody can paste.
+    #[test]
+    fn a_contract_marker_does_not_turn_an_expand_into_a_contract_hub1163() {
+        let refused = expand(
+            "-- contract: 1.4.0\n\
+             ALTER TABLE sales_sale RENAME COLUMN tax_rate TO tax_category_key",
+        );
+
+        assert!(
+            matches!(refused, Err(GuardError::KindMismatch { .. })),
+            "la marca solo vale bajo `kind: contract`: {refused:?}"
+        );
+    }
+
+    /// A `contract` that reshapes has to say from WHICH version it is safe. Until hub#1163 a
+    /// `contract` was accepted in any version at all: nothing in the file said when the previous
+    /// binary had stopped using what it retires, so nobody could tell whether the update window
+    /// had been respected.
+    #[test]
+    fn a_contract_that_reshapes_must_name_its_version_hub1163() {
+        let refused = contract("ALTER TABLE sales_sale RENAME COLUMN tax_rate TO tax_category_key");
+
+        let GuardError::ContractWithoutVersion { verb } =
+            refused.expect_err("un contract que reshapea declara su ventana")
+        else {
+            panic!("tenía que ser un ContractWithoutVersion");
+        };
+        assert_eq!(verb, "RENAME COLUMN");
+    }
+
+    /// …and with the marker it goes through, untouched: a rename is not a `DROP`, so there is
+    /// nothing to translate.
+    #[test]
+    fn a_contract_that_names_its_version_may_reshape_hub1163() {
+        let plan = contract(
+            "-- Sales · 015 — the column moves to the tax catalogue key.\n\
+             -- contract: 1.4.0\n\
+             ALTER TABLE sales_sale RENAME COLUMN tax_rate TO tax_category_key",
+        )
+        .expect("declara su ventana");
+
+        let Plan::Rewritten(statements) = plan else {
+            panic!("un contract se reescribe");
+        };
+        assert!(
+            statements[0].contains("RENAME COLUMN tax_rate TO tax_category_key"),
+            "no hay nada que traducir en un rename: {statements:?}"
+        );
+    }
+
+    /// The marker has to name a VERSION. `-- contract:` on its own, or followed by prose, is the
+    /// author saying nothing while looking like they said something.
+    #[test]
+    fn a_contract_marker_without_a_version_does_not_count_hub1163() {
+        for marker in [
+            "-- contract:",
+            "-- contract: pronto",
+            "-- contract: v próxima",
+        ] {
+            let refused = contract(&format!(
+                "{marker}\nALTER TABLE sales_sale RENAME COLUMN a TO b"
+            ));
+
+            assert!(
+                matches!(refused, Err(GuardError::ContractWithoutVersion { .. })),
+                "`{marker}` no nombra una versión: {refused:?}"
+            );
+        }
+    }
+
+    /// A `contract` that only retires structure (the 4 published ones) does NOT need the marker:
+    /// the rule lands on the reshape, which is what breaks N-1. Widening it would put published,
+    /// installed work in red for nothing.
+    #[test]
+    fn a_contract_that_only_drops_needs_no_version_hub1163() {
+        contract("ALTER TABLE sales_sale DROP COLUMN tax_rate").expect("es el caso ya publicado");
+        contract("DROP TABLE sales_old_line").expect("es el caso ya publicado");
+    }
+
+    // ── Blast radius: what is already published keeps installing ────────────────────
+
+    /// 🔴 **The grandfathered list may only SHRINK.** It is the only thing stopping «grandfather
+    /// it» from becoming the way to keep publishing what the contract forbids — same rule, same
+    /// reason, as [`GRANDFATHERED`].
+    #[test]
+    fn the_reshape_grandfathered_list_may_only_shrink_hub1163() {
+        assert!(
+            RESHAPE_GRANDFATHERED.len() <= 12,
+            "la lista de reshapes abuelados ha CRECIDO ({}). No se añade nada: una migración \
+             nueva que renombra o cambia un tipo se declara `contract` y nombra su versión.",
+            RESHAPE_GRANDFATHERED.len()
+        );
+    }
+
+    /// The pass is for the RESHAPE and for nothing else: a grandfathered file that also destroys
+    /// is still refused. Otherwise one entry in the list would reopen the whole door.
+    #[test]
+    fn a_grandfathered_reshape_is_still_refused_a_drop_hub1163() {
+        let (module_id, filename) = RESHAPE_GRANDFATHERED[0];
+        let refused = check(
+            module_id,
+            filename,
+            &format!("ALTER TABLE {module_id}_thing DROP COLUMN total"),
+            Kind::Expand,
+        );
+
+        assert!(
+            matches!(refused, Err(GuardError::KindMismatch { .. })),
+            "el pase es para el reshape, no para todo: {refused:?}"
+        );
+    }
+
+    /// …and it is per FILE, not per module: the next migration of the same module inherits
+    /// nothing. Same rule as [`GRANDFATHERED`], and the reason the pairs are `(module, file)`.
+    #[test]
+    fn the_reshape_pass_does_not_extend_to_the_next_migration_hub1163() {
+        let (module_id, _) = RESHAPE_GRANDFATHERED[0];
+        let refused = check(
+            module_id,
+            "migrations/postgres/999_brand_new.sql",
+            &format!("ALTER TABLE {module_id}_thing RENAME COLUMN a TO b"),
+            Kind::Expand,
+        );
+
+        assert!(
+            matches!(refused, Err(GuardError::KindMismatch { .. })),
+            "el pase es por fichero: {refused:?}"
         );
     }
 }

@@ -26,17 +26,18 @@ ver más abajo):
   **roles y permisos** (pestaña `#permisos` de empleados) y el **asistente AI**
   (`components/AssistantDrawer.vue`, panel paralelo en escritorio/tablet y superpuesto en
   móvil). Tema claro/oscuro. CSP estricta validada históricamente (§14); hoy los gates vivos
-  son vitest + 4 specs Playwright (`apps/web/tests/e2e/`).
+  son vitest + 6 specs Playwright (`apps/web/tests/e2e/`, `pnpm -F @erplora/web test:e2e`).
 - **AUTH** ([apps/web/src/views/LoginPage.vue](apps/web/src/views/LoginPage.vue) + `src/lib/session.ts`):
   email (1er login) → dispositivo de confianza (enforce, sin bypass — hub#330) → PIN con
   rate-limit (hub#329); fallback demo SOLO bajo `VITE_DEMO=1`
   (`apps/web/src/lib/config.ts`).
 - **Piezas propias mínimas**: logo (imagen inline con fallback al logo local de ERPlora) y el
   PIN vía `ok-pinpad` (OutfitKit) — lo único que Ionic no trae. El resto es **Ionic + Tailwind**.
-- **CLI de módulos**: el CLI vivo es **`@erplora/module-toolkit`** (`erplora
+- **CLI de módulos**: el único CLI es **`@erplora/module-toolkit`** (`erplora
   build/dev/validate/pack/sign/publish`), desarrollado en `module-toolkit/` en la raíz del
-  monorepo. El antiguo [packages/module-cli](packages/module-cli) está **deprecado**
-  (ver su `DEPRECATED.md`).
+  monorepo. El hub **no compila módulos**: `apps/web/sync-modules.mjs` solo copia sus `dist/`.
+  (El antiguo `packages/module-cli` se borró en hub#1244 — llevaba deprecado desde que los
+  módulos salieron del workspace y sus tests no los corría nadie.)
 - **Contrato** ([schemas/](schemas)): `module.schema.json` + `envelope.schema.json`.
 
 - **Runtime Rust** ([crates/runtime](crates/runtime) + [crates/db](crates/db)): host genérico
@@ -57,7 +58,6 @@ apps/
                  web + hardware por invoke in-process (ADR-0196/0180)                [real]
   bridge/        Bridge standalone (red-only): hardware POS por localhost HTTP/WS     [en retirada, ADR-0196]
 packages/
-  module-cli/    erplora module build|validate                                       [deprecado, ver DEPRECATED.md — usa @erplora/module-toolkit]
   module-sdk/    SDK TS frontend (HttpWsTransport contra el runtime Axum)            [interfaz]
   module-types/  tipos del contrato (manifest/envelope)                             [parcial]
 modules/         módulos instalados en runtime (vacío de source; el source vive en
@@ -116,9 +116,24 @@ Atajos para arrancar solo una mitad: `pnpm dev:web` (Vite) · `pnpm dev:runtime`
 
 ```sh
 pnpm -F @erplora/web test                       # vitest (unit/componentes)
-pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts   # 4 specs e2e
+pnpm -F @erplora/web test:e2e                   # 6 specs e2e (arranca runtime + Vite solo)
 pnpm -F @erplora/web typecheck                  # TS estricto
 ```
+
+Los e2e levantan ELLOS el banco (`webServer` de `tests/playwright.config.ts`: runtime Axum +
+Vite), así que no hace falta un `pnpm dev` al lado — si ya lo tienes, lo reutilizan. Lo único
+que piden es una BD que exista:
+
+```sh
+docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_web'
+docker exec erplora-test-pg-5433 psql -U postgres -c 'CREATE DATABASE hub_e2e_assistant'
+export E2E_DATABASE_URL=postgres://postgres:test@localhost:5433/hub_e2e_assistant
+```
+
+Las capturas de `toHaveScreenshot` **se generan donde corren** (el runner Linux de
+`test-web.yml`: Run workflow → `update_baselines: true` → artefacto `playwright-baselines`).
+Las de un Mac no casan jamás con las de Linux y están en el `.gitignore`; mientras no exista
+la baseline de tu plataforma, el caso visual se salta diciéndolo.
 
 ## Decisiones fijadas (ver §14–15 del doc)
 

@@ -70,7 +70,9 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// la pantalla de la cola no podía existir fuera del shell. Gate: el del namespace (sesión local),
 /// **no admin** — es la audiencia que hub#987 ya decidió para los mismos hechos: una cola que nadie
 /// drena necesita a quien está en el mostrador, no a quien administra el hub.
-const CORE_QUERIES: &[&str] = &[
+/// `pub` porque **es contrato del kernel** (hub#1235): el namespace reservado `hub.*` que el core
+/// contesta sin que ningún módulo lo declare, congelado en `contracts/kernel/engine.snapshot`.
+pub const CORE_QUERIES: &[&str] = &[
     "users.list",
     "roles.list",
     "setup.status",
@@ -171,9 +173,6 @@ pub fn is_extendable_base_role(role: &str) -> bool {
     is_base_role(role) && !is_admin_role(role)
 }
 
-/// Longitud válida de un PIN local (dígitos). El login es un pinpad numérico.
-const PIN_LEN: std::ops::RangeInclusive<usize> = 4..=8;
-
 /// Un usuario del hub tal y como lo pinta la pantalla de Personal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HubUserRow {
@@ -263,13 +262,6 @@ pub struct UpdateHubUser {
     /// exactamente donde estaba — volver a solo-PIN es siempre posible. El caso Lightspeed
     /// L-Series (tarjeta irrevocable, producto descatalogado) es por qué esto no es opcional.
     pub badge: Option<String>,
-}
-
-fn invalid(detail: impl Into<String>) -> RuntimeError {
-    RuntimeError::InvalidPayload {
-        name: "hub.users".into(),
-        detail: detail.into(),
-    }
 }
 
 /// A refused field of a hub user, named by field and reason (hub#1070): what a test asserts on
@@ -395,8 +387,12 @@ fn clean_badge(value: &str) -> Result<String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
-        return Err(invalid(
-            "la placa solo admite letras, dígitos, `-` y `_`",
+        // hub#1190: named by field and reason like every other refusal of this door, so the
+        // screen translates it instead of repeating the runtime's sentence.
+        return Err(invalid_field(
+            "badge",
+            "format",
+            "the badge only accepts letters, digits, `-` and `_`",
         ));
     }
     Ok(badge.to_string())
@@ -449,7 +445,13 @@ async fn ensure_name_is_free(
     if res.rows.is_empty() {
         Ok(())
     } else {
-        Err(invalid(format!("ya hay un usuario activo llamado «{name}»")))
+        // hub#1190 («fleco del mismo #1185»): `name`/`duplicate`, not the last untyped refusal of
+        // this door. The screen anchors it under the name field and says it in the hub's language.
+        Err(invalid_field(
+            "name",
+            "duplicate",
+            format!("there is already an active user called «{name}»"),
+        ))
     }
 }
 
@@ -1196,6 +1198,37 @@ mod tests {
         db
     }
 
+    /// The two refusals #1185 left behind (hub#1190, «fleco del mismo #1185»): both were still
+    /// Spanish `InvalidPayload` prose, so the screen had no `(field, reason)` to translate and no
+    /// choice but to paint the sentence. Every other refusal of this door already travels as data.
+    #[test]
+    fn a_badge_with_the_wrong_shape_is_refused_by_field_and_reason_hub1190() {
+        let err = clean_badge("bad badge!").unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::InvalidField { field, reason, .. }
+                     if field == "badge" && reason == "format"),
+            "a badge the hub refuses has to name its field and its reason: {err}"
+        );
+        // The runtime writes English (code-language rule); Spanish is the UI's job (ADR-0055).
+        assert!(!err.to_string().contains("placa"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_name_is_refused_by_field_and_reason_hub1190() {
+        let db = db().await;
+        identity::create_user(&db, HUB, "Marta", "1234", "cashier", None)
+            .await
+            .unwrap();
+        let err = ensure_name_is_free(&db, HUB, "Marta", None).await.unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::InvalidField { field, reason, .. }
+                     if field == "name" && reason == "duplicate"),
+            "a name already taken has to name its field and its reason: {err}"
+        );
+        assert!(err.to_string().contains("Marta"), "{err}");
+        assert!(!err.to_string().contains("usuario activo llamado"), "{err}");
+    }
+
     #[test]
     fn only_owner_and_admin_administer_the_hub() {
         // Single, closed definition shared by the HTTP admin gate, the API keys, the login-user
@@ -1317,5 +1350,74 @@ mod tests {
         assert!(!truthy(&json!(0)));
         assert!(truthy(&json!(true)));
         assert!(!truthy(&json!(null)));
+    }
+
+    /// Regression for ERPlora/hub#1302: a hub's PIN length is a SETTING (`pin_length_of`, 4 or 6,
+    /// hub#974) — never a fixed shape. `clean_pin` already threads the length through instead of
+    /// assuming one; this test pins that down by name so an edit that hardcodes `4` again breaks a
+    /// test that says exactly why.
+    #[test]
+    fn clean_pin_refuses_four_digits_when_the_hub_wants_six_hub1302() {
+        let err = clean_pin("4821", 6).unwrap_err();
+        match &err {
+            RuntimeError::InvalidField { field, reason, detail, .. } => {
+                assert_eq!(field, "pin");
+                assert_eq!(reason, "format");
+                // The refusal has to name what THIS hub expects (six), never what some other hub
+                // would have wanted (four) — the whole point of hub#1302.
+                assert!(detail.contains('6'), "refusal must name the hub's real length: {detail}");
+                assert!(!detail.contains('4'), "refusal must not claim four digits: {detail}");
+            }
+            other => panic!("expected InvalidField(pin, format), got {other:?}"),
+        }
+        // The mirror: six digits are exactly what a six-length hub wants.
+        assert_eq!(clean_pin("482137", 6).unwrap(), "482137");
+    }
+
+    /// GUARD for ERPlora/hub#1302 (zero-regression rule, root CLAUDE.md): no error message in
+    /// this file may hardcode a PIN digit count as a literal number — the length is per-hub
+    /// (`pin_length_of`) and has to flow through a variable, never be typed in as a fixed count.
+    ///
+    /// Scans this file's OWN source text (not its runtime output), so it catches the bug at the
+    /// place it would be introduced: a hardcoded `"N digits"` literal, not the `{length}`-style
+    /// interpolation `clean_pin` actually uses. Mirrors the equivalent rule on the web's locale
+    /// strings (`apps/web/src/i18n/pin-length-not-hardcoded.hub1302.test.ts`).
+    #[test]
+    fn no_message_literal_hardcodes_a_pin_digit_count_hub1302() {
+        let source = include_str!("hub_users.rs");
+        for (lineno, line) in source.lines().enumerate() {
+            // Skip this guard's own text (and the regression test above), so the assertion cannot
+            // trip over the words describing the rule.
+            if line.contains("hub1302") {
+                continue;
+            }
+            assert!(
+                !hardcodes_digit_count(line),
+                "hub_users.rs:{} hardcodes a PIN digit count: {}",
+                lineno + 1,
+                line.trim()
+            );
+        }
+    }
+
+    /// A digit sitting immediately (optionally through one space or hyphen) before the word
+    /// "digit" or "dígito" — spelled out so this very sentence does not trip its own rule: a
+    /// numeral, then optionally a space or a hyphen, then straight into "digit(s)"/"dígito(s)".
+    /// Not the bare word: `"the badge must be between 4 and 64 characters"` and `"avoid repeated
+    /// digits (1111)"` do NOT match, because neither has a digit sitting right next to the word.
+    fn hardcodes_digit_count(line: &str) -> bool {
+        let lower = line.to_ascii_lowercase();
+        for needle in ["digit", "díg"] {
+            let mut search_from = 0;
+            while let Some(pos) = lower[search_from..].find(needle) {
+                let at = search_from + pos;
+                let before = lower[..at].trim_end_matches([' ', '-']);
+                if before.ends_with(|c: char| c.is_ascii_digit()) {
+                    return true;
+                }
+                search_from = at + needle.len();
+            }
+        }
+        false
     }
 }

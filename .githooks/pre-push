@@ -64,6 +64,9 @@
 #   the self-resync, driven without cargo, without GitHub and without touching
 #   the machine's installed hook)
 #   HUB_GATE_SCOPE=workspace forces the old behaviour for one push.
+#   HUB_GATE_MATERIALIZE_CMD · HUB_GATE_MODULES_FLOOR (hub#1153: how the
+#   PUBLISHED module catalogue is materialised, and the minimum number of
+#   manifests it must contain — driven without network or deploy keys)
 #   HUB_GATE_UNPROTECTED_LOCK_WAIT (hub#788: lock-wait cap while the SSH
 #   connection has no keepalive; the rule is keepalive margin > max lock wait)
 #   HUB_GATE_PUSH_POLL_TRIES · HUB_GATE_PUSH_POLL_DELAY (hub#574: how long the
@@ -834,37 +837,92 @@ raise_lock_limits() {
     echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
 }
 
-# The module e2e — the ones that install real modules from `modules-workspace` — are the one
-# place where "run what CI ran" needs saying out loud, because CI does NOT run them: the guard
-# sees `CI=true` and takes a legitimate skip (hub#253). On a clean develop they are 120 failures
-# across 25 targets (stale module builds), so running them by default would block every push,
-# and it would also make "we replaced the CI gate" a false claim.
+# The module e2e — the ones that install the real modules — are the one place where "run what CI
+# ran" needs saying out loud, because `test-hub.yml` does NOT run them: the guard sees `CI=true`
+# and takes a legitimate skip (hub#253). They run in `test-hub-modules.yml`, against the PUBLISHED
+# catalogue, and that is the shape this gate has to reproduce or stay quiet about.
 #
-# Default is therefore parity: skip, exactly as CI does. `HUB_GATE_WITH_MODULES=1` opts into the
-# stricter run — worth turning on the day those 120 are fixed, since it covers ground CI never has.
+# Default is therefore parity with `test-hub.yml`: skip. `HUB_GATE_WITH_MODULES=1` opts into the
+# stricter run.
+#
+# ── hub#1153: WHICH modules, and why it is not the sibling checkout ──────────
+# This used to export `ERPLORA_MODULES_DIR=<monorepo>/modules-workspace/modules`, i.e. whatever
+# branch the last agent left each module on — 9 of 27 were off `main` on 2026-08-28. A gate whose
+# verdict depends on that is a raffle, and it fails in BOTH directions: a module BEHIND reds a push
+# that did not cause it (`sales_e2e`: 4 operations vs 5, several half-hour diagnoses), a module
+# AHEAD greens a contract that already moved in production (hub#540) — the expensive one, because
+# nothing looks wrong.
+#
+# So the catalogue is MATERIALISED from each module's `origin/main` into a cache under $STATE_DIR,
+# by `scripts/materialize-published-modules.sh` — the SAME script `test-hub-modules.yml` runs, so
+# the local gate and the "crater/runbot" job cannot drift apart (the Postgres config living in
+# three copies already cost `main` once, hub#647). `modules-workspace` is still consulted, but
+# ONLY for the module ids and their remote URLs; its content never reaches the suite. Pulling or
+# resetting it is not an option either way — those checkouts hold other agents' unpushed commits.
+#
+# The failure is LOUD, never a downgrade: opting in is a request for the published catalogue, and
+# a run that silently skipped the module e2e would be a green that proved nothing — the very hole
+# this closes. Contract: `architecture/hub/kernel-contract.md` §6 hole #2 (ADR «El Hub se CIERRA
+# como KERNEL», 2026-08-27).
+#
+# Escape hatches, both documented: `ERPLORA_MODULES_DIR` set by hand still wins (debugging a tree),
+# and dropping `HUB_GATE_WITH_MODULES` goes back to CI parity.
+MODULES_FLOOR="${HUB_GATE_MODULES_FLOOR:-25}"
 resolve_modules_dir() {
     if [ "${HUB_GATE_WITH_MODULES:-0}" != "1" ]; then
         export ERPLORA_E2E_ALLOW_SKIP=1
         return 0
     fi
-    [ -n "${ERPLORA_MODULES_DIR:-}" ] && return 0
-    # The relative path the tests use only resolves from a checkout inside the monorepo, and the
-    # fleet works out of /private/tmp worktrees — so resolve it here rather than leave it to luck.
-    local candidate
+    if [ -n "${ERPLORA_MODULES_DIR:-}" ]; then
+        echo "ℹ️  pre-push: ERPLORA_MODULES_DIR is set by hand ($ERPLORA_MODULES_DIR) → using it as-is." >&2
+        return 0
+    fi
+
+    # The id source. The relative path only resolves from a checkout inside the monorepo and the
+    # fleet works out of /private/tmp worktrees, so it is resolved here rather than left to luck.
+    local ids_from="" candidate
     for candidate in \
         "$(git rev-parse --show-toplevel)/../modules-workspace/modules" \
         "${HOME:-}/workspace/code/ERPlora/modules-workspace/modules"
     do
         if [ -d "$candidate" ]; then
-            ERPLORA_MODULES_DIR="$(cd "$candidate" && pwd)"
-            export ERPLORA_MODULES_DIR
-            return 0
+            ids_from="$(cd "$candidate" && pwd -P)"
+            break
         fi
     done
-    echo "⚠️  pre-push: HUB_GATE_WITH_MODULES=1 but modules-workspace is nowhere — skipping them." >&2
-    export ERPLORA_E2E_ALLOW_SKIP=1
+
+    local dest="$STATE_DIR/modules-main" cmd
+    if [ -n "${HUB_GATE_MATERIALIZE_CMD:-}" ]; then
+        cmd="$HUB_GATE_MATERIALIZE_CMD"
+    else
+        local script
+        script="$(git rev-parse --show-toplevel)/scripts/materialize-published-modules.sh"
+        if [ ! -f "$script" ]; then
+            echo "❌ pre-push: HUB_GATE_WITH_MODULES=1 but scripts/materialize-published-modules.sh is not in this checkout." >&2
+            echo "   Without it the only catalogue available is the PARKED modules-workspace, and measuring" >&2
+            echo "   against that is what hub#1153 abolished. Update the branch, or drop HUB_GATE_WITH_MODULES." >&2
+            return 1
+        fi
+        cmd="bash \"$script\""
+    fi
+
+    local args="--dest \"$dest\" --floor \"$MODULES_FLOOR\""
+    [ -n "$ids_from" ] && args="$args --ids-from \"$ids_from\""
+
+    echo "📦 pre-push: materialising the PUBLISHED module catalogue into $dest (hub#1153)…" >&2
+    local resolved
+    if ! resolved="$(eval "$cmd $args")" || [ -z "$resolved" ]; then
+        echo "" >&2
+        echo "❌ pre-push: the PUBLISHED module catalogue could not be materialised → push ABORTED." >&2
+        echo "   HUB_GATE_WITH_MODULES=1 asks for the published catalogue; running the suite without it" >&2
+        echo "   would skip the module e2e in silence and report a green that proved nothing (hub#1153)." >&2
+        echo "   Fix the access above, or push without HUB_GATE_WITH_MODULES for the usual CI parity." >&2
+        return 1
+    fi
+    ERPLORA_MODULES_DIR="$resolved"
+    export ERPLORA_MODULES_DIR
 }
-resolve_modules_dir
+resolve_modules_dir || exit 1
 
 # A `resolve_blueprints_dir` used to sit here: `sector_packs_pg_e2e` read its sector seeds out of
 # the sibling `blueprints` checkout, those two tests have no opt-in, and from a /private/tmp

@@ -67,8 +67,9 @@ pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) ->
             })?;
 
         // El SQL se ejecuta TAL CUAL salvo en un `contract`. Recomponer un batch que se ha partido
-        // por `;` corrompe SQL válido —el splitter no entiende dollar-quoting— y el peor caso de
-        // eso es romper un módulo que estaba bien. Ver `migration_guard::Plan`.
+        // por `;` corrompe SQL válido, y el peor caso de eso es romper un módulo que estaba bien.
+        // El splitter entiende dollar-quoting desde hub#1149, pero entender sirve para DECIDIR,
+        // no para recomponer. Ver `migration_guard::Plan`.
         match plan {
             crate::migration_guard::Plan::AsWritten => db.execute_batch(&sql).await?,
             crate::migration_guard::Plan::Rewritten(statements) => {

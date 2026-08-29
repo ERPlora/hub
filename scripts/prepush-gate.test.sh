@@ -182,6 +182,25 @@ make_monorepo() {
     echo "$base"
 }
 
+# A stand-in for scripts/materialize-published-modules.sh: it records the
+# arguments the hook passed and answers with the directory it was told to fill.
+# The real script has its own suite (scripts/materialize-published-modules.test.sh);
+# what is under test HERE is the hook's half of the contract — which directory it
+# asks for, what it does with the answer, and what it does with a refusal.
+write_fake_materializer() {      # $1 = path of the fake  $2 = where to record the args
+    cat > "$1" <<FAKE
+#!/usr/bin/env bash
+printf '%s\n' "\$*" > "$2"
+dest=""
+while [ \$# -gt 0 ]; do
+    case "\$1" in --dest) dest="\$2"; shift 2 ;; *) shift ;; esac
+done
+mkdir -p "\$dest"
+printf '%s\n' "\$dest"
+FAKE
+    chmod +x "$1"
+}
+
 # ── 9. Default is CI PARITY: the module e2e are skipped, exactly as in CI ─────
 #    CI never runs them (the guard sees CI=true and skips). On a clean develop they
 #    are 120 failures / 25 targets, so running them by default would block every
@@ -196,33 +215,94 @@ got=$(cat "$base/ENV" 2>/dev/null)
     && ok "default: module e2e skipped, same as the CI gate it replaces" \
     || bad "default: module e2e skipped, same as the CI gate it replaces" "exit=$code got='$got'"
 
-# ── 10. Opt-in runs them, and finds them from ANY worktree ────────────────────
-#    The fleet works out of /private/tmp worktrees, outside the monorepo, where the
-#    relative path crates/runtime/../../../modules-workspace/modules does not resolve
-#    and the guard panics instead of skipping (hub#253). The hook resolves it.
+# ── 10. Opt-in measures the PUBLISHED catalogue, NEVER modules-workspace ─────
+#    Regression test for ERPlora/hub#1153. The hook used to export
+#    `ERPLORA_MODULES_DIR=<monorepo>/modules-workspace/modules`, whose content is
+#    whatever branch the last agent left each module on (9 of 27 were off `main`
+#    on 2026-08-28). A gate that measures against that is a raffle, and it fails
+#    in both directions: a module BEHIND reds a push that did not cause it, a
+#    module AHEAD greens a contract that already moved (hub#540).
+#
+#    The contract now: the catalogue is MATERIALISED from each module's
+#    `origin/main` into $STATE_DIR/modules-main, and modules-workspace may only
+#    ever be handed over as an ID SOURCE (`--ids-from`), never as the answer.
+base=$(make_monorepo)
+write_fake_materializer "$base/fake-materialize" "$base/ARGS"
+sha=$(git -C "$base/hub" rev-parse HEAD)
+code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=1 \
+    HUB_GATE_MATERIALIZE_CMD="bash $base/fake-materialize" \
+    HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_MODULES_DIR:-} skip=\${ERPLORA_E2E_ALLOW_SKIP:-}\" > $base/ENV; true")
+got=$(cat "$base/ENV" 2>/dev/null)
+args=$(cat "$base/ARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ "$got" = "dir=$base/.state/modules-main skip=" ] || errs="$errs got='$got'"
+case "$got" in *modules-workspace*) errs="$errs THE-SUITE-WAS-POINTED-AT-THE-PARKED-CHECKOUT" ;; esac
+case "$args" in *"--ids-from $base/modules-workspace/modules"*) ;; *) errs="$errs workspace-was-not-offered-as-an-id-source(args='$args')" ;; esac
+[ -z "$errs" ] \
+    && ok "opt-in: the suite measures the published catalogue, never modules-workspace (hub#1153)" \
+    || bad "opt-in: the suite measures the published catalogue, never modules-workspace (hub#1153)" "$errs"
+
+# ── 10b. An explicit ERPLORA_MODULES_DIR still wins ──────────────────────────
+#    Documented escape hatch: pointing the gate at a tree you are debugging is
+#    legitimate, and it must not trigger a materialisation on top of it.
+base=$(make_monorepo)
+sha=$(git -C "$base/hub" rev-parse HEAD)
+code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=1 ERPLORA_MODULES_DIR="$base/hand-picked" \
+    HUB_GATE_MATERIALIZE_CMD="touch $base/MATERIALIZED; echo $base/.state/modules-main" \
+    HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_MODULES_DIR:-}\" > $base/ENV; true")
+got=$(cat "$base/ENV" 2>/dev/null)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ "$got" = "dir=$base/hand-picked" ] || errs="$errs got='$got'"
+[ -f "$base/MATERIALIZED" ] && errs="$errs materialised-on-top-of-an-explicit-dir"
+[ -z "$errs" ] \
+    && ok "opt-in: an explicit ERPLORA_MODULES_DIR wins and nothing is materialised" \
+    || bad "opt-in: an explicit ERPLORA_MODULES_DIR wins and nothing is materialised" "$errs"
+
+# ── 11. A catalogue that cannot be materialised ABORTS the push ──────────────
+#    The old hook warned and set ERPLORA_E2E_ALLOW_SKIP=1, so `HUB_GATE_WITH_MODULES=1`
+#    could run the suite with the module e2e silently skipped — a green that
+#    proved nothing, which is the exact hole hub#1153 is about. Opting in is a
+#    request for the published catalogue; not getting it is a failure, not a
+#    downgrade. The floor (>=25 manifests) is enforced inside the materialiser
+#    and reaches the gate as a non-zero exit.
 base=$(make_monorepo)
 sha=$(git -C "$base/hub" rev-parse HEAD)
 code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_WITH_MODULES=1 \
-    HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_MODULES_DIR:-} skip=\${ERPLORA_E2E_ALLOW_SKIP:-}\" > $base/ENV; true")
-got=$(cat "$base/ENV" 2>/dev/null)
-[ "$code" = 0 ] && [ "$got" = "dir=$base/modules-workspace/modules skip=" ] \
-    && ok "opt-in: the suite is pointed at modules-workspace, wherever it is" \
-    || bad "opt-in: the suite is pointed at modules-workspace, wherever it is" "exit=$code got='$got'"
+    HUB_GATE_MATERIALIZE_CMD="echo 'only 3 module(s) with module.json — the floor is 25' >&2; exit 1" \
+    HUB_GATE_TEST_CMD="touch $base/RAN; true")
+errs=""
+[ "$code" = 0 ] && errs="$errs push-was-let-through"
+[ -f "$base/RAN" ] && errs="$errs suite-ran-without-the-published-catalogue"
+grep -q "the floor is 25" "$base/hub/.out" 2>/dev/null || errs="$errs the-materialiser-error-was-swallowed"
+grep -qi "HUB_GATE_WITH_MODULES" "$base/hub/.out" 2>/dev/null || errs="$errs no-hint-about-how-to-opt-out"
+[ -z "$errs" ] \
+    && ok "opt-in: a catalogue that cannot be materialised aborts the push, never a silent skip" \
+    || bad "opt-in: a catalogue that cannot be materialised aborts the push, never a silent skip" "$errs out=$(tr '\n' ' ' < "$base/hub/.out" | tail -c 300)"
 
-# ── 11. Opt-in without modules on disk: skip, never the hub#253 panic ─────────
-repo=$(make_repo)
-git -C "$repo" config --bool hooks.hubPrepushGate true
-sha=$(git -C "$repo" rev-parse HEAD)
-code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_WITH_MODULES=1 HOME="$repo/nowhere" \
-    HUB_GATE_TEST_CMD="echo \"skip=\${ERPLORA_E2E_ALLOW_SKIP:-}\" > $repo/ENV; true")
-got=$(cat "$repo/ENV" 2>/dev/null)
-[ "$code" = 0 ] && [ "$got" = "skip=1" ] \
-    && ok "opt-in with no modules on disk: skips instead of panicking" \
-    || bad "opt-in with no modules on disk: skips instead of panicking" "exit=$code got='$got'"
+# ── 11b. A checkout with no materialiser fails LOUDLY, it does not degrade ───
+#    An old checkout (or a botched install) is exactly when a silent fallback to
+#    modules-workspace would come back.
+base=$(make_monorepo)
+sha=$(git -C "$base/hub" rev-parse HEAD)
+code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=1 \
+    HUB_GATE_TEST_CMD="touch $base/RAN; true")
+errs=""
+[ "$code" = 0 ] && errs="$errs push-was-let-through"
+[ -f "$base/RAN" ] && errs="$errs suite-ran-anyway"
+grep -q "materialize-published-modules.sh" "$base/hub/.out" 2>/dev/null || errs="$errs error-does-not-name-the-missing-script"
+[ -z "$errs" ] \
+    && ok "opt-in: a checkout without the materialiser aborts instead of falling back" \
+    || bad "opt-in: a checkout without the materialiser aborts instead of falling back" "$errs out=$(tr '\n' ' ' < "$base/hub/.out" | tail -c 300)"
 
 # ── 12. `blueprints/` is NOT a dependency of the gate any more ────────────────
 #    It used to be: `sector_packs_pg_e2e` read its sector seeds out of that sibling

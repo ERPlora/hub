@@ -357,8 +357,8 @@ por operación para el asistente.
 
 - **Tier 0 — Declarativo (sin código):** tablas, queries de lista/get, CRUD de una fila,
   permisos/roles, menú, `ai_tools`, scheduled tasks. ~30% de módulos. Máxima seguridad, cero compilación.
-- **Tier 1 — Declarativo + capacidades del host:** `render.pdf`/`render.xlsx` (plantilla),
-  forma *for-each* para batch sencillo, `http.fetch` **mediado** (§5.5). Cubre mucho sin WASM.
+- **Tier 1 — Declarativo + capacidades del host:** forma *for-each* para batch sencillo,
+  `http.fetch` **mediado** (§5.5). Cubre mucho sin WASM.
 - **Tier 2 — WASM tipado (Extism):** lógica real — batch/array (`sale_lines`, `bulk_create`),
   reglas fiscales/descuentos, validaciones dependientes de BD, importadores. El WASM **no**
   toca la BD: recibe input y devuelve *intenciones* (SQL declarado + eventos) que Rust valida
@@ -393,8 +393,6 @@ de otros módulos** (con permisos) vía host functions, sin importar su código.
 El host (Rust) expone un conjunto **cerrado** de capacidades que un módulo Tier 0/1 puede
 usar de forma declarativa, sin WASM y sin acceso crudo a recursos:
 
-- **`render.pdf` / `render.xlsx`**: el módulo declara una plantilla; el host genera el
-  documento (sustituye a `fpdf2`/`openpyxl`/`weasyprint`).
 - **`http.fetch` mediado (red saliente, Opción A — decidida en §6):**
   1. El módulo declara en `module.json` una **allowlist** de dominios + los secretos que
      necesita (por nombre lógico, **nunca** el valor):
@@ -410,6 +408,14 @@ usar de forma declarativa, sin WASM y sin acceso crudo a recursos:
 
 Así un **tercero puede publicar integraciones** (pago, envío, mensajería) sin abrir red
 arbitraria ni exponer secretos.
+
+> **Lo que NO es una capacidad del host: `render.pdf`/`render.xlsx`** (hub#1237). Esta sección las
+> anunció durante toda la Fase 5 y nunca se implementaron: no hay `CapabilityKind` para ellas, no
+> se pueden declarar en `module.json` y ningún módulo las puede pedir. Un contrato que promete lo
+> que no existe es una mentira a los autores de módulos, así que se retiran en vez de congelarse
+> (contrato del kernel, ADR «El Hub se CIERRA como KERNEL»). Un documento se genera hoy en el
+> módulo que lo necesita; si algún día el host lo hace, entrará por una ADR y con su
+> `CapabilityKind`, no por una línea de esta lista.
 
 > Lo **crítico-fiscal** (`verifactu`/AEAT con mTLS PKCS#12, `payroll`) **no** usa esta vía:
 > va por **plugin nativo first-party** (Opción B, escape hatch §5.3).
@@ -445,7 +451,7 @@ seguro. Pero **rompe** en lo que un ERP real necesita a diario:
 | **Flujos multi-paso** (factura→stock→asiento) | ❌ | WASM + composición de commands |
 | **Integraciones externas** (WhatsApp, fiscal, pasarelas) | ❌ | `http.fetch` mediado (Tier 1) o nativo |
 | **Validación > JSON-Schema** | ❌ | WASM (`invariants`) |
-| **PDF / Excel** | ❌ | Capacidad host `render.pdf`/`render.xlsx` (Tier 1) |
+| **PDF / Excel** | ❌ | Lo genera el módulo (no hay capacidad host — retirada en hub#1237) |
 | **Cross-módulo** | ⚠️ solo vía eventos | Host functions (query/command de otros) |
 
 **Ergonomía.** Un módulo con poder de código arbitrario (SQLAlchemy, servicios, hooks,
@@ -514,7 +520,7 @@ Tipos TS del manifest + JSON Schema de `module.json`, **generados desde
 
 Crate que usan los autores de lógica WASM: macro `#[command]`/`#[query]`, serialización
 JSON in/out (ABI Extism), y **host functions** (ejecutar un query/command permitido, emitir
-evento, `render.pdf`, `http.fetch` en allowlist). El guest devuelve *intenciones*; nunca
+evento, `http.fetch` en allowlist). El guest devuelve *intenciones*; nunca
 toca la BD. Sin esto, escribir WASM es inviable.
 
 > **Guest = el código que corre DENTRO del sandbox** (el "invitado"), frente al **host**
@@ -607,7 +613,7 @@ cambios. Instalación desde el marketplace real (`source/s3_source` + `cloud-cli
 
 ### Fase 5 — WASM + tooling + RAG
 `wasm-host` (Extism) + `guest-sdk`; portar `sale_create`/reglas a WASM; capacidades host
-(`render.pdf`/`render.xlsx`, `http.fetch` mediado §5.5); CLI completo + firma; `ai_tools` +
+(`http.fetch` mediado §5.5); CLI completo + firma; `ai_tools` +
 `search_docs` (pgvector cloud + degradación local §9.5).
 
 ### Fase 6 — Cierre

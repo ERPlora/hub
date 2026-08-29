@@ -16,6 +16,7 @@ import { addIcons } from 'ionicons';
 
 import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
+import type { ModuleSettingsLocale } from './module-settings';
 import { moduleBase } from './module-url';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { orderSlotFillers } from './slot-fillers';
@@ -386,6 +387,13 @@ export interface ModuleLocaleFile {
    *  (`sales.void`) → `{ label }`. Opcional: un módulo que no lo traiga hace que el diálogo caiga a
    *  su nombre localizado, nunca al nombre del command. */
   commands?: Record<string, { label?: string }>;
+  /**
+   * Strings of the module's SETTINGS screen (hub#1094): the heading and one entry per JSON Schema
+   * property. The screen the shell generates read only the schema — canonical English — so it came
+   * out in English on a Spanish hub even though `kitchen` and `tables` had been publishing these
+   * very keys for weeks. Resolved in `lib/module-settings.ts`.
+   */
+  settings?: ModuleSettingsLocale;
 }
 
 export interface InstalledManifest {

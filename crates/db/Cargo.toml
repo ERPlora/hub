@@ -33,3 +33,8 @@ sqlx={ version = "0.9.0", default-features = false, features = [
 tokio = { version ="^1.52.3", features = ["macros", "rt-multi-thread"] }
 # testutil also compiles under plain `cfg(test)` (this crate's own tests), without the feature.
 libc = "0.2"
+
+# Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
+# queda EXENTO del gate de clippy en silencio; `scripts/tests/clippy-lints.test.sh` lo vigila.
+[lints]
+workspace = true

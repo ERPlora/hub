@@ -437,6 +437,7 @@ import {
 } from '../lib/dead-letter';
 import { isAdmin } from '../lib/session';
 import { toastSuccess, toastError } from '../lib/toast';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 
@@ -674,10 +675,14 @@ const logRows = computed<Row[]>(() => logs.value as unknown as Row[]);
 // ── Formato ──────────────────────────────────────────────────────
 
 function fmtDateTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(
-    locale.value === 'en' ? 'en-GB' : 'es-ES',
-    { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' },
+  return (
+    formatDateTime(iso, {
+      locale: locale.value,
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) ?? iso
   );
 }
 
@@ -807,11 +812,7 @@ async function loadDeadLetters(): Promise<void> {
 }
 
 function formatWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso, { locale: locale.value }) ?? iso;
 }
 
 async function retryOne(id: string): Promise<void> {

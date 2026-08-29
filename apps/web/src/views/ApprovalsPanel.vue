@@ -79,6 +79,7 @@ import { dataTableLabels } from '../lib/data-table-labels';
 import { createApprovalsController, type Approval, type ApprovalsController } from '../lib/approvals';
 import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
+import { formatDateTime } from '../lib/format-datetime';
 
 const { t, locale } = useI18n();
 
@@ -154,16 +155,15 @@ function syncFromController(): void {
 function whenCell(row: Row): Node {
   const span = document.createElement('span');
   const raw = String(row.createdAt ?? '');
-  const date = new Date(raw);
-  span.textContent = Number.isNaN(date.getTime())
-    ? raw
-    : date.toLocaleString(locale.value === 'en' ? 'en-GB' : 'es-ES', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+  span.textContent =
+    formatDateTime(raw, {
+      locale: locale.value,
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) ?? raw;
   return span;
 }
 

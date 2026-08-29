@@ -323,7 +323,7 @@ test('hub#715: the surface is one route, and every id it can paste in one is che
   assert.deepEqual(
     methods,
     // The dead-letter half arrived with hub#953; its own routes are pinned further down.
-    ['dead', 'deadCount', 'discard', 'list', 'retry', 'retryAll', 'shape', 'trace'],
+    ['dead', 'deadCount', 'discard', 'discarded', 'list', 'retry', 'retryAll', 'shape', 'trace'],
     'adding an escape hatch here turns this red on purpose',
   );
 
@@ -440,6 +440,7 @@ test('hub#953: the six dead-letter gestures are six routes, and the surface is s
     'dead',
     'deadCount',
     'discard',
+    'discarded',
     'list',
     'retry',
     'retryAll',
@@ -472,6 +473,41 @@ test('hub#953: the six dead-letter gestures are six routes, and the surface is s
     assert.equal(call.headers[MODULE_HEADER], EDITOR, 'the call names the module the gate reads');
     assert.equal(call.headers['X-Hub-Session'], SESSION, 'the SHELL owns the session, as always');
   }
+});
+
+test('hub#1117: the closed rows are a seventh route, and the stamp arrives whole', async () => {
+  // The reason was write-only: `discard` stored who/when/why and no read projected any of the
+  // three, so the tray's «cerrado porque…» lived in the component's `@state` and died on reload.
+  // `discarded()` is the read half — one more route, still no method that takes a path.
+  const closed = {
+    id: A_DEAD_LETTER.id,
+    event_name: 'flow.reminder.due',
+    module_id: 'flows',
+    last_error: 'host.notify: the hub is not enrolled',
+    created_at: '2026-08-09T10:00:00+00:00',
+    discarded_at: '2026-08-23T11:00:00+00:00',
+    discarded_by: 'hub_user:qa3',
+    discard_reason: 'duplicada: la factura se registró a mano',
+  };
+  const { client, calls } = scoped({ ok: true, data: [closed] });
+
+  const rows = await client.events.discarded();
+
+  assert.deepEqual(
+    calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
+    // No id and no filter, like the endpoint: the hub answers about ITS OWN closed rows.
+    ['GET /api/hub/events/discarded'],
+  );
+  assert.equal(calls[0].headers[MODULE_HEADER], EDITOR, 'the call names the module the gate reads');
+  assert.equal(rows.length, 1);
+  // The three halves of the audit travel TOGETHER: «somebody closed this» and «closed because
+  // duplicada» answer different questions, and only the three together are a record.
+  assert.equal(rows[0].discard_reason, 'duplicada: la factura se registró a mano');
+  assert.equal(rows[0].discarded_by, 'hub_user:qa3');
+  assert.equal(rows[0].discarded_at, '2026-08-23T11:00:00+00:00');
+  // A closed row is a decision already made: what it carried is no longer the question, so the
+  // payload is not part of this read. `dead()` remains the one that carries it.
+  assert.equal((rows[0] as unknown as Record<string, unknown>).payload, undefined);
 });
 
 test('hub#953: an id that would climb out of the prefix never becomes a request', async () => {
@@ -593,7 +629,7 @@ test('hub#953: a hub older than these routes leaves the methods ABSENT, so the s
   // answers everything, would make `typeof …dead === 'function'` a lie on an old hub.
   const { client } = scoped();
   const proto = Object.getPrototypeOf(client.events);
-  for (const name of ['dead', 'deadCount', 'retry', 'discard', 'retryAll', 'trace']) {
+  for (const name of ['dead', 'deadCount', 'retry', 'discard', 'discarded', 'retryAll', 'trace']) {
     const descriptor = Object.getOwnPropertyDescriptor(proto, name) ?? { value: undefined };
     assert.equal(
       typeof descriptor.value,
