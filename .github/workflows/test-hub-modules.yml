@@ -380,7 +380,7 @@ jobs:
 
           # The title is the idempotency key: stable, matched EXACTLY, and colon-free.
           title="Los módulos publicados ROMPEN contra develop"
-          body="Detectado por \`test-hub-modules.yml\` — ${origin} (hub#1239).
+          body="Detectado por \`test-hub-modules.yml\` — ${origin} (hub#1239, hub#1246).
 
           - rama probada: \`${GITHUB_REF_NAME}\` — commit \`${GITHUB_SHA}\`
           - run que falló: ${RUN_URL}
@@ -395,19 +395,14 @@ jobs:
 
           Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando el catálogo vuelva a verde."
 
-          # List and match locally, never `--search`: that reads GitHub's search index, which
-          # lags behind reality (it returned ZERO with open issues on 2026-08-16). Two failures
-          # minutes apart — push develop then push main, two module releases — would open two
-          # issues. The REST list is consistent; `gh` runs the jq filter itself.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
-            --json number,title \
-            --jq '[.[] | select(.title == "Los módulos publicados ROMPEN contra develop")][0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refrescando la issue de alerta abierta #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lists and matches LOCALLY, never `--search` (hub#1246):
+          # that reads GitHub's search index, which lags behind reality (it returned ZERO with
+          # open issues on 2026-08-16). Two failures minutes apart — push develop then push
+          # main, two module releases — would open two issues otherwise. Now the shared script
+          # used by every alert step in this repo (test-hub.yml, image-freshness.yml, and this
+          # one) instead of a fourth copy of the same list-and-filter logic.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
 
       # `always()`: si el job se cancela a media suite (`cancel-in-progress` lo hace a diario), el
       # residuo se quedaría en el runner envenenando al vecino. La limpieza no puede depender de

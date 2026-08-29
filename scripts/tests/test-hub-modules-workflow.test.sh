@@ -129,25 +129,33 @@ if len(alert) == 1:
     run = str(alert[0].get("run", ""))
     cond = str(alert[0].get("if", ""))
     check(
-        "the alert is idempotent (searches for the open issue before creating one)",
-        "gh issue list" in run and "gh issue comment" in run and "gh issue create" in run,
-        "it must reuse the open issue, never open one per run",
-    )
-    check(
         "the alert search phrase carries no colon (colons are GitHub search syntax)",
         ":" not in ALERT_TITLE,
         ALERT_TITLE,
     )
-    # Review of hub#1245: `gh issue list --search` reads GitHub's SEARCH index, which lags
-    # behind reality (it returned zero with open issues on 2026-08-16). Two failures minutes
-    # apart — push develop then push main, two module releases — would open two issues, which
-    # is the opposite of idempotent. The lookup must list the open issues and match the title
-    # locally.
+    # Review of hub#1246: the idempotent lookup (list the open issues, match the title
+    # LOCALLY, comment or create) used to be inlined here with `gh issue list --search`,
+    # which reads GitHub's SEARCH index — it lags behind reality (it returned zero with open
+    # issues on 2026-08-16). It is now `scripts/ci/alert-issue.sh`, the ONE implementation
+    # shared with `test-hub.yml` and `image-freshness.yml` (hub#1246) — its own idempotency
+    # and its own ban on `--search` are covered by scripts/tests/alert-issue.test.sh, not
+    # duplicated here. This step's job is only to delegate to it with the right title/body.
     code = "\n".join(l for l in run.splitlines() if not l.lstrip().startswith("#"))
     check(
-        "the alert looks the open issue up by LISTING and filtering locally, never `--search`",
-        "--search" not in code and "--json number,title" in code and "select(.title ==" in code,
+        "the alert never inlines `--search` (delegates to scripts/ci/alert-issue.sh instead)",
+        "--search" not in code,
         "GitHub's search index lags: two failures minutes apart would open two issues",
+    )
+    check(
+        "the alert delegates the lookup to the shared scripts/ci/alert-issue.sh",
+        "./scripts/ci/alert-issue.sh" in code,
+        "every alert step (test-hub, image-freshness, test-hub-modules) must share ONE"
+        " implementation instead of copies that can drift apart (hub#1246)",
+    )
+    check(
+        "the alert passes the exact title through TITLE=",
+        f'title="{ALERT_TITLE}"' in code and ("TITLE=\"$title\"" in code or "TITLE=$title" in code),
+        code,
     )
     # Review of hub#1245: the tests step can die BEFORE `tee` creates the log (the `>= 30
     # targets` guard, the grep pipeline). awk on an absent file exits 2, `set -euo pipefail`
