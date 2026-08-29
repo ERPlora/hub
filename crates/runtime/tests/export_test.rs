@@ -10,9 +10,11 @@
 //!   - `manifest.sha256` cubre exactamente los ficheros del bundle,
 //!   - el manifest es la fuente de verdad (locale, secciones) — a prueba de renombres del zip.
 //!
-//! Patrón de los e2e existentes (inventory_e2e.rs): módulos REALES de modules-workspace
-//! contra SQLite en memoria, cero mocks. La implementación de `export_hub` es columna del
-//! humano; estos tests van primero y deben FALLAR (unimplemented!) hasta la Fase 1.
+//! Patrón de los e2e existentes: módulos REALES de modules-workspace contra SQLite en
+//! memoria, cero mocks (hub#1264: la referencia era `inventory_e2e.rs`, ya migrado a
+//! baterías `erplora test` del propio módulo — el patrón que sigue viviendo aquí es el
+//! del fixture del kernel, no el de un módulo concreto). Estos tests van primero y deben
+//! FALLAR (unimplemented!) hasta la Fase 1.
 
 use std::path::PathBuf;
 
