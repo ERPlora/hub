@@ -6,6 +6,13 @@
 //! one), a label resolved through the module's own `locales/<lang>.json` with English as the
 //! canonical fallback (ADR-0055), and the cross-module slot contract — coupling by slot NAME, never
 //! by an import, which is what makes `provides_slots` a contract rather than a dependency.
+//!
+//! `provides_slots` and `navigation[].chrome` are NOT typed by this crate (see `manifest.rs`'s
+//! `ROOT_FIELDS`/`NAV_FIELDS`): the runtime only has to recognise the two blocks at install time
+//! and carry them to the shell verbatim. Whether they actually TRAVEL correctly is proven through
+//! the real door the shell calls (`GET /modules/:id/module.json`) in
+//! `crates/server/tests/kernel_fixture_slots_chrome_real_door_hub1266.rs` — not in this crate, which
+//! has no HTTP layer to serve them from. ERPlora/hub#1266.
 #[path = "support/kernel_fixture.rs"]
 mod kernel_fixture;
 
@@ -94,34 +101,23 @@ async fn labels_resolve_through_the_modules_locales_hub1238() {
     );
 }
 
-/// `provides_slots` and `navigation[].chrome` are carried verbatim in the manifest the shell reads:
-/// the kernel transports the contract, it does not reinterpret it.
+/// `provides_slots` and `navigation[].chrome` install without a `manifest_warnings` entry: the
+/// kernel recognises both blocks (`ROOT_FIELDS`/`NAV_FIELDS` in `manifest.rs`) even though it does
+/// not type their contents, because both belong to the shell (ADR-0043/0048). A warning here would
+/// mean the kernel silently flagged part of a contract it has already promised to carry.
+///
+/// This is as far as THIS crate can prove: `erplora-runtime` has no HTTP layer, and the shell never
+/// reads either block from anything this crate exposes — it fetches the raw `module.json` from
+/// `GET /modules/:id/module.json` (`crates/server`). This test used to also assert on that raw JSON
+/// by reading the fixture's OWN file off disk, which proved the fixture, never the kernel
+/// (ERPlora/hub#1266) — that assertion now lives in
+/// `crates/server/tests/kernel_fixture_slots_chrome_real_door_hub1266.rs`, through the real door.
 #[tokio::test]
-async fn the_slot_and_chrome_contract_travel_verbatim_hub1238() {
+async fn provides_slots_and_chrome_install_without_warnings_hub1266() {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     install_fixture(&mut rt).await;
 
-    let raw: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(kernel_fixture::dir().join("module.json")).expect("manifest"),
-    )
-    .expect("parse");
-
-    let slot = &raw["provides_slots"][0];
-    assert_eq!(slot["slot"], serde_json::json!("kfx.items.aside"));
-    assert_eq!(
-        slot["component"],
-        serde_json::json!("kfx-aside"),
-        "the filler is the module's OWN component: coupling by slot name, never by import"
-    );
-    assert_eq!(
-        raw["navigation"][0]["chrome"],
-        serde_json::json!(["fullscreen"]),
-        "chrome is an opt-in to a control the SHELL owns; the module never ships the button"
-    );
-
-    // And the runtime installed the module with that manifest without complaining about either
-    // block — a warning here would mean the kernel silently dropped part of the shell's contract.
     let info = rt
         .modules()
         .into_iter()
@@ -129,7 +125,7 @@ async fn the_slot_and_chrome_contract_travel_verbatim_hub1238() {
         .expect("installed");
     assert!(
         info.manifest_warnings.is_empty(),
-        "{:?}",
+        "installing a manifest with provides_slots/chrome must not warn: {:?}",
         info.manifest_warnings
     );
 }
