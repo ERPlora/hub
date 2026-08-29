@@ -51,6 +51,12 @@ on:
       - 'scripts/ci/alert-issue.sh'
       - 'scripts/tests/alert-issue.test.sh'
       - 'scripts/tests/alert-issue-workflows.test.sh'
+      # La lista revisada de e2e del kernel y su resolutor (hub#1359). Es lo que `test-hub-modules.yml`
+      # ejecuta contra el catálogo publicado, así que una PR que solo tocara la lista —justo lo que
+      # hace cada slice de hub#1264— no correría ninguno de sus casos sin estas tres rutas.
+      - 'scripts/ci/kernel-e2e-targets.sh'
+      - 'scripts/ci/kernel-e2e-targets.txt'
+      - 'scripts/tests/kernel-e2e-targets.test.sh'
   workflow_dispatch:
 
 permissions:
@@ -166,3 +172,16 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/alert-issue-workflows.test.sh
+
+      # ── La lista revisada de e2e del kernel (hub#1359) ────────────────────────────────
+      # `test-hub-modules.yml` ya no decide qué correr con un número mágico (`>= 30`), que era
+      # una foto y no un contrato: cada slice de hub#1264 lo rompía y el único arreglo que
+      # ofrecía era bajarlo. Ahora lo decide `scripts/ci/kernel-e2e-targets.txt`, comparada con
+      # el árbol en las dos direcciones. Sus casos corren AQUÍ, en segundos, y no dentro del job
+      # de módulos (45 min y su propio filtro `paths`): el último caso del fichero es la lista
+      # real contra el árbol real, así que una PR que borre un `.rs` sin tocar la lista —o que
+      # añada uno sin declararlo— se entera al revisar, no a las 3 de la mañana.
+      - name: Lista revisada de e2e del kernel (hub#1359)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/kernel-e2e-targets.test.sh

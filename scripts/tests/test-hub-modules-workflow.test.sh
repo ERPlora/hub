@@ -49,6 +49,7 @@ fi
 
 WORKFLOW="$workflow" REPO_ROOT="$script_dir/../.." python3 - <<'PY'
 import os
+import re
 import sys
 
 import yaml
@@ -157,8 +158,8 @@ if len(alert) == 1:
         f'title="{ALERT_TITLE}"' in code and ("TITLE=\"$title\"" in code or "TITLE=$title" in code),
         code,
     )
-    # Review of hub#1245: the tests step can die BEFORE `tee` creates the log (the `>= 30
-    # targets` guard, the grep pipeline). awk on an absent file exits 2, `set -euo pipefail`
+    # Review of hub#1245: the tests step can die BEFORE `tee` creates the log (the target-list
+    # guard, the resolver pipeline). awk on an absent file exits 2, `set -euo pipefail`
     # kills the alert step, and the issue never opens — the mute red this step abolishes.
     check(
         "the alert survives a missing cargo log (the tests step can die before `tee`)",
@@ -199,6 +200,45 @@ check(
     len(tests_step) == 1,
     f"{len(tests_step)} steps carry that id",
 )
+
+
+# ── 2b · The target set is guarded by a reviewed LIST, never by a magic number ───────
+# hub#1359 (the red: hub#1354): the floor used to be `[ "$count" -ge 30 ]`. That is a snapshot, not a contract —
+# hub#1264 moves module-owned e2e out of the hub into each module's `erplora test` battery, the
+# seventh slice took the count to 29, and `develop` went red for the whole fleet blaming a grep
+# that was working. The only repair a number offers is to lower it, which teaches the wrong
+# reflex about a coverage guard; and it can never catch the other direction, because a count
+# only grows there.
+RESOLVER = "scripts/ci/kernel-e2e-targets.sh"
+MANIFEST = "scripts/ci/kernel-e2e-targets.txt"
+if len(tests_step) == 1:
+    tests_code = "\n".join(
+        l
+        for l in str(tests_step[0].get("run", "")).splitlines()
+        if not l.lstrip().startswith("#")
+    )
+    check(
+        f"the tests step resolves its targets through `{RESOLVER}`",
+        RESOLVER in tests_code,
+        "inlining the resolution again is how the local gate and this job drifted apart"
+        " over the module catalogue (hub#1153)",
+    )
+    # `-ge <n>` / `-lt <n>` over the target count in any form: the exact shape that broke, and
+    # any near-miss rewrite of it.
+    numeric_floor = re.search(r"\$\{?count\}?\"?\s*-(?:ge|gt|lt|le|eq|ne)\s*\"?\d+", tests_code)
+    check(
+        "the tests step carries NO hardcoded numeric floor on the target count",
+        numeric_floor is None,
+        f"found {numeric_floor.group(0) if numeric_floor else ''!r} — the floor is the reviewed"
+        f" list in {MANIFEST}, so removing a target takes an edit a reviewer can see (hub#1359)",
+    )
+
+for shipped in (RESOLVER, MANIFEST):
+    check(
+        f"`{shipped}` really exists in this checkout",
+        os.path.isfile(os.path.join(os.environ["REPO_ROOT"], shipped)),
+        "a workflow that calls a file nobody shipped fails at 3am, not at review time",
+    )
 
 
 # ── 3 · A module release notifies the hub, and the run SAYS which module ─────────────
