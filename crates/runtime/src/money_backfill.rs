@@ -225,8 +225,11 @@ pub async fn detect_money_unit(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
 /// Reports a mixed hub to the error registry (severity `unexpected`, see
 /// [`crate::error_registry::severity_of`]) and on `stderr`. A failure nobody sees does not exist:
 /// this is how ops learns that a hub was left half migrated (hub#1209). On the boot path the
-/// registry has no sink yet (`install_error_reporting` runs after `ensure_system_tables`), so there
-/// the `stderr` line is the one that reaches the hub's log.
+/// registry has no sink installed yet (`install_error_reporting` runs after `ensure_system_tables`)
+/// — but it no longer drops the event for that: it buffers it and delivers it, in order, the moment
+/// the sink arrives a few lines later in the same boot (`ErrorRegistry` buffering, hub#1274). The
+/// `stderr` line stays too, since it is the one line an operator tailing the container log sees
+/// with no Cloud round-trip at all.
 fn report_mixed(err: &crate::errors::RuntimeError, source: &str) {
     eprintln!("[backfill-money] 🔴 {err}");
     crate::error_registry::report_runtime_error(err, source, None, json!({ "issue": "hub#1209" }));
