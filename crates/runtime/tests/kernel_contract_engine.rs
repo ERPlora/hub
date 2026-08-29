@@ -188,22 +188,22 @@ fn generate() -> String {
         out.push_str(&format!("commands.*.expect_rows.op = {op}\n"));
     }
 
-    // El contrato de deduplicación del outbox (hub#1076): `emit[]` acepta el nombre plano de
-    // siempre O un objeto que además nombra `dedup_key`, verificado deserializando las DOS formas
-    // de verdad en vez de copiar su shape a mano.
+    // The outbox dedup contract (hub#1076): `emit[]` accepts the plain name as always OR an object
+    // that also names `dedup_key`, verified by really deserialising BOTH shapes instead of copying
+    // their shape by hand.
     out.push_str("\n[emit]\n");
     let plain: erplora_runtime::manifest::EmitDef = serde_json::from_value(json!("sale.completed"))
-        .expect("la forma string de `emit[]` tiene que seguir parseando");
+        .expect("the string form of `emit[]` must keep parsing");
     assert_eq!(plain.event(), "sale.completed");
     assert!(
         plain.dedup_key().is_none(),
-        "la forma string nunca declara `dedup_key`"
+        "the string form never declares `dedup_key`"
     );
     out.push_str("commands.*.emit[] = string\n");
     let dedup_fields = item_members(&manifest_src, "pub struct", "EmitDedupKey");
     assert!(
         !dedup_fields.is_empty(),
-        "no se han leído los campos de `EmitDedupKey`"
+        "the fields of `EmitDedupKey` were not read"
     );
     for field in &dedup_fields {
         out.push_str(&format!("commands.*.emit[].{field}\n"));
@@ -211,7 +211,7 @@ fn generate() -> String {
     let keyed: erplora_runtime::manifest::EmitDef = serde_json::from_value(
         json!({"event": "sale.completed", "dedup_key": "wa_message_id"}),
     )
-    .expect("la forma objeto de `emit[]` tiene que parsear");
+    .expect("the object form of `emit[]` must parse");
     assert_eq!(keyed.event(), "sale.completed");
     assert_eq!(keyed.dedup_key(), Some("wa_message_id"));
 

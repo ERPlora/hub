@@ -477,7 +477,7 @@
           },
           "emit": {
             "type": "array",
-            "description": "Eventos que emite este command. Cada entrada es o el nombre plano del evento (comportamiento de siempre: emite una vez por EJECUCIÓN) o un objeto que además declara `dedup_key` (hub#1076): el nombre de un campo del payload del command cuyo valor deriva el id de la fila del outbox, así que una emisión REPETIDA con la MISMA clave (redelivery de un webhook, reintento del relay del outbox) se absorbe en vez de encolar un segundo evento — el mismo mecanismo que ya usa `insert_core_event_once` para un evento core. Opt-in: ausente = comportamiento de siempre.",
+            "description": "Events this command emits. Each entry is either the plain event name (historical behaviour: emits once per EXECUTION) or an object that also declares `dedup_key` (hub#1076): the name of a field of the command's payload whose value derives the outbox row id, so a REPEATED emission with the SAME key (webhook redelivery, outbox relay retry) is absorbed instead of queuing a second event — the mechanism `insert_core_event_once` already uses for a core event. Opt-in: absent = historical behaviour.",
             "items": {
               "oneOf": [
                 { "type": "string" },
@@ -489,7 +489,7 @@
                     "event": { "type": "string" },
                     "dedup_key": {
                       "type": "string",
-                      "description": "Nombre de un campo del payload del command (el mismo espacio de nombres que un bind `:campo` en su SQL) cuyo valor identifica de forma única la emisión. Dos ejecuciones con el MISMO valor absorben la segunda en el outbox; valores distintos son eventos distintos."
+                      "description": "Name of a field of the command's payload (the same namespace as a `:field` bind in its SQL) whose value uniquely identifies the emission, scoped to the hub. Two executions with the SAME value absorb the second one in the outbox; different values are different events. A field that is absent or not a scalar emits WITHOUT deduplication and is reported."
                     }
                   }
                 }

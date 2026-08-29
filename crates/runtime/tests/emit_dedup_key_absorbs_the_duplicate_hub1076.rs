@@ -45,12 +45,12 @@ async fn fresh_runtime() -> Runtime {
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture_dir())
         .await
-        .expect("instalar w1076");
+        .expect("install w1076");
     rt
 }
 
-/// Cuenta las filas pendientes del outbox para un `event_name` dado, en este hub — el oráculo de
-/// "¿se encoló el evento?", igual que en `min_affected_rows_e2e.rs`.
+/// Counts the outbox rows of a given `event_name` in this hub — the "was the event queued?"
+/// oracle, same as in `min_affected_rows_e2e.rs`.
 async fn outbox_count(rt: &Runtime, hub_id: &str, event_name: &str) -> i64 {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -62,11 +62,11 @@ async fn outbox_count(rt: &Runtime, hub_id: &str, event_name: &str) -> i64 {
             &p,
         )
         .await
-        .expect("contar el outbox")
+        .expect("count the outbox")
         .rows;
     rows[0]["n"]
         .as_i64()
-        .unwrap_or_else(|| panic!("COUNT devolvió algo raro: {rows:?}"))
+        .unwrap_or_else(|| panic!("COUNT returned something odd: {rows:?}"))
 }
 
 #[tokio::test]
@@ -78,16 +78,16 @@ async fn a_repeated_wa_message_id_leaves_one_row_and_one_event_hub1076() {
     let first = rt
         .execute_command("w1076.messages.ingest", &payload, &ctx)
         .await
-        .expect("primera entrega: OK");
+        .expect("first delivery: OK");
     assert_eq!(first["ok"], json!(true));
 
-    // Redelivery: el webhook manda el MISMO mensaje otra vez porque no vio el ACK a tiempo. El
-    // caller tiene que ver exactamente lo mismo que la primera vez — nunca un 409/500 — o
-    // reintentará para siempre.
+    // Redelivery: the webhook sends the SAME message again because it never saw the ACK in time.
+    // The caller has to see exactly what it saw the first time — never a 409/500 — or it will
+    // retry forever.
     let second = rt
         .execute_command("w1076.messages.ingest", &payload, &ctx)
         .await
-        .expect("segunda entrega (redelivery del webhook): OK, NUNCA 409/500");
+        .expect("second delivery (webhook redelivery): OK, NEVER 409/500");
     assert_eq!(second["ok"], json!(true));
 
     let rows = rt
@@ -97,20 +97,20 @@ async fn a_repeated_wa_message_id_leaves_one_row_and_one_event_hub1076() {
     assert_eq!(
         rows.len(),
         1,
-        "el UNIQUE(hub_id, wa_message_id) + ON CONFLICT ya dejaba una sola fila"
+        "UNIQUE(hub_id, wa_message_id) + ON CONFLICT already left a single row"
     );
 
     assert_eq!(
         outbox_count(&rt, "h1", "w1076.message.received").await,
         1,
-        "`dedup_key` debe absorber la segunda emisión: 1 evento en el outbox, no 2"
+        "`dedup_key` must absorb the second emission: 1 event in the outbox, not 2"
     );
 }
 
 #[tokio::test]
 async fn two_different_wa_message_ids_each_get_their_own_event_hub1076() {
-    // `dedup_key` solo absorbe REPETIDOS de la MISMA clave — no debe convertirse en "este command
-    // emite como mucho una vez por hub".
+    // `dedup_key` only absorbs REPEATS of the SAME key — it must not turn into "this command
+    // emits at most once per hub".
     let rt = fresh_runtime().await;
     let ctx = admin_ctx();
 
@@ -120,40 +120,40 @@ async fn two_different_wa_message_ids_each_get_their_own_event_hub1076() {
         &ctx,
     )
     .await
-    .expect("primer mensaje");
+    .expect("first message");
     rt.execute_command(
         "w1076.messages.ingest",
         &params(json!({ "wa_message_id": "wamid.TWO", "body": "dos" })),
         &ctx,
     )
     .await
-    .expect("segundo mensaje, clave distinta");
+    .expect("second message, different key");
 
     assert_eq!(
         outbox_count(&rt, "h1", "w1076.message.received").await,
         2,
-        "dos wa_message_id distintos son dos mensajes de negocio: dos eventos"
+        "two different wa_message_id are two business messages: two events"
     );
 }
 
 #[tokio::test]
 async fn without_dedup_key_a_duplicate_still_double_emits_legacy_hub1076() {
-    // Acceptance criterion de hub#1076: un módulo publicado que NO adopta `dedup_key` conserva su
-    // comportamiento EXACTO de siempre — opt-in, nunca un cambio de comportamiento en silencio.
+    // Acceptance criterion of hub#1076: a published module that does NOT adopt `dedup_key` keeps
+    // its EXACT historical behaviour — opt-in, never a silent behaviour change.
     let rt = fresh_runtime().await;
     let ctx = admin_ctx();
     let payload = params(json!({ "wa_message_id": "wamid.LEGACY", "body": "hola" }));
 
     rt.execute_command("w1076.messages.ingest_legacy", &payload, &ctx)
         .await
-        .expect("primera entrega");
+        .expect("first delivery");
     rt.execute_command("w1076.messages.ingest_legacy", &payload, &ctx)
         .await
-        .expect("segunda entrega");
+        .expect("second delivery");
 
     assert_eq!(
         outbox_count(&rt, "h1", "w1076.message.legacy_received").await,
         2,
-        "sin `dedup_key` el command sigue emitiendo por EJECUCIÓN, como siempre (opt-in, hub#1076)"
+        "without `dedup_key` the command keeps emitting per EXECUTION, as always (opt-in, hub#1076)"
     );
 }

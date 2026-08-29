@@ -1,9 +1,9 @@
--- Puerta de ingesta idempotente (hub#1076): dos entregas con el mismo `wa_message_id` (redelivery
--- de un webhook at-least-once) deben dejar UNA fila. El índice único (hub_id, wa_message_id) +
--- `ON CONFLICT DO NOTHING` absorben la fila; lo que este fixture ejercita es que `emit.dedup_key`
--- absorba TAMBIÉN el evento del outbox, que hasta hub#1076 se encolaba una vez por EJECUCIÓN
--- (min_affected_rows/expect_rows revierten la tx entera y no sirven aquí: el webhook necesita un
--- 200 OK para la redelivery, no un 409).
+-- Idempotent ingestion door (hub#1076): two deliveries with the same `wa_message_id` (an
+-- at-least-once webhook redelivery) must leave ONE row. The unique index (hub_id, wa_message_id) +
+-- `ON CONFLICT DO NOTHING` absorb the row; what this fixture exercises is that `emit.dedup_key`
+-- ALSO absorbs the outbox event, which until hub#1076 was queued once per EXECUTION
+-- (min_affected_rows/expect_rows roll back the whole tx and are useless here: the webhook needs a
+-- 200 OK for the redelivery, not a 409).
 INSERT INTO w1076_messages (id, hub_id, wa_message_id, body, created_at)
 VALUES (:new_id, :hub_id, :wa_message_id, :body, :now)
 ON CONFLICT (hub_id, wa_message_id) DO NOTHING;
