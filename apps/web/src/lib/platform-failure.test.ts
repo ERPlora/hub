@@ -114,4 +114,31 @@ describe('platformFailureMessage (hub#1258, hub#1315)', () => {
       expect(sdkPlatformFailureMessage({ code }, 'es')).not.toBeNull();
     }
   });
+
+  // ── hub#1337 ────────────────────────────────────────────────────────────────────────────────
+  //
+  // `other` is not part of the ten above and never was: `may_reach_the_client`
+  // (`crates/server/src/lib.rs`) lets `E::Other(_)` speak on purpose, and the two `Other(...)`
+  // sites Personal can actually hit say «usuario no encontrado» (`crates/runtime/src/hub_users.rs`,
+  // `user_profile.rs`). The SDK used to answer them with the generic plumbing line; now it steps
+  // aside — but only if it can SEE the sentence, so this bridge has to hand it over. It did not.
+
+  it('hub#1337: an authored `other` keeps the sentence the runtime deliberately let through', () => {
+    const error = new HubUsersError('usuario no encontrado', 'other');
+
+    expect(platformFailureMessage(error, 'es')).toBeUndefined();
+  });
+
+  it('hub#1337: a REDACTED `other` is still told in the language of whoever is reading', () => {
+    // `carries_driver_text` fired: what arrived is the runtime's fixed ENGLISH log line, and the
+    // screen must not paint it — the hub#1102 incident, for the one code nobody had covered.
+    const error = new RoleActivationError(
+      'the request could not be completed — the hub recorded the details',
+      'other',
+    );
+
+    const message = platformFailureMessage(error, 'es');
+    expect(message).toBe(sdkPlatformFailureMessage({ code: 'db' }, 'es'));
+    expect(message).not.toMatch(/could not be completed/);
+  });
 });
