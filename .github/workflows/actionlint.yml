@@ -34,6 +34,7 @@ name: Lint Workflows (actionlint)
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/**'
       # El test de contrato de abajo vive fuera de `.github/`, así que sin esto una PR que
@@ -55,6 +56,10 @@ concurrency:
 
 jobs:
   actionlint:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: actionlint (all workflows)
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
