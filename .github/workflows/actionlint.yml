@@ -37,6 +37,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/**'
+      # Las composite actions son el OTRO sitio donde vive un `run:`. Sin esta entrada, una PR que
+      # solo tocara una de ellas no ejecutaría la guardia de abajo — que ahora también las escanea.
+      - '.github/actions/**'
       # El test de contrato de abajo vive fuera de `.github/`, así que sin esto una PR que
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
@@ -162,9 +165,10 @@ jobs:
           bash ./scripts/tests/alert-issue.test.sh
 
       # pyyaml ya está instalado por el paso de arriba.
-      # El contrato ya no lleva lista fija de workflows: recorre `.github/workflows/**` y exige
-      # la delegación a CUALQUIER paso que toque una issue, así que un workflow nuevo no puede
-      # quedarse fuera de la guardia por no estar apuntado (hub#1327).
+      # El contrato ya no lleva lista fija de workflows: recorre `.github/workflows/**` y
+      # `.github/actions/**` y exige la delegación a CUALQUIER paso que toque una issue, así que
+      # ni un workflow nuevo ni una composite action pueden quedarse fuera de la guardia por no
+      # estar apuntados (hub#1327).
       - name: Contrato de los pasos de alerta de todos los workflows (hub#1246, hub#1327)
         run: |
           set -euo pipefail

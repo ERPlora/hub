@@ -17,6 +17,8 @@
 # would inherit the same blind spot. The scan is now DISCOVERY-BASED: every step of every
 # workflow that touches an issue (`gh issue …`) or calls the shared script IS an alert step and
 # must obey the contract, so a new workflow cannot opt out of the guard by not being listed.
+# The composite actions under `.github/actions/**` are scanned the same way: a step moved into one
+# of them would otherwise walk straight back out of the guard one level down.
 #
 # It parses each workflow as YAML (not grep) so a failure NAMES the workflow, the job, the step
 # and the missing element, and it checks the step's `run:` CODE with comments stripped out — a
@@ -90,10 +92,34 @@ check(
     "no workflow file matched — the scan would pass without checking anything",
 )
 
+# A composite action is the OTHER place a `run:` step can live in this repo, and a step moved into
+# one would leave the guard exactly the way `test-web.yml` left the hardcoded list (hub#1327).
+# There is no alert step in one today; this is the door, closed before somebody walks through it.
+action_paths = sorted(
+    set(glob.glob(os.path.join(repo_root, ".github/actions/**/action.yml"), recursive=True))
+    | set(glob.glob(os.path.join(repo_root, ".github/actions/**/action.yaml"), recursive=True))
+)
+
 # rel_path -> list of the `run:` code of its alert steps, comments stripped
 discovered = {}
 
-for path in workflow_paths:
+
+def step_groups(doc):
+    """(label, steps, enforce_checkout) for every step list the file defines.
+
+    A workflow job owns its own checkout, so the guard can demand one. A composite action cannot:
+    the CALLER's job checks the repo out, and the action has no way to see (or add) that step —
+    demanding it there would be a false red. The `--search` and delegation rules still apply.
+    """
+    for job_name, job in (doc.get("jobs") or {}).items():
+        if isinstance(job, dict):
+            yield f"job `{job_name}`", job.get("steps") or [], True
+    runs = doc.get("runs")
+    if isinstance(runs, dict) and isinstance(runs.get("steps"), list):
+        yield "composite action", runs["steps"], False
+
+
+for path in workflow_paths + action_paths:
     rel_path = os.path.relpath(path, repo_root)
     try:
         with open(path, encoding="utf-8") as fh:
@@ -104,10 +130,7 @@ for path in workflow_paths:
     if not isinstance(doc, dict):
         continue
 
-    for job_name, job in (doc.get("jobs") or {}).items():
-        if not isinstance(job, dict):
-            continue
-        steps = job.get("steps") or []
+    for label, steps, enforce_checkout in step_groups(doc):
         for index, step in enumerate(steps):
             if not isinstance(step, dict):
                 continue
@@ -115,7 +138,7 @@ for path in workflow_paths:
             if not any(marker in code for marker in ALERT_MARKERS):
                 continue
 
-            where = f"{rel_path} · job `{job_name}` · step «{step.get('name', index)}»"
+            where = f"{rel_path} · {label} · step «{step.get('name', index)}»"
             discovered.setdefault(rel_path, []).append(code)
 
             check(
@@ -134,7 +157,7 @@ for path in workflow_paths:
             # in `test-web.yml` was a job of its own with no checkout at all (hub#1327): the
             # delegation would have died with `No such file or directory` at 3am, and a mute
             # alert is worse than the duplicate it replaced.
-            if SHARED_SCRIPT in code:
+            if enforce_checkout and SHARED_SCRIPT in code:
                 checked_out = any(
                     str((earlier or {}).get("uses") or "").startswith("actions/checkout")
                     for earlier in steps[:index]
@@ -143,7 +166,7 @@ for path in workflow_paths:
                 check(
                     f"{where}: its job checks the repo out before calling the script",
                     checked_out,
-                    f"no `actions/checkout` step precedes it in job `{job_name}`, so "
+                    f"no `actions/checkout` step precedes it in {label}, so "
                     f"{SHARED_SCRIPT} would not exist on the runner",
                 )
 
