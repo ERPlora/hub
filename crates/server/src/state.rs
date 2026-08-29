@@ -138,6 +138,49 @@ pub fn parse_demo_flag(raw: Option<&str>) -> bool {
     )
 }
 
+/// The Cloud Portal URL [`HubConfig::from_env_with_auth`] falls back to when `HUB_CLOUD_API_URL`
+/// is not set. Named as a constant so the default and [`cloud_url_guard`] always compare against
+/// the exact same string — two literals here could silently drift apart.
+pub const PRODUCTION_CLOUD_BASE_URL: &str = "https://erplora.com";
+
+/// What a `HUB_DEV_MODE=1` runtime should do about a `cloud_base_url` that resolved to the
+/// **production** default (hub#1279).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CloudUrlGuard {
+    /// Nothing to flag: not dev mode, or `cloud_base_url` isn't the production default.
+    Ok,
+    /// Dev mode + production default + not CI: warn loudly, keep starting.
+    Warn,
+    /// Dev mode + production default + CI: refuse to start.
+    Refuse,
+}
+
+/// Decides [`CloudUrlGuard`] from the three inputs that matter, as a **pure function** — so both
+/// branches are unit-tested without touching process env or actually starting the server.
+///
+/// The gap this closes (hub#1279): a **deployed** hub always has `HUB_CLOUD_API_URL` injected by
+/// provisioning (Hetzner and AWS providers both set it from `settings.CLOUD_BASE_URL`), so the
+/// fallback in [`HubConfig::from_env_with_auth`] only ever fires for a process started OUTSIDE
+/// provisioning — a Playwright bench, a `cargo run` helper, `pnpm dev`. Exactly that silently
+/// called PRODUCTION from the CI runner before hub#1277 pinned the one caller that mattered
+/// (`apps/web/tests/playwright.config.ts`); nothing stopped the *next* bench from repeating it.
+///
+/// `dev_mode` scopes the guard on purpose: it is the only signal that this is a bench/dev
+/// process, not a real hub. `pnpm dev` (`scripts/dev.mjs`) sets `HUB_DEV_MODE=1` and deliberately
+/// keeps pointing at production (see the `/hub-local` skill) — refusing on `dev_mode` alone would
+/// break it. `ci` is what tells the two apart: it is the signal that nobody is at the terminal to
+/// read a warning, so unattended-in-CI is the only case that hard-refuses.
+pub fn cloud_url_guard(dev_mode: bool, cloud_base_url: &str, ci: bool) -> CloudUrlGuard {
+    if !dev_mode || cloud_base_url.trim() != PRODUCTION_CLOUD_BASE_URL {
+        return CloudUrlGuard::Ok;
+    }
+    if ci {
+        CloudUrlGuard::Refuse
+    } else {
+        CloudUrlGuard::Warn
+    }
+}
+
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
 ///  - `hub_id`: lo inyecta el despliegue vía env `HUB_ID` (sin selector de hub).
 ///  - `cloud_base_url`: el Cloud Portal contra el que se resuelven marketplace + asistente.
@@ -251,7 +294,7 @@ impl HubConfig {
     pub fn from_env_with_auth(auth_mode: AuthMode) -> Self {
         let hub_id = std::env::var("HUB_ID").unwrap_or_else(|_| DEV_HUB_ID.to_string());
         let cloud_base_url = std::env::var("HUB_CLOUD_API_URL")
-            .unwrap_or_else(|_| "https://erplora.com".to_string());
+            .unwrap_or_else(|_| PRODUCTION_CLOUD_BASE_URL.to_string());
         let module_cache = std::env::var("HUB_MODULE_CACHE")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("erplora-modules"));
@@ -816,6 +859,66 @@ mod tests {
             assert!(
                 !parse_demo_flag(Some(raw)),
                 "`{raw}` no debía marcar el hub como demo"
+            );
+        }
+    }
+
+    // ── hub#1279: a dev/bench runtime must not silently call PRODUCTION ────────────────────
+
+    /// 🔴 The bug: a runtime started with `HUB_DEV_MODE=1` (a Playwright bench, a CI job) and no
+    /// explicit `HUB_CLOUD_API_URL` inherited the production default in silence — exactly what
+    /// made the web e2e bench call `erplora.com` from the CI runner before hub#1277 pinned that
+    /// one caller's env. `CI` is the signal nobody is there to read a warning: it must refuse.
+    #[test]
+    fn hub1279_missing_cloud_url_is_a_startup_error_not_a_prod_default() {
+        let outcome = cloud_url_guard(true, PRODUCTION_CLOUD_BASE_URL, true);
+        assert_eq!(
+            outcome,
+            CloudUrlGuard::Refuse,
+            "HUB_DEV_MODE=1 + the production default + CI must refuse to start, not silently \
+             call production: {outcome:?}"
+        );
+    }
+
+    /// The local counterpart: `pnpm dev` (`scripts/dev.mjs`) sets `HUB_DEV_MODE=1` and points at
+    /// production ON PURPOSE (`/hub-local`) — a developer sitting at the terminal can read a
+    /// warning, so outside CI the guard must not break that flow. It still has to say something.
+    #[test]
+    fn hub1279_dev_mode_outside_ci_warns_but_keeps_starting() {
+        let outcome = cloud_url_guard(true, PRODUCTION_CLOUD_BASE_URL, false);
+        assert_eq!(
+            outcome,
+            CloudUrlGuard::Warn,
+            "HUB_DEV_MODE=1 + the production default outside CI must warn, not refuse (that \
+             would break `pnpm dev`): {outcome:?}"
+        );
+    }
+
+    /// A deployed hub is out of scope on purpose: provisioning (Hetzner and AWS) always injects
+    /// `HUB_CLOUD_API_URL`, so a production runtime (`dev_mode = false`) never has a reason to be
+    /// flagged even if its `cloud_base_url` happened to equal the production default.
+    #[test]
+    fn hub1279_non_dev_mode_default_is_never_flagged() {
+        assert_eq!(
+            cloud_url_guard(false, PRODUCTION_CLOUD_BASE_URL, true),
+            CloudUrlGuard::Ok
+        );
+        assert_eq!(
+            cloud_url_guard(false, PRODUCTION_CLOUD_BASE_URL, false),
+            CloudUrlGuard::Ok
+        );
+    }
+
+    /// Explicitly setting `HUB_CLOUD_API_URL` to a bench stub (or anything other than the
+    /// production URL) never trips the guard, in or out of CI — this is exactly the fix hub#1277
+    /// already applied to `apps/web/tests/playwright.config.ts`.
+    #[test]
+    fn hub1279_explicit_non_production_url_is_never_flagged() {
+        for ci in [true, false] {
+            assert_eq!(
+                cloud_url_guard(true, "http://127.0.0.1:1", ci),
+                CloudUrlGuard::Ok,
+                "an explicit non-production URL must never be flagged (ci={ci})"
             );
         }
     }

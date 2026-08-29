@@ -324,6 +324,36 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // (al soltarlo se pierden los logs en cola del appender no-bloqueante).
     let _log_guard = logging::init(&cfg.hub.media_dir);
 
+    // hub#1279 — a dev/bench process (`HUB_DEV_MODE=1`) with no explicit `HUB_CLOUD_API_URL`
+    // silently inherits the PRODUCTION default (see `HubConfig::from_env_with_auth`). A deployed
+    // hub never hits this — provisioning always injects the var — so this only ever fires for a
+    // process started outside it: a Playwright bench, a CI job, `pnpm dev`. `pnpm dev` keeps
+    // pointing at production on purpose (`/hub-local`), so only `CI` — nobody at the terminal to
+    // read a warning — turns this into a hard refusal. Checked before the DSN below: it needs
+    // neither Postgres nor the log guard's side effects, just the cheapest fail-fast available.
+    match state::cloud_url_guard(
+        cfg.hub.dev_mode,
+        &cfg.hub.cloud_base_url,
+        std::env::var_os("CI").is_some(),
+    ) {
+        state::CloudUrlGuard::Ok => {}
+        state::CloudUrlGuard::Warn => eprintln!(
+            "cloud: HUB_CLOUD_API_URL not set → defaulting to {} (PRODUCTION). HUB_DEV_MODE=1, so \
+             this runtime keeps starting, but a dev/bench process with no explicit \
+             HUB_CLOUD_API_URL talks to production by default (hub#1279) — set it explicitly.",
+            state::PRODUCTION_CLOUD_BASE_URL,
+        ),
+        state::CloudUrlGuard::Refuse => {
+            return Err(format!(
+                "HUB_CLOUD_API_URL is not set and HUB_DEV_MODE=1 while running in CI (CI is \
+                 set): a CI dev/bench run must never default to {} (PRODUCTION, hub#1279). Set \
+                 HUB_CLOUD_API_URL explicitly (e.g. a closed loopback address).",
+                state::PRODUCTION_CLOUD_BASE_URL,
+            )
+            .into());
+        }
+    }
+
     // Backend de datos: **Postgres-only** (ADR-0154). `HUB_DATABASE_URL` es obligatoria — sin ella
     // el arranque falla con un error claro (fail-fast). El Cloud lo inyecta en forma SQLAlchemy
     // (`postgresql+asyncpg://…`); sqlx quiere `postgresql://…` → se normaliza (`normalize_pg_dsn`).
