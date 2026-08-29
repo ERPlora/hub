@@ -626,7 +626,7 @@ impl Registry {
                 || module
                     .commands
                     .values()
-                    .any(|c| c.emit.iter().any(|e| e == event_name));
+                    .any(|c| c.emit.iter().any(|e| e.event() == event_name));
             if declared {
                 ids.insert(module.id.clone());
             }
@@ -647,10 +647,10 @@ impl Registry {
         let mut events: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
             std::collections::BTreeMap::new();
         for module in &self.installed {
-            let command_emits = module.commands.values().flat_map(|c| c.emit.iter());
-            for event in module.events.emits.iter().chain(command_emits) {
+            let command_emits = module.commands.values().flat_map(|c| c.emit.iter().map(|e| e.event()));
+            for event in module.events.emits.iter().map(String::as_str).chain(command_emits) {
                 events
-                    .entry(event.clone())
+                    .entry(event.to_string())
                     .or_default()
                     .insert(module.id.clone());
             }

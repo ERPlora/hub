@@ -175,17 +175,41 @@ pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
 /// payload. Un evento emitido dentro de un run queda sellado con ese run, y todo evento en cascada
 /// nombra al evento cuya entrega lo provocó. Sin eso la cadena venta → run → command → evento hijo
 /// solo se podía adivinar por marca de tiempo, que con dos ventas por segundo no es una respuesta.
+///
+/// `dedup_key` (hub#1076) is the manifest-declared field NAME (`emit[].dedup_key`, e.g.
+/// `"wa_message_id"`), not a value — this function is what resolves it against `payload`. When it
+/// resolves to a scalar, the row's `id` is derived from it instead of a fresh [`new_id`], and the
+/// `INSERT` grows an `ON CONFLICT (id) DO NOTHING`: a repeated emission with the same key is
+/// absorbed, same mechanism as [`insert_core_event_once`]. `None` (no key declared, or the field
+/// is absent/non-scalar) keeps the field's whole history: every call emits, exactly like before
+/// hub#1076 — and a mistaken manifest degrades to that rather than losing the row's writer.
 pub(crate) fn insert_op(
     ctx: &RequestContext,
     module_id: &str,
     event: &str,
     payload: &Params,
     depth: u32,
+    dedup_key: Option<&str>,
 ) -> (String, Params) {
+    let dedup_id = dedup_key.and_then(|field| {
+        let resolved = payload.get(field).and_then(scalar_dedup_value);
+        if resolved.is_none() {
+            // Visible, never silent (production-ready rule): a manifest mistake here must not
+            // roll back a mutation that already committed at the SQL layer, so this degrades to
+            // "emits, undeduplicated" instead of erroring the whole command.
+            eprintln!(
+                "⚠ outbox: el command de `{module_id}` declara `emit[].dedup_key: \"{field}\"` \
+                 para `{event}` pero el payload no trae ese campo (o no es un valor simple) — \
+                 este evento se emite SIN deduplicar"
+            );
+        }
+        resolved.map(|value| format!("dedup:{module_id}:{event}:{value}"))
+    });
+
     let perms: Vec<&String> = ctx.permissions.iter().collect();
     let now = now_rfc3339();
     let mut p = Params::new();
-    p.insert("id".into(), json!(new_id()));
+    p.insert("id".into(), json!(dedup_id.clone().unwrap_or_else(new_id)));
     p.insert("hub_id".into(), json!(ctx.hub_id));
     p.insert("user_id".into(), json!(ctx.user_id));
     p.insert("permissions".into(), json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())));
@@ -202,10 +226,30 @@ pub(crate) fn insert_op(
     );
     p.insert("parent_event_id".into(), json!(ctx.parent_event_id()));
     p.insert("now".into(), json!(now));
-    let sql = "INSERT INTO _event_outbox \
+    let conflict_clause = if dedup_id.is_some() {
+        " ON CONFLICT (id) DO NOTHING"
+    } else {
+        ""
+    };
+    let sql = format!(
+        "INSERT INTO _event_outbox \
         (id, hub_id, user_id, permissions, event_name, module_id, payload, depth, run_id, parent_event_id, status, attempts, next_attempt_at, last_error, created_at) \
-        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, 'pending', 0, :now, '', :now)";
-    (sql.to_string(), p)
+        VALUES (:id, :hub_id, :user_id, :permissions, :event_name, :module_id, :payload, :depth, :run_id, :parent_event_id, 'pending', 0, :now, '', :now){conflict_clause}"
+    );
+    (sql, p)
+}
+
+/// The stable string form of a JSON value fit to key an outbox dedup id on — scalars only. Null,
+/// an array or an object have no single obvious textual identity (and a manifest naming one as
+/// `dedup_key` is almost certainly pointing at the wrong field), so this returns `None` and the
+/// caller degrades to "emits, undeduplicated" rather than guessing.
+fn scalar_dedup_value(value: &Json) -> Option<String> {
+    match value {
+        Json::String(s) => Some(s.clone()),
+        Json::Number(n) => Some(n.to_string()),
+        Json::Bool(b) => Some(b.to_string()),
+        Json::Null | Json::Array(_) | Json::Object(_) => None,
+    }
 }
 
 /// Writes a **core event** — one the host itself ingests from outside the hub — into the outbox
@@ -242,7 +286,7 @@ pub async fn insert_core_event_once(
         String::new(),
         [permissions::WILDCARD.to_string()],
     );
-    let (sql, mut params) = insert_op(&ctx, "", event_name, payload, 0);
+    let (sql, mut params) = insert_op(&ctx, "", event_name, payload, 0, None);
     params.insert("id".into(), json!(id));
     let result = db
         .execute(&format!("{sql} ON CONFLICT (id) DO NOTHING"), &params)
@@ -1611,7 +1655,7 @@ mod tests {
     use crate::registry::{ModuleStatus, Principal, RegisteredCommand};
     use erplora_db::{testutil::fresh_db, PgAdapter};
 
-    fn cmd(module: &str, sql: &str, emit: Vec<String>) -> RegisteredCommand {
+    fn cmd(module: &str, sql: &str, emit: Vec<crate::manifest::EmitDef>) -> RegisteredCommand {
         RegisteredCommand {
             module_id: module.to_string(),
             def: CommandDef {
@@ -2809,7 +2853,7 @@ mod tests {
         module: &str,
         permission: &str,
         sql: &str,
-        emit: Vec<String>,
+        emit: Vec<crate::manifest::EmitDef>,
     ) -> RegisteredCommand {
         let mut c = cmd(module, sql, emit);
         c.def.permission = permission.to_string();
@@ -3259,7 +3303,7 @@ mod tests {
     #[test]
     fn the_seal_of_an_event_comes_from_the_context_and_not_from_its_payload() {
         let plain = RequestContext::new("h1", "u1", ["*".to_string()]);
-        let (_, p) = insert_op(&plain, "m", "e", &Params::new(), 0);
+        let (_, p) = insert_op(&plain, "m", "e", &Params::new(), 0, None);
         assert_eq!(p["run_id"], json!(""));
         assert_eq!(p["parent_event_id"], json!(""));
 
@@ -3269,7 +3313,7 @@ mod tests {
                 run_id: "run-7".into(),
             })
             .caused_by_event("evt-origin");
-        let (_, p) = insert_op(&inside_a_run, "m", "e", &Params::new(), 0);
+        let (_, p) = insert_op(&inside_a_run, "m", "e", &Params::new(), 0, None);
         assert_eq!(
             p["run_id"],
             json!("run-7"),

@@ -194,7 +194,10 @@ async fn install_registers_redeem_capabilities() {
     );
     // El consumo emite un evento para que otros módulos reaccionen.
     let redeem = reg.get_command("services.packages.redeem").unwrap();
-    assert_eq!(redeem.def.emit, ["services.package.redeemed"]);
+    assert_eq!(
+        redeem.def.emit.iter().map(|e| e.event()).collect::<Vec<_>>(),
+        ["services.package.redeemed"]
+    );
 }
 
 #[tokio::test]

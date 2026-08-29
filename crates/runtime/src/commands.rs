@@ -469,9 +469,10 @@ pub(crate) async fn execute_at(
         ops.push(outbox::insert_op(
             ctx,
             &cmd.module_id,
-            event,
+            event.event(),
             &bound,
             depth + 1,
+            event.dedup_key(),
         ));
     }
     ops.extend_from_slice(extra_ops);
@@ -545,7 +546,7 @@ pub(crate) async fn execute_at(
         events::notify_sink(
             registry,
             crate::registry::EventSource::Module(&cmd.module_id),
-            event,
+            event.event(),
             &bound,
         );
     }
@@ -1235,9 +1236,10 @@ async fn persist_handler_output(
         tx_ops.push(outbox::insert_op(
             ctx,
             &cmd.module_id,
-            event,
+            event.event(),
             &declared_payload,
             depth + 1,
+            event.dedup_key(),
         ));
     }
     // Los eventos que devuelve el handler se validan contra el `module.json` ANTES de encolarlos
@@ -1274,6 +1276,7 @@ async fn persist_handler_output(
             name,
             payload,
             depth + 1,
+            None,
         ));
     }
     tx_ops.extend_from_slice(extra_ops);
@@ -1308,7 +1311,7 @@ async fn persist_handler_output(
     // namespace en el que hub#240 les deja llamarse.
     let source = crate::registry::EventSource::Module(&cmd.module_id);
     for event in &cmd.def.emit {
-        events::notify_sink(registry, source, event, &declared_payload);
+        events::notify_sink(registry, source, event.event(), &declared_payload);
     }
     for (name, payload) in &handler_events {
         events::notify_sink(registry, source, name, payload);
@@ -1464,7 +1467,7 @@ pub(crate) fn validate_handler_event(
         .commands
         .values()
         .filter(|c| c.module_id == handler_module_id)
-        .any(|c| c.def.emit.iter().any(|e| e == name));
+        .any(|c| c.def.emit.iter().any(|e| e.event() == name));
     if declared_in_manifest || declared_in_commands {
         return Ok(());
     }
@@ -1743,7 +1746,11 @@ fn enforce_fiscal_precondition<'a>(
 /// committed sale into an error — the money is already taken and the record is already on its way;
 /// refusing afterwards would help nobody. The seal is idempotent, so the next fiscal transaction
 /// catches up.
-async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestContext, emitted: &[String]) {
+async fn seal_first_record_if_fiscal(
+    db: &dyn DatabaseAdapter,
+    ctx: &RequestContext,
+    emitted: &[crate::manifest::EmitDef],
+) {
     if emitted.is_empty() || ctx.fiscal_mode != Some(crate::fiscal_profile::FiscalMode::Active) {
         return; // Nothing emitted, or this hub is not filing for real: nothing to seal.
     }
@@ -1754,7 +1761,7 @@ async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestCont
     if profile.environment != crate::fiscal_profile::ENV_PRODUCTION
         || !emitted
             .iter()
-            .any(|e| profile.fiscal_trigger_events.iter().any(|t| t == e))
+            .any(|e| profile.fiscal_trigger_events.iter().any(|t| t == e.event()))
     {
         return;
     }
@@ -1794,7 +1801,7 @@ fn enforce_fiscal_capacity(
     ctx: &RequestContext,
     module_id: &str,
     is_core_command: bool,
-    emitted: &[String],
+    emitted: &[crate::manifest::EmitDef],
 ) -> Result<()> {
     // `None` means UNRESOLVED, never "nothing owed": a path that did not stamp the mode must not
     // read as compliant. Nothing can be decided here, so nothing is allowed through on its word —
@@ -1819,7 +1826,7 @@ fn enforce_fiscal_capacity(
             // Only what would OPEN a fiscal chain is refused. Everything else keeps working.
             if !emitted
                 .iter()
-                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e))
+                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e.event()))
             {
                 return Ok(());
             }
@@ -2122,7 +2129,7 @@ mod tests {
             &["invoice.created"],
             &[],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
             .expect_err("sin proveedor no se abre una cadena fiscal");
         assert_eq!(code_of(&err), "fiscal.provider_missing");
     }
@@ -2138,7 +2145,7 @@ mod tests {
             &[],
         );
         assert!(
-            enforce_fiscal_capacity(&ctx, "inventory", false, &["inventory.stock.moved".to_string()])
+            enforce_fiscal_capacity(&ctx, "inventory", false, &[crate::manifest::EmitDef::from("inventory.stock.moved")])
                 .is_ok(),
             "mover stock no abre ninguna cadena fiscal"
         );
@@ -2153,7 +2160,7 @@ mod tests {
             &["invoice.created"],
             &["verifactu"],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
             .expect_err("una cadena ajena no se continúa");
         assert_eq!(code_of(&err), "fiscal.installation_mismatch");
     }
@@ -2163,7 +2170,7 @@ mod tests {
     fn an_active_hub_with_its_provider_mounted_is_not_gated() {
         let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
         assert!(
-            enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok()
+            enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok()
         );
     }
 
@@ -2199,7 +2206,7 @@ mod tests {
     fn an_unresolved_mode_is_not_read_as_permission_to_emit() {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         assert_eq!(ctx.fiscal_mode, None);
-        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok());
+        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok());
     }
 
     /// Un evento declarado en el `emit` de un command del módulo se acepta (comportamiento
@@ -4013,7 +4020,7 @@ mod tests {
     fn root_wasm_command() -> RegisteredCommand {
         let mut def = cmd_def();
         def.sql = Vec::new();
-        def.emit = vec!["customers.groups.changed".to_string()];
+        def.emit = vec!["customers.groups.changed".into()];
         RegisteredCommand {
             module_id: "customers".to_string(),
             def,

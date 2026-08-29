@@ -477,8 +477,23 @@
           },
           "emit": {
             "type": "array",
+            "description": "Eventos que emite este command. Cada entrada es o el nombre plano del evento (comportamiento de siempre: emite una vez por EJECUCIÓN) o un objeto que además declara `dedup_key` (hub#1076): el nombre de un campo del payload del command cuyo valor deriva el id de la fila del outbox, así que una emisión REPETIDA con la MISMA clave (redelivery de un webhook, reintento del relay del outbox) se absorbe en vez de encolar un segundo evento — el mismo mecanismo que ya usa `insert_core_event_once` para un evento core. Opt-in: ausente = comportamiento de siempre.",
             "items": {
-              "type": "string"
+              "oneOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["event", "dedup_key"],
+                  "properties": {
+                    "event": { "type": "string" },
+                    "dedup_key": {
+                      "type": "string",
+                      "description": "Nombre de un campo del payload del command (el mismo espacio de nombres que un bind `:campo` en su SQL) cuyo valor identifica de forma única la emisión. Dos ejecuciones con el MISMO valor absorben la segunda en el outbox; valores distintos son eventos distintos."
+                    }
+                  }
+                }
+              ]
             }
           },
           "min_affected_rows": {

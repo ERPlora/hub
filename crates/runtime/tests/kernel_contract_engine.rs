@@ -26,6 +26,7 @@ use erplora_db::Params;
 use erplora_runtime::manifest::CapabilityKind;
 use erplora_runtime::migration_guard::Kind;
 use erplora_runtime::RequestContext;
+use serde_json::json;
 
 #[path = "support/kernel_snapshot.rs"]
 mod kernel_snapshot;
@@ -186,6 +187,34 @@ fn generate() -> String {
     for op in expect_rows_ops() {
         out.push_str(&format!("commands.*.expect_rows.op = {op}\n"));
     }
+
+    // El contrato de deduplicación del outbox (hub#1076): `emit[]` acepta el nombre plano de
+    // siempre O un objeto que además nombra `dedup_key`, verificado deserializando las DOS formas
+    // de verdad en vez de copiar su shape a mano.
+    out.push_str("\n[emit]\n");
+    let plain: erplora_runtime::manifest::EmitDef = serde_json::from_value(json!("sale.completed"))
+        .expect("la forma string de `emit[]` tiene que seguir parseando");
+    assert_eq!(plain.event(), "sale.completed");
+    assert!(
+        plain.dedup_key().is_none(),
+        "la forma string nunca declara `dedup_key`"
+    );
+    out.push_str("commands.*.emit[] = string\n");
+    let dedup_fields = item_members(&manifest_src, "pub struct", "EmitDedupKey");
+    assert!(
+        !dedup_fields.is_empty(),
+        "no se han leído los campos de `EmitDedupKey`"
+    );
+    for field in &dedup_fields {
+        out.push_str(&format!("commands.*.emit[].{field}\n"));
+    }
+    let keyed: erplora_runtime::manifest::EmitDef = serde_json::from_value(
+        json!({"event": "sale.completed", "dedup_key": "wa_message_id"}),
+    )
+    .expect("la forma objeto de `emit[]` tiene que parsear");
+    assert_eq!(keyed.event(), "sale.completed");
+    assert_eq!(keyed.dedup_key(), Some("wa_message_id"));
+
     out
 }
 
