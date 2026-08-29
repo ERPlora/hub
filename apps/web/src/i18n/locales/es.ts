@@ -596,6 +596,12 @@ export default {
     shareWithErploraDone: 'Datos compartidos con ERPlora.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
     shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
+    fiscalRouteTitle: 'Envío a la Agencia Tributaria',
+    fiscalRouteLead: 'Tus facturas llegan a la AEAT por una de estas dos vías.',
+    fiscalRouteDelegated: 'Lo hace ERPlora por ti',
+    fiscalRouteOwn: 'Con mi propio certificado',
+    fiscalRouteOwnHint:
+      'Firmas y envías con tu certificado; no hace falta ningún otorgamiento a ERPlora.',
     grantTitle: 'Otorgamiento de representación',
     grantDesc:
       'Tu consentimiento firmado para que ERPlora remita tus registros de facturación a la Agencia Tributaria en tu nombre. Obligatorio antes de que el negocio pase a producción.',

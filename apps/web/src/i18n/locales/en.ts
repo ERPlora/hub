@@ -641,6 +641,14 @@ export default {
     shareWithErploraDone: 'Details shared with ERPlora.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
     shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
+    // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
+    // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
+    fiscalRouteTitle: 'Filing with the tax authority',
+    fiscalRouteLead: 'Your invoices reach the tax authority through one of these two routes.',
+    fiscalRouteDelegated: 'ERPlora does it for you',
+    fiscalRouteOwn: 'With my own certificate',
+    fiscalRouteOwnHint:
+      'You sign and file with your own certificate; no grant to ERPlora is needed.',
     grantTitle: 'Representation grant',
     grantDesc:
       'Your signed consent for ERPlora to file your invoicing records with the tax authority on your behalf. Required before your business can go live.',

@@ -779,22 +779,38 @@ export interface BusinessCertificate {
   present: boolean;
   uploaded_at?: string | null;
   subject?: string | null;
+  /**
+   * Por cuál de las **dos vías excluyentes** llegan las facturas de este hub a la AEAT
+   * (ADR-0320 §1 — hub#1314): `own` = firma y remite el propio obligado con su `.p12`, así que no
+   * otorga nada a nadie; `delegated` = lo hace ERPlora en su nombre con el Sello, y eso —y solo
+   * eso— exige el Anexo I firmado.
+   *
+   * Lo nombra el runtime (`certificate::route_of`), que es el mismo sitio del que sale la decisión
+   * de `go_live`. La pantalla NO lo deduce de `present`: dos deducciones separadas es como acaban
+   * discrepando la pantalla y la puerta de producción.
+   */
+  transmission_route?: FiscalTransmissionRoute;
 }
+
+/** Las dos vías de ADR-0320 §1. Las palabras son las del runtime; no se traducen. */
+export type FiscalTransmissionRoute = 'own' | 'delegated';
 
 /**
  * Lee el estado del certificado fiscal del negocio. Cualquier sesión puede leerlo. Degrada a
- * `{ present: false }` si el endpoint todavía no existe (404) o el runtime no responde, para que
- * la UI muestre "Sin certificado" en vez de romper.
+ * `{ present: false, transmission_route: 'delegated' }` si el endpoint todavía no existe (404) o
+ * el runtime no responde, para que la UI muestre "Sin certificado" en vez de romper — y la vía
+ * degradada es la delegada porque es la que se le puede ofrecer a alguien sin `.p12` (hub#1314).
  */
 export async function getBusinessCertificate(): Promise<BusinessCertificate> {
+  const unknown: BusinessCertificate = { present: false, transmission_route: 'delegated' };
   try {
     const res = await runtimeFetch(`${RUNTIME_URL}/api/business/certificate`, {
       headers: runtimeHeaders(),
     });
-    if (!res.ok) return { present: false };
+    if (!res.ok) return unknown;
     return (await res.json()) as BusinessCertificate;
   } catch {
-    return { present: false };
+    return unknown;
   }
 }
 

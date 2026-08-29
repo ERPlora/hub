@@ -523,7 +523,22 @@ pub async fn go_live(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalPro
     // it never becomes `READY` in the first place — and `NOT_READY` would send its owner to hunt
     // for a certificate that only signing can unlock. Signing is the FIRST thing missing, so it is
     // the first thing said.
-    if profile.representation_status != REPRESENTATION_VIGENTE {
+    //
+    // 🔴 **…and only on the DELEGATED route** (ADR-0320 §1 — hub#1314). The grant and the business's
+    // own certificate are two EXCLUSIVE ways of reaching the AEAT: a taxpayer who signs and files
+    // with their own `.p12` delegates nothing, so there is nothing to authorise — the SaaS routes
+    // them `direct` without even looking at the grant. Demanding it anyway locked those hubs out of
+    // production behind a document neither the AEAT asks for nor ERPlora would ever use.
+    //
+    // The question is «with WHICH certificate?» ([`certificate::transmission_route`]), never «can
+    // it sign?»: `can_sign` is `true` with the DELEGATED one too, and that one is precisely the
+    // case that needs the grant — it is ERPlora filing on somebody's behalf. A slot that cannot be
+    // read propagates instead of degrading to a route: an unreadable answer is not «own», and a
+    // silent fallback here would be a guess about which route a business is on.
+    let route = crate::certificate::transmission_route(db, hub_id).await?;
+    if route != crate::certificate::ROUTE_OWN
+        && profile.representation_status != REPRESENTATION_VIGENTE
+    {
         return Err(RuntimeError::Domain {
             code: NO_REPRESENTATION.to_string(),
             message: "this hub has not signed the representation grant: ERPlora files these \
@@ -1747,8 +1762,29 @@ mod tests {
         reg
     }
 
-    /// Deja el hub en `READY` de verdad: identidad + certificado + proveedor montado.
+    /// Deja el hub en `READY` de verdad —identidad + certificado + proveedor montado— **firmando
+    /// con el certificado DELEGADO**, que es el hub al que el otorgamiento le hace falta de verdad
+    /// (ADR-0320 §1): ERPlora remite en su nombre, así que sin Anexo I no hay quien le represente.
+    ///
+    /// 🔴 El slot importa y no es decorativo: `_hub_certificate.kind` tiene `DEFAULT 'own'`, así que
+    /// una fila sin `kind` sembraba un certificado PROPIO y estos tests creían estar probando la
+    /// vía delegada mientras probaban la contraria.
     async fn hub_ready_without_grant(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
+        hub_ready_signing_with(db, hub_id, crate::certificate::CertificateKind::Delegated).await
+    }
+
+    /// El mismo hub `READY` y sin otorgamiento, pero **con certificado PROPIO**: la otra vía de
+    /// ADR-0320 §1, la que no necesita representante porque firma y remite el propio obligado.
+    async fn hub_ready_with_own_certificate(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
+        hub_ready_signing_with(db, hub_id, crate::certificate::CertificateKind::Own).await
+    }
+
+    /// Deja el hub en `READY` de verdad: identidad + certificado en `kind` + proveedor montado.
+    async fn hub_ready_signing_with(
+        db: &dyn DatabaseAdapter,
+        hub_id: &str,
+        kind: crate::certificate::CertificateKind,
+    ) -> Registry {
         booted_hub(db, hub_id, Some("ES")).await;
         set_setting(db, hub_id, "business_tax_id", "B12345674").await;
         set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
@@ -1757,9 +1793,10 @@ mod tests {
         // what is looked at here is the PRESENCE of the row, never its contents.
         let mut p = Params::new();
         p.insert("hub_id".into(), json!(hub_id));
+        p.insert("kind".into(), json!(kind.as_str()));
         db.execute(
-            "INSERT INTO _hub_certificate (hub_id, pkcs12_b64, password, uploaded_at, uploaded_by) \
-             VALUES (:hub_id, 'v1:ciphertext', 'v1:ciphertext', '2026-08-08T09:00:00Z', 'hub_user:1')",
+            "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
+             VALUES (:hub_id, :kind, 'v1:ciphertext', 'v1:ciphertext', '2026-08-08T09:00:00Z', 'hub_user:1')",
             &p,
         )
         .await
@@ -1847,6 +1884,48 @@ mod tests {
             .unwrap();
 
         let err = go_live(&db, "hub-es").await.expect_err("revocado no es firmado");
+
+        assert_eq!(code_of(&err), NO_REPRESENTATION);
+    }
+
+    // ── Certificado PROPIO y otorgamiento son EXCLUYENTES (ADR-0320 §1 — hub#1314) ─────────────
+
+    /// 🔴 **Con certificado propio no hay nada que otorgar.** Son dos vías EXCLUYENTES de llegar a
+    /// la AEAT: o firma y remite el propio obligado con su certificado, o lo hace ERPlora en su
+    /// nombre con el Sello — y para lo segundo, y solo para lo segundo, hace falta el Anexo I.
+    ///
+    /// El SaaS ya lo resuelve así (`select_transmission_route`: el certificado propio gana antes de
+    /// mirar siquiera el otorgamiento), y el hub exigía las dos cosas: un negocio con su `.p12`
+    /// subido no podía pasar a producción hasta firmar un otorgamiento que ni la AEAT le pide ni
+    /// ERPlora usaría, porque su ruta es `direct`.
+    #[tokio::test]
+    async fn an_own_certificate_needs_no_grant_to_go_live() {
+        let db = fresh_db().await;
+        hub_ready_with_own_certificate(&db, "hub-es").await;
+
+        let after = go_live(&db, "hub-es")
+            .await
+            .expect("quien firma con su certificado no otorga nada a nadie");
+
+        assert_eq!(after.status, FiscalStatus::Active);
+    }
+
+    /// Y la puerta sigue cerrada por el otro lado: **el certificado DELEGADO no vale como propio**.
+    /// Es el de ERPlora (ADR-0202 §2.1), lo lleva cualquier hub al que se le repartió, y `can_sign`
+    /// dice `true` con él — así que preguntar «¿puede firmar?» en vez de «¿con QUÉ firma?» abriría
+    /// producción a la flota entera sin un solo Anexo I firmado.
+    #[tokio::test]
+    async fn only_the_delegated_certificate_still_demands_the_grant() {
+        let db = fresh_db().await;
+        hub_ready_without_grant(&db, "hub-es").await;
+        assert!(
+            crate::certificate::can_sign(&db, "hub-es").await.unwrap(),
+            "el fixture tiene que poder firmar, o el test no distingue can_sign de active_kind"
+        );
+
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("el Sello de ERPlora remite EN NOMBRE de alguien: hace falta su firma");
 
         assert_eq!(code_of(&err), NO_REPRESENTATION);
     }
