@@ -91,12 +91,22 @@ impl TestDb {
 
     /// A fresh [`PgAdapter`] whose pool has `search_path` pinned to this test's schema.
     pub async fn adapter(&self) -> PgAdapter {
+        self.adapter_with_max_connections(5).await
+    }
+
+    /// Same as [`TestDb::adapter`], with an explicit pool cap.
+    ///
+    /// `max_connections(1)` is how a test STATES that its calls share one connection instead of
+    /// leaning on the pool handing the idle one back. Per-connection state — sqlx's
+    /// prepared-statement cache above all (ERPlora/hub#1348) — is invisible to a test that cannot
+    /// pin the connection down.
+    pub async fn adapter_with_max_connections(&self, max_connections: u32) -> PgAdapter {
         let opts = self
             .opts
             .clone()
             .options([("search_path", self.schema.as_str())]);
         let pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(max_connections)
             .connect_with(opts)
             .await
             .expect("abrir el pool sobre el esquema de test");

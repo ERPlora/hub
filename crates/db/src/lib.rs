@@ -231,7 +231,19 @@ macro_rules! build_query {
         // `AssertSqlSafe`: sqlx 0.9 requires `'static` SQL or an explicit assertion (anti-injection).
         // Correct here: the SQL skeleton comes from trusted module manifests and the values are
         // bound separately (`:name` → placeholder), never interpolated into the text.
-        let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql));
+        //
+        // `.persistent(false)`: do NOT let sqlx cache the prepared statement (ERPlora/hub#1348).
+        // That cache is keyed on the SQL **text** alone — `get_or_prepare` reads it BEFORE it
+        // looks at this flag — so the parameter types negotiated by the FIRST execution of a text
+        // stay pinned to it for the life of the connection. Our SQL is dynamic and our parameters
+        // are JSON, so the same text legitimately arrives with different parameter types: a `null`
+        // binds as `DynNull` (OID 0, server-inferred from context) while a value binds as
+        // int8/float8/text. Cache the first shape and the second is decoded against the wrong
+        // type — `22P03 incorrect binary data format in bind parameter N` when the widths differ,
+        // and silently wrong data when they do not. Cost: Postgres re-parses the statement, on the
+        // UNNAMED one, so there is no extra roundtrip and no `Close` to send; the custom plan it
+        // yields is often better than the generic one a cached statement settles into.
+        let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql)).persistent(false);
         for name in $names.iter() {
             q = match $params.get(name) {
                 // NULL — bound as `DynNull` (see its definition above): emits a NULL with OID 0
@@ -1041,7 +1053,7 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil::fresh_db;
+    use crate::testutil::{TestDb, fresh_db};
     use serde_json::json;
 
     fn params(v: Json) -> Params {
@@ -1568,6 +1580,99 @@ mod tests {
     #[test]
     fn pg_max_connections_default_matches_sqlx_default() {
         assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 10);
+    }
+
+    // ── Statement cache vs. NULL binds (`DynNull`, OID 0) — ERPlora/hub#1348 ──────────────────
+    //
+    // sqlx keys its prepared-statement cache on the SQL **text** alone, and `get_or_prepare`
+    // consults that cache before it honours `persistent`. So the parameter types negotiated by the
+    // FIRST execution of a text stay pinned to it for the life of the connection.
+    //
+    // A JSON `null` binds as `DynNull` (OID 0 = "infer from context"), which hands the type choice
+    // to the server. With `CAST(:cost AS INTEGER)` — the shape
+    // `inventory/commands/_receive_line.sql` really uses — the server picks `int4`. The next
+    // execution binds an `i64`: 8 bytes of binary payload into a 4-byte slot, and Postgres answers
+    // `22P03 incorrect binary data format in bind parameter N`.
+    //
+    // It is not an inventory quirk: ANY optional `["integer","null"]` field that is sometimes sent
+    // and sometimes omitted hits it, and in production one pooled connection serves thousands of
+    // requests, so the two shapes meeting on one connection is the normal case, not the rare one.
+    // The pools below are capped at ONE connection so these tests prove that instead of hoping for
+    // it.
+
+    /// Write path: the same INSERT text run first with `null`, then with a typed value.
+    #[tokio::test]
+    async fn null_bind_then_typed_bind_on_the_same_sql_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost INTEGER);")
+            .await
+            .unwrap();
+
+        // The SAME text on both calls: that is what makes them meet on the cached statement.
+        let sql =
+            "INSERT INTO stock (id, hub_id, cost) VALUES (:id, :hub_id, CAST(:cost AS INTEGER))";
+
+        db.execute(sql, &params(json!({ "id": "a", "hub_id": "h1", "cost": Json::Null })))
+            .await
+            .expect("el bind NULL (DynNull, OID 0) debe insertar");
+
+        db.execute(sql, &params(json!({ "id": "b", "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect(
+                "tras preparar la sentencia con un bind NULL, un valor tipado en la MISMA \
+                 conexión debe seguir funcionando (hub#1348)",
+            );
+
+        // Not blowing up is not enough: both values have to have landed RIGHT. A slot with the
+        // wrong type can also swallow the bytes and store garbage without saying anything.
+        let rows = db
+            .query(
+                "SELECT id, cost FROM stock WHERE hub_id = :hub_id ORDER BY id",
+                &params(json!({ "hub_id": "h1" })),
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 2, "las dos filas se insertaron: {rows:?}");
+        assert_eq!(rows[0]["cost"], Json::Null, "la fila del bind NULL guarda NULL");
+        assert_eq!(rows[1]["cost"], json!(180), "la fila tipada guarda el valor exacto");
+    }
+
+    /// Read path: same story through `query`. A list that filters by an optional field breaks the
+    /// same way, and `build_query!` is the single door both paths go through.
+    #[tokio::test]
+    async fn null_bind_then_typed_bind_on_the_same_select_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost INTEGER);")
+            .await
+            .unwrap();
+        db.execute_batch(
+            "INSERT INTO stock (id, hub_id, cost) VALUES ('a', 'h1', NULL), ('b', 'h1', 180);",
+        )
+        .await
+        .unwrap();
+
+        let sql = "SELECT id FROM stock WHERE hub_id = :hub_id \
+                   AND cost IS NOT DISTINCT FROM CAST(:cost AS INTEGER) ORDER BY id";
+
+        let null_first = db
+            .query(sql, &params(json!({ "hub_id": "h1", "cost": Json::Null })))
+            .await
+            .expect("el bind NULL (DynNull, OID 0) debe consultar");
+        assert_eq!(null_first.rows.len(), 1, "el filtro NULL devuelve su fila");
+        assert_eq!(null_first.rows[0]["id"], json!("a"));
+
+        let typed_second = db
+            .query(sql, &params(json!({ "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect(
+                "tras preparar el SELECT con un bind NULL, un valor tipado en la MISMA conexión \
+                 debe seguir funcionando (hub#1348)",
+            );
+        assert_eq!(typed_second.rows.len(), 1, "el filtro tipado devuelve su fila");
+        assert_eq!(typed_second.rows[0]["id"], json!("b"));
     }
 
     #[test]
