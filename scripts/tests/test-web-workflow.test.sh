@@ -50,6 +50,19 @@ on_sub_block() { # $1 = name
     '
 }
 
+# One job's block under `jobs:` (e.g. `verify`), from `  <name>:` to the next
+# 2-space job key. Job-scoped, not file-wide: a whole-file grep would say a
+# guard is present because a DIFFERENT job happens to mention the same words
+# (caught by mutation testing — removing the checkout override from `verify`
+# alone did not fail check 8 until this scoping was added).
+job_block() { # $1 = name
+    awk -v key="  $1:" '
+        $0 == key {inside=1; print; next}
+        inside && /^  [A-Za-z0-9_-]+:/ {exit}
+        inside {print}
+    ' "$workflow"
+}
+
 echo "test-web.yml — contrato del gate del web (hub#1240)"
 
 # ── 1. The npm script the workflow (and a developer) invokes ─────────────────
@@ -137,6 +150,67 @@ if grep -q 'scripts/tests/test-web-workflow.test.sh' "$workflow"; then
 else
     bad "test-web.yml corre este mismo contrato" \
         "este fichero no lo ejecuta ningún workflow — exactamente el defecto que hub#1240 arregla"
+fi
+
+# ── 8. Nightly schedule on develop (hub#1253) ────────────────────────────────
+# `crates/**` queda fuera de `paths` a propósito (ver cabecera del workflow): un merge
+# solo-Rust en develop no dispara nunca este fichero. Sin un `schedule`, una regresión
+# del runtime que rompa el shell no sale hasta la siguiente PR que toque `apps/web/**`.
+schedule_block=$(on_sub_block schedule)
+verify_job=$(job_block verify)
+e2e_job=$(job_block e2e)
+# Each job's checkout must carry BOTH the event guard and the `develop` literal —
+# checked PER JOB, not with a whole-file grep: `e2e` alone having the override
+# would satisfy a file-wide grep while `verify` (vue-tsc + vitest) silently kept
+# testing whatever `main` happens to be, and a scheduled run would then mix
+# develop's e2e result with main's typecheck result under one "develop is
+# broken" alert.
+verify_has_ref=1
+e2e_has_ref=1
+printf '%s' "$verify_job" | grep -q "event_name == 'schedule'" && printf '%s' "$verify_job" | grep -q "'develop'" || verify_has_ref=0
+printf '%s' "$e2e_job" | grep -q "event_name == 'schedule'" && printf '%s' "$e2e_job" | grep -q "'develop'" || e2e_has_ref=0
+if [ -z "$schedule_block" ]; then
+    bad "test-web.yml tiene un \`schedule\` nocturno" \
+        "no hay bloque \`schedule:\` en \`on:\`: un cambio de runtime que rompe el shell no se ve hasta la siguiente PR del web (hub#1253)"
+elif ! printf '%s' "$schedule_block" | grep -q 'cron:'; then
+    bad "el \`schedule\` declara un \`cron\`" \
+        "\`on.schedule\` existe pero sin \`cron:\`, así que GitHub no lo dispara nunca"
+elif [ "$verify_has_ref" -eq 0 ]; then
+    bad "el checkout del job \`verify\` fuerza develop en el cron" \
+        "\`schedule\` solo dispara el fichero que vive en \`main\` (comportamiento nativo de GitHub) y por defecto haría checkout de ESA rama — lo contrario de lo que pide hub#1253. Al job \`verify\` le falta un \`ref:\` condicionado a \`github.event_name == 'schedule'\` que fuerce \`develop\`"
+elif [ "$e2e_has_ref" -eq 0 ]; then
+    bad "el checkout del job \`e2e\` fuerza develop en el cron" \
+        "mismo defecto que \`verify\` pero en el job \`e2e\`: sin el \`ref:\` condicionado, el cron probaría \`main\` en vez de \`develop\`"
+else
+    ok "on.schedule tiene cron y los checkouts de verify+e2e fuerzan develop en ese camino"
+fi
+
+# ── 9. La alerta también cubre el cron (hub#1253) ────────────────────────────
+# El job `alert-develop` solo miraba `github.event_name == 'push'`: un cron rojo a las
+# 3 de la mañana no lo ve nadie (el mismo agujero que hub#572/#1239 cerraron para push).
+alert_job=$(job_block alert-develop)
+if [ -z "$alert_job" ]; then
+    bad "existe el job \`alert-develop\`" "no se encontró \`  alert-develop:\` en $workflow"
+elif ! printf '%s' "$alert_job" | grep -q "event_name == 'schedule'"; then
+    bad "la alerta de develop roto también dispara con el \`schedule\`" \
+        "el \`if:\` de \`alert-develop\` solo mira \`github.event_name == 'push'\`: un cron rojo no abre ni refresca la issue de alerta (hub#1253)"
+else
+    ok "alert-develop dispara también cuando el trigger es \`schedule\`"
+fi
+
+# ── 10. `scripts/**` de la guardia dispara el gate (hub#1247) ────────────────
+# `pnpm verify` corre `node --test scripts/tests/no-dead-packages.test.mjs` como primer
+# paso (hub#1244), pero ese fichero no estaba en los `paths` de push/pull_request: una PR
+# que solo tocara la guardia no ejecutaba ningún check.
+guard_path="scripts/tests/no-dead-packages.test.mjs"
+if ! printf '%s' "$push_block" | grep -qF "$guard_path"; then
+    bad "la guardia \`no-dead-packages\` dispara test-web.yml en push" \
+        "\`on.push.paths\` no incluye \`$guard_path\` (hub#1247)"
+elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qF "$guard_path"; then
+    bad "la guardia \`no-dead-packages\` dispara test-web.yml en pull_request" \
+        "\`on.pull_request.paths\` no incluye \`$guard_path\` (hub#1247)"
+else
+    ok "\`$guard_path\` está en los \`paths\` de push y pull_request"
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

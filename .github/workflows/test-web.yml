@@ -60,6 +60,24 @@
 # sale hasta la siguiente PR del web. Si algún día eso pasa de verdad, la palanca
 # es añadir `crates/**` aquí — no antes.
 #
+# ── `schedule` nocturno sobre develop (hub#1253) ─────────────────────────────
+# El párrafo de arriba deja un hueco: sin `crates/**` en `paths`, un merge SOLO-Rust
+# en `develop` no dispara nunca este fichero, así que una regresión del runtime que
+# rompa el shell (un endpoint que cambia de forma, un 428/403 nuevo) no sale hasta
+# la siguiente PR que toque `apps/web/**` — y ahí le cae a otro. `schedule` es el
+# mecanismo aburrido y estándar (mismo patrón que `test-hub-modules.yml`, hub#1239):
+# corre TODO el fichero una vez al día, sin filtro de `paths` (un `schedule` no lo
+# tiene), y así ve develop tal como quedó tras cualquier merge, sea de Rust o no.
+#
+# 🔴 GitHub solo dispara `schedule` desde el fichero que vive en la rama POR DEFECTO
+# del repo (`main`, ver `image-freshness.yml`) y por defecto haría checkout de ESA
+# rama — justo lo contrario de lo que se pide aquí. Los jobs `verify` y `e2e` fuerzan
+# `ref: develop` cuando `github.event_name == 'schedule'`; en cualquier otro evento
+# el checkout se comporta como siempre (la ref del propio evento). Hasta que este
+# fichero llegue a `main` en un lote de release, el cron no se dispara solo —
+# `workflow_dispatch` sigue sirviendo mientras tanto (mismo aviso que
+# `image-freshness.yml`).
+#
 # Contrato de este fichero: `scripts/tests/test-web-workflow.test.sh`, que corre
 # como un paso del job `verify` (un test de la guarda que no corre en ningún
 # sitio es la lista de la compra, no una guarda).
@@ -77,6 +95,9 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "scripts/tests/test-web-workflow.test.sh"
+      # La guardia que `pnpm verify` corre primero (hub#1244): sin ella en `paths`, una
+      # PR que solo tocara `no-dead-packages.test.mjs` no disparaba ningún check (hub#1247).
+      - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
   pull_request:
     paths:
@@ -86,7 +107,11 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "scripts/tests/test-web-workflow.test.sh"
+      - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
+  # Nocturno sobre develop, sin filtro de `paths` (hub#1253 — ver cabecera arriba).
+  schedule:
+    - cron: "8 3 * * *" # diario, fuera de la hora en punto (pico de carga de GitHub)
   workflow_dispatch:
     inputs:
       update_baselines:
@@ -113,8 +138,14 @@ jobs:
       CI: "1"
 
     steps:
+      # `ref` condicionado (hub#1253): `schedule` dispara el fichero que vive en `main`
+      # (rama por defecto) y por defecto haría checkout de ESA rama; en cualquier otro
+      # evento se comporta como siempre (la ref del propio evento — `github.ref` ya es
+      # eso mismo, así que el `||` es un no-op fuera del cron).
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
 
       # Same runtime as the image build (docker/Dockerfile: node:22-bookworm-slim + corepack),
       # so a green run here means the `vue-tsc` inside `build-hub.yml` is green too.
@@ -179,8 +210,11 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
+      # Mismo `ref` condicionado que el job `verify` (hub#1253) — ver el comentario allí.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
 
       # 🔴 Misma defensa que `test-hub.yml`: el resolutor de módulos del shell mira al hermano
       # `modules-workspace/` del checkout, que cae FUERA del workspace y PERSISTE entre jobs. Si
@@ -316,8 +350,15 @@ jobs:
   alert-develop:
     name: Alerta de develop roto
     needs: [verify, e2e]
+    # `schedule` se suma aquí (hub#1253): sin esto, un cron rojo a las 3 de la mañana no
+    # lo ve nadie — el mismo agujero que hub#572/#1239 cerraron para `push`. El cron no
+    # tiene `github.ref == refs/heads/develop` (ese contexto reporta la rama POR DEFECTO,
+    # `main`), así que se acepta por el nombre del evento y punto: el `ref:` condicionado
+    # de los checkouts de arriba ya garantiza que lo que se probó fue `develop`.
     if: >-
-      always() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
+      always() &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+       github.event_name == 'schedule') &&
       (needs.verify.result == 'failure' || needs.e2e.result == 'failure')
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
@@ -328,6 +369,7 @@ jobs:
       - name: Abrir o refrescar la issue de alerta (hub#1240)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER: ${{ github.event_name }}
           SHA: ${{ github.sha }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -335,15 +377,28 @@ jobs:
           E2E_RESULT: ${{ needs.e2e.result }}
         run: |
           set -euo pipefail
-          subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
-          title="el web de develop esta roto tras un merge"
-          body="Detectado por la suite del web sobre develop (hub#1240).
 
-          - develop HEAD: \`${SHA}\` — '${subject}'
+          # `github.sha`/`github.event.head_commit` describen el evento que disparó el
+          # run — para `schedule` eso es el HEAD de `main` (la rama por defecto), NO el
+          # `develop` que los jobs de arriba probaron de verdad (`ref:` condicionado,
+          # hub#1253). Se resuelve el HEAD real de develop con la API en ese camino en
+          # vez de confiar en un contexto que apunta a la rama equivocada.
+          if [ "$TRIGGER" = "schedule" ]; then
+            sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.sha')
+            subject=$(gh api "repos/${GITHUB_REPOSITORY}/commits/develop" --jq '.commit.message' | head -n 1)
+          else
+            sha="$SHA"
+            subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
+          fi
+
+          title="el web de develop esta roto tras un merge"
+          body="Detectado por la suite del web sobre develop (hub#1240 · disparo \`${TRIGGER}\`).
+
+          - develop HEAD: \`${sha}\` — '${subject}'
           - run fallido: ${RUN_URL}
           - verify (vue-tsc + vitest): ${VERIFY_RESULT} · e2e (playwright): ${E2E_RESULT}
 
-          Hasta hub#1240 este workflow solo corría en \`main\`, y por eso hub#1200 (un test web rojo) aguantó en develop sin que lo viera nadie. Este run es el primero que mira develop tal como lo dejó el merge.
+          Hasta hub#1240 este workflow solo corría en \`main\`, y por eso hub#1200 (un test web rojo) aguantó en develop sin que lo viera nadie. Desde hub#1253 este run también puede venir de la pasada nocturna (\`schedule\`): sin ella, un merge SOLO-Rust en develop no dispara nunca este fichero y una regresión del runtime que rompa el shell no salía hasta la siguiente PR del web.
 
           Ojo: el rojo puede ser del diff o del ENTORNO (disco, contenedor de servicio, navegador). El run enlazado lo dice; si es entorno, se cierra esta issue y ya está.
 
