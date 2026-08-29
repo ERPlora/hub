@@ -205,7 +205,7 @@ const columns = computed<DataTableColumn[]>(() => [
  * `platformFailureMessage`, hub#1102).
  */
 function reasonOf(error: unknown, fallback: string): string {
-  const translated = invalidFieldMessage(error, t, te) ?? platformFailureMessage(error, t, te);
+  const translated = invalidFieldMessage(error, t, te) ?? platformFailureMessage(error, locale.value);
   if (translated) return translated;
   return error instanceof RoleActivationError && error.code && error.message
     ? error.message

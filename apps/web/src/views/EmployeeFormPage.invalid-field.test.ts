@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import { IonInput } from '@ionic/vue';
+import { platformFailureMessage as sdkPlatformFailureMessage } from '@erplora/module-sdk';
 
 import es from '../i18n/locales/es';
 
@@ -140,6 +141,10 @@ describe('Personal traduce el rechazo del core (hub#1190)', () => {
 describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', () => {
   // 🔴 El bug: antes de este PR las seis, `module_not_installed`, `module_inactive` y
   // `read_unavailable` caían todas al `message` en inglés del runtime.
+  //
+  // hub#1315: las frases esperadas ya no salen de `es.platformFailure.*` (esa copia se borró) sino
+  // directamente del SDK (`platformFailureMessage` de `@erplora/module-sdk`) — la misma tabla que
+  // usa el Web Component de un módulo. Comparar contra el SDK es lo que prueba que no hay drift.
   const ENGLISH_PLUMBING = 'the request could not be completed — the hub recorded the details';
 
   it.each(['db', 'io', 'wasm', 'native', 'schema', 'manifest'] as const)(
@@ -152,7 +157,7 @@ describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', 
       await flushPromises();
 
       expect(form.text()).not.toContain(ENGLISH_PLUMBING);
-      expect(form.text()).toContain(es.platformFailure.unavailable);
+      expect(form.text()).toContain(sdkPlatformFailureMessage({ code }, 'es'));
     },
   );
 
@@ -164,7 +169,7 @@ describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', 
     await flushPromises();
 
     expect(form.text()).not.toContain('módulo no instalado');
-    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+    expect(form.text()).toContain(sdkPlatformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es'));
   });
 
   it('nombra la app desactivada para `module_inactive` — frase DISTINTA de "falta"', async () => {
@@ -174,7 +179,7 @@ describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', 
     await form.vm.onSave();
     await flushPromises();
 
-    expect(form.text()).toContain(es.platformFailure.moduleInactive.replace('{app}', 'taxes'));
+    expect(form.text()).toContain(sdkPlatformFailureMessage({ code: 'module_inactive', module: 'taxes' }, 'es'));
   });
 
   it('nombra la app que falta como dependencia para `missing_dependency`', async () => {
@@ -185,7 +190,7 @@ describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', 
     await form.vm.onSave();
     await flushPromises();
 
-    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'inventory'));
+    expect(form.text()).toContain(sdkPlatformFailureMessage({ code: 'missing_dependency', module: 'inventory' }, 'es'));
   });
 
   it('deriva la app de `read_unavailable` desde `query` cuando no viene `module`', async () => {
@@ -200,6 +205,6 @@ describe('Personal traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', 
     await flushPromises();
 
     expect(form.text()).not.toContain('rules.list');
-    expect(form.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+    expect(form.text()).toContain(sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es'));
   });
 });

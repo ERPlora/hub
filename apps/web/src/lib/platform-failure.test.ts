@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// Regression test for ERPlora/hub#1258.
+// Regression test for ERPlora/hub#1258, rewritten for ERPlora/hub#1315.
 //
 // Personal (`EmployeesPage`/`EmployeeFormPage`) and Settings → Roles (`RolesPanel`) already
 // translate `hub.users.*` (hub#355), the access-sync family (hub#1214) and `invalid_field`
@@ -10,108 +10,108 @@
 // `REDACTED_MESSAGE`, hub#1074) or an authored sentence that never went through i18n for the other
 // four. A hub in Spanish read English in the middle of Personal.
 //
-// `packages/module-sdk/src/index.ts` already solved this exact problem for a module's Web
-// Component (`platformFailureMessage`, hub#1102) — but it bakes its two sentences into the SDK file
-// itself, not the vue-i18n catalogues the shell already uses, so a screen that called it would
-// bypass the parity guard (`locales.parity.test.ts`, hub#1241) and grow a second translation
-// mechanism next to `invalidFieldMessage`. This is the shell's own, over `t`/`te`.
+// hub#1258 fixed it by growing a SECOND, byte-identical copy of the two sentences
+// `packages/module-sdk/src/index.ts` already had for a module's Web Component (`hub#1102`), keyed
+// through vue-i18n instead of the SDK's own table. Two catalogues meant a wording tweak on either
+// side would drift the other in silence — and the copy here was missing `manifest`, a code the SDK
+// never had to answer before. hub#1315 removes the copy: this file now renders EXACTLY the SDK's
+// sentence (`platformFailureMessage` from `@erplora/module-sdk`), so there is exactly one place
+// these ten sentences are written. The `instanceof` gate stays the shell's own — the SDK's table
+// answers ANY object shape (a module's raw envelope), and this screen only wants it for its own
+// two error classes.
 import { describe, expect, it } from 'vitest';
-import { createI18n } from 'vue-i18n';
+import { platformFailureMessage as sdkPlatformFailureMessage } from '@erplora/module-sdk';
 
-import en from '../i18n/locales/en';
-import es from '../i18n/locales/es';
 import { HubUsersError, RoleActivationError } from './hub-users';
-import { PLATFORM_FAILURE_CODES, platformFailureMessage } from './platform-failure';
+import { platformFailureMessage } from './platform-failure';
 
-function translators(locale: 'es' | 'en') {
-  const i18n = createI18n({ legacy: false, locale, fallbackLocale: 'en', messages: { es, en } });
-  const g = i18n.global as unknown as {
-    t: (key: string, params?: Record<string, unknown>) => string;
-    te: (key: string) => boolean;
-  };
-  return { t: g.t.bind(g), te: g.te.bind(g) };
-}
+/** Every code this family answers — same ten `hub1258` named, now sourced from the SDK's table. */
+const PLATFORM_FAILURE_CODES = [
+  'db', 'io', 'wasm', 'native', 'schema', 'manifest',
+  'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
+] as const;
 
-const ES = translators('es');
-const EN = translators('en');
-
-describe('platformFailureMessage (hub#1258)', () => {
-  it.each(['db', 'io', 'wasm', 'native', 'schema', 'manifest'] as const)(
-    'the "%s" plumbing code gets the same translated sentence, never the redacted English line',
+describe('platformFailureMessage (hub#1258, hub#1315)', () => {
+  it.each(PLATFORM_FAILURE_CODES)(
+    'the "%s" code renders EXACTLY the sentence the SDK table produces, in Spanish',
     (code) => {
-      const error = new HubUsersError(
-        'the request could not be completed — the hub recorded the details',
-        code,
-      );
-      const message = platformFailureMessage(error, ES.t, ES.te);
-      expect(message).toBe(es.platformFailure.unavailable);
-      expect(message).not.toMatch(/could not be completed/);
+      const error = new HubUsersError('x', code, undefined, undefined, 'taxes', 'taxes.rules.list');
+      const expected = sdkPlatformFailureMessage({ code, module: 'taxes', query: 'taxes.rules.list' }, 'es');
+      expect(expected).not.toBeNull();
+      expect(platformFailureMessage(error, 'es')).toBe(expected);
     },
   );
 
+  it('the six plumbing codes never leak the redacted English line', () => {
+    const error = new HubUsersError(
+      'the request could not be completed — the hub recorded the details',
+      'db',
+    );
+    const message = platformFailureMessage(error, 'es');
+    expect(message).not.toMatch(/could not be completed/);
+  });
+
   it('names the missing app for `module_not_installed`', () => {
     const error = new HubUsersError('módulo no instalado', 'module_not_installed', undefined, undefined, 'taxes');
-    expect(platformFailureMessage(error, ES.t, ES.te)).toBe(
-      es.platformFailure.moduleMissing.replace('{app}', 'taxes'),
+    expect(platformFailureMessage(error, 'es')).toBe(
+      sdkPlatformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es'),
     );
   });
 
   it('names the missing app for `missing_dependency` (the envelope already normalises it into `module`)', () => {
     const error = new HubUsersError('falta dependencia', 'missing_dependency', undefined, undefined, 'inventory');
-    expect(platformFailureMessage(error, ES.t, ES.te)).toBe(
-      es.platformFailure.moduleMissing.replace('{app}', 'inventory'),
+    expect(platformFailureMessage(error, 'es')).toBe(
+      sdkPlatformFailureMessage({ code: 'missing_dependency', module: 'inventory' }, 'es'),
     );
   });
 
   it('falls back to the generic missing-app sentence when the runtime named none', () => {
     const error = new HubUsersError('no instalado', 'module_not_installed');
-    expect(platformFailureMessage(error, ES.t, ES.te)).toBe(es.platformFailure.moduleMissingGeneric);
+    expect(platformFailureMessage(error, 'es')).toBe(
+      sdkPlatformFailureMessage({ code: 'module_not_installed' }, 'es'),
+    );
   });
 
   it('names the switched-off app for `module_inactive`, a DIFFERENT sentence from "missing"', () => {
     const error = new HubUsersError('desactivado', 'module_inactive', undefined, undefined, 'taxes');
-    const off = platformFailureMessage(error, ES.t, ES.te);
-    expect(off).toBe(es.platformFailure.moduleInactive.replace('{app}', 'taxes'));
-    expect(off).not.toBe(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+    const off = platformFailureMessage(error, 'es');
+    expect(off).toBe(sdkPlatformFailureMessage({ code: 'module_inactive', module: 'taxes' }, 'es'));
+    expect(off).not.toBe(sdkPlatformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es'));
   });
 
   it('derives the app of `read_unavailable` from the query when the envelope names no module', () => {
     const error = new HubUsersError('lectura no disponible', 'read_unavailable', undefined, undefined, undefined, 'taxes.rules.list');
-    expect(platformFailureMessage(error, ES.t, ES.te)).toBe(
-      es.platformFailure.moduleMissing.replace('{app}', 'taxes'),
+    expect(platformFailureMessage(error, 'es')).toBe(
+      sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es'),
     );
   });
 
   it('works the same for RoleActivationError (Settings → Roles)', () => {
     const error = new RoleActivationError('the request could not be completed — the hub recorded the details', 'db');
-    expect(platformFailureMessage(error, ES.t, ES.te)).toBe(es.platformFailure.unavailable);
+    expect(platformFailureMessage(error, 'es')).toBe(sdkPlatformFailureMessage({ code: 'db' }, 'es'));
   });
 
   it('en is the source and es the translation (ADR-0055), not one string', () => {
     const error = new HubUsersError('x', 'db');
-    expect(platformFailureMessage(error, EN.t, EN.te)).not.toBe(platformFailureMessage(error, ES.t, ES.te));
+    expect(platformFailureMessage(error, 'en')).not.toBe(platformFailureMessage(error, 'es'));
   });
 
   it('an unmapped code keeps deciding nothing: the caller falls back to the message that arrived', () => {
-    expect(platformFailureMessage(new HubUsersError('x', 'hub.users.pin_in_use'), ES.t, ES.te)).toBeUndefined();
-    expect(platformFailureMessage(new HubUsersError('x', 'permission_denied'), ES.t, ES.te)).toBeUndefined();
-    expect(platformFailureMessage(new Error('network down'), ES.t, ES.te)).toBeUndefined();
+    expect(platformFailureMessage(new HubUsersError('x', 'hub.users.pin_in_use'), 'es')).toBeUndefined();
+    expect(platformFailureMessage(new HubUsersError('x', 'permission_denied'), 'es')).toBeUndefined();
+    expect(platformFailureMessage(new Error('network down'), 'es')).toBeUndefined();
+  });
+
+  it('an object with a matching `.code` that is NOT one of the shell\'s own error classes is ignored', () => {
+    // Unlike the SDK (which answers any object shape — a module's own deserialised envelope), the
+    // shell only reads this family off `HubUsersError`/`RoleActivationError`: a coincidental
+    // `.code` on an unrelated object must never paint a platform sentence it did not earn.
+    expect(platformFailureMessage({ code: 'db' }, 'es')).toBeUndefined();
   });
 
   it('lists exactly the codes the issue names, so a new RuntimeError variant does not fall through unnoticed', () => {
-    expect([...PLATFORM_FAILURE_CODES].sort()).toEqual(
-      [
-        'db',
-        'io',
-        'wasm',
-        'native',
-        'schema',
-        'manifest',
-        'module_not_installed',
-        'module_inactive',
-        'missing_dependency',
-        'read_unavailable',
-      ].sort(),
-    );
+    for (const code of PLATFORM_FAILURE_CODES) {
+      expect(sdkPlatformFailureMessage({ code }, 'es')).not.toBeNull();
+    }
   });
 });

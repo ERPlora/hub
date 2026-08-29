@@ -1606,18 +1606,9 @@ export default {
       duplicate: 'Este hub ya tiene ese valor.',
     },
   },
-  // Lo que dice el core cuando rechaza a nivel de PLATAFORMA (hub#1258). Traducción de
-  // `platformFailure` de `en.ts` — el inglés es la fuente (ADR-0055).
-  platformFailure: {
-    unavailable:
-      'No se pudo completar la operación. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
-    moduleMissing:
-      'Falta la app «{app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.',
-    moduleMissingGeneric:
-      'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
-    moduleInactive:
-      'La app «{app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.',
-    moduleInactiveGeneric:
-      'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
-  },
+  // hub#1258 used to carry a `platformFailure` catalogue here (translation of the one in `en.ts`)
+  // for what the core says when it refuses at the PLATFORM level — a byte-identical copy of
+  // `platformFailureMessage` in `packages/module-sdk/src/index.ts` (hub#1102). hub#1315 removed
+  // the copy: `lib/platform-failure.ts` now renders the SDK's own sentence directly, so there are
+  // no i18n keys to keep in parity here any more.
 } as const;
