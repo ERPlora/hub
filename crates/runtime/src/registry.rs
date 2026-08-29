@@ -863,6 +863,21 @@ pub struct RequestContext {
     /// `:has_certificate` (0/1) para que los módulos con capability `certificate` (p.ej. verifactu)
     /// muestren el estado SIN leer la tabla de sistema directamente.
     pub has_certificate: bool,
+    /// **This hub is an ephemeral DEMO** (`Registry::demo_hub`, sealed at boot from `HUB_DEMO`
+    /// — ADR-0197, hub#1135). The dispatcher copies it here next to the business identity,
+    /// EXACTLY the same pattern as [`Self::has_certificate`]: a hub condition a module needs in
+    /// order to paint (verifactu#40 — do not offer "Production" in a demo that
+    /// `enforce_fiscal_environment_pin` is always going to deny), sounded by the runtime and
+    /// exposed as 0/1 so the SQL never reads a system table.
+    ///
+    /// It is a READ-ONLY copy for `system_params`, never the source of truth: the fiscal close
+    /// (`fiscal_environment_pin`, `fiscal_profile::determine_fiscal_mode`…) keeps reading
+    /// `Registry::demo_hub` DIRECTLY, not this field — for the same reason `Registry::demo_hub`
+    /// itself documents: a `ctx` is a label a new door could forget to stamp, and the close
+    /// cannot afford that fail-open. This field exists only so `system_params` has something to
+    /// read; a caller never writes it — `system_params` overwrites it with the value from `ctx`
+    /// after cloning the payload, exactly like `hub_id` or `has_certificate`.
+    pub is_demo_hub: bool,
     /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
     /// inyecta el dispatcher junto a la identidad de negocio.
     ///
@@ -1022,6 +1037,7 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            is_demo_hub: false,
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
             fiscal_providers: Vec::new(),
@@ -1168,6 +1184,14 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Copy with the hub's ephemeral DEMO mark (hub#1135). The dispatcher fills it next to
+    /// `with_business`/`with_certificate`, reading `Registry::demo_hub` — never the caller. A
+    /// builder so it does not break existing `new(...)`/tests.
+    pub fn with_demo_hub(mut self, is_demo: bool) -> Self {
+        self.is_demo_hub = is_demo;
         self
     }
 
