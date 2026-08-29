@@ -231,6 +231,11 @@ pub(crate) async fn execute_at(
             // default era un duplicado que podía pudrirse (taxes#40 lo demostró).
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
             .with_certificate(has_cert)
+            // The ephemeral DEMO mark (ADR-0197, hub#1135): copied from `Registry::demo_hub`,
+            // never from the caller — SAME pattern as `with_certificate` right above, so that
+            // `system_params` exposes `:is_demo_hub` without any module having to probe the
+            // registry on its own.
+            .with_demo_hub(registry.demo_hub)
             // Which AEAT this hub files to (ADR-0360, hub#1087): from the profile, next to the
             // mode it feeds. The certificate arm of `enforce_fiscal_precondition` reads it —
             // in `testing` there is nothing to authorize.
@@ -469,9 +474,10 @@ pub(crate) async fn execute_at(
         ops.push(outbox::insert_op(
             ctx,
             &cmd.module_id,
-            event,
+            event.event(),
             &bound,
             depth + 1,
+            event.dedup_key(),
         ));
     }
     ops.extend_from_slice(extra_ops);
@@ -545,7 +551,7 @@ pub(crate) async fn execute_at(
         events::notify_sink(
             registry,
             crate::registry::EventSource::Module(&cmd.module_id),
-            event,
+            event.event(),
             &bound,
         );
     }
@@ -1235,9 +1241,10 @@ async fn persist_handler_output(
         tx_ops.push(outbox::insert_op(
             ctx,
             &cmd.module_id,
-            event,
+            event.event(),
             &declared_payload,
             depth + 1,
+            event.dedup_key(),
         ));
     }
     // Los eventos que devuelve el handler se validan contra el `module.json` ANTES de encolarlos
@@ -1274,6 +1281,7 @@ async fn persist_handler_output(
             name,
             payload,
             depth + 1,
+            None,
         ));
     }
     tx_ops.extend_from_slice(extra_ops);
@@ -1308,7 +1316,7 @@ async fn persist_handler_output(
     // namespace en el que hub#240 les deja llamarse.
     let source = crate::registry::EventSource::Module(&cmd.module_id);
     for event in &cmd.def.emit {
-        events::notify_sink(registry, source, event, &declared_payload);
+        events::notify_sink(registry, source, event.event(), &declared_payload);
     }
     for (name, payload) in &handler_events {
         events::notify_sink(registry, source, name, payload);
@@ -1464,7 +1472,7 @@ pub(crate) fn validate_handler_event(
         .commands
         .values()
         .filter(|c| c.module_id == handler_module_id)
-        .any(|c| c.def.emit.iter().any(|e| e == name));
+        .any(|c| c.def.emit.iter().any(|e| e.event() == name));
     if declared_in_manifest || declared_in_commands {
         return Ok(());
     }
@@ -1743,7 +1751,11 @@ fn enforce_fiscal_precondition<'a>(
 /// committed sale into an error — the money is already taken and the record is already on its way;
 /// refusing afterwards would help nobody. The seal is idempotent, so the next fiscal transaction
 /// catches up.
-async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestContext, emitted: &[String]) {
+async fn seal_first_record_if_fiscal(
+    db: &dyn DatabaseAdapter,
+    ctx: &RequestContext,
+    emitted: &[crate::manifest::EmitDef],
+) {
     if emitted.is_empty() || ctx.fiscal_mode != Some(crate::fiscal_profile::FiscalMode::Active) {
         return; // Nothing emitted, or this hub is not filing for real: nothing to seal.
     }
@@ -1754,7 +1766,7 @@ async fn seal_first_record_if_fiscal(db: &dyn DatabaseAdapter, ctx: &RequestCont
     if profile.environment != crate::fiscal_profile::ENV_PRODUCTION
         || !emitted
             .iter()
-            .any(|e| profile.fiscal_trigger_events.iter().any(|t| t == e))
+            .any(|e| profile.fiscal_trigger_events.iter().any(|t| t == e.event()))
     {
         return;
     }
@@ -1794,7 +1806,7 @@ fn enforce_fiscal_capacity(
     ctx: &RequestContext,
     module_id: &str,
     is_core_command: bool,
-    emitted: &[String],
+    emitted: &[crate::manifest::EmitDef],
 ) -> Result<()> {
     // `None` means UNRESOLVED, never "nothing owed": a path that did not stamp the mode must not
     // read as compliant. Nothing can be decided here, so nothing is allowed through on its word —
@@ -1819,7 +1831,7 @@ fn enforce_fiscal_capacity(
             // Only what would OPEN a fiscal chain is refused. Everything else keeps working.
             if !emitted
                 .iter()
-                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e))
+                .any(|e| ctx.fiscal_triggers.iter().any(|t| t == e.event()))
             {
                 return Ok(());
             }
@@ -2122,7 +2134,7 @@ mod tests {
             &["invoice.created"],
             &[],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
             .expect_err("sin proveedor no se abre una cadena fiscal");
         assert_eq!(code_of(&err), "fiscal.provider_missing");
     }
@@ -2138,7 +2150,7 @@ mod tests {
             &[],
         );
         assert!(
-            enforce_fiscal_capacity(&ctx, "inventory", false, &["inventory.stock.moved".to_string()])
+            enforce_fiscal_capacity(&ctx, "inventory", false, &[crate::manifest::EmitDef::from("inventory.stock.moved")])
                 .is_ok(),
             "mover stock no abre ninguna cadena fiscal"
         );
@@ -2153,7 +2165,7 @@ mod tests {
             &["invoice.created"],
             &["verifactu"],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()])
+        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
             .expect_err("una cadena ajena no se continúa");
         assert_eq!(code_of(&err), "fiscal.installation_mismatch");
     }
@@ -2163,7 +2175,7 @@ mod tests {
     fn an_active_hub_with_its_provider_mounted_is_not_gated() {
         let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
         assert!(
-            enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok()
+            enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok()
         );
     }
 
@@ -2199,7 +2211,7 @@ mod tests {
     fn an_unresolved_mode_is_not_read_as_permission_to_emit() {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         assert_eq!(ctx.fiscal_mode, None);
-        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &["invoice.created".to_string()]).is_ok());
+        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok());
     }
 
     /// Un evento declarado en el `emit` de un command del módulo se acepta (comportamiento
@@ -3414,6 +3426,60 @@ mod tests {
         );
     }
 
+    /// **Regression test for ERPlora/hub#1264.** The business-identity enrichment at the top of
+    /// [`execute_at`] must run at ANY relay depth, not only at the call's root (`depth == 0`).
+    ///
+    /// FIX QA (2026-06-25): the original condition was `depth == 0`, which left commands
+    /// delivered by the Outbox relay — listeners run at `depth > 0`, `Origin::Internal`, with a
+    /// ctx built fresh by `outbox::listener_ctx` whose business identity is always empty — WITHOUT
+    /// enrichment. The real incident: `sale.completed` (depth 1) → `invoice.create_from_sale`
+    /// (listener, depth 1) issued invoices with a BLANK issuer, so VeriFactu's `ingest_invoice`
+    /// no-opped (an accepted record is never re-sent, ADR-0189) — zero registers, zero QR, and no
+    /// error anywhere. This used to be pinned ONLY by `invoice_e2e.rs`'s
+    /// `auto_f2_propagates_business_issuer_via_outbox`, a hub e2e that decorated the kernel with
+    /// `sales`+`invoice` — another module's topology, hub#1264 §5. The kernel proves its own
+    /// contract with its own fixture instead.
+    #[tokio::test]
+    async fn dispatcher_enriches_business_identity_at_any_relay_depth_hub1264() {
+        let db = db_with_fiscal_tables().await;
+        set_business_identity(&db, "h1").await;
+        let reg = registry_with_fiscal_command();
+        // The ctx the OUTBOX RELAY hands a listener: fresh, business identity always empty — only
+        // `hub_settings` carries it, never the relay's own context.
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        // depth = 1 simulates a listener delivered by the relay (Origin::Internal): never the root.
+        let out = execute_at(
+            &db,
+            &reg,
+            "invoice.create",
+            &fiscal_payload(),
+            &ctx,
+            1,
+            &[],
+            Origin::Internal,
+            None,
+        )
+        .await
+        .expect("a listener at depth > 0 must still get the business identity enriched");
+        assert_eq!(out["ok"], json!(true));
+
+        let rows = db
+            .query(
+                "SELECT issuer_nif, issuer_name FROM fiscal_doc",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(
+            rows.rows[0]["issuer_nif"], json!("B12345674"),
+            "a document stamped by a RELAYED command (depth > 0) must carry the hub's real \
+             issuer, never a blank one"
+        );
+        assert_eq!(rows.rows[0]["issuer_name"], json!("ACME SL"));
+    }
+
     /// Native handler op that resolves to the fiscal SQL of its own module — the exact
     /// path the real `invoice` WASM handler takes (`persist_handler_output`).
     #[derive(Debug)]
@@ -4013,7 +4079,7 @@ mod tests {
     fn root_wasm_command() -> RegisteredCommand {
         let mut def = cmd_def();
         def.sql = Vec::new();
-        def.emit = vec!["customers.groups.changed".to_string()];
+        def.emit = vec!["customers.groups.changed".into()];
         RegisteredCommand {
             module_id: "customers".to_string(),
             def,

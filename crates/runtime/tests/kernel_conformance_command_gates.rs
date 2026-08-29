@@ -14,6 +14,43 @@ use erplora_runtime::{Runtime, RuntimeError};
 use kernel_fixture::{admin, install_fixture};
 use serde_json::json;
 
+/// A declarative (SQL-only) command answers with the id the KERNEL minted for it: `new_ids[0]` is
+/// the `:new_id` its statement consumed, and it names the row that now exists. The UI needs it to
+/// address what it just created (ADR-0141 gate 6, ADR-0144: without it the fifth tap on a line
+/// raised the quantity on screen and persisted nothing).
+///
+/// Regression test for ERPlora/hub#1264: pinned until then by `sales_e2e` through the published
+/// `sales.order.add_line` — another module's command. The kernel proves it with its own fixture.
+#[tokio::test]
+async fn a_declarative_command_answers_with_the_id_it_minted_hub1264() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    install_fixture(&mut rt).await;
+
+    let mut p = Params::new();
+    p.insert("name".into(), json!("minted"));
+    let out = rt
+        .execute_command("kfx.item.create", &p, &admin())
+        .await
+        .expect("create");
+    let ids = out["new_ids"]
+        .as_array()
+        .expect("a declarative command reports the ids it minted");
+    assert_eq!(ids.len(), 1, "one INSERT, one id: {out}");
+    let id = ids[0].as_str().expect("an id is a string");
+
+    let mut by_id = Params::new();
+    by_id.insert("id".into(), json!(id));
+    let rows = rt
+        .db_for_test()
+        .query("SELECT name FROM kfx_item WHERE id = :id", &by_id)
+        .await
+        .expect("read the row by the id the kernel answered")
+        .rows;
+    assert_eq!(rows.len(), 1, "new_ids[0] names the row that was written: {out}");
+    assert_eq!(rows[0]["name"], json!("minted"));
+}
+
 async fn rows(rt: &Runtime) -> usize {
     rt.db_for_test()
         .query("SELECT id FROM kfx_item", &Params::new())

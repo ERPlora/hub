@@ -3006,6 +3006,16 @@ pub fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         "has_certificate".into(),
         Json::from(if ctx.has_certificate { 1 } else { 0 }),
     );
+    // The hub's EPHEMERAL DEMO mark (ADR-0197, hub#1135), as 0/1 — SAME pattern as
+    // `:has_certificate` right above: a hub condition a module needs in order to paint
+    // (verifactu#40 — do not offer "Production" in a demo that the fiscal close is always going
+    // to deny), sounded by the runtime, never guessed by the module. It is not a setting and is
+    // not writable by payload: `ctx.is_demo_hub` overwrites it here, AFTER cloning `base`, so a
+    // caller that stuffs it into its own payload loses it exactly like it loses `:hub_id`.
+    p.insert(
+        "is_demo_hub".into(),
+        Json::from(if ctx.is_demo_hub { 1 } else { 0 }),
+    );
     // LA ZONA HORARIA DEL NEGOCIO (hub#731, hub#1022), como nombre IANA ya RESUELTO
     // (`settings::timezone_of`: la declarada o la deducida del país/región). Disponible como
     // `:timezone` en TODO el SQL de queries y comandos — «mañana a las 09:00» son las 09:00 de la
@@ -3127,6 +3137,54 @@ mod tests {
         let p = system_params(&Params::new(), &ctx);
         assert_eq!(p["timezone"], json!("Atlantic/Canary"));
         assert_eq!(p["caller_lang"], json!("en"));
+    }
+
+    /// hub#1135: a module cannot know today that its hub is an ephemeral DEMO (ADR-0197) — the
+    /// mark is sealed on `Registry::demo_hub` from `HUB_DEMO` but never reached `system_params`,
+    /// so the SQL every module writes had no `:is_demo_hub` to bind, unlike the sibling gate
+    /// `:has_certificate` that already exists for the same shape of question (a hub condition a
+    /// module needs to paint, sounded by the runtime, exposed as 0/1 so the SQL never reads a
+    /// system table). Asserted BOTH ways, not just the positive: a normal hub must keep reading
+    /// `0` — the failure mode of a demo mark is a REAL hub mislabelled as a demo, which would
+    /// freeze its fiscal identity in silence (see `RequestContext::is_demo_hub` doc comment).
+    #[test]
+    fn hub1135_system_params_expose_the_demo_mark_both_ways() {
+        let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["is_demo_hub"], json!(0), "a normal hub reads 0, never absent");
+
+        let ctx = ctx.with_demo_hub(true);
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["is_demo_hub"], json!(1), "a demo hub reads 1");
+    }
+
+    /// hub#1135: «no es un setting y no debe poder escribirse» — the same non-negotiable the
+    /// issue states for `is_demo_hub` that `being_a_demo_is_not_something_a_hub_can_switch_on`
+    /// (settings.rs) already enforces for `hub_settings`. Here the door is the PAYLOAD: whatever
+    /// a caller stuffs into its own params under `is_demo_hub` must be overwritten by the value
+    /// `system_params` computes from `ctx` — exactly like `hub_id`/`has_certificate`/every other
+    /// system param, none of which a caller can forge by pre-filling the same key.
+    #[test]
+    fn hub1135_the_demo_mark_is_not_writable_by_payload() {
+        let normal_ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let mut forged_true = Params::new();
+        forged_true.insert("is_demo_hub".into(), json!(1));
+        let p = system_params(&forged_true, &normal_ctx);
+        assert_eq!(
+            p["is_demo_hub"],
+            json!(0),
+            "a normal hub cannot be talked into claiming demo=1 via payload"
+        );
+
+        let demo_ctx = normal_ctx.with_demo_hub(true);
+        let mut forged_false = Params::new();
+        forged_false.insert("is_demo_hub".into(), json!(0));
+        let p = system_params(&forged_false, &demo_ctx);
+        assert_eq!(
+            p["is_demo_hub"],
+            json!(1),
+            "a demo hub cannot be talked out of its own mark via payload"
+        );
     }
 
     /// hub#131/#145: [`Runtime::execute_command`] (la puerta PÚBLICA del embedder, la única que

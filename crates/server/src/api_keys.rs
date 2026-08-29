@@ -60,7 +60,7 @@ fn key_err(e: erplora_runtime::RuntimeError) -> Response {
 
 /// GET /api/keys — lista las keys del hub (sin secreto). Auth = sesión admin.
 pub async fn list_keys(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return admin_unauthorized(e);
     }
@@ -77,7 +77,7 @@ pub async fn create_key(
     headers: HeaderMap,
     Json(req): Json<CreateKeyReq>,
 ) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(u) => u,
         Err(e) => return admin_unauthorized(e),
@@ -105,7 +105,7 @@ pub async fn rotate_key(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return admin_unauthorized(e);
     }
@@ -123,7 +123,7 @@ pub async fn revoke_key(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return admin_unauthorized(e);
     }
@@ -227,7 +227,7 @@ pub async fn data_query(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
 
     // Puerta 1: la operación debe existir, pertenecer al módulo de la ruta y estar `expose_api`.
     if !rt.registry().is_query_exposed(&module, &name) {
@@ -267,7 +267,7 @@ pub async fn data_command(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
 
     if !rt.registry().is_command_exposed(&module, &name) {
         return not_exposed("command", &module, &name);

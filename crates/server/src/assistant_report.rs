@@ -64,7 +64,7 @@ pub async fn report(
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(c) => c,
         Err(e) => return unauthorized(e),

@@ -15,6 +15,10 @@
 #     hub#572 and this file was never brought in line.
 #   · the alert issue — a red post-merge run notifies nobody by itself
 #     (image-freshness.yml, hub#652, proved Actions notifications reach no one).
+#   · `HUB_CLOUD_API_URL` on the runtime `webServer` (hub#1279) — without it,
+#     `cloud_base_url` falls back to PRODUCTION (`erplora.com`) and the bench
+#     calls it FROM THE CI RUNNER, exactly what happened before hub#1277 pinned
+#     this one env var. A missing env var leaves no red either, same as above.
 #
 # Run:  bash scripts/tests/test-web-workflow.test.sh
 #
@@ -27,6 +31,7 @@ set -uo pipefail
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 workflow="$repo_root/.github/workflows/test-web.yml"
 package_json="$repo_root/apps/web/package.json"
+playwright_config="$repo_root/apps/web/tests/playwright.config.ts"
 
 pass=0
 fail=0
@@ -211,6 +216,39 @@ elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qF "$guard_path"; then
         "\`on.pull_request.paths\` no incluye \`$guard_path\` (hub#1247)"
 else
     ok "\`$guard_path\` está en los \`paths\` de push y pull_request"
+fi
+
+# ── 11. The runtime `webServer` never falls back to production (hub#1279) ─────
+# `webServer` is an array: the first entry starts the Rust runtime (`cargo run`)
+# and the second starts Vite (`pnpm exec vite`). Only the runtime's `env` block
+# matters here, so it's sliced out up to the vite entry's `command` line —
+# grepping the whole file would also accept `HUB_CLOUD_API_URL` sitting in the
+# vite block (which the runtime never reads) or in a comment.
+runtime_webserver_block() {
+    awk '
+        /webServer: *\[/ {inside=1}
+        /command: .pnpm exec vite/ {exit}
+        inside {print}
+    ' "$playwright_config"
+}
+
+if [ ! -f "$playwright_config" ]; then
+    bad "existe apps/web/tests/playwright.config.ts" \
+        "no se encontró el fichero — no hay banco que pueda arrancar el runtime"
+else
+    runtime_block=$(runtime_webserver_block)
+    if [ -z "$runtime_block" ]; then
+        bad "el webServer del runtime tiene un bloque \`env\`" \
+            "no se pudo aislar el primer \`webServer\` (¿cambió la forma del fichero?) — revisa \`runtime_webserver_block\`"
+    elif ! printf '%s' "$runtime_block" | grep -q 'HUB_CLOUD_API_URL'; then
+        bad "el webServer del runtime fija HUB_CLOUD_API_URL" \
+            "sin ella \`cloud_base_url\` cae al default de PRODUCCIÓN (\`https://erplora.com\`, hub#1279): el banco llamaría a erplora.com DESDE EL RUNNER, tal como pasó antes de hub#1277"
+    elif printf '%s' "$runtime_block" | grep -Eq "HUB_CLOUD_API_URL: *['\"]https://erplora\.com"; then
+        bad "HUB_CLOUD_API_URL del banco no apunta a producción" \
+            "el webServer del runtime fija HUB_CLOUD_API_URL a la propia URL de PRODUCCIÓN — un valor \"puesto\" que sigue llamando a erplora.com no cierra hub#1279"
+    else
+        ok "el webServer del runtime fija HUB_CLOUD_API_URL a algo que no es producción (hub#1279)"
+    fi
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

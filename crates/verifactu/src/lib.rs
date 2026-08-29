@@ -4146,6 +4146,11 @@ mod environment_chain_tests {
         /// Contingency entries, so a batch drain can be driven end to end (hub#471).
         queue: Vec<Json>,
         has_core_certificate: bool,
+        /// Which slot the core reports as signing when `has_core_certificate` is set. Defaults to
+        /// `"own"` (unchanged behaviour for every existing test) — mutated directly by tests that
+        /// simulate a certificate ROTATION between two calls (hub#1270): the label the core
+        /// reports has no bearing on the hash chain, which is exactly the property under test.
+        signing_kind: &'static str,
         reads: Mutex<Vec<(String, Params)>>,
         /// Every XML this engine archived, in order.
         ///
@@ -4163,6 +4168,7 @@ mod environment_chain_tests {
                 records,
                 queue: Vec::new(),
                 has_core_certificate: false,
+                signing_kind: "own",
                 reads: Mutex::new(Vec::new()),
                 archived: Mutex::new(Vec::new()),
             }
@@ -4237,10 +4243,11 @@ mod environment_chain_tests {
         }
 
         /// The certificate question is the CORE's to answer (hub#319) — the engine no longer
-        /// queries `_hub_certificate`, so the fixture stops pretending to be that table. `own`,
-        /// because these tests are about the CHAIN and not about which certificate signs.
+        /// queries `_hub_certificate`, so the fixture stops pretending to be that table.
+        /// `signing_kind` defaults to `"own"`, because most of these tests are about the CHAIN
+        /// and not about which certificate signs; the rotation test overrides it.
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
-            Ok(self.has_core_certificate.then(|| "own".to_string()))
+            Ok(self.has_core_certificate.then(|| self.signing_kind.to_string()))
         }
 
         /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
@@ -5265,6 +5272,113 @@ mod environment_chain_tests {
         let payload = emitted(&out.events, EVENT_RECORD_REJECTED)
             .expect("nothing was built and nothing was sent: that has to leave the module");
         assert_eq!(payload["reason"], json!(REASON_ENVIRONMENT_UNKNOWN));
+    }
+
+    /// Turns the `verifactu._insert_record` operation `create_record` returned into the row a
+    /// real INSERT would have persisted: `record_id` becomes `id`, and `hub_id`/`status` — which
+    /// the operation's params never carry, since the runtime's own SQL supplies them — are filled
+    /// in the way it would. Feeding this back into a fresh [`ChainHost`] is how a test chains a
+    /// SECOND `create_record` call, or a `validate_chain` walk, onto a record this module itself
+    /// produced — instead of a hand-typed row that could silently drift from the real shape.
+    fn persisted(op: &Operation, status: &str) -> Json {
+        let mut row = Json::Object(op.params.clone());
+        let obj = row.as_object_mut().expect("insert op params are an object");
+        let id = obj.remove("record_id").unwrap_or_else(|| json!("rec"));
+        obj.insert("id".into(), id);
+        obj.insert("hub_id".into(), json!(HUB));
+        obj.insert("status".into(), json!(status));
+        row
+    }
+
+    /// **Regression test for ERPlora/hub#1270** — LOCAL half of hub#325 (the AEAT preproduction
+    /// half stays blocked on the FNMT seal, pm#73).
+    ///
+    /// The certificate a hub signs with is a fact of the CORE (`_hub_certificate`, ADR-0202
+    /// §2.1) and can be rotated at any moment — the business re-uploads its own `.p12`, or
+    /// ERPlora rotates the delegated one. `alta_hash` (chain.rs) never takes it as an input: its
+    /// formula is exactly the AEAT's (`IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&
+    /// TipoFactura&CuotaTotal&ImporteTotal&Huella&FechaHoraHusoGenRegistro`, Orden HAC/1177/2024)
+    /// — the PREVIOUS record's own fingerprint, never who signed it. So a rotation between two
+    /// records must not break `Huella(N+1) == f(…, Huella(N), …)`, and `chain.validate` — the
+    /// same recompute this engine runs to audit its own chain — must still walk it and accept it.
+    #[tokio::test]
+    async fn the_chain_does_not_break_when_the_certificate_changes_hub1270() {
+        // Record 1, signed while the core reports the OWN certificate (cert A).
+        let mut host_a = ChainHost::new(config_row("testing"), vec![]);
+        host_a.has_core_certificate = true;
+        host_a.signing_kind = "own";
+        let out1 = create_record(&create_input(), &host_a).await.unwrap();
+        let insert1 = find_op(&out1, "verifactu._insert_record");
+        assert_eq!(
+            insert1.params.get("previous_hash"),
+            Some(&json!("")),
+            "record 1 opens the chain"
+        );
+        let hash1 = insert1
+            .params
+            .get("record_hash")
+            .and_then(Json::as_str)
+            .expect("record 1 carries its own hash")
+            .to_string();
+        let record1 = persisted(insert1, "accepted");
+
+        // Certificate ROTATION: the core now reports the DELEGATED slot signing — a different
+        // identity entirely, with nothing shared with the one that signed record 1. Same issuer,
+        // same environment, only the certificate changed.
+        let mut host_b = ChainHost::new(config_row("testing"), vec![record1.clone()]);
+        host_b.has_core_certificate = true;
+        host_b.signing_kind = "delegated";
+        let mut input2 = create_input();
+        input2["payload"]["invoice_number"] = json!("F-2026-000124");
+        let out2 = create_record(&input2, &host_b).await.unwrap();
+        let insert2 = find_op(&out2, "verifactu._insert_record");
+
+        assert_eq!(
+            insert2.params.get("previous_hash"),
+            Some(&json!(hash1)),
+            "record N+1 must chain on record N's OWN fingerprint, unaffected by the certificate \
+             rotation between the two — the certificate never enters `alta_hash`"
+        );
+        assert_eq!(
+            insert2.params.get("sequence_number"),
+            Some(&json!(2)),
+            "the sequence keeps advancing across the rotation"
+        );
+        let record2 = persisted(insert2, "accepted");
+
+        // A verifier walking the chain accepts it — the SAME recompute `chain.validate` runs to
+        // audit its own work, over BOTH records, spanning the rotation. The validating host
+        // reports NO certificate at all (`has_core_certificate` defaults to `false`): a third,
+        // different state from either cert A or cert B, so nothing here could accidentally leak
+        // "the current certificate" into the recompute and still agree by coincidence.
+        let validate_input = json!({
+            "payload": {},
+            "context": { "hub_id": HUB, "now": "2026-08-06T11:00:00+02:00",
+                         "current_user_id": "u1", "new_ids": ["id-evt"] }
+        });
+        let valid_host = ChainHost::new(config_row("testing"), vec![record1.clone(), record2.clone()]);
+        let out = validate_chain(&validate_input, &valid_host).await.unwrap();
+        let event = find_op(&out, "verifactu._insert_event");
+        assert_eq!(
+            event.params.get("event_type"),
+            Some(&json!("chain_validated")),
+            "the chain must survive the certificate rotation: {:?}",
+            event.params.get("message")
+        );
+
+        // NEGATIVE: a tampered record 1 — as if it had silently been re-signed instead of merely
+        // re-transmitted — is exactly the break this guard has to catch. Without this half, a
+        // verifier that always says "valid" would pass the assertion above for the wrong reason.
+        let mut tampered = record1;
+        tampered["record_hash"] = json!("f".repeat(64));
+        let broken_host = ChainHost::new(config_row("testing"), vec![tampered, record2]);
+        let out = validate_chain(&validate_input, &broken_host).await.unwrap();
+        let event = find_op(&out, "verifactu._insert_event");
+        assert_eq!(
+            event.params.get("event_type"),
+            Some(&json!("chain_error")),
+            "a tampered record must still break the chain the verifier walks"
+        );
     }
 }
 

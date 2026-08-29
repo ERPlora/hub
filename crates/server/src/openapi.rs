@@ -36,7 +36,7 @@ use crate::state::AppState;
 ///
 /// El `hub_id` viene del despliegue (config), no del header.
 pub async fn openapi_json(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     // 1) Gate server-side por setting: docs deshabilitadas → 404 (la ruta "no existe").
     if !api_docs_enabled(&rt).await {
         return (

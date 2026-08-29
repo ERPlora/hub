@@ -95,7 +95,7 @@ pub async fn approve(
         Ok(rt) => rt,
         Err(e) => return tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     // The CASHIER is authenticated as on any other call: the approval is granted to whoever was
     // refused, and they are identified the same way they always are. The approver proves
     // themselves with the PIN alone — they are not opening a session, they are authorising one act.

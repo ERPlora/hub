@@ -1,0 +1,32 @@
+{
+  "id": "w1076",
+  "name": "W1076 Fixture",
+  "version": "1.0.0",
+  "permissions": ["w1076.message.read", "w1076.message.ingest"],
+  "role_permissions": { "admin": ["*"] },
+  "navigation": [],
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "w1076.messages.list": {
+      "permission": "w1076.message.read",
+      "sql": "queries/messages_list.sql"
+    }
+  },
+  "commands": {
+    "w1076.messages.ingest": {
+      "permission": "w1076.message.ingest",
+      "transaction": true,
+      "sql": ["commands/messages_ingest.sql"],
+      "emit": [{ "event": "w1076.message.received", "dedup_key": "wa_message_id" }]
+    },
+    "w1076.messages.ingest_legacy": {
+      "permission": "w1076.message.ingest",
+      "transaction": true,
+      "sql": ["commands/messages_ingest.sql"],
+      "emit": ["w1076.message.legacy_received"]
+    }
+  },
+  "events": {
+    "emits": ["w1076.message.received", "w1076.message.legacy_received"]
+  }
+}

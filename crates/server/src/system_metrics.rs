@@ -314,7 +314,7 @@ async fn scalar_u64(db: &dyn DatabaseAdapter, sql: &str, params: &Params) -> Opt
 /// (owner/admin), como `export/import` y `settings`: es información de gestión del hub.
 pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return (
                 StatusCode::UNAUTHORIZED,
@@ -344,7 +344,7 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
     // BD + sesiones bajo un único lock del runtime.
     let now = chrono::Utc::now().to_rfc3339();
     let (database, sessions) = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let db = rt.db();
         (
             read_database(db, database_limit).await,

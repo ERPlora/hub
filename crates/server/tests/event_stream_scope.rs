@@ -145,7 +145,7 @@ async fn serve() -> Server {
 /// The accountant's key: `custom`, read on `invoice`, nothing else (ADR-0057 §7).
 async fn accountant_key(srv: &Server) -> String {
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     rt.create_api_key(
         "Gestoría",
         &ApiKeyScope::custom(vec![ScopeEntry {
@@ -165,7 +165,7 @@ async fn accountant_key(srv: &Server) -> String {
 /// every negative here: the same frame, at the same instant, on a listener entitled to it.
 async fn shell_key(srv: &Server) -> String {
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     rt.create_api_key(
         "Shell",
         &ApiKeyScope::blanket(ApiKeyAccess::ReadOnly),
@@ -181,7 +181,7 @@ async fn shell_key(srv: &Server) -> String {
 /// which is the only place that knows who emitted them.
 async fn run(srv: &Server, command: &str) {
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     rt.execute_command(
         command,
         &Params::new(),

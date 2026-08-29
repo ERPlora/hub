@@ -533,7 +533,7 @@ async fn the_background_loop_completes_what_it_dispatched() {
     let state = AppState::with_config(rt, config);
 
     let pending = {
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         rt.process_flows().await.unwrap().pending_io
     };
     assert_eq!(pending.len(), 1);
@@ -543,7 +543,7 @@ async fn the_background_loop_completes_what_it_dispatched() {
     let mut status = String::new();
     for _ in 0..50 {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let rt = state.runtime.lock().await;
+        let rt = state.runtime.read().await;
         let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
         status = run.status.clone();
         if status == "failed" || status == "pending" {

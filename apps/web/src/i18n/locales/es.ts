@@ -596,6 +596,12 @@ export default {
     shareWithErploraDone: 'Datos compartidos con ERPlora.',
     shareWithErploraError: 'No se han podido compartir los datos con ERPlora.',
     shareWithErploraNeedsTaxId: 'Rellena antes el NIF.',
+    fiscalRouteTitle: 'Envío a la Agencia Tributaria',
+    fiscalRouteLead: 'Tus facturas llegan a la AEAT por una de estas dos vías.',
+    fiscalRouteDelegated: 'Lo hace ERPlora por ti',
+    fiscalRouteOwn: 'Con mi propio certificado',
+    fiscalRouteOwnHint:
+      'Firmas y envías con tu certificado; no hace falta ningún otorgamiento a ERPlora.',
     grantTitle: 'Otorgamiento de representación',
     grantDesc:
       'Tu consentimiento firmado para que ERPlora remita tus registros de facturación a la Agencia Tributaria en tu nombre. Obligatorio antes de que el negocio pase a producción.',
@@ -766,6 +772,10 @@ export default {
     alreadyInstalled: '{name} ya está instalado.',
     installing: 'Instalando {name}…',
     installSuccess: '{name} instalado correctamente.',
+    // hub#1130: el cierre del plan de instalación (ADR-0060) arrastró dependencias — el dueño pidió
+    // UNA app y le llegaron varias; nombrarlas en la MISMA confirmación es el reverso del `409
+    // has_dependents` de hub#1101, que ya nombra lo que rompería un desinstalar.
+    installSuccessWithDependencies: '{name} instalado correctamente. También se instaló: {names}.',
     installError: 'No se pudo iniciar la instalación de {name}.',
     // ADR-0060: el plan de instalación necesita módulos que el hub no tiene contratados.
     installBlocked: '{name} necesita apps que aún no tienes contratadas: {missing}. No se ha instalado nada.',
@@ -1595,5 +1605,19 @@ export default {
       inactive: 'Este valor está apagado en este hub.',
       duplicate: 'Este hub ya tiene ese valor.',
     },
+  },
+  // Lo que dice el core cuando rechaza a nivel de PLATAFORMA (hub#1258). Traducción de
+  // `platformFailure` de `en.ts` — el inglés es la fuente (ADR-0055).
+  platformFailure: {
+    unavailable:
+      'No se pudo completar la operación. Inténtalo de nuevo y avisa a un administrador si sigue pasando.',
+    moduleMissing:
+      'Falta la app «{app}» y esta acción la necesita. Pide a un administrador que la instale desde Apps.',
+    moduleMissingGeneric:
+      'Falta una app que esta acción necesita. Pide a un administrador que la instale desde Apps.',
+    moduleInactive:
+      'La app «{app}» está desactivada y esta acción la necesita. Pide a un administrador que vuelva a activarla desde Apps.',
+    moduleInactiveGeneric:
+      'Una app que esta acción necesita está desactivada. Pide a un administrador que vuelva a activarla desde Apps.',
   },
 } as const;

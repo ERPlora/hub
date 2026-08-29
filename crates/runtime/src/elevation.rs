@@ -471,6 +471,53 @@ mod tests {
         assert_eq!(grants.len(), 0, "spending removes it, it does not mark it");
     }
 
+    /// Regression test for ERPlora/hub#978. Since the server's runtime sits behind a `RwLock`,
+    /// commands overlap and two retries can reach `spend` at the same instant; the exactly-once
+    /// spend is this store's own guarantee (one `get` + `remove` under one guard), not the
+    /// request lock's. Sixteen threads released by one barrier race for the same token, and
+    /// exactly one wins — every round. Many rounds on purpose: a `get` and a `remove` that are
+    /// not under the same guard lose the race only when the scheduler interleaves them, which
+    /// one round misses about half the time and fifty rounds never do. The HTTP-level test of the
+    /// same rule (`multi_till_hub978`) has the same blind spot with far fewer chances to hit it.
+    #[test]
+    fn a_racing_spend_is_won_by_exactly_one_thread_hub978() {
+        use std::sync::{Arc, Barrier};
+
+        const RACERS: usize = 16;
+        const ROUNDS: usize = 50;
+        let grants = Arc::new(Grants::new());
+        for round in 0..ROUNDS {
+            let token = grants.mint(binding(), "u-manager", crate::identity::Credential::pin());
+            let barrier = Arc::new(Barrier::new(RACERS));
+            let racers: Vec<_> = (0..RACERS)
+                .map(|_| {
+                    let grants = Arc::clone(&grants);
+                    let barrier = Arc::clone(&barrier);
+                    let token = token.clone();
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        grants.spend(&token, &binding()).is_some()
+                    })
+                })
+                .collect();
+            let wins = racers
+                .into_iter()
+                .map(|racer| racer.join().expect("a racer panicked"))
+                .filter(|won| *won)
+                .count();
+
+            assert_eq!(
+                wins, 1,
+                "round {round}: exactly one racing retry spends the approval"
+            );
+            assert_eq!(
+                grants.len(),
+                0,
+                "round {round}: the approval is gone once spent"
+            );
+        }
+    }
+
     #[test]
     fn the_ceiling_is_measured_in_seconds_not_hours() {
         // ⚠️ Asserted in ABSOLUTE seconds on purpose. Every other test here says

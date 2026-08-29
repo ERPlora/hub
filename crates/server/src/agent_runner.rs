@@ -115,7 +115,7 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
     // loop does it.
     let mut messages = vec![json!({ "role": "user", "content": request.prompt })];
     let instructions = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let now = chrono::Utc::now();
         assistant::build_instructions(
             rt.registry(),
@@ -209,7 +209,7 @@ async fn prepare(
     run_id: &str,
     step_id: &str,
 ) -> Result<(AiRequest, Tools), String> {
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     let request = rt
         .load_flow_ai_request(run_id, step_id)
         .await
@@ -485,7 +485,7 @@ async fn dispatch(
     let params = parse_arguments(&call.arguments);
 
     if kind == "query" {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         return Ok(Dispatched::Result(
             match rt
                 .execute_flow_query(&request.flow_id, &request.run_id, &call.name, &params)
@@ -499,7 +499,7 @@ async fn dispatch(
 
     // A WRITE. Under `manual` — the default — it becomes a row and the turn ends here.
     if !request.policy.is_auto() {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
 
         // **hub#825 — the tray only ever shows what, if approved, runs.** The payload is judged
         // against the command's JSON Schema HERE, before the row exists, by the same code that will
@@ -552,7 +552,7 @@ async fn dispatch(
     // `policy: "auto"` — the owner said so in writing. The gate is still the runtime's:
     // `execute_flow_command` re-reads the grant and runs through `Origin::Automation`, so the
     // fiscal gates, the schema validation and the transactional outbox all still apply.
-    let rt = st.runtime.lock().await;
+    let rt = st.runtime.read().await;
     Ok(Dispatched::Result(
         match rt
             .execute_flow_command(

@@ -641,6 +641,14 @@ export default {
     shareWithErploraDone: 'Details shared with ERPlora.',
     shareWithErploraError: 'Could not share the details with ERPlora.',
     shareWithErploraNeedsTaxId: 'Fill in the tax id first.',
+    // One question, two EXCLUSIVE answers (ADR-0320 §1 — hub#1314): either the business files with
+    // its own certificate, or ERPlora files on its behalf with the signed grant. Never both.
+    fiscalRouteTitle: 'Filing with the tax authority',
+    fiscalRouteLead: 'Your invoices reach the tax authority through one of these two routes.',
+    fiscalRouteDelegated: 'ERPlora does it for you',
+    fiscalRouteOwn: 'With my own certificate',
+    fiscalRouteOwnHint:
+      'You sign and file with your own certificate; no grant to ERPlora is needed.',
     grantTitle: 'Representation grant',
     grantDesc:
       'Your signed consent for ERPlora to file your invoicing records with the tax authority on your behalf. Required before your business can go live.',
@@ -830,6 +838,10 @@ export default {
     alreadyInstalled: '{name} is already installed.',
     installing: 'Installing {name}…',
     installSuccess: '{name} installed successfully.',
+    // hub#1130: the install-plan closure (ADR-0060) dragged dependencies in — the owner asked for
+    // ONE app and got several; naming them in the SAME confirmation is the reverse of hub#1101's
+    // `409 has_dependents`, which already names what an uninstall would break.
+    installSuccessWithDependencies: '{name} installed successfully. Also installed: {names}.',
     installError: 'Could not start installation of {name}.',
     // ADR-0060: the install plan needs modules this hub has not purchased. Nothing was installed.
     installBlocked: '{name} needs apps you have not subscribed to yet: {missing}. Nothing has been installed.',
@@ -1753,5 +1765,25 @@ export default {
       inactive: 'This value is switched off in this hub.',
       duplicate: 'This hub already has that value.',
     },
+  },
+  // What the core says when it refuses at the PLATFORM level (hub#1258) — the family that is
+  // nobody's business rule: `db`/`io`/`wasm`/`native`/`schema`/`manifest` are the six codes
+  // `error_payload` redacts to one fixed English line (hub#1074), and `module_not_installed`/
+  // `module_inactive`/`missing_dependency`/`read_unavailable` are the four whose remedy names an
+  // app. Personal and Settings → Roles used to fall through to that redacted line, or to an
+  // authored sentence that never went through i18n. Mirrors `platformFailureMessage` in
+  // `packages/module-sdk/src/index.ts` (hub#1102) — see `lib/platform-failure.ts` for why this is a
+  // separate catalogue instead of reusing that one.
+  platformFailure: {
+    unavailable:
+      'The operation could not be completed. Try again, and tell an administrator if it keeps happening.',
+    moduleMissing:
+      'The app “{app}” is missing and this action needs it. Ask an administrator to install it from Apps.',
+    moduleMissingGeneric:
+      'An app this action needs is not installed. Ask an administrator to install it from Apps.',
+    moduleInactive:
+      'The app “{app}” is switched off and this action needs it. Ask an administrator to switch it back on from Apps.',
+    moduleInactiveGeneric:
+      'An app this action needs is switched off. Ask an administrator to switch it back on from Apps.',
   },
 } as const;
