@@ -217,6 +217,149 @@ case "$pkg_repo" in
             "es '${pkg_repo:-<vacío>}': sin ese enlace, el GITHUB_TOKEN del repo no está autorizado sobre el paquete" ;;
 esac
 
+# ═════════════════════════════════════════════════════════════════════════════
+# BEHAVIOUR — the four outcomes of the publish step, EXECUTED (hub#1308)
+#
+# Everything above reads the workflow as TEXT. Text is enough to pin the wiring (a
+# `packages: write` either is in the job or is not), but it cannot tell whether the
+# classification actually WORKS: `grep -qi 'billing limit' /dev/null` and a swap of the
+# `blocked_by=billing`/`blocked_by=other` assignments both leave every grep-based case above
+# GREEN while the step misreports the cause — which is the exact failure hub#1308 is about.
+# So the step's own `run:` script is EXTRACTED FROM THE WORKFLOW (never a copy kept in this
+# file: a copy drifts the moment build-hub.yml changes and then proves nothing) and executed
+# against a fake `npm` first on PATH, once per outcome. Same recipe `image-tags.test.sh` and
+# `alert-issue.test.sh` already use for `gh`; bash + awk + mktemp only, no PyYAML, no network.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# The `run:` body of the step whose `id:` is `publish`, de-indented. Anchoring on the `id:`
+# (not the step's name, which is prose and translatable) and stopping at the first line that is
+# neither blank nor indented into the block keeps the NEXT step out of the extraction.
+extract_publish_run() {
+    awk '
+        /^      - name: / { is_publish = 0; in_run = 0 }
+        /^        id: publish$/ { is_publish = 1 }
+        is_publish && /^        run: \|$/ { in_run = 1; next }
+        in_run && /^$/ { print ""; next }
+        in_run && /^          / { sub(/^          /, ""); print; next }
+        in_run { in_run = 0; is_publish = 0 }
+    ' "$workflow"
+}
+
+sandbox=$(mktemp -d)
+trap 'rm -rf "$sandbox"' EXIT
+step_script="$sandbox/publish-step.sh"
+extract_publish_run > "$step_script"
+
+# A silent extraction failure would turn every case below into a vacuous green, so it is a
+# hard stop, not a skipped case.
+if ! grep -q 'npm publish' "$step_script"; then
+    bad "el \`run:\` del paso \`id: publish\` se puede extraer de build-hub.yml" \
+        "la extracción no contiene ningún \`npm publish\`: sin ella los casos de conducta no probarían nada"
+    printf '\nFAIL: %s caso(s) de contrato en el job publish-module-sdk (hub#1308)\n' "$fail"
+    exit 1
+fi
+ok "el \`run:\` del paso \`id: publish\` se extrae del workflow (nunca una copia que se desincronice)"
+
+mkdir -p "$sandbox/bin"
+cat > "$sandbox/bin/npm" <<'FAKE_NPM'
+#!/usr/bin/env bash
+# Fake `npm`, first on PATH. Records the invocation and answers what the case asked for:
+# `--dry-run` gets its own exit code (the `pack` path), the real publish prints the literal
+# the registry would have returned and exits with its own code.
+printf '%s\n' "$*" >> "$FAKE_NPM_CALLS"
+for arg in "$@"; do
+    if [ "$arg" = "--dry-run" ]; then
+        echo "npm notice Publishing to https://npm.pkg.github.com/ (dry-run)"
+        exit "$FAKE_NPM_DRY_RUN_EXIT"
+    fi
+done
+printf '%s\n' "$FAKE_NPM_PUBLISH_OUTPUT"
+exit "$FAKE_NPM_PUBLISH_EXIT"
+FAKE_NPM
+chmod +x "$sandbox/bin/npm"
+
+# The response GitHub Packages actually returned on run 33228750255 — the whole line, the one
+# the UI truncated to `Permission permission_…`.
+BILLING_403='npm error code E403
+npm error 403 403 Forbidden - PUT https://npm.pkg.github.com/@erplora%2fmodule-sdk - Permission permission_denied: Account has reached its billing limit. Contact support or your organization admin to increase the quota.'
+
+case_n=0
+run_publish_step() {   # $1 tag, $2 dry-run exit, $3 publish exit, $4 publish output
+    case_n=$((case_n + 1))
+    CASE_DIR="$sandbox/case-$case_n"
+    mkdir -p "$CASE_DIR"
+    GITHUB_OUTPUT="$CASE_DIR/output"; : > "$GITHUB_OUTPUT"
+    FAKE_NPM_CALLS="$CASE_DIR/npm-calls"; : > "$FAKE_NPM_CALLS"
+    STEP_LOG="$CASE_DIR/log"
+    export GITHUB_OUTPUT FAKE_NPM_CALLS
+    export RUNNER_TEMP="$CASE_DIR"
+    export GITHUB_REF_NAME="$1"
+    export FAKE_NPM_DRY_RUN_EXIT="$2" FAKE_NPM_PUBLISH_EXIT="$3" FAKE_NPM_PUBLISH_OUTPUT="$4"
+    PATH="$sandbox/bin:$PATH" bash "$step_script" > "$STEP_LOG" 2>&1
+    STEP_EXIT=$?
+}
+
+# Last value written for a step output — the step appends, never rewrites.
+step_output() { grep "^$1=" "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-; }
+
+# ── B1 · The billing 403: classified, NAMED, and still red ───────────────────
+run_publish_step v1.1.11 0 1 "$BILLING_403"
+errs=""
+[ "$STEP_EXIT" -ne 0 ] || errs="$errs sigue-en-verde"
+[ "$(step_output blocked_by)" = "billing" ] || errs="$errs blocked_by=$(step_output blocked_by)"
+grep -q '::error title=GitHub Packages ha rechazado la publicación por CUOTA' "$STEP_LOG" || errs="$errs sin-::error-de-cuota"
+[ -z "$errs" ] \
+    && ok "un 403 por cuota: el paso muere en ROJO, marca blocked_by=billing y NOMBRA la cuota" \
+    || bad "un 403 por cuota: el paso muere en ROJO, marca blocked_by=billing y NOMBRA la cuota" \
+        "$errs — es el fallo de hub#1308: si no se clasifica, la UI solo enseña 'Permission permission_…'"
+
+# ── B2 · Any OTHER registry rejection must NOT be sold as the quota ──────────
+run_publish_step v1.1.11 0 1 'npm error code E409
+npm error 409 Conflict - PUT https://npm.pkg.github.com/@erplora%2fmodule-sdk - Cannot publish over existing version'
+errs=""
+[ "$STEP_EXIT" -ne 0 ] || errs="$errs sigue-en-verde"
+[ "$(step_output blocked_by)" = "other" ] || errs="$errs blocked_by=$(step_output blocked_by)"
+grep -q '::error title=npm publish ha fallado contra GitHub Packages' "$STEP_LOG" || errs="$errs sin-::error-generico"
+grep -q 'title=GitHub Packages ha rechazado la publicación por CUOTA' "$STEP_LOG" && errs="$errs lo-vende-como-cuota"
+[ -z "$errs" ] \
+    && ok "un rechazo que NO es la cuota se marca blocked_by=other y no se vende como cuota" \
+    || bad "un rechazo que NO es la cuota se marca blocked_by=other y no se vende como cuota" \
+        "$errs — clasificar mal manda al lector a pedir cuota por un conflicto de versión"
+
+# ── B3 · The package cannot even be packed: no real PUT is attempted ─────────
+run_publish_step v1.1.11 1 0 ''
+errs=""
+[ "$STEP_EXIT" -ne 0 ] || errs="$errs sigue-en-verde"
+[ "$(step_output blocked_by)" = "pack" ] || errs="$errs blocked_by=$(step_output blocked_by)"
+grep -q '::error title=El paquete del SDK no se puede ni empaquetar' "$STEP_LOG" || errs="$errs sin-::error-de-empaquetado"
+grep -qv -- '--dry-run' "$FAKE_NPM_CALLS" && errs="$errs publicó-de-verdad-tras-fallar-el-dry-run"
+[ -z "$errs" ] \
+    && ok "si \`--dry-run\` falla, no se intenta la publicación real y se marca blocked_by=pack" \
+    || bad "si \`--dry-run\` falla, no se intenta la publicación real y se marca blocked_by=pack" "$errs"
+
+# ── B4 · The happy path: green, no block, and `latest` for a final version ───
+run_publish_step v1.1.11 0 0 '+ @erplora/module-sdk@1.1.11'
+errs=""
+[ "$STEP_EXIT" -eq 0 ] || errs="$errs exit=$STEP_EXIT"
+[ -z "$(step_output blocked_by)" ] || errs="$errs blocked_by=$(step_output blocked_by)"
+[ "$(step_output dist_tag)" = "latest" ] || errs="$errs dist_tag=$(step_output dist_tag)"
+grep -q -- '^publish --tag latest$' "$FAKE_NPM_CALLS" || errs="$errs npm-sin---tag-latest"
+grep -q '::error' "$STEP_LOG" && errs="$errs ::error-en-el-camino-feliz"
+[ -z "$errs" ] \
+    && ok "publicación correcta de una versión final: verde, sin bloqueo, dist-tag \`latest\`" \
+    || bad "publicación correcta de una versión final: verde, sin bloqueo, dist-tag \`latest\`" "$errs"
+
+# ── B5 · A release candidate must never move `latest` ────────────────────────
+run_publish_step v1.2.0-rc.3 0 0 '+ @erplora/module-sdk@1.2.0-rc.3'
+errs=""
+[ "$STEP_EXIT" -eq 0 ] || errs="$errs exit=$STEP_EXIT"
+[ "$(step_output dist_tag)" = "next" ] || errs="$errs dist_tag=$(step_output dist_tag)"
+grep -q -- '^publish --tag next$' "$FAKE_NPM_CALLS" || errs="$errs npm-sin---tag-next"
+grep -q -- '--tag latest' "$FAKE_NPM_CALLS" && errs="$errs la-rc-movería-latest"
+[ -z "$errs" ] \
+    && ok "una candidata vX.Y.Z-rc.N va al dist-tag \`next\` y NO mueve \`latest\`" \
+    || bad "una candidata vX.Y.Z-rc.N va al dist-tag \`next\` y NO mueve \`latest\`" "$errs"
+
 printf '\n'
 if [ "$fail" -gt 0 ]; then
     printf 'FAIL: %s caso(s) de contrato en el job publish-module-sdk (hub#1308)\n' "$fail"
