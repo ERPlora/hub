@@ -140,3 +140,38 @@ describe('vite.config tree-shakes @ionic/core (hub#798)', () => {
     ).toBe(true);
   });
 });
+
+// hub#1367: the gate's web stage was aborting pushes on the CLOCK rather than on the code. The
+// `test` block declared `include` and `environment` and nothing else, so all 2178 unit tests ran
+// on vitest's default `testTimeout: 5000` — a WALL-CLOCK budget. On a quiet machine the whole
+// suite spends ~17 s of test time (mean ~8 ms per test) and nothing comes within an order of
+// magnitude of 5 s; with the fleet loading the box (~19 worktrees on 15 cores) the very same
+// tests get starved of CPU and vitest kills them. Measured on origin/develop@29e3a012: 0 failures
+// at load ~10, 1 at load ~30, 40+ at load ~40 — the code identical in all three.
+//
+// A timeout is an anti-hang BACKSTOP, not an assertion: it must be loose enough that only a
+// genuinely hung test trips it, and tight enough that a hung test still fails instead of wedging
+// the gate forever. These assertions pin that property — deliberately as bounds and not as an
+// equality, because the number is a budget to be tuned, while the guarantee is not.
+describe('the unit suite survives a machine shared with the fleet (hub#1367)', () => {
+  it('gives a test far more headroom than the 5 s default before calling it hung', async () => {
+    const cfg = await loadConfig();
+    // 5000 (the default) is what made a config-import test time out under load.
+    expect(cfg.test.testTimeout).toBeGreaterThanOrEqual(20_000);
+    // …but a hung test must still FAIL, and reasonably soon: the gate blocks the whole fleet.
+    expect(cfg.test.testTimeout).toBeLessThanOrEqual(120_000);
+  });
+
+  it('gives hooks the same headroom: a starved beforeEach is not a broken beforeEach', async () => {
+    const cfg = await loadConfig();
+    expect(cfg.test.hookTimeout).toBeGreaterThanOrEqual(20_000);
+    expect(cfg.test.hookTimeout).toBeLessThanOrEqual(120_000);
+  });
+
+  it('never retries: a red test stays red (cero regresiones)', async () => {
+    const cfg = await loadConfig();
+    // `retry` would turn this same starvation green — and with it every real flake the suite
+    // exists to catch. The fix is to stop measuring the machine, not to re-roll the dice.
+    expect(cfg.test.retry ?? 0).toBe(0);
+  });
+});

@@ -45,12 +45,11 @@ function browserProfile(seed: Record<string, string> = {}) {
 
 type BrowserProfile = ReturnType<typeof browserProfile>;
 
-/**
- * Booting a browser here means `resetModules` + re-importing the whole runtime module graph, which
- * is slow enough under a parallel suite run to trip the 5 s default. The generous budget is about
- * the fixture, not about the code under test.
- */
-const BOOT_A_BROWSER_MS = 30_000;
+// Booting a browser here means `resetModules` + re-importing the whole runtime module graph — slow
+// enough under a parallel suite run that this file used to carry its own 30 s budget. It no longer
+// needs one: hub#1367 made that budget global in `vite.config.ts`, because the problem was never
+// this fixture but a wall-clock timeout being read as a verdict on the code. A local budget only
+// hid the general case, and at 30 s it was still short enough to be killed by the fleet's load.
 
 /** A hub context answer: what the runtime tells the shell when it boots (`/api/hub/context`). */
 function hubContextResponse(machineRegistered = true) {
@@ -97,7 +96,7 @@ describe('the device identity of a browser (hub#454)', () => {
     expect(fromTill).toBeTruthy();
     expect(fromLaptop).toBeTruthy();
     expect(fromTill).not.toBe(fromLaptop);
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('never presents the hub id as a device: it names the hub, and anyone can read it', async () => {
     // `GET /api/hub/context` takes no session — the hub id is public by design. An identity that
@@ -105,7 +104,7 @@ describe('the device identity of a browser (hub#454)', () => {
     const browser = browserProfile();
 
     expect(await deviceIdPresentedBy(browser)).not.toBe(HUB_ID);
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('naming one device leaves the other one alone — id and storage', async () => {
     // The till is ALIVE and already has its identity written down. If minting one for the laptop
@@ -119,7 +118,7 @@ describe('the device identity of a browser (hub#454)', () => {
     expect(till.data.get(STORAGE_KEY)).toBe('dev_the-till-already-knows-who-it-is');
     expect(fromLaptop).not.toBe(till.data.get(STORAGE_KEY));
     expect(await deviceIdPresentedBy(till)).toBe('dev_the-till-already-knows-who-it-is');
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('survives closing the tab and coming back: the same browser is the same device', async () => {
     // The gesture the promise rests on. An identity that changed on every reload would make
@@ -130,7 +129,7 @@ describe('the device identity of a browser (hub#454)', () => {
     const second = await deviceIdPresentedBy(till);
 
     expect(second).toBe(first);
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('clearing the site data is a NEW device, not the old one coming back', async () => {
     // The honest consequence of keeping the identity in the browser, and the reason it can only
@@ -144,7 +143,7 @@ describe('the device identity of a browser (hub#454)', () => {
     const after = await deviceIdPresentedBy(browser);
     expect(after).toBeTruthy();
     expect(after).not.toBe(before);
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('is opaque: nothing about it is derived from the hub, the user or the moment', async () => {
     const browser = browserProfile();
@@ -153,7 +152,7 @@ describe('the device identity of a browser (hub#454)', () => {
 
     expect(id).toMatch(/^dev_[0-9a-f-]{32,}$/);
     expect(id).not.toContain(HUB_ID);
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('a blank or padded value in storage is not a name, and a fresh one is minted', async () => {
     // Whatever wrote it — a half-finished write, a hand-edited devtools entry — blanks are not an
@@ -164,7 +163,7 @@ describe('the device identity of a browser (hub#454)', () => {
 
     expect(await deviceIdPresentedBy(blank)).toMatch(/^dev_[0-9a-f-]{32,}$/);
     expect(await deviceIdPresentedBy(padded)).toBe('dev_written-with-spaces');
-  }, BOOT_A_BROWSER_MS);
+  });
 });
 
 describe('what the login says about this client (hub#454)', () => {
@@ -178,7 +177,7 @@ describe('what the login says about this client (hub#454)', () => {
       'X-Device-Id': expect.stringMatching(/^dev_[0-9a-f-]{32,}$/),
       'X-Device-Platform': 'cloud',
     });
-  }, BOOT_A_BROWSER_MS);
+  });
 
   it('a hub whose machine is not registered claims nothing about the deployment', async () => {
     // Nothing is known yet, so nothing is asserted — the browser still HAS its identity, it just
@@ -189,7 +188,7 @@ describe('what the login says about this client (hub#454)', () => {
 
     await expect(loginHeaders()).resolves.toEqual({ 'X-Client-Type': 'hub' });
     await expect(resolveDeviceId()).resolves.toMatch(/^dev_[0-9a-f-]{32,}$/);
-  }, BOOT_A_BROWSER_MS);
+  });
 });
 
 describe('who names the device when there is a shell', () => {
