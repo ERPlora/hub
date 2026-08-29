@@ -71,16 +71,13 @@ on:
     types: [module-published]
   # Las seis superficies del kernel (ver la cabecera). `crates/runtime/**` ya cubre el antiguo
   # `crates/runtime/src/e2e_support.rs`, que por eso deja de listarse aparte.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/test-hub-modules.yml'
-      - 'crates/runtime/**'
-      - 'crates/server/**'
-      - 'schemas/**'
-      - 'crates/db/**'
-      - 'crates/guest-sdk/**'
-      - 'crates/wasm-host/**'
+  # Sin `pull_request` desde el 2026-08-29 (Ioan): estos e2e los corre el gate pre-push, que
+  # materializa el catálogo PUBLICADO y los ejecuta POR DEFECTO (hub#1353 — medido sobre develop
+  # limpio: 30 binarios, 1 365 tests, 0 fallos, 5m07s; la nota de «120 fallos» era anterior a
+  # hub#1153, cuando el catálogo se leía de `modules-workspace`). Rojo = push abortado, y sin
+  # push no hay PR: la prueba no se pierde, cambia de sitio.
+  # `push` a develop/main se queda: es la red POST-MERGE (hub#572) y el sitio donde el
+  # `repository_dispatch` de un módulo recién publicado sigue midiendo contra el kernel.
 
 # El grupo NO puede ser solo `github.ref` desde que existe el dispatch: los avisos de dos módulos
 # distintos llegan sobre la MISMA rama por defecto, y con un grupo común el segundo cancelaría la

@@ -977,7 +977,12 @@ raise_lock_limits() {
 # and dropping `HUB_GATE_WITH_MODULES` goes back to CI parity.
 MODULES_FLOOR="${HUB_GATE_MODULES_FLOOR:-25}"
 resolve_modules_dir() {
-    if [ "${HUB_GATE_WITH_MODULES:-0}" != "1" ]; then
+    # Por defecto SÍ (Ioan, 2026-08-29): `test-hub-modules.yml` ya no corre en las PRs, así que si
+    # el gate se saltara los e2e de módulos no los correría NADIE — y esa es exactamente la vía por
+    # la que una PR del kernel rompe un módulo en producción. Medido el 29/08 sobre develop limpio:
+    # 30 binarios, 1 365 tests, 0 fallos, 5m07s (hub#1353). `HUB_GATE_WITH_MODULES=0` los salta a
+    # sabiendas — y como cualquier salto, deja el push sin atestiguar más abajo.
+    if [ "${HUB_GATE_WITH_MODULES:-1}" != "1" ]; then
         export ERPLORA_E2E_ALLOW_SKIP=1
         return 0
     fi
