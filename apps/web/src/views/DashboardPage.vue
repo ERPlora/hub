@@ -184,7 +184,15 @@ import BlueprintHeroCard from '../components/BlueprintHeroCard.vue';
 import MyAppsCard from '../components/MyAppsCard.vue';
 import SetupChecklistCard from '../components/SetupChecklistCard.vue';
 import { dataTableLabels } from '../lib/data-table-labels';
-import { getClient, getHubSector, listInstalledModules, type InstalledModule } from '../lib/runtime';
+import {
+  activeModuleIds,
+  getClient,
+  getHubSector,
+  listInstalledModules,
+  refreshActiveModuleIds,
+  type InstalledModule,
+} from '../lib/runtime';
+import { loadRecentSales, type ActivityRow } from '../lib/dashboard-activity';
 import { collectDashboardWidgets } from '../lib/dashboard-widgets';
 import { buildBlueprintWidget } from '../lib/dashboard-blueprint-widget';
 import { moduleNav, moduleNavState } from '../lib/nav';
@@ -438,12 +446,6 @@ function badgeCell(text: string, tone: Tone): Node {
   return span;
 }
 
-interface ActivityRow {
-  date: string; sale: string; customer: string; method: string; amount: number;
-  /** Stable machine value; translated only for display (hub#863). */
-  status: 'completed' | 'pending';
-  tone: Tone;
-}
 const activityRaw = ref<ActivityRow[]>([]);
 // Display rows: `status` is translated here and ONLY here, so the badge, the select filter and its
 // options all see the same localized word — and a locale switch repaints them (the fetched value
@@ -487,20 +489,12 @@ watch(locale, () => {
 
 async function loadActivity(): Promise<void> {
   try {
-    const page = await client.queryPage<Record<string, unknown>>('sales.list', {
-      limit: 100,
-      sort: 'created_at',
-      dir: 'desc',
-    });
-    activityRaw.value = page.rows.map((r) => ({
-      date: String(r.created_at ?? ''),
-      sale: String(r.sale_number ?? `#${r.id}`),
-      customer: String(r.customer_name ?? '—'),
-      method: String(r.payment_method_name ?? '—'),
-      amount: Number(r.total) || 0,
-      status: r.status === 'completed' ? 'completed' : 'pending',
-      tone: r.status === 'completed' ? 'success' : 'medium',
-    }));
+    // `sales` is optional (hub#1211): the read is gated on the ACTIVE module set the SDK's own
+    // short-circuit reads, so a hub without a till never asks the till for its sales (that 404 on
+    // every dashboard load is what kept `NoStrayGetApiQuery.spec.ts` red). The refresh is
+    // best-effort and session-guarded; an unknown set still travels, as before.
+    await refreshActiveModuleIds();
+    activityRaw.value = await loadRecentSales(client, activeModuleIds());
   } catch {
     activityRaw.value = [];
   } finally {

@@ -2,7 +2,7 @@
 // registros a la AEAT, con un código de dominio estable (`verifactu.unsent_records`) y un mensaje
 // que dice cuántos quedan. Ese rechazo tiene que llegar entero al que pulsó el botón: si el
 // cliente lo aplana a «no se pudo», la guarda vuelve a ser un no-op mudo.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ModuleActionError,
@@ -13,6 +13,7 @@ import {
   refreshActiveModuleIds,
   uninstallModule,
 } from './runtime';
+import { setHubSession } from './session';
 
 function respondWith(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -114,9 +115,49 @@ describe('desinstalar · el gate de dependientes', () => {
 // reading `activeModuleIds()` instead of asking the transport. A toggle that did not keep that set
 // current would just move the 404 from "every call" to "every call until the next unrelated
 // refresh" — still a defect, just a slower one.
-describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)', () => {
+describe('activeModuleIds · refreshed on every module action (hub#1211)', () => {
+  /** The suite runs in `node` (vite.config.ts): the session store needs a `localStorage` to live in. */
+  function memoryStorage(): Storage {
+    const values = new Map<string, string>();
+    return {
+      get length() {
+        return values.size;
+      },
+      clear: () => values.clear(),
+      getItem: (key) => values.get(key) ?? null,
+      key: (index) => [...values.keys()][index] ?? null,
+      removeItem: (key) => {
+        values.delete(key);
+      },
+      setItem: (key, value) => {
+        values.set(key, String(value));
+      },
+    } as Storage;
+  }
+
+  beforeEach(() => {
+    // Every refresh below happens on a signed-in shell — toggling a module needs a session anyway.
+    vi.stubGlobal('localStorage', memoryStorage());
+    setHubSession('sess-live');
+  });
+
   afterEach(() => {
     publishActiveModuleIds(undefined);
+  });
+
+  it('does not ask the runtime BEFORE there is a session: a 401 is not free (hub#1211)', async () => {
+    // `getClient()` is built in `main.ts` on a cold boot, BEFORE anyone signs in. Seeding there
+    // without this guard is a guaranteed `GET /api/modules → 401` on every login screen — console
+    // noise of exactly the kind this fix removes — and it feeds the central dead-session probe
+    // (hub#846). Same rule as `ensureMediaCookie`: nothing is asked until there is a session.
+    setHubSession(null);
+    const spy = vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, data: [] }) });
+    vi.stubGlobal('fetch', spy);
+
+    await refreshActiveModuleIds();
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(activeModuleIds()).toBeUndefined();
   });
 
   /** Answers `/api/modules` (GET) and the action endpoint (POST) differently, by URL shape. */
@@ -132,7 +173,7 @@ describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)'
     return spy;
   }
 
-  it('activateModule republica el conjunto ACTIVO tras el éxito', async () => {
+  it('activateModule republishes the ACTIVE set after success', async () => {
     scriptedFetch({
       ok: true,
       data: [{ id: 'cash_register', name: 'Caja', status: 'active', version: '1.0.0' }],
@@ -143,7 +184,7 @@ describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)'
     expect(activeModuleIds()).toEqual(new Set(['cash_register']));
   });
 
-  it('deja fuera los módulos INACTIVOS: lo que corto-circuita es "activo", no "instalado"', async () => {
+  it('leaves INACTIVE modules out: what short-circuits is "active", not "installed"', async () => {
     scriptedFetch({
       ok: true,
       data: [
@@ -157,7 +198,7 @@ describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)'
     expect(activeModuleIds()).toEqual(new Set(['sales']));
   });
 
-  it('un refresco que falla CONSERVA la respuesta anterior, nunca la vacía', async () => {
+  it('a failed refresh KEEPS the previous answer, never empties it', async () => {
     publishActiveModuleIds(new Set(['sales']));
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
@@ -166,7 +207,7 @@ describe('activeModuleIds · se refresca con cada acción de módulo (hub#1211)'
     expect(activeModuleIds()).toEqual(new Set(['sales']));
   });
 
-  it('sin ningún refresco todavía, la respuesta es "no lo sé" (undefined), nunca un [] inventado', () => {
+  it('with no refresh yet, the answer is "not known" (undefined), never an invented []', () => {
     expect(activeModuleIds()).toBeUndefined();
   });
 });

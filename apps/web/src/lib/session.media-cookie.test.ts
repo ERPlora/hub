@@ -10,7 +10,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ensureMediaCookie = vi.fn().mockResolvedValue(true);
-vi.mock('./runtime', () => ({ ensureMediaCookie }));
+// `setHubSession` also re-seeds the active-module set (hub#1211, `session.active-modules.test.ts`);
+// it is mocked here only so that chain resolves instead of tripping over a missing export.
+const refreshActiveModuleIds = vi.fn().mockResolvedValue(undefined);
+vi.mock('./runtime', () => ({ ensureMediaCookie, refreshActiveModuleIds }));
 
 import { setHubSession } from './session';
 

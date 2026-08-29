@@ -48,10 +48,12 @@ async function withSession(page: Page, s: Session): Promise<void> {
   );
 }
 
-// hub#1211 fixed the real defect this pinned as `fixme` (surfaced when hub#1240 first ran this
-// suite): `queryOptional`/`queryAllOptional` no longer make the request to find out a module is
-// absent — the shell's `installedModules` (module-sdk) short-circuits from the live ACTIVE module
-// set, so an optional integration that is not installed leaves no `POST /api/query` at all.
+// hub#1211 fixed the two defects this pinned as `fixme` (surfaced when hub#1240 first ran this
+// suite). In a module, `queryOptional`/`queryAllOptional` no longer make the request to find out a
+// module is absent — the shell's `installedModules` (module-sdk) short-circuits from the live ACTIVE
+// module set. And on THIS bench — an empty hub, where no module runs — the 404 was the shell's own:
+// the dashboard's activity feed asked `sales.list` on every mount, till or no till; it is gated on
+// the same set now (`lib/dashboard-activity.ts`). Either one would keep this red.
 test('panel loads fire no GET /api/query and no /api/query failure', async ({ page }) => {
   const session = await loginByPin();
   await withSession(page, session);

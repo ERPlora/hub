@@ -342,9 +342,9 @@ export function getClient(): ErploraClient {
         // (`hubTimezone()` ← `/api/hub/context`), para que un módulo que agende lea el MISMO
         // reloj que el runtime le entrega a un handler (`context.timezone`).
         timezone: hubTimezone,
-        // hub#1211: le da a `queryOptional`/`queryAllOptional` el conjunto de módulos ACTIVOS, sin
-        // el cual la única forma de saber que uno falta era preguntar al transporte igualmente y
-        // atrapar `module_not_installed` después de que la petición ya hubiera viajado.
+        // hub#1211: gives `queryOptional`/`queryAllOptional` the set of ACTIVE modules — without
+        // it, the only way to learn a module was missing was to ask the transport anyway and catch
+        // `module_not_installed` after the request had already travelled.
         installedModules: activeModuleIds,
         notifier: (n) => {
           const color: ToastColor =
@@ -354,12 +354,14 @@ export function getClient(): ErploraClient {
       },
       bridge,
     );
-    // Siembra inicial (hub#1211): mientras resuelve, `activeModuleIds()` sigue devolviendo
-    // `undefined` ("no lo sé todavía") y el SDK cae a preguntar al transporte, como antes.
+    // Initial seed (hub#1211): while it resolves, `activeModuleIds()` keeps answering `undefined`
+    // ("not known yet") and the SDK falls back to asking the transport, as before. On a cold boot
+    // there is no session yet and the seed asks nothing — login re-seeds through `setHubSession`.
     void refreshActiveModuleIds();
-    // `module.installed` (ARQUITECTURA.md §2.2/§4) es el único evento WS de ciclo de vida de
-    // módulos que existe hoy; activar/desactivar/desinstalar no emiten uno propio, así que esos
-    // tres se refrescan síncronamente al resolver en `moduleAction`.
+    // `module.installed` (ARQUITECTURA.md §2.2/§4) is the only module lifecycle WS event that
+    // exists today; activate/deactivate/uninstall emit none of their own, so those three refresh
+    // synchronously when `moduleAction` resolves (in THIS tab — another tab only learns of them on
+    // its next refresh, see the note on `refreshActiveModuleIds`).
     _client.on('module.installed', () => {
       void refreshActiveModuleIds();
     });
@@ -551,19 +553,25 @@ export function publishActiveModuleIds(ids: ReadonlySet<string> | null | undefin
 
 /**
  * Re-asks the runtime which modules are ACTIVE and republishes the set (hub#1211). Called once at
- * client construction and after every install (`module.installed` WS event) / activate / deactivate
- * / uninstall — the exact same moments the shell already refreshes its own nav and module list.
+ * client construction, on every login (`setHubSession`, the funnel all five ways in go through —
+ * `main.ts` builds the client on a cold boot BEFORE anyone signs in, and login is a route change,
+ * not a reload) and after every install (`module.installed` WS event) / activate / deactivate /
+ * uninstall — the exact same moments the shell already refreshes its own nav and module list.
  *
- * Best-effort by contract, like `refreshHubTimezone`: a failed refresh KEEPS the previous answer
- * (never publishes an empty set on a transient error, which would make every optional query look
- * absent) — it just stays `undefined` ("not known yet") if there was no previous answer either.
+ * Never asks before there IS a session, same rule as `ensureMediaCookie`: that request could only
+ * be a 401, which is console noise of the exact kind this exists to remove and feeds the central
+ * dead-session probe (hub#846). Best-effort by contract, like `refreshHubTimezone`: a failed
+ * refresh KEEPS the previous answer (never publishes an empty set on a transient error, which
+ * would make every optional query look absent) — it just stays `undefined` ("not known yet") if
+ * there was no previous answer either.
  */
 export async function refreshActiveModuleIds(): Promise<void> {
+  if (!getHubSession()) return;
   try {
     const modules = await listInstalledModules();
     publishActiveModuleIds(new Set(modules.filter((m) => m.status === 'active').map((m) => m.id)));
   } catch {
-    // Deja la respuesta anterior — ver el comentario de arriba.
+    // Keeps the previous answer — see the doc comment above.
   }
 }
 

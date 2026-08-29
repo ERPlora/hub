@@ -129,10 +129,21 @@ export function setHubSession(token: string | null): void {
   // porque no se haya podido traer una credencial de fotos. Sin cookie se pierden las fotos —y la
   // baldosa ya cae a sus iniciales (sales#104)—, no la sesión.
   if (token) {
-    void import('./runtime')
+    const runtime = import('./runtime');
+    void runtime
       .then((m) => m.ensureMediaCookie())
       .catch(() => {
         /* noop: ni el chunk que no llega ni la puerta que rechaza cancelan un login */
+      });
+    // Re-seeds the ACTIVE module set the SDK's `queryOptional` short-circuit reads (hub#1211). The
+    // first seed runs when `main.ts` builds the client — on a cold boot that is BEFORE there is a
+    // session, so it asks nothing; and login is a route change, not a reload, so without this the
+    // set would stay "not known" for the whole session and the fix would be inert for real users.
+    // An independent chain on purpose: this failing must not cost the photos, nor the other way.
+    void runtime
+      .then((m) => m.refreshActiveModuleIds())
+      .catch(() => {
+        /* noop: without the set the SDK keeps asking the transport, exactly as before hub#1211 */
       });
   }
 }

@@ -1942,6 +1942,17 @@ export class PrintApi {
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The runtime's RESERVED namespace owner (ADR-0192, `crates/runtime/src/hub_users.rs::CORE_NAMESPACE`):
+ * `hub.*` is served by the core itself, before the module registry, and is never an installed
+ * module — so it is never in `installedModules` and can never be proven absent. Without this
+ * exemption the `queryOptional` short-circuit (hub#1211) would answer `undefined` for every
+ * `queryOptional('hub.…')`, the exact false absence it exists to avoid (the runtime itself never
+ * says `module_not_installed` for the core: a bad `hub.*` name is `not_found`, a broken contract,
+ * and must still explode). Module-private on purpose: not part of the frozen public surface.
+ */
+const CORE_NAMESPACE_OWNER = 'hub';
+
 export class ErploraClient {
   private bridge?: BridgeTransport;
   /** The module this client acts FOR, set only by {@link ErploraClient.forModule}. */
@@ -1987,7 +1998,7 @@ export class ErploraClient {
        * `undefined` means "I do not know yet" (e.g. before the shell's first `GET /api/modules`
        * resolves), and is treated as "cannot rule it out" — the SDK falls back to asking the
        * transport, exactly like before this option existed. Guessing "absent" while unknown would
-       * be the SYMMETRIC regression: a real query silently skipped. Inyectable para tests.
+       * be the SYMMETRIC regression: a real query silently skipped. Injectable for tests.
        */
       installedModules?: () => ReadonlySet<string> | undefined;
     } = {},
@@ -2011,11 +2022,12 @@ export class ErploraClient {
    * `true` only when the caller can PROVE the owning module is absent — `installedModules()`
    * answered a concrete set and the module is not in it. Any doubt (no option wired, the set is
    * not known yet, or the name carries no recognisable owner) resolves to `false`, which keeps the
-   * existing "ask the transport, catch the absence" path as the fallback.
+   * existing "ask the transport, catch the absence" path as the fallback. The core namespace is
+   * never absent by construction (see {@link CORE_NAMESPACE_OWNER}).
    */
   private isKnownAbsent(name: string): boolean {
     const owner = ErploraClient.ownerModuleOf(name);
-    if (!owner) return false;
+    if (!owner || owner === CORE_NAMESPACE_OWNER) return false;
     const installed = this.opts.installedModules?.();
     if (!installed) return false;
     return !installed.has(owner);
@@ -2189,11 +2201,12 @@ export class ErploraClient {
    * permiso denegado o un handler roto son contratos rotos, no ausencias. Esto NO es un
    * `.catch(() => [])` — esa forma se tragaba las dos cosas y por eso se retiró.
    *
-   * **Corto-circuito (hub#1211):** cuando `installedModules` (inyectado por el shell) PRUEBA que
-   * el módulo dueño está ausente, devuelve `undefined` sin llamar al transporte — antes se
-   * enteraba de la ausencia haciendo la petición igual, así que cada integración opcional ausente
-   * dejaba un `404 POST /api/query` en la consola en CADA llamada. Sin esa prueba (opción no
-   * inyectada, o aún no resuelta), cae al camino de siempre: pregunta y atrapa la ausencia.
+   * **Short-circuit (hub#1211):** when `installedModules` (injected by the shell) PROVES the owner
+   * module is absent, this returns `undefined` without calling the transport — before, it learned
+   * the absence by making the request anyway, so every absent optional integration left a
+   * `404 POST /api/query` in the console on EVERY call. Without that proof (option not injected,
+   * or not resolved yet), it takes the usual path: ask, and catch the absence. The core namespace
+   * `hub.*` never short-circuits (it is not a module and cannot be absent).
    */
   async queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined> {
     if (this.isKnownAbsent(name)) return undefined;
