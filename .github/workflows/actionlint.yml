@@ -40,6 +40,10 @@ on:
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
       - 'scripts/tests/canonical-mirrors-workflow.test.sh'
+      # The verdict `canonical-mirrors.yml` delegates to, and its tests (hub#1296): a PR that
+      # only touched the classifier would otherwise run none of its cases.
+      - 'scripts/canonical-mirrors-verdict.sh'
+      - 'scripts/tests/canonical-mirrors-verdict.test.sh'
   workflow_dispatch:
 
 permissions:
@@ -113,3 +117,15 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/canonical-mirrors-workflow.test.sh
+
+      # ── The verdict on the toolkit's copies (hub#1296) ──────────────────────────────────
+      # `canonical-mirrors.yml` no longer takes the toolkit's byte-for-byte outcome as the
+      # verdict: `scripts/canonical-mirrors-verdict.sh` re-reads it — a copy behind an additive
+      # change warns, a retirement or a hand-edited copy fails. That script decides what merges,
+      # so its cases (hermetic: a scratch git repo and a scratch toolkit) run here, on every PR
+      # that can change it. Same reason as the two contracts above: seconds, and a guard nobody
+      # runs is a shopping list.
+      - name: Verdict on the toolkit's vendored copies (hub#1296)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/canonical-mirrors-verdict.test.sh
