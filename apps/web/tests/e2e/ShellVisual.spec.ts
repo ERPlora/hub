@@ -17,11 +17,14 @@
 //   Actions → «Regenerar baselines visuales (Linux)» (visual-baselines.yml) → Run workflow
 // Ese run corre con `--update-snapshots=all` y sube los PNG como artefacto para commitearlos.
 //
-// Mientras no exista la baseline de la plataforma en la que corres, el caso se SALTA en voz alta
-// en vez de fallar — pero SOLO fuera de CI (hub#1250: en CI una baseline ausente tiene que FALLAR,
-// no saltarse, o borrar un PNG en una PR volvería el caso verde por salto en lugar de rojo; ese
-// fallo lo produce `updateSnapshots: 'none'` en `playwright.config.ts`). Ver
-// `src/lib/visual-baseline-gate.ts` para la lógica y sus tests.
+// Mientras esta pantalla no tenga NINGUNA baseline generada todavía, el caso se SALTA en voz alta
+// en vez de fallar — en cualquier entorno, CI incluido (es justo el estado de este PR: cero PNG
+// commiteados, `visual-baselines.yml` sin poder dispararse hasta llegar a `main`). Fuera de CI eso
+// no cambia nunca (un Mac no va a igualar jamás el PNG de Linux), pero en CI es solo el estado
+// TRANSITORIO de antes de la primera regeneración: en cuanto exista una sola baseline para esta
+// pantalla, que falte ESTE fichero deja de saltarse y pasa a FALLAR (hub#1250: borrar un PNG en
+// una PR no puede volver el caso verde por salto); ese fallo lo produce `updateSnapshots: 'none'`
+// en `playwright.config.ts`. Ver `src/lib/visual-baseline-gate.ts` para la lógica y sus tests.
 
 import { test, expect } from '@playwright/test';
 import { VIEWPORTS, skipIfBaselineMissingLocally } from './shell-visual-helpers';
