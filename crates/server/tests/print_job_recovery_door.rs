@@ -41,7 +41,7 @@ struct Fixture {
     router: axum::Router,
     admin: String,
     cashier: String,
-    rt: std::sync::Arc<tokio::sync::Mutex<Runtime>>,
+    rt: erplora_server::SharedRuntime,
     temp: PathBuf,
 }
 
@@ -185,7 +185,7 @@ fn every_gesture() -> Vec<String> {
 }
 
 async fn status_of(f: &Fixture, job_id: &str) -> String {
-    f.rt.lock()
+    f.rt.read()
         .await
         .print_queue(None, None, 500)
         .await

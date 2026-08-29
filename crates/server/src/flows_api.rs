@@ -274,7 +274,7 @@ macro_rules! admin_session {
             Ok(arc) => arc,
             Err(e) => return crate::tenant_rejected(e),
         };
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         let admin = match auth::require_admin_session(&$headers, &$st.config, &rt).await {
             Ok(admin) => admin,
             Err(e) => return rejected(e),
@@ -291,7 +291,7 @@ macro_rules! admin_session {
 
 pub async fn list_flows(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.list_flows().await {
         Ok(flows) => Json(json!({ "ok": true, "data": flows })).into_response(),
         Err(e) => flow_err(e),
@@ -308,7 +308,7 @@ pub async fn create_flow(
         Ok(new) => new,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.create_flow(&new, &who).await {
         Ok(flow) => (StatusCode::CREATED, Json(json!({ "ok": true, "data": flow }))).into_response(),
         Err(e) => flow_err(e),
@@ -321,7 +321,7 @@ pub async fn get_flow(
     Path(id): Path<String>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.get_flow(&id).await {
         Ok(flow) => Json(json!({ "ok": true, "data": flow })).into_response(),
         Err(e) => flow_err(e),
@@ -341,7 +341,7 @@ pub async fn update_flow(
         Ok(new) => new,
         Err(response) => return response,
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.update_flow(&id, &new, &who).await {
         Ok(flow) => Json(json!({ "ok": true, "data": flow })).into_response(),
         Err(e) => flow_err(e),
@@ -356,7 +356,7 @@ pub async fn delete_flow(
     Path(id): Path<String>,
 ) -> Response {
     let (arc, who) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.delete_flow(&id, &who).await {
         Ok(()) => Json(json!({ "ok": true, "data": { "id": id, "deleted": true } })).into_response(),
         Err(e) => flow_err(e),
@@ -371,7 +371,7 @@ pub async fn list_grants(
     Path(id): Path<String>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = rt.get_flow(&id).await {
         return flow_err(e);
     }
@@ -399,7 +399,7 @@ pub async fn replace_grants(
         Ok(wanted) => wanted,
         Err(e) => return flow_err(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.replace_flow_grants(&id, &wanted, &who).await {
         Ok(()) => match rt.list_flow_grants(&id).await {
             Ok(grants) => Json(json!({ "ok": true, "data": grants })).into_response(),
@@ -424,7 +424,7 @@ pub async fn start_run(
     let input = body
         .map(|Json(v)| v.get("input").cloned().unwrap_or(v))
         .unwrap_or_else(|| json!({}));
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.start_flow_run(&id, &input, &who).await {
         Ok(run_id) => (
             StatusCode::ACCEPTED,
@@ -450,7 +450,7 @@ pub async fn list_runs(
     Query(page): Query<RunsPage>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = rt.get_flow(&id).await {
         return flow_err(e);
     }
@@ -522,7 +522,7 @@ pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Respo
 /// holds, and a hub's credentials are its customer's, not ours.
 pub async fn list_secrets(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.list_flow_secrets().await {
         Ok(secrets) => Json(json!({ "ok": true, "data": secrets })).into_response(),
         Err(e) => flow_err(e),
@@ -540,7 +540,7 @@ pub async fn put_secret(
     let Some(value) = body.get("value").and_then(|v| v.as_str()) else {
         return bad_request("invalid_payload", "a secret needs a `value`");
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.put_flow_secret(&name, value, &who).await {
         Ok(info) => Json(json!({ "ok": true, "data": info })).into_response(),
         Err(e) => flow_err(e),
@@ -555,7 +555,7 @@ pub async fn delete_secret(
     Path(name): Path<String>,
 ) -> Response {
     let (arc, who) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.delete_flow_secret(&name, &who).await {
         Ok(()) => Json(json!({ "ok": true, "data": { "name": name, "deleted": true } })).into_response(),
         Err(e) => flow_err(e),
@@ -577,7 +577,7 @@ pub async fn get_run(
     Path(run_id): Path<String>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let (run, steps) = match rt.get_flow_run(&run_id).await {
         Ok(found) => found,
         Err(e) => return flow_err(e),
@@ -603,7 +603,7 @@ pub async fn list_approvals(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let status = params.get("status").map(String::as_str).filter(|s| !s.is_empty());
     match rt.list_flow_approvals(status, APPROVALS_PAGE).await {
         Ok(items) => Json(json!({ "ok": true, "data": items })).into_response(),
@@ -657,7 +657,7 @@ async fn decide(
     comment: String,
 ) -> Response {
     let (arc, who) = admin_session!(st, headers);
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     match rt.decide_flow_approval(&id, approve, &who, &comment).await {
         Ok(approval) => Json(json!({ "ok": true, "data": approval })).into_response(),
         Err(e) => flow_err(e),

@@ -96,7 +96,7 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -129,7 +129,7 @@ pub async fn list_discarded(State(st): State<AppState>, headers: HeaderMap) -> R
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -147,7 +147,7 @@ pub async fn count_dead(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -177,7 +177,7 @@ pub async fn retry_dead(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -213,7 +213,7 @@ pub async fn retry_all_dead(State(st): State<AppState>, headers: HeaderMap) -> R
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -252,7 +252,7 @@ pub async fn discard_dead(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match require_admin_and_capability(&headers, &st, &rt).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -304,7 +304,7 @@ pub async fn trace_event(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -345,7 +345,7 @@ pub async fn list_events(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -397,7 +397,7 @@ pub async fn event_shape(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
         return response;
     }

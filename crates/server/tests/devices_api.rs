@@ -331,7 +331,7 @@ async fn a_row_with_no_id_is_never_the_device_you_are_holding() {
     // A trust row keyed on the empty string is writable, and a caller that names no device also
     // presents `""`. Comparing the two would flag a row the owner is NOT holding as "the one you
     // are using" — right next to the button that signs them out.
-    state.runtime.lock().await.trust_device("", "ghost").await.unwrap();
+    state.runtime.read().await.trust_device("", "ghost").await.unwrap();
 
     let response = call(&router, "GET", "/api/devices", Some(&sessions.admin), &[]).await;
 
@@ -540,7 +540,7 @@ async fn the_next_online_login_does_not_touch_the_name_the_business_chose() {
     // signed in last" — and it must never reach `name`, or the owner's choice lasts one shift.
     state
         .runtime
-        .lock()
+        .read()
         .await
         .trust_device("till-1", "Luis Prats")
         .await
@@ -711,7 +711,7 @@ async fn the_first_login_names_a_device_after_the_platform_it_announced() {
     // shift). ADR-0257 forbids reading it off the id, which is 128 opaque bits.
     state
         .runtime
-        .lock()
+        .read()
         .await
         .trust_device_with_default_name("tablet-9", "Marta Ruiz", "Chrome · Android")
         .await
@@ -720,7 +720,7 @@ async fn the_first_login_names_a_device_after_the_platform_it_announced() {
     // device is called until somebody decides otherwise, not something rewritten on every entry.
     state
         .runtime
-        .lock()
+        .read()
         .await
         .trust_device_with_default_name("tablet-9", "Luis Prats", "Safari · iPad")
         .await

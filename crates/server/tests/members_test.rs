@@ -151,7 +151,7 @@ async fn admin_state(cloud_base_url: &str) -> AppState {
 /// Abre una sesión server-side para un `hub_user` con el `role` dado; devuelve el token opaco
 /// (cabecera `X-Hub-Session`).
 async fn open_session(state: &AppState, role: &str) -> String {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let uid = rt.create_user("U", "", role, None).await.unwrap();
     rt.create_session(&uid, 3600, None).await.unwrap()
 }
@@ -190,7 +190,7 @@ async fn add_member_rejects_non_admin_and_touches_nothing() {
     );
 
     // No se creó ningún usuario-login y el SaaS no recibió nada.
-    let listed = state.runtime.lock().await.list_login_users().await.unwrap();
+    let listed = state.runtime.read().await.list_login_users().await.unwrap();
     assert!(listed.is_empty(), "no se creó el hub_user local");
     assert!(calls.lock().await.is_empty(), "no se notificó al SaaS");
 }
@@ -213,7 +213,7 @@ async fn add_member_as_admin_creates_local_user_and_notifies_saas() {
     assert_eq!(body["user"]["role"], json!("manager"));
 
     // Usuario-login creado localmente con su email + rol.
-    let listed = state.runtime.lock().await.list_login_users().await.unwrap();
+    let listed = state.runtime.read().await.list_login_users().await.unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].email, "ana@bar.com");
     assert_eq!(listed[0].role, "manager");
@@ -251,7 +251,7 @@ async fn remove_member_as_admin_deactivates_local_and_notifies_saas() {
     assert_eq!(body_json(resp).await["ok"], json!(true));
 
     // El usuario-login queda inactivo (sigue listado para audit).
-    let listed = state.runtime.lock().await.list_login_users().await.unwrap();
+    let listed = state.runtime.read().await.list_login_users().await.unwrap();
     assert_eq!(listed.len(), 1);
     assert!(!listed[0].is_active, "desactivado");
 

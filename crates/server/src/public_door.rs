@@ -88,7 +88,7 @@ pub async fn mint_claim(
         Ok(rt) => rt,
         Err(error) => return crate::tenant_rejected(error),
     };
-    let rt = runtime.lock().await;
+    let rt = runtime.read().await;
     let ctx = match auth::authenticate(&headers, &st.config, &rt).await {
         Ok(ctx) => ctx,
         Err(e) => return crate::unauthorized(e),
@@ -153,7 +153,7 @@ pub async fn show(
         Ok(v) => v,
         Err(r) => return r,
     };
-    let rt = runtime.lock().await;
+    let rt = runtime.read().await;
     let lang = language(&st, &rt, q.lang.as_deref()).await;
     let key = throttle_key(&headers, &locator);
     if let Some(retry) = st.login_throttle.locked_for(&key) {
@@ -228,7 +228,7 @@ pub async fn redeem(
         Ok(v) => v,
         Err(r) => return r,
     };
-    let rt = runtime.lock().await;
+    let rt = runtime.read().await;
     let lang = language(&st, &rt, q.lang.as_deref()).await;
     let key = throttle_key(&headers, &locator);
     if let Some(retry) = st.login_throttle.locked_for(&key) {
@@ -343,7 +343,7 @@ pub async fn redeem(
 
 type Resolved = (
     String,
-    std::sync::Arc<tokio::sync::Mutex<erplora_runtime::Runtime>>,
+    crate::state::SharedRuntime,
 );
 
 async fn resolve(st: &AppState) -> Result<Resolved, Response> {

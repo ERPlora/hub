@@ -194,7 +194,7 @@ pub async fn export_tables(State(st): State<AppState>, headers: HeaderMap) -> Re
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -223,7 +223,7 @@ pub async fn export_blueprint(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -399,7 +399,7 @@ pub async fn import_inspect(
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -561,7 +561,7 @@ pub async fn import_blueprint(
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -668,7 +668,7 @@ pub(crate) async fn run_import(
             .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
-        let mut rt = arc.lock().await;
+        let mut rt = arc.write().await;
         for m in &manifest.modules {
             if rt.registry().is_installed(&m.id) {
                 installed_modules.push(
@@ -734,7 +734,7 @@ pub(crate) async fn run_import(
             .runtime_for(&st.hub_id())
             .await
             .map_err(crate::tenant_rejected)?;
-        let mut rt = arc.lock().await;
+        let mut rt = arc.write().await;
         let r = import::import_sections(&mut rt, &manifest, &files, &selection, data_hub_id)
             .await
             .map_err(|e| {
@@ -826,7 +826,7 @@ pub(crate) async fn run_import(
                 .runtime_for(&st.hub_id())
                 .await
                 .map_err(crate::tenant_rejected)?;
-            let rt = arc.lock().await;
+            let rt = arc.read().await;
             let _ = reset::store_import_report(&rt, data_hub_id, batch, &manifest.name, &report_json).await;
         }
     }
@@ -987,7 +987,7 @@ pub async fn retry_import(
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return unauthorized(e);
         }
@@ -1010,7 +1010,7 @@ pub async fn retry_import(
             Ok(rt) => rt,
             Err(e) => return crate::tenant_rejected(e),
         };
-        let rt = arc.lock().await;
+        let rt = arc.read().await;
         match reset::last_import_report(&rt, &data_hub_id, &batch_id).await {
             Ok(Some(s)) => s,
             Ok(None) => {

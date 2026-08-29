@@ -750,9 +750,10 @@ pub async fn available_versions(
 /// la más vieja. Vacío = no hay nada que elegir.
 ///
 /// **No recibe el `Runtime` a propósito**: lo que necesita del hub —la versión instalada y el pin—
-/// se lee antes, se suelta el candado y solo entonces se llama al Cloud. Sostener el `Mutex<Runtime>`
-/// durante un round-trip de red congelaría `/api/query` y `/api/command` —el TPV— mientras el
-/// marketplace tarda en contestar. Es el mismo cuidado que ya tiene `list_module_updates`.
+/// se lee antes, se suelta el candado y solo entonces se llama al Cloud. Sostener el guard del
+/// runtime durante un round-trip de red retendría a un escritor en cola (una instalación) y, tras
+/// él, a `/api/query` y `/api/command` —el TPV— mientras el marketplace tarda en contestar
+/// (hub#978). Es el mismo cuidado que ya tiene `list_module_updates`.
 ///
 /// La política la pone `module_update::offer`, **el mismo sitio donde vive la de `resolve`**: que la
 /// lista y la resolución automática no puedan discrepar es el punto — si el desplegable tuviera su

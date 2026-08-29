@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 use erplora_runtime::{EventSink, EventSource, Runtime};
 use erplora_vector::VectorStore;
 use serde_json::{json, Value as Json};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 
 /// Índice vectorial compartido para el routing de tools (§9.2b) y la ingestión de embeddings de
 /// módulos al instalar (§9.6). `None` = no hay índice → el asistente degrada a "todos los tools"
@@ -489,8 +489,22 @@ pub type MachineToken = Arc<RwLock<Option<String>>>;
 /// En Cloud ya viene fijado por el despliegue y la celda no cambia.
 pub type HubId = Arc<RwLock<String>>;
 
-/// Estado de la app Axum. El runtime no es `Sync` para mutación, así que va tras un `Mutex`;
-/// para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) es más que suficiente.
+/// The runtime as every host shares it (hub#978).
+///
+/// A `RwLock`, not a `Mutex`: commands, queries, the relay tick and every read-only route take
+/// the **shared** guard and overlap, so N tills cost N× the database, not N× a queue. Only what
+/// needs `&mut Runtime` — installing, updating, activating or removing a module, adopting the
+/// real `hub_id` at bootstrap — takes the **exclusive** guard, and waits for the requests in
+/// flight to finish first. Everything an overlapping command mutates (a step-up approval being
+/// spent, the WASM cache, the outbox) is already atomic on its own — a `std::sync::Mutex`
+/// inside the store or a transaction in Postgres — which is what makes the shared guard safe.
+///
+/// Until hub#978 this was a `tokio::Mutex` held for the whole `execute_command`, and the p50 of
+/// a sale scaled linearly with the number of tills (11 ms → 197 ms from 1 to 10 tills, measured).
+pub type SharedRuntime = Arc<tokio::sync::RwLock<Runtime>>;
+
+/// Estado de la app Axum. El runtime va tras el [`SharedRuntime`] de arriba (lectores en
+/// paralelo, escritores exclusivos); para 1–30 usuarios por hub (ARQUITECTURA.md §7.5) sobra.
 ///
 /// **Dos modos de topología** (ADR-0005):
 ///  - **single-tenant (N=1)** — `tenants = None`: hay UN runtime (`runtime`), el del hub/org del
@@ -502,7 +516,7 @@ pub type HubId = Arc<RwLock<String>>;
 ///    arranque), pero el camino de datos va por el router. Ver [`AppState::runtime_for`].
 #[derive(Clone)]
 pub struct AppState {
-    pub runtime: Arc<Mutex<Runtime>>,
+    pub runtime: SharedRuntime,
     pub events: broadcast::Sender<WsEvent>,
     pub config: HubConfig,
     /// Token de máquina **vivo** (hot-reload). Se siembra del `config.cloud_api_token` o de una
@@ -601,7 +615,7 @@ impl AppState {
         // encenderlo no es un cierre.
         runtime.set_demo_hub(config.demo);
         Self {
-            runtime: Arc::new(Mutex::new(runtime)),
+            runtime: Arc::new(tokio::sync::RwLock::new(runtime)),
             events: tx,
             config,
             machine_token,
@@ -649,7 +663,7 @@ impl AppState {
     pub async fn runtime_for(
         &self,
         hub_id: &str,
-    ) -> Result<Arc<Mutex<Runtime>>, crate::tenant::TenantError> {
+    ) -> Result<SharedRuntime, crate::tenant::TenantError> {
         match &self.tenants {
             Some(router) => router.resolve_runtime(hub_id).await,
             None => {
@@ -658,12 +672,17 @@ impl AppState {
                 // internos (settings, perfil, instalación…) usen el mismo scope que la auth. La
                 // autoridad es la celda del host, NUNCA el argumento (que en query/command puede
                 // proceder de `X-Hub-Id` en modo dev).
+                //
+                // Read first, write only on the (once-per-life) mismatch: this runs on EVERY
+                // request, and an exclusive guard here would put the queue hub#978 removed
+                // right back — a writer waits for every reader and blocks the ones behind it.
                 let effective_hub_id = self.hub_id();
-                let mut runtime = self.runtime.lock().await;
-                if runtime.hub_id() != effective_hub_id {
-                    runtime.adopt_hub_id(effective_hub_id);
+                if self.runtime.read().await.hub_id() != effective_hub_id {
+                    let mut runtime = self.runtime.write().await;
+                    if runtime.hub_id() != effective_hub_id {
+                        runtime.adopt_hub_id(effective_hub_id);
+                    }
                 }
-                drop(runtime);
                 Ok(self.runtime.clone())
             }
         }
