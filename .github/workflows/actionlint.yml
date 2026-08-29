@@ -151,18 +151,21 @@ jobs:
           bash ./scripts/tests/canonical-mirrors-verdict.test.sh
       # ── Contrato del lookup compartido de alertas (hub#1246) ─────────────────────────
       # `scripts/ci/alert-issue.sh` reemplaza el `gh issue list --search` (índice que va por
-      # detrás de la realidad) por REST + filtro local en los tres workflows con paso de
-      # alerta. Sin este paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que
-      # reintrodujera `--search` en cualquiera de los tres, o rompiera el propio script, no
-      # ejecutaría ninguno de sus dos tests — exactamente el hueco que `canonical-mirrors.yml`
-      # ya sufrió una vez (hub#1260) por un filtro `paths` sin ensanchar.
+      # detrás de la realidad) por REST + filtro local en TODOS los pasos de alerta. Sin este
+      # paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que reintrodujera
+      # `--search` en cualquiera de ellos, o rompiera el propio script, no ejecutaría ninguno
+      # de sus dos tests — exactamente el hueco que `canonical-mirrors.yml` ya sufrió una vez
+      # (hub#1260) por un filtro `paths` sin ensanchar.
       - name: Contrato de scripts/ci/alert-issue.sh (hub#1246)
         run: |
           set -euo pipefail
           bash ./scripts/tests/alert-issue.test.sh
 
       # pyyaml ya está instalado por el paso de arriba.
-      - name: Contrato de los pasos de alerta de test-hub/image-freshness/test-hub-modules (hub#1246)
+      # El contrato ya no lleva lista fija de workflows: recorre `.github/workflows/**` y exige
+      # la delegación a CUALQUIER paso que toque una issue, así que un workflow nuevo no puede
+      # quedarse fuera de la guardia por no estar apuntado (hub#1327).
+      - name: Contrato de los pasos de alerta de todos los workflows (hub#1246, hub#1327)
         run: |
           set -euo pipefail
           bash ./scripts/tests/alert-issue-workflows.test.sh

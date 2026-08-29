@@ -145,10 +145,9 @@ jobs:
             --bind 0.0.0.0:8788
 
       # Idempotent alert, same pattern as `image-freshness.yml` (hub#652): one open issue, reused
-      # (comment) while the condition persists — never one per run. Copied inline rather than
-      # calling a shared helper: no unified issue-lookup script has landed on `develop` yet: keep
-      # this comment as the pointer for whoever lands one (see decision-log / architecture#501)
-      # to fold this step into it too.
+      # (comment) while the condition persists — never one per run. The shared lookup this step
+      # was waiting for landed as `scripts/ci/alert-issue.sh` (hub#1246), so it delegates like
+      # every other alert step instead of keeping a copy that can drift (hub#1327).
       - name: Open or refresh the alert issue
         if: failure() && steps.check.outcome == 'failure'
         env:
@@ -172,12 +171,9 @@ jobs:
           Este issue se reutiliza (un comentario por detección) mientras la condición persista;
           ciérralo cuando el job vuelva a estar en verde."
 
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"N-1 no sirve contra el esquema de la rama actual" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refreshing open alert issue #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # `--search` reads GitHub's search INDEX, which lags behind reality: it returned ZERO
+          # with open issues on 2026-08-16 and hit intermittently later, so two detections could
+          # each miss the other's issue and open TWO (hub#1246). The shared script lists over the
+          # REST API and matches the title LOCALLY.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
