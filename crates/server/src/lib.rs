@@ -4327,11 +4327,12 @@ async fn activate_module(
     match rt.activate(&id).await {
         Ok(()) => {
             drop(rt);
-            // hub#1317 (revisión de hub#1311): antes de esto, activar no emitía nada por `/ws` —
-            // el mismo agujero que hub#631 cerró SOLO para `module.installed`. Otra pestaña/
-            // dispositivo del mismo hub (y, desde hub#1211, el caché de módulos activos que lee
-            // `queryOptional`) se quedaba con el estado de ayer hasta recargar. Misma forma que
-            // `module.installed`: frame crudo sin `FRAME_MODULE` (es del hub, no de un módulo).
+            // hub#1317 (review of hub#1311): before this, activating a module emitted nothing
+            // over `/ws` — the same hole hub#631 closed ONLY for `module.installed`. Another
+            // tab/device of the same hub (and, since hub#1211, the module-sdk's active-modules
+            // cache read by `queryOptional`) stayed on yesterday's state until it reloaded. Same
+            // shape as `module.installed`: a raw frame with no `FRAME_MODULE` (it's the hub's
+            // own, not a module's).
             st.broadcast(json!({ "type": "module.activated", "module_id": id }));
             Json(json!({ "ok": true })).into_response()
         }
@@ -4351,8 +4352,8 @@ async fn deactivate_module(
     match rt.deactivate(&id).await {
         Ok(()) => {
             drop(rt);
-            // hub#1317: mismo razonamiento que `activate_module` — sin esto, otra pestaña seguía
-            // ofreciendo un módulo que el dueño acababa de apagar hasta que alguien la recargara.
+            // hub#1317: same reasoning as `activate_module` — without this, another tab kept
+            // offering a module the owner had just switched off until someone reloaded it.
             st.broadcast(json!({ "type": "module.deactivated", "module_id": id }));
             Json(json!({ "ok": true })).into_response()
         }
@@ -4391,10 +4392,10 @@ async fn uninstall_module(
     match outcome {
         Ok(()) => {
             drop(rt);
-            // hub#1317: se emite YA, antes de la limpieza best-effort de embeddings de abajo — lo
-            // que le importa a otra pestaña/dispositivo es que el runtime ya desinstaló el módulo,
-            // no si el índice vectorial (best-effort) llegó a limpiarse. Aplica igual a `force`:
-            // el módulo se fue de todas formas.
+            // hub#1317: emitted NOW, before the best-effort embeddings cleanup below — what
+            // matters to another tab/device is that the runtime already uninstalled the module,
+            // not whether the best-effort vector index cleanup finished. Same for `force`: the
+            // module is gone either way.
             st.broadcast(json!({ "type": "module.uninstalled", "module_id": id }));
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
             // Best-effort: no falla la desinstalación si el store da error.

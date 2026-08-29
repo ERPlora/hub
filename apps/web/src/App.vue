@@ -345,12 +345,12 @@ async function gateAndRefresh(): Promise<void> {
       })();
     });
   }
-  // hub#1317 (revisión de hub#1311): activar/desactivar/desinstalar no emitían NADA por `/ws` —
-  // el mismo agujero que hub#631 cerró solo para `module.installed`. Otra pestaña/dispositivo del
-  // mismo hub se quedaba con la nav de ayer hasta recargar (activar `modifiers` desde el back-office
-  // no llegaba al TPV abierto en la caja). Misma reacción que instalar: entitlement puede cambiar
-  // lo que un módulo recién (des)activado puede mostrar, y la nav puede haber perdido/ganado una
-  // entrada entera.
+  // hub#1317 (review of hub#1311): activate/deactivate/uninstall emitted NOTHING over `/ws` —
+  // the same hole hub#631 closed only for `module.installed`. Another tab/device of the same hub
+  // stayed on yesterday's nav until it reloaded (activating `modifiers` from the back office
+  // never reached the POS open at the register). Same reaction as install: entitlement can
+  // change what a just-(de)activated module is allowed to show, and the nav may have lost or
+  // gained an entire entry.
   if (!moduleActivatedUnsub) {
     moduleActivatedUnsub = getClient().on('module.activated', () => {
       void (async () => {
@@ -381,8 +381,8 @@ async function gateAndRefresh(): Promise<void> {
 }
 
 /**
- * Desuscripción de los eventos de ciclo de vida de módulo (una sola suscripción viva por evento;
- * App.vue no se desmonta). `module.installed` es de antes de hub#1317; las otras tres, de hub#1317.
+ * Unsubscribe for the module lifecycle events (one live subscription per event; App.vue never
+ * unmounts). `module.installed` predates hub#1317; the other three are from hub#1317.
  */
 let moduleInstalledUnsub: (() => void) | null = null;
 let moduleActivatedUnsub: (() => void) | null = null;
