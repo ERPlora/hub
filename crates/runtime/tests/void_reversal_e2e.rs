@@ -13,13 +13,13 @@
 //! vuelo del módulo `sales` (ajeno). El disparo real es `sales.void` (solo UPDATE+emit) y el
 //! relay del Outbox; las aserciones leen por las queries públicas reales.
 //!
-//! **hub#1264, slice 4 (`cash_register`, ERPlora/cash_register#67):** la mitad de este fichero
-//! que afirma comportamiento de `cash_register` (`_reverse_sale`: refund compensatorio, arqueo,
-//! no-op en tarjeta) ya vive en `cash_register/tests/reverse_on_void.hub.test.py`. El fichero NO
-//! se borra ni se recorta aquí: sus 4 tests entrelazan esa aserción con la de `inventory`
-//! (`_restock_on_void`, restitución de stock) DENTRO de las mismas funciones — no es partible sin
-//! diseñar la batería que le toca a `inventory`, fuera del alcance de este slice. Queda para quien
-//! tome el slice de `inventory`, con el precedente ya escrito en `cash_register`.
+//! **hub#1264, slice 4 (`cash_register`, ERPlora/cash_register#67):** the half of this file that
+//! asserts `cash_register` behaviour (`_reverse_sale`: compensating refund, reconciliation, no-op
+//! on card) already lives in `cash_register/tests/reverse_on_void.hub.test.py`. The file is NOT
+//! deleted or trimmed here: its 4 tests interleave that assertion with `inventory`'s
+//! (`_restock_on_void`, stock restored) INSIDE the same functions — it cannot be split without
+//! designing the battery that belongs to `inventory`, out of this slice's scope. Left for whoever
+//! takes the `inventory` slice, with the precedent already written in `cash_register`.
 use std::path::PathBuf;
 
 use erplora_db::{Params, testutil::fresh_db};
