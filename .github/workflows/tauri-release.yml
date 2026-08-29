@@ -106,7 +106,9 @@ jobs:
           # `ci-runner-1` es una máquina Linux. Windows y macOS se quedan donde están porque no
           # hay dónde llevarlos — Hetzner no ofrece imágenes Windows y macOS exige hardware
           # Apple. No es una decisión de coste: es que no existe la alternativa.
-          - os: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+          # amd64 ONLY (the .deb/AppImage are x86_64): `CI_BUILD_RUNS_ON` pins this entry to
+          # `["self-hosted","X64"]` so it never lands on the arm64 Mac helper (infra/ci-helper-mac).
+          - os: ${{ fromJSON(vars.CI_BUILD_RUNS_ON || '"ubuntu-latest"') }}
             label: linux
           - os: windows-latest
             label: windows
@@ -362,7 +364,9 @@ jobs:
     # Android es Linux: sale del presupuesto igual que el resto. Ojo con lo que este job da por
     # supuesto de la imagen — el `node -e` de más abajo usa «el Node preinstalado del runner»
     # (declarado a propósito, hub#465). `ci-runner-1` lo trae instalado a nivel de sistema por eso.
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # amd64 ONLY: the Android NDK ships x86_64 host tools; `CI_BUILD_RUNS_ON` keeps this job off
+    # the arm64 Mac helper (infra/ci-helper-mac).
+    runs-on: ${{ fromJSON(vars.CI_BUILD_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

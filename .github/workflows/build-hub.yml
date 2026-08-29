@@ -62,7 +62,10 @@ jobs:
     # que rodar a la flota. `ci-runner-1` (Hetzner, dedicado) sale de ese presupuesto.
     # Un interruptor y no un valor fijo porque el runner es UNA máquina: si se cae o se recicla,
     # borrar la Variable devuelve la CI a GitHub sin tocar ningún workflow.
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ⚠️ amd64 ONLY: the fleet runs this image on x86_64 and buildx builds for the daemon's own
+    # arch. `CI_BUILD_RUNS_ON` (repo Variable, `["self-hosted","X64"]`) keeps the job away from
+    # the arm64 Mac helper (infra/ci-helper-mac); unset, it falls back to GitHub's runners.
+    runs-on: ${{ fromJSON(vars.CI_BUILD_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     permissions:
       contents: read
