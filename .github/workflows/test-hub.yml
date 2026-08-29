@@ -241,12 +241,16 @@ jobs:
           # failure ("if one changes image, the other must too")… and was written in the same
           # change that left this filter untouched.
           #
-          # The port stays coupled to this file on purpose: it comes from the service's `ports`
-          # mapping via the expression below. The image name never appears here.
+          # Neither the image name nor a port filter appears here any more: the runner exposes the
+          # service container's ID as `job.services.postgres.id`, which cannot drift when the image
+          # changes and does not depend on the engine's `docker ps --filter publish=` semantics.
+          # (Docker Desktop's engine does NOT match ephemeral host ports with that filter — found on
+          # 2026-08-29 bringing up the arm64 Mac helper, infra/ci-helper-mac — while ci-runner-1's
+          # engine does. The ID works on both.)
           PG_PORT="${{ job.services.postgres.ports['5432'] }}"
-          PG=$(docker ps --filter "publish=${PG_PORT}" --format '{{.ID}}' | head -1)
-          if [ -z "$PG" ]; then
-            echo "::error::no Postgres container found publishing host port ${PG_PORT}."
+          PG="${{ job.services.postgres.id }}"
+          if [ -z "$PG" ] || ! docker inspect "$PG" >/dev/null 2>&1; then
+            echo "::error::service container '${PG:-<empty>}' (expected to publish host port ${PG_PORT}) is not visible through the docker socket."
             echo "Containers currently running:"
             docker ps --format '  {{.ID}}  {{.Image}}  {{.Ports}}'
             exit 1
