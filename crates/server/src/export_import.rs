@@ -1212,6 +1212,7 @@ mod tests {
                 module_id: "inventory".into(),
                 version: "1.2.0".into(),
                 dir: PathBuf::from("/tmp/x"),
+                also_installed: Vec::new(),
             }),
         );
         assert_eq!(entry["status"], "installed");

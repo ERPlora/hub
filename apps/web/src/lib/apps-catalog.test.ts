@@ -5,7 +5,7 @@
 // (Bug reportado en el demo 2026-07-12: un módulo recién instalado seguía como "Disponible".)
 import { describe, expect, it } from 'vitest';
 
-import { catalogActionFor, catalogRowState, isModuleInstalled } from './apps-catalog';
+import { alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled } from './apps-catalog';
 
 describe('isModuleInstalled', () => {
   it('el Cloud manda cuando dice instalado', () => {
@@ -71,5 +71,27 @@ describe('catalogActionFor', () => {
     expect(catalogActionFor('installed')).toBe(null);
     expect(catalogActionFor('unavailable')).toBe(null);
     expect(catalogActionFor('installing')).toBe(null);
+  });
+});
+
+// hub#1130: `request-install` now reports `also_installed` (dependency ids) alongside the module
+// the owner actually asked for. The screen must name them by their catalogue NAME — the owner
+// asked to install "Verifactu", not "invoice"/"sales"/"inventory".
+describe('alsoInstalledNames', () => {
+  const catalog = [
+    { id: 'invoice', name: 'Facturas' },
+    { id: 'sales', name: 'Ventas' },
+  ];
+
+  it('resolves each dragged-in id to its catalogue name, in the given order', () => {
+    expect(alsoInstalledNames(['invoice', 'sales'], catalog)).toEqual(['Facturas', 'Ventas']);
+  });
+
+  it('falls back to the raw id for a module the catalogue does not know', () => {
+    expect(alsoInstalledNames(['inventory'], catalog)).toEqual(['inventory']);
+  });
+
+  it('nothing dragged in → empty list, never dropped silently', () => {
+    expect(alsoInstalledNames([], catalog)).toEqual([]);
   });
 });

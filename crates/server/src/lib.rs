@@ -2260,6 +2260,10 @@ async fn request_install(
                 "module_id": installed.module_id,
                 "version": installed.version,
                 "status": "installed",
+                // hub#1130: dependencies the install-plan/manifest resolution dragged in that
+                // were NOT installed before this call. Always present — empty when nothing was
+                // dragged in — so the caller never has to special-case the shape.
+                "also_installed": installed.also_installed,
             }))
             .into_response()
         }

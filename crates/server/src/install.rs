@@ -113,6 +113,11 @@ pub struct Installed {
     pub version: String,
     /// Carpeta extraída en el cache local (para la ingestión de embeddings, §9).
     pub dir: PathBuf,
+    /// hub#1130: ids que la resolución de dependencias (plan del Cloud, ADR-0060, o el fallback
+    /// anidado por manifest) instaló como efecto lateral de `module_id`, y que **no** estaban
+    /// instalados antes de esta llamada. `module_id` nunca aparece en su propia lista. Vacío —
+    /// nunca ausente— cuando no arrastró nada, para que quien la lea no distinga dos formas.
+    pub also_installed: Vec<String>,
 }
 
 /// Política de firma para **tests**: admite módulos sin firmar (los mocks del Cloud de los tests
@@ -497,7 +502,11 @@ async fn acquire_and_install(
     }
 
     let mut installing: std::collections::HashSet<String> = std::collections::HashSet::new();
-    install_recursive(
+    // hub#1130: shared across the whole recursion, so a dependency's own nested dependencies land
+    // here too — depth-first, so every dependency is pushed only after ITS dependencies already
+    // are (the topological order the response promises).
+    let mut dragged_in: Vec<String> = Vec::new();
+    let mut installed = install_recursive(
         http,
         cloud_base_url,
         cache_root,
@@ -506,11 +515,14 @@ async fn acquire_and_install(
         module_id.to_string(),
         requested_version.to_string(),
         &mut installing,
+        &mut dragged_in,
         on_progress,
         signature_policy,
         updating.map(str::to_string),
     )
-    .await
+    .await?;
+    installed.also_installed = dragged_in;
+    Ok(installed)
 }
 
 /// Guarda en la base del PROPIO hub el paquete que se acaba de verificar e instalar (hub#571).
@@ -1035,6 +1047,11 @@ async fn execute_plan(
 ) -> Result<PlanOutcome, InstallError> {
     let cloud = CloudClient::new(cloud_base_url);
     let mut headline: Option<Installed> = None;
+    // hub#1130: every node OTHER than the requested module that this call actually installs
+    // (the loop below `continue`s past whatever was already installed), in plan order — the same
+    // topological order the Cloud computed. Reported back so the caller can say what got dragged
+    // in instead of staying silent about it.
+    let mut dragged_in: Vec<String> = Vec::new();
 
     // The plan's own closure: a dependency listed anywhere in the plan will be installed by it
     // (dependencies-first order), so only deps outside this set make the plan incomplete.
@@ -1137,10 +1154,20 @@ async fn execute_plan(
 
         mark_installed(http, &cloud, auth, &node.module_id, &node.version).await;
 
+        // hub#1130: this node just got installed by THIS call. If it is not the headline, it is
+        // something the caller did not ask for by name — record it so the response can say so.
+        if node.module_id != module_id {
+            dragged_in.push(installed_id.clone());
+        }
+
         let installed = Installed {
             module_id: installed_id,
             version: node.version.clone(),
             dir,
+            // Filled in below once the whole plan finished executing: at this point in the loop
+            // there could still be more dependents after the headline (the plan is not required to
+            // put `requested` last), so the final list is only complete once the loop is done.
+            also_installed: Vec::new(),
         };
         if node.module_id == module_id {
             headline = Some(installed);
@@ -1150,12 +1177,16 @@ async fn execute_plan(
     // The requested module may be absent from the plan because it was ALREADY installed
     // (`already_satisfied`): reinstalling adds nothing, so report what is there.
     match headline {
-        Some(i) => Ok(PlanOutcome::Installed(i)),
+        Some(mut i) => {
+            i.also_installed = dragged_in;
+            Ok(PlanOutcome::Installed(i))
+        }
         None if runtime.registry().is_installed(module_id) => {
             Ok(PlanOutcome::Installed(Installed {
                 module_id: module_id.to_string(),
                 version: runtime.registry().module_version(module_id),
                 dir: cache_root.to_path_buf(),
+                also_installed: dragged_in,
             }))
         }
         // Empty plan and the module is not installed: the Cloud does not consider it installable here.
@@ -1196,6 +1227,10 @@ fn install_recursive<'a>(
     module_id: String,
     requested_version: String,
     installing: &'a mut std::collections::HashSet<String>,
+    // hub#1130: ids installed anywhere in this recursion, in the order they finished installing
+    // (depth-first ⇒ topological). Shared by mutable reference across every frame, including the
+    // outermost (the requested module itself is never pushed — only its dependencies are).
+    dragged_in: &'a mut Vec<String>,
     on_progress: OnProgress<'a>,
     signature_policy: &'a cloud_client::SignaturePolicy,
     updating: Option<String>,
@@ -1254,7 +1289,7 @@ fn install_recursive<'a>(
             if installing.contains(&dep) || runtime.registry().is_installed(&dep) {
                 continue;
             }
-            install_recursive(
+            let installed_dep = install_recursive(
                 http,
                 cloud_base_url,
                 cache_root,
@@ -1263,12 +1298,16 @@ fn install_recursive<'a>(
                 dep,
                 "latest".to_string(),
                 &mut *installing,
+                &mut *dragged_in,
                 on_progress,
                 signature_policy,
                 // Una dependencia nunca es «el módulo que se actualiza»: se instala si falta.
                 None,
             )
             .await?;
+            // hub#1130: record it AFTER it (and everything IT dragged in) is fully installed —
+            // depth-first push order is topological order.
+            dragged_in.push(installed_dep.module_id);
         }
 
         // (5) Instalar el módulo (migra, registra, activa) — ya con sus deps presentes.
@@ -1294,6 +1333,11 @@ fn install_recursive<'a>(
             module_id: installed_id,
             version: version.version,
             dir,
+            // hub#1130: this frame's own dependencies are already in the SHARED `dragged_in` by
+            // now; the caller (outermost `acquire_and_install`) reads that accumulator directly
+            // once the whole recursion finishes, so this field is left empty here on purpose —
+            // filling it in per-frame would just be discarded (and double-count on the way back up).
+            also_installed: Vec::new(),
         })
     })
 }
