@@ -58,6 +58,7 @@ name: Canonical mirrors (module-toolkit)
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'schemas/module.schema.json'
       - 'crates/db/src/lib.rs'
@@ -99,6 +100,10 @@ permissions:
 
 jobs:
   mirrors:
+    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
+    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
+    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: la copia del toolkit sigue al día
     # The org's own runner when `CI_RUNNER_LABEL` is set, the hosted image when it is not. The
     # fallback is the point: if the variable disappears, this keeps running instead of queueing
