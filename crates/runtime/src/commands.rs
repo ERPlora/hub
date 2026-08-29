@@ -3426,6 +3426,60 @@ mod tests {
         );
     }
 
+    /// **Regression test for ERPlora/hub#1264.** The business-identity enrichment at the top of
+    /// [`execute_at`] must run at ANY relay depth, not only at the call's root (`depth == 0`).
+    ///
+    /// FIX QA (2026-06-25): the original condition was `depth == 0`, which left commands
+    /// delivered by the Outbox relay — listeners run at `depth > 0`, `Origin::Internal`, with a
+    /// ctx built fresh by `outbox::listener_ctx` whose business identity is always empty — WITHOUT
+    /// enrichment. The real incident: `sale.completed` (depth 1) → `invoice.create_from_sale`
+    /// (listener, depth 1) issued invoices with a BLANK issuer, so VeriFactu's `ingest_invoice`
+    /// no-opped (an accepted record is never re-sent, ADR-0189) — zero registers, zero QR, and no
+    /// error anywhere. This used to be pinned ONLY by `invoice_e2e.rs`'s
+    /// `auto_f2_propagates_business_issuer_via_outbox`, a hub e2e that decorated the kernel with
+    /// `sales`+`invoice` — another module's topology, hub#1264 §5. The kernel proves its own
+    /// contract with its own fixture instead.
+    #[tokio::test]
+    async fn dispatcher_enriches_business_identity_at_any_relay_depth_hub1264() {
+        let db = db_with_fiscal_tables().await;
+        set_business_identity(&db, "h1").await;
+        let reg = registry_with_fiscal_command();
+        // The ctx the OUTBOX RELAY hands a listener: fresh, business identity always empty — only
+        // `hub_settings` carries it, never the relay's own context.
+        let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
+
+        // depth = 1 simulates a listener delivered by the relay (Origin::Internal): never the root.
+        let out = execute_at(
+            &db,
+            &reg,
+            "invoice.create",
+            &fiscal_payload(),
+            &ctx,
+            1,
+            &[],
+            Origin::Internal,
+            None,
+        )
+        .await
+        .expect("a listener at depth > 0 must still get the business identity enriched");
+        assert_eq!(out["ok"], json!(true));
+
+        let rows = db
+            .query(
+                "SELECT issuer_nif, issuer_name FROM fiscal_doc",
+                &Params::new(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rows.rows.len(), 1);
+        assert_eq!(
+            rows.rows[0]["issuer_nif"], json!("B12345674"),
+            "a document stamped by a RELAYED command (depth > 0) must carry the hub's real \
+             issuer, never a blank one"
+        );
+        assert_eq!(rows.rows[0]["issuer_name"], json!("ACME SL"));
+    }
+
     /// Native handler op that resolves to the fiscal SQL of its own module — the exact
     /// path the real `invoice` WASM handler takes (`persist_handler_output`).
     #[derive(Debug)]
