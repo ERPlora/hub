@@ -1603,6 +1603,34 @@ export interface DiscardResult {
   discard_reason?: string;
 }
 
+/**
+ * **One dead-letter somebody CLOSED**, with the whole stamp the close left behind (hub#1117).
+ *
+ * The sibling of {@link DeadEvent}, and deliberately not the same shape. A dead-letter is a
+ * decision waiting to be made, so it travels with its payload — that is what tells a lost invoice
+ * from noise. A closed row is a decision already made, and what is asked of it afterwards is «who
+ * closed this, when and why», never «what did it carry»: **no payload travels here**.
+ *
+ * The three parts of the stamp arrive together because an audit record is the three together.
+ * «Somebody closed this» was already stored before hub#955 and it is the half that needed no
+ * storing; the reason is the half only the person closing the row knew.
+ */
+export interface DiscardedEvent {
+  id: string;
+  event_name: string;
+  /** The **emitting** module (attribution), as in {@link DeadEvent}. */
+  module_id: string;
+  /** Why it died in the first place — the half of the story the hub knows on its own. */
+  last_error: string;
+  created_at: string;
+  /** When it was closed. Also the row's retention clock: ninety days from here it is pruned. */
+  discarded_at: string;
+  /** `hub_user:<id>` — the resolved session, never anything the caller sent. */
+  discarded_by: string;
+  /** Why a person closed it, **as stored** (trimmed and capped). `''` when none was given. */
+  discard_reason: string;
+}
+
 /** One link of a correlation chain (hub#666). No payload: the chain is for walking, not inspecting. */
 export interface CorrelatedEvent {
   id: string;
@@ -1638,17 +1666,17 @@ export interface EventTrace {
  *
  * Not the live event bus: to react to events, use `subscribe`. This is the read the flow editor is
  * built from — {@link list} fills its «when this happens» dropdown, {@link shape} its data picker,
- * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total` — plus the six gestures
+ * so the owner chooses «Total de la venta — 42,50 €» and not `sale.total` — plus the seven gestures
  * that make a failure recoverable ({@link dead}, {@link deadCount}, {@link retry}, {@link discard},
- * {@link retryAll}, {@link trace}), which is the tray `ERPlora/flows#20` draws.
+ * {@link discarded}, {@link retryAll}, {@link trace}), which is the tray `ERPlora/flows#20` draws.
  *
- * **All eight sit behind the same two gates** (ADR-0312, hub#953): a human owner/admin session the
+ * **All nine sit behind the same two gates** (ADR-0312, hub#953): a human owner/admin session the
  * runtime checks, plus `manage_flows` declared in the calling module's `module.json` and granted by
  * the owner. The gate matters MORE for the dead-letter half than for the catalogue: a dead-letter
  * carries the whole payload, and {@link retry} re-runs another module's command with THAT module's
  * authority (hub#686). Without it, one installed module could drive another's automations.
  *
- * Eight methods, eight routes, no method that takes a path — the same discipline as
+ * Nine methods, nine routes, no method that takes a path — the same discipline as
  * {@link FlowsApi}, pinned by the same test file.
  */
 export class EventsApi {
@@ -1761,6 +1789,30 @@ export class EventsApi {
       path: `${EVENTS_BASE_PATH}/${event}/discard`,
       ...(reason === undefined ? {} : { body: { reason } }),
     }) as Promise<DiscardResult>;
+  }
+
+  /**
+   * `GET /api/hub/events/discarded` — **what was closed by hand**, newest closure first, with the
+   * whole stamp: who, when and WHY (hub#1117).
+   *
+   * The read half of {@link discard}. All three parts had been stored since hub#955 and nothing
+   * projected any of them: {@link dead} filters `dead`, so closing a row took it out of the only
+   * listing there was, and {@link trace} returns the status without the stamp. A tray could show
+   * «cerrado porque…» only for as long as the component that closed it stayed mounted — the
+   * promise «durante noventa días» was checkable with `psql` and nowhere else.
+   *
+   * The ninety days need no argument here: retention is a hard delete, so a row past the window is
+   * simply not in the answer. No id and no filter, like {@link retryAll} — the hub answers about
+   * ITS OWN closed rows, and no argument exists that could name another tenant's.
+   *
+   * **No payload**, unlike {@link dead}: this is an audit read of a decision already made. The
+   * tray `ERPlora/flows#47` draws is built on it.
+   */
+  async discarded(): Promise<DiscardedEvent[]> {
+    return this.send({
+      method: 'GET',
+      path: `${EVENTS_BASE_PATH}/discarded`,
+    }) as Promise<DiscardedEvent[]>;
   }
 
   /**

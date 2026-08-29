@@ -2134,6 +2134,15 @@ impl Runtime {
         outbox::list_dead(self.db.as_ref(), &self.hub_id, limit).await
     }
 
+    /// Dead-letters of this hub an operator CLOSED, newest closure first (hub#1117) — the read
+    /// half of [`Self::discard_dead_event`]. Who closed each row, when and WHY, which had been
+    /// written in full since hub#955 and projected by nothing: closing a row took it out of
+    /// `list_dead`, the only listing there was. No payload travels: the decision is made, and what
+    /// is asked of a closed row afterwards is the stamp, not the cargo.
+    pub async fn list_discarded_events(&self, limit: i64) -> Result<Vec<outbox::DiscardedEvent>> {
+        outbox::list_discarded(self.db.as_ref(), &self.hub_id, limit).await
+    }
+
     /// Puts a dead-letter back in front of the relay (`pending`, attempts reset). Three answers,
     /// because a row that CANNOT be replayed is neither a success nor a missing id
     /// ([`outbox::RetryOutcome`], hub#827).

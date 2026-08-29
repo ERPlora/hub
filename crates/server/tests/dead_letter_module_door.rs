@@ -173,13 +173,16 @@ async fn send(router: &axum::Router, request: Request<Body>) -> axum::response::
 /// Every gesture of the queue, as `(method, uri)`. The list is here so a route added later without
 /// a gate turns this red instead of shipping open.
 ///
-/// Ordered so that a caller who gets THROUGH all six leaves each row to its own gesture:
+/// Ordered so that a caller who gets THROUGH all seven leaves each row to its own gesture:
 /// `retry-all` goes last because it sweeps every remaining dead row, and a `retry` after it would
 /// meet a `pending` one and answer `404` for a reason that has nothing to do with any gate.
 fn every_gesture() -> Vec<(&'static str, String)> {
     vec![
         ("GET", "/api/hub/events/dead".to_string()),
         ("GET", "/api/hub/events/dead/count".to_string()),
+        // The closed rows and their reasons (hub#1117): an audit listing is not a laxer read than
+        // the queue it audits — it names what every automation of this business decided.
+        ("GET", "/api/hub/events/discarded".to_string()),
         ("GET", format!("/api/hub/events/{DEAD_LISTED}/trace")),
         ("POST", format!("/api/hub/events/{DEAD_RETRY}/retry")),
         ("POST", format!("/api/hub/events/{DEAD_DISCARD}/discard")),

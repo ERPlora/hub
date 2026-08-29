@@ -106,6 +106,39 @@ pub async fn list_dead(State(st): State<AppState>, headers: HeaderMap) -> Respon
     }
 }
 
+/// GET /api/hub/events/discarded — **the rows closed by hand**, with the whole stamp: who closed
+/// each one, when and why (hub#1117). Newest closure first. Auth = the same door as the rest of
+/// this file (admin session + `manage_flows` when the request names a module).
+///
+/// The stamp had been written in full since hub#955 and no surface projected it: `…/dead` filters
+/// `status='dead'`, so closing a row took it out of the only listing there was, and
+/// `…/{id}/trace` returns none of the three columns. The tray promises on screen «el hub guarda
+/// quién cerró cada uno, cuándo y por qué durante noventa días» and that sentence could only be
+/// checked with `psql`. A record nobody can read is not a record.
+///
+/// **No payload**, unlike `…/dead`: there the payload is what lets an operator choose between
+/// retrying and closing, and here the decision is already made. What is asked of a closed row is
+/// the stamp, not the cargo — and this is the widest reading of the outbox, so it grows no wider
+/// than the case needs.
+///
+/// The ninety days of ADR-0309 are respected **by construction**: retention is a hard `DELETE`,
+/// so a pruned row is not in the table and cannot come out here. Nothing to filter, nothing to
+/// drift from the policy.
+pub async fn list_discarded(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(arc) => arc,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.lock().await;
+    if let Err(response) = require_admin_and_capability(&headers, &st, &rt).await {
+        return response;
+    }
+    match rt.list_discarded_events(DEAD_PAGE).await {
+        Ok(events) => Json(json!({ "ok": true, "data": events })).into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// GET /api/hub/events/dead/count — cuántas dead-letters hay AHORA. Count barato (sin payloads)
 /// para alimentar el badge de la campana del topbar por sondeo, sin arrastrar las filas enteras que
 /// pesa el listado. Cuenta SOLO `dead` (no `delivered`/`pending`/`discarded`). Auth = sesión admin.

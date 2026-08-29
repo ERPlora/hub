@@ -1620,6 +1620,7 @@ pub fn app(state: AppState) -> Router {
         // cierra un registro para siempre, así que NO se abren a una API key ni al token de máquina.
         .route("/api/hub/events/dead", get(outbox_admin::list_dead))
         .route("/api/hub/events/dead/count", get(outbox_admin::count_dead))
+        .route("/api/hub/events/discarded", get(outbox_admin::list_discarded))
         .route("/api/hub/events/retry-all", post(outbox_admin::retry_all_dead))
         .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
         .route(
