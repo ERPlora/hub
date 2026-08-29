@@ -38,6 +38,10 @@ TARGETS = [
     (".github/workflows/test-hub.yml", "develop is broken after a merge"),
     (".github/workflows/image-freshness.yml", "main HEAD has no image in GHCR"),
     (".github/workflows/test-hub-modules.yml", "Los módulos publicados ROMPEN contra develop"),
+    # hub#1308: el paso que avisa de que un tag no pudo publicar `@erplora/module-sdk`. Entra en
+    # esta lista el mismo día que nace, para que no repita el `--search` que hub#1246 arrancó de
+    # los otros tres.
+    (".github/workflows/build-hub.yml", "El SDK @erplora/module-sdk no se pudo publicar en GitHub Packages"),
 ]
 
 failures = []
