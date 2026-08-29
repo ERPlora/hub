@@ -125,7 +125,7 @@ pub async fn usage_series(
     Query(q): Query<RangeQuery>,
 ) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(error) = auth::require_user_session(&headers, &st.config, &rt).await {
             return (
                 StatusCode::UNAUTHORIZED,

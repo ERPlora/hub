@@ -55,6 +55,12 @@ pub fn alta_hash(
 }
 
 /// Huella SHA-256 de un registro de **anulación** (sin TipoFactura/CuotaTotal/ImporteTotal).
+///
+/// hub#1330: los nombres de campo de la anulación NO son los del alta — la AEAT fija para
+/// `RegistroAnulacion/IDFactura` los nombres `IDEmisorFacturaAnulada`/`NumSerieFacturaAnulada`/
+/// `FechaExpedicionFacturaAnulada` («Detalle de las especificaciones técnicas para generación
+/// de la huella o hash de los registros de facturación», v0.1.2, 27/08/2024, §3.b), ya
+/// reflejados en el XML que emite `aeat.rs` (`build_soap`, bloque `RegistroAnulacion`).
 pub fn anulacion_hash(
     issuer_nif: &str,
     invoice_number: &str,
@@ -63,8 +69,8 @@ pub fn anulacion_hash(
     generation_timestamp: &str,
 ) -> String {
     let input = format!(
-        "IDEmisorFactura={issuer_nif}&NumSerieFactura={invoice_number}\
-         &FechaExpedicionFactura={fecha}\
+        "IDEmisorFacturaAnulada={issuer_nif}&NumSerieFacturaAnulada={invoice_number}\
+         &FechaExpedicionFacturaAnulada={fecha}\
          &Huella={previous_hash}&FechaHoraHusoGenRegistro={generation_timestamp}",
         fecha = format_date(invoice_date_iso),
     );

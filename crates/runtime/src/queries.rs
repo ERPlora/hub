@@ -176,7 +176,11 @@ pub async fn execute_page(
                     .unwrap_or_else(|_| "UTC".to_string()),
             )
             .with_caller_lang(crate::effective_caller_lang(db, &f, &ctx.hub_id, &ctx.user_id).await)
-            .with_certificate(has_cert);
+            .with_certificate(has_cert)
+            // The ephemeral DEMO mark (ADR-0197, hub#1135), SAME pattern as `with_certificate`:
+            // copied from `Registry::demo_hub`, never from the caller, so that EVERY query (not
+            // just commands) sees `:is_demo_hub` live.
+            .with_demo_hub(registry.demo_hub);
         &enriched_ctx
     } else {
         ctx

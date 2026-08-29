@@ -35,7 +35,7 @@ use erplora_db::Params;
 use erplora_runtime::Runtime;
 use erplora_server::whatsapp_quota::{self, QuotaSync};
 use serde_json::{json, Value};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 /// `Params` es un `Map<String, Json>`; este envoltorio evita repetir la construcción en cada test.
 fn params<const N: usize>(pairs: [(&str, Value); N]) -> Params {
@@ -57,14 +57,14 @@ fn fixture() -> PathBuf {
 
 /// Un hub cuyo registro lleva de verdad `whatsapp_inbox`, instalado por la ÚNICA puerta que
 /// registra algo (`install_from_dir`) — no un mapa de estado tocado a mano.
-async fn hub(installed: bool) -> Arc<Mutex<Runtime>> {
+async fn hub(installed: bool) -> Arc<RwLock<Runtime>> {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
     if installed {
         rt.install_from_dir(&fixture()).await.unwrap();
     }
-    Arc::new(Mutex::new(rt))
+    Arc::new(RwLock::new(rt))
 }
 
 /// La credencial de MÁQUINA del hub — la única que un tick de background puede tener.
@@ -152,13 +152,13 @@ fn plan_body(max_billable_messages: Value) -> Value {
 }
 
 /// Un tick completo contra el Cloud simulado.
-async fn sync(runtime: &Arc<Mutex<Runtime>>, base_url: &str) -> QuotaSync {
+async fn sync(runtime: &Arc<RwLock<Runtime>>, base_url: &str) -> QuotaSync {
     whatsapp_quota::sync_once(runtime, &reqwest::Client::new(), base_url, &machine_auth()).await
 }
 
 /// El medidor tal y como está guardado. `None` = la fila singleton ni siquiera existe.
-async fn stored_limit(runtime: &Arc<Mutex<Runtime>>) -> Option<i64> {
-    let rt = runtime.lock().await;
+async fn stored_limit(runtime: &Arc<RwLock<Runtime>>) -> Option<i64> {
+    let rt = runtime.read().await;
     let rows = rt
         .db()
         .query(
@@ -234,7 +234,7 @@ async fn un_cambio_de_plan_se_refleja_en_el_siguiente_tick_sin_pisar_los_ajustes
     sync(&runtime, &base_url).await;
     // El comerciante escribe su saludo entre los dos ticks.
     {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         rt.db()
             .execute(
                 "UPDATE whatsapp_inbox_settings SET greeting = :g WHERE hub_id = :hub_id",
@@ -249,7 +249,7 @@ async fn un_cambio_de_plan_se_refleja_en_el_siguiente_tick_sin_pisar_los_ajustes
     assert_eq!(outcome, QuotaSync::Written(200));
     assert_eq!(stored_limit(&runtime).await, Some(200));
     let greeting = {
-        let rt = runtime.lock().await;
+        let rt = runtime.read().await;
         rt.db()
             .query(
                 "SELECT greeting FROM whatsapp_inbox_settings WHERE hub_id = :hub_id",
@@ -376,7 +376,7 @@ async fn un_hub_sin_el_modulo_ni_siquiera_pregunta_al_cloud() {
 #[tokio::test]
 async fn el_command_de_la_cuota_no_se_alcanza_por_la_puerta_publica() {
     let runtime = hub(true).await;
-    let rt = runtime.lock().await;
+    let rt = runtime.read().await;
     let ctx = erplora_runtime::RequestContext::new(HUB, "u1", ["*".to_string()]);
 
     let denied = rt

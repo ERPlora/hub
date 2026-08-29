@@ -226,7 +226,7 @@ fn agent_step(policy: &str) -> Value {
 }
 
 async fn start_run(h: &Hub, input: Value) -> String {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     rt.start_flow_run(&h.flow_id, &input, "hub_user:owner")
         .await
         .unwrap();
@@ -238,7 +238,7 @@ async fn start_run(h: &Hub, input: Value) -> String {
 }
 
 async fn bookings(h: &Hub) -> Vec<Value> {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     rt.db_for_test()
         .query(
             "SELECT customer, starts_at, minutes, created_by FROM agenda_booking ORDER BY starts_at",
@@ -254,24 +254,24 @@ async fn bookings(h: &Hub) -> Vec<Value> {
 /// than calling the runner alone — is what keeps these tests honest about the seam.
 async fn perform(h: &Hub, run_id: &str) {
     let result = agent_runner::run_turn(&h.state, run_id, "agent").await;
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     rt.complete_flow_io(run_id, "agent", result).await.unwrap();
 }
 
 /// One turn of the background loop. The tick — never the runner — is what carries a run past the
 /// step the agent finished, exactly as it does for every other kind of step.
 async fn tick(h: &Hub) {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     rt.process_flows().await.unwrap();
 }
 
 async fn run_status(h: &Hub, run_id: &str) -> String {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     rt.get_flow_run(run_id).await.unwrap().0.status
 }
 
 async fn step_output(h: &Hub, run_id: &str) -> Value {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     let (_, steps) = rt.get_flow_run(run_id).await.unwrap();
     steps
         .iter()
@@ -281,7 +281,7 @@ async fn step_output(h: &Hub, run_id: &str) -> Value {
 }
 
 async fn seed_slots(h: &Hub) {
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     let mut p = Params::new();
     p.insert("hub".into(), json!(HUB));
     rt.db_for_test()
@@ -367,7 +367,7 @@ async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person(
     );
     assert_eq!(run_status(&h, &run_id).await, store::STATUS_WAITING_APPROVAL);
 
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     let pending = rt
         .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
         .await
@@ -412,7 +412,7 @@ async fn approving_from_the_tray_books_the_appointment_without_asking_the_model_
     perform(&h, &run_id).await;
 
     let id = {
-        let rt = h.state.runtime.lock().await;
+        let rt = h.state.runtime.read().await;
         rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
             .await
             .unwrap()[0]
@@ -483,7 +483,7 @@ async fn rejecting_from_the_tray_books_nothing() {
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
     perform(&h, &run_id).await;
     let id = {
-        let rt = h.state.runtime.lock().await;
+        let rt = h.state.runtime.read().await;
         rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
             .await
             .unwrap()[0]
@@ -687,7 +687,7 @@ async fn max_iters_stops_a_runaway_loop_and_fails_the_step() {
         3,
         "the cap is counted server-side, not trusted to the model"
     );
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
@@ -769,7 +769,7 @@ async fn an_invalid_proposal_never_reaches_the_tray_and_the_model_corrects_it_in
         );
 
         // …and the tray holds ONE row: the corrected proposal. The impossible one was never written.
-        let rt = h.state.runtime.lock().await;
+        let rt = h.state.runtime.read().await;
         let pending = rt
             .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
             .await
@@ -809,7 +809,7 @@ async fn a_model_that_never_gets_the_payload_right_ends_in_words_not_in_the_tray
 
     perform(&h, &run_id).await;
 
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     assert!(
         rt.list_flow_approvals(None, 50).await.unwrap().is_empty(),
         "nothing impossible was parked for a person"
@@ -852,7 +852,7 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
     perform(&h, &run_id).await;
 
     let id = {
-        let rt = h.state.runtime.lock().await;
+        let rt = h.state.runtime.read().await;
         rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
             .await
             .unwrap()[0]
@@ -862,7 +862,7 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
 
     // The module updates overnight: `minutes` becomes required, and the stored payload has none.
     {
-        let mut rt = h.state.runtime.lock().await;
+        let mut rt = h.state.runtime.write().await;
         rt.update_from_dir(&stricter_fixture()).await.unwrap();
     }
 
@@ -888,7 +888,7 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
     );
 
     assert!(bookings(&h).await.is_empty(), "nothing was written");
-    let rt = h.state.runtime.lock().await;
+    let rt = h.state.runtime.read().await;
     let row = rt.get_flow_approval(&id).await.unwrap();
     drop(rt);
     assert_eq!(

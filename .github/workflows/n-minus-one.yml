@@ -1,0 +1,183 @@
+# ==============================================================================
+# N-1 job — does the LAST released binary keep serving against THIS branch's schema?
+# (hub#1282, second half of hub#1163)
+# ==============================================================================
+#
+# hub#1163 shipped a lint that reads the TEXT of a migration (`RENAME`, `ALTER COLUMN … TYPE`)
+# and blocks what it can see there. What no lint can see: a new NOT NULL constraint, a default
+# that quietly disappeared, or a table that changed shape without ever using a watched verb.
+# None of those break the migration itself — they break the OLDER binary's queries against the
+# NEW schema, and with `start-first` blue/green (ADR-0269, update-model.md §3.1) N and N-1 serve
+# the SAME database at once during every rollout. The only way to know N-1 survives that is to
+# actually run it — this workflow does exactly that, via `scripts/ci/n-minus-one.sh`.
+#
+# `hub_canary` cannot cover this (hub#879): it is a brand-new hub with a single task — there is
+# no N-1 anywhere near it.
+#
+# What it does (all the logic lives in the script, so it is unit-testable with stubs —
+# `scripts/tests/n-minus-one.test.sh`):
+#   1. Resolve the last `v*` tag (semver sort) and pull the immutable `ghcr.io/erplora/hub:<sha>`
+#      image `build-hub.yml` already publishes for it — no rebuilding N-1 from source.
+#   2. Build N (this branch/ref) from source and boot it briefly against a clean scratch
+#      Postgres, letting its own startup apply the system migrations. That Postgres afterwards
+#      IS N's schema.
+#   3. Start the N-1 image against that same database, wait for `/readyz`=UP, and smoke the
+#      `hub.*` reserved-namespace core queries through it (the one surface reachable with zero
+#      modules installed — modules come from the marketplace at runtime, and this job has no
+#      network path there).
+#   4. Any of the above failing is RED, naming exactly what broke (the tag, or the query).
+#
+# Cadence — decided in hub#1282, not left to measure later:
+#   NOT `pull_request`. The hub gate is already the throughput ceiling of the whole fleet
+#   (~40 min/push, serialized on `ci-runner-1`'s two slots — hub#1207), and this job adds a
+#   Postgres service PLUS building N from source PLUS booting two binaries. Same cadence as
+#   `image-freshness.yml` (hub#652): `schedule` daily + `workflow_dispatch` — cheap enough to run
+#   often, without adding to the per-PR critical path. `workflow_dispatch` doubles as the
+#   "before a release" run: the release runbook (`architecture/hub/release-pipeline.md`) triggers
+#   it by hand, from `main`, right before cutting a `v*` tag — the one moment N and N-1 truly
+#   need to coexist, and the one a scheduled run the night before cannot guarantee it caught.
+#
+# NOTE (same as image-freshness.yml): `schedule` only fires from the workflow file on the
+# DEFAULT branch. Until this file reaches `main`, only `workflow_dispatch` runs it.
+# ==============================================================================
+
+name: N-1 compatibility (last release vs this schema)
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # daily, off the top of the hour — same reasoning as image-freshness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Repo-wide group (no ref): the script binds ONE fixed host port (`--bind 0.0.0.0:8788`, and N-1
+# runs with `--network host`), and `ci-runner-1`/`ci-runner-1b` share a single Docker host — two
+# runs from different refs at once would fight over that port and paint a false RED.
+concurrency:
+  group: n-minus-one
+  cancel-in-progress: true
+
+jobs:
+  n-minus-one:
+    name: N-1 binary against N's schema
+    # Same switch as the rest of the hub's CI: the dedicated `ci-runner-1` when the org Variable
+    # is set, GitHub's `ubuntu-latest` otherwise.
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read   # GHCR pull of the private ghcr.io/erplora/hub image (N-1)
+      issues: write    # open/refresh the alert issue on RED, same pattern as image-freshness.yml
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hub_test
+        # Unmapped container port (hub#898): `ci-runner-1`'s two slots share one Docker host, and
+        # a pinned host port collides with `test-hub.yml` running concurrently. Publishing only
+        # the container port lets Docker pick a free host port per job.
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      # `fetch-depth: 0`: the script resolves N-1 from the FULL tag history
+      # (`git tag -l 'v*' --sort=-v:refname`) — a shallow clone would see no tags at all.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # `rustup` ships with GitHub's images but is just another file on `ci-runner-1` — install
+      # it if missing, same guard `test-hub.yml` carries.
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo (no toca ni el PATH ni los toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
+
+      # Same two guards as `test-hub.yml`'s cache step: the action's `Post` step deletes
+      # `$CARGO_HOME/bin` (would take `rustup` down with it) and, on our own shared-`$HOME`
+      # runner, `~/.cargo/registry/src` out from under a concurrent job (hub#886).
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
+
+      - name: Log in to GHCR (read N-1's image)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the Postgres host port (hub#898)
+        id: pg
+        run: |
+          set -euo pipefail
+          echo "port=${{ job.services.postgres.ports['5432'] }}" >> "$GITHUB_OUTPUT"
+
+      - name: N-1 vs N's schema
+        id: check
+        run: |
+          set -euo pipefail
+          ./scripts/ci/n-minus-one.sh \
+            --repo-dir . \
+            --image ghcr.io/erplora/hub \
+            --database-url "postgres://postgres:test@localhost:${{ steps.pg.outputs.port }}/hub_test" \
+            --bind 0.0.0.0:8788
+
+      # Idempotent alert, same pattern as `image-freshness.yml` (hub#652): one open issue, reused
+      # (comment) while the condition persists — never one per run. Copied inline rather than
+      # calling a shared helper: no unified issue-lookup script has landed on `develop` yet: keep
+      # this comment as the pointer for whoever lands one (see decision-log / architecture#501)
+      # to fold this step into it too.
+      - name: Open or refresh the alert issue
+        if: failure() && steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="N-1 no sirve contra el esquema de la rama actual"
+          body="Detectado por el job N-1 diario (hub#1282, segunda mitad de hub#1163).
+
+          - run: ${RUN_URL}
+          - el log del job nombra el elemento exacto que rompió: el tag N-1 que no se pudo obtener,
+            o la query core que N-1 ya no puede servir contra el esquema nuevo.
+
+          Esto es justo lo que ningún lint puede ver: una constraint nueva, un default que
+          desapareció o una tabla que cambió de forma sin usar un verbo vigilado por el lint de
+          hub#1163. Con el blue/green \`start-first\` (update-model.md §3.1) N y N-1 sirven la
+          MISMA base de datos a la vez en cada despliegue — si N-1 no sobrevive esto, un rollout
+          real revienta a mitad de camino.
+
+          Este issue se reutiliza (un comentario por detección) mientras la condición persista;
+          ciérralo cuando el job vuelva a estar en verde."
+
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search '"N-1 no sirve contra el esquema de la rama actual" in:title' \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Refreshing open alert issue #$existing"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

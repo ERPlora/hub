@@ -241,7 +241,7 @@ async fn a_queued_ticket_comes_out_of_a_real_printer_and_ends_done() {
     );
 
     let arc = state.runtime_for(&state.hub_id()).await.unwrap();
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let status = rt
         .print_queue(None, None, 10)
         .await

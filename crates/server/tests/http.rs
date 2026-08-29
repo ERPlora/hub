@@ -575,7 +575,7 @@ async fn hub_context_adopts_machine_identity_without_restart() {
     assert_eq!(j["machine_registered"], json!(true));
     assert_eq!(j["registration_required"], json!(false));
     assert_eq!(j["public_key_loaded"], json!(true));
-    assert_eq!(state.runtime.lock().await.hub_id(), "real-hub-id");
+    assert_eq!(state.runtime.read().await.hub_id(), "real-hub-id");
 }
 
 #[tokio::test]

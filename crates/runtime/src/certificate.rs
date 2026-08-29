@@ -477,6 +477,14 @@ pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
             }),
         );
         o.insert("active".into(), json!(active));
+        // Which of the two EXCLUSIVE routes to the AEAT this hub is on (ADR-0320 §1 — hub#1314).
+        // Named here instead of left to the screen to derive from `active`: Ajustes → Negocio picks
+        // the route with it, and `fiscal_profile::go_live` decides whether the Anexo I is required
+        // with the same `route_of`. A screen that deduced it on its own would be a second rule.
+        o.insert(
+            "transmission_route".into(),
+            json!(route_of(occupied.first().map(|(k, _)| *k))),
+        );
     }
     Ok(out)
 }
@@ -512,6 +520,41 @@ pub async fn active_kind(
     hub_id: &str,
 ) -> Result<Option<CertificateKind>> {
     Ok(occupied_slots(db, hub_id).await?.first().map(|(k, _)| *k))
+}
+
+/// **The two EXCLUSIVE ways a hub's records reach the tax authority** (ADR-0320 §1 — hub#1314).
+///
+/// [`ROUTE_OWN`] — the taxpayer signs and files with their own certificate; nothing is delegated to
+/// anybody, so no representation grant (Anexo I) exists or is needed. [`ROUTE_DELEGATED`] — ERPlora
+/// files ON BEHALF of the taxpayer with its Sello, which is exactly what the signed Anexo I
+/// authorises. One or the other, never both: the SaaS already picks like this
+/// (`select_transmission_route`, `apps/dashboard/fiscal/services/verifactu_gateway.py`), and the
+/// hub used to demand the grant on both.
+///
+/// Stable words: they cross to the browser and the screen programs against them.
+pub const ROUTE_OWN: &str = "own";
+pub const ROUTE_DELEGATED: &str = "delegated";
+
+/// [`ROUTE_OWN`]/[`ROUTE_DELEGATED`] from the slot that signs — **the rule, in one place**.
+///
+/// A `const fn` over the already-resolved slot instead of a second query, so [`status`] (which has
+/// the occupied slots in hand) and [`transmission_route`] (which has a hub id) answer through the
+/// same match. Two call sites deriving «is this the own one?» separately is how the screen and the
+/// go-live end up disagreeing about which route a business is on.
+///
+/// **No certificate at all is [`ROUTE_DELEGATED`]**, deliberately: it is the route waiting for that
+/// hub the moment the control plane hands it the Sello, and the one the screen must offer by
+/// default. Answering `own` there would send somebody with no `.p12` to a form they cannot finish.
+pub const fn route_of(active: Option<CertificateKind>) -> &'static str {
+    match active {
+        Some(CertificateKind::Own) => ROUTE_OWN,
+        Some(CertificateKind::Delegated) | None => ROUTE_DELEGATED,
+    }
+}
+
+/// [`route_of`] for a hub: which of the two routes its records take right now.
+pub async fn transmission_route(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<&'static str> {
+    Ok(route_of(active_kind(db, hub_id).await?))
 }
 
 /// **What the certificate this hub signs with IS** — the axis that picks the AEAT entry point
@@ -1359,6 +1402,56 @@ mod tests {
         assert!(
             can_sign(&db, "hub-test").await.unwrap(),
             "borrar el propio no puede dejar al hub sin facturar"
+        );
+    }
+
+    /// **La VÍA por la que las facturas llegan a la AEAT, nombrada** (ADR-0320 §1 — hub#1314): o la
+    /// firma y remite el obligado con su certificado (`own`), o lo hace ERPlora en su nombre con el
+    /// Sello (`delegated`). Son excluyentes, y quien decide cuál es el slot activo — nada más.
+    ///
+    /// Un hub SIN ningún certificado es `delegated` a propósito: es la vía que le espera en cuanto
+    /// el plano de control le reparta el Sello, y es la que la pantalla tiene que ofrecerle por
+    /// defecto. Decir `own` ahí mandaría a alguien sin `.p12` a una pantalla que no puede completar.
+    #[tokio::test]
+    async fn the_transmission_route_names_the_slot_that_signs() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(11));
+        let db = db_ready().await;
+
+        assert_eq!(
+            transmission_route(&db, "hub-test").await.unwrap(),
+            ROUTE_DELEGATED,
+            "sin certificado la vía que le espera es la de ERPlora, no la propia"
+        );
+
+        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            transmission_route(&db, "hub-test").await.unwrap(),
+            ROUTE_DELEGATED,
+            "el Sello de ERPlora remite EN NOMBRE del obligado: vía delegada"
+        );
+
+        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            transmission_route(&db, "hub-test").await.unwrap(),
+            ROUTE_OWN,
+            "el propio gana en cuanto se sube — y con él sobra el otorgamiento"
+        );
+
+        // Y la misma respuesta viaja en el JSON que lee la pantalla, sin que esta tenga que
+        // deducirla de `active`: dos deducciones separadas es como se separan.
+        let seen = status(&db, "hub-test").await.unwrap();
+        assert_eq!(seen["transmission_route"], json!(ROUTE_OWN));
+
+        delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["transmission_route"],
+            json!(ROUTE_DELEGATED),
+            "al borrar el propio la pantalla vuelve a la vía de ERPlora"
         );
     }
 

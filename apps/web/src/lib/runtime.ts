@@ -342,6 +342,10 @@ export function getClient(): ErploraClient {
         // (`hubTimezone()` ← `/api/hub/context`), para que un módulo que agende lea el MISMO
         // reloj que el runtime le entrega a un handler (`context.timezone`).
         timezone: hubTimezone,
+        // hub#1211: gives `queryOptional`/`queryAllOptional` the set of ACTIVE modules — without
+        // it, the only way to learn a module was missing was to ask the transport anyway and catch
+        // `module_not_installed` after the request had already travelled.
+        installedModules: activeModuleIds,
         notifier: (n) => {
           const color: ToastColor =
             n.type === 'success' ? 'success' : n.type === 'error' ? 'danger' : n.type === 'warning' ? 'warning' : 'primary';
@@ -350,6 +354,17 @@ export function getClient(): ErploraClient {
       },
       bridge,
     );
+    // Initial seed (hub#1211): while it resolves, `activeModuleIds()` keeps answering `undefined`
+    // ("not known yet") and the SDK falls back to asking the transport, as before. On a cold boot
+    // there is no session yet and the seed asks nothing — login re-seeds through `setHubSession`.
+    void refreshActiveModuleIds();
+    // `module.installed` (ARQUITECTURA.md §2.2/§4) is the only module lifecycle WS event that
+    // exists today; activate/deactivate/uninstall emit none of their own, so those three refresh
+    // synchronously when `moduleAction` resolves (in THIS tab — another tab only learns of them on
+    // its next refresh, see the note on `refreshActiveModuleIds`).
+    _client.on('module.installed', () => {
+      void refreshActiveModuleIds();
+    });
   }
   return _client;
 }
@@ -363,6 +378,10 @@ export interface InstallRequestResult {
   module_id: string;
   version: string;
   status: string;
+  /** hub#1130: ids que el cierre de dependencias (ADR-0060) instaló junto al pedido, y que NO
+   *  estaban instalados antes de esta llamada. Siempre presente — vacío, nunca ausente, cuando
+   *  no arrastró nada — para que quien la lea no tenga que distinguir dos formas. */
+  also_installed: string[];
 }
 
 /** Un módulo del plan que hay que COMPRAR antes de poder instalar (ADR-0060). */
@@ -514,6 +533,52 @@ export async function listInstalledModules(): Promise<InstalledModule[]> {
   return env.data ?? [];
 }
 
+// hub#1211 — the live set of ACTIVE module ids, published for `ErploraClient`'s `installedModules`
+// option (`getClient()` below): lets `queryOptional`/`queryAllOptional` learn a module is absent
+// WITHOUT a round trip, instead of asking the transport and catching `module_not_installed` after
+// the request already happened — which is what left a `404 POST /api/query` in the console on
+// EVERY call of an optional integration the hub does not have (`sales` asking `verifactu`, hub#1121
+// surfaced it as `sales` → `modifiers`). `undefined` means "not known yet"; the SDK treats that as
+// "cannot rule the module out" and falls back to asking the transport, same as before this existed.
+let activeModuleIdsCache: ReadonlySet<string> | undefined;
+
+/** Current answer for `ErploraClient`'s `installedModules` option. Inyectable/legible en tests. */
+export function activeModuleIds(): ReadonlySet<string> | undefined {
+  return activeModuleIdsCache;
+}
+
+/**
+ * Republishes the ACTIVE module id set (hub#1211). Exported so tests can seed/clear it exactly
+ * like `publishHubTimezone` — `null`/`undefined` clears it back to "not known yet".
+ */
+export function publishActiveModuleIds(ids: ReadonlySet<string> | null | undefined): void {
+  activeModuleIdsCache = ids ?? undefined;
+}
+
+/**
+ * Re-asks the runtime which modules are ACTIVE and republishes the set (hub#1211). Called once at
+ * client construction, on every login (`setHubSession`, the funnel all five ways in go through —
+ * `main.ts` builds the client on a cold boot BEFORE anyone signs in, and login is a route change,
+ * not a reload) and after every install (`module.installed` WS event) / activate / deactivate /
+ * uninstall — the exact same moments the shell already refreshes its own nav and module list.
+ *
+ * Never asks before there IS a session, same rule as `ensureMediaCookie`: that request could only
+ * be a 401, which is console noise of the exact kind this exists to remove and feeds the central
+ * dead-session probe (hub#846). Best-effort by contract, like `refreshHubTimezone`: a failed
+ * refresh KEEPS the previous answer (never publishes an empty set on a transient error, which
+ * would make every optional query look absent) — it just stays `undefined` ("not known yet") if
+ * there was no previous answer either.
+ */
+export async function refreshActiveModuleIds(): Promise<void> {
+  if (!getHubSession()) return;
+  try {
+    const modules = await listInstalledModules();
+    publishActiveModuleIds(new Set(modules.filter((m) => m.status === 'active').map((m) => m.id)));
+  } catch {
+    // Keeps the previous answer — see the doc comment above.
+  }
+}
+
 /**
  * Fallo de una acción de módulo que CONSERVA el código estable del runtime (hub#139).
  *
@@ -574,6 +639,10 @@ async function moduleAction(
       env.error?.dependents,
     );
   }
+  // hub#1211: activate/deactivate/uninstall change WHICH modules are active — re-publish the set
+  // the SDK's short-circuit reads, or an optional query for the module just (de)activated would
+  // keep answering with yesterday's cache until something else happened to refresh it.
+  await refreshActiveModuleIds();
 }
 
 /**
@@ -779,22 +848,38 @@ export interface BusinessCertificate {
   present: boolean;
   uploaded_at?: string | null;
   subject?: string | null;
+  /**
+   * Por cuál de las **dos vías excluyentes** llegan las facturas de este hub a la AEAT
+   * (ADR-0320 §1 — hub#1314): `own` = firma y remite el propio obligado con su `.p12`, así que no
+   * otorga nada a nadie; `delegated` = lo hace ERPlora en su nombre con el Sello, y eso —y solo
+   * eso— exige el Anexo I firmado.
+   *
+   * Lo nombra el runtime (`certificate::route_of`), que es el mismo sitio del que sale la decisión
+   * de `go_live`. La pantalla NO lo deduce de `present`: dos deducciones separadas es como acaban
+   * discrepando la pantalla y la puerta de producción.
+   */
+  transmission_route?: FiscalTransmissionRoute;
 }
+
+/** Las dos vías de ADR-0320 §1. Las palabras son las del runtime; no se traducen. */
+export type FiscalTransmissionRoute = 'own' | 'delegated';
 
 /**
  * Lee el estado del certificado fiscal del negocio. Cualquier sesión puede leerlo. Degrada a
- * `{ present: false }` si el endpoint todavía no existe (404) o el runtime no responde, para que
- * la UI muestre "Sin certificado" en vez de romper.
+ * `{ present: false, transmission_route: 'delegated' }` si el endpoint todavía no existe (404) o
+ * el runtime no responde, para que la UI muestre "Sin certificado" en vez de romper — y la vía
+ * degradada es la delegada porque es la que se le puede ofrecer a alguien sin `.p12` (hub#1314).
  */
 export async function getBusinessCertificate(): Promise<BusinessCertificate> {
+  const unknown: BusinessCertificate = { present: false, transmission_route: 'delegated' };
   try {
     const res = await runtimeFetch(`${RUNTIME_URL}/api/business/certificate`, {
       headers: runtimeHeaders(),
     });
-    if (!res.ok) return { present: false };
+    if (!res.ok) return unknown;
     return (await res.json()) as BusinessCertificate;
   } catch {
-    return { present: false };
+    return unknown;
   }
 }
 

@@ -1027,6 +1027,70 @@ pub enum ExpectRowsOp {
     Min,
 }
 
+/// The `dedup_key` half of a `command.emit` entry (hub#1076): the name of a field in the
+/// command's bound payload (`context.payload` plus what `system_params` injects — same source a
+/// `:name` bind reads from) whose value derives the outbox row's id.
+///
+/// This is what makes a repeated emission with the same key a no-op instead of a second event —
+/// `outbox::insert_op` turns it into the exact `ON CONFLICT (id) DO NOTHING` shape
+/// `outbox::insert_core_event_once` already uses for a core-ingested event
+/// (`"wa-<wa_message_id>"`). It is the outbox idempotency-key pattern (Stripe's
+/// `Idempotency-Key`, Kafka's keyed dedup): the key is evaluated against the request, and a
+/// repeat within the store's own uniqueness window is absorbed, never rejected — the shape a
+/// webhook redelivery or an outbox-relay retry needs, which `min_affected_rows`/`expect_rows`
+/// cannot give (both roll back the whole transaction and hand the caller an error).
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct EmitDedupKey {
+    pub event: String,
+    pub dedup_key: String,
+}
+
+/// One entry of a command's `emit` list (hub#1076).
+///
+/// Two wire shapes, kept wire-compatible with every published module:
+/// - a plain string (`"sale.completed"`) — the legacy, always-emits-by-execution behaviour;
+/// - an object naming `dedup_key` (`{"event": "...", "dedup_key": "wa_message_id"}`) — opt-in,
+///   see [`EmitDedupKey`].
+///
+/// A manifest that only ever wrote `emit: ["a.b"]` deserialises exactly as it always has: the
+/// field is additive, never a behaviour change for a module that has not adopted it.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum EmitDef {
+    Name(String),
+    Keyed(EmitDedupKey),
+}
+
+impl EmitDef {
+    /// The event name, whichever wire shape declared it.
+    pub fn event(&self) -> &str {
+        match self {
+            EmitDef::Name(name) => name,
+            EmitDef::Keyed(k) => &k.event,
+        }
+    }
+
+    /// The payload field this entry derives its outbox dedup id from, if it declared one.
+    pub fn dedup_key(&self) -> Option<&str> {
+        match self {
+            EmitDef::Name(_) => None,
+            EmitDef::Keyed(k) => Some(&k.dedup_key),
+        }
+    }
+}
+
+impl From<&str> for EmitDef {
+    fn from(name: &str) -> Self {
+        EmitDef::Name(name.to_string())
+    }
+}
+
+impl From<String> for EmitDef {
+    fn from(name: String) -> Self {
+        EmitDef::Name(name)
+    }
+}
+
 /// State of one declared domain error code (ADR-0398). An empty object is the normal entry;
 /// `deprecated` names the version since which consumers are told to stop relying on it — the
 /// first of the two publications retiring a code needs (the second one deletes it).
@@ -1409,8 +1473,10 @@ pub struct CommandDef {
     /// puede romperse en un TPV.
     #[serde(default)]
     pub reads: Vec<ReadDef>,
+    /// Events this command emits. See [`EmitDef`] for the two wire shapes (plain name, or an
+    /// object naming `dedup_key`, hub#1076).
     #[serde(default)]
-    pub emit: Vec<String>,
+    pub emit: Vec<EmitDef>,
     /// **Contrato de mutación** (hub#140): mínimo de filas que la(s) sentencia(s) `sql` del
     /// command DEBEN afectar para que el command se considere exitoso y se emitan sus `emit`.
     /// Si el recuento real queda por debajo, la transacción se revierte entera y NO se escribe
@@ -1990,11 +2056,11 @@ impl Manifest {
         let mut by_event: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
         for (name, command) in &self.commands {
             for event in &command.emit {
-                if declared.contains(event.as_str()) {
+                if declared.contains(event.event()) {
                     continue;
                 }
                 by_event
-                    .entry(event.as_str())
+                    .entry(event.event())
                     .or_default()
                     .insert(name.as_str());
             }

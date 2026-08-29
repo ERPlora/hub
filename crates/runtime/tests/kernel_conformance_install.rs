@@ -9,8 +9,40 @@
 mod kernel_fixture;
 
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::{ModuleStatus, Runtime};
+use erplora_runtime::{ModuleStatus, Runtime, RuntimeError};
 use kernel_fixture::{broken_copy, install_fixture, MODULE_ID};
+
+/// 🔴 Proof the guard catches the positive: a module whose `depends_on` names a module that is NOT
+/// installed is refused NAMING both — the installer's topological order is the kernel's promise,
+/// never the caller's luck.
+///
+/// Regression test for ERPlora/hub#1264: this used to be pinned by `sales_e2e::missing_dep_fails`
+/// (installing the published `sales` without `taxes`), i.e. by another module's topology. The
+/// kernel proves it with its own fixture.
+#[tokio::test]
+async fn install_refuses_a_module_whose_dependency_is_missing_hub1264() {
+    let db = fresh_db().await;
+    let mut rt = Runtime::new(Box::new(db));
+    let broken = broken_copy("missing-dependency", |m| {
+        m["depends_on"] = serde_json::json!(["kfx_dep"]);
+    });
+
+    let err = rt
+        .install_from_dir(broken.path())
+        .await
+        .expect_err("a dependency nobody installed is refused, not skipped");
+    match &err {
+        RuntimeError::MissingDependency { module, dep } => {
+            assert_eq!(module, MODULE_ID, "the refusal names the module: {err}");
+            assert_eq!(dep, "kfx_dep", "…and the dependency it lacks: {err}");
+        }
+        other => panic!("expected MissingDependency naming module and dep, got {other:?}"),
+    }
+    assert!(
+        !rt.registry().is_installed(MODULE_ID),
+        "nothing is left half-registered behind a refused install"
+    );
+}
 
 #[tokio::test]
 async fn installing_registers_every_declared_surface_hub1238() {

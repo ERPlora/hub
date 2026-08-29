@@ -17,10 +17,12 @@
 //! These tests seed real rows in a real Postgres (`test-pg` on :5433) because the failure they
 //! describe is about `information_schema` types across several tables: an empty database, or the
 //! SQLite the rest of the suite once used, would go green without ever seeing it.
+use std::sync::{Arc, Mutex};
+
 use erplora_db::{testutil::fresh_db, DatabaseAdapter, Params, PgAdapter};
 use erplora_runtime::error_registry::error_code_of;
 use erplora_runtime::money_backfill::{self, MoneyUnit};
-use erplora_runtime::RuntimeError;
+use erplora_runtime::{ErrorEvent, ErrorRegistry, ErrorSink, RuntimeError};
 
 /// Reads a numeric cell whatever its JSON shape: Postgres decodes `NUMERIC` as a **string**
 /// (precision contract of `pg_cell`) and integers as numbers.
@@ -246,6 +248,43 @@ async fn boot_neither_marks_nor_bricks_a_mixed_hub_hub1209() {
 
     assert!(!marked, "a mixed hub must not be marked as cents at boot");
     assert!(!money_backfill::is_marked_cents(&db).await.unwrap());
+}
+
+/// 🔴 ERPlora/hub#1274: `seed_marker_if_cents` reports through `ErrorRegistry::global()` at exactly
+/// the point `ensure_system_tables` calls it — well before `serve()` calls `install_error_reporting`
+/// a few hundred lines later in the same boot. Before the fix, `ErrorRegistry::report` dropped an
+/// event silently whenever there was no sink yet, so this exact failure never reached the Cloud on
+/// ANY hub's first boot after going half-migrated: an operator would only ever see the `stderr`
+/// line in the container log, never an alert. This proves the event survives that window and comes
+/// out the registry's one read door — the sink the host installs — once it exists.
+#[tokio::test]
+async fn boot_error_of_a_mixed_hub_reaches_the_sink_once_installed_hub1274() {
+    let db = fresh_db().await;
+    sales_in_cents(&db).await;
+    payments_in_euros(&db).await;
+
+    // Reported HERE, before any sink exists — the exact call `ensure_system_tables` makes.
+    money_backfill::seed_marker_if_cents(&db)
+        .await
+        .expect("boot must not fail on a mixed hub");
+
+    // The host installs the sink later in the SAME boot, exactly like `serve()` does right after
+    // `ensure_system_tables` returns.
+    struct CaptureSink(Mutex<Vec<ErrorEvent>>);
+    impl ErrorSink for CaptureSink {
+        fn submit(&self, event: ErrorEvent) {
+            self.0.lock().unwrap().push(event);
+        }
+    }
+    let sink = Arc::new(CaptureSink(Mutex::new(Vec::new())));
+    ErrorRegistry::install(sink.clone());
+
+    let events = sink.0.lock().unwrap();
+    assert!(
+        events.iter().any(|e| e.error_code == "money_unit_ambiguous"),
+        "the boot-time mixed-hub error must reach the sink once it is installed, not be lost: \
+         got {events:?}"
+    );
 }
 
 /// A hub that is uniformly in one unit still gets its verdict — the consensus rule must not turn

@@ -137,7 +137,7 @@ pub async fn enqueue_job(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -185,7 +185,7 @@ pub async fn list_jobs(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -301,7 +301,7 @@ pub async fn retry_job(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(response) = admin_and_printer_capability(&headers, &st, &rt).await {
         return response;
     }
@@ -349,7 +349,7 @@ pub async fn discard_job(
         Ok(arc) => arc,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let who = match admin_and_printer_capability(&headers, &st, &rt).await {
         Ok(who) => who,
         Err(response) => return response,
@@ -490,7 +490,7 @@ pub async fn register_host(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
         Ok(ctx) => ctx,
         Err(e) => return unauthorized(e),
@@ -531,7 +531,7 @@ pub async fn host_heartbeat(State(st): State<AppState>, headers: HeaderMap) -> R
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -557,7 +557,7 @@ pub async fn list_hosts(State(st): State<AppState>, headers: HeaderMap) -> Respo
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -593,7 +593,7 @@ pub async fn retire_host(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -683,7 +683,7 @@ pub async fn list_stations(State(st): State<AppState>, headers: HeaderMap) -> Re
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -722,7 +722,7 @@ pub async fn create_station(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -757,7 +757,7 @@ pub async fn rename_station(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -785,7 +785,7 @@ pub async fn delete_station(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -812,7 +812,7 @@ pub async fn list_routes(State(st): State<AppState>, headers: HeaderMap) -> Resp
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
@@ -856,7 +856,7 @@ pub async fn set_route(
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
         Ok(admin) => admin,
         Err(e) => return unauthorized(e),
@@ -886,7 +886,7 @@ pub async fn undrained_stations(State(st): State<AppState>, headers: HeaderMap) 
         Ok(rt) => rt,
         Err(e) => return crate::tenant_rejected(e),
     };
-    let rt = arc.lock().await;
+    let rt = arc.read().await;
     if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
         return unauthorized(e);
     }
