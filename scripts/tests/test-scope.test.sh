@@ -56,7 +56,7 @@ packages() { resolve "$@" | sed -n '3,$p' | tr '\n' ' ' | sed 's/ $//'; }
 
 echo "resolver exists and is executable python"
 [ -f "$resolver" ] && ok "scripts/ci/test-scope.py exists" || bad "scripts/ci/test-scope.py is missing"
-python3 -m py_compile "$resolver" 2>/dev/null && ok "compiles" || bad "does not compile"
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile "$resolver" 2>/dev/null && ok "compiles" || bad "does not compile"
 
 echo "no Rust touched → none"
 [ "$(mode .github/workflows/test-hub.yml docs/x.md)" = none ] && ok "workflow + docs → none" || bad "expected none" "$(resolve .github/workflows/test-hub.yml)"
