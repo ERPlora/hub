@@ -1,0 +1,27 @@
+// Regression test for ERPlora/hub#1250 — contrato VISUAL del shell, pantalla ajustes.
+//
+// `/settings` sin hash aterriza en la pestaña «Hub» (`resolveSettingsTab('')`, `SettingsPage.vue`):
+// país, huso horario, moneda e idioma del hub del seed de dev — ninguno depende de módulos
+// instalados, así que la pantalla es determinista con el hub vacío del banco de e2e.
+import { test, expect } from '@playwright/test';
+import { VIEWPORTS, loggedInSession, skipIfBaselineMissingLocally } from './shell-visual-helpers';
+
+test.describe('contrato visual del shell — ajustes', () => {
+  for (const { width, height } of VIEWPORTS) {
+    test(`la pestaña «Hub» de Ajustes se pinta igual a ${width}px (hub#1250)`, async ({ page }, testInfo) => {
+      const snapshot = `settings-${width}.png`;
+      skipIfBaselineMissingLocally(testInfo, snapshot);
+
+      await page.setViewportSize({ width, height });
+      await loggedInSession(page);
+      await page.goto('/settings');
+
+      // Punto de asentamiento por CLASE: el tabbar del footer (montado siempre, fuera del
+      // `v-if`/`v-else-if` por pestaña) y la primera tarjeta de la pestaña «Hub».
+      await expect(page.locator('.ok-tabbar')).toBeVisible();
+      await expect(page.locator('ion-card').first()).toBeVisible();
+
+      await expect(page).toHaveScreenshot(snapshot);
+    });
+  }
+});

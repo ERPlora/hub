@@ -4,9 +4,11 @@
 #
 # `test-hub.yml` corre `cargo test --workspace`, pero los e2e que instalan módulos
 # reales SE AUTO-OMITEN allí: `actions/checkout` trae solo este repo, el guard ve
-# `CI=true` y toma el skip legítimo (hub#253). Son **238 tests en 36 targets** de
-# `tests/`, más los guardados en `src/` (`installer::every_published_manifest_*`) —
-# toda la cadena fiscal, el TPV, la cocina y el inventario— y el gate local también
+# `CI=true` y toma el skip legítimo (hub#253). Son los targets de `tests/` que declara
+# `scripts/ci/kernel-e2e-targets.txt` (eran 36 al abrir hub#1216; hub#1264 los va
+# devolviendo a la batería de cada módulo, así que el número se lee de la lista y no
+# se escribe aquí), más los guardados en `src/` (`installer::every_published_manifest_*`)
+# — toda la cadena fiscal, el TPV, la cocina y el inventario— y el gate local también
 # los salta por defecto (`HUB_GATE_WITH_MODULES`, hub#855). O sea que hasta este
 # workflow NO CORRÍAN EN NINGÚN SITIO automático: un test caducado por ADR-0405
 # estuvo un día entero en rojo con Actions en verde (hub#1215).
@@ -69,16 +71,13 @@ on:
     types: [module-published]
   # Las seis superficies del kernel (ver la cabecera). `crates/runtime/**` ya cubre el antiguo
   # `crates/runtime/src/e2e_support.rs`, que por eso deja de listarse aparte.
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/test-hub-modules.yml'
-      - 'crates/runtime/**'
-      - 'crates/server/**'
-      - 'schemas/**'
-      - 'crates/db/**'
-      - 'crates/guest-sdk/**'
-      - 'crates/wasm-host/**'
+  # Sin `pull_request` desde el 2026-08-29 (Ioan): estos e2e los corre el gate pre-push, que
+  # materializa el catálogo PUBLICADO y los ejecuta POR DEFECTO (hub#1353 — medido sobre develop
+  # limpio: 30 binarios, 1 365 tests, 0 fallos, 5m07s; la nota de «120 fallos» era anterior a
+  # hub#1153, cuando el catálogo se leía de `modules-workspace`). Rojo = push abortado, y sin
+  # push no hay PR: la prueba no se pierde, cambia de sitio.
+  # `push` a develop/main se queda: es la red POST-MERGE (hub#572) y el sitio donde el
+  # `repository_dispatch` de un módulo recién publicado sigue midiendo contra el kernel.
 
 # El grupo NO puede ser solo `github.ref` desde que existe el dispatch: los avisos de dos módulos
 # distintos llegan sobre la MISMA rama por defecto, y con un grupo común el segundo cancelaría la
@@ -301,18 +300,41 @@ jobs:
 
       # La lista de targets se DERIVA del código, no se escribe a mano: un e2e nuevo
       # entra solo, y no hay una lista que se quede obsoleta en silencio (que es la
-      # clase de mentira que hub#1215 vino a arreglar).
+      # clase de mentira que hub#1215 vino a arreglar). La lista revisada de más abajo
+      # NO sustituye a esa derivación: la CONTRASTA.
+      #
+      # Porque un conjunto derivado también puede ENCOGER en silencio, y el suelo que lo
+      # cubría era un número mágico (`[ "$count" -ge 30 ]`, hub#1229): una foto, no un
+      # contrato. hub#1264 está sacando del hub los e2e que afirman comportamiento de un
+      # módulo —se van a la batería `erplora test` de ese módulo—, el séptimo slice dejó
+      # la cuenta en 29 y `develop` se puso en rojo para toda la flota acusando al grep de
+      # no encontrar los e2e cuando funcionaba perfectamente (hub#1354). Y el único arreglo
+      # que ofrecía el número era bajarlo, que es el reflejo contrario al que debe enseñar
+      # un guardia de cobertura (hub#1359).
+      #
+      # Ahora el suelo es una LISTA REVISADA (`scripts/ci/kernel-e2e-targets.txt`) que
+      # `scripts/ci/kernel-e2e-targets.sh` compara con el árbol EN LAS DOS DIRECCIONES:
+      # falla si falta del árbol algo declarado (borrado sin avisar) y si sobra en el árbol
+      # algo no declarado (cobertura que nadie firmó — la dirección que un suelo numérico
+      # nunca puede cazar, porque ahí la cuenta solo sube). Quitar un target exige editar la
+      # lista EN LA MISMA PR, y ese diff es el acto revisable.
+      #
       # `--no-fail-fast` porque `cargo test` corta en el primer binario que falla y
       # esconde el resto.
       - name: cargo test — los targets que necesitan módulos
         id: tests
         run: |
           set -euo pipefail
-          targets=$(grep -rl "require_modules_workspace" crates/runtime/tests/ \
-                    | xargs -n1 basename | sed 's/\.rs$//' | sort)
-          count=$(printf '%s\n' "$targets" | wc -l | tr -d ' ')
+          # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
+          # Actions, y el script se corre también en local, donde solo sería ruido.
+          if ! targets=$(bash scripts/ci/kernel-e2e-targets.sh); then
+            echo "::error::la lista revisada de e2e del kernel no cuadra con crates/runtime/tests"
+            echo "::error::(el detalle, arriba en este mismo paso). Se edita scripts/ci/kernel-e2e-targets.txt"
+            echo "::error::en la MISMA PR que añade o quita el .rs — ver hub#1359."
+            exit 1
+          fi
+          count=$(printf '%s\n' "$targets" | grep -c .)
           echo "targets con módulos: $count"
-          [ "$count" -ge 30 ] || { echo "::error::solo $count targets — el grep no está encontrando los e2e"; exit 1; }
           args=""
           for t in $targets; do args="$args --test $t"; done
           # `--lib` además de los targets de integración: hay tests guardados en `src/` que un grep

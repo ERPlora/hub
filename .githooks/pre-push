@@ -450,6 +450,47 @@ resolve_scope() {
 }
 resolve_scope
 
+ensure_postgres() {
+    [ -n "${DATABASE_URL:-}" ] && return 0
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "❌ pre-push: the suite is Postgres-only (ADR-0154) and docker is not on PATH." >&2
+        echo "   Export DATABASE_URL yourself, or install/start Docker." >&2
+        return 1
+    fi
+    # A container built from the OLD image has to be REPLACED, not started. Everyone who ran this
+    # gate before pgvector was needed already has an `erplora-test-pg-5433` made from `postgres:18`,
+    # and `docker start` would happily bring the broken one back up — the fix would then only work
+    # on machines that never ran the gate, which is nobody's.
+    #
+    # Dropping it is safe: this container holds throwaway test schemas and nothing else.
+    if [ -n "$(docker ps -aq -f "name=^${PG_CONTAINER}$")" ]; then
+        current=$(docker inspect "$PG_CONTAINER" --format '{{.Config.Image}}' 2>/dev/null || echo '')
+        if [ "$current" != "$PG_IMAGE" ]; then
+            echo "ℹ️  pre-push: $PG_CONTAINER runs '$current', but the suite needs '$PG_IMAGE'" >&2
+            echo "   (crates/vector needs the pgvector extension). Recreating it — test data only." >&2
+            docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+        if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+            docker start "$PG_CONTAINER" >/dev/null
+        else
+            # shellcheck disable=SC2086  # PG_ARGS is a deliberate list of -c flags.
+            docker run -d --name "$PG_CONTAINER" -p 5433:5432 \
+                -e POSTGRES_PASSWORD=test -e POSTGRES_DB=hub_test "$PG_IMAGE" $PG_ARGS >/dev/null
+        fi
+        local tries=0
+        until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
+            tries=$((tries + 1))
+            [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never became ready." >&2; return 1; }
+            sleep 1
+        done
+    fi
+    raise_lock_limits
+    export DATABASE_URL="$PG_DSN"
+}
+
 # ── Etapa WEB (decisión de Ioan, 2026-08-29) ─────────────────────────────────
 # `cargo test --workspace` + e2e de módulos + web + playwright se ejecutan AQUÍ, en local, en
 # cada push, y NO en Actions: la nube se quedó con `develop`/`main` (la red post-merge de
@@ -482,6 +523,30 @@ fi
 # Corre la etapa web y aborta el push si está roja. Se llama en los DOS caminos (con Rust y
 # sin él), porque un cambio solo de `apps/web/**` no toca ningún paquete Rust y antes salía
 # por la puerta de `none` sin que nadie lo probara.
+# El banco de e2e de playwright necesita DOS bases sobre el Postgres del gate, y tienen que
+# EXISTIR (el runtime no las crea — lo dice `apps/web/tests/playwright.config.ts`). Además el spec
+# del asistente cae por defecto en `localhost:5434`, que en local no existe: sin exportar los DSN,
+# el playwright de cada push que toque web moriría al arrancar el runtime.
+ensure_e2e_databases() {
+    if [ -n "${HUB_GATE_E2E_DB_CMD:-}" ]; then
+        eval "$HUB_GATE_E2E_DB_CMD" || return 1
+    else
+        local db
+        for db in hub_e2e_web hub_e2e_assistant; do
+            docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null | grep -q 1 && continue
+            if ! docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE $db;" >/dev/null 2>&1; then
+                echo "❌ pre-push: no pude crear la base '$db' en $PG_CONTAINER (la necesita el e2e de web)." >&2
+                return 1
+            fi
+            echo "ℹ️  pre-push: creada la base '$db' del banco de e2e." >&2
+        done
+    fi
+    export HUB_E2E_DATABASE_URL="${HUB_E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/hub_e2e_web}"
+    export E2E_DATABASE_URL="${E2E_DATABASE_URL:-postgres://postgres:test@localhost:5433/hub_e2e_assistant}"
+    return 0
+}
+
 run_web_stage() {
     [ "$web_touched" = 1 ] || return 0
     local web_cmd
@@ -507,6 +572,8 @@ run_web_stage() {
         WEB_SKIPPED=1
         return 0
     fi
+    ensure_postgres || return 1
+    ensure_e2e_databases || return 1
     echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
     if ! eval "$web_cmd"; then
         echo "" >&2
@@ -843,47 +910,6 @@ fi
 
 # Bring up the Postgres the suite needs, unless the caller pinned the command
 # (the tests do) or already exported a DSN.
-ensure_postgres() {
-    [ -n "${DATABASE_URL:-}" ] && return 0
-    if ! command -v docker >/dev/null 2>&1; then
-        echo "❌ pre-push: the suite is Postgres-only (ADR-0154) and docker is not on PATH." >&2
-        echo "   Export DATABASE_URL yourself, or install/start Docker." >&2
-        return 1
-    fi
-    # A container built from the OLD image has to be REPLACED, not started. Everyone who ran this
-    # gate before pgvector was needed already has an `erplora-test-pg-5433` made from `postgres:18`,
-    # and `docker start` would happily bring the broken one back up — the fix would then only work
-    # on machines that never ran the gate, which is nobody's.
-    #
-    # Dropping it is safe: this container holds throwaway test schemas and nothing else.
-    if [ -n "$(docker ps -aq -f "name=^${PG_CONTAINER}$")" ]; then
-        current=$(docker inspect "$PG_CONTAINER" --format '{{.Config.Image}}' 2>/dev/null || echo '')
-        if [ "$current" != "$PG_IMAGE" ]; then
-            echo "ℹ️  pre-push: $PG_CONTAINER runs '$current', but the suite needs '$PG_IMAGE'" >&2
-            echo "   (crates/vector needs the pgvector extension). Recreating it — test data only." >&2
-            docker rm -f "$PG_CONTAINER" >/dev/null 2>&1 || true
-        fi
-    fi
-
-    if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-        if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-            docker start "$PG_CONTAINER" >/dev/null
-        else
-            # shellcheck disable=SC2086  # PG_ARGS is a deliberate list of -c flags.
-            docker run -d --name "$PG_CONTAINER" -p 5433:5432 \
-                -e POSTGRES_PASSWORD=test -e POSTGRES_DB=hub_test "$PG_IMAGE" $PG_ARGS >/dev/null
-        fi
-        local tries=0
-        until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
-            tries=$((tries + 1))
-            [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never became ready." >&2; return 1; }
-            sleep 1
-        done
-    fi
-    raise_lock_limits
-    export DATABASE_URL="$PG_DSN"
-}
-
 # The local half of hub#526 (CI was hub#565). `postgres:18` ships with
 # `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
 # suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
@@ -951,7 +977,12 @@ raise_lock_limits() {
 # and dropping `HUB_GATE_WITH_MODULES` goes back to CI parity.
 MODULES_FLOOR="${HUB_GATE_MODULES_FLOOR:-25}"
 resolve_modules_dir() {
-    if [ "${HUB_GATE_WITH_MODULES:-0}" != "1" ]; then
+    # Por defecto SÍ (Ioan, 2026-08-29): `test-hub-modules.yml` ya no corre en las PRs, así que si
+    # el gate se saltara los e2e de módulos no los correría NADIE — y esa es exactamente la vía por
+    # la que una PR del kernel rompe un módulo en producción. Medido el 29/08 sobre develop limpio:
+    # 30 binarios, 1 365 tests, 0 fallos, 5m07s (hub#1353). `HUB_GATE_WITH_MODULES=0` los salta a
+    # sabiendas — y como cualquier salto, deja el push sin atestiguar más abajo.
+    if [ "${HUB_GATE_WITH_MODULES:-1}" != "1" ]; then
         export ERPLORA_E2E_ALLOW_SKIP=1
         return 0
     fi

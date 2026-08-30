@@ -111,9 +111,12 @@ fi
 if ! grep -q "refs/heads/develop" "$workflow"; then
     bad "el paso de alerta se limita a push sobre develop" \
         "no hay guarda \`github.ref == 'refs/heads/develop'\`: la alerta se abriría también desde PRs y main"
-elif ! grep -q 'gh issue' "$workflow"; then
+# El paso ya no llama a `gh issue` a mano: delega en el lookup compartido (hub#1327). El grep
+# excluye las líneas de comentario (`^[^#]*`) — si no, un comentario que MENCIONE el script
+# satisfaría la guarda con el paso borrado, que es justo el fallo de hub#1365.
+elif ! grep -qE '^[^#]*\./scripts/ci/alert-issue\.sh' "$workflow"; then
     bad "el fallo post-merge en develop abre/refresca una issue de alerta" \
-        "ningún paso llama a \`gh issue\`: un rojo en develop solo notifica a Actions, o sea a nadie (hub#652)"
+        "ningún paso llama a \`./scripts/ci/alert-issue.sh\`: un rojo en develop solo notifica a Actions, o sea a nadie (hub#652)"
 elif ! grep -q 'issues: write' "$workflow"; then
     bad "el job puede escribir issues" \
         "falta \`issues: write\` en \`permissions\`: el paso de alerta fallaría con 403"

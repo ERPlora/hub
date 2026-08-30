@@ -43,6 +43,13 @@ make_repo() {
 run_hook() {
     local repo=$1 stdin=$2
     shift 2
+    # Desde el 29/08 el gate materializa el catálogo de módulos POR DEFECTO (hub#1353). Estos
+    # bancos son repos de mentira sin `scripts/materialize-published-modules.sh`, y salvo el caso
+    # que prueba justamente ese defecto, ninguno va de módulos: se apaga para no medir otra cosa.
+    case " $* " in
+        *HUB_GATE_WITH_MODULES=*|*HUB_GATE_MATERIALIZE_CMD=*) ;;
+        *) set -- "$@" HUB_GATE_WITH_MODULES=0 ;;
+    esac
     ( cd "$repo" && printf '%s\n' "$stdin" | env "$@" bash "$HOOK" ) >"$repo/.out" 2>&1
     echo $?
 }
@@ -201,19 +208,26 @@ FAKE
     chmod +x "$1"
 }
 
-# ── 9. Default is CI PARITY: the module e2e are skipped, exactly as in CI ─────
-#    CI never runs them (the guard sees CI=true and skips). On a clean develop they
-#    are 120 failures / 25 targets, so running them by default would block every
-#    push. Parity is also what makes "we turned the CI gate off" an honest claim.
+# ── 9. Por defecto los e2e de módulos SÍ corren (Ioan, 2026-08-29) ───────────
+#    La nota anterior decía «120 failures / 25 targets sobre un develop limpio, correrlos por
+#    defecto bloquearía cada push». Describía el estado ANTES de hub#1153, cuando el catálogo se
+#    leía de `modules-workspace` (la rifa de ramas). Desde que se materializa el catálogo
+#    PUBLICADO, pasan: medido el 29/08 sobre `origin/develop` limpio — 30 binarios, 1 365 tests,
+#    **0 fallos, 5m07s**, con 187 tests que solo pasan con módulos delante y 0 ignorados
+#    (hub#1353). Y ahora es obligatorio: `test-hub-modules.yml` ya no corre en las PRs, así que si
+#    el gate se los saltara no los correría NADIE — que es como una PR del kernel rompe un módulo
+#    en producción.
 base=$(make_monorepo)
 sha=$(git -C "$base/hub" rev-parse HEAD)
 code=$(run_hook "$base/hub" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_STATE_DIR="$base/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_MATERIALIZE_CMD="mkdir -p $base/.state/modules-main; echo $base/.state/modules-main #" \
     HUB_GATE_TEST_CMD="echo \"dir=\${ERPLORA_MODULES_DIR:-} skip=\${ERPLORA_E2E_ALLOW_SKIP:-}\" > $base/ENV; true")
 got=$(cat "$base/ENV" 2>/dev/null)
-[ "$code" = 0 ] && [ "$got" = "dir= skip=1" ] \
-    && ok "default: module e2e skipped, same as the CI gate it replaces" \
-    || bad "default: module e2e skipped, same as the CI gate it replaces" "exit=$code got='$got'"
+case "$got" in
+    "dir=$base/.state/modules-main skip="*|"dir="*"/modules-main skip=") ok "default: los e2e de modulos CORREN (catalogo materializado, sin ALLOW_SKIP)" ;;
+    *) bad "default: los e2e de modulos CORREN (catalogo materializado, sin ALLOW_SKIP)" "exit=$code got='$got'" ;;
+esac
 
 # ── 10. Opt-in measures the PUBLISHED catalogue, NEVER modules-workspace ─────
 #    Regression test for ERPlora/hub#1153. The hook used to export
@@ -509,7 +523,7 @@ git -C "$repo" add .githooks/pre-push
 git -C "$repo" commit -qm hook
 sha=$(git -C "$repo" rev-parse HEAD)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true")
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
@@ -529,7 +543,7 @@ git -C "$repo" add .githooks/pre-push
 git -C "$repo" commit -qm hook
 sha=$(git -C "$repo" rev-parse HEAD)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true")
 out=$(cat "$repo/.out" 2>/dev/null)
 errs=""
@@ -583,7 +597,7 @@ repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="cat $repo/.state/lock/owner > $repo/OWNER 2>/dev/null; true")
 errs=""
 [ "$code" = 0 ]                                  || errs="$errs exit=$code(want 0)"
@@ -603,7 +617,7 @@ wait "$dead_pid" 2>/dev/null
 mkdir -p "$repo/.state/lock"
 printf 'pid=%s\nsince=%s\n' "$dead_pid" "$(date +%s)" > "$repo/.state/lock/owner"
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_LOCK_WAIT=20 \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 out=$(cat "$repo/.out" 2>/dev/null)
@@ -626,7 +640,7 @@ sha=$(git -C "$repo" rev-parse HEAD)
 mkdir -p "$repo/.state/lock"
 printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_LOCK_WAIT=4 \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 out=$(cat "$repo/.out" 2>/dev/null)
@@ -649,7 +663,7 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 mkdir -p "$repo/.state/lock"
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_LOCK_WAIT=4 \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 errs=""
@@ -677,7 +691,7 @@ repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true")
 sshcmd=$(git -C "$repo" config core.sshCommand 2>/dev/null)
 errs=""
@@ -698,7 +712,7 @@ mkdir -p "$repo/.state/lock"
 printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
 start=$SECONDS
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_LOCK_WAIT=3600 HUB_GATE_UNPROTECTED_LOCK_WAIT=2 \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 took=$((SECONDS - start))
@@ -724,7 +738,7 @@ mkdir -p "$repo/.state/lock"
 printf 'pid=%s\nsince=%s\n' "$$" "$(date +%s)" > "$repo/.state/lock/owner"
 start=$SECONDS
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_LOCK_WAIT=3600 \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true")
 took=$((SECONDS - start))
@@ -822,12 +836,12 @@ repo=$(make_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
 echo two > "$repo/file"
 git -C "$repo" commit -qam two   # the checkout moves on; the green stays valid
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="echo run >> $repo/RUNS; true")
 runs=$(wc -l < "$repo/RUNS" 2>/dev/null | tr -d ' ')
 errs=""
@@ -1032,7 +1046,7 @@ run_scoped() {
     # el DEFECTO desde el 29/08 es `workspace` (la nube ya no corre la suite en las PRs).
     run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
         HUB_GATE_SCOPE_POLICY=scoped \
-        HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
         HUB_GATE_TEST_CMD='printf "%s|%s\n" "$HUB_GATE_SCOPE_MODE" "$HUB_GATE_SCOPE_PACKAGES" > '"$repo/SCOPE" \
         "$@"
 }
@@ -1175,7 +1189,7 @@ repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="[ -d '$repo/.state/lock' ] && touch $repo/RAN")
 errs=""
 [ "$code" = 0 ]           || errs="$errs exit=$code(want 0)"
@@ -1237,7 +1251,7 @@ echo "# stale installed copy" >> "$repo/installed/pre-push"
 chmod +x "$repo/installed/pre-push"
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
@@ -1267,7 +1281,7 @@ echo "# a change to the gate itself" >> "$repo/.githooks/pre-push"
 git -C "$repo" add -A && git -C "$repo" commit -qm "edit the gate"
 sha=$(git -C "$repo" rev-parse HEAD)
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
@@ -1304,7 +1318,7 @@ mkdir -p "$repo/installed"
 cp "$HOOK" "$repo/installed/pre-push"
 chmod +x "$repo/installed/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/feature $sha refs/heads/feature $ZERO" | env \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
@@ -1332,7 +1346,7 @@ chmod +x "$repo/installed/pre-push"
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 echo "# WIP uncommitted edit" >> "$repo/.githooks/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
@@ -1365,7 +1379,7 @@ mkdir -p "$repo/installed"
 cp "$HOOK" "$repo/installed/pre-push"
 chmod +x "$repo/installed/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
@@ -1388,7 +1402,7 @@ repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true" \
     HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 errs=""
@@ -1403,7 +1417,7 @@ repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true" \
     HUB_GATE_WEB_CMD="false")
 [ "$code" != 0 ] \
@@ -1415,7 +1429,7 @@ repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true" \
     HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 errs=""
@@ -1430,7 +1444,7 @@ repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" docs/nota.md)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="touch $repo/RAN; true" \
     HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 errs=""
@@ -1448,7 +1462,7 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
 rm -f "$repo/SCOPE"
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD='printf "%s\n" "$HUB_GATE_SCOPE_MODE" > '"$repo/SCOPE")
 errs=""
 [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
@@ -1469,7 +1483,7 @@ git -C "$repo" update-ref -d refs/remotes/origin/develop 2>/dev/null || true
 git -C "$repo" update-ref -d refs/remotes/origin/main 2>/dev/null || true
 sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
 code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
-    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     HUB_GATE_TEST_CMD="true" \
     HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
 errs=""
@@ -1515,6 +1529,30 @@ case "$ctrl" in *context=local-gate/hub-tests*) ;; *) errs="$errs CONTROL-no-ate
 [ -z "$errs" ] \
     && ok "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua (control: sin skip SI atestigua)" \
     || bad "web: SKIP_HUB_WEB deja pasar el push pero NO atestigua" "$errs"
+
+# 8. La etapa web recibe los DSN del banco de e2e. `apps/web/tests/e2e/AssistantGrounded.spec.ts`
+#    cae por defecto en `localhost:5434`, un Postgres que en local NO existe: sin exportarlos, el
+#    playwright de cada push que toque web moriria en el arranque del runtime.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_WEB_CMD='printf "%s|%s\n" "${HUB_E2E_DATABASE_URL:-}" "${E2E_DATABASE_URL:-}" > '"$repo/DSN")
+got=$(cat "$repo/DSN" 2>/dev/null)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+case "$got" in
+    *hub_e2e_web*\|*hub_e2e_assistant*) ;;
+    *) errs="$errs dsn='$got'" ;;
+esac
+case "$got" in *5434*) errs="$errs apunta-al-5434-que-no-existe" ;; esac
+[ -z "$errs" ] \
+    && ok "web: la etapa recibe HUB_E2E_DATABASE_URL y E2E_DATABASE_URL del Postgres del gate" \
+    || bad "web: la etapa recibe HUB_E2E_DATABASE_URL y E2E_DATABASE_URL del Postgres del gate" "$errs"
 
 echo
 echo "  $pass passed, $fail failed"

@@ -1,0 +1,192 @@
+# ==============================================================================
+# Regenerar baselines visuales del shell (Linux) — hub#1250
+# ==============================================================================
+#
+# WHY A SEPARATE WORKFLOW instead of extending `test-web.yml`'s own `update_baselines` dispatch
+# path (already there since hub#1240). Two reasons, the second is the one that actually forced it:
+#
+#   1. Un push a `develop` mientras esa corrida está en marcha la CANCELA: `test-web.yml`
+#      comparte el concurrency group `test-web-${{ github.ref }}` entre TODOS sus triggers — push,
+#      pull_request y workflow_dispatch caen en el MISMO grupo cuando se lanzan sobre la misma
+#      rama, y `cancel-in-progress: true` mata el más viejo. Es justo lo que pasó en el primer
+#      intento real (run 33130949827, comentario de Ioan en hub#1250 del 2026-08-28): Playwright
+#      dio 12 passed con `--update-snapshots=all`, pero el run acabó `cancelled` por el merge de
+#      otra tanda antes de subir el artefacto. Este workflow vive en SU PROPIO grupo, único por
+#      `run_id`, así que nada que se dispare sobre `develop` puede cancelarlo jamás.
+#
+#   2. Aislar la ÚNICA acción que REESCRIBE el contrato visual en un fichero sin trigger
+#      automático (`workflow_dispatch` a secas, sin `push` ni `pull_request`) y con una
+#      confirmación explícita — un dispatch por error no puede sobrescribir baselines que nadie
+#      ha revisado todavía.
+#
+# Duplica a propósito media plantilla del banco e2e de `test-web.yml` (Postgres, build del
+# runtime, Vite) en vez de extraer un workflow reusable (`workflow_call`): tocar `test-web.yml`
+# para esa extracción entraría en conflicto con otro cambio en curso sobre ese mismo fichero
+# (issue hub#1250, batch «cierre del hub como kernel»). El precio es mantener las DOS copias
+# sincronizadas si el banco cambia de forma; `scripts/tests/visual-baselines-workflow.test.sh` al
+# menos fija la forma de ESTE fichero, y `actionlint.yml` lo corre en cada PR que toque
+# `.github/workflows/**`.
+#
+# El filtro `Visual` en el paso de Playwright evita arrastrar al resto de la suite (en concreto
+# `AssistantGrounded.spec.ts`, que necesita una SEGUNDA base de datos): solo hacen falta los cinco
+# specs `*Visual.spec.ts` para regenerar el contrato visual.
+#
+# Procedimiento (issue hub#1250):
+#   1. Actions → «Regenerar baselines visuales (Linux)» → Run workflow → confirm: true.
+#   2. Descargar el artefacto `playwright-baselines`.
+#   3. Commitear los PNG en `apps/web/tests/e2e/<Spec>.spec.ts-snapshots/`.
+#   4. Confirmar que el siguiente run de `test-web.yml` los usa (los casos dejan de saltarse).
+# ==============================================================================
+
+name: Regenerar baselines visuales (Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Sí, quiero SOBRESCRIBIR las baselines visuales del shell (login/dashboard/apps/ajustes/personal) con lo que pinte este runner"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Único por `run_id`: ningún otro evento (push a develop, otra tanda de la flota) puede
+  # compartir este grupo y cancelarlo — es justo lo que canceló el intento anterior (hub#1250).
+  group: visual-baselines-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    name: playwright --update-snapshots=all (specs *Visual.spec.ts)
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+
+    services:
+      # Misma imagen que `test-web.yml` y `test-hub.yml` A PROPÓSITO — si una cambia, las otras
+      # también (un desfase entre ellas ya dejó `main` en rojo 7 runs seguidos el 2026-08-09).
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hub_e2e_web
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CI: "1"
+      # La señal que `playwright.config.ts` (`resolveUpdateSnapshotsMode`, hub#1250) traduce a
+      # `updateSnapshots: 'all'`, y que los specs (`shell-visual-helpers.ts`) traducen a "no
+      # saltes el caso aunque la baseline no exista todavía": es justo lo que hay que regenerar.
+      HUB_UPDATE_BASELINES: "1"
+      RUSTFLAGS: "-C debuginfo=0"
+      CARGO_TERM_COLOR: always
+
+    steps:
+      # Antes de gastar un solo minuto de runner: sin esta casilla, el dispatch se para en seco.
+      - name: Exigir confirmación explícita
+        if: ${{ github.event.inputs.confirm != 'true' }}
+        run: |
+          echo "::error::Este workflow SOBRESCRIBE las baselines visuales del shell. Relánzalo con la casilla 'confirm' marcada si es lo que quieres."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Misma defensa que `test-web.yml` (hub#1216): el resolutor de módulos del shell mira al
+      # hermano `modules-workspace/` del checkout, que cae fuera del workspace y PERSISTE entre
+      # jobs de un mismo runner.
+      - name: Quitar restos de modules-workspace en el runner (hub#1216)
+        run: |
+          STRAY="$GITHUB_WORKSPACE/../modules-workspace"
+          if [ -e "$STRAY" ]; then
+            n=$(find "$STRAY" -mindepth 3 -maxdepth 3 -name module.json 2>/dev/null | wc -l | tr -d ' ')
+            echo "::warning::restos de modules-workspace en el runner (${n} módulos) — se borran."
+            rm -rf "$STRAY"
+          fi
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Node 22 + pnpm (pinned by package.json `packageManager`)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Toolchain (rust-toolchain.toml)
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            echo "rustup ausente en este runner — instalándolo (no toca ni el PATH ni los toolchains)"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+              | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
+          save-if: ${{ runner.environment != 'self-hosted' }}
+
+      # Binario de DEBUG, no release: el `webServer` de `tests/playwright.config.ts` lo alcanza
+      # por `cargo run` (instantáneo con el binario ya construido).
+      - name: cargo build -p erplora-server
+        run: cargo build -p erplora-server
+
+      - name: Build del shell (dist)
+        run: pnpm -F @erplora/web exec vite build
+
+      - name: Exportar el DSN de Postgres del banco
+        env:
+          PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: echo "HUB_E2E_DATABASE_URL=postgres://postgres:test@localhost:${PG_PORT}/hub_e2e_web" >> "$GITHUB_ENV"
+
+      # `--with-deps`: un runner limpio no tiene las librerías del sistema que pide Chromium.
+      - name: Instalar el navegador de Playwright
+        run: pnpm -F @erplora/web exec playwright install --with-deps chromium
+
+      # `exec playwright` y no `test:e2e --`: pnpm mete un `--` literal en la lista de argumentos
+      # y Playwright se lo come sin quejarse, dejando el filtro siguiente sin efecto (mismo gotcha
+      # que documentaba `test-web.yml`). El filtro posicional `Visual` selecciona los cinco specs
+      # `*Visual.spec.ts` por substring de ruta — ninguno de los otros seis specs de `tests/e2e/`
+      # contiene esa palabra.
+      - name: Regenerar SOLO las capturas visuales (--update-snapshots=all)
+        run: pnpm -F @erplora/web exec playwright test -c tests/playwright.config.ts --update-snapshots=all Visual
+
+      - name: Subir las capturas regeneradas
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-baselines
+          path: apps/web/tests/e2e/**/*-snapshots/**
+          if-no-files-found: error
+
+      # La traza de un fallo, igual que en `test-web.yml`: sin esto un rojo aquí solo deja el
+      # mensaje de la aserción y hay que reproducirlo a ciegas en local.
+      - name: Subir las trazas del fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-traces-${{ github.run_id }}
+          path: |
+            apps/web/test-results/**
+            apps/web/playwright-report/**
+          if-no-files-found: ignore
+          retention-days: 7
