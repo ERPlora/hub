@@ -60,6 +60,9 @@ on:
       - 'scripts/ci/kernel-e2e-targets.sh'
       - 'scripts/ci/kernel-e2e-targets.txt'
       - 'scripts/tests/kernel-e2e-targets.test.sh'
+      # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
+      # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
+      - 'scripts/tests/publish-module-sdk-workflow.test.sh'
       # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
       # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
       # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
@@ -199,3 +202,15 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/kernel-e2e-targets.test.sh
+
+      # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
+      # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—
+      # sino la cuota de paquetes de la organización. Ese diagnóstico equivocado es justo el
+      # que lleva a "arreglarlo" quitando `packages: write`, el `registry-url` o el `scope`,
+      # o a taparlo con `continue-on-error`. Cada una de esas tres cosas rompe algo que hoy
+      # está bien, y ninguna deja rojo en ningún otro sitio. Segundos, y corre también como
+      # paso de `build-hub.yml`, que es el camino real a producción.
+      - name: Contrato del job publish-module-sdk (hub#1308)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/publish-module-sdk-workflow.test.sh

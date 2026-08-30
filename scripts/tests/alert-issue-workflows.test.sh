@@ -58,6 +58,10 @@ KNOWN_ALERT_STEPS = {
     ".github/workflows/test-hub-modules.yml": "Los módulos publicados ROMPEN contra develop",
     ".github/workflows/test-web.yml": "el web de develop esta roto tras un merge",
     ".github/workflows/n-minus-one.yml": "N-1 no sirve contra el esquema de la rama actual",
+    # hub#1308: el paso que avisa de que un tag no pudo publicar `@erplora/module-sdk`. Entra en
+    # esta lista el mismo día que nace, para que no repita el `--search` que hub#1246 arrancó de
+    # los otros tres.
+    ".github/workflows/build-hub.yml": "El SDK @erplora/module-sdk no se pudo publicar en GitHub Packages",
 }
 
 # What makes a step an "alert step": it either already delegates, or it still talks to the issue
