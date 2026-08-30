@@ -19,16 +19,26 @@ import { platformFailureMessage as sdkPlatformFailureMessage, type PlatformFailu
 import { HubUsersError, RoleActivationError } from './hub-users';
 
 /**
- * The `(code, module, query)` of a PLATFORM refusal, or `undefined` when this is not one.
+ * The `(code, module, query, message)` of a PLATFORM refusal, or `undefined` when this is not one.
  *
  * `instanceof`, not structural (unlike `fieldRefusalOf` in `invalid-field.ts`): the SDK's table
  * answers ANY object carrying one of its codes — it has to, a module's own deserialised envelope
  * is a plain object — and restricting the lookup to the shell's own error classes keeps an
  * unrelated `Error` with a coincidental `.code` from painting a platform sentence it never earned.
+ *
+ * hub#1337: the SENTENCE travels too. The ten codes above answer the same thing whatever arrived
+ * with them, but `other` does not — `may_reach_the_client` (`crates/server/src/lib.rs`)
+ * lets `E::Other(_)` speak on purpose, so the SDK shows the runtime's own sentence («usuario no
+ * encontrado») and falls back to the plumbing line only when that sentence was redacted. Dropping
+ * the message here left it deciding blind, and Personal painted the generic line over the useful
+ * one. Typed wider than `PlatformFailure` (which does not declare `message`: it is part of the
+ * frozen kernel surface, `contracts/kernel/sdk.d.ts`) and passed as-is — the SDK reads it.
  */
-function platformRejectionOf(error: unknown): PlatformFailure | undefined {
+function platformRejectionOf(
+  error: unknown,
+): (PlatformFailure & { message: string }) | undefined {
   if (!(error instanceof HubUsersError) && !(error instanceof RoleActivationError)) return undefined;
-  return { code: error.code, module: error.module, query: error.query };
+  return { code: error.code, module: error.module, query: error.query, message: error.message };
 }
 
 /**

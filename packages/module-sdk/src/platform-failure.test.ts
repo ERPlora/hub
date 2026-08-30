@@ -14,6 +14,7 @@
 // translation), so a module that shows `e.message` is right without changing a line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { ErploraError, HttpWsTransport, platformFailureMessage } from './index.ts';
 
 /** The runtime's answer, verbatim in shape: envelope, stable code, app as a field. */
@@ -169,4 +170,94 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
       );
     }
   }
+});
+
+// ── hub#1337 — `other` is NOT plumbing, and the runtime already said so ────────────────────────
+//
+// `may_reach_the_client` (`crates/server/src/lib.rs`) puts `E::Other(_)` on the SPEAKING side of
+// the door — the same side as `Domain`, `InvalidField` or `PermissionDenied` — with
+// `carries_driver_text` as the net underneath it, precisely so that the readable half of the ~50
+// `Other(...)` sites ("usuario no encontrado", `hub_users.rs`) reaches whoever is reading while the
+// half that wraps a `DbError` does not. This table then threw that decision away: `other` answered
+// the same fixed PLUMBING sentence as the six codes the runtime DOES redact, so a screen calling
+// `platformFailureMessage` could never show the authored sentence.
+//
+// The two codes are not the same thing, and one commit proves it: hub#1074 (`594eb485`) replaced
+// the door's flat `_ => "error"` bucket with `error_code_of` — which is where `other` comes from —
+// in the SAME change that introduced `may_reach_the_client`. So a hub that can answer `other` is by
+// construction a hub that already redacts, and its sentence is safe to show; a hub that answers
+// `error` is one from BEFORE that gate, whose bucket carried the driver's own words. Hence `other`
+// steps aside and `error` keeps the plumbing sentence.
+
+/** The line `error_payload` sends when it redacts — pinned here, and against the Rust below. */
+const RUNTIME_REDACTED_LINE = 'the request could not be completed — the hub recorded the details';
+
+test('hub#1337: an authored `other` reaches the reader — the runtime already decided it may', () => {
+  const failure = { code: 'other', message: 'usuario no encontrado' };
+
+  assert.equal(
+    platformFailureMessage(failure, 'es'),
+    null,
+    'stepping aside is what lets the caller keep the sentence `may_reach_the_client` let through',
+  );
+});
+
+test('hub#1337: the till reads the authored sentence, not the generic one', async () => {
+  const transport = transportWith({ code: 'other', message: 'usuario no encontrado' });
+
+  await assert.rejects(
+    () => transport.command('hub.users.set_pin', {}),
+    (e: unknown) => {
+      assert.ok(e instanceof ErploraError);
+      assert.equal(e.code, 'other');
+      assert.equal(e.message, 'usuario no encontrado');
+      return true;
+    },
+  );
+});
+
+test('hub#1337: a REDACTED `other` still speaks the language of whoever is reading', () => {
+  // `carries_driver_text` fired, so the sentence on the wire is the runtime's fixed ENGLISH line
+  // written for the log. Leaving it alone would put it on a Spanish till — hub#1102 all over again.
+  const es = platformFailureMessage({ code: 'other', message: RUNTIME_REDACTED_LINE }, 'es');
+
+  assert.ok(es);
+  assert.doesNotMatch(es!, /could not be completed/, 'the log line never reaches a counter');
+  assert.match(es!, /No se pudo/);
+});
+
+test('hub#1337: an `other` with nothing to say keeps the plumbing sentence', () => {
+  // An older runtime, or a caller that only carries the code: «unknown error» says less.
+  assert.ok(platformFailureMessage({ code: 'other' }, 'es'));
+  assert.ok(platformFailureMessage({ code: 'other', message: '   ' }, 'es'));
+});
+
+test('hub#1337: `error` stays plumbing — the hubs that answer it are the ones that never redacted', () => {
+  const es = platformFailureMessage(
+    { code: 'error', message: 'sqlx: error returned from database' },
+    'es',
+  );
+
+  assert.ok(es);
+  assert.doesNotMatch(es!, /sqlx/, 'the pre-hub#1074 bucket is what put driver text on a till');
+});
+
+test('hub#1337: the redaction line this table recognises is the one `crates/server` sends', () => {
+  // The guard under the rule above: `other` is told apart from a redaction by ONE constant, and a
+  // constant mirrored across two languages drifts unless something compares them. Same shape as
+  // `contract:check` — the copy is checked against the source, not trusted.
+  const lib = readFileSync(new URL('../../../crates/server/src/lib.rs', import.meta.url), 'utf8');
+  const declared = lib.match(/const REDACTED_MESSAGE: &str = "([^"]*)";/);
+
+  assert.ok(
+    declared,
+    '`REDACTED_MESSAGE` is no longer a plain `&str` literal in `crates/server/src/lib.rs`: ' +
+      'hub#1337 tells an authored `other` from a redacted one by comparing against it',
+  );
+  assert.equal(
+    declared![1],
+    RUNTIME_REDACTED_LINE,
+    'the runtime changed its redaction line and `PLATFORM_FAILURES.other` would start showing it ' +
+      'raw, in English, on a Spanish till',
+  );
 });
