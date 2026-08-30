@@ -779,6 +779,11 @@ publish_status() {
 if [ -f "$green" ]; then
     echo "✅ pre-push: this tree already passed the suite → skipping the rebuild." >&2
     publish_status "$pushed_sha"
+    # Verde → se le encarga la review local del código a un revisor Fable. No corre
+    # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
+    # para a toda la flota y una review perdida solo cuesta una review.
+    review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
+[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
 
@@ -905,6 +910,11 @@ trap 'p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -r
 if [ -f "$green" ]; then
     echo "✅ pre-push: another push just validated this tree → skipping the rebuild." >&2
     publish_status "$pushed_sha"
+    # Verde → se le encarga la review local del código a un revisor Fable. No corre
+    # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
+    # para a toda la flota y una review perdida solo cuesta una review.
+    review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
+[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
 
@@ -1093,4 +1103,9 @@ fi
 # behind it (SIGPIPE/closed SSH) with the branch never reaching origin.
 echo "✅ pre-push: suite green → letting the push proceed. The $CONTEXT status posts only after the ref is verified on origin." >&2
 publish_status "$pushed_sha"
+# Verde → se le encarga la review local del código a un revisor Fable. No corre
+# tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
+# para a toda la flota y una review perdida solo cuesta una review.
+review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
+[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
 exit 0
