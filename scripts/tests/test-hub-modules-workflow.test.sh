@@ -100,15 +100,21 @@ REQUIRED_PATHS = [
     "crates/wasm-host/**",
     ".github/workflows/test-hub-modules.yml",
 ]
-pr = triggers.get("pull_request")
-check("the workflow runs on `pull_request`", isinstance(pr, dict), f"got {pr!r}")
-pr_paths = (pr or {}).get("paths") or []
-for wanted in REQUIRED_PATHS:
-    check(
-        f"`on.pull_request.paths` covers `{wanted}`",
-        wanted in pr_paths,
-        f"paths are {pr_paths}",
-    )
+# Desde el 29/08 (Ioan) estos e2e NO corren en las PRs: los corre el gate pre-push, que
+# materializa el catálogo publicado y los ejecuta por defecto (hub#1353 — medido: 30 binarios,
+# 1 365 tests, 0 fallos, 5m07s). Si están rojos, el push se aborta y no llega a haber PR. El
+# `push` a develop/main se queda: es la red post-merge de hub#572, que el gate no puede dar.
+check(
+    "el workflow NO corre en `pull_request` (lo corre el gate local)",
+    triggers.get("pull_request") is None,
+    f"got {triggers.get('pull_request')!r}",
+)
+push_paths = (triggers.get("push") or {}).get("paths")
+check(
+    "sigue corriendo en `push` a develop/main sobre TODO el repo",
+    push_paths is None,
+    f"push.paths = {push_paths!r} — un filtro aquí dejaría el post-merge ciego",
+)
 
 
 # ── 2 · A failure is LOUD: an idempotent alert issue, like `test-hub.yml` ────────────

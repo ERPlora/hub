@@ -331,6 +331,12 @@ jobs:
       contents: read
       issues: write
     steps:
+      # Este job no compila nada: solo necesita el repo en disco porque el paso de abajo llama a
+      # `scripts/ci/alert-issue.sh` (hub#1327). Sin este checkout el paso moriría con `No such
+      # file or directory` y la alerta quedaría MUDA — peor que el duplicado que venía a evitar.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Abrir o refrescar la issue de alerta (hub#1240)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -355,14 +361,10 @@ jobs:
 
           Esta issue se REUTILIZA (un comentario por detección) mientras develop siga rojo; ciérrala cuando vuelva a verde."
 
-          # Frase de búsqueda sin dos puntos ni acentos a propósito (los dos puntos son sintaxis de
-          # búsqueda en GitHub) y estable — es lo que hace idempotente la alerta.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"el web de develop esta roto tras un merge" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refrescando la issue de alerta abierta #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lista y casa EN LOCAL, nunca con `--search` (hub#1246,
+          # resto en hub#1327): `--search` lee el índice de búsqueda de GitHub, que va por detrás
+          # de la realidad — devolvió CERO con issues abiertas el 2026-08-16 y acertó de forma
+          # intermitente después, que es peor. El título no lleva sufijo variable, así que
+          # MATCH=exact es la clave de idempotencia.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh

@@ -37,6 +37,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/**'
+      # Las composite actions son el OTRO sitio donde vive un `run:`. Sin esta entrada, una PR que
+      # solo tocara una de ellas no ejecutaría la guardia de abajo — que ahora también las escanea.
+      - '.github/actions/**'
       # El test de contrato de abajo vive fuera de `.github/`, así que sin esto una PR que
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
@@ -60,6 +63,13 @@ on:
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
+      # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
+      # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
+      # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
+      # gate pre-push, y el gate resuelve con `cargo test --workspace`: nunca consulta la lista).
+      # Sin esta entrada, un slice de hub#1264 que borra el `.rs` y olvida el `.txt` no encuentra
+      # NINGÚN guardia antes de mergear y tumba `develop` en el push — el rojo de hub#1354 (hub#1369).
+      - 'crates/runtime/tests/**'
   workflow_dispatch:
 
 permissions:
@@ -160,18 +170,22 @@ jobs:
           bash ./scripts/tests/canonical-mirrors-verdict.test.sh
       # ── Contrato del lookup compartido de alertas (hub#1246) ─────────────────────────
       # `scripts/ci/alert-issue.sh` reemplaza el `gh issue list --search` (índice que va por
-      # detrás de la realidad) por REST + filtro local en los tres workflows con paso de
-      # alerta. Sin este paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que
-      # reintrodujera `--search` en cualquiera de los tres, o rompiera el propio script, no
-      # ejecutaría ninguno de sus dos tests — exactamente el hueco que `canonical-mirrors.yml`
-      # ya sufrió una vez (hub#1260) por un filtro `paths` sin ensanchar.
+      # detrás de la realidad) por REST + filtro local en TODOS los pasos de alerta. Sin este
+      # paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que reintrodujera
+      # `--search` en cualquiera de ellos, o rompiera el propio script, no ejecutaría ninguno
+      # de sus dos tests — exactamente el hueco que `canonical-mirrors.yml` ya sufrió una vez
+      # (hub#1260) por un filtro `paths` sin ensanchar.
       - name: Contrato de scripts/ci/alert-issue.sh (hub#1246)
         run: |
           set -euo pipefail
           bash ./scripts/tests/alert-issue.test.sh
 
       # pyyaml ya está instalado por el paso de arriba.
-      - name: Contrato de los pasos de alerta de test-hub/image-freshness/test-hub-modules (hub#1246)
+      # El contrato ya no lleva lista fija de workflows: recorre `.github/workflows/**` y
+      # `.github/actions/**` y exige la delegación a CUALQUIER paso que toque una issue, así que
+      # ni un workflow nuevo ni una composite action pueden quedarse fuera de la guardia por no
+      # estar apuntados (hub#1327).
+      - name: Contrato de los pasos de alerta de todos los workflows (hub#1246, hub#1327)
         run: |
           set -euo pipefail
           bash ./scripts/tests/alert-issue-workflows.test.sh
