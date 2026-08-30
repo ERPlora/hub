@@ -55,6 +55,19 @@ on_sub_block() { # $1 = name
     '
 }
 
+# One job's block under `jobs:` (e.g. `verify`), from `  <name>:` to the next
+# 2-space job key. Job-scoped, not file-wide: a whole-file grep would say a
+# guard is present because a DIFFERENT job happens to mention the same words
+# (caught by mutation testing — removing the checkout override from `verify`
+# alone did not fail check 8 until this scoping was added).
+job_block() { # $1 = name
+    awk -v key="  $1:" '
+        $0 == key {inside=1; print; next}
+        inside && /^  [A-Za-z0-9_-]+:/ {exit}
+        inside {print}
+    ' "$workflow"
+}
+
 echo "test-web.yml — contrato del gate del web (hub#1240)"
 
 # ── 1. The npm script the workflow (and a developer) invokes ─────────────────
@@ -147,7 +160,74 @@ else
         "este fichero no lo ejecuta ningún workflow — exactamente el defecto que hub#1240 arregla"
 fi
 
-# ── 8. The runtime `webServer` never falls back to production (hub#1279) ─────
+# ── 8. Nightly schedule on develop (hub#1253) ────────────────────────────────
+# `crates/**` is deliberately left out of `paths` (see the workflow header): a
+# Rust-only merge on develop never triggers this file. Without a `schedule`, a
+# runtime regression that breaks the shell does not surface until the next PR
+# that touches `apps/web/**`.
+schedule_block=$(on_sub_block schedule)
+verify_job=$(job_block verify)
+e2e_job=$(job_block e2e)
+# Each job's checkout must carry BOTH the event guard and the `develop` literal —
+# checked PER JOB, not with a whole-file grep: `e2e` alone having the override
+# would satisfy a file-wide grep while `verify` (vue-tsc + vitest) silently kept
+# testing whatever `main` happens to be, and a scheduled run would then mix
+# develop's e2e result with main's typecheck result under one "develop is
+# broken" alert.
+verify_has_ref=1
+e2e_has_ref=1
+printf '%s' "$verify_job" | grep -q "event_name == 'schedule'" && printf '%s' "$verify_job" | grep -q "'develop'" || verify_has_ref=0
+printf '%s' "$e2e_job" | grep -q "event_name == 'schedule'" && printf '%s' "$e2e_job" | grep -q "'develop'" || e2e_has_ref=0
+if [ -z "$schedule_block" ]; then
+    bad "test-web.yml has a nightly \`schedule\`" \
+        "no \`schedule:\` block under \`on:\`: a runtime change that breaks the shell is not seen until the next PR to the web (hub#1253)"
+elif ! printf '%s' "$schedule_block" | grep -q 'cron:'; then
+    bad "the \`schedule\` declares a \`cron\`" \
+        "\`on.schedule\` exists but without \`cron:\`, so GitHub never fires it"
+elif [ "$verify_has_ref" -eq 0 ]; then
+    bad "the \`verify\` job's checkout forces develop on the cron" \
+        "\`schedule\` only fires the file living on \`main\` (native GitHub behaviour) and by default would check out THAT branch — the opposite of what hub#1253 asks. The \`verify\` job is missing a \`ref:\` conditioned on \`github.event_name == 'schedule'\` that forces \`develop\`"
+elif [ "$e2e_has_ref" -eq 0 ]; then
+    bad "the \`e2e\` job's checkout forces develop on the cron" \
+        "same defect as \`verify\` but on the \`e2e\` job: without the conditional \`ref:\`, the cron would test \`main\` instead of \`develop\`"
+else
+    ok "on.schedule has a cron and the verify+e2e checkouts force develop on that path"
+fi
+
+# ── 9. The alert also covers the cron (hub#1253) ─────────────────────────────
+# The `alert-develop` job only checked `github.event_name == 'push'`: a red cron run
+# at 3am is seen by nobody (the same hole hub#572/#1239 closed for push).
+alert_job=$(job_block alert-develop)
+if [ -z "$alert_job" ]; then
+    bad "the \`alert-develop\` job exists" "\`  alert-develop:\` was not found in $workflow"
+elif ! printf '%s' "$alert_job" | grep -q "event_name == 'schedule'"; then
+    bad "the develop-broken alert also fires on \`schedule\`" \
+        "\`alert-develop\`'s \`if:\` only checks \`github.event_name == 'push'\`: a red cron run neither opens nor refreshes the alert issue (hub#1253)"
+else
+    ok "alert-develop also fires when the trigger is \`schedule\`"
+fi
+
+# ── 10. The guard's `scripts/**` file triggers the gate (hub#1247) ───────────
+# `pnpm verify` runs `node --test scripts/tests/no-dead-packages.test.mjs` as its first
+# step (hub#1244), but that file was missing from the `paths`: a change that only touched
+# the guard triggered no check at all.
+#
+# This asked for `pull_request` too until 2026-08-29, when that trigger was removed on
+# purpose (see the header of test-web.yml): the heavy suite runs in the pre-push gate, and
+# what survives in the cloud is `push` over the merged tree. Keeping the old assertion
+# would demand a trigger the workflow is not supposed to have any more.
+guard_path="scripts/tests/no-dead-packages.test.mjs"
+if ! printf '%s' "$push_block" | grep -qF "$guard_path"; then
+    bad "the \`no-dead-packages\` guard triggers test-web.yml on push" \
+        "\`on.push.paths\` does not include \`$guard_path\` (hub#1247)"
+elif printf '%s' "$(on_block)" | grep -qE '^  pull_request:'; then
+    bad "test-web.yml has no \`pull_request\` trigger" \
+        "\`on.pull_request\` is back: the heavy suite moved to the pre-push gate on 2026-08-29, and \`merge-pr.sh\` authorises the merge with the \`local-gate/hub-tests\` attestation (pm#197). If it is back on purpose, this assertion is what has to change first"
+else
+    ok "\`$guard_path\` is in the push \`paths\`, and the gate does not run on \`pull_request\`"
+fi
+
+# ── 11. The runtime `webServer` never falls back to production (hub#1279) ─────
 # `webServer` is an array: the first entry starts the Rust runtime (`cargo run`)
 # and the second starts Vite (`pnpm exec vite`). Only the runtime's `env` block
 # matters here, so it's sliced out up to the vite entry's `command` line —
