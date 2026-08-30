@@ -105,6 +105,13 @@ pub struct DailyUsageHeartbeat {
     /// no hay techo (`"max"`) — el Cloud dejará su `memory_pct` a `null`, que es la verdad.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_limit_mb: Option<f64>,
+    /// Pico histórico de memoria del contenedor en MB (hub#981): `memory.peak` del cgroup. Es un
+    /// high-water mark, no una muestra — sobrevive al arranque, que es el momento más caro (se
+    /// reinstalan todos los módulos, contrato stateless) y dura segundos: ni el muestreo del
+    /// latido ni cAdvisor a 60 s lo ven. Es el dato que dimensiona el techo de RAM de un plan.
+    /// Ausente donde el kernel no expone `memory.peak` (< 5.19) o fuera de contenedor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_peak_mb: Option<f64>,
 }
 
 /// Un MB en bytes, para la conversión a las unidades del Cloud (1024·1024, la misma base que
@@ -128,6 +135,7 @@ impl DailyUsageHeartbeat {
     ) {
         self.memory_used_mb = memory.used_bytes.map(|b| round2(b as f64 / BYTES_PER_MB));
         self.memory_limit_mb = memory.limit_bytes.map(|b| round2(b as f64 / BYTES_PER_MB));
+        self.memory_peak_mb = memory.peak_bytes.map(|b| round2(b as f64 / BYTES_PER_MB));
         self.cpu_pct = cpu.fraction.map(|f| round2(f * 100.0));
     }
 }
@@ -304,6 +312,7 @@ pub async fn collect_daily_usage(
         cpu_pct: None,
         memory_used_mb: None,
         memory_limit_mb: None,
+        memory_peak_mb: None,
     }
 }
 
@@ -461,6 +470,7 @@ mod tests {
         cpu_pct: Some(50.0),
         memory_used_mb: Some(10.0),
         memory_limit_mb: Some(96.0),
+        memory_peak_mb: Some(192.0),
     };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -492,6 +502,7 @@ mod tests {
                 "cpu_pct": 50.0,
                 "memory_used_mb": 10.0,
                 "memory_limit_mb": 96.0,
+                "memory_peak_mb": 192.0,
             })
         );
         server.abort();
@@ -515,6 +526,7 @@ mod tests {
         cpu_pct: None,
         memory_used_mb: None,
         memory_limit_mb: None,
+        memory_peak_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
@@ -541,6 +553,7 @@ mod tests {
         cpu_pct: None,
         memory_used_mb: None,
         memory_limit_mb: None,
+        memory_peak_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert_eq!(body, json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION}));
@@ -573,6 +586,7 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         };
         // La fixture del free tier real (system_metrics): 10 MiB usados de 96 MiB, 0,5 de 1 core.
         usage.set_resource_metrics(
@@ -580,6 +594,7 @@ mod tests {
                 used_bytes: Some(10_485_760),
                 limit_bytes: Some(100_663_296),
                 fraction: Some(10_485_760.0 / 100_663_296.0),
+                peak_bytes: Some(201_326_592),
             },
             crate::system_metrics::CpuMetric {
                 used_cores: Some(0.5),
@@ -591,6 +606,11 @@ mod tests {
         assert_eq!(body["cpu_pct"], json!(50.0), "fracción 0..1 → porcentaje del Cloud");
         assert_eq!(body["memory_used_mb"], json!(10.0), "bytes → MB (10 MiB exactos)");
         assert_eq!(body["memory_limit_mb"], json!(96.0), "bytes → MB (96 MiB del plan free)");
+        // El PICO es lo que decide el techo de un plan: el régimen cabe de sobra en 256 MiB, y lo
+        // que no se ve desde fuera es el arranque (reinstalación stateless de los módulos), que
+        // dura segundos y cae entre scrapes. `memory.peak` es un high-water mark, así que el
+        // latido lo lleva aunque el pico ocurriera hace horas (hub#981).
+        assert_eq!(body["memory_peak_mb"], json!(192.0), "bytes → MB (192 MiB de pico)");
     }
 
     /// 🔴 [hub#975] Outside a container (Tauri/desktop/dev) the cgroup does not exist: the
@@ -611,12 +631,14 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         };
         usage.set_resource_metrics(
             crate::system_metrics::MemoryMetric {
                 used_bytes: None,
                 limit_bytes: None,
                 fraction: None,
+                peak_bytes: None,
             },
             crate::system_metrics::CpuMetric {
                 used_cores: None,
@@ -649,12 +671,14 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         };
         usage.set_resource_metrics(
             crate::system_metrics::MemoryMetric {
                 used_bytes: Some(10_485_760),
                 limit_bytes: None, // `memory.max = "max"`: sin techo
                 fraction: None,
+                peak_bytes: None,  // kernel sin `memory.peak`
             },
             crate::system_metrics::CpuMetric {
                 used_cores: Some(0.7),
@@ -686,6 +710,7 @@ mod tests {
         cpu_pct: None,
         memory_used_mb: None,
         memory_limit_mb: None,
+        memory_peak_mb: None,
     };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
@@ -826,6 +851,7 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         },
         )
         .await
@@ -881,6 +907,7 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         },
         )
         .await
@@ -914,6 +941,7 @@ mod tests {
             cpu_pct: None,
             memory_used_mb: None,
             memory_limit_mb: None,
+            memory_peak_mb: None,
         };
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");

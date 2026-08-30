@@ -190,11 +190,17 @@ else
 fi
 
 # ── 7. This very file runs somewhere (the sin it exists to punish) ───────────
-if grep -q 'scripts/tests/clippy-lints.test.sh' "$workflow"; then
-    ok "test-hub.yml corre este mismo contrato"
+# The invocation LINE only — never any mention of the file. `test-hub.yml`
+# names this script in a header comment too, so a whole-file `grep -q` stayed
+# green with the `run:` step deleted (proven by mutation: 10 passed, exit 0).
+# Same false green as the visual-baselines contract fixed in hub#1363; the
+# family issue is hub#1365 (test-web-workflow.test.sh has the twin).
+SELF='scripts/tests/clippy-lints.test.sh'
+if grep -qE "^[[:space:]]*(run:[[:space:]]*)?bash (\./)?${SELF//./\\.}[[:space:]]*$" "$workflow"; then
+    ok "test-hub.yml corre este mismo contrato (paso real, no una mención)"
 else
     bad "test-hub.yml corre este mismo contrato" \
-        "este fichero no lo ejecuta ningún workflow — exactamente el defecto que hub#1242 arregla"
+        "ningún paso invoca \`bash ${SELF}\` — exactamente el defecto que hub#1242 arregla; nombrarlo en un comentario no lo ejecuta"
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
