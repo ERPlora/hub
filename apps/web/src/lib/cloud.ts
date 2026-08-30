@@ -26,9 +26,9 @@ export interface LoginResult {
   hubId?: string;
 }
 
-// --- Login 2-pasos (2FA por OTP de email, ERPlora/saas#994) -------------------
+// --- Login 2-pasos (2FA por TOTP, app autenticadora, ERPlora/saas#994) ------
 // El SaaS cambió `POST /api/v1/auth/login/` a 2 pasos:
-//   · Paso 1: 401 con body {two_factor_required: true, ticket, method: 'email', expires_in}.
+//   · Paso 1: 401 con body {two_factor_required: true, ticket, method: 'totp', expires_in}.
 //   · Paso 2: POST {ticket, code} a /api/v1/auth/login/2fa/ → {access, refresh, hub_id}.
 // Un código erróneo responde 401 con un ticket NUEVO (single-use) en el body: el cliente DEBE
 // adoptar ese ticket para reintentar, nunca reusar el anterior ya consumido. El `ticket` vive
@@ -36,7 +36,7 @@ export interface LoginResult {
 export interface TwoFactorChallenge {
   /** Ticket monouso emitido por el Cloud; viaja al /2fa/ en el paso 2. */
   ticket: string;
-  /** Canal del OTP (hoy siempre 'email'). */
+  /** Canal del segundo factor (TOTP, app autenticadora — ADR «segundo factor opcional» 2026-08-29). */
   method: string;
   /** TTL del challenge en segundos. */
   expiresIn: number;
@@ -667,7 +667,7 @@ async function twoFactorChallengeIfPresent(res: Response): Promise<TwoFactorChal
     return null;
   }
   if (raw.two_factor_required === true && typeof raw.ticket === 'string' && raw.ticket) {
-    const method = typeof raw.method === 'string' && raw.method ? raw.method : 'email';
+    const method = typeof raw.method === 'string' && raw.method ? raw.method : 'totp';
     const expiresIn = Number.isFinite(raw.expires_in) ? Number(raw.expires_in) : 300;
     return { ticket: raw.ticket, method, expiresIn };
   }

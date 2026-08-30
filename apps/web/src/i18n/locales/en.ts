@@ -1381,15 +1381,15 @@ export default {
     orSeparator: 'or',
     continueWithGoogle: 'Continue with Google',
     errorGoogle: 'Could not sign in with Google. Please try again.',
-    // Login 2-pasos (2FA por OTP de email, ERPlora/saas#994): pantalla de introducción del código.
+    // Login 2-pasos (2FA por TOTP, app autenticadora, ERPlora/saas#994 + ADR «segundo factor opcional» 2026-08-29).
     twoFactorSubtitle: 'Verify it’s you',
-    twoFactorHint: 'We sent a one-time code to your email. Enter it to continue.',
+    twoFactorHint: 'Enter the 6-digit code from your authenticator app (or a recovery code).',
     twoFactorCodeLabel: 'Verification code',
     twoFactorCodePlaceholder: '6-digit code',
     twoFactorVerify: 'Verify',
     twoFactorBack: 'Back',
-    twoFactorRequired: 'Enter the code we sent to your email.',
-    twoFactorIncorrect: 'Incorrect or expired code. We sent a new code — try again.',
+    twoFactorRequired: 'Enter the code from your authenticator app.',
+    twoFactorIncorrect: 'Incorrect or expired code. Try again.',
     twoFactorError: 'Could not verify the code. Please try again.',
   },
   // hub#363 — the manager's approval, asked for without closing the cashier's session. Every line

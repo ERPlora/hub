@@ -1275,15 +1275,15 @@ export default {
     orSeparator: 'o',
     continueWithGoogle: 'Continuar con Google',
     errorGoogle: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.',
-    // Login 2-pasos (2FA por OTP de email, ERPlora/saas#994): pantalla de introducción del código.
+    // Login 2-pasos (2FA por TOTP, app autenticadora, ERPlora/saas#994): pantalla del código.
     twoFactorSubtitle: 'Verifica que eres tú',
-    twoFactorHint: 'Hemos enviado un código de un solo uso a tu email. Introdúcelo para continuar.',
+    twoFactorHint: 'Introduce el código de 6 dígitos de tu app autenticadora (o un código de recuperación).',
     twoFactorCodeLabel: 'Código de verificación',
     twoFactorCodePlaceholder: 'Código de 6 dígitos',
     twoFactorVerify: 'Verificar',
     twoFactorBack: 'Volver',
-    twoFactorRequired: 'Introduce el código que enviamos a tu email.',
-    twoFactorIncorrect: 'Código incorrecto o caducado. Hemos enviado un código nuevo, inténtalo de nuevo.',
+    twoFactorRequired: 'Introduce el código de tu app autenticadora.',
+    twoFactorIncorrect: 'Código incorrecto o caducado. Inténtalo de nuevo.',
     twoFactorError: 'No se pudo verificar el código. Inténtalo de nuevo.',
   },
   // hub#363 — la aprobación del encargado, pedida sin cerrar la sesión del cajero. Cada línea se

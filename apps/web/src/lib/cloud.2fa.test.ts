@@ -1,4 +1,5 @@
-// ERPlora/saas#994 — login 2-pasos (2FA por OTP de email). El SaaS cambió
+// ERPlora/saas#994 — login 2-pasos (2FA por TOTP, app autenticadora). El SaaS migró de OTP por
+// email a TOTP (allauth.mfa) — ver ADR «segundo factor opcional» (2026-08-29). El SaaS cambió
 // `POST /api/v1/auth/login/` para responder `401 {two_factor_required, ticket, method,
 // expires_in}`; el cliente completa con `POST /api/v1/auth/login/2fa/ {ticket, code}`. Un código
 // erróneo devuelve 401 con un ticket NUEVO (single-use). Aquí se prueba la pieza testable de
@@ -43,7 +44,7 @@ function fetchByRoute(routes: Record<string, (body: unknown) => Response>): Retu
   });
 }
 
-describe('login 2-pasos (2FA por email, ERPlora/saas#994)', () => {
+describe('login 2-pasos (2FA por TOTP, ERPlora/saas#994)', () => {
   beforeEach(() => {
     config.cloudApiUrl = 'https://cloud.test';
     beginRequest.mockClear();
@@ -83,6 +84,39 @@ describe('login 2-pasos (2FA por email, ERPlora/saas#994)', () => {
     });
     // No llega a pedir /me: el challenge aborta antes.
     expect(fetchMock.mock.calls.some(([u]) => u === ME)).toBe(false);
+  });
+
+  it('adopta el método por defecto ("totp") cuando el 401 no trae el campo `method`', async () => {
+    // El SaaS migró a TOTP (allauth.mfa, ADR «segundo factor opcional» 2026-08-29): el `method`
+    // por defecto del cliente es 'totp'. Si el Cloud omite el campo, el hub no adivina 'email'.
+    const fetchMock = fetchByRoute({
+      [LOGIN]: () =>
+        json({ two_factor_required: true, ticket: 'ticket-abc', expires_in: 300 }, 401),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await cloudLogin('ioan@bar.com', 'secret').catch((e) => e);
+    expect(err).toBeInstanceOf(TwoFactorRequiredError);
+    expect(err.ticket).toBe('ticket-abc');
+    expect(err.method).toBe('totp');
+    expect(err.expiresIn).toBe(300);
+  });
+
+  it('deja pasar `method: "totp"` tal cual, sin transformarlo', async () => {
+    // El hub NO reescribe el canal: devuelve lo que manda el Cloud. Así un futuro método no
+    // requiere tocar el cliente.
+    const fetchMock = fetchByRoute({
+      [LOGIN]: () =>
+        json(
+          { two_factor_required: true, ticket: 'ticket-abc', method: 'totp', expires_in: 300 },
+          401,
+        ),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const err = await cloudLogin('ioan@bar.com', 'secret').catch((e) => e);
+    expect(err).toBeInstanceOf(TwoFactorRequiredError);
+    expect(err.method).toBe('totp');
   });
 
   it('cloudLogin propaga un 401 sin 2FA como Error normal (no challenge)', async () => {

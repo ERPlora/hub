@@ -175,7 +175,7 @@
                 </ion-button>
               </form>
 
-              <!-- Paso: verificación 2FA (OTP por email, ERPlora/saas#994). El `ticket` vive
+              <!-- Paso: verificación 2FA (TOTP, app autenticadora, ERPlora/saas#994). El `ticket` vive
                    SOLO en memoria (nunca localStorage): es monouso y transitorio. Un código
                    erróneo devuelve un ticket NUEVO desde el Cloud; lo adoptamos y dejamos
                    reintentar sin pedir de nuevo la contraseña. -->
@@ -511,8 +511,8 @@ const emailError = ref<string>('');
 // El `ticket` del challenge vive SOLO en memoria — es monouso y transitorio; NUNCA
 // se persiste en localStorage. Se setea al detectar el 401 `two_factor_required`
 // (tanto en submitEmail como tras un código erróneo, que renueva el ticket).
-// El canal (`.method`, hoy siempre 'email') llega en el error; la UI siempre habla
-// de email, así que no se guarda por separado.
+// El canal (`.method`, hoy siempre 'totp') llega en el error; la UI siempre habla
+// de la app autenticadora, así que no se guarda por separado.
 // ---------------------------------------------------------------------------
 const twoFactorTicket = ref<string>('');
 const twoFactorCode = ref<string>('');
