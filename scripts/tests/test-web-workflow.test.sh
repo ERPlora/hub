@@ -124,9 +124,12 @@ fi
 if ! grep -q "refs/heads/develop" "$workflow"; then
     bad "el paso de alerta se limita a push sobre develop" \
         "no hay guarda \`github.ref == 'refs/heads/develop'\`: la alerta se abriría también desde PRs y main"
-elif ! grep -q 'gh issue' "$workflow"; then
+# El paso ya no llama a `gh issue` a mano: delega en el lookup compartido (hub#1327). El grep
+# excluye las líneas de comentario (`^[^#]*`) — si no, un comentario que MENCIONE el script
+# satisfaría la guarda con el paso borrado, que es justo el fallo de hub#1365.
+elif ! grep -qE '^[^#]*\./scripts/ci/alert-issue\.sh' "$workflow"; then
     bad "el fallo post-merge en develop abre/refresca una issue de alerta" \
-        "ningún paso llama a \`gh issue\`: un rojo en develop solo notifica a Actions, o sea a nadie (hub#652)"
+        "ningún paso llama a \`./scripts/ci/alert-issue.sh\`: un rojo en develop solo notifica a Actions, o sea a nadie (hub#652)"
 elif ! grep -q 'issues: write' "$workflow"; then
     bad "el job puede escribir issues" \
         "falta \`issues: write\` en \`permissions\`: el paso de alerta fallaría con 403"
@@ -206,17 +209,22 @@ fi
 
 # ── 10. The guard's `scripts/**` file triggers the gate (hub#1247) ───────────
 # `pnpm verify` runs `node --test scripts/tests/no-dead-packages.test.mjs` as its first
-# step (hub#1244), but that file was missing from the push/pull_request `paths`: a PR
-# that only touched the guard triggered no check at all.
+# step (hub#1244), but that file was missing from the `paths`: a change that only touched
+# the guard triggered no check at all.
+#
+# This asked for `pull_request` too until 2026-08-29, when that trigger was removed on
+# purpose (see the header of test-web.yml): the heavy suite runs in the pre-push gate, and
+# what survives in the cloud is `push` over the merged tree. Keeping the old assertion
+# would demand a trigger the workflow is not supposed to have any more.
 guard_path="scripts/tests/no-dead-packages.test.mjs"
 if ! printf '%s' "$push_block" | grep -qF "$guard_path"; then
     bad "the \`no-dead-packages\` guard triggers test-web.yml on push" \
         "\`on.push.paths\` does not include \`$guard_path\` (hub#1247)"
-elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qF "$guard_path"; then
-    bad "the \`no-dead-packages\` guard triggers test-web.yml on pull_request" \
-        "\`on.pull_request.paths\` does not include \`$guard_path\` (hub#1247)"
+elif printf '%s' "$(on_block)" | grep -qE '^  pull_request:'; then
+    bad "test-web.yml has no \`pull_request\` trigger" \
+        "\`on.pull_request\` is back: the heavy suite moved to the pre-push gate on 2026-08-29, and \`merge-pr.sh\` authorises the merge with the \`local-gate/hub-tests\` attestation (pm#197). If it is back on purpose, this assertion is what has to change first"
 else
-    ok "\`$guard_path\` is in both push and pull_request \`paths\`"
+    ok "\`$guard_path\` is in the push \`paths\`, and the gate does not run on \`pull_request\`"
 fi
 
 # ── 11. The runtime `webServer` never falls back to production (hub#1279) ─────

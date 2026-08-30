@@ -77,8 +77,13 @@ name: Hub tests (Rust · Postgres)
 # merge left it. Prevention at merge time (option 1) lives in pm's merge-pr.sh
 # (pm#74) — but that is `cargo check`, it does not EXECUTE; this run does.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): cargo test --workspace se ejecuta en el
+  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
+  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
+  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
+  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
+  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
+  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -345,6 +350,12 @@ jobs:
             echo "::notice::push a ${{ github.ref_name }}: suite completa"
             exit 0
           fi
+          # ⚠️ En una PR con Rust NO se acota. Este check se llama `cargo test --workspace` y es lo
+          # que AUTORIZA el merge (pm#58/#60): `merge-pr.sh` exige verlo en verde y NO acepta la
+          # atestación acotada del gate local como prueba de la suite completa. Acotarlo aquí
+          # dejaría el nombre mintiendo y devolvería el agujero de hub#572 (dos PRs verdes por
+          # separado que rompen develop juntas). Lo único que se ahorra es la PR SIN Rust, donde no
+          # hay nada que compilar y `merge-pr.sh` tampoco pide el check.
           git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed"
           cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/meta.json"
           if ! python3 scripts/ci/test-scope.py "$RUNNER_TEMP/meta.json" erplora-tauri tauri-plugin-erplora-android \
@@ -353,6 +364,10 @@ jobs:
             printf 'workspace\nresolver failed\n' > "$RUNNER_TEMP/scope"
           fi
           mode=$(sed -n 1p "$RUNNER_TEMP/scope"); reason=$(sed -n 2p "$RUNNER_TEMP/scope")
+          if [ "$mode" = packages ]; then
+            mode=workspace
+            reason="$reason — pero una PR con Rust corre el workspace entero (pm#58/#60)"
+          fi
           select=$(sed -n '3,$p' "$RUNNER_TEMP/scope" | sed 's/^/-p /' | tr '\n' ' ')
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "select=$select" >> "$GITHUB_OUTPUT"
@@ -403,8 +418,12 @@ jobs:
         id: tests
         run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android
 
-      # Misma suite, acotada a lo que el diff alcanza. `--exclude` solo existe con `--workspace`,
-      # por eso es un paso hermano y no una variable en el de arriba.
+      # Misma suite, acotada a lo que el diff alcanza. Hoy NADIE emite `packages` (una PR con Rust
+      # se ensancha arriba, y develop/main corren el workspace por definición): el paso se queda
+      # porque el resolutor sí sabe acotar y es lo que consumirá el gate local (hub#1347). Si algún
+      # día se decide acotar también en la PR, hay que cambiar ANTES `merge-pr.sh`, que exige ver
+      # `cargo test --workspace` en verde para autorizar el merge. `--exclude` solo existe con
+      # `--workspace`, por eso es un paso hermano y no una variable en el de arriba.
       - name: cargo test (alcance de la PR)
         if: steps.scope.outputs.mode == 'packages'
         run: cargo test ${{ steps.scope.outputs.select }}
@@ -429,7 +448,6 @@ jobs:
         run: |
           set -euo pipefail
           subject=$(printf '%s\n' "$COMMIT_MESSAGE" | head -n 1)
-          title="develop is broken after a merge: ${subject}"
           body="Detected by the post-merge suite on develop (hub#572).
 
           - develop HEAD: \`${SHA}\` — '${subject}'
@@ -441,14 +459,12 @@ jobs:
 
           This issue is reused (one comment per detection) while develop stays red; close it once develop is green again."
 
-          # Search phrase deliberately colon-free (colons are GitHub search
-          # syntax) and stable — it is what makes the alert idempotent.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"develop is broken after a merge" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refreshing open alert issue #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lists and matches LOCALLY, never `--search` (hub#1246):
+          # that reads GitHub's search index, which lags behind reality. MATCH=prefix because
+          # the title's `: <subject>` suffix changes on every commit — only the stable part
+          # before it is the idempotency key (a colon in the suffix is exactly what broke
+          # `--search`, which reads `:` as search syntax; `startswith()` does not care).
+          TITLE="develop is broken after a merge: ${subject}" \
+            MATCH=prefix MATCH_VALUE="develop is broken after a merge" \
+            LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh

@@ -4325,7 +4325,17 @@ async fn activate_module(
         return unauthorized(e);
     }
     match rt.activate(&id).await {
-        Ok(()) => Json(json!({ "ok": true })).into_response(),
+        Ok(()) => {
+            drop(rt);
+            // hub#1317 (review of hub#1311): before this, activating a module emitted nothing
+            // over `/ws` — the same hole hub#631 closed ONLY for `module.installed`. Another
+            // tab/device of the same hub (and, since hub#1211, the module-sdk's active-modules
+            // cache read by `queryOptional`) stayed on yesterday's state until it reloaded. Same
+            // shape as `module.installed`: a raw frame with no `FRAME_MODULE` (it's the hub's
+            // own, not a module's).
+            st.broadcast(json!({ "type": "module.activated", "module_id": id }));
+            Json(json!({ "ok": true })).into_response()
+        }
         Err(e) => err_response(e),
     }
 }
@@ -4340,7 +4350,13 @@ async fn deactivate_module(
         return unauthorized(e);
     }
     match rt.deactivate(&id).await {
-        Ok(()) => Json(json!({ "ok": true })).into_response(),
+        Ok(()) => {
+            drop(rt);
+            // hub#1317: same reasoning as `activate_module` — without this, another tab kept
+            // offering a module the owner had just switched off until someone reloaded it.
+            st.broadcast(json!({ "type": "module.deactivated", "module_id": id }));
+            Json(json!({ "ok": true })).into_response()
+        }
         Err(e) => err_response(e),
     }
 }
@@ -4376,6 +4392,11 @@ async fn uninstall_module(
     match outcome {
         Ok(()) => {
             drop(rt);
+            // hub#1317: emitted NOW, before the best-effort embeddings cleanup below — what
+            // matters to another tab/device is that the runtime already uninstalled the module,
+            // not whether the best-effort vector index cleanup finished. Same for `force`: the
+            // module is gone either way.
+            st.broadcast(json!({ "type": "module.uninstalled", "module_id": id }));
             // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
             // Best-effort: no falla la desinstalación si el store da error.
             if let Some(store) = &st.vector {

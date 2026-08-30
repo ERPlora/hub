@@ -37,14 +37,36 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/**'
+      # Las composite actions son el OTRO sitio donde vive un `run:`. Sin esta entrada, una PR que
+      # solo tocara una de ellas no ejecutaría la guardia de abajo — que ahora también las escanea.
+      - '.github/actions/**'
       # El test de contrato de abajo vive fuera de `.github/`, así que sin esto una PR que
       # SOLO tocara el test no lo ejecutaría.
       - 'scripts/tests/test-hub-modules-workflow.test.sh'
       - 'scripts/tests/canonical-mirrors-workflow.test.sh'
+      - 'scripts/tests/visual-baselines-workflow.test.sh'
       # The verdict `canonical-mirrors.yml` delegates to, and its tests (hub#1296): a PR that
       # only touched the classifier would otherwise run none of its cases.
       - 'scripts/canonical-mirrors-verdict.sh'
       - 'scripts/tests/canonical-mirrors-verdict.test.sh'
+      # Contrato del lookup compartido de alertas (hub#1246): sin esto, una PR que solo tocara
+      # `scripts/ci/alert-issue.sh` o uno de sus dos tests no ejecutaría ninguno de los dos.
+      - 'scripts/ci/alert-issue.sh'
+      - 'scripts/tests/alert-issue.test.sh'
+      - 'scripts/tests/alert-issue-workflows.test.sh'
+      # La lista revisada de e2e del kernel y su resolutor (hub#1359). Es lo que `test-hub-modules.yml`
+      # ejecuta contra el catálogo publicado, así que una PR que solo tocara la lista —justo lo que
+      # hace cada slice de hub#1264— no correría ninguno de sus casos sin estas tres rutas.
+      - 'scripts/ci/kernel-e2e-targets.sh'
+      - 'scripts/ci/kernel-e2e-targets.txt'
+      - 'scripts/tests/kernel-e2e-targets.test.sh'
+      # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
+      # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
+      # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
+      # gate pre-push, y el gate resuelve con `cargo test --workspace`: nunca consulta la lista).
+      # Sin esta entrada, un slice de hub#1264 que borra el `.rs` y olvida el `.txt` no encuentra
+      # NINGÚN guardia antes de mergear y tumba `develop` en el push — el rojo de hub#1354 (hub#1369).
+      - 'crates/runtime/tests/**'
   workflow_dispatch:
 
 permissions:
@@ -123,6 +145,15 @@ jobs:
           set -euo pipefail
           bash ./scripts/tests/canonical-mirrors-workflow.test.sh
 
+      # ── Contrato de `visual-baselines.yml` (hub#1250) ────────────────────────────────
+      # Mismo razonamiento: sin este paso, una PR que rompiera el workflow de regeneración de
+      # baselines visuales (trigger automático colado, grupo de concurrencia compartido con
+      # test-web.yml, filtro de specs perdido) no lo notaría nadie hasta el primer dispatch real
+      # — y ese dispatch es manual y poco frecuente, así que el hueco podría durar semanas.
+      - name: Contrato de visual-baselines.yml (hub#1250)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/visual-baselines-workflow.test.sh
       # ── The verdict on the toolkit's copies (hub#1296) ──────────────────────────────────
       # `canonical-mirrors.yml` no longer takes the toolkit's byte-for-byte outcome as the
       # verdict: `scripts/canonical-mirrors-verdict.sh` re-reads it — a copy behind an additive
@@ -134,3 +165,37 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/canonical-mirrors-verdict.test.sh
+      # ── Contrato del lookup compartido de alertas (hub#1246) ─────────────────────────
+      # `scripts/ci/alert-issue.sh` reemplaza el `gh issue list --search` (índice que va por
+      # detrás de la realidad) por REST + filtro local en TODOS los pasos de alerta. Sin este
+      # paso AQUÍ, el arreglo entero es memoria, no guardia: una PR que reintrodujera
+      # `--search` en cualquiera de ellos, o rompiera el propio script, no ejecutaría ninguno
+      # de sus dos tests — exactamente el hueco que `canonical-mirrors.yml` ya sufrió una vez
+      # (hub#1260) por un filtro `paths` sin ensanchar.
+      - name: Contrato de scripts/ci/alert-issue.sh (hub#1246)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/alert-issue.test.sh
+
+      # pyyaml ya está instalado por el paso de arriba.
+      # El contrato ya no lleva lista fija de workflows: recorre `.github/workflows/**` y
+      # `.github/actions/**` y exige la delegación a CUALQUIER paso que toque una issue, así que
+      # ni un workflow nuevo ni una composite action pueden quedarse fuera de la guardia por no
+      # estar apuntados (hub#1327).
+      - name: Contrato de los pasos de alerta de todos los workflows (hub#1246, hub#1327)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/alert-issue-workflows.test.sh
+
+      # ── La lista revisada de e2e del kernel (hub#1359) ────────────────────────────────
+      # `test-hub-modules.yml` ya no decide qué correr con un número mágico (`>= 30`), que era
+      # una foto y no un contrato: cada slice de hub#1264 lo rompía y el único arreglo que
+      # ofrecía era bajarlo. Ahora lo decide `scripts/ci/kernel-e2e-targets.txt`, comparada con
+      # el árbol en las dos direcciones. Sus casos corren AQUÍ, en segundos, y no dentro del job
+      # de módulos (45 min y su propio filtro `paths`): el último caso del fichero es la lista
+      # real contra el árbol real, así que una PR que borre un `.rs` sin tocar la lista —o que
+      # añada uno sin declararlo— se entera al revisar, no a las 3 de la mañana.
+      - name: Lista revisada de e2e del kernel (hub#1359)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/kernel-e2e-targets.test.sh

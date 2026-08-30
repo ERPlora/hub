@@ -185,11 +185,18 @@ export default defineConfig({
       },
     },
   },
-  // Unit tests (vitest), colocated with the code: src/**/*.test.ts. The Playwright e2e live in
-  // tests/e2e and vitest does NOT run them (they need the app up). The two root-level test files
-  // cover the dev-bench plumbing (hub#787): module sync from a worktree + env-driven port/proxy.
+  // Unit tests (vitest), colocated with the code: src/**/*.test.ts. The Playwright e2e SPECS live
+  // in tests/e2e and vitest does NOT run them (they need the app up). The root-level test files
+  // cover the dev-bench plumbing (hub#787: module sync from a worktree + env-driven port/proxy)
+  // and the `updateSnapshots` wiring of the visual contract (hub#1250) — a config FILE, not a
+  // spec, so importing it is a pure module load with no server involved.
   test: {
-    include: ['src/**/*.test.ts', 'sync-modules.test.mjs', 'vite.config.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'sync-modules.test.mjs',
+      'vite.config.test.ts',
+      'tests/playwright.config.test.ts',
+    ],
     environment: 'node',
   },
   // Dev proxy (mismo origen → sin CORS). El runtime local (Axum :8787) no expone CORS y el Cloud

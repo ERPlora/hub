@@ -13,6 +13,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { platformFailureMessage as sdkPlatformFailureMessage } from '@erplora/module-sdk';
 
 import es from '../i18n/locales/es';
 import en from '../i18n/locales/en';
@@ -162,7 +163,7 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
       await flushPromises();
 
       expect(panel.text()).not.toContain(ENGLISH_PLUMBING);
-      expect(panel.text()).toContain(es.platformFailure.unavailable);
+      expect(panel.text()).toContain(sdkPlatformFailureMessage({ code }, 'es'));
     },
   );
 
@@ -177,7 +178,7 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
     await flushPromises();
 
     expect(panel.text()).not.toContain('módulo no instalado');
-    expect(panel.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es'));
   });
 
   it('nombra la app desactivada para `module_inactive` — frase DISTINTA de "falta"', async () => {
@@ -190,7 +191,7 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
     await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
     await flushPromises();
 
-    expect(panel.text()).toContain(es.platformFailure.moduleInactive.replace('{app}', 'taxes'));
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'module_inactive', module: 'taxes' }, 'es'));
   });
 
   it('nombra la app que falta como dependencia para `missing_dependency`', async () => {
@@ -203,7 +204,7 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
     await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
     await flushPromises();
 
-    expect(panel.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'inventory'));
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'missing_dependency', module: 'inventory' }, 'es'));
   });
 
   it('deriva la app de `read_unavailable` desde `query` cuando no viene `module`', async () => {
@@ -224,6 +225,6 @@ describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub
     await flushPromises();
 
     expect(panel.text()).not.toContain('rules.list');
-    expect(panel.text()).toContain(es.platformFailure.moduleMissing.replace('{app}', 'taxes'));
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es'));
   });
 });

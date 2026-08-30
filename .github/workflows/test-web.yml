@@ -98,18 +98,17 @@ on:
       # only touched `no-dead-packages.test.mjs` triggered no check at all (hub#1247).
       - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "apps/web/**"
-      - "packages/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "scripts/tests/test-web-workflow.test.sh"
-      - "scripts/tests/no-dead-packages.test.mjs"
-      - ".github/workflows/test-web.yml"
-  # Nightly on develop, with no `paths` filter (hub#1253 — see header above).
+  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): pnpm verify + playwright se ejecuta en el
+  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
+  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
+  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
+  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
+  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
+  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
+  # Nightly on develop, with NO `paths` filter (hub#1253 — see header above). This is the only
+  # cloud run that no longer depends on what a change touched: the pre-push gate covers each push,
+  # and `push` above covers the merged tree, but neither catches what rots on its own — a pinned
+  # action that disappears, a transitive dependency that breaks, a flake that only shows at night.
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
   workflow_dispatch:
@@ -374,6 +373,12 @@ jobs:
       contents: read
       issues: write
     steps:
+      # Este job no compila nada: solo necesita el repo en disco porque el paso de abajo llama a
+      # `scripts/ci/alert-issue.sh` (hub#1327). Sin este checkout el paso moriría con `No such
+      # file or directory` y la alerta quedaría MUDA — peor que el duplicado que venía a evitar.
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Abrir o refrescar la issue de alerta (hub#1240)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -412,14 +417,10 @@ jobs:
 
           Esta issue se REUTILIZA (un comentario por detección) mientras develop siga rojo; ciérrala cuando vuelva a verde."
 
-          # Frase de búsqueda sin dos puntos ni acentos a propósito (los dos puntos son sintaxis de
-          # búsqueda en GitHub) y estable — es lo que hace idempotente la alerta.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"el web de develop esta roto tras un merge" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refrescando la issue de alerta abierta #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lista y casa EN LOCAL, nunca con `--search` (hub#1246,
+          # resto en hub#1327): `--search` lee el índice de búsqueda de GitHub, que va por detrás
+          # de la realidad — devolvió CERO con issues abiertas el 2026-08-16 y acertó de forma
+          # intermitente después, que es peor. El título no lleva sufijo variable, así que
+          # MATCH=exact es la clave de idempotencia.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh

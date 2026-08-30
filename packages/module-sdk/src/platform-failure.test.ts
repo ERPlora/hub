@@ -140,3 +140,33 @@ test('hub#1070/#1185: `invalid_field` pasa intacto — su `detail` dice más de 
   // Y el motivo es DATO, no prosa: quien quiera traducirlo ramifica sobre `reason`.
   assert.equal(platformFailureMessage({ code: 'invalid_field', field: 'role_key', reason: 'immutable' }, 'es'), null);
 });
+
+// hub#1315: `apps/web/src/lib/platform-failure.ts` (hub#1258) kept a BYTE-IDENTICAL copy of these
+// same ten sentences for the shell, over vue-i18n keys instead of this table — a wording tweak on
+// either side would drift the other in silence, and this table was already missing `manifest`
+// (a code `may_reach_the_client`, `crates/server/src/lib.rs`, redacts exactly like its five
+// plumbing siblings, but one only a module-INSTALL-time error had ever needed). This test is the
+// guard: the shell now imports `platformFailureMessage` straight from this file instead of holding
+// its own catalogue, so any code the runtime's authenticated door can answer with has to have an
+// entry HERE, in both languages, or a screen falls back to the runtime's raw English sentence
+// (`hub#1102`'s original bug, for a code nobody thought to cover).
+test('hub#1315: every code the authenticated door can answer with has an entry, in both languages', () => {
+  // Mirrors `may_reach_the_client` (`crates/server/src/lib.rs`): the six codes it redacts to the
+  // fixed PLUMBING line — db/io/wasm/native/schema/manifest — plus the four whose remedy names an
+  // app (`error_code_of`, `crates/runtime/src/error_registry.rs`).
+  const codes = [
+    'db', 'io', 'wasm', 'native', 'schema', 'manifest',
+    'module_not_installed', 'module_inactive', 'missing_dependency', 'read_unavailable',
+  ] as const;
+
+  for (const code of codes) {
+    for (const locale of ['es', 'en'] as const) {
+      const message = platformFailureMessage({ code, module: 'taxes', query: 'taxes.rules.list' }, locale);
+      assert.ok(
+        message,
+        `code "${code}" (${locale}) has no entry in PLATFORM_FAILURES — a screen would show the ` +
+          'runtime\'s raw sentence instead, exactly the incident hub#1102 fixed for the other codes',
+      );
+    }
+  }
+});

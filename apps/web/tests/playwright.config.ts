@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
 
 // E2E del shell del Hub contra el runtime REAL (Axum :8787) y Vite (:5173). Sin mocks (regla del
 // proyecto): el test arranca su propio runtime con BD efímera y un directorio de módulos VACÍO,
@@ -43,6 +44,12 @@ export default defineConfig({
   reporter: [['list']],
   // En CI un `.only` olvidado convierte la suite entera en un verde vacío.
   forbidOnly: !!process.env.CI,
+  // hub#1250 — el DEFAULT de Playwright ('missing') crea sola una baseline ausente y pasa en
+  // VERDE en cualquier entorno, CI incluido; eso es justo lo que dejaba una PR que borra un PNG
+  // pasar sin avisar. `resolveUpdateSnapshotsMode` (con sus tests en
+  // `src/lib/visual-baseline-gate.test.ts`) fuerza `'none'` en CI salvo en la corrida dedicada de
+  // `visual-baselines.yml`, que sí quiere `'all'`.
+  updateSnapshots: resolveUpdateSnapshotsMode(process.env),
   use: {
     baseURL: WEB_URL,
     trace: 'retain-on-failure',

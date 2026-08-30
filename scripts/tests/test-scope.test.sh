@@ -82,6 +82,19 @@ echo "reaching every testable package collapses to workspace"
 echo "the reason line is human-readable"
 resolve crates/server/src/main.rs | sed -n 2p | grep -qE 'of [0-9]+ packages reachable' && ok "reason names the count" || bad "reason line missing"
 
+echo "en una PR con Rust NO se acota: el check del workspace autoriza el merge (pm#58/#60)"
+wf0="$repo_root/.github/workflows/test-hub.yml"
+grep -qE "event_name.*==.*pull_request.*mode=workspace|PR con Rust.*workspace" "$wf0" \
+    && ok "el workflow fuerza workspace en PRs con Rust" || bad "una PR con Rust podria correr acotada y mentir en el nombre del check"
+# Ningun `cargo test` puede correr sin consultar el alcance: si lo hiciera, una PR sin Rust
+# volveria a compilar el workspace entero (25 min) para no probar nada.
+unguarded=$(awk '
+    /^ *- name:/ { step=$0; has_if=0 }
+    /^ *if:/     { if (index($0, "steps.scope.outputs.mode")) has_if=1 }
+    /run: *cargo test/ { if (!has_if) print step }
+' "$wf0")
+[ -z "$unguarded" ] && ok "todo cargo test consulta steps.scope.outputs.mode" || bad "hay cargo test sin guardia de alcance" "$unguarded"
+
 echo "test-hub.yml is wired to the resolver"
 wf="$repo_root/.github/workflows/test-hub.yml"
 grep -q 'scripts/ci/test-scope.py' "$wf" && ok "workflow calls the resolver" || bad "workflow does not call scripts/ci/test-scope.py"
