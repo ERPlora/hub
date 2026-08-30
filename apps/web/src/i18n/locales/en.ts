@@ -1383,7 +1383,7 @@ export default {
     errorGoogle: 'Could not sign in with Google. Please try again.',
     // Login 2-pasos (2FA por TOTP, app autenticadora, ERPlora/saas#994 + ADR «segundo factor opcional» 2026-08-29).
     twoFactorSubtitle: 'Verify it’s you',
-    twoFactorHint: 'Enter the 6-digit code from your authenticator app (or a recovery code).',
+    twoFactorHint: 'Enter the code from your authenticator app (or a recovery code).',
     twoFactorCodeLabel: 'Verification code',
     twoFactorCodePlaceholder: '6-digit code',
     twoFactorVerify: 'Verify',
