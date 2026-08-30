@@ -285,7 +285,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 
 /// What `hub_module` says this hub runs — the only answer that survives a restart.
 async fn recorded_version(state: &AppState) -> String {
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!("hub-upd"));
     p.insert("module_id".into(), json!("parts"));
@@ -346,7 +346,7 @@ async fn updating_really_installs_the_new_version_and_does_not_just_say_it_did()
         "hub_module must point at the new version, or the next restart undoes the update"
     );
     assert_eq!(
-        state.runtime.lock().await.registry().module_version("parts"),
+        state.runtime.read().await.registry().module_version("parts"),
         "2.0.0",
         "and the live runtime serves it"
     );
@@ -396,7 +396,7 @@ async fn a_version_that_cannot_install_keeps_the_old_one_and_says_so_without_a_5
     );
 
     assert_eq!(
-        state.runtime.lock().await.registry().module_version("parts"),
+        state.runtime.read().await.registry().module_version("parts"),
         "1.0.0",
         "the module still serves the version that works"
     );
@@ -468,7 +468,7 @@ async fn updating_a_module_this_hub_does_not_have_is_a_404_not_an_install() {
     let body = json_body(response).await;
     assert_eq!(body["code"], json!("update_not_installed"), "{body}");
     assert!(
-        !state.runtime.lock().await.registry().is_installed("ghost"),
+        !state.runtime.read().await.registry().is_installed("ghost"),
         "an update must never be a back door for installing something new"
     );
 
@@ -501,7 +501,7 @@ async fn an_update_leaves_a_trace_the_owner_can_read_later() {
     let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let history = erplora_runtime::update_history::recent(
         rt.db(),
         "hub-upd",
@@ -543,7 +543,7 @@ async fn pressing_update_on_something_already_current_writes_nothing() {
     let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let rt = state.runtime.lock().await;
+    let rt = state.runtime.read().await;
     let history = erplora_runtime::update_history::recent(
         rt.db(),
         "hub-upd",

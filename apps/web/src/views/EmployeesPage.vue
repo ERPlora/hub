@@ -215,6 +215,7 @@ import {
   type HubUser,
 } from '../lib/hub-users';
 import { invalidFieldMessage } from '../lib/invalid-field';
+import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
 import { isAdmin, user } from '../lib/session';
 import { toast } from '../lib/toast';
@@ -477,16 +478,19 @@ async function createUser(): Promise<void> {
 /**
  * Motivo TRADUCIDO de un rechazo del runtime; su mensaje inglés solo como último recurso.
  *
- * Tres escalones, en este orden (hub#1190): motivo de NEGOCIO del core (`hub.users.*`, hub#355) →
- * campo rechazado (`invalid_field` + `field`/`reason`, ADR-0398 §6) → la frase que vino. El
- * `message` del runtime está en inglés a propósito (regla del idioma del código); enseñarlo tal
- * cual es lo que ponía «the name is required» delante de una encargada.
+ * Cuatro escalones, en este orden (hub#1190, hub#1258): motivo de NEGOCIO del core (`hub.users.*`,
+ * hub#355) → campo rechazado (`invalid_field` + `field`/`reason`, ADR-0398 §6) → rechazo de
+ * PLATAFORMA (`db`, `module_not_installed`… — nadie escribió esa frase para esta pantalla, hub#1102)
+ * → la frase que vino. El `message` del runtime está en inglés a propósito (regla del idioma del
+ * código); enseñarlo tal cual es lo que ponía «the name is required» delante de una encargada.
  */
 function rejectionMessage(error: unknown, fallback = t('employees.saveError')): string {
   const key = hubUserErrorKey(error);
   if (key) return t(`employeeForm.errors.${key}`);
   const translated = invalidFieldMessage(error, t, te, { length: hubPinLength.value });
   if (translated) return translated;
+  const platform = platformFailureMessage(error, locale.value);
+  if (platform) return platform;
   return error instanceof Error ? error.message : fallback;
 }
 

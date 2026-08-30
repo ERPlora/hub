@@ -59,6 +59,11 @@ pub struct MemoryMetric {
     pub used_bytes: Option<u64>,
     pub limit_bytes: Option<u64>,
     pub fraction: Option<f64>,
+    /// Máximo histórico del cgroup (`memory.peak`, kernel ≥ 5.19). NO es una muestra: sobrevive
+    /// al pico del arranque, que dura segundos y se pierde entre scrapes (cAdvisor va a 60 s).
+    /// Es el número que decide el techo de RAM de un plan (hub#981). `None` donde el kernel no
+    /// lo expone — un cero mentiría.
+    pub peak_bytes: Option<u64>,
 }
 
 impl MemoryMetric {
@@ -66,7 +71,7 @@ impl MemoryMetric {
     /// `pub(crate)`: el heartbeat (hub#975) la usa como degradación honesta si el hilo de
     /// muestreo no vuelve.
     pub(crate) fn unavailable() -> Self {
-        Self { used_bytes: None, limit_bytes: None, fraction: None }
+        Self { used_bytes: None, limit_bytes: None, fraction: None, peak_bytes: None }
     }
 }
 
@@ -167,10 +172,12 @@ pub fn read_memory(r: &dyn CgroupReader) -> MemoryMetric {
         .unwrap_or(0);
     let used = current.saturating_sub(inactive);
     let limit = r.read("memory.max").as_deref().and_then(parse_mem_max);
+    let peak = r.read("memory.peak").as_deref().and_then(parse_u64);
     MemoryMetric {
         used_bytes: Some(used),
         limit_bytes: limit,
         fraction: fraction(used as f64, limit.map(|l| l as f64)),
+        peak_bytes: peak,
     }
 }
 
@@ -314,7 +321,7 @@ async fn scalar_u64(db: &dyn DatabaseAdapter, sql: &str, params: &Params) -> Opt
 /// (owner/admin), como `export/import` y `settings`: es información de gestión del hub.
 pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
             return (
                 StatusCode::UNAUTHORIZED,
@@ -344,7 +351,7 @@ pub async fn system_metrics(State(st): State<AppState>, headers: HeaderMap) -> R
     // BD + sesiones bajo un único lock del runtime.
     let now = chrono::Utc::now().to_rfc3339();
     let (database, sessions) = {
-        let rt = st.runtime.lock().await;
+        let rt = st.runtime.read().await;
         let db = rt.db();
         (
             read_database(db, database_limit).await,
@@ -419,6 +426,38 @@ mod tests {
         assert_eq!(m.used_bytes, Some(1000));
         assert_eq!(m.limit_bytes, None);
         assert_eq!(m.fraction, None);
+    }
+
+    #[test]
+    fn memory_reports_peak_high_water_mark() {
+        // `memory.peak` (cgroup v2) es el máximo histórico del cgroup, no una muestra: el pico
+        // del arranque (reinstalación stateless de los módulos) dura segundos y se pierde entre
+        // scrapes — cAdvisor muestrea a 60 s. Es el dato que decide el techo del plan (hub#981).
+        let r = FakeCgroup::new(&[
+            ("memory.current", "12582912\n"),
+            ("memory.stat", "anon 1\ninactive_file 2097152\n"),
+            ("memory.max", "268435456\n"),
+            ("memory.peak", "201326592\n"),
+        ]);
+        let m = read_memory(&r);
+        assert_eq!(m.peak_bytes, Some(201_326_592));
+        // El pico NO desplaza al uso actual: son dos lecturas distintas.
+        assert_eq!(m.used_bytes, Some(12_582_912 - 2_097_152));
+    }
+
+    #[test]
+    fn memory_peak_is_none_when_kernel_does_not_expose_it() {
+        // `memory.peak` llegó en el kernel 5.19: donde no está, el resto de la métrica sigue
+        // siendo válida y el pico se degrada a `null` («n/a»), no a cero — un cero mentiría.
+        let r = FakeCgroup::new(&[("memory.current", "1000\n"), ("memory.max", "max\n")]);
+        let m = read_memory(&r);
+        assert_eq!(m.peak_bytes, None);
+        assert_eq!(m.used_bytes, Some(1000));
+    }
+
+    #[test]
+    fn memory_unavailable_has_no_peak() {
+        assert_eq!(MemoryMetric::unavailable().peak_bytes, None);
     }
 
     #[test]

@@ -178,7 +178,7 @@ pub async fn readyz(State(st): State<AppState>) -> Response {
 /// desincronice del que mira Swarm.
 pub async fn snapshot(st: &AppState) -> Checks {
     let mut checks = Checks::new();
-    let runtime = st.runtime.lock().await;
+    let runtime = st.runtime.read().await;
     let db = runtime.db();
 
     // ── 1. La base de datos responde ─────────────────────────────────────────────────

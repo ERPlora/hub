@@ -345,10 +345,49 @@ async function gateAndRefresh(): Promise<void> {
       })();
     });
   }
+  // hub#1317 (review of hub#1311): activate/deactivate/uninstall emitted NOTHING over `/ws` —
+  // the same hole hub#631 closed only for `module.installed`. Another tab/device of the same hub
+  // stayed on yesterday's nav until it reloaded (activating `modifiers` from the back office
+  // never reached the POS open at the register). Same reaction as install: entitlement can
+  // change what a just-(de)activated module is allowed to show, and the nav may have lost or
+  // gained an entire entry.
+  if (!moduleActivatedUnsub) {
+    moduleActivatedUnsub = getClient().on('module.activated', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
+  if (!moduleDeactivatedUnsub) {
+    moduleDeactivatedUnsub = getClient().on('module.deactivated', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
+  if (!moduleUninstalledUnsub) {
+    moduleUninstalledUnsub = getClient().on('module.uninstalled', () => {
+      void (async () => {
+        await resolveEntitlement();
+        await refreshModuleNavAfterInstall();
+        await refreshSetupStatus(getClient());
+      })();
+    });
+  }
 }
 
-/** Desuscripción de `module.installed` (una sola suscripción viva; App.vue no se desmonta). */
+/**
+ * Unsubscribe for the module lifecycle events (one live subscription per event; App.vue never
+ * unmounts). `module.installed` predates hub#1317; the other three are from hub#1317.
+ */
 let moduleInstalledUnsub: (() => void) | null = null;
+let moduleActivatedUnsub: (() => void) | null = null;
+let moduleDeactivatedUnsub: (() => void) | null = null;
+let moduleUninstalledUnsub: (() => void) | null = null;
 onMounted(() => {
   if (isAuthed.value) void gateAndRefresh();
 });

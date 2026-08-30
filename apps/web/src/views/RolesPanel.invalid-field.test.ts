@@ -13,6 +13,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { platformFailureMessage as sdkPlatformFailureMessage } from '@erplora/module-sdk';
 
 import es from '../i18n/locales/es';
 import en from '../i18n/locales/en';
@@ -20,25 +21,42 @@ import en from '../i18n/locales/en';
 const listHubRoles = vi.fn();
 const setRoleActivation = vi.fn();
 
-const { RoleActivationError } = vi.hoisted(() => ({
+const { RoleActivationError, HubUsersError } = vi.hoisted(() => ({
   RoleActivationError: class RoleActivationError extends Error {
     readonly code?: string;
     readonly field?: string;
     readonly reason?: string;
-    constructor(message: string, code?: string, field?: string, reason?: string) {
+    // hub#1258: `module`/`query` of a PLATFORM refusal — same rule as `field`/`reason` above.
+    readonly module?: string;
+    readonly query?: string;
+    constructor(
+      message: string,
+      code?: string,
+      field?: string,
+      reason?: string,
+      module?: string,
+      query?: string,
+    ) {
       super(message);
       this.name = 'RoleActivationError';
       this.code = code;
       this.field = field;
       this.reason = reason;
+      this.module = module;
+      this.query = query;
     }
   },
+  // `lib/platform-failure.ts` also checks `instanceof HubUsersError` (Personal's own error class):
+  // a full module mock has to export SOMETHING under that name, or importing it throws before any
+  // test in this file gets to run. RolesPanel itself never touches it.
+  HubUsersError: class HubUsersError extends Error {},
 }));
 
 vi.mock('../lib/hub-users', () => ({
   listHubRoles: (...a: unknown[]) => listHubRoles(...a),
   setRoleActivation: (...a: unknown[]) => setRoleActivation(...a),
   RoleActivationError,
+  HubUsersError,
 }));
 
 const { isAdmin } = vi.hoisted(() => ({ isAdmin: { value: true } }));
@@ -127,5 +145,86 @@ describe('Ajustes → Roles traduce el rechazo del core (hub#1190)', () => {
 
     expect(panel.text()).not.toContain('network down');
     expect(panel.text()).toContain('Kitchen');
+  });
+});
+
+describe('Ajustes → Roles traduce un rechazo de PLATAFORMA, no de negocio (hub#1258)', () => {
+  // 🔴 El bug: antes de este PR estos códigos caían al `message` del runtime tal cual.
+  const ENGLISH_PLUMBING = 'the request could not be completed — the hub recorded the details';
+
+  it.each(['db', 'io', 'wasm', 'native', 'schema', 'manifest'] as const)(
+    'el código de plontería "%s" pinta la MISMA frase traducida, nunca la línea inglesa redactada',
+    async (code) => {
+      setRoleActivation.mockRejectedValue(new RoleActivationError(ENGLISH_PLUMBING, code));
+      const panel = panelIn('es');
+      await flushPromises();
+
+      await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
+      await flushPromises();
+
+      expect(panel.text()).not.toContain(ENGLISH_PLUMBING);
+      expect(panel.text()).toContain(sdkPlatformFailureMessage({ code }, 'es'));
+    },
+  );
+
+  it('nombra la app que falta para `module_not_installed`', async () => {
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError('módulo no instalado: `taxes`', 'module_not_installed', undefined, undefined, 'taxes'),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).not.toContain('módulo no instalado');
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'module_not_installed', module: 'taxes' }, 'es'));
+  });
+
+  it('nombra la app desactivada para `module_inactive` — frase DISTINTA de "falta"', async () => {
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError('módulo desactivado: `taxes`', 'module_inactive', undefined, undefined, 'taxes'),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'module_inactive', module: 'taxes' }, 'es'));
+  });
+
+  it('nombra la app que falta como dependencia para `missing_dependency`', async () => {
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError('falta dependencia: `inventory`', 'missing_dependency', undefined, undefined, 'inventory'),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'missing_dependency', module: 'inventory' }, 'es'));
+  });
+
+  it('deriva la app de `read_unavailable` desde `query` cuando no viene `module`', async () => {
+    setRoleActivation.mockRejectedValue(
+      new RoleActivationError(
+        'a required read (`taxes.rules.list`) could not be resolved',
+        'read_unavailable',
+        undefined,
+        undefined,
+        undefined,
+        'taxes.rules.list',
+      ),
+    );
+    const panel = panelIn('es');
+    await flushPromises();
+
+    await panel.vm.setActive({ name: 'kitchen', label: 'Kitchen', source: { kind: 'module' } }, true);
+    await flushPromises();
+
+    expect(panel.text()).not.toContain('rules.list');
+    expect(panel.text()).toContain(sdkPlatformFailureMessage({ code: 'read_unavailable', query: 'taxes.rules.list' }, 'es'));
   });
 });

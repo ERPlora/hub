@@ -104,6 +104,13 @@ jobs:
       - name: Contrato de publicación de los SDK (hub#1236)
         run: bash ./scripts/tests/publish-sdks.test.sh
 
+      # El otro lado del mismo paquete: el CABLEADO del job que lo publica (hub#1308) — permiso,
+      # registro, scope, token, `--tag` y la ausencia de `continue-on-error`. `publish-sdks.test.sh`
+      # comprueba que el paquete es publicable; este, que el job que lo publica sigue apuntando a
+      # GitHub Packages y no al npmjs público. ~1 s.
+      - name: Contrato del job publish-module-sdk (hub#1308)
+        run: bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
       # El MISMO tag `v*` dispara también `tauri-release.yml`, que publica la app en **Microsoft
@@ -214,6 +221,7 @@ jobs:
     permissions:
       contents: read
       packages: write   # publicar en GitHub Packages con GITHUB_TOKEN
+      issues: write     # abrir/refrescar la incidencia de alerta si la publicación falla (hub#1308)
 
     steps:
       - name: Checkout
@@ -237,35 +245,136 @@ jobs:
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: ./scripts/stamp-version.sh --version "${GITHUB_REF_NAME#v}"
 
-      # Sin `npm install`: el paquete se publica como FUENTE TypeScript (`main: src/index.ts`), no
-      # hay build ni artefacto que generar, y su única devDependency (`typescript`) solo la usa
-      # `contract:check`. `--dry-run` primero para que el contenido del tarball quede en el log:
-      # `files` es lo único que decide qué sale, y un tarball vacío se publica igual de bien.
+      # 🔴 hub#1308 — POR QUÉ ESTE PASO CLASIFICA EL FALLO EN VEZ DE LIMITARSE A MORIR.
+      #
+      # Cada tag dejaba el run en rojo con la imagen ya publicada, y el motivo que enseñaba la UI
+      # era `Permission permission_…`: truncado. Sobre esa media línea se diagnosticó que faltaba
+      # `packages: write`. NO faltaba — el mismo run imprime `Packages: write` en su grupo
+      # `GITHUB_TOKEN Permissions`. La línea entera, que solo está en el log crudo, dice:
+      #
+      #   403 Forbidden - PUT https://npm.pkg.github.com/@erplora%2fmodule-sdk
+      #   Permission permission_denied: Account has reached its billing limit.
+      #
+      # Es la CUOTA DE PAGO de la organización, no un permiso: `ERPlora/hub` es privado, así que
+      # el paquete npm que publica es privado, y los paquetes privados consumen esa cuota (los
+      # públicos no consumen nada). Ningún cambio en este fichero lo levanta: hace falta subir el
+      # límite de gasto de la org, o hacer PÚBLICO el paquete.
+      #
+      # Lo que sí arregla este paso es que la causa deje de esconderse. `--dry-run` NO autentica
+      # —en el run 33228750255 pasó en verde justo antes del 403 del PUT real—, así que ninguna
+      # comprobación previa puede anticiparlo: la única señal honesta es clasificar la respuesta
+      # del registro cuando llega y NOMBRARLA. El paso sigue fallando (nada de
+      # `continue-on-error`: una release que no publica no está en verde), y el paso siguiente
+      # abre la incidencia, porque un run de tag en rojo no avisa a nadie por sí solo (hub#652).
       #
       # `--tag` SIEMPRE explícito: sin él `npm publish` mueve el dist-tag `latest` a lo último que
       # se publica, así que una candidata `vX.Y.Z-rc.N` (canal canary) dejaría `latest` apuntando a
       # la rc y un `npm install @erplora/module-sdk` a secas se llevaría la candidata. Es el mismo
       # criterio que `image-tags.sh` aplica a la imagen: una rc NUNCA mueve `:latest`. Las
       # prereleases van a `next` (la convención de npm); las finales, a `latest`.
+      #
+      # Sin `npm install`: el paquete se publica como FUENTE TypeScript (`main: src/index.ts`), no
+      # hay build ni artefacto que generar, y su única devDependency (`typescript`) solo la usa
+      # `contract:check`. `--dry-run` primero para que el contenido del tarball quede en el log:
+      # `files` es lo único que decide qué sale, y un tarball vacío se publica igual de bien.
       - name: Publicar en GitHub Packages
+        id: publish
         working-directory: packages/module-sdk
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          # Sin `-e` a propósito: el fallo de `npm publish` hay que LEERLO y clasificarlo, no
+          # abortar en la línea. Cada camino de error termina en un `exit` explícito.
+          set -uo pipefail
           version="${GITHUB_REF_NAME#v}"
           case "$version" in
             *-*) dist_tag="next" ;;
             *)   dist_tag="latest" ;;
           esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
           echo "dist-tag npm: $dist_tag (versión $version)"
-          npm publish --dry-run --tag "$dist_tag"
-          npm publish --tag "$dist_tag"
-          echo ""
-          echo "Publicado @erplora/module-sdk@${version} (dist-tag ${dist_tag}) en https://npm.pkg.github.com"
-          echo "Consumir (requiere un token con read:packages sobre ERPlora/hub):"
-          echo "  .npmrc → @erplora:registry=https://npm.pkg.github.com"
-          echo "  package.json → \"@erplora/module-sdk\": \"^${GITHUB_REF_NAME#v}\""
+
+          if ! npm publish --dry-run --tag "$dist_tag"; then
+            echo "blocked_by=pack" >> "$GITHUB_OUTPUT"
+            echo "::error title=El paquete del SDK no se puede ni empaquetar::npm publish --dry-run ha fallado, así que no se intenta la publicación real. Mira el log de este paso: el problema está en packages/module-sdk (package.json, files, versión)."
+            exit 1
+          fi
+
+          log="${RUNNER_TEMP}/npm-publish.log"
+          npm publish --tag "$dist_tag" > "$log" 2>&1
+          status=$?
+          cat "$log"
+
+          if [ "$status" -eq 0 ]; then
+            echo "blocked_by=" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "Publicado @erplora/module-sdk@${version} (dist-tag ${dist_tag}) en https://npm.pkg.github.com"
+            echo "Consumir (requiere un token con read:packages sobre ERPlora/hub):"
+            echo "  .npmrc → @erplora:registry=https://npm.pkg.github.com"
+            echo "  package.json → \"@erplora/module-sdk\": \"^${version}\""
+            exit 0
+          fi
+
+          # La respuesta del registro, clasificada. `billing limit` es la literal que devuelve
+          # GitHub Packages cuando la cuota de la organización está agotada; es un bloqueo
+          # OPERATIVO de la org, no un defecto de esta release, y distinguirlo es lo único que
+          # evita que el siguiente lector vuelva a tocar `packages: write` como hizo hub#1308.
+          if grep -qi 'billing limit' "$log"; then
+            echo "blocked_by=billing" >> "$GITHUB_OUTPUT"
+            echo "::error title=GitHub Packages ha rechazado la publicación por CUOTA de la organización::403 permission_denied - Account has reached its billing limit. NO es un permiso que falte (este job declara packages: write y el run lo confirma). ERPlora/hub es privado, así que el paquete es privado y consume la cuota de pago de la org. Se levanta subiendo el límite de gasto de la org o haciendo PÚBLICO el paquete @erplora/module-sdk; no hay nada que arreglar en build-hub.yml. La imagen del hub SÍ está publicada: mira el job «Build & Push erplora/hub»."
+          else
+            echo "blocked_by=other" >> "$GITHUB_OUTPUT"
+            echo "::error title=npm publish ha fallado contra GitHub Packages::La causa NO es la cuota de la organización. El motivo exacto está en el log de este paso, unas líneas más arriba."
+          fi
+          exit "$status"
+
+      # Un run de tag en rojo no avisa a nadie: las notificaciones de Actions no llegan a ningún
+      # humano (lo que ya obligó a `image-freshness.yml` a abrir incidencia, hub#652). Y el
+      # lookup lo hace `scripts/ci/alert-issue.sh` —REST + filtro local, nunca `--search`, cuyo
+      # índice va por detrás de la realidad (hub#1246)—, con `MATCH=prefix` porque el `: <versión>`
+      # del título cambia en cada tag y solo la parte estable es la clave de idempotencia.
+      - name: Abrir/refrescar la incidencia de publicación del SDK (hub#1308)
+        if: failure() && steps.publish.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.publish.outputs.version }}
+          BLOCKED_BY: ${{ steps.publish.outputs.blocked_by }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          case "$BLOCKED_BY" in
+            billing)
+              cause="**Cuota de GitHub Packages de la organización agotada** — el registro responde \`403 permission_denied: Account has reached its billing limit\`.
+
+          No falta ningún permiso: este job declara \`packages: write\` y el run lo imprime en su grupo \`GITHUB_TOKEN Permissions\`. \`ERPlora/hub\` es un repo PRIVADO, así que el paquete npm que publica es PRIVADO y consume la cuota de pago de la organización; los paquetes públicos no consumen nada.
+
+          Se levanta de una de estas dos formas, ambas fuera de este repositorio:
+
+          - subir el límite de gasto de la organización, o
+          - hacer PÚBLICO el paquete \`@erplora/module-sdk\` (es MIT y su razón de ser es que lo consuman desarrolladores de módulos de fuera)." ;;
+            pack)
+              cause="**El paquete no se puede ni empaquetar** — \`npm publish --dry-run\` ha fallado, así que no se intentó la publicación real. El defecto está en \`packages/module-sdk\` (su \`package.json\`, su \`files\` o su versión) y sí se arregla en este repositorio." ;;
+            *)
+              cause="**El registro ha rechazado la publicación por un motivo que no es la cuota.** El log del paso «Publicar en GitHub Packages» lleva la respuesta entera de npm." ;;
+          esac
+
+          body="La imagen del hub de este tag SÍ se publicó (job «Build & Push erplora/hub»); lo que falló es solo el paquete npm.
+
+          - versión: \`${VERSION}\`
+          - run: ${RUN_URL}
+
+          Causa: ${cause}
+
+          Mientras esto siga rojo, \`@erplora/module-sdk@${VERSION}\` no existe en el registro. Eso NO rompe a los 26 repos de módulo —instalan el SDK por la composite action \`ERPlora/hub/.github/actions/module-sdk\` (hub#1097), que es lo único que GitHub resuelve sin credencial—; lo que se pierde es la IDENTIDAD verificable del SDK (\`npm view @erplora/module-sdk@X.Y.Z\`) y el desarrollo local fuera del monorepo.
+
+          Esta incidencia se reutiliza (un comentario por tag fallido) mientras el bloqueo siga en pie; ciérrala cuando un tag publique el SDK."
+
+          TITLE="El SDK @erplora/module-sdk no se pudo publicar en GitHub Packages: ${VERSION}" \
+            MATCH=prefix MATCH_VALUE="El SDK @erplora/module-sdk no se pudo publicar en GitHub Packages" \
+            LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
 
       # `erplora-guest-sdk` no se publica en ningún registro: se consume por GIT TAG
       # (`crates/guest-sdk/Cargo.toml` lleva `publish = false`). El tag ya existe —es el que ha

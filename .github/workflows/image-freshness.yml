@@ -164,17 +164,11 @@ jobs:
 
           This issue is reused (one comment per detection) while the condition persists; close it once the image is published again."
 
-          # Search phrase deliberately colon-free (colons are GitHub search
-          # syntax) and stable — it is what makes the alert idempotent.
-          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search '"main HEAD has no image in GHCR" in:title' \
-            --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "Refreshing open alert issue #$existing"
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # scripts/ci/alert-issue.sh lists and matches LOCALLY, never `--search` (hub#1246):
+          # that reads GitHub's search index, which lags behind reality — it returned ZERO with
+          # open issues on 2026-08-16, and hit intermittently later, which is worse.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
 
       - name: Fail loudly
         if: steps.check.outputs.result == 'stale'

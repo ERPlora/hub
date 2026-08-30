@@ -93,7 +93,7 @@ async fn commission_amount_combines_with_sales_by_staff() {
     if !erplora_runtime::require_modules_workspace() { return; }
     // Demuestra el SEAM del cierre del día: comisión = gross_total × commission_rate/100,
     // cruzando staff.commissions.summary (rate) con la fila simulada de sales.by_staff por
-    // staff_id. (sales.by_staff se ejercita en sales_e2e; aquí validamos la aritmética del seam.)
+    // staff_id. (sales.by_staff lo prueba la batería `tests/checkout.hub.test.py` del repo de sales — hub#1264; aquí validamos la aritmética del seam.)
     let rt = rt_staff().await;
     let ctx = admin();
     create_member(&rt, &ctx, "Ana", 15.0, "active").await;

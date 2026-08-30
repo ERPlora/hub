@@ -302,102 +302,129 @@
           {{ t('settings.saveChanges') }}
         </ion-button>
 
-        <!-- Certificado fiscal (.p12): recurso del NEGOCIO/hub (no del módulo verifactu). Se sube
-             aquí, junto al VAT y el nombre de la tienda. El runtime es la autoridad: solo guarda el
-             estado vía GET, nunca devuelve los bytes; PUT/DELETE son solo admin (401 si no). -->
+        <!-- 🔴 UNA pregunta, dos respuestas EXCLUYENTES (ADR-0320 §1 — hub#1314): o firma y remite
+             el propio obligado con su `.p12`, o lo hace ERPlora en su nombre con el Sello y para eso
+             firma el Anexo I. Nunca las dos. Apiladas como dos tarjetas se leían como dos cosas que
+             rellenar, y a quien ya tenía su certificado subido el otorgamiento le decía «no puedes
+             pasar a producción hasta que lo firmes» — un muro delante de un papel que la AEAT no le
+             pide y que ERPlora nunca usaría, porque su ruta es `direct`.
+             La vía NO es un ajuste nuevo que se guarde: la dicta el slot activo del certificado
+             (`transmission_route`, del mismo `route_of` con el que decide `go_live`), y cambiar de
+             pestaña solo cambia lo que se enseña. Es el patrón de Holded/Sage/Quipu: colaborador
+             social por defecto, certificado propio como opción. -->
         <ion-card class="mt-3">
           <ion-card-content>
             <ion-label>
-              <h2>{{ t('settings.certTitle') }}</h2>
-              <p>{{ t('settings.certDesc') }}</p>
+              <h2>{{ t('settings.fiscalRouteTitle') }}</h2>
+              <p>{{ t('settings.fiscalRouteLead') }}</p>
             </ion-label>
 
-            <ion-item lines="none" class="mt-2">
-              <HubIcon
-                slot="start"
-                :name="cert.present ? 'shield-checkmark-outline' : 'shield-outline'"
-              />
+            <!-- Segmento de ELECCIÓN, no tabbar de navegación: nada de `.ok-tabbar`, que es la
+                 barra de pestañas del footer y la cablea `bindTabbar()`, no el consumidor. -->
+            <ion-segment
+              class="fiscal-route-segment mt-2"
+              data-testid="fiscal-route-segment"
+              :value="fiscalRoute"
+              @ion-change="onFiscalRouteChange($event)"
+            >
+              <ion-segment-button value="delegated" data-testid="fiscal-route-delegated">
+                <ion-label>{{ t('settings.fiscalRouteDelegated') }}</ion-label>
+              </ion-segment-button>
+              <ion-segment-button value="own" data-testid="fiscal-route-own">
+                <ion-label>{{ t('settings.fiscalRouteOwn') }}</ion-label>
+              </ion-segment-button>
+            </ion-segment>
+
+            <!-- ── Vía DELEGADA: el otorgamiento (hub#817), y nada del `.p12` ───────────────── -->
+            <div v-if="fiscalRoute === 'delegated'" class="fiscal-grant mt-3">
               <ion-label>
-                <p v-if="cert.present">
-                  {{ t('settings.certPresent', { date: certUploadedLabel }) }}
-                </p>
-                <p v-else>{{ t('settings.certAbsent') }}</p>
-                <p v-if="cert.present && cert.subject">{{ cert.subject }}</p>
+                <h3>{{ t('settings.grantTitle') }}</h3>
+                <p>{{ t('settings.grantDesc') }}</p>
               </ion-label>
-            </ion-item>
+              <RepresentationGrantPanel
+                class="mt-2"
+                :obligado-nif="businessTaxId"
+                :obligado-name="businessLegalName"
+                :obligado-address="businessAddress"
+              />
+            </div>
 
-            <!-- Selector de fichero oculto disparado por un ion-button (patrón estándar CSP-safe). -->
-            <input
-              ref="certFileInput"
-              type="file"
-              accept=".p12,.pfx"
-              class="cert-file-input"
-              @change="onCertFileChange"
-            />
+            <!-- ── Vía PROPIA: el `.p12` del negocio, y ningún otorgamiento que firmar ──────── -->
+            <div v-else class="fiscal-certificate mt-3">
+              <ion-label>
+                <h3>{{ t('settings.certTitle') }}</h3>
+                <p>{{ t('settings.certDesc') }}</p>
+              </ion-label>
+              <ion-note class="fiscal-route-hint">{{ t('settings.fiscalRouteOwnHint') }}</ion-note>
 
-            <ion-button
-              expand="block"
-              fill="outline"
-              class="mt-2"
-              :disabled="!isAdmin"
-              @click="triggerCertFilePicker"
-            >
-              <HubIcon slot="start" name="document-attach-outline" />
-              {{ certFileName || t('settings.certChooseFile') }}
-            </ion-button>
+              <ion-item lines="none" class="mt-2">
+                <HubIcon
+                  slot="start"
+                  :name="cert.present ? 'shield-checkmark-outline' : 'shield-outline'"
+                />
+                <ion-label>
+                  <p v-if="cert.present">
+                    {{ t('settings.certPresent', { date: certUploadedLabel }) }}
+                  </p>
+                  <p v-else>{{ t('settings.certAbsent') }}</p>
+                  <p v-if="cert.present && cert.subject">{{ cert.subject }}</p>
+                </ion-label>
+              </ion-item>
 
-            <ion-input
-              class="mt-2"
-              type="password"
-              mode="md"
-              fill="outline"
-              label-placement="floating"
-              :label="t('settings.certPassword')"
-              :disabled="!isAdmin"
-              v-model="certPassword"
-            />
+              <!-- Selector de fichero oculto disparado por un ion-button (patrón CSP-safe). -->
+              <input
+                ref="certFileInput"
+                type="file"
+                accept=".p12,.pfx"
+                class="cert-file-input"
+                @change="onCertFileChange"
+              />
 
-            <ion-button
-              expand="block"
-              class="mt-3"
-              :disabled="!isAdmin || certBusy"
-              @click="uploadCert"
-            >
-              <HubIcon slot="start" name="cloud-upload-outline" />
-              {{ t('settings.certUpload') }}
-            </ion-button>
+              <ion-button
+                expand="block"
+                fill="outline"
+                class="mt-2"
+                :disabled="!isAdmin"
+                @click="triggerCertFilePicker"
+              >
+                <HubIcon slot="start" name="document-attach-outline" />
+                {{ certFileName || t('settings.certChooseFile') }}
+              </ion-button>
 
-            <ion-button
-              v-if="cert.present"
-              expand="block"
-              color="danger"
-              fill="outline"
-              class="mt-2"
-              :disabled="!isAdmin || certBusy"
-              @click="removeCert"
-            >
-              <HubIcon slot="start" name="trash-outline" />
-              {{ t('settings.certDelete') }}
-            </ion-button>
-          </ion-card-content>
-        </ion-card>
+              <ion-input
+                class="mt-2"
+                type="password"
+                mode="md"
+                fill="outline"
+                label-placement="floating"
+                :label="t('settings.certPassword')"
+                :disabled="!isAdmin"
+                v-model="certPassword"
+              />
 
-        <!-- Otorgamiento de representación (hub#817): ERPlora remite los registros VERI*FACTU EN
-             NOMBRE del negocio, y eso exige su consentimiento firmado (Anexo I). Va aquí, junto a
-             la identidad fiscal y al certificado, porque las tres son la misma decisión del dueño
-             — y porque sin otorgamiento vigente el paso a producción se niega. -->
-        <ion-card class="mt-3">
-          <ion-card-content>
-            <ion-label>
-              <h2>{{ t('settings.grantTitle') }}</h2>
-              <p>{{ t('settings.grantDesc') }}</p>
-            </ion-label>
-            <RepresentationGrantPanel
-              class="mt-2"
-              :obligado-nif="businessTaxId"
-              :obligado-name="businessLegalName"
-              :obligado-address="businessAddress"
-            />
+              <ion-button
+                expand="block"
+                class="mt-3"
+                :disabled="!isAdmin || certBusy"
+                @click="uploadCert"
+              >
+                <HubIcon slot="start" name="cloud-upload-outline" />
+                {{ t('settings.certUpload') }}
+              </ion-button>
+
+              <ion-button
+                v-if="cert.present"
+                expand="block"
+                color="danger"
+                fill="outline"
+                class="mt-2"
+                :disabled="!isAdmin || certBusy"
+                @click="removeCert"
+              >
+                <HubIcon slot="start" name="trash-outline" />
+                {{ t('settings.certDelete') }}
+              </ion-button>
+            </div>
           </ion-card-content>
         </ion-card>
 
@@ -719,6 +746,7 @@ import {
   refreshHubTimezone,
   type ModuleCapability,
   type BusinessCertificate,
+  type FiscalTransmissionRoute,
 } from '../lib/runtime';
 import { zoneClock, zoneOptions } from '../lib/timezone';
 import { formatDateTime } from '../lib/format-datetime';
@@ -1099,12 +1127,36 @@ async function saveTaxSettings(): Promise<void> {
 // El certificado de empresa (.p12) es un recurso del NEGOCIO/hub (salió del módulo verifactu): se
 // sube aquí junto al VAT y el nombre de la tienda. El runtime nunca devuelve los bytes; solo el
 // estado. Subir/eliminar es solo admin (el runtime revalida → 401 si no).
-const cert = ref<BusinessCertificate>({ present: false });
+const cert = ref<BusinessCertificate>({ present: false, transmission_route: 'delegated' });
 const certFileInput = ref<HTMLInputElement | null>(null);
 const certFile = ref<File | null>(null);
 const certFileName = ref<string>('');
 const certPassword = ref<string>('');
 const certBusy = ref<boolean>(false);
+
+// ── La VÍA hacia la AEAT: una de dos, nunca las dos (ADR-0320 §1 — hub#1314) ──────────────────
+// 🔴 NO es un ajuste que se guarde. Es lo que el runtime ya sabe —qué slot de certificado firma—
+// puesto delante del usuario como pregunta, con la misma respuesta (`transmission_route`) que usa
+// `go_live` para decidir si pide el Anexo I. Cambiar de pestaña solo cambia lo que se enseña; lo
+// que mueve la vía de verdad es subir o borrar el `.p12`, y eso llega por `cert`.
+const fiscalRoute = ref<FiscalTransmissionRoute>('delegated');
+
+/** El segmento solo cambia la vista; nada viaja al runtime. */
+function onFiscalRouteChange(e: Event): void {
+  const value = (e as CustomEvent<{ value?: string | null }>).detail?.value;
+  if (value === 'own' || value === 'delegated') fiscalRoute.value = value;
+}
+
+// Lo que diga el runtime MANDA sobre lo que el usuario estuviera mirando, y solo cuando cambia:
+// al abrir la pantalla, al subir el `.p12` (pasa a «propio») y al borrarlo (vuelve a «ERPlora»).
+// Sin esto, quien acaba de subir su certificado se quedaría mirando el formulario del otorgamiento.
+watch(
+  () => cert.value.transmission_route,
+  (route) => {
+    if (route) fiscalRoute.value = route;
+  },
+  { immediate: true },
+);
 
 /** Fecha de subida formateada para el estado "Certificado configurado (subido el …)". */
 const certUploadedLabel = computed<string>(() => {
@@ -1118,7 +1170,9 @@ const certUploadedLabel = computed<string>(() => {
 onMounted(() => {
   void getBusinessCertificate()
     .then((c) => {
-      cert.value = c;
+      // Una respuesta vacía NO sustituye a la que ya hay: dejar `cert` en nada tira abajo cuanto
+      // cuelga de ella —la vía hacia la AEAT, la primera— por un runtime que no contestó.
+      if (c) cert.value = c;
     })
     .catch(() => null);
 });
@@ -1165,7 +1219,11 @@ async function uploadCert(): Promise<void> {
     certFileName.value = '';
     certPassword.value = '';
     if (certFileInput.value) certFileInput.value.value = '';
-    cert.value = await getBusinessCertificate().catch(() => ({ present: true }));
+    // El PUT ya devolvió 2xx: el `.p12` está subido, así que la vía es la propia aunque la relectura
+    // falle. Decir `delegated` aquí devolvería al usuario al otorgamiento que acaba de dejar atrás.
+    cert.value = await getBusinessCertificate().catch(
+      (): BusinessCertificate => ({ present: true, transmission_route: 'own' }),
+    );
   } catch {
     await toastError(t('settings.certUploadError'));
   } finally {
@@ -1180,7 +1238,11 @@ async function removeCert(): Promise<void> {
   try {
     await deleteBusinessCertificate();
     await toastSuccess(t('settings.certDeleted'));
-    cert.value = await getBusinessCertificate().catch(() => ({ present: false }));
+    // Borrado el propio, el hub vuelve a firmar con el Sello de ERPlora (ADR-0202 §2.1): la vía
+    // pasa a ser la delegada, y con ella el otorgamiento vuelve a hacer falta.
+    cert.value = await getBusinessCertificate().catch(
+      (): BusinessCertificate => ({ present: false, transmission_route: 'delegated' }),
+    );
   } catch {
     await toastError(t('settings.certDeleteError'));
   } finally {
@@ -1374,6 +1436,27 @@ async function onCapabilityToggle(m: ModulePermissions, cap: ModuleCapability, e
 /* Input de fichero oculto (lo dispara un ion-button). Antes iba por inline style. */
 .cert-file-input {
   display: none;
+}
+
+/* La vía hacia la AEAT (hub#1314). El segmento ocupa el ancho: son DOS opciones y la elección es
+   la pregunta de la tarjeta, no un filtro al margen — en modo `ios` Ionic lo encogería al contenido
+   y quedaría flotando en medio. Las etiquetas envuelven en vez de truncarse: «Con mi propio
+   certificado» no cabe en una línea a 390 px, y media frase no es una opción que se pueda elegir. */
+.fiscal-route-segment {
+  width: 100%;
+}
+
+.fiscal-route-segment ion-label {
+  white-space: normal;
+  line-height: 1.2;
+}
+
+/* La consecuencia de elegir la vía propia —«no hace falta ningún otorgamiento»— es lo que quita el
+   miedo a quien acaba de leer que sin firmar no puede facturar. Va suelta y con aire, no pegada al
+   título, para que se lea antes que el formulario del `.p12`. */
+.fiscal-route-hint {
+  display: block;
+  margin-top: 0.5rem;
 }
 
 /* Responsible declaration (hub#528). The value is what gets read, so it stands out over the label

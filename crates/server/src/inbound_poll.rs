@@ -54,18 +54,15 @@
 //! succeeds resumes the normal tick at once. Any other failure (timeouts, 5xx) keeps the plain
 //! retry-next-tick behaviour — transient trouble is exactly what a fixed tick handles well.
 
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use cloud_client::{Auth, CloudClient};
 use erplora_runtime::outbox;
-use erplora_runtime::Runtime;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
-use tokio::sync::Mutex;
 
 use crate::entitlement::SharedRevalidation;
-use crate::state::{HubId, MachineToken};
+use crate::state::{HubId, MachineToken, SharedRuntime};
 
 /// The module whose presence turns this poller on. It is the product half of ADR-0283 K1c: the
 /// core ingests, the module owns the inbox screen and the flows that react to it.
@@ -343,14 +340,14 @@ impl InboundPoller {
     /// through a slow HTTP round trip would stall event delivery for the whole hub.
     pub async fn poll_once(
         &self,
-        runtime: &Arc<Mutex<Runtime>>,
+        runtime: &SharedRuntime,
         entitlement: &SharedRevalidation,
     ) -> Result<PollReport, PollError> {
         // ── Gate, before anything opens a socket ────────────────────────────────────────────
         // A hub that does not run the module must not hammer the SaaS 720 times an hour for an
         // inbox that will always be empty, and one that is not entitled must not be served at all.
         {
-            let rt = runtime.lock().await;
+            let rt = runtime.read().await;
             if !rt.registry().is_active(MODULE_ID) {
                 return Ok(PollReport::default());
             }
@@ -434,7 +431,7 @@ impl InboundPoller {
         let mut ingested = 0usize;
         let mut acknowledge: Vec<String> = Vec::with_capacity(fetched);
         {
-            let rt = runtime.lock().await;
+            let rt = runtime.read().await;
             let hub_id = rt.hub_id().to_string();
             for message in &messages {
                 let payload = message.event_payload();
@@ -568,7 +565,7 @@ mod tests {
     use serde_json::{json, Value};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex, RwLock};
-    use tokio::sync::Mutex as AsyncMutex;
+    use tokio::sync::RwLock as RuntimeLock;
 
     const HUB: &str = "hub-wa-7";
 
@@ -734,7 +731,7 @@ mod tests {
 
     /// A hub whose registry really does carry `whatsapp_inbox`, installed through the one door
     /// that registers anything (`install_from_dir`) — not a status map poked by hand.
-    async fn hub_with_module(installed: bool) -> Arc<AsyncMutex<Runtime>> {
+    async fn hub_with_module(installed: bool) -> SharedRuntime {
         let db = fresh_db().await;
         let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
         rt.ensure_system_tables().await.unwrap();
@@ -756,7 +753,7 @@ mod tests {
             rt.install_from_dir(&dir).await.unwrap();
             let _ = std::fs::remove_dir_all(&dir);
         }
-        Arc::new(AsyncMutex::new(rt))
+        Arc::new(RuntimeLock::new(rt))
     }
 
     fn poller(base_url: &str, token: Option<&str>) -> InboundPoller {
@@ -774,9 +771,9 @@ mod tests {
         crate::entitlement::new_shared()
     }
 
-    async fn outbox_rows(runtime: &Arc<AsyncMutex<Runtime>>) -> Vec<Value> {
+    async fn outbox_rows(runtime: &SharedRuntime) -> Vec<Value> {
         runtime
-            .lock()
+            .read()
             .await
             .db()
             .query(
@@ -899,7 +896,7 @@ mod tests {
         let cloud = fake_cloud(vec![message("wamid.1", "hola")]).await;
         let runtime = hub_with_module(true).await;
         runtime
-            .lock()
+            .read()
             .await
             .db()
             .execute_batch("DROP TABLE _event_outbox;")

@@ -1,0 +1,60 @@
+# Los e2e de `crates/runtime/tests/` que corren contra el CATÁLOGO PUBLICADO de módulos.
+# Lista revisada: es lo que `test-hub-modules.yml` ejecuta, y el guardia contra que ese conjunto
+# encoja (o crezca) en silencio. La comprueba `scripts/ci/kernel-e2e-targets.sh` en las dos
+# direcciones: un target del árbol que no esté aquí falla, y una línea de aquí sin fichero en el
+# árbol también.
+#
+# Sustituye al suelo numérico `[ "$count" -ge 30 ]` de hub#1229, que era una foto y no un
+# contrato: cada slice de hub#1264 lo rompía y el único arreglo que ofrecía era bajar el número
+# (hub#1359, destapada por el rojo de hub#1354: `develop` caído con «solo 29 targets — el grep no
+# está encontrando los e2e», cuando el grep funcionaba perfectamente).
+#
+# ── CÓMO SE EDITA ──────────────────────────────────────────────────────────────────────────
+# Un fichero entra aquí solo si llama a `require_modules_workspace()` en `crates/runtime/tests/`.
+#
+#   · e2e NUEVO del kernel  →  añade su línea en la misma PR.
+#   · slice de hub#1264 que se lleva un e2e a la batería `erplora test` de su módulo
+#                           →  BORRA su línea en la MISMA PR que borra el `.rs`, y di en el
+#                              cuerpo de la PR a qué batería del módulo se fue la cobertura.
+#
+# Ese borrado es el acto revisable: en el diff se lee `- verifactu_desglose_e2e` y se pregunta
+# dónde quedó su cobertura. Un `30` → `29` nunca hizo preguntar eso a nadie.
+
+# ── Banco de pruebas del KERNEL ────────────────────────────────────────────────────────────
+# Usan el catálogo publicado como banco, pero afirman comportamiento del RUNTIME (el motor
+# declarativo, el contrato de fila, el instalador, el relay del outbox), no de un módulo
+# concreto. Se quedan en el hub — hub#1264 los clasificó así explícitamente.
+blueprint_seed_reglas_no_duplican
+capability_denied_listener_e2e
+dashboard_widgets_e2e
+emit_schema_contract_hub1076
+export_test
+import_no_duplica_lo_sembrado
+import_report_persist_test
+import_retry_test
+import_test
+lifecycle_cascade_e2e
+module_manifest_contract
+module_not_installed_e2e
+module_seed_e2e
+money_columns_inventory                          # pese al nombre: el inventario de columnas de
+                                                 # dinero del BACKFILL DEL KERNEL contra ~100
+                                                 # tablas de todos los módulos (slice 6)
+pagination_e2e
+protects_guard_e2e
+published_migrations_stay_installable
+reads_e2e
+reset_test
+reset_undo_test
+
+# ── Pendientes de hub#1264 ─────────────────────────────────────────────────────────────────
+# Afirman comportamiento de UN módulo y se van con él cuando su slice aterrice. Cada slice borra
+# el `.rs` y su línea de aquí, en la misma PR. Cuando esta sección quede vacía, hub#1264 terminó.
+appointments_availability_e2e                    # → appointments
+reset_fiscal_test                                # → verifactu
+sale_charged_invoice_dead_e2e                    # → sales
+staff_commissions_e2e                            # → staff
+verifactu_chain_import_e2e                       # → verifactu
+verifactu_chain_survives_certificate_rotation_e2e # → verifactu
+verifactu_desglose_e2e                           # → verifactu
+void_reversal_e2e                                # → sales (mitad `inventory`: `_restock_on_void`)

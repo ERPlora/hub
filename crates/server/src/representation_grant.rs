@@ -504,7 +504,7 @@ pub async fn fetch_state(
 /// exactly as it was and says so, rather than inventing an "absent" that would close the go-live.
 pub async fn get_representation_grant(State(st): State<AppState>, headers: HeaderMap) -> Response {
     {
-        let runtime = st.runtime.lock().await;
+        let runtime = st.runtime.read().await;
         if let Err(error) = auth::require_user_session(&headers, &st.config, &runtime).await {
             return unauthorized(error);
         }
@@ -577,7 +577,7 @@ pub async fn post_representation_grant_model(
     Json(fields): Json<ModelFields>,
 ) -> Response {
     {
-        let runtime = st.runtime.lock().await;
+        let runtime = st.runtime.read().await;
         if let Err(error) = auth::require_admin_session(&headers, &st.config, &runtime).await {
             return unauthorized(error);
         }
@@ -645,7 +645,7 @@ pub async fn post_representation_grant(
     multipart: Multipart,
 ) -> Response {
     {
-        let runtime = st.runtime.lock().await;
+        let runtime = st.runtime.read().await;
         if let Err(error) = auth::require_admin_session(&headers, &st.config, &runtime).await {
             return unauthorized(error);
         }
@@ -707,7 +707,7 @@ pub async fn post_representation_grant(
 /// Writes the control plane's answer into `_hub_fiscal_profile`. Best-effort: a write that fails
 /// leaves the previous copy, and the next read of the screen tries again.
 async fn mirror_into_profile(st: &AppState, state: &GrantState) {
-    let runtime = st.runtime.lock().await;
+    let runtime = st.runtime.read().await;
     if let Err(error) = erplora_runtime::fiscal_profile::record_representation(
         runtime.db(),
         runtime.hub_id(),
@@ -722,7 +722,7 @@ async fn mirror_into_profile(st: &AppState, state: &GrantState) {
 
 /// The copy the hub already holds, for when the control plane cannot be reached.
 async fn stored_state(st: &AppState) -> GrantState {
-    let runtime = st.runtime.lock().await;
+    let runtime = st.runtime.read().await;
     match erplora_runtime::fiscal_profile::load(runtime.db(), runtime.hub_id()).await {
         Ok(Some(profile)) => (profile.representation_status, profile.representation_at),
         _ => (String::new(), String::new()),

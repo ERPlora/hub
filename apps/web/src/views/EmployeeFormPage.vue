@@ -202,12 +202,13 @@ import {
   type HubUserPatch,
 } from '../lib/hub-users';
 import { fieldRefusalOf, invalidFieldMessage } from '../lib/invalid-field';
+import { platformFailureMessage } from '../lib/platform-failure';
 import { hubPinLength } from '../lib/pin-length';
 import { onBadgeScan } from '../lib/badge-scanner';
 import { nfcBadgeReady } from '../lib/nfc-badge';
 import { toast } from '../lib/toast';
 
-const { t, te } = useI18n();
+const { t, te, locale } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const isEdit = computed(() => typeof route.params.id === 'string' && route.params.id.length > 0);
@@ -451,15 +452,18 @@ async function onSave(): Promise<void> {
     void toast(isEdit.value ? t('employees.updated') : t('employees.created'), 'success');
     await router.replace('/employees');
   } catch (error) {
-    // Orden: motivo de NEGOCIO del core (`hub.users.*`, hub#355) → campo rechazado traducido
-    // (hub#1190) → la frase que vino. El `message` del runtime está en INGLÉS a propósito (regla
-    // del idioma del código): pintarlo tal cual es lo que dejaba «the name is required» delante de
-    // una encargada. Se conserva como ÚLTIMO recurso porque dice más que cualquier genérico
-    // inventado (misma regla que `platformFailureMessage`, hub#1102).
+    // Orden (hub#1190, hub#1258): motivo de NEGOCIO del core (`hub.users.*`, hub#355) → campo
+    // rechazado traducido (hub#1190) → rechazo de PLATAFORMA traducido (`db`,
+    // `module_not_installed`… — nadie escribió esa frase para esta pantalla, hub#1102) → la frase
+    // que vino. El `message` del runtime está en INGLÉS a propósito (regla del idioma del código):
+    // pintarlo tal cual es lo que dejaba «the name is required» delante de una encargada. Se
+    // conserva como ÚLTIMO recurso porque dice más que cualquier genérico inventado (misma regla
+    // que `platformFailureMessage`, hub#1102).
     const key = hubUserErrorKey(error);
     const message = key
       ? t(`employeeForm.errors.${key}`)
       : (invalidFieldMessage(error, t, te, { length: hubPinLength.value }) ??
+        platformFailureMessage(error, locale.value) ??
         (error instanceof Error ? error.message : t('employees.saveError')));
     const refusal = fieldRefusalOf(error);
     if (!key && refusal && ANCHORED_FIELDS.includes(refusal.field)) {

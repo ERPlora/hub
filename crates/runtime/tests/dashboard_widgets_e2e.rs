@@ -85,7 +85,7 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
     assert_eq!(empty["total"].as_i64().unwrap_or(0), 0, "sin ventas el total es 0");
     assert_eq!(empty["tickets"].as_i64().unwrap_or(0), 0, "sin ventas los tickets son 0");
 
-    // A REAL sale: Café 1.21€×2 + Agua 1.10€×1, tax included → total 352 cents (proven in sales_e2e).
+    // A REAL sale: Café 1.21€×2 + Agua 1.10€×1, tax included → total 352 cents (proven by `tests/checkout.hub.test.py` in the sales repo, hub#1264).
     // With runtime and ctx sharing "h1" (hub#594) the seeded catalog is visible, so complete_sale
     // enforces a real `payment_method_id`.
     let pm = rt

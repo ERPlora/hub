@@ -257,7 +257,7 @@ pub async fn save(
 pub async fn restore_from_db(state: &crate::AppState) {
     let hub_id = state.hub_id();
     let marks = {
-        let runtime = state.runtime.lock().await;
+        let runtime = state.runtime.read().await;
         load(runtime.db(), &hub_id).await
     };
     match marks {
@@ -277,7 +277,7 @@ pub async fn flush(state: &crate::AppState) {
     };
     let hub_id = state.hub_id();
     let written = {
-        let runtime = state.runtime.lock().await;
+        let runtime = state.runtime.read().await;
         save(runtime.db(), &hub_id, marks).await
     };
     match written {

@@ -77,6 +77,7 @@ import {
   type HubRole,
 } from '../lib/hub-users';
 import { invalidFieldMessage } from '../lib/invalid-field';
+import { platformFailureMessage } from '../lib/platform-failure';
 import { isAdmin } from '../lib/session';
 import { toast } from '../lib/toast';
 
@@ -197,12 +198,14 @@ const columns = computed<DataTableColumn[]>(() => [
  *
  * hub#1190: si el rechazo es un `invalid_field` del core, la frase sale del catálogo del shell —
  * el `message` del runtime está en INGLÉS a propósito (regla del idioma del código) y pintarlo tal
- * cual dejaba a un hub en español leyendo «role `admin` is a base role of the hub…». Solo se
- * traduce lo que el catálogo tiene: para cualquier otro motivo se conserva la frase que vino, que
- * dice más que cualquier genérico (misma regla que `platformFailureMessage`, hub#1102).
+ * cual dejaba a un hub en español leyendo «role `admin` is a base role of the hub…». hub#1258: lo
+ * mismo para un rechazo de PLATAFORMA (`db`, `module_not_installed`…) — nadie escribió esa frase
+ * para este panel. Solo se traduce lo que el catálogo tiene: para cualquier otro motivo se
+ * conserva la frase que vino, que dice más que cualquier genérico (misma regla que
+ * `platformFailureMessage`, hub#1102).
  */
 function reasonOf(error: unknown, fallback: string): string {
-  const translated = invalidFieldMessage(error, t, te);
+  const translated = invalidFieldMessage(error, t, te) ?? platformFailureMessage(error, locale.value);
   if (translated) return translated;
   return error instanceof RoleActivationError && error.code && error.message
     ? error.message

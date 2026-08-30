@@ -590,7 +590,12 @@ const PLUMBING: Bilingual = {
  * The missing/inactive app family is NOT folded into it — «install it» and «switch it back on» are
  * different actions, and a screen that cannot tell them apart sends the owner to the wrong place.
  */
-const PLATFORM_FAILURES: Record<string, (app: string) => Bilingual> = {
+const PLATFORM_FAILURES: Record<
+  string,
+  // hub#1337: `null` = «there is nothing better to say than what already arrived». Only `other`
+  // answers it today, and only when the runtime let an authored sentence through.
+  (app: string, failure: PlatformFailure) => Bilingual | null
+> = {
   read_unavailable: (app) => missingApp(app),
   module_not_installed: (app) => missingApp(app),
   missing_dependency: (app) => missingApp(app),
@@ -607,11 +612,58 @@ const PLATFORM_FAILURES: Record<string, (app: string) => Bilingual> = {
   wasm: () => PLUMBING,
   native: () => PLUMBING,
   schema: () => PLUMBING,
-  other: () => PLUMBING,
+  // hub#1315: a module.json the installer refuses at install time (`RuntimeError::Manifest`) is
+  // redacted by `may_reach_the_client` exactly like its five siblings above — this table just
+  // never had to answer it before the shell's own copy (`apps/web/src/lib/platform-failure.ts`,
+  // hub#1258) started covering `manifest` over vue-i18n keys instead of here.
+  manifest: () => PLUMBING,
+  // hub#1337: `other` is NOT one of them. `may_reach_the_client` puts `E::Other(_)` on the SPEAKING
+  // side of the door — beside `Domain`, `PermissionDenied`, `InvalidField` — with
+  // `carries_driver_text` as the net underneath, exactly so the readable half of the ~50
+  // `Other(...)` sites («usuario no encontrado», `crates/runtime/src/hub_users.rs`) reaches whoever
+  // is reading and the half that wraps a `DbError` does not. Answering PLUMBING here threw that
+  // decision away and showed the generic line for all of them. So: step aside when the runtime let
+  // a sentence through, and speak only when it redacted one (or when there is none to keep).
+  other: (_app, failure) => (authoredSentenceOf(failure) ? null : PLUMBING),
   // The bucket every unmapped runtime error fell into before hub#1074, and what an older hub still
   // answers. Its message is plumbing by definition — that is what put driver text on a till.
+  //
+  // hub#1337: this is why it does NOT follow `other` above. One commit separates them — hub#1074
+  // (`594eb485`) replaced the door's flat `_ => "error"` bucket with `error_code_of`, where `other`
+  // comes from, in the SAME change that added `may_reach_the_client`. A hub that answers `other` is
+  // therefore a hub that already redacts, and its sentence is safe to keep; a hub that answers
+  // `error` is one from before that gate, whose bucket carried the driver's own words unfiltered.
   error: () => PLUMBING,
 };
+
+/**
+ * The line `error_payload` (`crates/server/src/lib.rs`, `REDACTED_MESSAGE`) sends INSTEAD of a
+ * sentence, when the one it had was plumbing (hub#1074).
+ *
+ * Mirrored rather than imported — it crosses a language boundary — and kept honest by a guard in
+ * `platform-failure.test.ts` that reads the constant straight out of the Rust and compares.
+ */
+const RUNTIME_REDACTED_LINE = 'the request could not be completed — the hub recorded the details';
+
+/**
+ * The sentence the runtime WROTE for whoever is reading, or `undefined` when it wrote none.
+ *
+ * `undefined` covers the two ways there is nothing to keep: the runtime redacted what it had
+ * (the fixed English line above, aimed at the log), or no message travelled at all — an older
+ * runtime, or a caller that only carries the code.
+ *
+ * Read off the envelope's `error` object, which always carries it ({@link Envelope}), but
+ * deliberately NOT declared on the public {@link PlatformFailure}: it is not something a CALLER has
+ * to supply to get a sentence, and every field of that interface is part of the frozen kernel
+ * surface (`contracts/kernel/sdk.d.ts`, ADR «El Hub se CIERRA como KERNEL»).
+ */
+function authoredSentenceOf(failure: PlatformFailure): string | undefined {
+  const sentence = (failure as { message?: unknown }).message;
+  if (typeof sentence !== 'string') return undefined;
+  const trimmed = sentence.trim();
+  if (!trimmed || trimmed === RUNTIME_REDACTED_LINE) return undefined;
+  return trimmed;
+}
 
 // 🔴 `invalid_field` (hub#1070/#1185) is deliberately NOT in the table above.
 //
@@ -641,7 +693,9 @@ function missingApp(app: string): Bilingual {
  * What to tell a person about a PLATFORM failure, or `null` when this is not one (hub#1102).
  *
  * `null` is the answer for a module's own domain code and for anything unrecognised — the caller
- * then keeps the sentence the runtime sent, which is the honest default.
+ * then keeps the sentence the runtime sent, which is the honest default. hub#1337: it is also the
+ * answer for an `other` that arrived WITH such a sentence, because the runtime's own door
+ * (`may_reach_the_client`) already decided that one may be read.
  */
 export function platformFailureMessage(
   failure: PlatformFailure,
@@ -649,7 +703,11 @@ export function platformFailureMessage(
 ): string | null {
   const entry = failure.code ? PLATFORM_FAILURES[failure.code] : undefined;
   if (!entry) return null;
-  const sentence = entry(appOf(failure));
+  // hub#1337: an entry may also decide there is nothing better to say than what already arrived —
+  // `other` does, when the runtime let an authored sentence through. Same answer as an unknown
+  // code, and for the same reason: the sentence that arrived wins.
+  const sentence = entry(appOf(failure), failure);
+  if (!sentence) return null;
   return locale.toLowerCase().startsWith('en') ? sentence.en : sentence.es;
 }
 
@@ -1942,6 +2000,17 @@ export class PrintApi {
 // Cliente que usan los Web Components.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The runtime's RESERVED namespace owner (ADR-0192, `crates/runtime/src/hub_users.rs::CORE_NAMESPACE`):
+ * `hub.*` is served by the core itself, before the module registry, and is never an installed
+ * module — so it is never in `installedModules` and can never be proven absent. Without this
+ * exemption the `queryOptional` short-circuit (hub#1211) would answer `undefined` for every
+ * `queryOptional('hub.…')`, the exact false absence it exists to avoid (the runtime itself never
+ * says `module_not_installed` for the core: a bad `hub.*` name is `not_found`, a broken contract,
+ * and must still explode). Module-private on purpose: not part of the frozen public surface.
+ */
+const CORE_NAMESPACE_OWNER = 'hub';
+
 export class ErploraClient {
   private bridge?: BridgeTransport;
   /** The module this client acts FOR, set only by {@link ErploraClient.forModule}. */
@@ -1976,10 +2045,50 @@ export class ErploraClient {
        * esto al Web Component. Inyectable para tests.
        */
       timezone?: () => string;
+      /**
+       * The live set of ACTIVE module ids (hub#1211) — the shell's `listInstalledModules()`
+       * filtered to `status === 'active'`, refreshed on install/uninstall/activate/deactivate.
+       * Lets `queryOptional`/`queryAllOptional` learn a module is absent WITHOUT a round trip:
+       * before this existed, the only way to find that out was asking the transport and catching
+       * `module_not_installed` after the request had already happened, so every optional
+       * integration a hub does not have left a failed `POST /api/query` in the console per call.
+       *
+       * `undefined` means "I do not know yet" (e.g. before the shell's first `GET /api/modules`
+       * resolves), and is treated as "cannot rule it out" — the SDK falls back to asking the
+       * transport, exactly like before this option existed. Guessing "absent" while unknown would
+       * be the SYMMETRIC regression: a real query silently skipped. Injectable for tests.
+       */
+      installedModules?: () => ReadonlySet<string> | undefined;
     } = {},
     bridge?: BridgeTransport,
   ) {
     this.bridge = bridge;
+  }
+
+  /**
+   * The module id a namespaced query/command NAME belongs to (ADR-0127: every name is namespaced
+   * `modulo.entidad.accion`) — `"verifactu.records.by_invoice"` → `"verifactu"`. `undefined` for a
+   * name with no dot: that is not a shape this SDK's naming convention produces, and refusing to
+   * guess an owner keeps the short-circuit from ever misfiring on it (it just travels, as before).
+   */
+  private static ownerModuleOf(name: string): string | undefined {
+    const dot = name.indexOf('.');
+    return dot > 0 ? name.slice(0, dot) : undefined;
+  }
+
+  /**
+   * `true` only when the caller can PROVE the owning module is absent — `installedModules()`
+   * answered a concrete set and the module is not in it. Any doubt (no option wired, the set is
+   * not known yet, or the name carries no recognisable owner) resolves to `false`, which keeps the
+   * existing "ask the transport, catch the absence" path as the fallback. The core namespace is
+   * never absent by construction (see {@link CORE_NAMESPACE_OWNER}).
+   */
+  private isKnownAbsent(name: string): boolean {
+    const owner = ErploraClient.ownerModuleOf(name);
+    if (!owner || owner === CORE_NAMESPACE_OWNER) return false;
+    const installed = this.opts.installedModules?.();
+    if (!installed) return false;
+    return !installed.has(owner);
   }
 
   /**
@@ -2149,8 +2258,16 @@ export class ErploraClient {
    * Todo lo demás EXPLOTA como en `query()`: una query renombrada en un módulo presente, un
    * permiso denegado o un handler roto son contratos rotos, no ausencias. Esto NO es un
    * `.catch(() => [])` — esa forma se tragaba las dos cosas y por eso se retiró.
+   *
+   * **Short-circuit (hub#1211):** when `installedModules` (injected by the shell) PROVES the owner
+   * module is absent, this returns `undefined` without calling the transport — before, it learned
+   * the absence by making the request anyway, so every absent optional integration left a
+   * `404 POST /api/query` in the console on EVERY call. Without that proof (option not injected,
+   * or not resolved yet), it takes the usual path: ask, and catch the absence. The core namespace
+   * `hub.*` never short-circuits (it is not a module and cannot be absent).
    */
   async queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined> {
+    if (this.isKnownAbsent(name)) return undefined;
     try {
       return await this.query<T>(name, params);
     } catch (e) {
@@ -2212,8 +2329,12 @@ export class ErploraClient {
    * exactly like {@link queryOptional}: a renamed query, a denied permission or a broken handler
    * are broken contracts, not absences. And `[]` keeps meaning "installed, nothing to offer", which
    * is a different answer from "not installed" and must stay tellable apart by the caller.
+   *
+   * **Short-circuit (hub#1211):** same guard as {@link queryOptional} — when `installedModules`
+   * PROVES the owner is absent, this returns `undefined` without ever calling the transport.
    */
   async queryAllOptional<T = unknown>(name: string, params: ListParams = {}): Promise<T[] | undefined> {
+    if (this.isKnownAbsent(name)) return undefined;
     try {
       return await this.queryAll<T>(name, params);
     } catch (e) {

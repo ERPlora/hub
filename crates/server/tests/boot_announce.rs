@@ -61,7 +61,7 @@ async fn booted_hub(cloud_base_url: &str, token: Option<&str>) -> AppState {
 
 /// Deja constancia en `hub_module` de que este hub tiene ese módulo — sin cargarlo.
 async fn record_installed(state: &AppState, module_id: &str) {
-    let runtime = state.runtime.lock().await;
+    let runtime = state.runtime.read().await;
     let mut params = Params::new();
     params.insert("hub_id".into(), json!(state.hub_id()));
     params.insert("module_id".into(), json!(module_id));

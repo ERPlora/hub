@@ -181,7 +181,8 @@ import { moduleNav, refreshModuleNav } from '../lib/nav';
 import { reloadForModuleUpdate } from '../lib/module-loader';
 import { canOpenModule, dependentsOf, moduleRoutePath, toggleIntent } from '../lib/installed-app-actions';
 import {
-  catalogActionFor, catalogRowState, isModuleInstalled, modulesWithUnknownPublication, publicationOf,
+  alsoInstalledNames, catalogActionFor, catalogRowState, isModuleInstalled,
+  modulesWithUnknownPublication, publicationOf,
   type CatalogRowState, type PublicationStatus,
 } from '../lib/apps-catalog';
 import { listDisplay, type ListLoadState } from '../lib/list-load-state';
@@ -699,6 +700,11 @@ function notifyGrantFailed(name: string): void {
 const client = inject(clientInjectionKey) ?? getClient();
 let unsubInstalled: (() => void) | null = null;
 let unsubProgress: (() => void) | null = null;
+// hub#1317: activate/deactivate/uninstall (unlike install) emitted nothing of their own —
+// another tab/device of the same hub stayed on this list exactly as it was until it reloaded.
+let unsubActivated: (() => void) | null = null;
+let unsubDeactivated: (() => void) | null = null;
+let unsubUninstalled: (() => void) | null = null;
 
 // --- Consentimiento de permisos al instalar (modal best-effort) ---
 // Si el módulo a instalar DECLARA capabilities, las mostramos antes de instalar y al confirmar las
@@ -904,7 +910,7 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     // `version` viene de `chooseVersion`: la elegida, o `latest` cuando no había nada que elegir
     // (el runtime la resuelve). Ya NO se usa la del catálogo Cloud: el catálogo dice qué versión
     // publica el marketplace, no cuál puede instalar ESTE hub.
-    await requestInstall(mod.id, version);
+    const result = await requestInstall(mod.id, version);
     // Concede los permisos consentidos (PUT solo admin → el runtime revalida). Best-effort: si
     // falla no rompe la instalación — pero YA NO SE CALLA. Un fallo aquí deja el módulo instalado
     // y sin permisos, que es exactamente el aterrizaje en «no tengo permiso» de pm#132; el toast
@@ -920,6 +926,13 @@ async function doInstall(mod: Mod, version: string, grantCaps: ModuleCapability[
     if (row) row.installed = true;
     if (grantFailed) {
       notifyGrantFailed(mod.name);
+    } else if (result.also_installed.length) {
+      // hub#1130: the install-plan closure (ADR-0060) dragged dependencies in — the owner asked
+      // for ONE app and got several. Naming them in the SAME confirmation (never a second modal,
+      // market: Odoo/Shopify) is the reverse of hub#1101's `409 has_dependents`, which already
+      // names what an uninstall would break.
+      const names = alsoInstalledNames(result.also_installed, modules.value).join(', ');
+      notify(t('apps.installSuccessWithDependencies', { name: mod.name, names }), 'success', 0);
     } else {
       notify(t('apps.installSuccess', { name: mod.name }), 'success');
     }
@@ -1280,12 +1293,37 @@ onMounted(() => {
     if (!root) return;
     setProgress(root, p?.module_id ?? root, p?.phase ?? '');
   });
+  // hub#1317 (review of hub#1311): activate/deactivate/uninstall emitted NOTHING over `/ws` —
+  // the same hole hub#631 closed only for `module.installed`. No toast here on purpose: the tab
+  // that DID the action already tells itself (`toggleModule`/`removeModule`, further up this
+  // file); this subscription is for the ones that did NOT.
+  unsubActivated = client.on('module.activated', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
+  unsubDeactivated = client.on('module.deactivated', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
+  unsubUninstalled = client.on('module.uninstalled', () => {
+    void loadCatalog();
+    void loadInstalled();
+    void loadModuleUpdates();
+    void refreshModuleNav();
+  });
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', recheckEntitlement);
   unsubInstalled?.();
   unsubProgress?.();
+  unsubActivated?.();
+  unsubDeactivated?.();
+  unsubUninstalled?.();
   mineTable.value?.removeEventListener('rowAction', handleMineAction);
   catalogTable.value?.removeEventListener('rowAction', handleCatalogAction);
 });
