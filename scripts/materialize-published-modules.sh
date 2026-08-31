@@ -214,6 +214,15 @@ module_version() {          # $1 = tree
 # report the same failure, so they are NOT in this list on purpose.
 RETRY_DELAYS="${HUB_MATERIALIZE_RETRY_DELAYS:-2 8 30}"
 
+# Which SIDE the failure is on, so the summary sends the reader to the right place
+# (hub#1380). Anything that smells of the remote — auth, the network, a repo that
+# is not there — is access; everything else is local, and the cache is the first
+# suspect.
+looks_like_access_failure() {  # $1 = path to the failed attempt's log
+    grep -qiE 'permission denied|could not read from remote|repository not found|does not appear to be a git repository|connection|timed out|host key|name or service not known|access denied' \
+        "$1" 2>/dev/null
+}
+
 is_transient_git_failure() {   # $1 = path to the failed attempt's log
     grep -qiE 'permission denied \(publickey\)|connection reset|early eof|could not read from remote|timed out' \
         "$1" 2>/dev/null
@@ -247,10 +256,27 @@ run_with_retry() {
 
 # The two network steps a module can need, each wrapped by run_with_retry so
 # a flaky attempt starts from a clean slate rather than a half-written tree.
+# `-f` on the checkout below is the hard reset the header already promises, and
+# hub#1380 is what its absence cost: the cache is SHARED by every worktree of the
+# hub, so ONE touched file inside it aborted the checkout — and the sanitising
+# step that would have removed it runs AFTER, so it never got to run at all. The
+# gate then stayed dead for the whole fleet, pointing at the deploy keys.
+# Forcing is safe HERE for the reason the header gives: $DEST is a DERIVED cache
+# this script owns end to end, and nobody edits inside it.
 fetch_existing_tree() {     # $1 = ssh_cmd  $2 = tree  $3 = url  $4 = branch
     git_with_key "$1" -C "$2" fetch -q --depth 1 "$3" "$4" \
-        && git -C "$2" checkout -q --detach FETCH_HEAD \
+        && git -C "$2" checkout -qf --detach FETCH_HEAD \
         && git -C "$2" clean -qfdx
+}
+
+# A cached directory is only reusable when it IS the module's own repo. On
+# 2026-08-30 all 27 held a clone of the HUB instead (639 MB, `origin` pointing at
+# ERPlora/hub), and the module checkout aborted against the hub's own files.
+# Fetching on top of the wrong repo never heals; re-cloning always does, and at
+# `--depth 1` it costs little. An unreadable or remote-less `.git` answers empty
+# here, which is also "not the module" — and also wants a re-clone.
+tree_is_the_module() {      # $1 = tree  $2 = expected url
+    [ "$(git -C "$1" remote get-url origin 2>/dev/null || true)" = "$2" ]
 }
 
 clone_new_tree() {          # $1 = ssh_cmd  $2 = url  $3 = tree  $4 = branch
@@ -278,7 +304,7 @@ for id in $ids; do
     ssh_cmd="$(ssh_for "$id")"
     tree="$DEST/$id"
     log="$DEST/.$id.log"
-    if [ -d "$tree/.git" ]; then
+    if [ -d "$tree/.git" ] && tree_is_the_module "$tree" "$url"; then
         if run_with_retry "$id" "$log" fetch_existing_tree "$ssh_cmd" "$tree" "$url" "$BRANCH"; then
             rm -f "$log"
         else
@@ -309,8 +335,27 @@ if [ -n "$failed" ]; then
         say "   ── $id ──"
         tail -5 "$DEST/.$id.log" | sed 's/^/     /' >&2
     done
-    say "   Nothing is measured against a partial catalogue: fix the access (deploy key,"
-    say "   ssh agent, network) and run again."
+    # Until hub#1380 EVERY failure read «fix the access», and half the time that is the
+    # wrong place to look: a dirty or foreign cache is LOCAL, and the hours went into
+    # deploy keys that were never broken. Say which side this was.
+    access=0
+    local_fail=0
+    for id in $failed; do
+        [ -f "$DEST/.$id.log" ] || continue
+        if looks_like_access_failure "$DEST/.$id.log"; then
+            access=1
+        else
+            local_fail=1
+        fi
+    done
+    say ""
+    say "   Nothing is measured against a partial catalogue."
+    [ "$access" = 1 ] && \
+        say "   → ACCESS: fix the deploy key / ssh agent / network, then run again."
+    [ "$local_fail" = 1 ] && {
+        say "   → LOCAL: this is not the access. The cache is DERIVED — nobody edits it and"
+        say "     nothing else reads it — so remove it and run again:  rm -rf $DEST"
+    }
     exit 1
 fi
 

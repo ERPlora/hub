@@ -324,7 +324,8 @@ mkdir -p "$STATE_DIR"
 # What shrinks is how long it is held, and a lock held for minutes drains a
 # queue that a lock held for forty minutes does not.
 #
-# Ownership is asked of `cargo metadata`, never hand-mapped, and it is
+# Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
+# `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
 # deliberately conservative in three places:
 #   · DEPENDENTS come along — touching `erplora-db` runs whoever builds on it,
 #     because that is the breakage a scoped gate would otherwise wave through;
@@ -341,6 +342,13 @@ GATE_EXCLUDES="${HUB_GATE_EXCLUDES:-erplora-tauri tauri-plugin-erplora-android}"
 # that no package claims (a crate not yet in `members`, a shared fixture) is a
 # reason to widen, not to ignore.
 GATE_RUST_DIRS="${HUB_GATE_RUST_DIRS:-crates}"
+# El resolutor VIVE EN EL REPO (hub#1346/#1347), no aquí dentro. El hook llevaba una
+# copia inline de las mismas 66 líneas: dos copias del mismo algoritmo divergen
+# solas, y cuando divergen el gate local y `test-hub.yml` dejan de medir lo mismo
+# sin dejar rojo en ningún sitio. Se lee del árbol que se empuja —no de junto al
+# hook— porque la copia que CORRE vive en `core.hooksPath`, fuera del repo, donde
+# no hay `scripts/`. Contrato: scripts/tests/test-scope.test.sh.
+SCOPE_RESOLVER="${HUB_GATE_SCOPE_RESOLVER:-$(git rev-parse --show-toplevel)/scripts/ci/test-scope.py}"
 
 SCOPE_MODE=workspace
 SCOPE_PACKAGES=""
@@ -355,73 +363,8 @@ scope_from_metadata() {
         return 0
     fi
     out="$(printf '%s\n' "$changed_files" \
-        | HUB_GATE_RUST_DIRS="$GATE_RUST_DIRS" python3 -c '
-import json, os, sys
-
-meta = json.load(open(sys.argv[1]))
-excludes = set(sys.argv[2:])
-rust_dirs = set(d for d in os.environ.get("HUB_GATE_RUST_DIRS", "crates").split() if d)
-root = meta["workspace_root"]
-members = set(meta.get("workspace_members") or [])
-
-# name -> directory that owns it, relative to the workspace root
-pkgs = {}
-for p in meta["packages"]:
-    if members and p["id"] not in members:
-        continue
-    rel = os.path.relpath(os.path.dirname(p["manifest_path"]), root)
-    pkgs[p["name"]] = "" if rel == "." else rel
-names = set(pkgs)
-
-# Reverse edges, every kind (normal, dev, build): a dev-dependency breaks the
-# dependent`s TESTS, which is precisely what this gate runs.
-rdeps = {n: set() for n in names}
-for p in meta["packages"]:
-    if p["name"] not in names:
-        continue
-    for d in p["dependencies"]:
-        if d["name"] in names and d["name"] != p["name"]:
-            rdeps[d["name"]].add(p["name"])
-
-TRANSVERSAL = ("Cargo.lock", "Cargo.toml", "rust-toolchain.toml")
-PREFIXES = (".cargo/", "schemas/")
-
-def verdict(mode, reason, pkgs_out=()):
-    print(mode)
-    print(reason)
-    for n in sorted(pkgs_out):
-        print(n)
-    raise SystemExit(0)
-
-touched = set()
-for path in [l.strip() for l in sys.stdin.read().splitlines() if l.strip()]:
-    if path in TRANSVERSAL or path.startswith(PREFIXES):
-        verdict("workspace", "%s can change what every crate compiles" % path)
-    owner, best = None, -1
-    for name, rel in pkgs.items():
-        if rel and (path == rel or path.startswith(rel + "/")) and len(rel) > best:
-            owner, best = name, len(rel)
-    if owner is not None:
-        touched.add(owner)
-    elif path.split("/")[0] in rust_dirs:
-        verdict("workspace", "%s sits in Rust source that no package claims" % path)
-
-scope, stack = set(), list(touched)
-while stack:
-    n = stack.pop()
-    if n in scope:
-        continue
-    scope.add(n)
-    stack.extend(rdeps.get(n, ()))
-scope -= excludes
-testable = names - excludes
-
-if not scope:
-    verdict("none", "no Rust package is touched by this diff")
-if testable and scope >= testable:
-    verdict("workspace", "the diff reaches every testable package")
-verdict("packages", "%d of %d packages reachable from this diff" % (len(scope), len(testable)), scope)
-' "$meta" $GATE_EXCLUDES 2>/dev/null)" || {
+        | HUB_GATE_RUST_DIRS="$GATE_RUST_DIRS" \
+            python3 "$SCOPE_RESOLVER" "$meta" $GATE_EXCLUDES 2>/dev/null)" || {
         rm -f "$meta"
         SCOPE_REASON="the scope could not be computed from \`cargo metadata\`"
         return 0
@@ -446,10 +389,57 @@ resolve_scope() {
         SCOPE_REASON="python3 is not on PATH, so package ownership cannot be resolved"
         return 0
     fi
+    if [ ! -f "$SCOPE_RESOLVER" ]; then
+        SCOPE_REASON="the scope resolver (scripts/ci/test-scope.py) is not in this checkout"
+        return 0
+    fi
     scope_from_metadata
 }
 resolve_scope
 
+# The local half of hub#526 (CI was hub#565). `postgres:18` ships with
+# `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
+# suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
+# ceiling and crashes whichever test passes by with `53200 out of shared memory`. Red tests that
+# have nothing to do with the diff, different each run — the most expensive flaky to diagnose.
+#
+# Raise the three settings (same as CI: 4096 / 300 / 512MB → ceiling ~1.2M) and restart, but ONLY
+# when the ceiling is still the low default. That keeps it idempotent: a container already raised
+# (a second push, or one that survived from a previous run) is not restarted, so this never adds
+# latency to the common path. `ALTER SYSTEM` needs a restart to take effect.
+raise_lock_limits() {
+    local current
+    current=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    # 6 400 is the stock ceiling (64 × 100). Anything already above it was raised before — skip.
+    if [ -n "$current" ] && [ "$current" -gt 6400 ] 2>/dev/null; then
+        return 0
+    fi
+    echo "pre-push: raising Postgres lock limits (hub#526) — was ${current:-?}, restarting ${PG_CONTAINER}…"
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';" >/dev/null
+    docker restart "$PG_CONTAINER" >/dev/null
+    local tries=0
+    until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never came back after raising limits." >&2; return 1; }
+        sleep 1
+    done
+    local after
+    after=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
+}
+
+# Definida AQUÍ, y no más abajo, porque `ensure_postgres` la llama: en bash una función
+# tiene que estar definida ANTES de la llamada en tiempo de ejecución, y el camino
+# temprano (diff solo-web, alcance Rust `none`) corre mucho antes de donde vivía. Ahí
+# moría con `command not found` — y el hook va sin `set -e`, así que no abortaba nada:
+# un fallo mudo que dejaba los límites de locks sin subir (hub#1375, familia de
+# hub#1355). Banco: scripts/prepush-gate.test.sh fija el orden.
+# Bring up the Postgres the suite needs, unless the caller pinned the command
+# (the tests do) or already exported a DSN.
 ensure_postgres() {
     [ -n "${DATABASE_URL:-}" ] && return 0
     if ! command -v docker >/dev/null 2>&1; then
@@ -499,6 +489,15 @@ ensure_postgres() {
 # allí, cambia aquí (`scripts/tests/test-web-workflow.test.sh` fija la de allí).
 WEB_PREFIXES="apps/web/ packages/"
 WEB_FILES="package.json pnpm-lock.yaml pnpm-workspace.yaml"
+# Los que DEFINEN la tubería web en vez de ser la app: la guardia que `pnpm verify` corre
+# primero (hub#1244/#1247), el contrato del workflow y el propio YAML. Faltaban de la lista,
+# y sin `pull_request` en `test-web.yml` eso dejaba un agujero: un push que solo tocara uno
+# de los tres no disparaba la etapa web en local NI ningún check en la nube — la única red
+# era el push a develop/main, o sea POST-MERGE (hub#1356).
+# Disparan, sí, pero por el camino BARATO: lo que cambió es la guardia, no el navegador.
+# Meterlos en la lista de arriba haría que un comentario del YAML se llevara
+# `cargo build` + `vite build` + playwright, ~20-40 min por nada.
+WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml"
 # Si no hay base contra la que diffear no se sabe qué toca el cambio. Para Rust el gate ya se
 # ensancha al workspace; aquí igual —pero solo si este repo TIENE web: ensanchar en un repo sin
 # `apps/web` no protegería nada y rompería cualquier push (no hay `package.json` que instalar).
@@ -506,6 +505,7 @@ web_touched=0
 if [ "$changed_known" != 1 ] && { [ -d apps/web ] || [ -f package.json ]; }; then
     web_touched=1
 fi
+web_light_touched=0
 if [ "$changed_known" = 1 ]; then
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
@@ -514,6 +514,9 @@ if [ "$changed_known" = 1 ]; then
         done
         for _n in $WEB_FILES; do
             [ "$_f" = "$_n" ] && web_touched=1
+        done
+        for _n in $WEB_LIGHT_FILES; do
+            [ "$_f" = "$_n" ] && web_light_touched=1
         done
     done <<EOF
 $changed_files
@@ -548,7 +551,40 @@ ensure_e2e_databases() {
 }
 
 run_web_stage() {
-    [ "$web_touched" = 1 ] || return 0
+    local web_tier=""
+    if [ "$web_touched" = 1 ]; then
+        web_tier=full
+    elif [ "$web_light_touched" = 1 ]; then
+        web_tier=light
+    else
+        return 0
+    fi
+
+    # Nivel LIGERO: solo lo que esos ficheros gobiernan de verdad. Node basta —la guardia
+    # usa únicamente builtins—, así que no hace falta `pnpm install` ni Postgres ni docker.
+    if [ "$web_tier" = light ]; then
+        if [ "${SKIP_HUB_WEB:-0}" = 1 ]; then
+            echo "⏭️  pre-push: SKIP_HUB_WEB=1 — la guardia web NO se ha corrido." >&2
+            WEB_SKIPPED=1
+            return 0
+        fi
+        local light_cmd
+        if [ -n "${HUB_GATE_WEB_LIGHT_CMD:-}" ]; then
+            light_cmd="$HUB_GATE_WEB_LIGHT_CMD"
+        else
+            light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
+                && bash scripts/tests/test-web-workflow.test.sh'
+        fi
+        echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
+        if ! eval "$light_cmd"; then
+            echo "" >&2
+            echo "❌ pre-push: la guardia de la tubería web está ROJA → push ABORTADO." >&2
+            return 1
+        fi
+        echo "✅ pre-push: guardia de la tubería web verde." >&2
+        return 0
+    fi
+
     local web_cmd
     if [ -n "${HUB_GATE_WEB_CMD:-}" ]; then
         web_cmd="$HUB_GATE_WEB_CMD"
@@ -917,43 +953,6 @@ if [ -f "$green" ]; then
 [ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
-
-# Bring up the Postgres the suite needs, unless the caller pinned the command
-# (the tests do) or already exported a DSN.
-# The local half of hub#526 (CI was hub#565). `postgres:18` ships with
-# `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
-# suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
-# ceiling and crashes whichever test passes by with `53200 out of shared memory`. Red tests that
-# have nothing to do with the diff, different each run — the most expensive flaky to diagnose.
-#
-# Raise the three settings (same as CI: 4096 / 300 / 512MB → ceiling ~1.2M) and restart, but ONLY
-# when the ceiling is still the low default. That keeps it idempotent: a container already raised
-# (a second push, or one that survived from a previous run) is not restarted, so this never adds
-# latency to the common path. `ALTER SYSTEM` needs a restart to take effect.
-raise_lock_limits() {
-    local current
-    current=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
-    # 6 400 is the stock ceiling (64 × 100). Anything already above it was raised before — skip.
-    if [ -n "$current" ] && [ "$current" -gt 6400 ] 2>/dev/null; then
-        return 0
-    fi
-    echo "pre-push: raising Postgres lock limits (hub#526) — was ${current:-?}, restarting $PG_CONTAINER…"
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;" >/dev/null
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;" >/dev/null
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';" >/dev/null
-    docker restart "$PG_CONTAINER" >/dev/null
-    local tries=0
-    until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
-        tries=$((tries + 1))
-        [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never came back after raising limits." >&2; return 1; }
-        sleep 1
-    done
-    local after
-    after=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
-    echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
-}
 
 # The module e2e — the ones that install the real modules — are the one place where "run what CI
 # ran" needs saying out loud, because `test-hub.yml` does NOT run them: the guard sees `CI=true`
