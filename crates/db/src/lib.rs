@@ -1675,6 +1675,54 @@ mod tests {
         assert_eq!(typed_second.rows[0]["id"], json!("b"));
     }
 
+    /// The SILENT face of the same bug, and the reason the fix is a blanket one: no `NULL` is
+    /// involved here at all. `build_query!` picks the Rust type from the JSON value — `i64` for
+    /// `180`, `f64` for `180.5` (see the bind loop above) — so one SQL text legitimately reaches
+    /// the same slot as two different types. With the statement cached, the second execution's 8
+    /// bytes of `f64` are decoded as the `int8` the first execution pinned: same width, so
+    /// Postgres raises NOTHING and stores the IEEE-754 bit pattern as a number.
+    ///
+    /// This is what rules out the narrower fix of "skip the cache only when a bind is `DynNull`":
+    /// it would leave this open, and this one does not announce itself (ERPlora/hub#1348).
+    #[tokio::test]
+    async fn int_bind_then_float_bind_on_the_same_sql_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch(
+            "CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost DOUBLE PRECISION);",
+        )
+        .await
+        .unwrap();
+
+        let sql = "INSERT INTO stock (id, hub_id, cost) VALUES (:id, :hub_id, \
+                   CAST(:cost AS DOUBLE PRECISION))";
+
+        db.execute(sql, &params(json!({ "id": "a", "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect("el bind entero debe insertar");
+
+        db.execute(sql, &params(json!({ "id": "b", "hub_id": "h1", "cost": 180.5 })))
+            .await
+            .expect("el bind decimal en la MISMA conexión debe insertar (hub#1348)");
+
+        let rows = db
+            .query(
+                "SELECT id, cost FROM stock WHERE hub_id = :hub_id ORDER BY id",
+                &params(json!({ "hub_id": "h1" })),
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 2, "las dos filas se insertaron: {rows:?}");
+        assert_eq!(rows[0]["cost"], json!(180.0), "la fila entera guarda 180");
+        assert_eq!(
+            rows[1]["cost"],
+            json!(180.5),
+            "la fila decimal guarda 180.5 y NO el patrón de bits reinterpretado como int8"
+        );
+    }
+
+
     #[test]
     fn portable_sql_normalizes_for_postgres() {
         let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
