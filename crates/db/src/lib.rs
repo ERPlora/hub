@@ -240,9 +240,17 @@ macro_rules! build_query {
         // binds as `DynNull` (OID 0, server-inferred from context) while a value binds as
         // int8/float8/text. Cache the first shape and the second is decoded against the wrong
         // type — `22P03 incorrect binary data format in bind parameter N` when the widths differ,
-        // and silently wrong data when they do not. Cost: Postgres re-parses the statement, on the
-        // UNNAMED one, so there is no extra roundtrip and no `Close` to send; the custom plan it
-        // yields is often better than the generic one a cached statement settles into.
+        // and silently wrong data when they do not.
+        //
+        // Cost, MEASURED and not assumed (during review of this fix; loopback Postgres 18, 400
+        // reps, pool pinned to one connection). An uncached statement is NOT free: sqlx's
+        // `prepare()` writes Parse+Describe, then flushes and AWAITS `ReadyForQuery` before it
+        // writes Bind/Execute, so every call pays a SECOND roundtrip that a cache hit does not.
+        // Point lookup 0.44 → 0.62 ms/query, list+join 0.72 → 1.00 ms, INSERT 0.57 → 0.70 ms:
+        // roughly +0.15…+0.28 ms, +24 %…+40 %. Accepted deliberately — it buys back a class of
+        // SILENT corruption of money and quantity fields, and a fraction of a millisecond per
+        // query is not where the POS spends its latency budget. What the flag does save is the
+        // `Close` on eviction: nothing is cached, so nothing is ever evicted.
         let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql)).persistent(false);
         for name in $names.iter() {
             q = match $params.get(name) {
@@ -1721,7 +1729,6 @@ mod tests {
             "la fila decimal guarda 180.5 y NO el patrón de bits reinterpretado como int8"
         );
     }
-
 
     #[test]
     fn portable_sql_normalizes_for_postgres() {
