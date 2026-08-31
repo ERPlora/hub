@@ -551,39 +551,43 @@ ensure_e2e_databases() {
 }
 
 run_web_stage() {
-    local web_tier=""
-    if [ "$web_touched" = 1 ]; then
-        web_tier=full
-    elif [ "$web_light_touched" = 1 ]; then
-        web_tier=light
-    else
+    if [ "$web_touched" != 1 ] && [ "$web_light_touched" != 1 ]; then
         return 0
     fi
 
     # Nivel LIGERO: solo lo que esos ficheros gobiernan de verdad. Node basta —la guardia
     # usa únicamente builtins—, así que no hace falta `pnpm install` ni Postgres ni docker.
-    if [ "$web_tier" = light ]; then
+    #
+    # 🔴 Corre SIEMPRE que el diff toque la tubería web, TAMBIÉN cuando además corre la
+    # etapa completa. No son excluyentes: la completa se para en `pnpm verify`, que
+    # incluye `no-dead-packages.test.mjs` pero NO `test-web-workflow.test.sh`, y
+    # `test-web.yml` perdió su `pull_request` (hub#1352). Con un `elif`, un diff que
+    # tocara `apps/web` Y el YAML —tocar la app y su workflow en el mismo commit es lo
+    # normal— dejaba el contrato del workflow sin correr NADIE antes del merge: el
+    # agujero de hub#1247/#1356 otra vez, por la puerta de al lado.
+    if [ "$web_light_touched" = 1 ]; then
         if [ "${SKIP_HUB_WEB:-0}" = 1 ]; then
             echo "⏭️  pre-push: SKIP_HUB_WEB=1 — la guardia web NO se ha corrido." >&2
             WEB_SKIPPED=1
-            return 0
-        fi
-        local light_cmd
-        if [ -n "${HUB_GATE_WEB_LIGHT_CMD:-}" ]; then
-            light_cmd="$HUB_GATE_WEB_LIGHT_CMD"
         else
-            light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
-                && bash scripts/tests/test-web-workflow.test.sh'
+            local light_cmd
+            if [ -n "${HUB_GATE_WEB_LIGHT_CMD:-}" ]; then
+                light_cmd="$HUB_GATE_WEB_LIGHT_CMD"
+            else
+                light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
+                    && bash scripts/tests/test-web-workflow.test.sh'
+            fi
+            echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
+            if ! eval "$light_cmd"; then
+                echo "" >&2
+                echo "❌ pre-push: la guardia de la tubería web está ROJA → push ABORTADO." >&2
+                return 1
+            fi
+            echo "✅ pre-push: guardia de la tubería web verde." >&2
         fi
-        echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
-        if ! eval "$light_cmd"; then
-            echo "" >&2
-            echo "❌ pre-push: la guardia de la tubería web está ROJA → push ABORTADO." >&2
-            return 1
-        fi
-        echo "✅ pre-push: guardia de la tubería web verde." >&2
-        return 0
     fi
+
+    [ "$web_touched" = 1 ] || return 0
 
     local web_cmd
     if [ -n "${HUB_GATE_WEB_CMD:-}" ]; then

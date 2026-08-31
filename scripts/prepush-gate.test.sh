@@ -1699,10 +1699,39 @@ errs=""
 #     creado (una máquina nueva, un worktree nuevo) llegaba a la línea. El hook está
 #     lleno de prosa con «—», «…» y «→», así que esto reaparece solo: la guardia mira
 #     el fichero entero, no esa línea.
-mb=$(grep -nP '\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]' "$HOOK" 2>/dev/null | head -3)
-[ -z "$mb" ] \
+#
+#     🔴 La guardia va en python3, NO en `grep -P`: el `grep` de macOS es BSD y NO
+#     tiene `-P`. Con `2>/dev/null` el «invalid option -- P» se tragaba, la variable
+#     salía vacía y el caso pasaba VERDE con el fallo delante — comprobado el 31/08
+#     con el mutante puesto (`restarting $PG_CONTAINER…`): 72/72, la guardia en
+#     verde. Los runners son Linux, así que en Actions sí cazaba; en el Mac donde
+#     empujan los ~19 worktrees, no. Una guardia que no corre no es una guardia, así
+#     que además EXIGE la marca de haber corrido: si no puede ejecutarse, es ROJO.
+mb=$(HOOK="$HOOK" python3 - 2>&1 <<'PY'
+import os, re
+hits = []
+with open(os.environ["HOOK"], encoding="utf-8") as fh:
+    for n, line in enumerate(fh, 1):
+        # `${VAR}` queda fuera solo: tras `$` viene `{`, que no abre un nombre.
+        for m in re.finditer(r"\$[A-Za-z_][A-Za-z0-9_]*", line):
+            nxt = line[m.end():m.end() + 1]
+            if nxt and ord(nxt) > 127:
+                hits.append("linea %d: %s" % (n, line.strip()[:100]))
+for h in hits[:3]:
+    print(h)
+print("GUARDIA-EJECUTADA")
+PY
+)
+errs=""
+case "$mb" in
+    *GUARDIA-EJECUTADA*) ;;
+    *) errs="la guardia NO se pudo ejecutar, y eso NO es un verde: $mb" ;;
+esac
+found=$(printf '%s\n' "$mb" | grep -v 'GUARDIA-EJECUTADA' | grep -v '^$')
+[ -z "$found" ] || errs="$errs usa \${VAR}: $found"
+[ -z "$errs" ] \
     && ok "hub#1375: ningún \$VAR queda pegado a un carácter multibyte (se lo tragaría el nombre)" \
-    || bad "hub#1375: ningún \$VAR queda pegado a un carácter multibyte (se lo tragaría el nombre)" "usa \${VAR}: $mb"
+    || bad "hub#1375: ningún \$VAR queda pegado a un carácter multibyte (se lo tragaría el nombre)" "$errs"
 
 # ── hub#1347: el hook consume scripts/ci/test-scope.py, no una copia suya ────
 # hub#1346 extrajo el resolutor de alcance a `scripts/ci/test-scope.py` para que
@@ -1873,6 +1902,34 @@ errs=""
 [ -z "$errs" ] \
     && ok "hub#1356: un cambio de apps/web sigue corriendo la etapa COMPLETA" \
     || bad "hub#1356: un cambio de apps/web sigue corriendo la etapa COMPLETA" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# (e) …y los DOS niveles no son excluyentes: un diff que toca `apps/web` Y el YAML
+#     tiene que correr TAMBIÉN el contrato ligero. `pnpm verify` —lo único que la
+#     etapa completa corre de la tubería— incluye `no-dead-packages.test.mjs` pero
+#     NO `test-web-workflow.test.sh`, y `test-web.yml` ya no tiene `pull_request`
+#     (hub#1352): en ese diff combinado el contrato del workflow no lo corría NADIE
+#     antes del merge. Es el agujero de hub#1247/#1356 otra vez, por la puerta de
+#     al lado — y tocar la app y su workflow en el mismo commit es lo normal.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/apps/web/src" "$repo/.github/workflows"
+echo "x" >> "$repo/apps/web/src/App.vue"
+echo "# retoque" >> "$repo/.github/workflows/test-web.yml"
+git -C "$repo" add -A >/dev/null 2>&1
+git -C "$repo" commit -qm "web + yaml en el mismo commit"
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBFULL; true" \
+    HUB_GATE_WEB_LIGHT_CMD="touch $repo/WEBLIGHT; true")
+errs=""
+[ "$code" = 0 ]         || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBFULL" ]  || errs="$errs no-corrio-la-etapa-completa"
+[ -f "$repo/WEBLIGHT" ] || errs="$errs el-contrato-del-workflow-NO-lo-corrio-nadie(pnpm-verify-no-lo-incluye)"
+[ -z "$errs" ] \
+    && ok "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" \
+    || bad "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
 
 echo
 echo "  $pass passed, $fail failed"
