@@ -93,9 +93,30 @@ set -uo pipefail
 # it WAS the module, and took the fetch path — whose `checkout -qf --detach
 # FETCH_HEAD` then ran against the pushing worktree, which is hub#1387 (the gate
 # leaves the worktree in detached HEAD on main). One cause, both symptoms.
+#
+# The list is NOT hand-maintained, because a hand-written one is exactly the
+# guard that rots: git considers FIFTEEN variables repository-local on 2.50.1
+# and `GIT_DIR` is only the one that bit us. `git -c <key>=<value> push` exports
+# `GIT_CONFIG_PARAMETERS` into this hook too — and `fleet-supervisor.sh` pushes
+# EVERY fleet branch with `git -c credential.helper='!gh auth git-credential'`,
+# so the config environment arrives here on every single push. An inherited
+# `url.<x>.insteadOf` rewrites where a clone connects and lands a tree that is
+# not the module: hub#1388 again, through a different door, identical symptom.
+# So git itself names the set (`git rev-parse --local-env-vars`, which needs no
+# repository and survives a bogus GIT_DIR) and it stays correct across upgrades.
+# The literal list below is the floor, and it is NOT the same set: it keeps the
+# two git does not name (`GIT_NAMESPACE`, the ref namespace, and
+# `GIT_QUARANTINE_PATH`, which receive-pack exports), and it does not carry the
+# seven git adds — the config trio plus GIT_IMPLICIT_WORK_TREE, GIT_GRAFT_FILE,
+# GIT_NO_REPLACE_OBJECTS, GIT_REPLACE_REF_BASE and GIT_SHALLOW_FILE. The two
+# lines are a union on purpose: the literal one still clears the variable that
+# actually bit us if `git` is not yet on PATH — the run dies on that a few lines
+# further down with a message that says so.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
       GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
       GIT_PREFIX GIT_QUARANTINE_PATH
+# shellcheck disable=SC2046  # word splitting is the point: these are NAMES
+unset $(git rev-parse --local-env-vars 2>/dev/null)
 
 DEST=""
 FLOOR=25
