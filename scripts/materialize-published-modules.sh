@@ -71,6 +71,32 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
+# ── 0 · Drop the INHERITED repository environment (hub#1388) ─────────────────
+# This script only ever talks to OTHER repositories — the module checkouts it
+# reads remotes from, and the cache trees it owns — so a repo-scoped git
+# variable inherited from the caller is never anything but poison here.
+#
+# It arrives on its own: `git push` FROM A WORKTREE exports
+# `GIT_DIR=<repo>/.git/worktrees/<name>` into the pre-push hook (measured on
+# git 2.50.1; a push from the MAIN checkout exports nothing, which is why this
+# never reproduced by hand and always reproduced on the fleet, which works only
+# out of worktrees). `GIT_DIR` OVERRIDES `git -C <dir>`, so `remote_for()` below
+# asked each module checkout for its origin and got the HUB's back
+# (`git@github:ERPlora/hub.git`) for all 27 ids — both of its branches read
+# correctly in isolation, which is precisely what made this so hard to see. The
+# hub was then cloned into all 27 directories, not one carried a module.json,
+# and every push with HUB_GATE_WITH_MODULES=1 aborted for the whole fleet while
+# the summary pointed at deploy keys that were never broken.
+#
+# The same inherited GIT_DIR is why the cache could not heal itself: hub#1385's
+# `tree_is_the_module` compared the hub's origin with the hub's origin, agreed
+# it WAS the module, and took the fetch path — whose `checkout -qf --detach
+# FETCH_HEAD` then ran against the pushing worktree, which is hub#1387 (the gate
+# leaves the worktree in detached HEAD on main). One cause, both symptoms.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
+      GIT_PREFIX GIT_QUARANTINE_PATH
+
 DEST=""
 FLOOR=25
 KEYS_DIR="${HUB_MODULE_KEYS_DIR:-${HOME:-}/.erplora/module-keys}"
@@ -320,7 +346,19 @@ for id in $ids; do
         fi
     fi
     if [ ! -f "$tree/module.json" ]; then
+        # The clone SUCCEEDED — so this is never an access problem, and saying
+        # so is the whole point (hub#1388): 27 of these in a row read as "I
+        # cannot reach the module repos" and sent two separate diagnoses into
+        # deploy keys that were perfectly fine. Recording the URL we actually
+        # cloned FROM is what makes the real cause visible in one line: when it
+        # says `…/hub.git`, the remote resolution is what is broken, not the key.
         say "   ⚠️  $id: '${BRANCH}' carries no module.json"
+        {
+            printf 'cloned from: %s\n' "$url"
+            printf "that clone worked, but '%s' has no module.json at its root,\n" "$BRANCH"
+            printf 'so this tree is NOT the module %s. A wrong remote URL or a\n' "$id"
+            printf 'stale cache directory — never a deploy key.\n'
+        } > "$log"
         failed="$failed $id"
         continue
     fi

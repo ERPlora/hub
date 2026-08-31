@@ -488,6 +488,87 @@ grep -qi 'cach\|derived\|deriv\|borrar\|delete\|rm -rf' "$OUT" \
     && ok "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" \
     || bad "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" "$errs out=$(tail -c 400 "$OUT")"
 
+# ── 16. hub#1388: the INHERITED git environment never decides what is cloned ──
+#    Root cause of hub#1388, and it is not a race (the first diagnosis) nor the
+#    id source. `git push` FROM A WORKTREE exports `GIT_DIR=<repo>/.git/worktrees/<name>`
+#    into the pre-push hook — a push from the main checkout does NOT, which is
+#    exactly why it never reproduced by hand and always reproduced on the fleet,
+#    which works only out of worktrees. `GIT_DIR` OVERRIDES `git -C <dir>`, so
+#    `remote_for()` asked the module checkout for its origin and got the HUB's
+#    (`git@github:ERPlora/hub.git`, SSH alias and all) for all 27 ids. Both
+#    branches of `remote_for` read correctly in isolation, which is what made
+#    this so hard to see: the poison is in the ENVIRONMENT, not the arguments.
+#    The hub was then cloned into all 27 directories, none carried a module.json,
+#    and every push with HUB_GATE_WITH_MODULES=1 died for the whole fleet.
+#    The same inherited GIT_DIR is why the cache never self-healed: hub#1385's
+#    `tree_is_the_module` compared the hub's origin against the hub's origin and
+#    said "yes, this is the module", taking the FETCH path — whose
+#    `checkout -qf --detach FETCH_HEAD` then ran against the pushing worktree
+#    (hub#1387: the gate leaves the worktree in detached HEAD on main).
+base=$(make_catalogue 26)
+OUT="$base/out"
+# A stand-in for the hub: a real bare repo whose content is NOT a module, so the
+# wrong clone SUCCEEDS and reproduces the observed symptom instead of an access
+# error. Its remote name is the one seen in the poisoned cache.
+hub_work="$base/build/hub"
+mkdir -p "$hub_work"
+git -C "$hub_work" init -q -b main
+git -C "$hub_work" config user.email hub@test
+git -C "$hub_work" config user.name hub
+echo '[workspace]' > "$hub_work/Cargo.toml"
+echo 'ARQUITECTURA' > "$hub_work/ARQUITECTURA.md"
+git -C "$hub_work" add -A
+git -C "$hub_work" commit -qm hub
+git init -q --bare "$base/origins/hub.git"
+git -C "$hub_work" remote add origin "$base/origins/hub.git"
+git -C "$hub_work" push -q origin main
+# …and the checkout the push comes from, whose git dir the hook inherits.
+git clone -q "$base/origins/hub.git" "$base/hubcheckout"
+code=$(
+    # Exactly what `git push` from a worktree exports, measured on git 2.50.1:
+    # GIT_DIR and nothing else. Setting GIT_WORK_TREE too would make `clone`
+    # fail outright ("working tree already exists") — a DIFFERENT symptom that
+    # would hide the one hub#1388 actually reported.
+    export GIT_DIR="$base/hubcheckout/.git"
+    bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25 >"$OUT" 2>&1
+    echo $?
+)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+wrong=0
+for i in $(seq 1 26); do
+    id=$(printf 'mod%02d' "$i")
+    [ "$(git -C "$base/dest/$id" remote get-url origin 2>/dev/null)" = "$base/origins/$id.git" ] \
+        || wrong=$((wrong + 1))
+done
+[ "$wrong" = 0 ] || errs="$errs $wrong-of-26-directories-do-not-carry-their-own-module-origin"
+[ -f "$base/dest/mod01/module.json" ] || errs="$errs mod01-has-no-module.json"
+[ -e "$base/dest/mod01/ARQUITECTURA.md" ] && errs="$errs the-hub-was-cloned-into-a-module-directory"
+[ -z "$errs" ] \
+    && ok "hub#1388: an inherited GIT_DIR does not redirect the clones at the hub" \
+    || bad "hub#1388: an inherited GIT_DIR does not redirect the clones at the hub" "$errs out=$(tail -c 600 "$OUT")"
+
+# ── 17. hub#1388: a tree that cloned fine but is NOT the module says so ───────
+#    The clone SUCCEEDS, so there is no access failure anywhere — yet the run
+#    ended with «Fix the access above» and sent two separate diagnoses into the
+#    deploy keys, which were never broken. A tree without a module.json is a
+#    LOCAL problem and has to name the URL it actually cloned from.
+base=$(make_catalogue 26)
+OUT="$base/out"
+# mod07's published main really carries no module.json: same shape, no network.
+git -C "$base/build/mod07" rm -q module.json
+git -C "$base/build/mod07" commit -qm "drop the manifest"
+git -C "$base/build/mod07" push -q origin main
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-without-a-manifest"
+grep -q 'mod07' "$OUT" || errs="$errs failure-does-not-name-the-module"
+grep -qi 'cach\|deriv\|rm -rf' "$OUT" || errs="$errs does-not-point-at-the-local-cache"
+grep -q "$base/origins/mod07.git" "$OUT" || errs="$errs does-not-say-which-url-it-cloned-from"
+[ -z "$errs" ] \
+    && ok "hub#1388: a manifest-less tree reports LOCAL and names the URL cloned" \
+    || bad "hub#1388: a manifest-less tree reports LOCAL and names the URL cloned" "$errs out=$(tail -c 600 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
