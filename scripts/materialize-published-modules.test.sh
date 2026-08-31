@@ -380,6 +380,114 @@ unset STUB_COUNTER STUB_FAIL_COUNT STUB_FAIL_MESSAGE STUB_REAL_GIT
     && ok "hub#1294: 'repository not found' fails immediately, with no retry" \
     || bad "hub#1294: 'repository not found' fails immediately, with no retry" "$errs out=$(tail -c 500 "$OUT")"
 
+# ── 13-15. La caché es COMPARTIDA: tiene que sanearse sola (hub#1380) ────────
+# El 2026-08-30 el gate murió para TODA la flota con los 27 módulos fallando a
+# la vez. Dos síntomas distintos, una sola causa: `fetch_existing_tree` hacía
+# `checkout` SIN `-f`, así que cualquier suciedad dentro de la caché abortaba el
+# checkout —y el `clean` que la habría quitado va DESPUÉS, o sea que no llegaba
+# a correr nunca—. La caché la comparten los ~19 worktrees del hub
+# (`STATE_DIR=$(git rev-parse --git-common-dir)/hub-gate`), así que que un
+# directorio quede sucio no es un accidente raro: es el estado normal.
+
+# ── 13. Un fichero tocado dentro de la caché se sanea solo ───────────────────
+#    Hoy: «error: Your local changes to the following files would be overwritten
+#    by checkout» y el gate queda muerto PARA SIEMPRE, porque nada lo limpia.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+publish_new_version "$base" mod01 3.1.4
+echo '{"id":"mod01","version":"DIRTY-local-edit"}' > "$base/dest/mod01/module.json"
+code2=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ]  || errs="$errs first-exit=$code"
+[ "$code2" = 0 ] || errs="$errs second-exit=$code2(la-cache-sucia-atasco-el-gate)"
+grep -q '"version":"3.1.4"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs cache-no-se-saneo(module.json=$(cat "$base/dest/mod01/module.json" 2>/dev/null))"
+[ -z "$(git -C "$base/dest/mod01" status --porcelain 2>/dev/null)" ] \
+    || errs="$errs la-cache-quedo-sucia-tras-el-saneo"
+[ -z "$errs" ] \
+    && ok "hub#1380: una caché con un fichero tocado se sanea sola en vez de atascar el gate" \
+    || bad "hub#1380: una caché con un fichero tocado se sanea sola en vez de atascar el gate" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 14. Un directorio que es OTRO repo se re-clona ───────────────────────────
+#    Los 27 directorios tenían dentro un clon DEL HUB (639 MB) con su árbol, y
+#    el checkout del módulo chocaba contra ficheros del hub que allí eran
+#    untracked. Un fetch encima de otro repo no se arregla nunca solo.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+rm -rf "$base/dest/mod01"
+mkdir -p "$base/dest/mod01"
+git -C "$base/dest/mod01" init -q -b main
+git -C "$base/dest/mod01" config user.email foreign@test
+git -C "$base/dest/mod01" config user.name foreign
+echo 'fn main() {}' > "$base/dest/mod01/hub-thing.rs"
+git -C "$base/dest/mod01" add hub-thing.rs
+git -C "$base/dest/mod01" commit -qm "soy otro repo"
+git -C "$base/dest/mod01" remote add origin "$base/origins/mod02.git"
+# untracked AQUÍ, pero versionados en el módulo: es lo que aborta el checkout.
+printf '{"id":"otro","version":"0.0.0"}\n' > "$base/dest/mod01/module.json"
+echo foreign > "$base/dest/mod01/marker"
+code2=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code2" = 0 ] || errs="$errs exit=$code2(un-repo-ajeno-en-la-cache-atasco-el-gate)"
+got_origin=$(git -C "$base/dest/mod01" remote get-url origin 2>/dev/null)
+[ "$got_origin" = "$base/origins/mod01.git" ] \
+    || errs="$errs no-se-re-clono(origin='$got_origin')"
+grep -q '"id":"mod01"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs la-cache-no-tiene-el-modulo-esperado"
+grep -q '"version":"2.0.0"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs no-quedo-en-la-version-publicada"
+[ -e "$base/dest/mod01/hub-thing.rs" ] && errs="$errs quedaron-restos-del-repo-ajeno"
+[ -z "$errs" ] \
+    && ok "hub#1380: un directorio de caché que es OTRO repo se re-clona solo" \
+    || bad "hub#1380: un directorio de caché que es OTRO repo se re-clona solo" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 15. El fallo dice DÓNDE está el problema ─────────────────────────────────
+#    Los dos fallos —«no llego al repo» y «la caché no sirve»— decían lo mismo:
+#    *fix the access (deploy key, ssh agent, network)*. Ahí es donde se pierde
+#    el tiempo: apunta al sitio equivocado en la mitad de los casos.
+base=$(make_catalogue 26)
+OUT="$base/out"
+rm -rf "$base/origins/mod07.git"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-con-un-modulo-inalcanzable"
+grep -qi 'deploy key\|ssh\|network\|acces' "$OUT" \
+    || errs="$errs un-fallo-de-ACCESO-no-menciona-el-acceso"
+[ -z "$errs" ] \
+    && ok "hub#1380: un fallo de ACCESO manda a mirar la llave/red" \
+    || bad "hub#1380: un fallo de ACCESO manda a mirar la llave/red" "$errs out=$(tail -c 400 "$OUT")"
+
+# …y el gemelo: un fallo LOCAL no puede mandar a mirar la red. Se fuerza con el
+# stub de git fallando el `fetch` con un error permanente que no es de acceso.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+mkdir -p "$base/bin"
+cat > "$base/bin/git" <<'STUB'
+#!/usr/bin/env bash
+for a in "$@"; do
+    if [ "$a" = "fetch" ]; then
+        printf 'error: cannot lock ref '"'"'refs/heads/main'"'"': Unable to create file: File exists\n' >&2
+        exit 128
+    fi
+done
+exec "$STUB_REAL_GIT" "$@"
+STUB
+chmod +x "$base/bin/git"
+export STUB_REAL_GIT="$REAL_GIT"
+code2=$(PATH="$base/bin:$PATH" HUB_MATERIALIZE_RETRY_DELAYS="0 0 0" \
+        run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+unset STUB_REAL_GIT
+errs=""
+[ "$code2" = 0 ] && errs="$errs exited-0-con-el-fetch-roto"
+grep -qi 'cach\|derived\|deriv\|borrar\|delete\|rm -rf' "$OUT" \
+    || errs="$errs un-fallo-LOCAL-no-dice-que-la-cache-se-puede-borrar"
+[ -z "$errs" ] \
+    && ok "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" \
+    || bad "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" "$errs out=$(tail -c 400 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

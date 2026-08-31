@@ -13,7 +13,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.githooks/pre-push"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOOK="$ROOT/.githooks/pre-push"
 ZERO=0000000000000000000000000000000000000000
 pass=0
 fail=0
@@ -996,6 +997,8 @@ resolver = "2"
 members = ["crates/a", "crates/b", "crates/c"]
 TOML
     mkdir -p "$dir/crates/a/src" "$dir/crates/b/src" "$dir/crates/c/src" "$dir/web"
+    mkdir -p "$dir/scripts/ci"
+    cp "$ROOT/scripts/ci/test-scope.py" "$dir/scripts/ci/test-scope.py"
     cat > "$dir/crates/a/Cargo.toml" <<'TOML'
 [package]
 name = "toy-a"
@@ -1630,6 +1633,303 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 [ "$code" = 0 ] \
     && ok "un revisor que peta no tumba el push" \
     || bad "un revisor que peta no tumba el push" "exit=$code(want 0)"
+
+# ── hub#1375: el gate llama a `raise_lock_limits` ANTES de definirla ─────────
+# `ensure_postgres` (que la llama) corre en el camino TEMPRANO —el diff solo-web,
+# alcance Rust `none`— mucho antes de que bash haya ejecutado la definición, que
+# vivía 440 líneas más abajo. El hook corre con `set -uo pipefail` y SIN `-e`, así
+# que no aborta nada: escupe `raise_lock_limits: command not found` y sigue. Un
+# fallo MUDO, y con él los límites de locks que la función sube (hub#526) se
+# quedan sin subir en ese camino.
+#
+# Es la misma familia que hub#1355 («ensure_postgres se define antes de su primer
+# uso»): allí se movió la función que fallaba y la que ella llama se quedó abajo.
+# Por eso van los dos controles: el SÍNTOMA (a) y el ORDEN (b), que caza la
+# familia entera aunque el camino cambie de sitio.
+
+# (a) El síntoma: un push solo-web no puede escupir `command not found`.
+#     Los otros casos de web pasan DATABASE_URL, con lo que `ensure_postgres`
+#     vuelve por la puerta de arriba y no llega nunca a la llamada — por eso este
+#     banco no lo cazó en su día. Aquí se deja vacía a propósito y se stubbea
+#     `docker` para que la función llegue hasta el final.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+dockerbin="${repo}-docker"; mkdir -p "$dockerbin"
+cat > "$dockerbin/docker" <<'DOCK'
+#!/usr/bin/env bash
+# `ps --format '{{.Names}}'` → el contenedor ya está arriba, así que ensure_postgres
+# se salta el run/start y cae directo en la llamada. Todo lo demás: mudo y OK.
+if [ "$1" = ps ]; then
+    for a in "$@"; do case "$a" in *Names*) echo erplora-test-pg-5433; exit 0 ;; esac; done
+    exit 0
+fi
+exit 0
+DOCK
+chmod +x "$dockerbin/docker"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$dockerbin:$PATH" DATABASE_URL= \
+    HUB_GATE_TEST_CMD="true" HUB_GATE_E2E_DB_CMD="true" HUB_GATE_WEB_CMD="true")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+grep -q 'raise_lock_limits: command not found' "$repo/.out" \
+    && errs="$errs la-llamada-muere-muda(command-not-found)"
+[ -z "$errs" ] \
+    && ok "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" \
+    || bad "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
+# (b) El orden, sobre el fichero: definida POR ENCIMA de su primera llamada.
+def_line=$(grep -n '^raise_lock_limits() {' "$HOOK" | head -1 | cut -d: -f1)
+call_line=$(grep -n '^[[:space:]]\+raise_lock_limits[[:space:]]*$' "$HOOK" | head -1 | cut -d: -f1)
+errs=""
+[ -n "$def_line" ]  || errs="$errs no-encuentro-la-definicion"
+[ -n "$call_line" ] || errs="$errs no-encuentro-la-llamada"
+[ -n "$def_line" ] && [ -n "$call_line" ] && [ "$def_line" -gt "$call_line" ] \
+    && errs="$errs definida-en-$def_line-pero-llamada-en-$call_line"
+[ -z "$errs" ] \
+    && ok "hub#1375: raise_lock_limits se define por encima de su primer uso" \
+    || bad "hub#1375: raise_lock_limits se define por encima de su primer uso" "$errs"
+
+# (c) `$VAR` pegado a un carácter multibyte se come el carácter DENTRO del nombre.
+#     bash 5.3 lee `$PG_CONTAINER…` como la variable `PG_CONTAINER…`, que no existe:
+#     con `set -u` eso NO es un aviso, es fatal — el hook muere y el push se aborta.
+#     Estuvo escondido porque `raise_lock_limits` vuelve antes por la puerta de arriba
+#     cuando el contenedor YA tiene los límites subidos; solo un contenedor RECIÉN
+#     creado (una máquina nueva, un worktree nuevo) llegaba a la línea. El hook está
+#     lleno de prosa con «—», «…» y «→», así que esto reaparece solo: la guardia mira
+#     el fichero entero, no esa línea.
+#
+#     🔴 La guardia va en python3, NO en `grep -P`: el `grep` de macOS es BSD y NO
+#     tiene `-P`. Con `2>/dev/null` el «invalid option -- P» se tragaba, la variable
+#     salía vacía y el caso pasaba VERDE con el fallo delante — comprobado el 31/08
+#     con el mutante puesto (`restarting $PG_CONTAINER…`): 72/72, la guardia en
+#     verde. Los runners son Linux, así que en Actions sí cazaba; en el Mac donde
+#     empujan los ~19 worktrees, no. Una guardia que no corre no es una guardia, así
+#     que además EXIGE la marca de haber corrido: si no puede ejecutarse, es ROJO.
+mb=$(HOOK="$HOOK" python3 - 2>&1 <<'PY'
+import os, re
+hits = []
+with open(os.environ["HOOK"], encoding="utf-8") as fh:
+    for n, line in enumerate(fh, 1):
+        # `${VAR}` queda fuera solo: tras `$` viene `{`, que no abre un nombre.
+        for m in re.finditer(r"\$[A-Za-z_][A-Za-z0-9_]*", line):
+            nxt = line[m.end():m.end() + 1]
+            if nxt and ord(nxt) > 127:
+                hits.append("linea %d: %s" % (n, line.strip()[:100]))
+for h in hits[:3]:
+    print(h)
+print("GUARDIA-EJECUTADA")
+PY
+)
+errs=""
+case "$mb" in
+    *GUARDIA-EJECUTADA*) ;;
+    *) errs="la guardia NO se pudo ejecutar, y eso NO es un verde: $mb" ;;
+esac
+found=$(printf '%s\n' "$mb" | grep -v 'GUARDIA-EJECUTADA' | grep -v '^$')
+[ -z "$found" ] || errs="$errs usa \${VAR}: $found"
+[ -z "$errs" ] \
+    && ok "hub#1375: ningún \$VAR queda pegado a un carácter multibyte (se lo tragaría el nombre)" \
+    || bad "hub#1375: ningún \$VAR queda pegado a un carácter multibyte (se lo tragaría el nombre)" "$errs"
+
+# ── hub#1347: el hook consume scripts/ci/test-scope.py, no una copia suya ────
+# hub#1346 extrajo el resolutor de alcance a `scripts/ci/test-scope.py` para que
+# `test-hub.yml` corriera los paquetes que una PR alcanza. El hook se quedó con
+# una copia INLINE de 66 líneas del mismo algoritmo. Dos copias del mismo
+# resolutor divergen solas, y cuando divergen el gate local y la nube dejan de
+# medir lo mismo sin que nadie se entere: el desfase no deja rojo en ningún sitio.
+
+# (a) No queda copia inline, y el fichero canónico se nombra.
+errs=""
+grep -q 'scripts/ci/test-scope.py' "$HOOK" || errs="$errs no-nombra-el-resolutor-canonico"
+grep -q "python3 -c '" "$HOOK"            && errs="$errs sigue-llevando-una-copia-inline"
+[ -z "$errs" ] \
+    && ok "hub#1347: el hook nombra scripts/ci/test-scope.py y no lleva copia inline" \
+    || bad "hub#1347: el hook nombra scripts/ci/test-scope.py y no lleva copia inline" "$errs"
+
+# (b) …y lo EJECUTA de verdad. Se sabotea el resolutor DEL REPO y el veredicto
+#     del hook tiene que venir de ahí. Sin esto, «nombra el fichero» lo cumple
+#     un comentario: es la comprobación que caza el positivo.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+cat > "$repo/scripts/ci/test-scope.py" <<'PY'
+import sys
+sys.stdin.read()
+print("workspace")
+print("VENGO-DE-SCRIPTS-CI-TEST-SCOPE")
+PY
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+grep -q 'VENGO-DE-SCRIPTS-CI-TEST-SCOPE' "$repo/.out" \
+    || errs="$errs el-veredicto-NO-sale-del-fichero-del-repo(sigue-la-copia-inline)"
+[ -z "$errs" ] \
+    && ok "hub#1347: el alcance lo decide el fichero del repo, no una copia dentro del hook" \
+    || bad "hub#1347: el alcance lo decide el fichero del repo, no una copia dentro del hook" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# (c) Si el resolutor NO está, se ensancha al workspace: es la degradación segura
+#     que el hook ya aplica a todo lo demás (metadata rota, python3 ausente). Un
+#     hook que muriera aquí pararía a la flota entera por un fichero movido.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+git -C "$repo" rm -q scripts/ci/test-scope.py
+git -C "$repo" commit -qm "sin resolutor"
+sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_SCOPE_POLICY=scoped \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true" HUB_GATE_WEB_CMD="true")
+errs=""
+[ "$code" = 0 ]      || errs="$errs exit=$code(want 0)"
+[ -f "$repo/RAN" ]   || errs="$errs no-corrio-la-suite"
+grep -q 'full workspace run' "$repo/.out" || errs="$errs no-se-ensancho-al-workspace"
+[ -z "$errs" ] \
+    && ok "hub#1347: sin resolutor en el repo, el gate se ensancha al workspace (nunca muere)" \
+    || bad "hub#1347: sin resolutor en el repo, el gate se ensancha al workspace (nunca muere)" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# ── hub#1356: el gate dispara la etapa web con LOS MISMOS ficheros que el YAML ─
+# `test-web.yml` perdió su trigger `pull_request` (hub#1352): la suite pesada se
+# mudó a este gate. Pero la lista del hook tenía TRES entradas menos que
+# `on.push.paths`, así que un push que solo tocara una de ellas no disparaba la
+# etapa web en local NI ningún check en la nube antes de mergear — la única red
+# que quedaba era el push a develop/main, o sea POST-MERGE. Es el defecto de
+# hub#1247 («una PR que solo toque la guardia no la ejecuta») reaparecido en local.
+#
+# El contrato estaba escrito solo en un comentario del hook, y un comentario no
+# falla cuando alguien cambia la lista de un lado.
+
+# (a) Toda entrada de `on.push.paths` está cubierta por el hook — y se dice CUÁL falta.
+mismatch=$(HOOK="$HOOK" ROOT="$ROOT" python3 - <<'PY'
+import os, re, sys
+hook = open(os.environ["HOOK"], encoding="utf-8").read()
+wf   = open(os.path.join(os.environ["ROOT"], ".github/workflows/test-web.yml"), encoding="utf-8").read()
+
+def hook_list(name):
+    m = re.search(r'^%s="([^"]*)"' % name, hook, re.M)
+    return m.group(1).split() if m else []
+
+prefixes = hook_list("WEB_PREFIXES")
+files    = hook_list("WEB_FILES") + hook_list("WEB_LIGHT_FILES")
+
+# on: → push: → paths:  (los comentarios dentro del bloque no cuentan)
+lines, paths, depth = wf.split("\n"), [], None
+inside = False
+for i, l in enumerate(lines):
+    if re.match(r"^\s*paths:\s*$", l) and re.search(r"^on:", "\n".join(lines[:i]), re.M):
+        # solo el bloque de push:
+        prev = [p for p in lines[:i] if p.strip() and not p.strip().startswith("#")]
+        if prev and re.match(r"^\s*push:\s*$", prev[-2] if len(prev) > 1 else ""):
+            inside, depth = True, len(l) - len(l.lstrip())
+            continue
+    if inside:
+        s = l.strip()
+        if not s or s.startswith("#"):
+            continue
+        ind = len(l) - len(l.lstrip())
+        if ind <= depth and not s.startswith("- "):
+            break
+        if s.startswith("- "):
+            paths.append(s[2:].strip().strip('"').strip("'"))
+
+missing = []
+for p in paths:
+    norm = p[:-3] if p.endswith("/**") else p
+    if norm + "/" in prefixes or norm in files:
+        continue
+    missing.append(p)
+if not paths:
+    print("NO-PUDE-LEER-on.push.paths")
+elif missing:
+    print("faltan-en-el-hook: " + " ".join(missing))
+PY
+)
+[ -z "$mismatch" ] \
+    && ok "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" \
+    || bad "hub#1356: la etapa web se dispara con los mismos ficheros que test-web.yml" "$mismatch"
+
+# (b) Tocar SOLO la guardia dispara la etapa — hoy no dispara nada.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" scripts/tests/no-dead-packages.test.mjs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBFULL; true" \
+    HUB_GATE_WEB_LIGHT_CMD="touch $repo/WEBLIGHT; true")
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
+{ [ -f "$repo/WEBLIGHT" ] || [ -f "$repo/WEBFULL" ]; } \
+    || errs="$errs tocar-la-guardia-no-disparo-NADA(el-agujero-de-hub#1247)"
+[ -z "$errs" ] \
+    && ok "hub#1356: un push que solo toca la guardia no-dead-packages SÍ la ejecuta" \
+    || bad "hub#1356: un push que solo toca la guardia no-dead-packages SÍ la ejecuta" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# (c) …pero por el camino BARATO: un retoque del YAML no puede arrastrar cargo
+#     build + vite build + playwright (~20-40 min). La profundidad va con lo que
+#     cambió; los disparadores, con el YAML.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" .github/workflows/test-web.yml)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBFULL; true" \
+    HUB_GATE_WEB_LIGHT_CMD="touch $repo/WEBLIGHT; true")
+errs=""
+[ "$code" = 0 ]         || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBLIGHT" ] || errs="$errs no-corrio-la-etapa-ligera"
+[ -f "$repo/WEBFULL" ]  && errs="$errs un-retoque-del-YAML-arrastro-playwright"
+[ -z "$errs" ] \
+    && ok "hub#1356: tocar el YAML corre la etapa LIGERA, no playwright" \
+    || bad "hub#1356: tocar el YAML corre la etapa LIGERA, no playwright" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# (d) La etapa completa sigue siendo la completa: apps/web NO se queda en ligera.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBFULL; true" \
+    HUB_GATE_WEB_LIGHT_CMD="touch $repo/WEBLIGHT; true")
+errs=""
+[ "$code" = 0 ]        || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBFULL" ] || errs="$errs un-cambio-de-apps/web-no-corrio-la-etapa-completa"
+[ -z "$errs" ] \
+    && ok "hub#1356: un cambio de apps/web sigue corriendo la etapa COMPLETA" \
+    || bad "hub#1356: un cambio de apps/web sigue corriendo la etapa COMPLETA" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# (e) …y los DOS niveles no son excluyentes: un diff que toca `apps/web` Y el YAML
+#     tiene que correr TAMBIÉN el contrato ligero. `pnpm verify` —lo único que la
+#     etapa completa corre de la tubería— incluye `no-dead-packages.test.mjs` pero
+#     NO `test-web-workflow.test.sh`, y `test-web.yml` ya no tiene `pull_request`
+#     (hub#1352): en ese diff combinado el contrato del workflow no lo corría NADIE
+#     antes del merge. Es el agujero de hub#1247/#1356 otra vez, por la puerta de
+#     al lado — y tocar la app y su workflow en el mismo commit es lo normal.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/apps/web/src" "$repo/.github/workflows"
+echo "x" >> "$repo/apps/web/src/App.vue"
+echo "# retoque" >> "$repo/.github/workflows/test-web.yml"
+git -C "$repo" add -A >/dev/null 2>&1
+git -C "$repo" commit -qm "web + yaml en el mismo commit"
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBFULL; true" \
+    HUB_GATE_WEB_LIGHT_CMD="touch $repo/WEBLIGHT; true")
+errs=""
+[ "$code" = 0 ]         || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBFULL" ]  || errs="$errs no-corrio-la-etapa-completa"
+[ -f "$repo/WEBLIGHT" ] || errs="$errs el-contrato-del-workflow-NO-lo-corrio-nadie(pnpm-verify-no-lo-incluye)"
+[ -z "$errs" ] \
+    && ok "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" \
+    || bad "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
 
 echo
 echo "  $pass passed, $fail failed"
