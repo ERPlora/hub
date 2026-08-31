@@ -1042,7 +1042,11 @@ resolve_modules_dir() {
         echo "❌ pre-push: the PUBLISHED module catalogue could not be materialised → push ABORTED." >&2
         echo "   HUB_GATE_WITH_MODULES=1 asks for the published catalogue; running the suite without it" >&2
         echo "   would skip the module e2e in silence and report a green that proved nothing (hub#1153)." >&2
-        echo "   Fix the access above, or push without HUB_GATE_WITH_MODULES for the usual CI parity." >&2
+        echo "   The materialiser above names WHICH side failed — ACCESS (key/ssh/network) or LOCAL" >&2
+        echo "   (a cache that is not the module: it is derived, so removing it is safe). Follow THAT" >&2
+        echo "   line: this message used to say «fix the access» whatever had happened, and hub#1380" >&2
+        echo "   and hub#1388 both lost hours in deploy keys that were never broken." >&2
+        echo "   Or push without HUB_GATE_WITH_MODULES for the usual CI parity." >&2
         return 1
     fi
     ERPLORA_MODULES_DIR="$resolved"

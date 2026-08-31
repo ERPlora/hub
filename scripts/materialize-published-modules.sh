@@ -71,6 +71,53 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
+# ── 0 · Drop the INHERITED repository environment (hub#1388) ─────────────────
+# This script only ever talks to OTHER repositories — the module checkouts it
+# reads remotes from, and the cache trees it owns — so a repo-scoped git
+# variable inherited from the caller is never anything but poison here.
+#
+# It arrives on its own: `git push` FROM A WORKTREE exports
+# `GIT_DIR=<repo>/.git/worktrees/<name>` into the pre-push hook (measured on
+# git 2.50.1; a push from the MAIN checkout exports nothing, which is why this
+# never reproduced by hand and always reproduced on the fleet, which works only
+# out of worktrees). `GIT_DIR` OVERRIDES `git -C <dir>`, so `remote_for()` below
+# asked each module checkout for its origin and got the HUB's back
+# (`git@github:ERPlora/hub.git`) for all 27 ids — both of its branches read
+# correctly in isolation, which is precisely what made this so hard to see. The
+# hub was then cloned into all 27 directories, not one carried a module.json,
+# and every push with HUB_GATE_WITH_MODULES=1 aborted for the whole fleet while
+# the summary pointed at deploy keys that were never broken.
+#
+# The same inherited GIT_DIR is why the cache could not heal itself: hub#1385's
+# `tree_is_the_module` compared the hub's origin with the hub's origin, agreed
+# it WAS the module, and took the fetch path — whose `checkout -qf --detach
+# FETCH_HEAD` then ran against the pushing worktree, which is hub#1387 (the gate
+# leaves the worktree in detached HEAD on main). One cause, both symptoms.
+#
+# The list is NOT hand-maintained, because a hand-written one is exactly the
+# guard that rots: git considers FIFTEEN variables repository-local on 2.50.1
+# and `GIT_DIR` is only the one that bit us. `git -c <key>=<value> push` exports
+# `GIT_CONFIG_PARAMETERS` into this hook too — and `fleet-supervisor.sh` pushes
+# EVERY fleet branch with `git -c credential.helper='!gh auth git-credential'`,
+# so the config environment arrives here on every single push. An inherited
+# `url.<x>.insteadOf` rewrites where a clone connects and lands a tree that is
+# not the module: hub#1388 again, through a different door, identical symptom.
+# So git itself names the set (`git rev-parse --local-env-vars`, which needs no
+# repository and survives a bogus GIT_DIR) and it stays correct across upgrades.
+# The literal list below is the floor, and it is NOT the same set: it keeps the
+# two git does not name (`GIT_NAMESPACE`, the ref namespace, and
+# `GIT_QUARANTINE_PATH`, which receive-pack exports), and it does not carry the
+# seven git adds — the config trio plus GIT_IMPLICIT_WORK_TREE, GIT_GRAFT_FILE,
+# GIT_NO_REPLACE_OBJECTS, GIT_REPLACE_REF_BASE and GIT_SHALLOW_FILE. The two
+# lines are a union on purpose: the literal one still clears the variable that
+# actually bit us if `git` is not yet on PATH — the run dies on that a few lines
+# further down with a message that says so.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
+      GIT_PREFIX GIT_QUARANTINE_PATH
+# shellcheck disable=SC2046  # word splitting is the point: these are NAMES
+unset $(git rev-parse --local-env-vars 2>/dev/null)
+
 DEST=""
 FLOOR=25
 KEYS_DIR="${HUB_MODULE_KEYS_DIR:-${HOME:-}/.erplora/module-keys}"
@@ -320,7 +367,19 @@ for id in $ids; do
         fi
     fi
     if [ ! -f "$tree/module.json" ]; then
+        # The clone SUCCEEDED — so this is never an access problem, and saying
+        # so is the whole point (hub#1388): 27 of these in a row read as "I
+        # cannot reach the module repos" and sent two separate diagnoses into
+        # deploy keys that were perfectly fine. Recording the URL we actually
+        # cloned FROM is what makes the real cause visible in one line: when it
+        # says `…/hub.git`, the remote resolution is what is broken, not the key.
         say "   ⚠️  $id: '${BRANCH}' carries no module.json"
+        {
+            printf 'cloned from: %s\n' "$url"
+            printf "that clone worked, but '%s' has no module.json at its root,\n" "$BRANCH"
+            printf 'so this tree is NOT the module %s. A wrong remote URL or a\n' "$id"
+            printf 'stale cache directory — never a deploy key.\n'
+        } > "$log"
         failed="$failed $id"
         continue
     fi
