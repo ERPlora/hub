@@ -8,6 +8,11 @@
 // Flujo: `kitchen.order.created` → líneas de la comanda (cada una arrastra el destino de SU
 // estación) → una hoja por ROL de impresora → puerta global `erplora.print` (lib/print.ts).
 //
+// La cabecera de esa hoja lleva la etiqueta de sala, la ronda y —desde hub#1410— **quién disparó
+// la ronda**: cocina tiene que saber a quién llamar cuando un plato sale mal o va tarde, sin
+// buscar a nadie por la sala. El id viaja opaco en la comanda y el nombre lo resuelve `waiterName`
+// contra `hub.users.list`, igual que la tarjeta del KDS (kitchen#63, ADR-0192).
+//
 // Dos reglas que no son negociables, las dos por lo mismo (un bar lleno):
 //  - **Nunca bloquea.** La comanda ya está en la BD y el KDS es la fuente de verdad; el papel es
 //    una copia. Si la impresora falla se avisa y se puede reimprimir, pero el camarero sigue.
@@ -155,6 +160,7 @@ export async function onKitchenOrderCreated(
   const label = str(header?.label);
   const roundNumber = num(header?.round_number ?? 1);
   const orderNumber = str(header?.order_number);
+  const waiter = await waiterName(client, header);
 
   // El aviso va ANTES de la comprobación de hojas y ANTES de imprimir, a propósito:
   //  - antes de las hojas, porque una comanda de SOLO PANTALLA no genera ninguna y es justo el
@@ -187,6 +193,10 @@ export async function onKitchenOrderCreated(
           receipt_id: orderNumber,
           label,
           round_number: roundNumber,
+          // Solo cuando hay nombre que poner: el renderizador ESC/POS omite la línea si el campo
+          // no viene (`is_truthy(data, "waiter")`), y una app vieja ignora la clave que no conoce
+          // — la hoja de siempre se sigue imprimiendo igual.
+          ...(waiter ? { waiter } : {}),
           items: group.items,
         },
       });
@@ -205,6 +215,36 @@ export async function onKitchenOrderCreated(
       });
     }
   }
+}
+
+/**
+ * El NOMBRE de quien disparó la ronda, o `''` cuando no hay ninguno que poner (hub#1410, recorte
+ * de kitchen#63).
+ *
+ * Cocina lo necesita para saber **a quién llamar** cuando un plato sale mal, va tarde o le falta
+ * algo, sin salir a buscar a nadie por la sala; es lo que Toast, Square for Restaurants y
+ * Lightspeed imprimen en la cabecera del chit. En pantalla ya estaba (la tarjeta del KDS lo pinta
+ * desde kitchen#63); en el papel no salía porque su productor es este, no el módulo.
+ *
+ * El `waiter_id` de la comanda es **opaco**: `kitchen` no une con `hub_user` a propósito (ADR-0192
+ * — el nombre es presentación y no debe atar el pase a la forma de las tablas del core), así que
+ * lo resuelve el consumidor por `hub.users.list`. Misma puerta y misma política que la tarjeta.
+ *
+ * `''` cubre tres casos y los tres imprimen lo mismo —nada—: la ronda no trae camarero (comanda
+ * vieja, disparo sin sesión), el hub ya no lista ese id (alguien que dejó el turno), o la lista no
+ * se pudo cargar. Un UUID en el papel sería PEOR que el hueco: el cocinero lo lee a dos metros, no
+ * puede usarlo y deja de fiarse de la cabecera.
+ *
+ * Sin `waiter_id` no se pregunta: sería una consulta más por cada comanda a cambio de nada.
+ */
+async function waiterName(client: ErploraClient, header: Record<string, unknown> | undefined): Promise<string> {
+  const waiterId = str(header?.waiter_id);
+  if (!waiterId) return '';
+  const users = await client
+    .query<{ id?: unknown; name?: unknown }[]>('hub.users.list')
+    .catch(() => [] as { id?: unknown; name?: unknown }[]);
+  const user = (Array.isArray(users) ? users : []).find((u) => u && str(u.id) === waiterId);
+  return str(user?.name).trim();
 }
 
 function orderIdOf(payload: unknown): string | undefined {
