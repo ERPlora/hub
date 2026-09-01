@@ -401,6 +401,19 @@ mod tests {
         }
     }
 
+    /// hub#1403: the split moved `system_params` into this module, but its crate-root path is
+    /// kernel contract — `tests/kernel_contract_engine.rs` freezes the `:name` binds of the 27
+    /// published modules by calling `erplora_runtime::system_params` directly. This pins the
+    /// re-export: if a future cleanup drops it, this fails to compile/behave instead of the
+    /// contract test silently testing a copy.
+    #[test]
+    fn hub1403_system_params_stays_reachable_at_the_crate_root() {
+        let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let p = crate::system_params(&Params::new(), &ctx);
+        assert_eq!(p["hub_id"], json!("h1"));
+        assert_eq!(p["timezone"], json!("UTC"));
+    }
+
     /// hub#1022/hub#1098: `:timezone`/`:caller_lang` llegan SIEMPRE con un valor bindeable — el
     /// resuelto por el dispatcher si pasó por ahí, y si no, los fallbacks DOCUMENTADOS (`UTC`, el
     /// reloj que correrá de todos modos; `es`, el default del core que taxes#40 fijó como tal).
