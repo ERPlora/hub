@@ -180,6 +180,37 @@ impl Runtime {
         self.registry.native.insert(module_id.to_string(), handler);
     }
 
+    /// What every INSTALLED native engine still owes an external authority — how much and
+    /// since when (hub#1406). One entry per installed engine that ANSWERED:
+    /// `Some(obligation)` = it owes work; `None` = it owes nothing and SAYS so (the caller
+    /// can report an honest zero). An engine whose queue cannot be read is skipped — «I
+    /// don't know» must reach the caller as an absence, never as a fabricated zero.
+    ///
+    /// Per engine this is the SAME question the retention gate asks before an uninstall
+    /// ([`NativeHandler::pending_obligations`], hub#314): one source, so the fleet alert
+    /// and the refusal can never disagree. Sorted by module id: the report is wire-bound.
+    pub async fn pending_obligations(&self) -> Vec<(String, Option<native::PendingObligation>)> {
+        let mut report = Vec::new();
+        for (module_id, engine) in &self.registry.native {
+            if !self.registry.is_installed(module_id) {
+                continue;
+            }
+            let host = native::DbHost {
+                db: self.db.as_ref(),
+                storage: None,
+                hub_id: &self.hub_id,
+                module_id,
+                static_folder: None,
+            };
+            match engine.pending_obligations(&self.hub_id, &host).await {
+                Ok(answer) => report.push((module_id.clone(), answer)),
+                Err(_) => {}
+            }
+        }
+        report.sort_by(|a, b| a.0.cmp(&b.0));
+        report
+    }
+
     /// Menú dinámico de los módulos **activos** (lo consume el shell). ARQUITECTURA.md §7.7.
     pub fn navigation(&self) -> Vec<NavEntry> {
         self.registry
@@ -207,5 +238,101 @@ mod tests {
         assert!(!rt.is_demo_hub());
         rt.set_demo_hub(true);
         assert!(rt.is_demo_hub());
+    }
+
+    #[derive(Debug)]
+    struct OwingEngine;
+
+    #[async_trait::async_trait]
+    impl native::NativeHandler for OwingEngine {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn native::NativeHost,
+        ) -> Result<erplora_wasm_host::Output> {
+            Err(RuntimeError::Native("not exercised by this test".into()))
+        }
+        async fn pending_obligations(
+            &self,
+            _hub_id: &str,
+            _host: &dyn native::NativeHost,
+        ) -> Result<Option<native::PendingObligation>> {
+            Ok(Some(native::PendingObligation {
+                count: 3,
+                oldest_pending_at: Some("2026-08-30T08:00:00Z".to_string()),
+                code: "testregime.unsent_records".to_string(),
+                message: "3 record(s) still owed to the authority".to_string(),
+            }))
+        }
+    }
+
+    #[derive(Debug)]
+    struct SettledEngine;
+
+    #[async_trait::async_trait]
+    impl native::NativeHandler for SettledEngine {
+        async fn call(
+            &self,
+            _function: &str,
+            _input: &Json,
+            _host: &dyn native::NativeHost,
+        ) -> Result<erplora_wasm_host::Output> {
+            Err(RuntimeError::Native("not exercised by this test".into()))
+        }
+        // Default `pending_obligations` → Ok(None): owes nothing, and SAYS so.
+    }
+
+    fn installed(id: &str) -> manifest::Manifest {
+        serde_json::from_str(&format!(
+            r#"{{"id":"{id}","name":"{id}","version":"1.0.0"}}"#
+        ))
+        .expect("minimal manifest parses")
+    }
+
+    /// hub#1406: the heartbeat asks the REGISTRY, not a concrete engine — «which
+    /// installed engines owe work to an external authority, how much and since
+    /// when?». Same per-engine question as the uninstall gate (hub#314): one
+    /// source, so the alert and the refusal can never disagree.
+    ///
+    /// Three engines pin the three answers: one owes (count + since-when), one
+    /// answers an honest «nothing» (`Ok(None)` — reported, so the caller can send
+    /// a real 0 instead of an absence), and one is registered but NOT installed
+    /// (the host bakes engines in even when this hub lacks the module) — silent.
+    #[tokio::test]
+    async fn hub1406_pending_obligations_are_asked_generically_to_the_registry() {
+        let mut rt = Runtime::new(Box::new(fresh_db().await));
+        rt.register_native("testregime", Arc::new(OwingEngine));
+        rt.register_native("quietregime", Arc::new(SettledEngine));
+        rt.register_native("ghostregime", Arc::new(OwingEngine));
+        rt.registry.installed.push(installed("testregime"));
+        rt.registry.installed.push(installed("quietregime"));
+
+        let report = rt.pending_obligations().await;
+
+        assert_eq!(
+            report.len(),
+            2,
+            "exactly the two INSTALLED engines answer: {report:?}"
+        );
+        let owing = report
+            .iter()
+            .find(|(id, _)| id == "testregime")
+            .expect("the owing engine is reported");
+        let obligation = owing.1.as_ref().expect("it owes work");
+        assert_eq!(obligation.count, 3);
+        assert_eq!(
+            obligation.oldest_pending_at.as_deref(),
+            Some("2026-08-30T08:00:00Z"),
+            "since-when travels with the count (hub#326)"
+        );
+        let quiet = report
+            .iter()
+            .find(|(id, _)| id == "quietregime")
+            .expect("an installed engine that owes nothing is still REPORTED");
+        assert!(
+            quiet.1.is_none(),
+            "owing nothing is an honest answer, not an absence"
+        );
     }
 }

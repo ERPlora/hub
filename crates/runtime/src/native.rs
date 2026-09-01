@@ -140,6 +140,11 @@ pub struct PendingObligation {
     /// How many units are still owed. The operator is told this number, so it must be the same
     /// one the module's own UI shows (for `verifactu`: the pending-records KPI).
     pub count: u64,
+    /// Since when the OLDEST unit has been owed (RFC 3339), if the engine knows. The daily
+    /// heartbeat forwards it to the SaaS next to the count (hub#326 / hub#1406): a fleet panel
+    /// that only sees «how many» cannot tell a hiccup from a hub that stopped remitting weeks
+    /// ago. `None` when nothing is owed or the engine cannot date it.
+    pub oldest_pending_at: Option<String>,
     /// Stable domain code, `<module>.<snake_case>` in the engine's OWN namespace — same public
     /// ABI as `expect_rows` (hub#139). The UI programs and translates against it.
     pub code: String,

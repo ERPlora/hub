@@ -1361,6 +1361,7 @@ mod retention_gate_tests {
         ) -> Result<Option<PendingObligation>> {
             Ok((self.count > 0).then(|| PendingObligation {
                 count: self.count,
+                oldest_pending_at: None,
                 code: self.code.to_string(),
                 message: format!("{} record(s) still unsent", self.count),
             }))
