@@ -1,0 +1,941 @@
+//! Module install/update/version/asset HTTP handlers — split out of `lib.rs` verbatim (hub#1404).
+
+use crate::*;
+
+#[derive(Deserialize)]
+pub(crate) struct RequestInstallReq {
+    module_id: String,
+    #[serde(default)]
+    version: String,
+}
+
+/// POST /api/modules/request-install — flujo real Cloud→descarga→runtime (ARQUITECTURA.md §2.2).
+/// Auth = JWT del usuario + `X-Hub-Id` de las cabeceras. Tras instalar, emite el evento
+/// `module.installed` por `/ws` y prepara la ingestión de embeddings (vía Cloud, pendiente §9.3).
+pub(crate) async fn request_install(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RequestInstallReq>,
+) -> Response {
+    // La credencial de máquina sirve para que ESTE Hub hable con Cloud, no para autorizar al
+    // navegador. Exigimos primero la sesión local de un owner/admin: de lo contrario cualquier
+    // módulo web same-origin podría disparar instalaciones usando indirectamente el token del Hub.
+    {
+        let rt = st.runtime.read().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    // Hub-scoped: token de máquina si el hub está enrolado; si no, JWT del usuario.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+
+    // Progreso por fases → WS `module.install.progress` (feedback visual del marketplace).
+    // `module_id` = módulo en curso (puede ser una dep anidada); `root_id` = el pedido por el
+    // usuario, para que el frontend actualice la card correcta aunque esté migrando una dep.
+    let progress_state = st.clone();
+    let root_id = req.module_id.clone();
+    let on_progress = move |module_id: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": module_id,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
+    let mut rt = st.runtime.write().await;
+    let result = install::install_from_cloud(
+        &st.http,
+        &st.config.cloud_base_url,
+        &st.config.module_cache,
+        &auth,
+        &mut rt,
+        &req.module_id,
+        &req.version,
+        &on_progress,
+        &st.config.signature_policy(),
+    )
+    .await;
+
+    match result {
+        Ok(installed) => {
+            let chunks = ingest::collect_chunks(rt.registry(), &installed.module_id);
+            drop(rt);
+            index_module_embeddings(&st, &auth, &installed.module_id, &installed.version, chunks)
+                .await;
+
+            // Evento WS con la forma exacta del contrato del frontend.
+            st.broadcast(json!({ "type": "module.installed", "module_id": installed.module_id }));
+
+            Json(json!({
+                "ok": true,
+                "module_id": installed.module_id,
+                "version": installed.version,
+                "status": "installed",
+                // hub#1130: dependencies the install-plan/manifest resolution dragged in that
+                // were NOT installed before this call. Always present — empty when nothing was
+                // dragged in — so the caller never has to special-case the shape.
+                "also_installed": installed.also_installed,
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            // Observabilidad (antes: 502 ciego sin log → invisible en Dokploy). Logueamos el error
+            // real y mapeamos a un código honesto: un fallo instalando en el runtime (deps sin
+            // satisfacer tras la resolución anidada = ciclo, migración, schema) NO es un 502 de
+            // gateway. Así el operador distingue "fallo del Cloud/red" de "fallo instalando el módulo".
+            tracing::error!(
+                module_id = %req.module_id,
+                requested_version = %req.version,
+                error = %e,
+                "request-install falló"
+            );
+            install_error_response(&e)
+        }
+    }
+}
+
+/// Ingestión de embeddings (§9.6): recoge el texto agéntico del módulo (`agent.description` +
+/// `ai.description` de queries/commands), lo embebe **vía el proxy del Cloud** (§9.3 — el Hub nunca
+/// llama a un proveedor de embeddings directamente) y lo registra en el índice vectorial para el
+/// routing de tools (§9.2b).
+///
+/// Best-effort: un fallo aquí NO aborta nada (el módulo ya está instalado y operativo; el router
+/// degrada a "todos"). Corre también tras un **update** (hub#516): la versión nueva puede describir
+/// tools distintas, y un índice que se queda con el texto de la versión anterior enruta a ciegas.
+pub(crate) async fn index_module_embeddings(
+    st: &AppState,
+    auth: &cloud_client::Auth,
+    module_id: &str,
+    version: &str,
+    chunks: Vec<ingest::PendingChunk>,
+) {
+    if chunks.is_empty() {
+        return;
+    }
+    let Some(store) = &st.vector else {
+        tracing::info!(module_id = %module_id, chunks = chunks.len(), "sin índice vectorial; ingestión de embeddings omitida (§9.5)");
+        return;
+    };
+    let embedder =
+        embed::CloudEmbedder::new(st.http.clone(), &st.config.cloud_base_url, auth.clone());
+    match embed::index_chunks(&embedder, store.as_ref(), &st.hub_id(), version, &chunks).await {
+        Ok(n) => tracing::info!(module_id = %module_id, chunks = n, "embeddings indexados (§9.6)"),
+        Err(e) => {
+            tracing::warn!(module_id = %module_id, error = %e, "ingestión de embeddings falló (no crítico; router degrada)")
+        }
+    }
+}
+
+/// Cuerpo (opcional) de `POST /api/modules/:id/update`. Sin `version` = **la última**, que es lo
+/// que se ofrece por defecto; con `version` = la que se eligió (palanca de soporte).
+///
+/// Elegir una versión concreta **no la clava**: el arranque siguiente vuelve a resolver la última
+/// (ADR-0269 — nadie se queda atrás). Clavar es el **pin de soporte**, herramienta nuestra, y no se
+/// toca desde aquí.
+#[derive(Deserialize, Default)]
+pub(crate) struct UpdateModuleReq {
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// **Actualiza un módulo sin reiniciar el contenedor** (hub#675 + hub#516).
+///
+/// Es lo que hace que un fix de módulo **no espere a una imagen nueva del hub**: los módulos solo se
+/// recogían al arrancar, y `rollout_hub_fleet` excluye a los hubs que ya están en la imagen
+/// objetivo, así que no había campaña que provocase el reinicio.
+///
+/// Va por [`install::update_from_cloud`] y **no** por `install_from_cloud`, y la diferencia no es
+/// cosmética: con el plan del Cloud (ADR-0060) el módulo que ya está instalado viaja en el set
+/// instalado, vuelve como `already_satisfied` y `execute_plan` lo **salta** — el update habría dicho
+/// que sí sin descargar nada. La puerta de update lo excluye del set y no lo salta.
+///
+/// **Si la versión nueva falla, la anterior sigue puesta**, y por dos caminos que se componen: el
+/// runtime repone en memoria lo que el módulo aportaba (hub#516, `Registry::snapshot_module`), y
+/// encima `update_with_fallback` confirma reinstalando la que había. `Outcome::Lost` queda para lo
+/// que de verdad lo es: que ni siquiera eso valga y el hub se quede sin el módulo.
+///
+/// Auth = **sesión local de admin** *más* credencial hub-scoped, igual que `request-install`. La
+/// sesión no es un detalle: sin ella, cualquier módulo web same-origin podría disparar
+/// actualizaciones usando indirectamente el token de máquina del hub.
+pub(crate) async fn update_module(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+    body: Option<Json<UpdateModuleReq>>,
+) -> Response {
+    use erplora_runtime::module_update::{update_with_fallback, Outcome};
+
+    {
+        let rt = st.runtime.read().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    // Mismo motivo que en `proxy_marketplace_module` (hub#1134): este id acaba dentro de las URLs
+    // del Cloud (`versions/`, `download/`) que se firman con el token de máquina.
+    if !module_id_is_safe(&module_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "module.invalid_id", "message": "invalid module id" },
+            })),
+        )
+            .into_response();
+    }
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "ok": false, "error": "hub sin credencial (ni token de máquina ni Authorization: Bearer)" })),
+        )
+            .into_response();
+    };
+
+    // La versión que tiene ahora: es a la que hay que volver si la nueva falla.
+    let installed = {
+        let rt = st.runtime.read().await;
+        rt.registry().module_version(&module_id)
+    };
+    if !st.runtime.read().await.registry().is_installed(&module_id) {
+        return install_error_response(&install::InstallError::NotInstalled(module_id));
+    }
+
+    // Vacío / `latest` = lo que el resolutor decida (el MISMO del arranque: cuarentena y pin
+    // mandan, nunca hacia atrás). Se resuelve AQUÍ, antes de tocar nada, porque el destino tiene que
+    // ser una versión concreta: es la que se compara con la instalada para saber si hay algo que
+    // hacer, y la que se reporta como `from → to`.
+    let requested = body
+        .map(|Json(b)| b)
+        .unwrap_or_default()
+        .version
+        .unwrap_or_default();
+    let target = {
+        let rt = st.runtime.read().await;
+        install::resolve_update_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &rt,
+            &module_id,
+            &requested,
+        )
+        .await
+    };
+
+    // Mismas fases que instalar (`resolving → downloading → verifying → installing`): la card del
+    // catálogo ya sabe pintarlas, así que actualizar se ve igual de vivo que instalar.
+    let progress_state = st.clone();
+    let root_id = module_id.clone();
+    let on_progress = move |current: &str, phase: &str| {
+        progress_state.broadcast(json!({
+            "type": "module.install.progress",
+            "module_id": current,
+            "root_id": root_id,
+            "phase": phase,
+        }));
+    };
+
+    // El fallo del PRIMER intento se guarda entero, no como texto: un plan `blocked` (dependencia
+    // premium sin comprar) o un `NotInstalled` son decisiones que le tocan al usuario, con su código
+    // y su puntero de compra — convertirlos en «no se pudo, sigues en la anterior» perdería la única
+    // información accionable que llevan.
+    let first_error: std::sync::Arc<std::sync::Mutex<Option<install::InstallError>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
+
+    // `update_with_fallback` compara `from`/`to` y decide la secuencia; la instalación real la pone
+    // este closure. Pedir la versión de partida es barato: `update_from_cloud` ve `to == from` y no
+    // descarga nada, así que la vuelta atrás confirma sin repetir trabajo.
+    let outcome = update_with_fallback(&installed, &target, |version| {
+        let st = st.clone();
+        let auth = auth.clone();
+        let module_id = module_id.clone();
+        let on_progress = &on_progress;
+        let first_error = first_error.clone();
+        async move {
+            let mut rt = st.runtime.write().await;
+            let result = install::update_from_cloud(
+                &st.http,
+                &st.config.cloud_base_url,
+                &st.config.module_cache,
+                &auth,
+                &mut rt,
+                &module_id,
+                &version,
+                on_progress,
+                &st.config.signature_policy(),
+            )
+            .await;
+            match result {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    let message = e.to_string();
+                    first_error.lock().unwrap().get_or_insert(e);
+                    Err(message)
+                }
+            }
+        }
+    })
+    .await;
+
+    // Lo que el dueño verá mañana en Sistema → Actualizaciones (hub#564). Se anota AQUÍ, con el
+    // resultado en la mano: el estado actual del hub no se puede restar de sí mismo para deducir
+    // una transición, así que si no se escribe cuando ocurre, no existe. Misma decisión que el
+    // arranque (`from_module_outcome`), y `AlreadyThere` no escribe nada porque no cambió nada.
+    // Best-effort: no poder anotar el historial no convierte una actualización buena en un error.
+    {
+        let rt = st.runtime.read().await;
+        let module_name = rt
+            .registry()
+            .installed
+            .iter()
+            .find(|m| m.id == module_id)
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| module_id.clone());
+        if let Some(change) =
+            erplora_runtime::update_history::from_module_outcome(&module_id, &module_name, &target, &outcome)
+        {
+            if let Err(e) =
+                erplora_runtime::update_history::record(rt.db(), &st.hub_id(), change).await
+            {
+                tracing::warn!(module_id = %module_id, error = %e, "no se pudo anotar el historial de actualización (hub#564)");
+            }
+        }
+    }
+
+    // Un fallo con decisión del usuario detrás (409 `install_blocked`, 404 `update_not_installed`)
+    // se cuenta como lo que es, no como «no se pudo».
+    if !matches!(outcome, Outcome::Updated { .. } | Outcome::AlreadyThere(_)) {
+        if let Some(e) = first_error.lock().unwrap().as_ref() {
+            if matches!(
+                e,
+                install::InstallError::Blocked { .. } | install::InstallError::NotInstalled(_)
+            ) {
+                return install_error_response(e);
+            }
+        }
+    }
+
+    match outcome {
+        Outcome::AlreadyThere(version) => {
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "version": version, "updated": false } })).into_response()
+        }
+        Outcome::Updated { from, to } => {
+            // La versión nueva puede describir tools distintas: un índice que se queda con el texto
+            // de la anterior enruta a ciegas.
+            let chunks = {
+                let rt = st.runtime.read().await;
+                ingest::collect_chunks(rt.registry(), &module_id)
+            };
+            index_module_embeddings(&st, &auth, &module_id, &to, chunks).await;
+            // Lo único que el dueño ve de toda la maquinaria (ADR-0269 §3.5): qué cambió y de qué
+            // versión a cuál. `module.installed` va detrás porque es el evento que el shell YA
+            // escucha (App.vue) para refrescar entitlement + nav.
+            st.broadcast(json!({
+                "type": "module.updated",
+                "module_id": module_id,
+                "from": from,
+                "to": to,
+            }));
+            st.broadcast(json!({ "type": "module.installed", "module_id": module_id }));
+            Json(json!({ "ok": true, "data": { "module_id": module_id, "from": from, "version": to, "updated": true } })).into_response()
+        }
+        // 200, no 5xx: la actualización no salió, pero **el módulo sigue funcionando**. Devolver un
+        // error haría pensar que el hub se quedó tocado, y no es el caso.
+        Outcome::RolledBack { stayed_on, error } => Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "version": stayed_on, "updated": false },
+            "warning": { "code": "module.update_failed_kept_previous", "message": error },
+        }))
+        .into_response(),
+        Outcome::Lost { module, error } => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "ok": false, "error": { "code": "module.update_lost", "message": format!("`{module}`: {error}") } })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /api/modules/updates` — qué versión ofrece hoy el marketplace para cada módulo instalado
+/// (hub#516). **Bajo demanda**, no en bucle: lo pregunta la pantalla de Apps cuando alguien la
+/// abre. Un sondeo periódico costaría una llamada por módulo (24) contra el Cloud sin que nadie
+/// esté mirando, y la vía desatendida ya la cubre el arranque, que resuelve la última versión.
+///
+/// Usa **el mismo resolutor** que el arranque, así que lo que el botón ofrece es exactamente lo que
+/// la actualización automática haría sola: nunca una versión en cuarentena, nunca hacia atrás, y el
+/// pin de soporte gana. Si el Cloud no contesta, `latest == installed` y no se ofrece nada —
+/// inventar una versión sería peor que no decir nada.
+pub(crate) async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let installed: Vec<(String, String, Option<String>)> = {
+        let rt = st.runtime.read().await;
+        if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+        match erplora_runtime::installer::installed_with_pin(rt.db(), &st.hub_id()).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "ok": false, "error": e.to_string() })),
+                )
+                    .into_response()
+            }
+        }
+    };
+
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y
+        // «no lo sé» nunca se pinta como «hay actualización».
+        return Json(json!({ "ok": true, "data": [] })).into_response();
+    };
+
+    let mut out = Vec::with_capacity(installed.len());
+    for (module_id, version, pinned) in installed {
+        let target = install::resolve_target(
+            &st.http,
+            &st.config.cloud_base_url,
+            &auth,
+            &module_id,
+            &version,
+            pinned.as_deref(),
+        )
+        .await;
+        out.push(json!({
+            "module_id": module_id,
+            "installed": version,
+            "latest": target.version(),
+            "update_available": target.is_update(),
+            "pinned": pinned,
+        }));
+    }
+    Json(json!({ "ok": true, "data": out })).into_response()
+}
+
+/// `GET /api/modules/:id/versions` — entre qué versiones puede elegir este hub (hub#675).
+///
+/// Es la lista del **desplegable de versión**, y sirve a las dos puertas: instalar (el módulo aún no
+/// está: valen todas las publicadas) y actualizar (solo hacia delante desde la instalada). Por eso
+/// **no es un 404** pedir las versiones de algo que no está instalado —esa regla es de `update`, no
+/// de esta— y por eso `installed` puede venir `null`.
+///
+/// La política la pone `module_update::offer`, la misma pieza que decide la actualización
+/// automática: fuera la cuarentena, fuera el retroceso, y un módulo clavado por soporte no ofrece
+/// nada. Sin eso, el desplegable sería una segunda puerta con una segunda política.
+///
+/// Auth = **sesión de admin**, igual que instalar y actualizar. Sin ella no se pregunta al Cloud:
+/// la respuesta viaja con la credencial de máquina del hub, y cualquier módulo web same-origin
+/// podría usarla de rebote para leer el catálogo.
+pub(crate) async fn list_module_versions(
+    State(st): State<AppState>,
+    Path(module_id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    {
+        let rt = st.runtime.read().await;
+        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+            return unauthorized(e);
+        }
+    }
+    // Mismo motivo que en `proxy_marketplace_module` (hub#1134): este id acaba dentro de la URL del
+    // Cloud que se firma con el token de máquina.
+    if !module_id_is_safe(&module_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "module.invalid_id", "message": "invalid module id" },
+            })),
+        )
+            .into_response();
+    }
+
+    // Todo lo que hace falta del hub, y **se suelta el candado**: la llamada al Cloud viene después.
+    // Sostener el guard del runtime durante un round-trip de red retendría a cualquier escritor en
+    // cola (una instalación) y, tras él, a `/api/query` y `/api/command` —el TPV— mientras el
+    // marketplace tarda en contestar (hub#978: el `RwLock` es justo con los escritores).
+    let (installed, pinned) = {
+        let rt = st.runtime.read().await;
+        (
+            install::installed_version(&rt, &module_id),
+            install::support_pin(&rt, &module_id).await,
+        )
+    };
+
+    // Sin credencial no se puede preguntar al marketplace. No es un error: es «no lo sé», y «no lo
+    // sé» se pinta como «no hay nada que elegir», nunca como una lista inventada.
+    let Some(auth) = auth::hub_scoped_auth(&headers, &st) else {
+        return Json(json!({
+            "ok": true,
+            "data": { "module_id": module_id, "installed": installed, "latest": null, "versions": [] },
+        }))
+        .into_response();
+    };
+
+    let versions = install::offered_versions(
+        &st.http,
+        &st.config.cloud_base_url,
+        &auth,
+        &module_id,
+        installed.as_deref(),
+        pinned.as_deref(),
+    )
+    .await;
+
+    Json(json!({
+        "ok": true,
+        "data": {
+            "module_id": module_id,
+            "installed": installed,
+            // La que se ofrece por defecto: la primera de la lista. `null` = no hay nada que elegir.
+            "latest": versions.first(),
+            "versions": versions,
+        },
+    }))
+    .into_response()
+}
+
+/// Status HTTP de un fallo del pipeline de instalación/actualización. Compartido por
+/// `request-install` y `update` (hub#516): el mismo fallo tiene que contarse igual por las dos
+/// puertas, o la UI acaba programando contra dos contratos.
+pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
+    match e {
+        install::InstallError::VersionNotFound(_) => StatusCode::NOT_FOUND,
+        // Actualizar algo que no está instalado: no hay recurso al que aplicar la operación.
+        install::InstallError::NotInstalled(_) => StatusCode::NOT_FOUND,
+        install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
+        // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
+        // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
+        install::InstallError::Source(source::SourceError::BadSignature(_)) => StatusCode::FORBIDDEN,
+        // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
+        // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
+        install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
+        install::InstallError::Cloud(_)
+        | install::InstallError::Source(_)
+        | install::InstallError::MissingSha256 { .. } => StatusCode::BAD_GATEWAY,
+    }
+}
+
+/// Respuesta de un fallo del pipeline, con el canal de errores de dominio (hub#139): además del
+/// mensaje humano viaja un `code` estable contra el que la UI programa y traduce. Un install —o un
+/// update— fallido no es mudo.
+pub(crate) fn install_error_response(e: &install::InstallError) -> Response {
+    let mut body = json!({
+        "ok": false,
+        "error": e.to_string(),
+        "code": e.code(),
+    });
+    if let install::InstallError::Blocked {
+        blocked_on,
+        purchase,
+        ..
+    } = e
+    {
+        body["blocked_on"] = json!(blocked_on);
+        body["purchase"] = json!(purchase
+            .iter()
+            .map(|p| json!({
+                "module_id": p.module_id,
+                "module_type": p.module_type,
+                "price": p.price,
+                "currency": p.currency,
+                "purchase_url": p.purchase_url,
+            }))
+            .collect::<Vec<_>>());
+    }
+    (install_error_status(e), Json(body)).into_response()
+}
+
+/// Lo que se le dice a las cachés sobre un asset servido por la ruta **con** versión: el contenido
+/// de una versión publicada no cambia jamás (republicar exige subir la versión), así que se puede
+/// guardar para siempre. Es lo que hace que la url versionada además sea *más rápida* que la de
+/// antes, no solo más correcta.
+pub(crate) const MODULE_ASSET_IMMUTABLE: &str = "public, max-age=31536000, immutable";
+
+/// Y lo que se le dice sobre la ruta **sin** versión: ahí el contenido SÍ cambia bajo los pies (es
+/// «la versión instalada», sea cual sea hoy), así que guardarla sin preguntar es exactamente el
+/// defecto de hub#935. `no-cache` no prohíbe almacenarla: obliga a revalidarla antes de usarla.
+pub(crate) const MODULE_ASSET_REVALIDATE: &str = "no-cache, must-revalidate";
+
+/// Un segmento de ruta que no puede salir del `module_cache` (ni `..` ni vacío ni separadores).
+pub(crate) fn is_safe_path_segment(seg: &str) -> bool {
+    !seg.is_empty() && seg != ".." && seg != "." && !seg.contains('/') && !seg.contains('\\')
+}
+
+/// Lee `module_cache/<id>/<version>/<rel>` y lo devuelve con su content-type y su política de caché.
+pub(crate) async fn read_module_asset(
+    st: &AppState,
+    id: &str,
+    version: &str,
+    rel: &str,
+    cache_control: &'static str,
+) -> Response {
+    // Anti path-traversal: ningún segmento `..` (incluido tras decodificar %2e%2e) ni vacío.
+    if rel.split('/').any(|seg| !is_safe_path_segment(seg)) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let full = st.config.module_cache.join(id).join(version).join(rel);
+    match tokio::fs::read(&full).await {
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, module_asset_content_type(rel)),
+                (header::CACHE_CONTROL, cache_control),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// GET /modules/:id/v/:version/*path — el MISMO asset, direccionado por versión (hub#935).
+///
+/// Existe porque un módulo actualizado no llegaba al navegador: todas las versiones se servían desde
+/// la misma url y sin una sola cabecera de caché, así que el borde cacheaba el `.js` por extensión
+/// (`cf-cache-status: HIT`) y el `import()` del shell seguía recibiendo el bundle anterior mientras
+/// el `module.json` ya decía la versión nueva. El fallo era MUDO: manifest nuevo, servidor nuevo,
+/// pantalla vieja. Un `?v=` no lo arregla —el borde ignora la query para la clave de caché—; una
+/// ruta distinta sí, porque ninguna caché la ha visto antes.
+///
+/// Sirve **cualquier versión presente en la caché de descargas**, no solo la instalada: es lo que la
+/// hace inmutable de verdad (una pestaña abierta desde antes de actualizar sigue resolviendo su
+/// bundle) y lo que permite declararla cacheable un año. El módulo sí tiene que estar instalado.
+pub(crate) async fn serve_module_asset_at(
+    State(st): State<AppState>,
+    Path((id, version, rel)): Path<(String, String, String)>,
+) -> Response {
+    // La versión es un segmento de ruta más y llega del cliente: hostil hasta que se demuestre.
+    if !is_safe_path_segment(&version) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let installed = {
+        let rt = st.runtime.read().await;
+        rt.modules().into_iter().any(|m| m.id == id)
+    };
+    if !installed {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    read_module_asset(&st, &id, &version, &rel, MODULE_ASSET_IMMUTABLE).await
+}
+
+/// GET /modules/:id/*path — sirve los assets web (`module.json`, `dist/*.esm.js`, wasm, icons) de un
+/// módulo instalado desde la CACHÉ de descargas, resueltos por la VERSIÓN instalada
+/// (`module_cache/<id>/<version>/<path>`). La versión sale del registro (el módulo debe estar
+/// instalado). Guard anti path-traversal. Un asset ausente o un módulo no instalado → **404** (lo
+/// maneja el cargador del Web Component); al ser ruta explícita NO cae al fallback SPA, así que nunca
+/// se sirve `index.html` haciéndose pasar por JS/JSON (que es exactamente lo que rompía la UI).
+///
+/// Sigue siendo la ruta del `module.json` —quien DICE en qué versión está el módulo— y el respaldo
+/// para clientes anteriores a hub#935. Por eso va marcada «revalida siempre»: su contenido cambia
+/// cada vez que se actualiza el módulo, y servirla de una caché es servir la versión de ayer.
+pub(crate) async fn serve_module_asset(
+    State(st): State<AppState>,
+    Path((id, rel)): Path<(String, String)>,
+) -> Response {
+    // Versión instalada del módulo (del registro). Módulo no instalado → 404.
+    let version = {
+        let rt = st.runtime.read().await;
+        rt.modules()
+            .into_iter()
+            .find(|m| m.id == id)
+            .map(|m| m.version)
+    };
+    let Some(version) = version else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    read_module_asset(&st, &id, &version, &rel, MODULE_ASSET_REVALIDATE).await
+}
+
+/// Content-Type de un asset de módulo por extensión (los que sirve [`serve_module_asset`]).
+pub(crate) fn module_asset_content_type(rel: &str) -> &'static str {
+    if rel.ends_with(".js") || rel.ends_with(".mjs") {
+        "text/javascript"
+    } else if rel.ends_with(".json") || rel.ends_with(".map") {
+        "application/json"
+    } else if rel.ends_with(".wasm") {
+        "application/wasm"
+    } else if rel.ends_with(".css") {
+        "text/css"
+    } else if rel.ends_with(".svg") {
+        "image/svg+xml"
+    } else {
+        "application/octet-stream"
+    }
+}
+
+#[derive(Deserialize)]
+pub(crate) struct InstallReq {
+    /// Ruta a la carpeta del módulo ya extraída (la prepara erplora-source desde el S3 zip).
+    dir: String,
+}
+
+/// Query param de idioma para los endpoints localizables (ADR-0055). `?locale=es`; default `en`.
+#[derive(serde::Deserialize)]
+pub(crate) struct LocaleQuery {
+    pub(crate) locale: Option<String>,
+}
+
+pub(crate) async fn navigation(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
+    let locale = q.locale.as_deref().unwrap_or("en");
+    let rt = st.runtime.read().await;
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => return unauthorized(e),
+    };
+    let reg = rt.registry();
+    let items: Vec<Value> = rt
+        .navigation()
+        .iter()
+        // hub#1052: una pestaña con `permission` solo se sirve a quien la tiene. Antes no había
+        // dónde declararlo, así que el módulo la pintaba para todos y el usuario descubría el
+        // límite estrellándose contra un 403 — `flows` lo dice en su propio código: mandar al
+        // cajero a revisar sus permisos «lo mandaría a un sitio al que no puede ir».
+        //
+        // El predicado es el MISMO que el de la puerta real (`permissions::has`), así que el menú
+        // y el command no pueden discrepar sobre qué significa un permiso. Sin `permission` la
+        // entrada es visible, como en todos los manifests publicados hasta hoy.
+        .filter(|n| {
+            n.nav
+                .permission
+                .as_deref()
+                .is_none_or(|p| erplora_runtime::permissions::has(&ctx, p))
+        })
+        .map(|n| {
+            let entry = reg.installed.iter().find(|m| m.id == n.module_id);
+            let mod_fallback = entry
+                .map(|m| m.name.as_str())
+                .unwrap_or(n.module_id.as_str());
+            json!({
+                "module_id": n.module_id,
+                // Nombre del módulo traducido (ADR-0055): lo usa el shell para el sidebar y las
+                // tarjetas del dashboard (un ítem por módulo).
+                "module_name": reg.module_name_localized(&n.module_id, mod_fallback, locale),
+                // Versión INSTALADA (hub#935). Con ella el shell construye la url versionada del
+                // bundle (`/modules/<id>/v/<version>/…`) sin depender del `module.json`, que es un
+                // asset y sí puede llegar de una caché: si llegara atrasado, el shell pediría la url
+                // de la versión vieja —cacheada— y volveríamos al fallo mudo que motivó la issue.
+                // Esta respuesta va autenticada y ninguna caché la toca.
+                "module_version": entry.map(|m| m.version.clone()),
+                "id": n.nav.id,
+                // Label de la pestaña traducido (ADR-0055): locale → en → label del manifest.
+                "label": reg.nav_label_localized(&n.module_id, &n.nav.id, &n.nav.label, locale),
+                "icon": n.nav.icon, "component": n.nav.component,
+            })
+        })
+        .collect();
+    // `active_modules` = módulos instalados **y activos** (hub#894). **Aditivo**: `ok`/`data` intactos.
+    //
+    // `data` es el menú, y por sí solo no distingue las dos cosas que producen el mismo array vacío:
+    // un hub recién nacido y un hub con 12 módulos cuyo menú salió vacío de todas formas. La primera
+    // es un hecho que merece pintarse («añade tu primera app»); la segunda no, y se pintaba igual —
+    // un hub real de producción (12/12 según `/readyz`) le dijo a su dueña que no tenía apps y le
+    // ofreció instalar las que ya tenía. Este número le da al shell contra qué comprobar la lista
+    // vacía en vez de creérsela.
+    //
+    // Cuenta los **activos**, no los instalados, y la diferencia importa: un módulo que el admin
+    // apagó a propósito NO se espera que aporte menú, así que contarlo convertiría un hub apagado a
+    // conciencia en un falso «no he podido cargar tus apps». El denominador es lo que el hub espera
+    // que aporte, no lo que tiene guardado.
+    let active_modules = reg
+        .installed
+        .iter()
+        .filter(|m| reg.is_active(&m.id))
+        .count();
+    Json(json!({ "ok": true, "data": items, "active_modules": active_modules })).into_response()
+}
+
+pub(crate) async fn list_modules(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(q): Query<LocaleQuery>,
+) -> Response {
+    let locale = q.locale.as_deref().unwrap_or("en");
+    let rt = st.runtime.read().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let reg = rt.registry();
+    // Ids de módulos (activos) que exponen al menos una op `expose_api` (ADR-0057). Se calcula UNA
+    // vez y se consulta por pertenencia → campo aditivo `has_public_api` por módulo, que usa la
+    // matriz de scope de las API keys para listar solo módulos que conceden algo.
+    let public_api: std::collections::HashSet<String> =
+        reg.modules_with_public_api().into_iter().collect();
+    let items: Vec<Value> = rt
+        .modules()
+        .into_iter()
+        .map(|m| {
+            json!({
+                "id": m.id,
+                // Nombre traducido (ADR-0055): locale → en → name del manifest.
+                "name": reg.module_name_localized(&m.id, &m.name, locale),
+                "version": m.version,
+                "status": m.status,
+                // Dependencias declaradas: el toggle del shell las usa para AVISAR de la cascada
+                // (ADR-0128) antes de desactivar («también desactivará: …»).
+                "depends_on": m.depends_on,
+                // ADITIVO (ADR-0057): true si el módulo expone alguna query/command `expose_api`.
+                "has_public_api": public_api.contains(&m.id),
+                // ADITIVO (hub#521): lo que el core NO entendió de su `module.json` y aun así
+                // instaló. Vacío en un módulo que encaja con el contrato — que es lo normal. Es la
+                // superficie CONSULTABLE del aviso: sin ella, «el hub lo ignora en silencio» se
+                // arreglaría escribiendo el silencio en un log que nadie mira.
+                "manifest_warnings": m.manifest_warnings,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": items })).into_response()
+}
+
+/// `POST /api/modules/install {dir}` — instala un módulo desde una carpeta YA extraída.
+///
+/// Vía de **desarrollo**: esquiva el pipeline del marketplace (grant + SHA256 obligatorio,
+/// ADR-0015), así que va doblemente gateada (hub#239, ver [`install_guard`]): modo desarrollo
+/// explícito + `dir` confinado en el staging del hub. La sesión admin sigue siendo necesaria,
+/// pero **no basta**: el agujero no era de auth, era de superficie.
+pub(crate) async fn install_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<InstallReq>,
+) -> Response {
+    let mut rt = st.runtime.write().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let dir = match install_guard::resolve_install_dir(
+        st.config.dev_mode,
+        &st.config.install_staging_roots(),
+        &req.dir,
+    ) {
+        Ok(dir) => dir,
+        Err(rejection) => return install_dir_rejected(&req.dir, rejection),
+    };
+    match rt.install_from_dir(&dir).await {
+        Ok(id) => Json(json!({ "ok": true, "data": { "module_id": id } })).into_response(),
+        Err(e) => err_response(e),
+    }
+}
+
+/// Respuesta estable a un `dir` de instalación rechazado (hub#239). `403` cuando la vía está
+/// cerrada por política (producción / fuera del staging), `422` cuando la ruta simplemente no
+/// sirve. Se registra a WARN: un intento fuera del staging es señal de abuso, no ruido.
+pub(crate) fn install_dir_rejected(requested: &str, rejection: install_guard::InstallDirRejection) -> Response {
+    use install_guard::InstallDirRejection as R;
+    let status = match rejection {
+        R::DevModeRequired | R::OutsideStaging => StatusCode::FORBIDDEN,
+        R::NotFound | R::NotADirectory => StatusCode::UNPROCESSABLE_ENTITY,
+    };
+    tracing::warn!(
+        dir = %requested,
+        code = rejection.code(),
+        "instalación desde carpeta rechazada"
+    );
+    let body = json!({
+        "ok": false,
+        "error": { "code": rejection.code(), "message": rejection.message() },
+    });
+    (status, Json(body)).into_response()
+}
+
+pub(crate) async fn activate_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let mut rt = st.runtime.write().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.activate(&id).await {
+        Ok(()) => {
+            drop(rt);
+            // hub#1317 (review of hub#1311): before this, activating a module emitted nothing
+            // over `/ws` — the same hole hub#631 closed ONLY for `module.installed`. Another
+            // tab/device of the same hub (and, since hub#1211, the module-sdk's active-modules
+            // cache read by `queryOptional`) stayed on yesterday's state until it reloaded. Same
+            // shape as `module.installed`: a raw frame with no `FRAME_MODULE` (it's the hub's
+            // own, not a module's).
+            st.broadcast(json!({ "type": "module.activated", "module_id": id }));
+            Json(json!({ "ok": true })).into_response()
+        }
+        Err(e) => err_response(e),
+    }
+}
+
+pub(crate) async fn deactivate_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let mut rt = st.runtime.write().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match rt.deactivate(&id).await {
+        Ok(()) => {
+            drop(rt);
+            // hub#1317: same reasoning as `activate_module` — without this, another tab kept
+            // offering a module the owner had just switched off until someone reloaded it.
+            st.broadcast(json!({ "type": "module.deactivated", "module_id": id }));
+            Json(json!({ "ok": true })).into_response()
+        }
+        Err(e) => err_response(e),
+    }
+}
+
+/// Body of `POST /api/modules/:id/uninstall` (hub#1101). Optional in full: the historical call
+/// sends nothing at all, and «nothing» has to keep meaning the SAFE answer.
+#[derive(serde::Deserialize, Default)]
+pub(crate) struct UninstallReq {
+    /// «Other apps need this one — remove it anyway». Only the caller that was shown the list
+    /// (the confirmation dialog of hub#773, or support driving the API on purpose) sends it.
+    /// It opens the dependants gate and NOTHING else: the fiscal locks are not the owner's
+    /// question and stay shut (ADR-0202 R2, ADR-0273 D5).
+    #[serde(default)]
+    force: bool,
+}
+
+pub(crate) async fn uninstall_module(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Option<Json<UninstallReq>>,
+) -> Response {
+    let force = body.map(|Json(b)| b.force).unwrap_or_default();
+    let mut rt = st.runtime.write().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let outcome = if force {
+        rt.uninstall_forced(&id).await
+    } else {
+        rt.uninstall(&id).await
+    };
+    match outcome {
+        Ok(()) => {
+            drop(rt);
+            // hub#1317: emitted NOW, before the best-effort embeddings cleanup below — what
+            // matters to another tab/device is that the runtime already uninstalled the module,
+            // not whether the best-effort vector index cleanup finished. Same for `force`: the
+            // module is gone either way.
+            st.broadcast(json!({ "type": "module.uninstalled", "module_id": id }));
+            // Borra del índice vectorial los chunks del módulo (§9.6): uninstall → delete chunks.
+            // Best-effort: no falla la desinstalación si el store da error.
+            if let Some(store) = &st.vector {
+                if let Err(e) = embed::drop_module(store.as_ref(), &st.hub_id(), &id).await {
+                    tracing::warn!(module_id = %id, error = %e, "no se pudieron borrar embeddings del módulo (no crítico)");
+                }
+            }
+            Json(json!({ "ok": true })).into_response()
+        }
+        Err(e) => err_response(e),
+    }
+}
