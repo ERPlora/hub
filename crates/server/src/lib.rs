@@ -1373,20 +1373,135 @@ async fn shutdown_signal(state: AppState) {
     eprintln!("apagado: cierro el listener y dreno las conexiones en vuelo…");
 }
 
+/// Env que fija el techo de peticiones EN VUELO en la superficie de negocio antes de que el
+/// runtime empiece a soltar carga (hub#1401). Por encima de este número, el exceso recibe un `503`
+/// inmediato en vez de encolarse hasta que el origen se satura.
+pub const MAX_INFLIGHT_ENV: &str = "HUB_MAX_INFLIGHT_REQUESTS";
+
+/// Default del techo de peticiones en vuelo cuando [`MAX_INFLIGHT_ENV`] no está configurado.
+///
+/// **512** es un tope de SEGURIDAD, no de latencia: protege al origen del apilamiento sin límite
+/// que provoca la tormenta de `502` de Cloudflare y la recuperación de decenas de segundos
+/// (medido: a 1000 concurrentes el origen colapsaba). Un hub sirve a UN negocio, así que su
+/// concurrencia real es de unas pocas decenas de peticiones a la vez —muy por debajo de 512—,
+/// mientras que 512 queda holgadamente por debajo del punto de colapso observado. El SaaS puede
+/// ajustarlo por plan vía [`MAX_INFLIGHT_ENV`]. El cuello real está en el pool de Postgres
+/// (`HUB_DB_MAX_CONNECTIONS`, 10 por defecto): este techo solo evita que el resto se acumule.
+pub const DEFAULT_MAX_INFLIGHT_REQUESTS: usize = 512;
+
+/// Segundos sugeridos en `Retry-After` al soltar una petición. La sobrecarga es transitoria —el
+/// presupuesto en vuelo se drena en mucho menos de un segundo en cuanto deja de crecer—, así que
+/// se pide un backoff corto en lugar de martillear un origen saturado.
+const OVERLOADED_RETRY_AFTER_SECS: u32 = 1;
+
+/// Interpreta el valor crudo de [`MAX_INFLIGHT_ENV`]: entero `>= 1`, o el default ante ausencia,
+/// vacío, no numérico o `0` (un techo de 0 dejaría al hub sin atender nada).
+fn resolve_max_inflight(raw: Option<&str>) -> usize {
+    match raw.map(str::trim).filter(|s| !s.is_empty()) {
+        None => DEFAULT_MAX_INFLIGHT_REQUESTS,
+        Some(s) => match s.parse::<usize>() {
+            Ok(n) if n >= 1 => n,
+            _ => {
+                eprintln!(
+                    "{MAX_INFLIGHT_ENV} inválido ({s:?}): se esperaba un entero >= 1; \
+                     usando el default {DEFAULT_MAX_INFLIGHT_REQUESTS}"
+                );
+                DEFAULT_MAX_INFLIGHT_REQUESTS
+            }
+        },
+    }
+}
+
+/// Lee [`MAX_INFLIGHT_ENV`] del entorno en el punto de construcción del router.
+fn max_inflight_from_env() -> usize {
+    resolve_max_inflight(std::env::var(MAX_INFLIGHT_ENV).ok().as_deref())
+}
+
+/// Mapea el rechazo de `LoadShed` al sobre de error del runtime (ADR-0412) como un `503 Service
+/// Unavailable` inmediato con `Retry-After`. Lo que NO sea la señal de sobrecarga es un fallo real
+/// del propio stack de capas y sale como `500` con su mensaje —nunca un cuerpo vacío mudo, nunca un
+/// `500` genérico para la sobrecarga.
+async fn handle_overloaded(err: tower::BoxError) -> Response {
+    if err.is::<tower::load_shed::error::Overloaded>() {
+        let mut response = (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "ok": false,
+                "error": {
+                    "code": "service_overloaded",
+                    "message": "el hub está recibiendo demasiadas peticiones a la vez; reintenta en unos segundos"
+                }
+            })),
+        )
+            .into_response();
+        if let Ok(value) = HeaderValue::from_str(&OVERLOADED_RETRY_AFTER_SECS.to_string()) {
+            response.headers_mut().insert(header::RETRY_AFTER, value);
+        }
+        response
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "ok": false,
+                "error": { "code": "load_shed_layer_error", "message": err.to_string() }
+            })),
+        )
+            .into_response()
+    }
+}
+
+/// Envuelve `router` para que nunca haya más de `max_inflight` peticiones en vuelo a la vez: el
+/// exceso se suelta INMEDIATAMENTE como `503` (ver [`handle_overloaded`]) en lugar de encolarse
+/// hasta que el origen se satura y Cloudflare responde `502` a cualquiera que llegue (hub#1401).
+///
+/// Patrón Tower canónico: un límite de concurrencia GLOBAL (un único semáforo compartido entre
+/// cada clon por conexión) acota el trabajo en vuelo; `LoadShed` convierte la contrapresión
+/// resultante en un rechazo rápido; `HandleErrorLayer` mapea ese rechazo al sobre de error del
+/// runtime y vuelve a dejar el servicio infalible. Salud/liveness (`/healthz`, `/readyz`) se dejan
+/// FUERA de esta capa a propósito —ver [`app`]—: un chequeo de salud debe responder incluso bajo
+/// sobrecarga, y un `503` en el healthcheck haría que Swarm reprogramara el contenedor en plena
+/// punta transitoria, convirtiendo la contrapresión en una caída real. Las rutas de streaming
+/// (`/ws`, `/ws/print`, SSE) SÍ pasan por aquí sin peligro: el permiso de concurrencia se libera
+/// cuando el handler devuelve la respuesta (el `Sse`/upgrade), no mientras dura el stream.
+pub fn with_load_shedding<S>(router: Router<S>, max_inflight: usize) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    use axum::error_handling::HandleErrorLayer;
+    use tower::limit::GlobalConcurrencyLimitLayer;
+    use tower::ServiceBuilder;
+
+    let shed = ServiceBuilder::new()
+        // La más externa: convierte el rechazo en el sobre de error del runtime, así el servicio
+        // vuelve a ser infalible (nunca el cuerpo vacío por defecto de tower).
+        .layer(HandleErrorLayer::new(handle_overloaded))
+        // Convierte la contrapresión del límite de concurrencia en un `Overloaded` inmediato en
+        // lugar de esperar en cola.
+        .load_shed()
+        // Un único semáforo compartido entre cada clon por conexión = presupuesto GLOBAL.
+        .layer(GlobalConcurrencyLimitLayer::new(max_inflight))
+        .into_inner();
+    router.layer(shed)
+}
+
 /// Construye el router con todas las rutas montadas sobre `state`.
 pub fn app(state: AppState) -> Router {
     let registration_state = state.clone();
     let activity_state = state.activity.clone();
-    Router::new()
+    // hub#1401: liveness/readiness viven en SU router, FUERA del presupuesto de peticiones en vuelo
+    // que lleva la superficie de negocio (más abajo). Un chequeo de salud que reciba un `503` bajo
+    // sobrecarga lo lee Swarm como «contenedor no sano» y reprograma el contenedor en plena punta
+    // transitoria, convirtiendo la contrapresión en una caída real. Liveness ≠ readiness (hub#538):
+    // `/healthz` dice si el proceso responde; `/readyz` dice si puede ATENDER, y es la que mira el
+    // `HEALTHCHECK` del contenedor para decidir si revierte.
+    let health = Router::new()
         .route("/healthz", get(healthz))
+        .route("/readyz", get(readiness::readyz));
+    let business = Router::new()
         // Un hub no se indexa (ver `with_noindex`). Va en el router de API, ANTES del
         // fallback SPA: sin esta ruta, `/robots.txt` devolvía `index.html` con un 200, que
         // un rastreador lee como «este sitio no tiene reglas».
         .route("/robots.txt", get(robots_txt))
-        // Liveness ≠ readiness (hub#538): `/healthz` dice si el proceso responde;
-        // `/readyz` dice si puede ATENDER. El `HEALTHCHECK` del contenedor apunta al
-        // segundo, que es el que Swarm mira para decidir si revierte.
-        .route("/readyz", get(readiness::readyz))
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
@@ -1793,8 +1908,17 @@ pub fn app(state: AppState) -> Router {
         // ruta = decisión del humano (`/api/events` por defecto).
         .route("/api/events", get(event_stream::sse))
         // Where the app asks for its credential for the channel (session → single-use ticket).
-        .route("/api/events/ticket", post(event_stream::mint_ticket))
-        // Log de cada request (método/ruta/estado/latencia) a INFO → consola + `media/_logs/`
+        .route("/api/events/ticket", post(event_stream::mint_ticket));
+    // hub#1401: acota el trabajo de negocio en vuelo y suelta el exceso como un `503` inmediato con
+    // `Retry-After` (ver [`with_load_shedding`]), en lugar de encolarlo hasta que el origen se
+    // satura y Cloudflare responde `502`. `/healthz` y `/readyz` quedan fuera a propósito (arriba).
+    // El shed va POR DENTRO del `TraceLayer` de abajo, así que un `503` soltado también se registra
+    // (queda VISIBLE, no es un fallo mudo).
+    let business = with_load_shedding(business, max_inflight_from_env());
+
+    health
+        .merge(business)
+        // Log de cada request (verbo/ruta/estado/latencia) a INFO → consola + `media/_logs/`
         // (ADR-0047): la primera población real de la carpeta media. La respuesta se loguea a INFO;
         // los fallos del propio servidor a ERROR.
         .layer(
@@ -5531,5 +5655,36 @@ mod error_field_tests {
         });
         assert_eq!(error["code"], "missing_dependency");
         assert_eq!(error["module"], "taxes");
+    }
+}
+
+#[cfg(test)]
+mod load_shed_config_tests {
+    //! hub#1401 — the in-flight budget parses env safely: a valid integer is honoured, and
+    //! anything that would leave the hub unable to serve (absent, empty, non-numeric, or `0`)
+    //! falls back to the production default instead of shedding everything.
+    use super::{resolve_max_inflight, DEFAULT_MAX_INFLIGHT_REQUESTS};
+
+    #[test]
+    fn absent_or_blank_uses_the_default() {
+        assert_eq!(resolve_max_inflight(None), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(resolve_max_inflight(Some("")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(resolve_max_inflight(Some("   ")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+    }
+
+    #[test]
+    fn a_valid_positive_integer_is_honoured() {
+        assert_eq!(resolve_max_inflight(Some("2")), 2);
+        assert_eq!(resolve_max_inflight(Some("1024")), 1024);
+        assert_eq!(resolve_max_inflight(Some("  64 ")), 64);
+    }
+
+    #[test]
+    fn zero_and_garbage_fall_back_to_the_default_never_choke_the_hub() {
+        // A ceiling of 0 would shed every request forever — clamp it to the default.
+        assert_eq!(resolve_max_inflight(Some("0")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(resolve_max_inflight(Some("-5")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(resolve_max_inflight(Some("abc")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(resolve_max_inflight(Some("1.5")), DEFAULT_MAX_INFLIGHT_REQUESTS);
     }
 }
