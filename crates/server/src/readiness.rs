@@ -152,9 +152,47 @@ pub fn modules_check(expected: &[String], registered: &[String]) -> Check {
     )
 }
 
+/// Avisa al Cloud de los switchovers de BD que el hub ha sobrevivido desde el último aviso.
+///
+/// Va aquí y no en [`snapshot`] a propósito: el snapshot solo describe el estado (lo consulta
+/// también el aviso de arranque), mientras que esto **consume** el contador. `/readyz` es el latido
+/// que Swarm ya trae, así que no hace falta un temporizador propio para sacar el dato.
+///
+/// Se cuenta una vez por switchover, no una por sondeo: una alerta que se repite cada 10 segundos
+/// para siempre es una alerta que todo el mundo aprende a ignorar — el mismo silencio, más ruidoso.
+async fn report_recovered_switchovers(st: &AppState) {
+    use erplora_runtime::error_registry::{severity, source, ErrorEvent, ErrorRegistry};
+
+    let pending = {
+        let runtime = st.runtime.read().await;
+        runtime.db().take_unreported_read_only_rejections()
+    };
+    if pending == 0 {
+        return;
+    }
+    tracing::warn!(
+        rejections = pending,
+        "the database switched over: writes were rejected by the replica and the pool recycled \
+         its connections"
+    );
+    ErrorRegistry::global().report(
+        ErrorEvent::new(
+            source::HUB,
+            "db_read_only_rejected",
+            format!(
+                "{pending} write(s) rejected by a read-only replica (25006): the database \
+                 switched over and the pool recycled the connections pinned to the ex-leader"
+            ),
+            severity::UNEXPECTED,
+        )
+        .with_context(json!({ "rejections": pending })),
+    );
+}
+
 /// `GET /readyz`.
 pub async fn readyz(State(st): State<AppState>) -> Response {
     let checks = snapshot(&st).await;
+    report_recovered_switchovers(&st).await;
     let status = aggregate(&checks);
     let body = json!({
         "status": status.as_str(),
@@ -183,7 +221,14 @@ pub async fn snapshot(st: &AppState) -> Checks {
 
     // ── 1. La base de datos responde ─────────────────────────────────────────────────
     let database = match db.query("SELECT 1 AS ok", &Default::default()).await {
-        Ok(_) => Check::new(Health::Up),
+        // Un switchover del que el hub se recuperó solo (hub#1376) **no** baja el estado: la BD
+        // atiende, y marcar `DOWN` por algo ya resuelto dispararía el rollback de Swarm. Pero sale
+        // en el detalle, porque un hub que sobrevivió a un cambio de líder es justo lo que hay que
+        // mirar cuando alguien pregunta por qué se cortó el cobro un momento.
+        Ok(_) => match db.read_only_rejections() {
+            0 => Check::new(Health::Up),
+            rejections => Check::with(Health::Up, json!({ "read_only_rejections": rejections })),
+        },
         Err(error) => Check::with(Health::Down, json!({ "error": error.to_string() })),
     };
     let database_up = database.status == Health::Up;
