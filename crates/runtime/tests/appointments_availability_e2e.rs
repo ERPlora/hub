@@ -54,6 +54,9 @@ async fn rt_appts() -> Runtime {
     rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
     rt.install_from_dir(&mdir("services")).await.expect("instalar services");
     rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
+    // appointments 1.1.57 added `depends_on: schedules >= 2.0.17` (the working-hours engine it
+    // asserts against in scenario 4); schedules itself depends on nothing.
+    rt.install_from_dir(&mdir("schedules")).await.expect("instalar schedules");
     rt.install_from_dir(&mdir("appointments")).await.expect("instalar appointments");
     rt
 }
