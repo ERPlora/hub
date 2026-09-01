@@ -1505,12 +1505,15 @@ attest_case() { # <SKIP_HUB_WEB 0|1> -> imprime los args del status publicado (v
     git -C "$repo" config --bool hooks.hubPrepushGate true
     touch_and_commit "$repo" crates/c/src/lib.rs >/dev/null   # Rust: es lo que se atestigua
     sha=$(touch_and_commit "$repo" apps/web/src/App.vue)      # y web: es lo que se puede saltar
+    # `>>`, no `>`: desde pm#198 un diff con Rust Y web publica DOS sellos, y con `>` el segundo
+    # borraba al primero — el control de abajo («corriendo todo SÍ atestigua») se caía sin que
+    # nada estuviera roto. Se acumulan, y las aserciones buscan cada contexto dentro del montón.
     ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
     "repo view") echo 'ERPlora/hub'; exit 0 ;;
     "auth status") exit 0 ;;
 esac
-for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
 for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
@@ -1930,6 +1933,155 @@ errs=""
 [ -z "$errs" ] \
     && ok "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" \
     || bad "hub#1356: apps/web + el YAML en el mismo diff corre la completa Y el contrato ligero" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 250)"
+
+# ── Web ATTESTATION: the gate vouches for what it ran (pm#198, hub#1368) ─────
+#
+# Since hub#1352 the cloud keeps only path-filtered workflows, so a hub PR that
+# touches ONLY web or ONLY docs reports ZERO checks — and merge-pr.sh refuses
+# that silence unless a seal vouches for the head sha:
+#   · local-gate/hub-web          — the web stage ran green on this machine;
+#   · local-gate/no-suite-needed  — the diff touches neither Rust nor web.
+# Regression tests for ERPlora/pm#198 (web-only PRs unmergeable) and
+# ERPlora/hub#1368 (docs-only pushes with no seal). The fake `gh` (make_gh)
+# captures every status POST — appending, so a push that posts two seals shows
+# both. DATABASE_URL and HUB_GATE_E2E_DB_CMD are pinned so the web stage never
+# touches docker.
+
+# 1. A WEB-ONLY diff posts the web seal: the stage ran green, and the seal is
+#    the only witness merge-pr.sh can read (the PR has zero Actions checks).
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
+sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
+          # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+grep -q 'context=local-gate/hub-web' <<<"$args"          || errs="$errs web-only-diff-posted-no-hub-web-seal"
+grep -q 'context=local-gate/hub-tests' <<<"$args"        && errs="$errs web-only-diff-claimed-the-rust-seal"
+grep -q 'context=local-gate/no-suite-needed' <<<"$args"  && errs="$errs web-only-diff-claimed-nothing-ran"
+[ -z "$errs" ] \
+    && ok "attestation: a web-only diff posts local-gate/hub-web and nothing else (pm#198)" \
+    || bad "attestation: a web-only diff posts local-gate/hub-web and nothing else (pm#198)" "$errs args='$args'"
+
+# 2. A DOCS-ONLY diff posts the no-suite seal: the gate resolved the sha and
+#    decided there was nothing to run — which is NOT the same shape as a dead
+#    Actions, and the seal is what lets merge-pr.sh tell them apart.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" docs/nota.md)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_TEST_CMD="touch $repo/RAN; true" HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
+          # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                          || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+grep -q 'context=local-gate/no-suite-needed' <<<"$args"  || errs="$errs docs-only-diff-posted-no-no-suite-seal"
+grep -q 'context=local-gate/hub-web' <<<"$args"          && errs="$errs docs-only-diff-claimed-the-web-seal"
+grep -q 'context=local-gate/hub-tests' <<<"$args"        && errs="$errs docs-only-diff-claimed-the-rust-seal"
+[ -f "$repo/RAN" ]                                       && errs="$errs rust-ran-for-a-docs-only-diff"
+[ -f "$repo/WEBSTAGE" ]                                  && errs="$errs web-ran-for-a-docs-only-diff"
+[ -z "$errs" ] \
+    && ok "attestation: a docs-only diff posts local-gate/no-suite-needed and runs nothing (hub#1368)" \
+    || bad "attestation: a docs-only diff posts local-gate/no-suite-needed and runs nothing (hub#1368)" "$errs args='$args'"
+
+# 3. A diff with RUST AND WEB posts BOTH seals: merge-pr.sh needs the Rust one
+#    for the suite and the web one for the stage — each seal names what ran.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+touch_and_commit "$repo" crates/c/src/lib.rs >/dev/null
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true")
+sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
+          # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                                   || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+grep -q 'context=local-gate/hub-tests' <<<"$args" || errs="$errs rust-plus-web-did-not-post-the-rust-seal"
+grep -q 'context=local-gate/hub-web' <<<"$args"   || errs="$errs rust-plus-web-did-not-post-the-web-seal"
+[ -z "$errs" ] \
+    && ok "attestation: a diff with Rust and web posts BOTH seals (pm#198)" \
+    || bad "attestation: a diff with Rust and web posts BOTH seals (pm#198)" "$errs args='$args'"
+
+# 4. SKIP_HUB_WEB on a web-only diff posts NOTHING: a bypass produces absence
+#    of seal, never a false seal — merge-pr.sh keeps refusing, which is the point.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+    HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+    DATABASE_URL="postgres://postgres:test@localhost:5433/hub_test" \
+    HUB_GATE_E2E_DB_CMD="true" \
+    HUB_GATE_TEST_CMD="true" HUB_GATE_WEB_CMD="true" \
+    SKIP_HUB_WEB=1)
+sleep 2   # el status se publica en SEGUNDO PLANO tras verificar el ref: sin esta espera,
+          # «no se publicó nada» y «aún no se ha publicado» se leen igual (un verde falso).
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                || errs="$errs exit=$code(want 0)"
+[ ! -f "$repo/POSTARGS" ]      || errs="$errs skipped-web-still-attested: $(tr '\n' ' ' < "$repo/POSTARGS" | tail -c 200)"
+grep -qi 'no se atestigua' <<<"$out" || errs="$errs skipped-web-not-called-out"
+[ -z "$errs" ] \
+    && ok "attestation: SKIP_HUB_WEB on a web-only diff posts nothing and says so" \
+    || bad "attestation: SKIP_HUB_WEB on a web-only diff posts nothing and says so" "$errs"
+
 
 echo
 echo "  $pass passed, $fail failed"
