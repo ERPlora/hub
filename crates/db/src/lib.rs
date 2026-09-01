@@ -573,9 +573,13 @@ pub const BRIDGE_FUNCTIONS: &[&str] = &[
 ///
 /// Funciones cubiertas (ver [`BRIDGE_FUNCTIONS`]):
 /// - `erp_now()` → `now()`. Timestamp del servidor (ADR-0007: fechas `TEXT` ISO-8601).
-/// - `erp_lpad(valor, ancho, relleno)` → `lpad((<valor>)::text, <ancho>, <relleno>)`.
+/// - `erp_lpad(valor, ancho, relleno)` → rellena por la izquierda hasta `ancho`.
 /// - `erp_pad(valor, ancho)` = atajo de `erp_lpad(valor, ancho, '0')` para números de documento
-///   (factura `FAC-00042`, ticket `TCK-0042`) → `lpad((<valor>)::text, <ancho>, '0')`.
+///   (factura `FAC-00042`, ticket `TCK-0042`).
+///
+///   🔴 En ambas, **`ancho` es un MÍNIMO, nunca un techo**: un valor más largo que `ancho` se
+///   conserva ENTERO. Ver [`pad_to_min_width`] — el `lpad` pelado de Postgres truncaba y hacía
+///   colisionar el documento 10.000 con el 1.000 (hub#1378).
 fn shim_functions(sql: &str) -> String {
     // Atajo: si ningún nombre del set aparece, no hay nada que reescribir.
     let lower = sql.to_ascii_lowercase();
@@ -681,6 +685,26 @@ fn next_call(bytes: &[u8], after_name: usize) -> Option<(usize, Vec<(usize, usiz
     None
 }
 
+/// Expresión Postgres que rellena `value` por la izquierda hasta `width` **sin truncar nunca**
+/// (hub#1378).
+///
+/// El `lpad(texto, ancho, relleno)` de Postgres impone un ancho **EXACTO**: recorta lo que sobra,
+/// así que `lpad('10000', 4, '0')` = `'1000'` y el número de documento 10.000 colisionaba con el
+/// 1.000 en el índice UNIQUE del ticket (ERPlora/sales#241; en `invoice`, 1.000.000 contra
+/// 100.000). El contrato de las funciones-puente dice ancho **MÍNIMO**, así que se le pide a
+/// `lpad` el mayor entre el ancho pedido y la longitud real del valor: lo que cabe se rellena
+/// igual que antes y lo que no cabe se conserva entero.
+///
+/// `length()` cuenta **caracteres**, no bytes, así que un valor acentuado no pierde posiciones de
+/// relleno.
+///
+/// ⚠️ La expresión del valor aparece **dos veces**, de modo que debe ser no-volátil. Las llamadas
+/// reales de los módulos son columnas o subconsultas de solo lectura, estables dentro del snapshot
+/// de la sentencia, y el validador del toolkit reescribe la misma expresión.
+fn pad_to_min_width(value: &str, width: &str, fill: &str) -> String {
+    format!("lpad(({value})::text, greatest({width}, length(({value})::text)), {fill})")
+}
+
 /// Renderiza una función-puente concreta a su expresión nativa Postgres. `None` = aridad
 /// incorrecta (se deja el texto intacto; el validador del toolkit debería haberlo atrapado en build).
 fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<String> {
@@ -701,7 +725,7 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             }
             let value = arg(0);
             let width = arg(1);
-            Some(format!("lpad(({value})::text, {width}, '0')"))
+            Some(pad_to_min_width(&value, &width, "'0'"))
         }
         "erp_lpad" => {
             if args.len() != 3 {
@@ -710,7 +734,7 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             let value = arg(0);
             let width = arg(1);
             let fill = arg(2); // literal `'x'` o expresión
-            Some(format!("lpad(({value})::text, {width}, {fill})"))
+            Some(pad_to_min_width(&value, &width, &fill))
         }
 
         // ── funciones-puente de fecha/hora ───────────────────────────────────────────────────
@@ -799,9 +823,11 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             }
             let h = arg(0);
             let m = arg(1);
-            Some(format!(
-                "(lpad(({h})::text, 2, '0') || ':' || lpad(({m})::text, 2, '0'))"
-            ))
+            // Mismo contrato de ancho mínimo (hub#1378): una duración de 100 h se renderizaba
+            // "10:00" porque `lpad` recortaba las horas.
+            let hh = pad_to_min_width(&h, "2", "'0'");
+            let mm = pad_to_min_width(&m, "2", "'0'");
+            Some(format!("({hh} || ':' || {mm})"))
         }
         _ => None,
     }
@@ -1148,6 +1174,82 @@ mod tests {
         assert_eq!(q.rows[0]["paid"], json!(1));
     }
 
+    /// Regresión (hub#1378): `erp_pad` es padding **mínimo**, nunca un techo. En Postgres `lpad`
+    /// TRUNCA cuando el valor supera el ancho, así que el contador diario 10.000 se renderizaba
+    /// `1000` y COLISIONABA con la venta 1.000 en el índice UNIQUE del número de documento
+    /// (ERPlora/sales#241; en `invoice` el fallback de 6 dígitos choca en 1.000.000 con 100.000).
+    /// Reproduce la forma real de `sales._insert_sale`: el número se arma leyendo el contador
+    /// recién incrementado en la MISMA sentencia, con una subconsulta escalar.
+    #[tokio::test]
+    async fn erp_pad_never_truncates_so_document_numbers_stay_unique() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE counter (hub_id TEXT, day TEXT, last_number INTEGER, \
+               PRIMARY KEY (hub_id, day)); \
+             CREATE TABLE sale (id TEXT PRIMARY KEY, hub_id TEXT, sale_number TEXT); \
+             CREATE UNIQUE INDEX uq_sale_number ON sale (hub_id, sale_number);",
+        )
+        .await
+        .unwrap();
+        db.execute(
+            "INSERT INTO counter (hub_id, day, last_number) VALUES (:hub_id, :day, 1000)",
+            &params(json!({ "hub_id": "h1", "day": "20260901" })),
+        )
+        .await
+        .unwrap();
+
+        let insert_sale = "INSERT INTO sale (id, hub_id, sale_number) VALUES (:id, :hub_id, \
+             :day || '-' || erp_pad((SELECT last_number FROM counter \
+                                     WHERE hub_id = :hub_id AND day = :day), 4))";
+        db.execute(insert_sale, &params(json!({ "id": "s1", "hub_id": "h1", "day": "20260901" })))
+            .await
+            .unwrap();
+
+        // La venta 10.000 del día: cuatro dígitos ya no le bastan y el ancho es un MÍNIMO.
+        db.execute(
+            "UPDATE counter SET last_number = 10000 WHERE hub_id = :hub_id AND day = :day",
+            &params(json!({ "hub_id": "h1", "day": "20260901" })),
+        )
+        .await
+        .unwrap();
+        db.execute(insert_sale, &params(json!({ "id": "s2", "hub_id": "h1", "day": "20260901" })))
+            .await
+            .expect("la venta 10.000 no puede colisionar con la 1.000 en uq_sale_number");
+
+        let q = db
+            .query("SELECT sale_number FROM sale ORDER BY id", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 2);
+        assert_eq!(q.rows[0]["sale_number"], json!("20260901-1000"));
+        assert_eq!(
+            q.rows[1]["sale_number"],
+            json!("20260901-10000"),
+            "erp_pad rellena hasta el ancho, no recorta a el"
+        );
+    }
+
+    /// Regresión (hub#1378): el contrato de anchura es un MÍNIMO en ambas funciones-puente, y el
+    /// relleno de `erp_lpad` cuenta CARACTERES (no bytes) para que el acento no coma una posición.
+    #[tokio::test]
+    async fn erp_pad_and_erp_lpad_pad_to_a_minimum_width() {
+        let db = fresh_db().await;
+        let q = db
+            .query(
+                "SELECT erp_pad(:small, 5) AS small, erp_pad(:big, 4) AS big, \
+                        erp_lpad(:word, 6, '.') AS narrow, erp_lpad(:phrase, 4, '.') AS wide",
+                &params(json!({
+                    "small": 42, "big": 10000, "word": "café", "phrase": "cafetería"
+                })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows[0]["small"], json!("00042"), "lo que cabe se rellena igual que antes");
+        assert_eq!(q.rows[0]["big"], json!("10000"), "lo que no cabe se conserva entero");
+        assert_eq!(q.rows[0]["narrow"], json!("..café"), "el relleno cuenta caracteres");
+        assert_eq!(q.rows[0]["wide"], json!("cafetería"), "9 caracteres no se recortan a 4");
+    }
+
     /// Regresión (ADR-0154): `shim_ddl_types`/`translate` reconstruían el SQL byte-a-byte con
     /// `push(byte as char)` → mojibake para no-ASCII (`Café`→`CafÃ©`) en TODO `execute_batch`/
     /// `execute` (seed/import). Antes quedaba oculto porque en SQLite `shim_ddl_types` era la
@@ -1374,7 +1476,7 @@ mod tests {
     #[test]
     fn shim_erp_pad() {
         let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)");
-        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, 5, '0')");
+        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, greatest(5, length(($1)::text)), '0')");
         assert_eq!(names, vec!["n"]);
     }
 
@@ -1386,7 +1488,8 @@ mod tests {
         );
         assert_eq!(
             sql,
-            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, 6, '0')"
+            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, \
+             greatest(6, length(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text)), '0')"
         );
         assert_eq!(names, vec!["h"]);
     }
@@ -1449,7 +1552,7 @@ mod tests {
     #[test]
     fn shim_erp_lpad() {
         let (sql, names) = translate("SELECT erp_lpad(:code, 8, '*')");
-        assert_eq!(sql, "SELECT lpad(($1)::text, 8, '*')");
+        assert_eq!(sql, "SELECT lpad(($1)::text, greatest(8, length(($1)::text)), '*')");
         assert_eq!(names, vec!["code"]);
     }
 
@@ -1503,7 +1606,8 @@ mod tests {
         let (p, _) = translate("SELECT erp_timefmt(m / 60, m % 60)");
         assert_eq!(
             p,
-            "SELECT (lpad((m / 60)::text, 2, '0') || ':' || lpad((m % 60)::text, 2, '0'))"
+            "SELECT (lpad((m / 60)::text, greatest(2, length((m / 60)::text)), '0') || ':' || \
+             lpad((m % 60)::text, greatest(2, length((m % 60)::text)), '0'))"
         );
     }
 
@@ -1734,6 +1838,10 @@ mod tests {
     fn portable_sql_normalizes_for_postgres() {
         let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
         let (pg, _) = translate(sql);
-        assert_eq!(pg, "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, 4, '0'), now())");
+        assert_eq!(
+            pg,
+            "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, greatest(4, length(($1)::text)), '0'), \
+             now())"
+        );
     }
 }
