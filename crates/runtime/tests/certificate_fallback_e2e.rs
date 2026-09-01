@@ -183,7 +183,7 @@ async fn the_gate_accepts(rt: &Runtime, hub_id: &str) -> bool {
     }
 }
 
-/// Reader 4 — the fiscal ENGINE (`build_identity`, `crates/verifactu`). `true` = the module would
+/// Reader 4 — the fiscal ENGINE (`build_identity`, `crates/plugins/verifactu`). `true` = the module would
 /// go ahead and transmit to the AEAT.
 ///
 /// Asked through the runtime's REAL host (`DbHost`), not a hand-written stand-in: a twin host would

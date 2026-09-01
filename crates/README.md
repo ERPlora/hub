@@ -27,8 +27,18 @@ para el de tests, `cargo test -p <crate>`. Tabla orientativa:
 | `erplora-wasm-host` | **Tier 2**: ejecuta handlers WASM en sandbox (Extism), devuelve *intenciones*. | ✅ implementado |
 | `erplora-sync` | Cliente de eventos en vivo (consume `/ws`) con reconexión + backoff. | ✅ implementado |
 | `erplora-peripherals` | Hardware POS red-only (ESC/POS, cajón, discovery, cola/reintentos) — ver [`peripherals/README.md`](peripherals/README.md). | ✅ implementado |
-| `erplora-verifactu` | Lógica fiscal VeriFactu (encadenado, XML, hashing). | ✅ implementado |
+| `erplora-verifactu` | Lógica fiscal VeriFactu (encadenado, XML, hashing). Vive en **`crates/plugins/`** (convención de abajo). | ✅ implementado |
 | `tauri-plugin-erplora-android` | Plugin Tauri para Android: permisos de runtime en contexto (`ACCESS_LOCAL_NETWORK`, `POST_NOTIFICATIONS`) y el Kotlin que Rust no alcanza (ADR-0180 §2). Lleva además el `AndroidManifest.xml` que los DECLARA fuera del proyecto generado, para que regenerar `gen/android` no se los lleve (ADR-0241). | ✅ implementado |
+
+## Convención: `crates/*` vs `crates/plugins/*` (hub#1405)
+
+- **`crates/*`** = el **core país-agnóstico** («el hub es la base de LEGO»): nada aquí puede
+  nombrar un país ni un régimen fiscal concreto.
+- **`crates/plugins/*`** = motores de **régimen fiscal first-party** (hoy `verifactu`; futuro:
+  `ticketbai`, `nf525`, `facturx`…). La frontera base↔pieza se LEE en el árbol del workspace, y
+  el gate la vigila (guard «el core no nombra países», hub#1407).
+- Es un **estado intermedio a propósito**: el ADR-0424 fija como destino que cada motor migre al
+  WASM de su módulo y este directorio acabe desapareciendo. No invertir aquí más de lo mecánico.
 
 ## Probarlo
 
