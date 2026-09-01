@@ -8,7 +8,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
-use erplora_db::Params;
+use erplora_db::{DatabaseAdapter, Params};
 use erplora_runtime::Runtime;
 use erplora_server::{build_router, AppState, AuthMode, HubConfig, DEV_HUB_ID};
 use http_body_util::BodyExt;
@@ -210,4 +210,43 @@ async fn installing_the_first_module_keeps_the_hub_ready() {
     assert_eq!(body["checks"]["modules"]["expected"], json!(1), "cuerpo: {body}");
     assert_eq!(body["checks"]["modules"]["registered"], json!(1), "cuerpo: {body}");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// hub#1376 — un switchover del que el hub se recuperó **solo** no puede quedar invisible.
+///
+/// `/readyz` sigue verde (la BD atiende, y bajarlo dispararía el rollback de Swarm por algo que ya
+/// está resuelto), pero dice cuántas escrituras llegó a rechazar la réplica. Es el dato que se mira
+/// cuando alguien pregunta por qué el TPV se quedó un momento sin cobrar: sin él, el hub responde
+/// 200 en todo y no queda rastro de que la base de datos cambió de líder debajo.
+#[tokio::test]
+async fn a_switchover_the_hub_recovered_from_shows_up_in_readyz_hub1376() {
+    let tdb = erplora_db::testutil::TestDb::new().await;
+    // Una sola conexión: así la escritura de abajo usa forzosamente la que se degrada a réplica,
+    // en vez de que el pool le dé otra limpia y el test pase sin probar nada.
+    let db = tdb.adapter_with_max_connections(1).await;
+    erplora_runtime::migrations::ensure_table(&db).await.unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+    erplora_runtime::identity::ensure_tables(&db).await.unwrap();
+    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID).await.unwrap();
+
+    // La BD hace switchover: la conexión del pool se queda hablando con el ex-líder.
+    erplora_db::testutil::demote_pooled_connections_to_replica(&db, 1).await;
+    // Una escritura cualquiera — se recupera sola, y por eso justamente nadie se enteraría.
+    db.execute_batch("CREATE TABLE switchover_probe (id BIGINT PRIMARY KEY);")
+        .await
+        .expect("la escritura se recupera sola tras el switchover");
+
+    let state = AppState::with_config(
+        Runtime::new(Box::new(db)),
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    );
+    let (status, body) = get(state, "/readyz").await;
+
+    assert_eq!(status, StatusCode::OK, "la BD atiende: el hub sigue listo. cuerpo: {body}");
+    assert_eq!(body["checks"]["database"]["status"], json!("UP"), "cuerpo: {body}");
+    assert_eq!(
+        body["checks"]["database"]["read_only_rejections"],
+        json!(1),
+        "el switchover que el hub sobrevivió tiene que verse desde fuera. cuerpo: {body}"
+    );
 }
