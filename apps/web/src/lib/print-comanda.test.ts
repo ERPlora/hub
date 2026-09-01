@@ -258,3 +258,73 @@ describe('lo que la línea arrastra al papel (hub#1156)', () => {
     }
   });
 });
+
+describe('quién mandó la ronda sale EN EL PAPEL (hub#1410 · recorte de kitchen#63)', () => {
+  // La mitad de kitchen#63 se hizo en la tarjeta del KDS; la del papel se quedó fuera porque su
+  // productor está aquí, no en el módulo. El renderizador ESC/POS ya sabía pintarlo
+  // (`escpos.rs`, campo `waiter`) y nadie se lo mandaba nunca.
+  //
+  // Por qué importa en el pase: cuando un plato sale mal, va tarde o le falta algo, cocina
+  // necesita a QUIÉN llamar sin buscar a nadie por la sala. Toast, Square for Restaurants y
+  // Lightspeed imprimen el «server» en la cabecera del chit por exactamente eso.
+  //
+  // El `waiter_id` de la comanda es OPACO (kitchen no une con `hub_user`, ADR-0192): el nombre lo
+  // resuelve el consumidor por `hub.users.list`, que es lo que ya hace la tarjeta del KDS.
+  function clientWithWaiter(users: unknown, over: Record<string, unknown> = {}) {
+    const query = vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return [CROQUETAS];
+      if (name === 'kitchen.orders.get') {
+        return [{ id: 'k-1', label: 'Mesa 4', round_number: 2, order_number: 'C-018', waiter_id: 'u-7' }];
+      }
+      if (name === 'hub.users.list') {
+        if (users instanceof Error) throw users;
+        return users;
+      }
+      return [];
+    });
+    return { query, ...over } as never;
+  }
+
+  const okPrint = () =>
+    vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+  it('el papel lleva el NOMBRE de quien disparó la ronda', async () => {
+    const print = okPrint();
+    await onKitchenOrderCreated(
+      clientWithWaiter([{ id: 'u-9', name: 'Marta' }, { id: 'u-7', name: 'Ana' }]),
+      { order_id: 'k-1' },
+      { print },
+    );
+    expect(print.mock.calls[0]![0].data?.waiter).toBe('Ana');
+  });
+
+  it('un `waiter_id` que el hub ya no lista NO saca un UUID por la impresora', async () => {
+    // Un id crudo es PEOR que un hueco: el cocinero lo lee a dos metros, no puede usarlo y deja
+    // de fiarse de la cabecera. Misma política que la tarjeta del KDS.
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithWaiter([{ id: 'u-9', name: 'Marta' }]), { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('si `hub.users.list` falla, la comanda SALE IGUAL — sin camarero', async () => {
+    // El papel no puede depender de una consulta de presentación: la comida se cocina igual.
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithWaiter(new Error('403')), { order_id: 'k-1' }, { print });
+    expect(print).toHaveBeenCalledTimes(1);
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+
+  it('una ronda SIN camarero no le pregunta al hub por sus personas', async () => {
+    // Una comanda vieja, o disparada sin sesión, no tiene a quién nombrar: preguntar por la lista
+    // de personas en cada disparo sería una consulta por comanda a cambio de nada.
+    const query = vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return [CROQUETAS];
+      if (name === 'kitchen.orders.get') return [{ id: 'k-1', label: 'Mesa 4', round_number: 1, order_number: 'C-018' }];
+      return [];
+    });
+    const print = okPrint();
+    await onKitchenOrderCreated({ query } as never, { order_id: 'k-1' }, { print });
+    expect(query.mock.calls.map((c) => c[0])).not.toContain('hub.users.list');
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
+  });
+});
