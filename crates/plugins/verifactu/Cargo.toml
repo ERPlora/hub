@@ -9,10 +9,10 @@ version.workspace = true
 license.workspace = true
 
 [dependencies]
-erplora-runtime = { path = "../runtime" }
-erplora-db = { path = "../db" }
+erplora-runtime = { path = "../../runtime" }
+erplora-db = { path = "../../db" }
 # Tipos del contrato de intenciones (Output/Operation), compartidos con el WASM Tier 2.
-erplora-wasm-host = { path = "../wasm-host", default-features = false }
+erplora-wasm-host = { path = "../../wasm-host", default-features = false }
 async-trait = "0.1"
 serde_json = "1"
 sha2 = "0.10"

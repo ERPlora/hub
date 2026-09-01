@@ -21,7 +21,7 @@
 //!    no administrative permission. A gate the cashier cannot pass would make the whole feature
 //!    unreachable exactly where it has to work.
 //!
-//! The wire-level twin of this rule (§15.8 in `crates/verifactu/src/xsd.rs`, hub#964) is
+//! The wire-level twin of this rule (§15.8 in `crates/plugins/verifactu/src/xsd.rs`, hub#964) is
 //! deliberately **not** this number: it validates against 3.010,00 (the ceiling plus the AEAT's
 //! +10,00 rounding margin) because that is what the service really rejects. This query publishes
 //! the ceiling itself, 3.000,00, because the till must never spend a tolerance that belongs to the

@@ -5,10 +5,10 @@
 //! **The property.** The certificate a hub signs with is a fact of the CORE
 //! (`_hub_certificate`, ADR-0202 §2.1) and can be rotated at any moment — the business
 //! re-uploads its own `.p12`, or ERPlora rotates the delegated one. The fiscal hash chain must
-//! not care: `chain::alta_hash` (`crates/verifactu/src/chain.rs`) composes the AEAT fingerprint
+//! not care: `chain::alta_hash` (`crates/plugins/verifactu/src/chain.rs`) composes the AEAT fingerprint
 //! from `IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&TipoFactura&CuotaTotal&
 //! ImporteTotal&Huella&FechaHoraHusoGenRegistro` (Orden HAC/1177/2024) — the PREVIOUS record's
-//! own hash, never who signed it. `crates/verifactu/src/lib.rs::environment_chain_tests` pins
+//! own hash, never who signed it. `crates/plugins/verifactu/src/lib.rs::environment_chain_tests` pins
 //! this at the unit level with a synthetic host; this file is the e2e half: the REAL `verifactu`
 //! module, its REAL native engine, and a REAL certificate rotation through `_hub_certificate` —
 //! on a real Postgres, through the real dispatcher (`Runtime::execute_command`).

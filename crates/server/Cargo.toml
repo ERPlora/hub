@@ -9,7 +9,7 @@ license.workspace = true
 erplora-runtime = { path = "../runtime" }
 erplora-db = { path = "../db" }
 # Plugin nativo first-party (ADR-0009): motor fiscal VeriFactu horneado en el runtime.
-erplora-verifactu = { path = "../verifactu" }
+erplora-verifactu = { path = "../plugins/verifactu" }
 # Cliente del Cloud Portal: construye las peticiones (versions/ download/ mark_installed/ +
 # assistant stream) y verifica SHA256. `source` aporta el verify+unzip seguro (anti zip-slip).
 cloud_client = { package = "erplora-cloud-client", path = "../cloud-client" }

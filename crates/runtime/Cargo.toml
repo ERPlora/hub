@@ -85,7 +85,7 @@ erplora-guest-sdk = { path = "../guest-sdk" }
 # AEAT record reads it — is to reach the XML from a test that also drives the runtime. It is a
 # DEV-dependency only (Cargo allows the dev cycle: verifactu depends on runtime, runtime's tests
 # depend on verifactu), so nothing ships in the runtime library itself.
-erplora-verifactu = { path = "../verifactu" }
+erplora-verifactu = { path = "../plugins/verifactu" }
 serde_json = "1"
 
 # Hereda `[workspace.lints]` del manifest raíz (hub#1242). Sin estas dos líneas el crate
