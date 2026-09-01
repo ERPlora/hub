@@ -13,7 +13,8 @@ versión nueva. Tampoco se puede ofrecer «vuelve a la última `1.x`» ni compar
 ## Fuente única de verdad
 
 - **`[workspace.package].version`** en `Cargo.toml` es la versión del hub. Todos los crates la
-  heredan vía `version.workspace = true`, así que bumpar ese valor fluye a runtime, server, db, etc.
+  heredan vía `version.workspace = true`, así que el número **que el CI estampa desde el tag** fluye
+  a runtime, server, db, etc. (no lo escribe una persona — ver «Cómo sacar una release»).
 - El runtime la reporta con `env!("CARGO_PKG_VERSION")`: `/api/system` → `hubVersion`, y el
   error-sink hacia el Cloud.
 - **En `main`** ese valor es la versión «en desarrollo» (la siguiente).
@@ -59,9 +60,27 @@ contrato que alguien externo depende. Todo lo demás es iteración fluida.
 
 ## Cómo sacar una release
 
-1. Actualizar `[workspace.package].version` en `Cargo.toml` (la nueva versión «en desarrollo»).
-2. Tras mergear a `main`, crear el tag `vX.Y.Z` (igual que el valor que acabas de poner).
-3. El CI publica la imagen con los tags semver y estampa la versión en el binario.
+**La versión la escribe el TAG** ([ADR-0280](../architecture/00-overview/decision-log.md#adr-0280)).
 
-> El bump de versión va en el mismo PR que introduce el cambio de contrato/feature, no en uno
-> aparte: así el tag apunta exactamente al commit que lo introdujo.
+1. Mergear a `develop` → `main` con `./pm/merge-pr.sh hub <nº PR>`.
+2. Etiquetar: `git tag v1.2.3 && git push origin v1.2.3`.
+
+Eso es todo lo que hace una persona. El tag dispara `build-hub.yml`, que **antes de compilar**
+pasa por [`scripts/image-tags.sh`](scripts/image-tags.sh) —donde vive la guarda que impide
+republicar encima de lo que ya está en producción— y estampa el número con
+[`scripts/stamp-version.sh`](scripts/stamp-version.sh) desde `${GITHUB_REF_NAME#v}`.
+
+🪦 **`Cargo.toml` NO se toca.** Aquí ponía «actualizar `[workspace.package].version`» como paso 1:
+eso es el modelo **anterior a ADR-0280** y está **derogado**. Hoy lo estampa el CI, y el número que
+haya en el repo se queda en el de desarrollo y da igual — tocarlo a mano no adelanta nada y hace
+creer que el fichero manda.
+
+Y no lo estampa solo en `Cargo.toml`: `stamp-version.sh` escribe **los tres** ficheros que llevan
+versión (el workspace de Cargo, el `package.json` del `module-sdk` y su `version.ts`) y **se niega**
+si alguno no tiene dónde escribir — estampar dos de tres y salir en verde es exactamente como los
+tres números se separan.
+
+> **Fuente canónica de esto**:
+> [`architecture/hub/versioning.md` §4](../architecture/hub/versioning.md). Si este fichero y aquel
+> discrepan, manda aquel — es el que se mantiene con los ADR. Este doc explica **cómo se decide el
+> número** (arriba); el procedimiento de publicación vive allí.
