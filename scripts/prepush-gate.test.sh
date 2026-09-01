@@ -1415,6 +1415,37 @@ errs=""
     && ok "web: un diff solo de apps/web corre la etapa web aunque no haya Rust" \
     || bad "web: un diff solo de apps/web corre la etapa web aunque no haya Rust" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
+# 1b. …y con el comando web FIJADO no toca docker NI Postgres (hub#1368).
+#     El banco de e2e (`hub_e2e_web`/`hub_e2e_assistant`) es dependencia del comando POR
+#     DEFECTO —playwright contra el runtime—, no de quien trae el suyo. Prepararlo igualmente
+#     exigía un `erplora-test-pg-5433` vivo: en la CI del propio gate el caso de arriba murió
+#     con «no pude crear la base 'hub_e2e_web'» (76/77, run 33564975392) y en el Mac salía
+#     verde SOLO porque el contenedor estaba ahí — el rojo dependía de la máquina, no del
+#     código. Este control no: `docker` se stubbea y basta con que el hook lo LLAME para
+#     ponerse rojo, haya contenedor o no. `DATABASE_URL=` vacío a propósito: heredada del
+#     entorno, `ensure_postgres` volvería por la puerta de arriba y escondería la mitad del
+#     defecto. El stub escribe FUERA del repo: dentro ensuciaría el árbol (guardia hub#855),
+#     y el registro NO se puede llamar `DOCKER`: el disco del Mac es insensible a mayúsculas,
+#     así que el stub se escribiría encima de sí mismo y el caso saldría rojo siempre.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
+dockerbin="${repo}-nodocker"; mkdir -p "$dockerbin"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/calls.log"\nexit 0\n' "$dockerbin" > "$dockerbin/docker"
+chmod +x "$dockerbin/docker"
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    PATH="$dockerbin:$PATH" DATABASE_URL= \
+    HUB_GATE_TEST_CMD="true" \
+    HUB_GATE_WEB_CMD="touch $repo/WEBSTAGE; true")
+errs=""
+[ "$code" = 0 ]                 || errs="$errs exit=$code(want 0)"
+[ -f "$repo/WEBSTAGE" ]         || errs="$errs web-stage-did-not-run"
+[ ! -f "$dockerbin/calls.log" ] || errs="$errs toco-docker=$(tr '\n' '|' < "$dockerbin/calls.log" | tail -c 200)"
+[ -z "$errs" ] \
+    && ok "web: con el comando web fijado el gate no toca docker ni el banco de e2e" \
+    || bad "web: con el comando web fijado el gate no toca docker ni el banco de e2e" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+
 # 2. Web en rojo = push ABORTADO (sin push no hay PR: es la puerta que pidió Ioan).
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
@@ -1655,6 +1686,15 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 #     vuelve por la puerta de arriba y no llega nunca a la llamada — por eso este
 #     banco no lo cazó en su día. Aquí se deja vacía a propósito y se stubbea
 #     `docker` para que la función llegue hasta el final.
+#
+#     🔴 Sin fijar `HUB_GATE_WEB_CMD`: desde hub#1368 el gate solo prepara Postgres
+#     cuando la etapa web es LA SUYA, así que con el comando fijado `ensure_postgres`
+#     ya no se llama y este caso no probaría nada — verde por vacío, que es peor que
+#     rojo. Se stubbea `pnpm` para llegar al camino de producción, y por eso NO se
+#     mira el código de salida: el comando por defecto muere después, en
+#     `cargo build -p erplora-server`, que este banco de juguete no tiene. Todo lo
+#     que se mide ocurre antes, y el control POSITIVO («raising Postgres lock
+#     limits») exige que `ensure_postgres` haya llegado hasta la llamada de verdad.
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
@@ -1670,14 +1710,17 @@ fi
 exit 0
 DOCK
 chmod +x "$dockerbin/docker"
-code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+printf '#!/bin/sh\nexit 0\n' > "$dockerbin/pnpm"
+chmod +x "$dockerbin/pnpm"
+run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
     PATH="$dockerbin:$PATH" DATABASE_URL= \
-    HUB_GATE_TEST_CMD="true" HUB_GATE_E2E_DB_CMD="true" HUB_GATE_WEB_CMD="true")
+    HUB_GATE_TEST_CMD="true" HUB_GATE_E2E_DB_CMD="true" >/dev/null
 errs=""
-[ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
 grep -q 'raise_lock_limits: command not found' "$repo/.out" \
     && errs="$errs la-llamada-muere-muda(command-not-found)"
+grep -q 'raising Postgres lock limits' "$repo/.out" \
+    || errs="$errs CONTROL-ensure_postgres-no-llego-a-raise_lock_limits"
 [ -z "$errs" ] \
     && ok "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" \
     || bad "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"

@@ -552,10 +552,18 @@ fi
 # EXISTIR (el runtime no las crea — lo dice `apps/web/tests/playwright.config.ts`). Además el spec
 # del asistente cae por defecto en `localhost:5434`, que en local no existe: sin exportar los DSN,
 # el playwright de cada push que toque web moriría al arrancar el runtime.
+#
+# 🔴 Crear las bases es cosa del comando POR DEFECTO, no de quien trae el suyo ($1 = 0). Con
+# `HUB_GATE_WEB_CMD` fijado, las bases son dependencia de ESE comando y prepararlas igualmente
+# exigía un `erplora-test-pg-5433` vivo: en un entorno sin él —la CI del propio gate, un portátil
+# sin docker— un diff solo-web moría por una base que su comando ni abre (hub#1368; el banco
+# `scripts/prepush-gate.test.sh` promete no tocar Docker y lo tocaba). Los DSN, en cambio, se
+# exportan SIEMPRE: son el contrato con la etapa, la corra quien la corra.
 ensure_e2e_databases() {
+    local gate_owns_web_cmd=${1:-1}
     if [ -n "${HUB_GATE_E2E_DB_CMD:-}" ]; then
         eval "$HUB_GATE_E2E_DB_CMD" || return 1
-    else
+    elif [ "$gate_owns_web_cmd" = 1 ]; then
         local db
         for db in hub_e2e_web hub_e2e_assistant; do
             docker exec "$PG_CONTAINER" psql -U postgres -tAc \
@@ -611,10 +619,15 @@ run_web_stage() {
 
     [ "$web_touched" = 1 ] || return 0
 
-    local web_cmd
+    # `gate_owns_web_cmd`: la etapa que corre es LA NUESTRA (pnpm verify + playwright), y con ella
+    # su dependencia — el Postgres del gate y las dos bases del banco de e2e. Si quien llama fijó
+    # `HUB_GATE_WEB_CMD`, el comando es suyo y sus dependencias también: el gate no levanta un
+    # contenedor para algo que no va a usar (hub#1368).
+    local web_cmd gate_owns_web_cmd=0
     if [ -n "${HUB_GATE_WEB_CMD:-}" ]; then
         web_cmd="$HUB_GATE_WEB_CMD"
     else
+        gate_owns_web_cmd=1
         command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1 || {
             echo "❌ pre-push: el diff toca web y no hay 'pnpm' ni 'corepack' en el PATH." >&2
             echo "   Instálalos (corepack enable) o sáltate la etapa con SKIP_HUB_WEB=1." >&2
@@ -634,8 +647,10 @@ run_web_stage() {
         WEB_SKIPPED=1
         return 0
     fi
-    ensure_postgres || return 1
-    ensure_e2e_databases || return 1
+    if [ "$gate_owns_web_cmd" = 1 ]; then
+        ensure_postgres || return 1
+    fi
+    ensure_e2e_databases "$gate_owns_web_cmd" || return 1
     echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
     if ! eval "$web_cmd"; then
         echo "" >&2
