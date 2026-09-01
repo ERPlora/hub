@@ -60,6 +60,12 @@ on:
       - 'scripts/ci/kernel-e2e-targets.sh'
       - 'scripts/ci/kernel-e2e-targets.txt'
       - 'scripts/tests/kernel-e2e-targets.test.sh'
+      # Y la OTRA mitad de esa lista (hub#1381): las baterías `*.hub.test.py|sh` que heredan la
+      # cobertura de cada e2e retirado. Un slice de hub#1264 toca las dos listas en la misma PR,
+      # así que sin estas rutas la PR que solo mueve la cobertura no correría sus casos.
+      - 'scripts/ci/module-hub-batteries.sh'
+      - 'scripts/ci/module-hub-batteries.txt'
+      - 'scripts/tests/module-hub-batteries.test.sh'
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
@@ -202,6 +208,18 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/kernel-e2e-targets.test.sh
+
+      # ── La lista de baterías de módulo (hub#1381) ─────────────────────────────────────
+      # La lista de arriba dice qué e2e del kernel SE FUERON; esta dice a qué batería se fueron,
+      # y el guard comprueba que esa batería está de verdad en el módulo PUBLICADO. Sin ella, el
+      # borrado del e2e apunta a nada comprobable: así se perdieron los 391 de
+      # `services_package_redeem_e2e.rs` el 2026-08-30, con las dos CI en verde (hub#1372).
+      # Sus casos corren AQUÍ, en segundos y sin catálogo (son herméticos); el contraste contra
+      # los 27 módulos de verdad lo hace `test-hub-modules.yml`, que ya los materializa.
+      - name: Lista de baterías de módulo (hub#1381)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/module-hub-batteries.test.sh
 
       # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
       # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—

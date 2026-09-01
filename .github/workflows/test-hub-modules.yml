@@ -242,6 +242,46 @@ jobs:
           rm -rf "$KEYS"
           echo "ERPLORA_MODULES_DIR=$RESOLVED" >> "$GITHUB_ENV"
 
+      # ── hub#1381 · la cobertura que hub#1264 muda tiene que ESTAR donde el slice prometió ──
+      # hub#1264 saca del hub los e2e que afirman comportamiento de un MÓDULO y los devuelve a su
+      # repo como baterías `erplora test`. La premisa es que la cobertura CAMBIA DE SITIO; el
+      # 2026-08-30 no cambió de sitio, se cayó por un hueco: hub#1372 borró
+      # `services_package_redeem_e2e.rs` —391 líneas que ESTE job ejecutaba— y su relevo,
+      # `services/tests/package_redeem.hub.test.py`, no lo corría NADIE. Las dos CI en verde.
+      #
+      # Este paso es el único sitio del repo donde eso se puede contrastar, y sale gratis: el
+      # catálogo PUBLICADO ya está en disco del paso de arriba. La lista revisada
+      # (`scripts/ci/module-hub-batteries.txt`) es la otra mitad de `kernel-e2e-targets.txt`: el
+      # slice borra una línea allí y añade aquí la batería que hereda la cobertura, en la MISMA
+      # PR. Ese par de ediciones es el acto revisable.
+      #
+      # 🔴 Comprueba que la batería EXISTE, no que pase. Hoy NINGÚN gate corre
+      # `erplora test --against-hub` y hub#1381 sigue abierta para el corredor: un verde aquí se
+      # lee «la batería está donde dijeron», nunca «la batería pasa».
+      - name: Las baterías de módulo cuadran con la lista revisada (hub#1381)
+        id: batteries
+        run: |
+          set -uo pipefail
+          # El catálogo lo toma de `ERPLORA_MODULES_DIR`, que exportó el paso anterior.
+          # stdout es la lista de módulos con batería (el futuro worklist del corredor) y stderr
+          # el veredicto: se separan para que la issue de alerta pueda CITAR el veredicto en vez
+          # de mandar al lector de vuelta al log.
+          rc=0
+          bash scripts/ci/module-hub-batteries.sh \
+            > "$RUNNER_TEMP/module-batteries.out" \
+            2> "$RUNNER_TEMP/module-batteries.err" || rc=$?
+          cat "$RUNNER_TEMP/module-batteries.err" >&2
+          if [ "$rc" -ne 0 ]; then
+            # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
+            # Actions, y el guard se corre también en local, donde solo sería ruido.
+            echo "::error::la lista revisada de baterías de módulo no cuadra con el catálogo"
+            echo "::error::PUBLICADO (el detalle, arriba en este mismo paso). Se edita"
+            echo "::error::scripts/ci/module-hub-batteries.txt en la MISMA PR que borra el e2e"
+            echo "::error::del hub — ver hub#1381."
+            exit "$rc"
+          fi
+          echo "módulos con batería \`*.hub.test.py|sh\`: $(grep -c . "$RUNNER_TEMP/module-batteries.out")"
+
       - name: Raise Postgres lock limits (hub#526) + export dynamic port (hub#898)
         run: |
           set -euo pipefail
@@ -423,6 +463,51 @@ jobs:
           # main, two module releases — would open two issues otherwise. Now the shared script
           # used by every alert step in this repo (test-hub.yml, image-freshness.yml, and this
           # one) instead of a fourth copy of the same list-and-filter logic.
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
+
+      # Una batería que un módulo publica (o retira) rompe este guard en el CRON y en el aviso
+      # `module-published` — justo donde no mira nadie. Ese es el rojo mudo en el que hub#1215
+      # estuvo un día entero, así que lleva la MISMA alerta idempotente que la suite de al lado:
+      # una issue que se reutiliza, nunca una por run. Título propio porque el arreglo es otro —
+      # aquí no se ha roto un módulo, se ha desparejado la lista— y quien la lee es otro.
+      - name: Abrir o refrescar la issue de las baterías de módulo (hub#1381)
+        if: >-
+          failure() && steps.batteries.outcome == 'failure' &&
+          (github.event_name == 'schedule' || github.event_name == 'repository_dispatch' ||
+           github.event_name == 'push')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          # `[ -s ]` primero: el paso del guard puede morir ANTES de escribir su stderr (un
+          # `ERPLORA_MODULES_DIR` vacío sale por otra rama). `cat` sobre un fichero ausente mata
+          # este paso bajo `set -e` y la issue no se abriría — el rojo mudo que viene a abolir.
+          VERDICT="(el guard no dejó veredicto: murió antes de escribirlo — mira el log del run)"
+          if [ -s "$RUNNER_TEMP/module-batteries.err" ]; then
+            VERDICT=$(head -c 3000 "$RUNNER_TEMP/module-batteries.err")
+          fi
+
+          title="La lista de baterías de módulo no cuadra con el catálogo publicado"
+          body="Detectado por \`test-hub-modules.yml\` — disparo \`${GITHUB_EVENT_NAME}\` (hub#1381).
+
+          - rama probada: \`${GITHUB_REF_NAME}\` — commit \`${GITHUB_SHA}\`
+          - run que falló: ${RUN_URL}
+
+          **Veredicto del guard:**
+
+          \`\`\`
+          ${VERDICT}
+          \`\`\`
+
+          \`scripts/ci/module-hub-batteries.txt\` empareja cada e2e del kernel que hub#1264 retiró con la batería \`*.hub.test.py|sh\` que heredó su cobertura. Que no cuadre significa una de dos: un módulo publicó o retiró una batería sin que nadie tocara la lista, o un slice borró el e2e del hub apuntando a una batería que no está. Las dos se arreglan editando la lista **y** diciendo en la PR dónde quedó la cobertura.
+
+          🔴 Ojo con lo que este guard NO dice: comprueba que la batería EXISTE, no que pase. Hoy ningún gate corre \`erplora test --against-hub\` — hub#1381 sigue abierta para el corredor.
+
+          Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando la lista vuelva a cuadrar."
+
           TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
             ./scripts/ci/alert-issue.sh
 
