@@ -827,9 +827,17 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 let now_iso = chrono::Utc::now().to_rfc3339();
                 let mut usage = {
                     let runtime = st.runtime.read().await;
-                    let mut usage =
-                        daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now_iso)
-                            .await;
+                    // Lo que cada motor instalado debe a su autoridad (hub#326/hub#1406) — la
+                    // pregunta va al REGISTRO, no a un motor con nombre; mismo lock barato que
+                    // el resto del snapshot.
+                    let pending = runtime.pending_obligations().await;
+                    let mut usage = daily_usage::collect_daily_usage(
+                        runtime.db(),
+                        runtime.hub_id(),
+                        &now_iso,
+                        &pending,
+                    )
+                    .await;
                     // Lo que este hub tiene del certificado DELEGADO (ADR-0202 §2.5). Mismo lock
                     // que el resto del snapshot: es la lectura barata, y no puede sostenerse
                     // durante la llamada de red de abajo.

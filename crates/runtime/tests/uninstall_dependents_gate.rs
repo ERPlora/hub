@@ -164,6 +164,7 @@ impl NativeHandler for OwingEngine {
     ) -> Result<Option<PendingObligation>, RuntimeError> {
         Ok((self.count > 0).then(|| PendingObligation {
             count: self.count,
+            oldest_pending_at: None,
             code: "dloose.unsent_records".to_string(),
             message: format!("{} record(s) still unsent", self.count),
         }))

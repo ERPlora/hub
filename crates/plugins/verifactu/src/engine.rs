@@ -81,12 +81,16 @@ impl NativeHandler for VerifactuEngine {
         hub_id: &str,
         host: &dyn NativeHost,
     ) -> Result<Option<PendingObligation>> {
-        let count = contingency_queue(hub_id, host).await?.depth;
+        let queue = contingency_queue(hub_id, host).await?;
+        let count = queue.depth;
         if count == 0 {
             return Ok(None);
         }
         Ok(Some(PendingObligation {
             count,
+            // Since-when travels with the count (hub#326/hub#1406): same queue read,
+            // so the heartbeat and this refusal can never disagree.
+            oldest_pending_at: queue.oldest_pending_at,
             code: "verifactu.unsent_records".to_string(),
             // English source string; the UI translates against the stable code (ADR-0055).
             message: format!(
