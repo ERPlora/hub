@@ -244,6 +244,63 @@ test('hub#1337: `error` stays plumbing — the hubs that answer it are the ones 
   assert.doesNotMatch(es!, /sqlx/, 'the pre-hub#1074 bucket is what put driver text on a till');
 });
 
+/**
+ * The `REDACTED_MESSAGE` literal a Rust source declares, or `null` when it declares none.
+ *
+ * `\s` and not a space, and that is the whole point (hub#1337). `rustfmt` puts the literal on its
+ * OWN line whenever the declaration does not fit in 100 columns — which is exactly what
+ * `dispatch_api.rs` looks like today:
+ *
+ * ```rust
+ * pub(crate) const REDACTED_MESSAGE: &str =
+ *     "the request could not be completed — the hub recorded the details";
+ * ```
+ *
+ * A pattern that demanded `= "…";` on the same line found ZERO there and the guard below went red
+ * with «found 0 (none)» — not because the constant was gone, but because a line got wrapped. That
+ * is the same class of brittleness the hard-coded path had: a control that stops finding the
+ * positive stops being a control. Lifetimes (`&'static str`) and escaped quotes are tolerated for
+ * the same reason.
+ */
+function redactedLineIn(source: string): string | null {
+  const found = source.match(
+    /const\s+REDACTED_MESSAGE\s*:\s*&\s*(?:'\w+\s+)?str\s*=\s*"((?:[^"\\]|\\.)*)"\s*;/,
+  );
+  return found ? found[1]! : null;
+}
+
+test('hub#1337: the guard reads the constant however `rustfmt` lays it out', () => {
+  // The shape `crates/server/src/dispatch_api.rs` HAS — the one that made this guard find zero.
+  assert.equal(
+    redactedLineIn('pub(crate) const REDACTED_MESSAGE: &str =\n    "wrapped by rustfmt";\n'),
+    'wrapped by rustfmt',
+  );
+  // And the shape it had before the line grew past 100 columns, which must keep working.
+  assert.equal(
+    redactedLineIn('const REDACTED_MESSAGE: &str = "on one line";'),
+    'on one line',
+  );
+  // A lifetime is still a plain `&str` literal.
+  assert.equal(
+    redactedLineIn("pub const REDACTED_MESSAGE: &'static str = \"with a lifetime\";"),
+    'with a lifetime',
+  );
+
+  // POSITIVE CONTROLS — the reason this helper is tested at all is that a finder which never
+  // fails is indistinguishable from one that never looks.
+  assert.equal(redactedLineIn('fn main() {}'), null, 'no declaration is no match');
+  assert.equal(
+    redactedLineIn('const REDACTED_MESSAGE: String = String::new();'),
+    null,
+    'it is not a plain `&str` literal any more, and the guard must say so',
+  );
+  assert.equal(
+    redactedLineIn('const REDACTED_MESSAGE_PREFIX: &str = "not this one";'),
+    null,
+    'a different constant whose name merely starts the same is not the one the door sends',
+  );
+});
+
 test('hub#1337: the redaction line this table recognises is the one `crates/server` sends', () => {
   // The guard under the rule above: `other` is told apart from a redaction by ONE constant, and a
   // constant mirrored across two languages drifts unless something compares them. Same shape as
@@ -260,9 +317,8 @@ test('hub#1337: the redaction line this table recognises is the one `crates/serv
     .filter((entry) => entry.endsWith('.rs'))
     .sort()
     .flatMap((entry) => {
-      const found = readFileSync(join(srcRoot, entry), 'utf8')
-        .match(/const REDACTED_MESSAGE: &str = "([^"]*)";/);
-      return found ? [{ file: entry, line: found[1] }] : [];
+      const found = redactedLineIn(readFileSync(join(srcRoot, entry), 'utf8'));
+      return found === null ? [] : [{ file: entry, line: found }];
     });
 
   assert.equal(
