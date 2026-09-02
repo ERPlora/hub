@@ -16,6 +16,7 @@ pub mod access_email;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
+pub mod gateway_identity;
 pub mod certificate_refetch;
 pub mod commands;
 pub mod device_mode;

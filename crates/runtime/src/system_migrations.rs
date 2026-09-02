@@ -1743,6 +1743,26 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL DEFAULT '';",
     },
 
+    // hub#1432 (hub#985 §1) — the hub's MACHINE identity for the fiscal gateway (ADR-0419).
+    // The private key is GENERATED ON THE HUB and never leaves it (`gateway_identity.rs` is the
+    // only reader/writer): only a CSR travels to the operator, and a signed certificate + the
+    // internal CA come back. `private_key_pem` is encrypted at rest with `secret_box`
+    // (HUB_SECRETS_KEY, fail-closed on write); `certificate_pem`/`ca_pem` are public material.
+    // Singleton per hub (PK `hub_id`), like `_hub_certificate` — a hub has ONE machine identity.
+    // ⚠️ This table must NEVER enter an export bundle: the key not travelling is the whole point
+    // (same rule as ADR-0113's "the password does not travel").
+    SystemMigration {
+        version: 55,
+        name: "hub_gateway_identity",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
+  hub_id TEXT NOT NULL, private_key_pem TEXT NOT NULL, certificate_pem TEXT NOT NULL DEFAULT '', \
+  ca_pem TEXT NOT NULL DEFAULT '', common_name TEXT NOT NULL, \
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
