@@ -162,6 +162,10 @@ for text in strings(steps):
         if event in TRIGGERS and event not in real:
             print("bifurca por %s, pero el on: es %s" % (event, sorted(real)))
 PYEOF
+# A dead interpreter must not look like a clean file: the redirect creates $tmp/dead empty, so
+# without this check a missing PyYAML would pass the case vacuously (ci-prose-matches-triggers
+# fails closed on the same dependency).
+[ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
 dead=$(sort -u "$tmp/dead")
 [ -z "$dead" ] && ok "ningun paso filtra por un evento imposible" \
     || bad "hay una rama inalcanzable en test-hub.yml" "$dead"
@@ -180,6 +184,7 @@ for job in (doc.get("jobs") or {}).values():
         if step.get("if"):
             print("%s -> if: %s" % (step.get("name", "?"), step["if"]))
 PYEOF
+[ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
 gated=$(cat "$tmp/gated")
 [ -z "$gated" ] && ok "cargo test --workspace no lleva if:" \
     || bad "un cargo test puede saltarse en silencio" "$gated"
