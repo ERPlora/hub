@@ -49,12 +49,11 @@
 #
 # On green it publishes a commit status on the pushed sha, and the CONTEXT says
 # which run it was (hub#1207): `local-gate/hub-tests` only for a real full
-# workspace run, `local-gate/hub-tests-scoped` for a scoped one. That matters
-# because `merge-pr.sh` reads the first as proof the WORKSPACE suite ran; a
-# scoped run posting it would answer a question it never tested. With its own
-# context, merge-pr.sh sees the full-suite one as absent and falls through to
-# the `cargo test --workspace` check Actions really did run — and still refuses
-# to merge when neither exists (pm#58/#60). The status is an ATTESTATION that
+# workspace run, `local-gate/hub-tests-scoped` for a scoped one. The seal always
+# names what really ran; `merge-pr.sh` accepts either as proof this push's Rust
+# was tested (pm#230 — before that it only took the full one, which is why the
+# policy default used to be `workspace`), and still refuses to merge when
+# neither exists or the seal is not green. The status is an ATTESTATION that
 # the run happened here — it is not an independent verification. It posts only AFTER a background step
 # verifies the remote ref really advanced to (or past) the pushed sha
 # (hub#574): a pre-push runs before the transfer and cannot know whether the
@@ -902,9 +901,10 @@ export HUB_GATE_SCOPE_PACKAGES="$SCOPE_PACKAGES"
 # that is the question it asks ("did the thing that tests this run?"). A scoped
 # run publishing that context would answer yes to a question it did not test,
 # which is the same antipattern as a test asserting on prose. So a scoped run
-# gets its own context: merge-pr.sh then sees the full-suite one as ABSENT and
-# falls through to the `cargo test --workspace` check that Actions really did
-# run on the PR — and still refuses to merge if that check is missing or red.
+# gets its own context, `local-gate/hub-tests-scoped`, which merge-pr.sh accepts
+# as proof of THIS push's Rust since pm#230 — the full workspace net runs
+# post-merge on develop/main (hub#572). It still refuses to merge when neither
+# seal exists or the seal it finds is not green.
 # The description says the packages out loud, so the PR page shows the scope.
 GATE_CMD_LABEL="cargo test --workspace"
 if [ "$SCOPE_MODE" = packages ]; then
