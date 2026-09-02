@@ -110,6 +110,21 @@ pub struct DailyUsageHeartbeat {
     /// Ausente donde el kernel no expone `memory.peak` (< 5.19) o fuera de contenedor.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_peak_mb: Option<f64>,
+    /// Cuál de las DOS vías EXCLUYENTES (ADR-0320 §1, hub#1314) lleva los registros de este hub a
+    /// la AEAT: `own` = el obligado firma y remite con su certificado —**el Anexo I no le
+    /// aplica**—; `delegated` = ERPlora remite en su nombre con su Sello, que es exactamente lo
+    /// que autoriza el otorgamiento firmado.
+    ///
+    /// Sale de [`erplora_runtime::certificate::transmission_route`], la MISMA función con la que
+    /// el hub decide su go-live y pinta su propia pantalla. Que la resolviera el Cloud por su
+    /// cuenta sería una segunda regla, y dos reglas separadas es como la pantalla y la puerta
+    /// acaban discrepando sobre la vía de un negocio.
+    ///
+    /// **Ausente = no se pudo leer**, nunca «volvió a `delegated`»: misma semántica que
+    /// `orders_today` y `cert_version` arriba, y aquí cuesta un documento legal de más. El Cloud
+    /// deja su espejo como estaba (saas#1745) — el silencio no mueve la columna.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transmission_route: Option<&'static str>,
 }
 
 /// Un MB en bytes, para la conversión a las unidades del Cloud (1024·1024, la misma base que
@@ -350,6 +365,15 @@ pub async fn collect_daily_usage(
         memory_used_mb: None,
         memory_limit_mb: None,
         memory_peak_mb: None,
+        // La vía por la que este hub remite (hub#1441). SÍ se lee aquí, y no en el llamador como
+        // el certificado delegado: es una consulta barata a las mismas tablas que las de arriba y
+        // los DOS latidos —el de arranque y el tick de 24 h— la necesitan igual. Rellenarla en un
+        // solo llamador dejaría al otro mandando un cuerpo sin vía, y el Cloud no distingue «este
+        // latido no la trae» de «este hub no la sabe». `Err` viaja como ausencia (`.ok()`), que es
+        // lo que el contrato reserva para «no pude leerlo».
+        transmission_route: erplora_runtime::certificate::transmission_route(db, hub_id)
+            .await
+            .ok(),
     }
 }
 
@@ -511,6 +535,7 @@ mod tests {
             memory_used_mb: Some(10.0),
             memory_limit_mb: Some(96.0),
             memory_peak_mb: Some(192.0),
+            transmission_route: None,
         };
         send_heartbeat(
             &reqwest::Client::new(),
@@ -566,6 +591,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
@@ -595,6 +621,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         let body = serde_json::to_value(&usage).unwrap();
         assert_eq!(
@@ -630,6 +657,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         // La fixture del free tier real (system_metrics): 10 MiB usados de 96 MiB, 0,5 de 1 core.
         usage.set_resource_metrics(
@@ -690,6 +718,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         usage.set_resource_metrics(
             crate::system_metrics::MemoryMetric {
@@ -735,6 +764,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         usage.set_resource_metrics(
             crate::system_metrics::MemoryMetric {
@@ -777,6 +807,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
@@ -933,6 +964,7 @@ mod tests {
                 memory_used_mb: None,
                 memory_limit_mb: None,
                 memory_peak_mb: None,
+                transmission_route: None,
             },
         )
         .await
@@ -988,6 +1020,7 @@ mod tests {
                 memory_used_mb: None,
                 memory_limit_mb: None,
                 memory_peak_mb: None,
+                transmission_route: None,
             },
         )
         .await
@@ -1024,6 +1057,7 @@ mod tests {
             memory_used_mb: None,
             memory_limit_mb: None,
             memory_peak_mb: None,
+            transmission_route: None,
         };
 
         let wire = serde_json::to_value(&body).expect("el latido tiene que serializar");
