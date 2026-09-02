@@ -2147,7 +2147,7 @@ mod tests {
     // demo's ⛔ without making one of them lie is to put the data there for real.
 
     /// 🔴 A demo hub is handed a fiscal identity at boot, so the gate of ADR-0203 has something to
-    /// 🔒 Decision pin (2026-09-02, hub#985 §1 E2E): the demo boots as the Sello's OWN holder.
+    /// 🔒 Decision pin (2026-09-02, hub#1452 · hub#985 §1 E2E): the demo boots as the Sello's OWN holder.
     ///
     /// Measured against the AEAT preproduction through the gateway: `B00000000` → Fault 4116
     /// (malformed NIF), a checksum-valid stranger → Fault 4112 (the certificate holder may only

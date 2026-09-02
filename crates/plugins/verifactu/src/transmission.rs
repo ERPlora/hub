@@ -1003,7 +1003,7 @@ mod tests {
 
     // ── a delivered body that is not a verdict is a VISIBLE failure (2026-09-02) ──────────────
 
-    /// The live bug: a SOAP Fault filed as an all-empty verdict — «AEAT (testing): » with no
+    /// The live bug (hub#1452): a SOAP Fault filed as an all-empty verdict — «AEAT (testing): » with no
     /// code, no message, no clue. The Fault below is the AEAT preproduction's real answer to
     /// the old demo tax id (`B00000000`, Fault 4116), captured on 2026-09-02.
     #[test]
