@@ -173,12 +173,11 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
+      # Sin `fetch-depth`: el default (1 commit) basta. Los dos commits que se pedían aquí eran
+      # para el `git diff HEAD^1 HEAD` del paso de alcance, y ese paso se fue con hub#1463 — nada
+      # más en este workflow lee historia.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # 2 = the PR merge commit AND its two parents: `git diff HEAD^1 HEAD` is exactly the PR's
-          # diff against its base at merge time, which is what the scope step below needs.
-          fetch-depth: 2
 
       # Contrato del cableado de lints (hub#1242): que la tabla `[workspace.lints]` exista, que
       # TODOS los miembros la hereden y que el paso de clippy de más abajo siga aquí y antes de la
@@ -187,9 +186,11 @@ jobs:
       - name: Contrato del gate de lints (hub#1242)
         run: bash scripts/tests/clippy-lints.test.sh
 
-      # Contrato del alcance (hub#1207 llevado a CI): el resolutor que decide qué paquetes corre
-      # una PR existe, respeta las reglas (dependientes, transversal, no reclamado) y este workflow
-      # está cableado a él. Mismo motivo que arriba: un cable suelto no da rojo por sí solo.
+      # Contrato del alcance (hub#1207): el resolutor que decide qué paquetes corre una pasada
+      # existe y respeta las reglas (dependientes, transversal, no reclamado). Quien lo CONSUME es
+      # el gate pre-push; aquí ya no se acota nada (hub#1463), y la batería incluye los casos que
+      # lo fijan. Se ejecuta desde este workflow porque una batería que no invoca nadie no deja
+      # rojo en ningún sitio (hub#1392). Mismo motivo que arriba: va antes de la suite.
       - name: Contrato del alcance de la suite (scripts/ci/test-scope.py)
         run: bash scripts/tests/test-scope.test.sh
 
@@ -335,47 +336,7 @@ jobs:
       # the sources the job on the other slot is compiling from. That is what killed the Android
       # release build of v1.1.1 (hub#886); this workflow reaches the same registry, so it carries
       # the same guard. Long version in `test-shell.yml`.
-      # ── Alcance de la suite (hub#1207, ahora también en CI) ──────────────────────────────────
-      # En una PR se corren los paquetes que el diff puede alcanzar (dependientes incluidos, por
-      # `cargo metadata`); un push a develop/main corre el workspace entero. Medido el 29/08: la
-      # suite completa son 25 min de ranura y una PR se re-empuja 2-3 veces en revisión, así que la
-      # MITAD de los minutos del runner se iban en runs cancelados. Lo transversal (Cargo.lock,
-      # manifest, toolchain, schemas/) o un fichero Rust sin dueño ensanchan al workspace: el coste
-      # de un paquete olvidado es un develop rojo, y eso no se ahorra.
-      - name: Alcance de la suite (PR → paquetes alcanzados · develop/main → workspace)
-        id: scope
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-            echo "::notice::push a ${{ github.ref_name }}: suite completa"
-            exit 0
-          fi
-          # ⚠️ En una PR con Rust NO se acota. Este check se llama `cargo test --workspace` y es lo
-          # que AUTORIZA el merge (pm#58/#60): `merge-pr.sh` exige verlo en verde y NO acepta la
-          # atestación acotada del gate local como prueba de la suite completa. Acotarlo aquí
-          # dejaría el nombre mintiendo y devolvería el agujero de hub#572 (dos PRs verdes por
-          # separado que rompen develop juntas). Lo único que se ahorra es la PR SIN Rust, donde no
-          # hay nada que compilar y `merge-pr.sh` tampoco pide el check.
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed"
-          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/meta.json"
-          if ! python3 scripts/ci/test-scope.py "$RUNNER_TEMP/meta.json" erplora-tauri tauri-plugin-erplora-android \
-               < "$RUNNER_TEMP/changed" > "$RUNNER_TEMP/scope"; then
-            echo "::warning::el resolutor de alcance falló — se corre el workspace entero"
-            printf 'workspace\nresolver failed\n' > "$RUNNER_TEMP/scope"
-          fi
-          mode=$(sed -n 1p "$RUNNER_TEMP/scope"); reason=$(sed -n 2p "$RUNNER_TEMP/scope")
-          if [ "$mode" = packages ]; then
-            mode=workspace
-            reason="$reason — pero una PR con Rust corre el workspace entero (pm#58/#60)"
-          fi
-          select=$(sed -n '3,$p' "$RUNNER_TEMP/scope" | sed 's/^/-p /' | tr '\n' ' ')
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "select=$select" >> "$GITHUB_OUTPUT"
-          echo "::notice::alcance: $mode — $reason ${select:+($select)}"
-
       - name: Rust cache
-        if: steps.scope.outputs.mode != 'none'
         uses: Swatinem/rust-cache@v2
         with:
           cache-bin: false
@@ -409,25 +370,13 @@ jobs:
       # `--no-deps`: linta el workspace, no las ~600 cajas de terceros (sus avisos no los
       # arreglamos y solo ensucian el log).
       - name: cargo clippy --workspace
-        if: steps.scope.outputs.mode != 'none'
         run: |
           cargo clippy --workspace --all-targets --no-deps \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
 
       - name: cargo test --workspace
-        if: steps.scope.outputs.mode == 'workspace'
         id: tests
         run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android
-
-      # Misma suite, acotada a lo que el diff alcanza. Hoy NADIE emite `packages` (una PR con Rust
-      # se ensancha arriba, y develop/main corren el workspace por definición): el paso se queda
-      # porque el resolutor sí sabe acotar y es lo que consumirá el gate local (hub#1347). Si algún
-      # día se decide acotar también en la PR, hay que cambiar ANTES `merge-pr.sh`, que exige ver
-      # `cargo test --workspace` en verde para autorizar el merge. `--exclude` solo existe con
-      # `--workspace`, por eso es un paso hermano y no una variable en el de arriba.
-      - name: cargo test (alcance de la PR)
-        if: steps.scope.outputs.mode == 'packages'
-        run: cargo test ${{ steps.scope.outputs.select }}
 
       # When the POST-MERGE run on develop goes red (hub#572), make it loud:
       # open (or refresh, idempotently — one open issue, never one per run) an
