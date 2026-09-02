@@ -1157,6 +1157,176 @@ grep -q 'toy-c' <<<"$args"                         || errs="$errs description-do
     && ok "attestation: a scoped run posts its OWN context and names the packages" \
     || bad "attestation: a scoped run posts its OWN context and names the packages" "$errs args='$args'"
 
+# ── 40b. hub#1451: `scoped` es el DEFECTO fuera de develop/main ──────────────
+#
+#    Hasta aquí el defecto era `workspace` (29/08, pm#197/hub#1346): Actions dejó de correr la
+#    suite en las PRs y `merge-pr.sh` solo aceptaba `local-gate/hub-tests`, así que una pasada
+#    acotada dejaba la PR sin poder mergearse. Eso lo cierra pm#230 —el script acepta también
+#    `local-gate/hub-tests-scoped`— y con ello el defecto puede volver a ser el alcance.
+#
+#    La regla es la REF EMPUJADA, no el diff:
+#      · una rama de PR  → `scoped`   (el diff decide qué paquetes corren)
+#      · develop / main  → `workspace` (post-merge: es el árbol que de verdad se despliega)
+#      · un tag, o una ref que no se pudo leer → `workspace` (conservador: una release no se acota)
+#    `HUB_GATE_SCOPE_POLICY` sigue forzando los dos modos, que es el escape para depurar.
+#
+#    Lo que NO cambia y estos casos vigilan: un diff transversal se ensancha igual (el resolutor
+#    manda sobre la política), el sello sigue diciendo la verdad de lo que corrió, y un rojo sigue
+#    abortando el push.
+
+# Igual que `run_scoped` pero SIN fijar la política: mide el DEFECTO, que es lo que hub#1451
+# cambia. La ref empujada es un parámetro porque es justo lo que decide el modo.
+run_default_ref() {
+    local repo=$1 sha=$2 ref=$3
+    shift 3
+    rm -f "$repo/SCOPE"
+    run_hook "$repo" "$ref $sha $ref $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        HUB_GATE_TEST_CMD='printf "%s|%s\n" "$HUB_GATE_SCOPE_MODE" "$HUB_GATE_SCOPE_PACKAGES" > '"$repo/SCOPE" \
+        "$@"
+}
+
+# 40b.1 — una rama de PR corre POR ALCANCE sin que nadie pida nada.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/1451-algo)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                  || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+grep -q '^packages|' <<<"$scope" || errs="$errs default-on-a-PR-branch-is-NOT-scoped"
+grep -q 'toy-c' <<<"$scope"      || errs="$errs missing-touched-package"
+grep -q 'toy-a' <<<"$scope"      && errs="$errs pulled-in-untouched-toy-a"
+[ -z "$errs" ] \
+    && ok "hub#1451: por DEFECTO una rama de PR corre por ALCANCE, no el workspace" \
+    || bad "hub#1451: por DEFECTO una rama de PR corre por ALCANCE, no el workspace" "$errs scope='$scope'"
+
+# 40b.2 — develop y main NO se acotan: son el árbol que se despliega, y ahí la red completa es
+#         el punto, no el coste.
+for integration in develop main; do
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+    code=$(run_default_ref "$repo" "$sha" "refs/heads/$integration")
+    scope=$(cat "$repo/SCOPE" 2>/dev/null)
+    errs=""
+    [ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+    grep -q '^workspace|' <<<"$scope" || errs="$errs push-to-$integration-got-scoped"
+    [ -z "$errs" ] \
+        && ok "hub#1451: un push a $integration corre el WORKSPACE aunque el diff sea de un crate" \
+        || bad "hub#1451: un push a $integration corre el WORKSPACE aunque el diff sea de un crate" "$errs scope='$scope'"
+done
+
+# 40b.3 — un TAG tampoco. El hub solo se despliega con un tag `v1.1.N`: acotar ahí sería firmar
+#         una release con una pasada parcial.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/tags/v1.1.99)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs tag-push-got-scoped"
+[ -z "$errs" ] \
+    && ok "hub#1451: un push de TAG corre el workspace (una release no se acota)" \
+    || bad "hub#1451: un push de TAG corre el workspace (una release no se acota)" "$errs scope='$scope'"
+
+# 40b.4 — el escape sigue existiendo en LOS DOS sentidos.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/x HUB_GATE_SCOPE_POLICY=workspace)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs env-workspace-did-not-override-the-default"
+[ -z "$errs" ] \
+    && ok "hub#1451: HUB_GATE_SCOPE_POLICY=workspace fuerza la suite entera en una rama de PR" \
+    || bad "hub#1451: HUB_GATE_SCOPE_POLICY=workspace fuerza la suite entera en una rama de PR" "$errs scope='$scope'"
+
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/develop HUB_GATE_SCOPE_POLICY=scoped)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                  || errs="$errs exit=$code(want 0)"
+grep -q '^packages|' <<<"$scope" || errs="$errs env-scoped-did-not-override-on-develop"
+[ -z "$errs" ] \
+    && ok "hub#1451: HUB_GATE_SCOPE_POLICY=scoped fuerza el alcance incluso en develop" \
+    || bad "hub#1451: HUB_GATE_SCOPE_POLICY=scoped fuerza el alcance incluso en develop" "$errs scope='$scope'"
+
+# 40b.5 — EL control que sostiene todo lo demás: el resolutor manda sobre la política. Un diff que
+#         toca `schemas/` —el contrato que leen los tests del runtime, o sea las baterías de
+#         módulos— se ensancha al workspace ESTANDO en una rama de PR y en modo por defecto.
+#         Sin esto, «scoped por defecto» sería una vía para colar un cambio de contrato sin que
+#         nadie corriera lo que ese contrato gobierna.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" schemas/module.schema.json)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/contrato)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs schemas-diff-stayed-scoped"
+[ -z "$errs" ] \
+    && ok "hub#1451: tocar schemas/ ESCALA al workspace aun en una rama y en modo por defecto" \
+    || bad "hub#1451: tocar schemas/ ESCALA al workspace aun en una rama y en modo por defecto" "$errs scope='$scope'"
+
+# 40b.6 — y un ROJO sigue abortando el push. Un gate más rápido que deja pasar un rojo no es un
+#         gate rápido: es ningún gate.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+# `false`, no `exit 1`: el hook hace `eval "$test_cmd"`, así que un `exit` se lleva por delante
+# al propio hook y el caso mediría otra cosa.
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/rojo HUB_GATE_TEST_CMD="touch $repo/RAN; false")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]              || errs="$errs exit=$code(want 1)"
+[ -f "$repo/RAN" ]           || errs="$errs the-suite-never-ran"
+grep -qi 'ABORTED' <<<"$out" || errs="$errs does-not-say-the-push-was-aborted"
+[ -z "$errs" ] \
+    && ok "hub#1451: en modo por defecto un test ROJO sigue abortando el push" \
+    || bad "hub#1451: en modo por defecto un test ROJO sigue abortando el push" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
+# 40b.7 — el sello dice la verdad de lo que corrió, en los dos lados del defecto: la rama publica
+#         el contexto ACOTADO (el que `merge-pr.sh` acepta desde pm#230) y develop el COMPLETO.
+for pair in "refs/heads/fix/sello|local-gate/hub-tests-scoped" "refs/heads/develop|local-gate/hub-tests"; do
+    ref=${pair%%|*}; want=${pair##*|}
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+    ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    "repo view") echo 'ERPlora/hub'; exit 0 ;;
+    "auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+    code=$(run_hook "$repo" "$ref $sha $ref $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+        HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+        HUB_GATE_TEST_CMD="true")
+    sleep 2
+    args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+    errs=""
+    [ "$code" = 0 ]                          || errs="$errs exit=$code(want 0)"
+    grep -q "context=$want" <<<"$args"       || errs="$errs did-not-post-$want"
+    if [ "$want" = local-gate/hub-tests ]; then
+        grep -q -- '--workspace' <<<"$args"  || errs="$errs full-run-does-not-claim-workspace"
+    else
+        grep -q -- '--workspace' <<<"$args"  && errs="$errs scoped-run-claims-workspace"
+        grep -q 'context=local-gate/hub-tests ' <<<"$args " && errs="$errs scoped-run-claimed-the-full-context"
+    fi
+    [ -z "$errs" ] \
+        && ok "hub#1451: el sello por defecto de $ref es $want" \
+        || bad "hub#1451: el sello por defecto de $ref es $want" "$errs args='$args'"
+done
+
 # ── 41. A real full-workspace run keeps the full-suite context and wording ────
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
@@ -1489,8 +1659,13 @@ errs=""
     && ok "web: un diff de solo documentacion no corre nada" \
     || bad "web: un diff de solo documentacion no corre nada" "$errs"
 
-# 5. Politica por defecto = WORKSPACE. Desde que Actions no corre la suite en las PRs, un
-#    `packages` local dejaria el merge autorizado por una pasada parcial (pm#58/#60): se ensancha.
+# 5. Politica por defecto = la que dicta la REF (hub#1451). Este caso decia lo contrario —«por
+#    defecto una PR con Rust corre el WORKSPACE entero»— y era correcto con SU premisa: el 29/08
+#    (pm#197) Actions dejo de correr la suite en las PRs y `merge-pr.sh` solo aceptaba
+#    `local-gate/hub-tests`, asi que una pasada acotada dejaba la PR inmergeable. pm#230 acepta
+#    tambien `local-gate/hub-tests-scoped`, la premisa cae, y con ella este contrato: se REESCRIBE
+#    a proposito, no se ajusta al codigo. El desglose completo de la regla nueva —develop/main,
+#    tags, los dos escapes, la escalada por `schemas/`— esta en el bloque 40b.
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
@@ -1500,11 +1675,11 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD='printf "%s\n" "$HUB_GATE_SCOPE_MODE" > '"$repo/SCOPE")
 errs=""
 [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
-[ "$(cat "$repo/SCOPE" 2>/dev/null)" = workspace ] \
-    || errs="$errs mode=$(cat "$repo/SCOPE" 2>/dev/null)(want workspace)"
+[ "$(cat "$repo/SCOPE" 2>/dev/null)" = packages ] \
+    || errs="$errs mode=$(cat "$repo/SCOPE" 2>/dev/null)(want packages)"
 [ -z "$errs" ] \
-    && ok "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" \
-    || bad "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" "$errs"
+    && ok "politica: por defecto una rama de PR corre por ALCANCE (hub#1451 enmienda pm#197)" \
+    || bad "politica: por defecto una rama de PR corre por ALCANCE (hub#1451 enmienda pm#197)" "$errs"
 
 # 6. Sin base contra la que diffear no se sabe que toca el cambio: para Rust ya se ensancha al
 #    workspace, y para web hay que ser igual de conservador o el diff se cuela sin probar.
