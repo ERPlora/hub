@@ -14,7 +14,9 @@
 // translation), so a module that shows `e.message` is right without changing a line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ErploraError, HttpWsTransport, platformFailureMessage } from './index.ts';
 
 /** The runtime's answer, verbatim in shape: envelope, stable code, app as a field. */
@@ -145,14 +147,14 @@ test('hub#1070/#1185: `invalid_field` pasa intacto — su `detail` dice más de 
 // hub#1315: `apps/web/src/lib/platform-failure.ts` (hub#1258) kept a BYTE-IDENTICAL copy of these
 // same ten sentences for the shell, over vue-i18n keys instead of this table — a wording tweak on
 // either side would drift the other in silence, and this table was already missing `manifest`
-// (a code `may_reach_the_client`, `crates/server/src/lib.rs`, redacts exactly like its five
+// (a code `may_reach_the_client`, `crates/server/src/dispatch_api.rs`, redacts exactly like its five
 // plumbing siblings, but one only a module-INSTALL-time error had ever needed). This test is the
 // guard: the shell now imports `platformFailureMessage` straight from this file instead of holding
 // its own catalogue, so any code the runtime's authenticated door can answer with has to have an
 // entry HERE, in both languages, or a screen falls back to the runtime's raw English sentence
 // (`hub#1102`'s original bug, for a code nobody thought to cover).
 test('hub#1315: every code the authenticated door can answer with has an entry, in both languages', () => {
-  // Mirrors `may_reach_the_client` (`crates/server/src/lib.rs`): the six codes it redacts to the
+  // Mirrors `may_reach_the_client` (`crates/server/src/dispatch_api.rs`): the six codes it redacts to the
   // fixed PLUMBING line — db/io/wasm/native/schema/manifest — plus the four whose remedy names an
   // app (`error_code_of`, `crates/runtime/src/error_registry.rs`).
   const codes = [
@@ -174,7 +176,7 @@ test('hub#1315: every code the authenticated door can answer with has an entry, 
 
 // ── hub#1337 — `other` is NOT plumbing, and the runtime already said so ────────────────────────
 //
-// `may_reach_the_client` (`crates/server/src/lib.rs`) puts `E::Other(_)` on the SPEAKING side of
+// `may_reach_the_client` (`crates/server/src/dispatch_api.rs`) puts `E::Other(_)` on the SPEAKING side of
 // the door — the same side as `Domain`, `InvalidField` or `PermissionDenied` — with
 // `carries_driver_text` as the net underneath it, precisely so that the readable half of the ~50
 // `Other(...)` sites ("usuario no encontrado", `hub_users.rs`) reaches whoever is reading while the
@@ -246,16 +248,32 @@ test('hub#1337: the redaction line this table recognises is the one `crates/serv
   // The guard under the rule above: `other` is told apart from a redaction by ONE constant, and a
   // constant mirrored across two languages drifts unless something compares them. Same shape as
   // `contract:check` — the copy is checked against the source, not trusted.
-  const lib = readFileSync(new URL('../../../crates/server/src/lib.rs', import.meta.url), 'utf8');
-  const declared = lib.match(/const REDACTED_MESSAGE: &str = "([^"]*)";/);
+  //
+  // The source file is FOUND, never pinned. hub#1418 split `crates/server/src/lib.rs` and carried
+  // `REDACTED_MESSAGE` over to `dispatch_api.rs`; a hard-coded path turned this guard into a red
+  // that rode on every push of the web stage instead of a check that reads the constant. So walk
+  // `crates/server/src/` and demand EXACTLY ONE declaration: zero means the constant is gone or is
+  // no longer a plain `&str` literal, and two means a split left divergent copies, with neither
+  // this table nor the reader knowing which one the door actually sends.
+  const srcRoot = fileURLToPath(new URL('../../../crates/server/src/', import.meta.url));
+  const declared = readdirSync(srcRoot, { recursive: true, encoding: 'utf8' })
+    .filter((entry) => entry.endsWith('.rs'))
+    .sort()
+    .flatMap((entry) => {
+      const found = readFileSync(join(srcRoot, entry), 'utf8')
+        .match(/const REDACTED_MESSAGE: &str = "([^"]*)";/);
+      return found ? [{ file: entry, line: found[1] }] : [];
+    });
 
-  assert.ok(
-    declared,
-    '`REDACTED_MESSAGE` is no longer a plain `&str` literal in `crates/server/src/lib.rs`: ' +
+  assert.equal(
+    declared.length,
+    1,
+    'expected exactly ONE `const REDACTED_MESSAGE: &str = "…";` under `crates/server/src/`, found ' +
+      `${declared.length} (${declared.map((d) => d.file).join(', ') || 'none'}): ` +
       'hub#1337 tells an authored `other` from a redacted one by comparing against it',
   );
   assert.equal(
-    declared![1],
+    declared[0]!.line,
     RUNTIME_REDACTED_LINE,
     'the runtime changed its redaction line and `PLATFORM_FAILURES.other` would start showing it ' +
       'raw, in English, on a Spanish till',
