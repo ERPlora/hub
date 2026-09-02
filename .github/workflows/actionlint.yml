@@ -69,6 +69,10 @@ on:
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
+      # El guardia de los puertos de los service containers (hub#898). La regla que vigila vive
+      # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
+      # toque ÚNICAMENTE el guardia ejecute sus propios casos.
+      - 'scripts/tests/service-container-ports.test.sh'
       # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
       # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
       # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
@@ -232,3 +236,16 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
+      # ── Los puertos de los service containers (hub#898) ───────────────────────────────
+      # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y
+      # no dejó nada que sostuviera la regla. El saas reestrenó la MISMA incidencia el 2026-09-02
+      # (saas#1790): su job de migraciones seguía con `5432:5432`, y como bloquea el deploy dejó
+      # tres despliegues a PRE sin salir en 21 h. Las ranuras de `ci-runner-1` comparten un solo
+      # demonio Docker, así que el segundo job concurrente muere en «Initialize containers» sin
+      # un solo `FAILED` que buscar. Este paso es lo que impide el tercer estreno: recorre TODOS
+      # los workflows, así que uno nuevo no puede quedarse fuera por no estar apuntado.
+      - name: Puertos de los service containers (hub#898)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/service-container-ports.test.sh
