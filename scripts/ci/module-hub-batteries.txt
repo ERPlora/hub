@@ -86,3 +86,13 @@ staff/tests/commissions.hub.test.py
 
 # verifactu_desglose_e2e sigue en el hub (verifactu#67, mergeada el 2026-09-01)
 verifactu/tests/desglose.hub.test.py
+
+# ── Baterías NUEVAS: en el hub NUNCA hubo un e2e que retirar ────────────────────────────────
+# El tercer origen de una línea aquí, y el que la lista no contemplaba: una batería que no
+# hereda de nadie porque nace en el módulo, cubriendo una cadena que el kernel nunca afirmó.
+# No lleva par en `kernel-e2e-targets.txt` — no hay nada que borrar allí — y por eso el guard es
+# el único sitio donde queda constancia de que existe.
+
+# combos × sales × inventory: que un menú mueva el stock de sus COMPONENTES no lo afirmaba
+# ningún e2e del hub (inventory#73). Cobertura nueva, no mudada (inventory#77, v1.2.44).
+inventory/tests/combo_stock.hub.test.py
