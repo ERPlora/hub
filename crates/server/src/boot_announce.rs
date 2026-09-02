@@ -77,7 +77,8 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     let mut usage = {
         let runtime = state.runtime.read().await;
         let now = chrono::Utc::now().to_rfc3339();
-        daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now).await
+        let pending = runtime.pending_obligations().await;
+        daily_usage::collect_daily_usage(runtime.db(), runtime.hub_id(), &now, &pending).await
     };
     // hub#975: el latido de arranque lleva la misma telemetría de recursos que el diario —
     // fuera del lock del runtime (el sampler de CPU duerme 100 ms) y best-effort igual que él.

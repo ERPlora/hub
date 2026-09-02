@@ -152,17 +152,27 @@ fn generate() -> String {
 /// `(method, path, auth class)` for every route of `app()`, ordered by path then method.
 fn routes_of_app() -> Vec<(String, String, String)> {
     let sources = crate_sources();
-    let lib = sources.get("lib").expect("crates/server/src/lib.rs");
-    let blanked = blank_noise(lib);
+    // hub#1404 split `lib.rs`: `pub fn app(` lives in its own module now, so the router
+    // source is WHICHEVER file declares it, not `lib.rs` by name.
+    let router_src = sources
+        .values()
+        .find(|src| blank_noise(src).contains("pub fn app("))
+        .expect("crates/server/src/** declara `pub fn app(`");
+    let blanked = blank_noise(router_src);
     let bodies = item_bodies(&sources);
 
     let classes = class_map(&bodies);
 
     let body = app_body(&blanked);
     let mut rows: BTreeMap<(String, String), String> = BTreeMap::new();
-    for (path, expr) in route_calls(&blanked, lib, body) {
+    for (path, expr) in route_calls(&blanked, router_src, body) {
         for (method, handler) in method_handlers(&expr) {
-            let key = split_handler(&handler);
+            let mut key = split_handler(&handler);
+            if !classes.contains_key(&key) {
+                if let Some(resolved) = resolve_unqualified(&key.1, &bodies) {
+                    key = resolved;
+                }
+            }
             let found = classes.get(&key).cloned().unwrap_or_default();
             let class = if found.is_empty() {
                 "none".to_string()
@@ -252,6 +262,38 @@ fn method_handlers(expr: &str) -> Vec<(String, String)> {
     out
 }
 
+/// The files hub#1404 split the old `lib.rs` into. Before the split every one of these
+/// items lived in ONE file and an unqualified call between them resolved for free; the
+/// flat fallback below reproduces exactly that graph — and nothing more: a caller
+/// OUTSIDE this set never gained resolution from the split, so it must not gain it now.
+const SPLIT_FILES: [&str; 9] = [
+    "assistant_api",
+    "auth_api",
+    "boot",
+    "cloud_proxy",
+    "config",
+    "dispatch_api",
+    "load_shed",
+    "module_api",
+    "routes",
+];
+
+fn is_split_file(file: &str) -> bool {
+    SPLIT_FILES.contains(&file)
+}
+
+/// The (file, fn) of the ONE split file defining `name`, if exactly one does.
+fn resolve_unqualified(
+    name: &str,
+    bodies: &BTreeMap<(String, String), String>,
+) -> Option<(String, String)> {
+    let mut hits = bodies
+        .keys()
+        .filter(|(f, n)| n == name && is_split_file(f));
+    let first = hits.next()?.clone();
+    hits.next().is_none().then_some(first)
+}
+
 fn split_handler(handler: &str) -> (String, String) {
     match handler.rsplit_once("::") {
         Some((module, name)) => (
@@ -287,11 +329,22 @@ fn class_map(
         classes.insert(key.clone(), direct);
         let callees = called_names(body)
             .into_iter()
-            .map(|call| match call.split_once("::") {
-                Some((m, n)) => (m.to_string(), n.to_string()),
-                None => (key.0.clone(), call),
+            .filter_map(|call| {
+                let k = match call.split_once("::") {
+                    Some((m, n)) => (m.to_string(), n.to_string()),
+                    None => {
+                        let local = (key.0.clone(), call.clone());
+                        if bodies.contains_key(&local) {
+                            local
+                        } else if is_split_file(&key.0) {
+                            resolve_unqualified(&call, bodies)?
+                        } else {
+                            return None;
+                        }
+                    }
+                };
+                (bodies.contains_key(&k) && k != *key).then_some(k)
             })
-            .filter(|k| bodies.contains_key(k) && k != key)
             .collect();
         edges.insert(key.clone(), callees);
     }

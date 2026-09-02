@@ -48,6 +48,16 @@
 # (hub#574): a pre-push runs before the transfer and cannot know whether the
 # push will land.
 #
+# Two more contexts cover the shapes that are NOT a Rust run (pm#198, hub#1368):
+# `local-gate/hub-web` whenever the web stage ran green — next to a Rust run or
+# alone — and `local-gate/no-suite-needed` when the diff touches neither Rust
+# nor web. Since hub#1352 the cloud keeps only path-filtered workflows, so those
+# two shapes fire NO workflow: without a seal the PR reports zero checks, which
+# from the PR page and from `merge-pr.sh` is indistinguishable from a dead
+# Actions, and the PR becomes immergeable (hub#1361, hub#1402). A web stage
+# skipped with SKIP_HUB_WEB=1 publishes nothing: a bypass produces ABSENCE of
+# seal, never a false seal.
+#
 # ── ARMING ───────────────────────────────────────────────────────────────────
 #     git config --bool hooks.hubPrepushGate true      # arm
 #     git config --bool hooks.hubPrepushGate false     # disarm
@@ -59,6 +69,7 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   (HUB_GATE_STATUS_CMD is invoked with $1 = sha, $2 = context, $3 = description)
 #   HUB_GATE_METADATA_CMD · HUB_GATE_BASE_REFS · HUB_GATE_EXCLUDES ·
 #   HUB_GATE_RUST_DIRS · HUB_GATE_NO_SELFHEAL (hub#1207: the scope resolver and
 #   the self-resync, driven without cargo, without GitHub and without touching
@@ -76,6 +87,17 @@ set -uo pipefail
 
 ZERO=0000000000000000000000000000000000000000
 CONTEXT=local-gate/hub-tests
+# The two seals for what is NOT a Rust run (pm#198, hub#1368). Since hub#1352
+# Actions keeps only path-filtered workflows, so a hub PR that touches ONLY web
+# or ONLY docs reports ZERO checks — indistinguishable from a dead CI on the PR
+# page. `merge-pr.sh` refuses that silence unless one of these vouches for the
+# head sha:
+#   · local-gate/hub-web          — the web stage ran green on this machine;
+#   · local-gate/no-suite-needed  — the diff touches neither Rust nor web, the
+#                                   gate resolved it and there was nothing to run.
+# A bypass (SKIP_HUB_WEB=1) publishes NEITHER: absence of seal, never a false one.
+WEB_CONTEXT=local-gate/hub-web
+NO_SUITE_CONTEXT=local-gate/no-suite-needed
 PG_CONTAINER=erplora-test-pg-5433
 PG_DSN=postgres://postgres:test@localhost:5433/hub_test
 # pgvector, not plain `postgres:18` — `crates/vector/tests/pg_store.rs` does `CREATE EXTENSION
@@ -324,7 +346,8 @@ mkdir -p "$STATE_DIR"
 # What shrinks is how long it is held, and a lock held for minutes drains a
 # queue that a lock held for forty minutes does not.
 #
-# Ownership is asked of `cargo metadata`, never hand-mapped, and it is
+# Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
+# `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
 # deliberately conservative in three places:
 #   · DEPENDENTS come along — touching `erplora-db` runs whoever builds on it,
 #     because that is the breakage a scoped gate would otherwise wave through;
@@ -341,6 +364,13 @@ GATE_EXCLUDES="${HUB_GATE_EXCLUDES:-erplora-tauri tauri-plugin-erplora-android}"
 # that no package claims (a crate not yet in `members`, a shared fixture) is a
 # reason to widen, not to ignore.
 GATE_RUST_DIRS="${HUB_GATE_RUST_DIRS:-crates}"
+# El resolutor VIVE EN EL REPO (hub#1346/#1347), no aquí dentro. El hook llevaba una
+# copia inline de las mismas 66 líneas: dos copias del mismo algoritmo divergen
+# solas, y cuando divergen el gate local y `test-hub.yml` dejan de medir lo mismo
+# sin dejar rojo en ningún sitio. Se lee del árbol que se empuja —no de junto al
+# hook— porque la copia que CORRE vive en `core.hooksPath`, fuera del repo, donde
+# no hay `scripts/`. Contrato: scripts/tests/test-scope.test.sh.
+SCOPE_RESOLVER="${HUB_GATE_SCOPE_RESOLVER:-$(git rev-parse --show-toplevel)/scripts/ci/test-scope.py}"
 
 SCOPE_MODE=workspace
 SCOPE_PACKAGES=""
@@ -355,73 +385,8 @@ scope_from_metadata() {
         return 0
     fi
     out="$(printf '%s\n' "$changed_files" \
-        | HUB_GATE_RUST_DIRS="$GATE_RUST_DIRS" python3 -c '
-import json, os, sys
-
-meta = json.load(open(sys.argv[1]))
-excludes = set(sys.argv[2:])
-rust_dirs = set(d for d in os.environ.get("HUB_GATE_RUST_DIRS", "crates").split() if d)
-root = meta["workspace_root"]
-members = set(meta.get("workspace_members") or [])
-
-# name -> directory that owns it, relative to the workspace root
-pkgs = {}
-for p in meta["packages"]:
-    if members and p["id"] not in members:
-        continue
-    rel = os.path.relpath(os.path.dirname(p["manifest_path"]), root)
-    pkgs[p["name"]] = "" if rel == "." else rel
-names = set(pkgs)
-
-# Reverse edges, every kind (normal, dev, build): a dev-dependency breaks the
-# dependent`s TESTS, which is precisely what this gate runs.
-rdeps = {n: set() for n in names}
-for p in meta["packages"]:
-    if p["name"] not in names:
-        continue
-    for d in p["dependencies"]:
-        if d["name"] in names and d["name"] != p["name"]:
-            rdeps[d["name"]].add(p["name"])
-
-TRANSVERSAL = ("Cargo.lock", "Cargo.toml", "rust-toolchain.toml")
-PREFIXES = (".cargo/", "schemas/")
-
-def verdict(mode, reason, pkgs_out=()):
-    print(mode)
-    print(reason)
-    for n in sorted(pkgs_out):
-        print(n)
-    raise SystemExit(0)
-
-touched = set()
-for path in [l.strip() for l in sys.stdin.read().splitlines() if l.strip()]:
-    if path in TRANSVERSAL or path.startswith(PREFIXES):
-        verdict("workspace", "%s can change what every crate compiles" % path)
-    owner, best = None, -1
-    for name, rel in pkgs.items():
-        if rel and (path == rel or path.startswith(rel + "/")) and len(rel) > best:
-            owner, best = name, len(rel)
-    if owner is not None:
-        touched.add(owner)
-    elif path.split("/")[0] in rust_dirs:
-        verdict("workspace", "%s sits in Rust source that no package claims" % path)
-
-scope, stack = set(), list(touched)
-while stack:
-    n = stack.pop()
-    if n in scope:
-        continue
-    scope.add(n)
-    stack.extend(rdeps.get(n, ()))
-scope -= excludes
-testable = names - excludes
-
-if not scope:
-    verdict("none", "no Rust package is touched by this diff")
-if testable and scope >= testable:
-    verdict("workspace", "the diff reaches every testable package")
-verdict("packages", "%d of %d packages reachable from this diff" % (len(scope), len(testable)), scope)
-' "$meta" $GATE_EXCLUDES 2>/dev/null)" || {
+        | HUB_GATE_RUST_DIRS="$GATE_RUST_DIRS" \
+            python3 "$SCOPE_RESOLVER" "$meta" $GATE_EXCLUDES 2>/dev/null)" || {
         rm -f "$meta"
         SCOPE_REASON="the scope could not be computed from \`cargo metadata\`"
         return 0
@@ -446,10 +411,57 @@ resolve_scope() {
         SCOPE_REASON="python3 is not on PATH, so package ownership cannot be resolved"
         return 0
     fi
+    if [ ! -f "$SCOPE_RESOLVER" ]; then
+        SCOPE_REASON="the scope resolver (scripts/ci/test-scope.py) is not in this checkout"
+        return 0
+    fi
     scope_from_metadata
 }
 resolve_scope
 
+# The local half of hub#526 (CI was hub#565). `postgres:18` ships with
+# `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
+# suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
+# ceiling and crashes whichever test passes by with `53200 out of shared memory`. Red tests that
+# have nothing to do with the diff, different each run — the most expensive flaky to diagnose.
+#
+# Raise the three settings (same as CI: 4096 / 300 / 512MB → ceiling ~1.2M) and restart, but ONLY
+# when the ceiling is still the low default. That keeps it idempotent: a container already raised
+# (a second push, or one that survived from a previous run) is not restarted, so this never adds
+# latency to the common path. `ALTER SYSTEM` needs a restart to take effect.
+raise_lock_limits() {
+    local current
+    current=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    # 6 400 is the stock ceiling (64 × 100). Anything already above it was raised before — skip.
+    if [ -n "$current" ] && [ "$current" -gt 6400 ] 2>/dev/null; then
+        return 0
+    fi
+    echo "pre-push: raising Postgres lock limits (hub#526) — was ${current:-?}, restarting ${PG_CONTAINER}…"
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;" >/dev/null
+    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';" >/dev/null
+    docker restart "$PG_CONTAINER" >/dev/null
+    local tries=0
+    until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
+        tries=$((tries + 1))
+        [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never came back after raising limits." >&2; return 1; }
+        sleep 1
+    done
+    local after
+    after=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
+    echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
+}
+
+# Definida AQUÍ, y no más abajo, porque `ensure_postgres` la llama: en bash una función
+# tiene que estar definida ANTES de la llamada en tiempo de ejecución, y el camino
+# temprano (diff solo-web, alcance Rust `none`) corre mucho antes de donde vivía. Ahí
+# moría con `command not found` — y el hook va sin `set -e`, así que no abortaba nada:
+# un fallo mudo que dejaba los límites de locks sin subir (hub#1375, familia de
+# hub#1355). Banco: scripts/prepush-gate.test.sh fija el orden.
+# Bring up the Postgres the suite needs, unless the caller pinned the command
+# (the tests do) or already exported a DSN.
 ensure_postgres() {
     [ -n "${DATABASE_URL:-}" ] && return 0
     if ! command -v docker >/dev/null 2>&1; then
@@ -499,6 +511,15 @@ ensure_postgres() {
 # allí, cambia aquí (`scripts/tests/test-web-workflow.test.sh` fija la de allí).
 WEB_PREFIXES="apps/web/ packages/"
 WEB_FILES="package.json pnpm-lock.yaml pnpm-workspace.yaml"
+# Los que DEFINEN la tubería web en vez de ser la app: la guardia que `pnpm verify` corre
+# primero (hub#1244/#1247), el contrato del workflow y el propio YAML. Faltaban de la lista,
+# y sin `pull_request` en `test-web.yml` eso dejaba un agujero: un push que solo tocara uno
+# de los tres no disparaba la etapa web en local NI ningún check en la nube — la única red
+# era el push a develop/main, o sea POST-MERGE (hub#1356).
+# Disparan, sí, pero por el camino BARATO: lo que cambió es la guardia, no el navegador.
+# Meterlos en la lista de arriba haría que un comentario del YAML se llevara
+# `cargo build` + `vite build` + playwright, ~20-40 min por nada.
+WEB_LIGHT_FILES="scripts/tests/no-dead-packages.test.mjs scripts/tests/test-web-workflow.test.sh .github/workflows/test-web.yml"
 # Si no hay base contra la que diffear no se sabe qué toca el cambio. Para Rust el gate ya se
 # ensancha al workspace; aquí igual —pero solo si este repo TIENE web: ensanchar en un repo sin
 # `apps/web` no protegería nada y rompería cualquier push (no hay `package.json` que instalar).
@@ -506,6 +527,7 @@ web_touched=0
 if [ "$changed_known" != 1 ] && { [ -d apps/web ] || [ -f package.json ]; }; then
     web_touched=1
 fi
+web_light_touched=0
 if [ "$changed_known" = 1 ]; then
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
@@ -514,6 +536,9 @@ if [ "$changed_known" = 1 ]; then
         done
         for _n in $WEB_FILES; do
             [ "$_f" = "$_n" ] && web_touched=1
+        done
+        for _n in $WEB_LIGHT_FILES; do
+            [ "$_f" = "$_n" ] && web_light_touched=1
         done
     done <<EOF
 $changed_files
@@ -527,10 +552,18 @@ fi
 # EXISTIR (el runtime no las crea — lo dice `apps/web/tests/playwright.config.ts`). Además el spec
 # del asistente cae por defecto en `localhost:5434`, que en local no existe: sin exportar los DSN,
 # el playwright de cada push que toque web moriría al arrancar el runtime.
+#
+# 🔴 Crear las bases es cosa del comando POR DEFECTO, no de quien trae el suyo ($1 = 0). Con
+# `HUB_GATE_WEB_CMD` fijado, las bases son dependencia de ESE comando y prepararlas igualmente
+# exigía un `erplora-test-pg-5433` vivo: en un entorno sin él —la CI del propio gate, un portátil
+# sin docker— un diff solo-web moría por una base que su comando ni abre (hub#1368; el banco
+# `scripts/prepush-gate.test.sh` promete no tocar Docker y lo tocaba). Los DSN, en cambio, se
+# exportan SIEMPRE: son el contrato con la etapa, la corra quien la corra.
 ensure_e2e_databases() {
+    local gate_owns_web_cmd=${1:-1}
     if [ -n "${HUB_GATE_E2E_DB_CMD:-}" ]; then
         eval "$HUB_GATE_E2E_DB_CMD" || return 1
-    else
+    elif [ "$gate_owns_web_cmd" = 1 ]; then
         local db
         for db in hub_e2e_web hub_e2e_assistant; do
             docker exec "$PG_CONTAINER" psql -U postgres -tAc \
@@ -548,11 +581,53 @@ ensure_e2e_databases() {
 }
 
 run_web_stage() {
+    if [ "$web_touched" != 1 ] && [ "$web_light_touched" != 1 ]; then
+        return 0
+    fi
+
+    # Nivel LIGERO: solo lo que esos ficheros gobiernan de verdad. Node basta —la guardia
+    # usa únicamente builtins—, así que no hace falta `pnpm install` ni Postgres ni docker.
+    #
+    # 🔴 Corre SIEMPRE que el diff toque la tubería web, TAMBIÉN cuando además corre la
+    # etapa completa. No son excluyentes: la completa se para en `pnpm verify`, que
+    # incluye `no-dead-packages.test.mjs` pero NO `test-web-workflow.test.sh`, y
+    # `test-web.yml` perdió su `pull_request` (hub#1352). Con un `elif`, un diff que
+    # tocara `apps/web` Y el YAML —tocar la app y su workflow en el mismo commit es lo
+    # normal— dejaba el contrato del workflow sin correr NADIE antes del merge: el
+    # agujero de hub#1247/#1356 otra vez, por la puerta de al lado.
+    if [ "$web_light_touched" = 1 ]; then
+        if [ "${SKIP_HUB_WEB:-0}" = 1 ]; then
+            echo "⏭️  pre-push: SKIP_HUB_WEB=1 — la guardia web NO se ha corrido." >&2
+            WEB_SKIPPED=1
+        else
+            local light_cmd
+            if [ -n "${HUB_GATE_WEB_LIGHT_CMD:-}" ]; then
+                light_cmd="$HUB_GATE_WEB_LIGHT_CMD"
+            else
+                light_cmd='node --test scripts/tests/no-dead-packages.test.mjs \
+                    && bash scripts/tests/test-web-workflow.test.sh'
+            fi
+            echo "🧪 pre-push: el diff toca la tubería web (guardia/contrato/YAML) → sus comprobaciones…" >&2
+            if ! eval "$light_cmd"; then
+                echo "" >&2
+                echo "❌ pre-push: la guardia de la tubería web está ROJA → push ABORTADO." >&2
+                return 1
+            fi
+            echo "✅ pre-push: guardia de la tubería web verde." >&2
+        fi
+    fi
+
     [ "$web_touched" = 1 ] || return 0
-    local web_cmd
+
+    # `gate_owns_web_cmd`: la etapa que corre es LA NUESTRA (pnpm verify + playwright), y con ella
+    # su dependencia — el Postgres del gate y las dos bases del banco de e2e. Si quien llama fijó
+    # `HUB_GATE_WEB_CMD`, el comando es suyo y sus dependencias también: el gate no levanta un
+    # contenedor para algo que no va a usar (hub#1368).
+    local web_cmd gate_owns_web_cmd=0
     if [ -n "${HUB_GATE_WEB_CMD:-}" ]; then
         web_cmd="$HUB_GATE_WEB_CMD"
     else
+        gate_owns_web_cmd=1
         command -v pnpm >/dev/null 2>&1 || command -v corepack >/dev/null 2>&1 || {
             echo "❌ pre-push: el diff toca web y no hay 'pnpm' ni 'corepack' en el PATH." >&2
             echo "   Instálalos (corepack enable) o sáltate la etapa con SKIP_HUB_WEB=1." >&2
@@ -572,8 +647,10 @@ run_web_stage() {
         WEB_SKIPPED=1
         return 0
     fi
-    ensure_postgres || return 1
-    ensure_e2e_databases || return 1
+    if [ "$gate_owns_web_cmd" = 1 ]; then
+        ensure_postgres || return 1
+    fi
+    ensure_e2e_databases "$gate_owns_web_cmd" || return 1
     echo "🧪 pre-push: el diff toca web → pnpm verify + playwright en local…" >&2
     if ! eval "$web_cmd"; then
         echo "" >&2
@@ -583,6 +660,141 @@ run_web_stage() {
     fi
     echo "✅ pre-push: etapa web verde." >&2
     return 0
+}
+
+# ── Publishing the attestations ──────────────────────────────────────────────
+# Defined BEFORE the scope dispatch on purpose: the `none` path attests its two
+# shapes (web-only, nothing-to-run — pm#198, hub#1368) and exits before the lock
+# and the suite, so the machinery that posts a seal must already exist by then.
+# The Rust paths keep calling it exactly where they did.
+PUBLISH_LOG="$STATE_DIR/publish-status.log"
+
+# Everything the human needs to tell "the attestation was not published" apart from
+# "GitHub Actions is down" — because from the PR page the two look IDENTICAL (no
+# checks), and only one of them is a reason to go anywhere near the merge button.
+# This block used to not exist: the publish step `exit 0`'d in silence (hub#739).
+unpublished_report() {
+    # $4 is the repo when we got far enough to know it — so the copy-paste command
+    # below is the real one, not a template the reader has to fill in. $5 is the
+    # context being published and defaults to the Rust one: the report has to name
+    # the seal that failed to post, whichever of the three it was (pm#198).
+    local reason=$1 detail=$2 sha=$3 slug=${4:-<owner>/<repo>} ctx=${5:-$CONTEXT}
+    echo "⚠️  pre-push: the Hub gate was GREEN, but its attestation could not be published."
+    echo "    context : $ctx"
+    echo "    commit  : $sha"
+    echo "    reason  : $reason"
+    if [ -n "$detail" ]; then
+        printf '    gh said : %s\n' "$(printf '%s' "$detail" | head -5)"
+    fi
+    echo "    the gh account it tried:"
+    if command -v gh >/dev/null 2>&1; then
+        gh auth status 2>&1 | sed 's/^[[:space:]]*/      /'
+    else
+        echo "      (none — gh is not on PATH)"
+    fi
+    echo "    Consequence: the PR will show up WITHOUT CHECKS, exactly like a dead CI."
+    echo "    Do NOT force the merge on that — merge-pr.sh refuses on silence by design"
+    echo "    (pm#58/#60; forcing past it is how saas#1184 landed unverified)."
+    echo "    Switch gh to an account that can see the repo and push again, or post it by hand:"
+    echo "      gh api -X POST repos/<owner>/<repo>/statuses/$sha \\"
+    echo "        -f state=success -f context=$ctx -f description='local gate green'"
+}
+
+# Two channels, on purpose.
+#   · the LOG is the durable one: the publish step outlives the hook, so a message
+#     printed when it finally fails can land after the shell prompt is already back.
+#   · the terminal is the loud one. In the background half it is /dev/tty, opened
+#     here rather than inherited: a background writer holding git's stderr pipe can
+#     stall the push for the whole two minutes the poll lasts.
+log_report() {
+    { printf '\n===== %s =====\n' "$(date '+%F %T')"; printf '%s\n' "$1"; } >>"$PUBLISH_LOG" 2>/dev/null || true
+}
+report_sync() {
+    local msg; msg="$(unpublished_report "$@")"
+    log_report "$msg"
+    printf '%s\n' "$msg" >&2
+}
+report_async() {
+    local msg; msg="$(unpublished_report "$@")"
+    log_report "$msg"
+    printf '%s\n' "$msg" >/dev/tty 2>/dev/null || true
+}
+
+# Publish an attestation in the background: the commit does not exist on the
+# remote until the push we are gating actually lands. $2/$3 name WHAT is being
+# attested (context and description) and default to the Rust suite's, so every
+# call site that predates the web and no-suite seals keeps working unchanged
+# (pm#198, hub#1368).
+publish_status() {
+    local sha=$1 ctx=${2:-$CONTEXT} desc=${3:-$GATE_DESC}
+    if [ -n "${HUB_GATE_STATUS_CMD:-}" ]; then
+        ( set -- "$sha" "$ctx" "$desc"; eval "$HUB_GATE_STATUS_CMD" ) >/dev/null 2>&1 &
+        return 0
+    fi
+
+    # Resolved SYNCHRONOUSLY and on purpose: this is the call that fails when the
+    # active gh account cannot see the repo (Ioan carries one account per company,
+    # each checkout its own), and a warning printed here lands while the human is
+    # still watching the push, instead of behind their prompt two minutes later.
+    if ! command -v gh >/dev/null 2>&1; then
+        report_sync "gh is not on PATH, so nothing can attest this run" "" "$sha" "" "$ctx"
+        return 0
+    fi
+    local repo rc err out="$STATE_DIR/.repo.$$"
+    err="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>&1 1>"$out")"
+    rc=$?
+    repo="$(cat "$out" 2>/dev/null)"
+    rm -f "$out"
+    if [ "$rc" -ne 0 ] || [ -z "$repo" ]; then
+        report_sync "the active gh account cannot resolve this repository" "$err" "$sha" "" "$ctx"
+        return 0
+    fi
+
+    (
+        # hub#574: the attestation is the CONSEQUENCE of the push landing. A
+        # pre-push hook runs BEFORE the transfer, so it cannot know — instead,
+        # this background step verifies the REMOTE REF really advanced to (or
+        # past) the pushed sha before posting. "The commit exists on origin"
+        # is not enough: the same sha may already be there from an earlier
+        # push to another ref while THIS push died (SIGPIPE / exit 141 /
+        # closed SSH — three sightings in one day, 2026-08-08).
+        local tries=0 seen=0 perr poll_tries poll_delay
+        poll_tries="${HUB_GATE_PUSH_POLL_TRIES:-24}"
+        poll_delay="${HUB_GATE_PUSH_POLL_DELAY:-5}"
+        landed() {
+            local got cmpstat
+            if [ -n "$pushed_ref" ]; then
+                got="$(gh api "repos/$repo/git/ref/${pushed_ref#refs/}" -q .object.sha 2>/dev/null)" || return 1
+                [ "$got" = "$sha" ] && return 0
+                [ -n "$got" ] || return 1
+                # The ref may have moved PAST our sha already (a fleet mate
+                # pushed on top): landed means "the ref contains the sha".
+                cmpstat="$(gh api "repos/$repo/compare/$sha...$got" -q .status 2>/dev/null)" || return 1
+                [ "$cmpstat" = "ahead" ] || [ "$cmpstat" = "identical" ]
+            else
+                gh api "repos/$repo/commits/$sha" >/dev/null 2>&1
+            fi
+        }
+        while [ "$tries" -lt "$poll_tries" ]; do
+            landed && { seen=1; break; }
+            sleep "$poll_delay"
+            tries=$((tries + 1))
+        done
+        if [ "$seen" != 1 ]; then
+            report_async "the remote ref ${pushed_ref:-?} never advanced to $sha — the push DID NOT LAND (SIGPIPE / closed SSH / killed process). Retry the push: the tree is cached green, so the retry is instant" "" "$sha" "$repo" "$ctx"
+            exit 0
+        fi
+        if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
+                -f state=success \
+                -f context="$ctx" \
+                -f description="$desc" \
+                2>&1 >/dev/null)"; then
+            report_async "gh refused to post the status to $repo" "$perr" "$sha" "$repo" "$ctx"
+            exit 0
+        fi
+        log_report "published $ctx=success on $repo@$sha"
+    ) >/dev/null 2>&1 &
+    disown 2>/dev/null || true
 }
 
 # ── Política de alcance (Ioan, 2026-08-29) ───────────────────────────────────
@@ -603,6 +815,33 @@ case "$SCOPE_MODE" in
         # OJO: ya no vale «lo cubren sus checks en la PR». Desde el 29/08 Actions no corre web ni
         # los e2e en una PR, así que si el diff toca web hay que probarlo AQUÍ o no lo prueba nadie.
         run_web_stage || exit 1
+        # Atestiguar lo que el gate DECIDIÓ sobre este sha (pm#198, hub#1368). Una PR del hub sin
+        # ningún check es exactamente lo que `merge-pr.sh` rechaza como «Actions está caído», y
+        # sin sello no hay forma de distinguirlo de las otras dos causas: la etapa web corrió
+        # verde aquí, o no había nada que correr. Un bypass no publica nada: AUSENCIA de sello,
+        # nunca un sello falso.
+        if [ "${WEB_SKIPPED:-0}" = 1 ]; then
+            echo "⚠️  pre-push: la etapa web se saltó (SKIP_HUB_WEB=1) → NO se atestigua nada." >&2
+            echo "   Este push no autoriza ningún merge: corre el gate entero (sin SKIP_HUB_WEB) y reempuja." >&2
+            exit 0
+        fi
+        if [ "$web_touched" = 1 ]; then
+            echo "✅ pre-push: etapa web verde → el sello $WEB_CONTEXT se publica al confirmarse el ref en origin." >&2
+            publish_status "$pushed_sha" "$WEB_CONTEXT" \
+                "web stage (pnpm verify + playwright) green on the pusher's machine (hook ${HOOK_ID:-unknown})"
+        elif [ "$web_light_touched" = 1 ]; then
+            # El diff toca la TUBERÍA web (guardia/contrato/YAML) pero no la app: corrió la etapa
+            # ligera, no playwright. Mismo contexto —la pregunta que responde es «¿corrió aquí lo
+            # que este diff exige del lado web?»— y la descripción dice cuál de las dos fue, para
+            # no firmar una pasada que no se hizo.
+            echo "✅ pre-push: guardia de la tubería web verde → el sello $WEB_CONTEXT se publica al confirmarse el ref en origin." >&2
+            publish_status "$pushed_sha" "$WEB_CONTEXT" \
+                "web pipeline guard green on the pusher's machine — the app itself is untouched (hook ${HOOK_ID:-unknown})"
+        else
+            echo "✅ pre-push: nada que correr → el sello $NO_SUITE_CONTEXT se publica al confirmarse el ref en origin." >&2
+            publish_status "$pushed_sha" "$NO_SUITE_CONTEXT" \
+                "nothing to run on this diff: no Rust and no web (gate hook ${HOOK_ID:-unknown})"
+        fi
         exit 0
         ;;
     packages)
@@ -651,133 +890,19 @@ tree="$(git rev-parse "${pushed_sha}^{tree}" 2>/dev/null)" || exit 1
 scope_key="$(printf '%s|%s' "$SCOPE_MODE" "$SCOPE_PACKAGES" | git hash-object --stdin 2>/dev/null)"
 green="$STATE_DIR/$tree.${scope_key:0:12}.green"
 
-PUBLISH_LOG="$STATE_DIR/publish-status.log"
+# The publish machinery (PUBLISH_LOG, unpublished_report, the report channels
+# and publish_status) is defined ABOVE, before the scope dispatch: the `none`
+# path attests and exits before ever reaching this point.
 
-# Everything the human needs to tell "the attestation was not published" apart from
-# "GitHub Actions is down" — because from the PR page the two look IDENTICAL (no
-# checks), and only one of them is a reason to go anywhere near the merge button.
-# This block used to not exist: the publish step `exit 0`'d in silence (hub#739).
-unpublished_report() {
-    # $4 is the repo when we got far enough to know it — so the copy-paste command
-    # below is the real one, not a template the reader has to fill in.
-    local reason=$1 detail=$2 sha=$3 slug=${4:-<owner>/<repo>}
-    echo "⚠️  pre-push: the Hub suite was GREEN, but its attestation could not be published."
-    echo "    context : $CONTEXT"
-    echo "    commit  : $sha"
-    echo "    reason  : $reason"
-    if [ -n "$detail" ]; then
-        printf '    gh said : %s\n' "$(printf '%s' "$detail" | head -5)"
-    fi
-    echo "    the gh account it tried:"
-    if command -v gh >/dev/null 2>&1; then
-        gh auth status 2>&1 | sed 's/^[[:space:]]*/      /'
-    else
-        echo "      (none — gh is not on PATH)"
-    fi
-    echo "    Consequence: the PR will show up WITHOUT CHECKS, exactly like a dead CI."
-    echo "    Do NOT force the merge on that — merge-pr.sh refuses on silence by design"
-    echo "    (pm#58/#60; forcing past it is how saas#1184 landed unverified)."
-    echo "    Switch gh to an account that can see the repo and push again, or post it by hand:"
-    echo "      gh api -X POST repos/<owner>/<repo>/statuses/$sha \\"
-    echo "        -f state=success -f context=$CONTEXT -f description='local gate green'"
-}
-
-# Two channels, on purpose.
-#   · the LOG is the durable one: the publish step outlives the hook, so a message
-#     printed when it finally fails can land after the shell prompt is already back.
-#   · the terminal is the loud one. In the background half it is /dev/tty, opened
-#     here rather than inherited: a background writer holding git's stderr pipe can
-#     stall the push for the whole two minutes the poll lasts.
-log_report() {
-    { printf '\n===== %s =====\n' "$(date '+%F %T')"; printf '%s\n' "$1"; } >>"$PUBLISH_LOG" 2>/dev/null || true
-}
-report_sync() {
-    local msg; msg="$(unpublished_report "$@")"
-    log_report "$msg"
-    printf '%s\n' "$msg" >&2
-}
-report_async() {
-    local msg; msg="$(unpublished_report "$@")"
-    log_report "$msg"
-    printf '%s\n' "$msg" >/dev/tty 2>/dev/null || true
-}
-
-# Publish the attestation in the background: the commit does not exist on the
-# remote until the push we are gating actually lands.
-publish_status() {
-    local sha=$1
-    if [ -n "${HUB_GATE_STATUS_CMD:-}" ]; then
-        ( set -- "$sha"; eval "$HUB_GATE_STATUS_CMD" ) >/dev/null 2>&1 &
-        return 0
-    fi
-
-    # Resolved SYNCHRONOUSLY and on purpose: this is the call that fails when the
-    # active gh account cannot see the repo (Ioan carries one account per company,
-    # each checkout its own), and a warning printed here lands while the human is
-    # still watching the push, instead of behind their prompt two minutes later.
-    if ! command -v gh >/dev/null 2>&1; then
-        report_sync "gh is not on PATH, so nothing can attest this run" "" "$sha"
-        return 0
-    fi
-    local repo rc err out="$STATE_DIR/.repo.$$"
-    err="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>&1 1>"$out")"
-    rc=$?
-    repo="$(cat "$out" 2>/dev/null)"
-    rm -f "$out"
-    if [ "$rc" -ne 0 ] || [ -z "$repo" ]; then
-        report_sync "the active gh account cannot resolve this repository" "$err" "$sha"
-        return 0
-    fi
-
-    (
-        # hub#574: the attestation is the CONSEQUENCE of the push landing. A
-        # pre-push hook runs BEFORE the transfer, so it cannot know — instead,
-        # this background step verifies the REMOTE REF really advanced to (or
-        # past) the pushed sha before posting. "The commit exists on origin"
-        # is not enough: the same sha may already be there from an earlier
-        # push to another ref while THIS push died (SIGPIPE / exit 141 /
-        # closed SSH — three sightings in one day, 2026-08-08).
-        local tries=0 seen=0 perr poll_tries poll_delay
-        poll_tries="${HUB_GATE_PUSH_POLL_TRIES:-24}"
-        poll_delay="${HUB_GATE_PUSH_POLL_DELAY:-5}"
-        landed() {
-            local got cmpstat
-            if [ -n "$pushed_ref" ]; then
-                got="$(gh api "repos/$repo/git/ref/${pushed_ref#refs/}" -q .object.sha 2>/dev/null)" || return 1
-                [ "$got" = "$sha" ] && return 0
-                [ -n "$got" ] || return 1
-                # The ref may have moved PAST our sha already (a fleet mate
-                # pushed on top): landed means "the ref contains the sha".
-                cmpstat="$(gh api "repos/$repo/compare/$sha...$got" -q .status 2>/dev/null)" || return 1
-                [ "$cmpstat" = "ahead" ] || [ "$cmpstat" = "identical" ]
-            else
-                gh api "repos/$repo/commits/$sha" >/dev/null 2>&1
-            fi
-        }
-        while [ "$tries" -lt "$poll_tries" ]; do
-            landed && { seen=1; break; }
-            sleep "$poll_delay"
-            tries=$((tries + 1))
-        done
-        if [ "$seen" != 1 ]; then
-            report_async "the remote ref ${pushed_ref:-?} never advanced to $sha — the push DID NOT LAND (SIGPIPE / closed SSH / killed process). Retry the push: the tree is cached green, so the retry is instant" "" "$sha" "$repo"
-            exit 0
-        fi
-        if ! perr="$(gh api -X POST "repos/$repo/statuses/$sha" \
-                -f state=success \
-                -f context="$CONTEXT" \
-                -f description="$GATE_DESC" \
-                2>&1 >/dev/null)"; then
-            report_async "gh refused to post the status to $repo" "$perr" "$sha"
-            exit 0
-        fi
-        log_report "published $CONTEXT=success on $repo@$sha"
-    ) >/dev/null 2>&1 &
-    disown 2>/dev/null || true
-}
 
 if [ -f "$green" ]; then
     echo "✅ pre-push: this tree already passed the suite → skipping the rebuild." >&2
+    # Solo el sello de Rust, NUNCA el de web (pm#198). El caché va por tree+scope, pero
+    # `web_touched` lo decide el diff contra la base: el MISMO árbol empujado contra una base
+    # que se movió puede tocar web ahora y no haberlo tocado cuando se grabó este verde. Firmar
+    # aquí `local-gate/hub-web` sería firmar una etapa que quizá no corrió nadie. Sin sello web
+    # no se bloquea nada: el de Rust ya le da checks a la PR; lo que falta es la garantía, y
+    # esa se consigue reempujando con el árbol tocado.
     publish_status "$pushed_sha"
     # Verde → se le encarga la review local del código a un revisor Fable. No corre
     # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
@@ -909,6 +1034,7 @@ trap 'p="$(lock_owner_field pid)"; if [ -z "$p" ] || [ "$p" = "$$" ]; then rm -r
 # Whoever held the lock may have just turned this very tree green.
 if [ -f "$green" ]; then
     echo "✅ pre-push: another push just validated this tree → skipping the rebuild." >&2
+    # Mismo motivo que el cache-hit de arriba: aquí NO se publica el sello web (pm#198).
     publish_status "$pushed_sha"
     # Verde → se le encarga la review local del código a un revisor Fable. No corre
     # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
@@ -917,43 +1043,6 @@ if [ -f "$green" ]; then
 [ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
-
-# Bring up the Postgres the suite needs, unless the caller pinned the command
-# (the tests do) or already exported a DSN.
-# The local half of hub#526 (CI was hub#565). `postgres:18` ships with
-# `max_locks_per_transaction=64` and `max_connections=100` — a GLOBAL ceiling of ~6 400 locks. The
-# suite creates an ephemeral schema PER TEST with every system table inside, so it exhausts that
-# ceiling and crashes whichever test passes by with `53200 out of shared memory`. Red tests that
-# have nothing to do with the diff, different each run — the most expensive flaky to diagnose.
-#
-# Raise the three settings (same as CI: 4096 / 300 / 512MB → ceiling ~1.2M) and restart, but ONLY
-# when the ceiling is still the low default. That keeps it idempotent: a container already raised
-# (a second push, or one that survived from a previous run) is not restarted, so this never adds
-# latency to the common path. `ALTER SYSTEM` needs a restart to take effect.
-raise_lock_limits() {
-    local current
-    current=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
-    # 6 400 is the stock ceiling (64 × 100). Anything already above it was raised before — skip.
-    if [ -n "$current" ] && [ "$current" -gt 6400 ] 2>/dev/null; then
-        return 0
-    fi
-    echo "pre-push: raising Postgres lock limits (hub#526) — was ${current:-?}, restarting $PG_CONTAINER…"
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_locks_per_transaction = 4096;" >/dev/null
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;" >/dev/null
-    docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET shared_buffers = '512MB';" >/dev/null
-    docker restart "$PG_CONTAINER" >/dev/null
-    local tries=0
-    until docker exec "$PG_CONTAINER" pg_isready -U postgres >/dev/null 2>&1; do
-        tries=$((tries + 1))
-        [ "$tries" -gt 30 ] && { echo "❌ pre-push: $PG_CONTAINER never came back after raising limits." >&2; return 1; }
-        sleep 1
-    done
-    local after
-    after=$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-        "SELECT current_setting('max_locks_per_transaction')::int * (current_setting('max_connections')::int + current_setting('max_prepared_transactions')::int);" 2>/dev/null | tr -d '[:space:]')
-    echo "pre-push: lock ceiling now ${after:-?} (was ${current:-?})."
-}
 
 # The module e2e — the ones that install the real modules — are the one place where "run what CI
 # ran" needs saying out loud, because `test-hub.yml` does NOT run them: the guard sees `CI=true`
@@ -1039,7 +1128,11 @@ resolve_modules_dir() {
         echo "❌ pre-push: the PUBLISHED module catalogue could not be materialised → push ABORTED." >&2
         echo "   HUB_GATE_WITH_MODULES=1 asks for the published catalogue; running the suite without it" >&2
         echo "   would skip the module e2e in silence and report a green that proved nothing (hub#1153)." >&2
-        echo "   Fix the access above, or push without HUB_GATE_WITH_MODULES for the usual CI parity." >&2
+        echo "   The materialiser above names WHICH side failed — ACCESS (key/ssh/network) or LOCAL" >&2
+        echo "   (a cache that is not the module: it is derived, so removing it is safe). Follow THAT" >&2
+        echo "   line: this message used to say «fix the access» whatever had happened, and hub#1380" >&2
+        echo "   and hub#1388 both lost hours in deploy keys that were never broken." >&2
+        echo "   Or push without HUB_GATE_WITH_MODULES for the usual CI parity." >&2
         return 1
     fi
     ERPLORA_MODULES_DIR="$resolved"
@@ -1103,6 +1196,17 @@ fi
 # behind it (SIGPIPE/closed SSH) with the branch never reaching origin.
 echo "✅ pre-push: suite green → letting the push proceed. The $CONTEXT status posts only after the ref is verified on origin." >&2
 publish_status "$pushed_sha"
+# Un diff con Rust Y web lleva el sello de Rust de arriba, pero eso no dice nada de la mitad
+# web, y desde hub#1352 nadie más la corre en una PR: `local-gate/hub-web` es lo único que
+# responde «¿corrió la etapa web sobre este sha?» (pm#198). Aquí solo se llega con la etapa
+# verde y sin saltar (WEB_SKIPPED sale antes), así que el sello nunca firma lo no corrido.
+if [ "$web_touched" = 1 ]; then
+    publish_status "$pushed_sha" "$WEB_CONTEXT" \
+        "web stage (pnpm verify + playwright) green on the pusher's machine (hook ${HOOK_ID:-unknown})"
+elif [ "$web_light_touched" = 1 ]; then
+    publish_status "$pushed_sha" "$WEB_CONTEXT" \
+        "web pipeline guard green on the pusher's machine — the app itself is untouched (hook ${HOOK_ID:-unknown})"
+fi
 # Verde → se le encarga la review local del código a un revisor Fable. No corre
 # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
 # para a toda la flota y una review perdida solo cuesta una review.

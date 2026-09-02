@@ -1,0 +1,88 @@
+# Las baterías `*.hub.test.py|sh` de los módulos PUBLICADOS: la otra mitad de
+# `scripts/ci/kernel-e2e-targets.txt`.
+#
+# Lista revisada, comprobada por `scripts/ci/module-hub-batteries.sh` en las DOS direcciones
+# contra el catálogo publicado: una línea de aquí sin fichero en el módulo falla, y una batería
+# en el módulo que no esté aquí también.
+#
+# ── POR QUÉ EXISTE ─────────────────────────────────────────────────────────────────────────
+# hub#1264 saca del hub los e2e que afirman comportamiento de UN MÓDULO y los devuelve al repo de
+# ese módulo como baterías `erplora test`. La premisa es que la cobertura CAMBIA DE SITIO. El
+# 2026-08-30 no cambió de sitio: hub#1372 borró `services_package_redeem_e2e.rs` —391 líneas que
+# corrían el gate pre-push Y `test-hub-modules.yml`— y su relevo,
+# `services/tests/package_redeem.hub.test.py`, no lo ejecutaba NADIE. Las dos CI en verde, que es
+# lo que lo hizo caro: ningún rojo avisó de que esa cobertura había dejado de ejercitarse.
+#
+# ── CÓMO SE EDITA ──────────────────────────────────────────────────────────────────────────
+# Un slice de hub#1264 hace las dos ediciones EN LA MISMA PR:
+#
+#   1. BORRA la línea del e2e en `scripts/ci/kernel-e2e-targets.txt`, y
+#   2. AÑADE aquí la batería que hereda esa cobertura.
+#
+# Ese par de ediciones es el acto revisable. Un borrado que no apunta a nada comprobable es
+# exactamente cómo se perdieron los 391 de `services`.
+#
+# 🔴 LO QUE ESTA LISTA NO DICE. Dice que la batería ESTÁ donde el slice prometió. NO dice que se
+# ejecute: hoy NINGÚN gate corre `erplora test --against-hub`, y hub#1381 sigue abierta para eso.
+# Un verde aquí se lee «la batería está donde dijeron», nunca «la batería pasa». Los tres
+# bloqueos medidos del corredor están en hub#1381.
+#
+# El formato es `<module-id>/<ruta de la batería dentro del módulo>`.
+
+# ── Slices ATERRIZADOS: el e2e del hub YA NO EXISTE, esta batería es toda la cobertura ──────
+# Estos son los que de verdad dependen de que alguien corra las baterías: en el hub no queda
+# nada que afirme este comportamiento.
+
+# ← sales_e2e.rs (slice 1, hub#1340)
+sales/tests/checkout.hub.test.py
+sales/tests/orders.hub.test.py
+sales/tests/void.hub.test.py
+sales/tests/void_chain.hub.test.py
+
+# ← kitchen_e2e.rs (slice 2, hub#1342)
+kitchen/tests/combos.hub.test.py
+kitchen/tests/stations.hub.test.py
+kitchen/tests/tickets.hub.test.py
+
+# ← tables_session_history_e2e.rs (slice 3, hub#1343)
+tables/tests/session_history.hub.test.py
+
+# ← cash_register_e2e.rs (slice 4, hub#1344)
+cash_register/tests/reverse_on_void.hub.test.py
+cash_register/tests/session.hub.test.py
+
+# ← customers_e2e.rs (hub#1349)
+customers/tests/purchases.hub.test.py
+customers/tests/wasm_handlers.hub.test.py
+
+# ← inventory_e2e.rs, inventory_ledger_e2e.rs, inventory_stats_e2e.rs,
+#   inventory_stock_modes_e2e.rs, inventory_units_e2e.rs (slice 6, hub#1350)
+inventory/tests/ledger.hub.test.py
+inventory/tests/listeners.hub.test.py
+inventory/tests/products.hub.test.py
+inventory/tests/stats.hub.test.py
+inventory/tests/stock.hub.test.py
+inventory/tests/units.hub.test.py
+
+# ← invoice_e2e.rs (hub#1345)
+invoice/tests/create.hub.test.py
+invoice/tests/from_sale.hub.test.py
+
+# ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
+services/tests/package_redeem.hub.test.py
+
+# ── Baterías ATERRIZADAS cuyo e2e del hub SIGUE EN PIE ──────────────────────────────────────
+# La mitad aditiva ya está (las PRs de módulo son `+N/-0`), pero su línea sigue en la sección
+# «Pendientes de hub#1264» de `kernel-e2e-targets.txt`, así que hoy la cobertura se ejerce en el
+# kernel. Cuando el slice borre ese e2e, estas líneas pasan al bloque de arriba — y a partir de
+# ese momento dependen del corredor de hub#1381.
+
+# appointments_availability_e2e sigue en el hub (appointments#96)
+appointments/tests/availability.hub.test.py
+appointments/tests/create_overlap.hub.test.py
+
+# staff_commissions_e2e sigue en el hub (staff#49)
+staff/tests/commissions.hub.test.py
+
+# verifactu_desglose_e2e sigue en el hub (verifactu#67, mergeada el 2026-09-01)
+verifactu/tests/desglose.hub.test.py

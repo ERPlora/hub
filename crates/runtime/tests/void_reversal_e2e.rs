@@ -82,9 +82,15 @@ async fn arqueo(rt: &Runtime, ctx: &RequestContext, sid: &str) -> i64 {
     // el número de turno lo acuña el servidor y el que manda el llamante se IGNORA, así que la
     // sesión de este test nunca se llamó `VR-260625-1000`. Lo que de verdad identificaba la fila
     // era —y sigue siendo— el `.find()` por `id` de abajo, sobre la lista sin filtrar.
-    rt.execute_query("cash_register.sessions.list", &Params::new(), ctx)
+    // Same dual representation as `expected_cash` above: the live-KPI CASE of cash_register#65
+    // unifies the column type to NUMERIC on Postgres, so even a closed session's stored INTEGER
+    // arrives as a JSON string ("13000").
+    let v = rt.execute_query("cash_register.sessions.list", &Params::new(), ctx)
         .await.unwrap().iter().find(|s| s["id"] == json!(sid)).unwrap()
-        ["expected_balance"].as_i64().unwrap()
+        ["expected_balance"].clone();
+    v.as_i64()
+        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .unwrap_or_else(|| panic!("expected_balance no numérico: {v:?}"))
 }
 
 async fn create_product(rt: &Runtime, ctx: &RequestContext, name: &str, sku: &str, stock: i64) -> String {

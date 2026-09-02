@@ -16,7 +16,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::postgres::PgConnectOptions;
 use sqlx::{ConnectOptions, Connection};
 
 use crate::PgAdapter;
@@ -91,22 +91,79 @@ impl TestDb {
 
     /// A fresh [`PgAdapter`] whose pool has `search_path` pinned to this test's schema.
     pub async fn adapter(&self) -> PgAdapter {
+        self.adapter_with_max_connections(5).await
+    }
+
+    /// Same as [`TestDb::adapter`], with an explicit pool cap.
+    ///
+    /// `max_connections(1)` is how a test STATES that its calls share one connection instead of
+    /// leaning on the pool handing the idle one back. Per-connection state — sqlx's
+    /// prepared-statement cache above all (ERPlora/hub#1348) — is invisible to a test that cannot
+    /// pin the connection down.
+    pub async fn adapter_with_max_connections(&self, max_connections: u32) -> PgAdapter {
         let opts = self
             .opts
             .clone()
             .options([("search_path", self.schema.as_str())]);
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect_with(opts)
+        PgAdapter::connect_with_options(opts, max_connections)
             .await
-            .expect("abrir el pool sobre el esquema de test");
-        PgAdapter::from_pool(pool)
+            .expect("abrir el pool sobre el esquema de test")
+    }
+    /// An adapter whose pool is read-only **from birth**: every connection, new ones included,
+    /// rejects writes with `25006`. Models "the whole cluster is read-only" (Patroni with no
+    /// leader, a full disk) — the case where retrying cannot possibly help and the error has to
+    /// reach the caller instead of turning into an infinite loop (ERPlora/hub#1376).
+    pub async fn adapter_read_only(&self) -> PgAdapter {
+        let opts = self.opts.clone().options([
+            ("search_path", self.schema.as_str()),
+            ("default_transaction_read_only", "on"),
+        ]);
+        PgAdapter::connect_with_options(opts, 5)
+            .await
+            .expect("abrir el pool solo-lectura sobre el esquema de test")
     }
 }
 
 /// Convenience: a fresh adapter on a brand-new ephemeral schema. Most tests want exactly this.
 pub async fn fresh_db() -> PgAdapter {
     TestDb::new().await.adapter().await
+}
+
+/// Demotes every connection the pool currently holds to "replica": they stay open and pooled, but
+/// refuse writes with `25006 read_only_sql_transaction`, exactly like the ex-leader does after a
+/// Patroni switchover (ERPlora/hub#1376).
+///
+/// `SET default_transaction_read_only = on` is a faithful stand-in because sqlx runs no
+/// `DISCARD ALL` when a connection goes back to the pool (there is no `after_release` hook here),
+/// so the session flag survives the round trip — same SQLSTATE, same live connection.
+pub async fn demote_pooled_connections_to_replica(db: &PgAdapter, how_many: usize) {
+    let mut held = Vec::with_capacity(how_many);
+    for _ in 0..how_many {
+        let mut conn = db.pool.acquire().await.expect("acquire a pooled connection");
+        sqlx::query("SET default_transaction_read_only = on")
+            .execute(&mut *conn)
+            .await
+            .expect("mark the pooled session read-only");
+        held.push(conn);
+    }
+    drop(held);
+    wait_until_idle(db, how_many).await;
+}
+
+/// Waits until the pool has `want` connections back in the idle queue.
+///
+/// Dropping a `PoolConnection` hands it back through a **spawned** task, so without this the next
+/// `acquire` could race it and open a brand-new (healthy) connection instead — the test would then
+/// pass without ever touching the poisoned one. A false green, which is the very failure mode
+/// hub#1376 is about.
+async fn wait_until_idle(db: &PgAdapter, want: usize) {
+    for _ in 0..1_000 {
+        if db.pool.num_idle() >= want {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+    }
+    panic!("the pool never returned {want} connection(s) to the idle queue");
 }
 
 /// Ensure the base database named in the DSN exists; create it via the `postgres` maintenance DB if

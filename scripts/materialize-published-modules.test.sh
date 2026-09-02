@@ -380,6 +380,300 @@ unset STUB_COUNTER STUB_FAIL_COUNT STUB_FAIL_MESSAGE STUB_REAL_GIT
     && ok "hub#1294: 'repository not found' fails immediately, with no retry" \
     || bad "hub#1294: 'repository not found' fails immediately, with no retry" "$errs out=$(tail -c 500 "$OUT")"
 
+# ── 13-15. La caché es COMPARTIDA: tiene que sanearse sola (hub#1380) ────────
+# El 2026-08-30 el gate murió para TODA la flota con los 27 módulos fallando a
+# la vez. Dos síntomas distintos, una sola causa: `fetch_existing_tree` hacía
+# `checkout` SIN `-f`, así que cualquier suciedad dentro de la caché abortaba el
+# checkout —y el `clean` que la habría quitado va DESPUÉS, o sea que no llegaba
+# a correr nunca—. La caché la comparten los ~19 worktrees del hub
+# (`STATE_DIR=$(git rev-parse --git-common-dir)/hub-gate`), así que que un
+# directorio quede sucio no es un accidente raro: es el estado normal.
+
+# ── 13. Un fichero tocado dentro de la caché se sanea solo ───────────────────
+#    Hoy: «error: Your local changes to the following files would be overwritten
+#    by checkout» y el gate queda muerto PARA SIEMPRE, porque nada lo limpia.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+publish_new_version "$base" mod01 3.1.4
+echo '{"id":"mod01","version":"DIRTY-local-edit"}' > "$base/dest/mod01/module.json"
+code2=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ]  || errs="$errs first-exit=$code"
+[ "$code2" = 0 ] || errs="$errs second-exit=$code2(la-cache-sucia-atasco-el-gate)"
+grep -q '"version":"3.1.4"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs cache-no-se-saneo(module.json=$(cat "$base/dest/mod01/module.json" 2>/dev/null))"
+[ -z "$(git -C "$base/dest/mod01" status --porcelain 2>/dev/null)" ] \
+    || errs="$errs la-cache-quedo-sucia-tras-el-saneo"
+[ -z "$errs" ] \
+    && ok "hub#1380: una caché con un fichero tocado se sanea sola en vez de atascar el gate" \
+    || bad "hub#1380: una caché con un fichero tocado se sanea sola en vez de atascar el gate" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 14. Un directorio que es OTRO repo se re-clona ───────────────────────────
+#    Los 27 directorios tenían dentro un clon DEL HUB (639 MB) con su árbol, y
+#    el checkout del módulo chocaba contra ficheros del hub que allí eran
+#    untracked. Un fetch encima de otro repo no se arregla nunca solo.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+rm -rf "$base/dest/mod01"
+mkdir -p "$base/dest/mod01"
+git -C "$base/dest/mod01" init -q -b main
+git -C "$base/dest/mod01" config user.email foreign@test
+git -C "$base/dest/mod01" config user.name foreign
+echo 'fn main() {}' > "$base/dest/mod01/hub-thing.rs"
+git -C "$base/dest/mod01" add hub-thing.rs
+git -C "$base/dest/mod01" commit -qm "soy otro repo"
+git -C "$base/dest/mod01" remote add origin "$base/origins/mod02.git"
+# untracked AQUÍ, pero versionados en el módulo: es lo que aborta el checkout.
+printf '{"id":"otro","version":"0.0.0"}\n' > "$base/dest/mod01/module.json"
+echo foreign > "$base/dest/mod01/marker"
+code2=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code2" = 0 ] || errs="$errs exit=$code2(un-repo-ajeno-en-la-cache-atasco-el-gate)"
+got_origin=$(git -C "$base/dest/mod01" remote get-url origin 2>/dev/null)
+[ "$got_origin" = "$base/origins/mod01.git" ] \
+    || errs="$errs no-se-re-clono(origin='$got_origin')"
+grep -q '"id":"mod01"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs la-cache-no-tiene-el-modulo-esperado"
+grep -q '"version":"2.0.0"' "$base/dest/mod01/module.json" 2>/dev/null \
+    || errs="$errs no-quedo-en-la-version-publicada"
+[ -e "$base/dest/mod01/hub-thing.rs" ] && errs="$errs quedaron-restos-del-repo-ajeno"
+[ -z "$errs" ] \
+    && ok "hub#1380: un directorio de caché que es OTRO repo se re-clona solo" \
+    || bad "hub#1380: un directorio de caché que es OTRO repo se re-clona solo" "$errs out=$(tail -c 500 "$OUT")"
+
+# ── 15. El fallo dice DÓNDE está el problema ─────────────────────────────────
+#    Los dos fallos —«no llego al repo» y «la caché no sirve»— decían lo mismo:
+#    *fix the access (deploy key, ssh agent, network)*. Ahí es donde se pierde
+#    el tiempo: apunta al sitio equivocado en la mitad de los casos.
+base=$(make_catalogue 26)
+OUT="$base/out"
+rm -rf "$base/origins/mod07.git"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-con-un-modulo-inalcanzable"
+grep -qi 'deploy key\|ssh\|network\|acces' "$OUT" \
+    || errs="$errs un-fallo-de-ACCESO-no-menciona-el-acceso"
+[ -z "$errs" ] \
+    && ok "hub#1380: un fallo de ACCESO manda a mirar la llave/red" \
+    || bad "hub#1380: un fallo de ACCESO manda a mirar la llave/red" "$errs out=$(tail -c 400 "$OUT")"
+
+# …y el gemelo: un fallo LOCAL no puede mandar a mirar la red. Se fuerza con el
+# stub de git fallando el `fetch` con un error permanente que no es de acceso.
+base=$(make_catalogue 25)
+OUT="$base/out"
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+mkdir -p "$base/bin"
+cat > "$base/bin/git" <<'STUB'
+#!/usr/bin/env bash
+for a in "$@"; do
+    if [ "$a" = "fetch" ]; then
+        printf 'error: cannot lock ref '"'"'refs/heads/main'"'"': Unable to create file: File exists\n' >&2
+        exit 128
+    fi
+done
+exec "$STUB_REAL_GIT" "$@"
+STUB
+chmod +x "$base/bin/git"
+export STUB_REAL_GIT="$REAL_GIT"
+code2=$(PATH="$base/bin:$PATH" HUB_MATERIALIZE_RETRY_DELAYS="0 0 0" \
+        run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+unset STUB_REAL_GIT
+errs=""
+[ "$code2" = 0 ] && errs="$errs exited-0-con-el-fetch-roto"
+grep -qi 'cach\|derived\|deriv\|borrar\|delete\|rm -rf' "$OUT" \
+    || errs="$errs un-fallo-LOCAL-no-dice-que-la-cache-se-puede-borrar"
+[ -z "$errs" ] \
+    && ok "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" \
+    || bad "hub#1380: un fallo LOCAL manda a la caché (borrable), no a la red" "$errs out=$(tail -c 400 "$OUT")"
+
+# ── 16. hub#1388: the INHERITED git environment never decides what is cloned ──
+#    Root cause of hub#1388, and it is not a race (the first diagnosis) nor the
+#    id source. `git push` FROM A WORKTREE exports `GIT_DIR=<repo>/.git/worktrees/<name>`
+#    into the pre-push hook — a push from the main checkout does NOT, which is
+#    exactly why it never reproduced by hand and always reproduced on the fleet,
+#    which works only out of worktrees. `GIT_DIR` OVERRIDES `git -C <dir>`, so
+#    `remote_for()` asked the module checkout for its origin and got the HUB's
+#    (`git@github:ERPlora/hub.git`, SSH alias and all) for all 27 ids. Both
+#    branches of `remote_for` read correctly in isolation, which is what made
+#    this so hard to see: the poison is in the ENVIRONMENT, not the arguments.
+#    The hub was then cloned into all 27 directories, none carried a module.json,
+#    and every push with HUB_GATE_WITH_MODULES=1 died for the whole fleet.
+#    The same inherited GIT_DIR is why the cache never self-healed: hub#1385's
+#    `tree_is_the_module` compared the hub's origin against the hub's origin and
+#    said "yes, this is the module", taking the FETCH path — whose
+#    `checkout -qf --detach FETCH_HEAD` then ran against the pushing worktree
+#    (hub#1387: the gate leaves the worktree in detached HEAD on main).
+base=$(make_catalogue 26)
+OUT="$base/out"
+# A stand-in for the hub: a real bare repo whose content is NOT a module, so the
+# wrong clone SUCCEEDS and reproduces the observed symptom instead of an access
+# error. Its remote name is the one seen in the poisoned cache.
+hub_work="$base/build/hub"
+mkdir -p "$hub_work"
+git -C "$hub_work" init -q -b main
+git -C "$hub_work" config user.email hub@test
+git -C "$hub_work" config user.name hub
+echo '[workspace]' > "$hub_work/Cargo.toml"
+echo 'ARQUITECTURA' > "$hub_work/ARQUITECTURA.md"
+git -C "$hub_work" add -A
+git -C "$hub_work" commit -qm hub
+git init -q --bare "$base/origins/hub.git"
+git -C "$hub_work" remote add origin "$base/origins/hub.git"
+git -C "$hub_work" push -q origin main
+# …and the checkout the push comes from, whose git dir the hook inherits.
+git clone -q "$base/origins/hub.git" "$base/hubcheckout"
+code=$(
+    # Exactly what `git push` from a worktree exports, measured on git 2.50.1:
+    # GIT_DIR and nothing else. Setting GIT_WORK_TREE too would make `clone`
+    # fail outright ("working tree already exists") — a DIFFERENT symptom that
+    # would hide the one hub#1388 actually reported.
+    export GIT_DIR="$base/hubcheckout/.git"
+    bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25 >"$OUT" 2>&1
+    echo $?
+)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+wrong=0
+for i in $(seq 1 26); do
+    id=$(printf 'mod%02d' "$i")
+    [ "$(git -C "$base/dest/$id" remote get-url origin 2>/dev/null)" = "$base/origins/$id.git" ] \
+        || wrong=$((wrong + 1))
+done
+[ "$wrong" = 0 ] || errs="$errs $wrong-of-26-directories-do-not-carry-their-own-module-origin"
+[ -f "$base/dest/mod01/module.json" ] || errs="$errs mod01-has-no-module.json"
+[ -e "$base/dest/mod01/ARQUITECTURA.md" ] && errs="$errs the-hub-was-cloned-into-a-module-directory"
+[ -z "$errs" ] \
+    && ok "hub#1388: an inherited GIT_DIR does not redirect the clones at the hub" \
+    || bad "hub#1388: an inherited GIT_DIR does not redirect the clones at the hub" "$errs out=$(tail -c 600 "$OUT")"
+
+# ── 17. hub#1388: a tree that cloned fine but is NOT the module says so ───────
+#    The clone SUCCEEDS, so there is no access failure anywhere — yet the run
+#    ended with «Fix the access above» and sent two separate diagnoses into the
+#    deploy keys, which were never broken. A tree without a module.json is a
+#    LOCAL problem and has to name the URL it actually cloned from.
+base=$(make_catalogue 26)
+OUT="$base/out"
+# mod07's published main really carries no module.json: same shape, no network.
+git -C "$base/build/mod07" rm -q module.json
+git -C "$base/build/mod07" commit -qm "drop the manifest"
+git -C "$base/build/mod07" push -q origin main
+code=$(run_script bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 25)
+errs=""
+[ "$code" = 0 ] && errs="$errs exited-0-without-a-manifest"
+grep -q 'mod07' "$OUT" || errs="$errs failure-does-not-name-the-module"
+grep -qi 'cach\|deriv\|rm -rf' "$OUT" || errs="$errs does-not-point-at-the-local-cache"
+grep -q "$base/origins/mod07.git" "$OUT" || errs="$errs does-not-say-which-url-it-cloned-from"
+[ -z "$errs" ] \
+    && ok "hub#1388: a manifest-less tree reports LOCAL and names the URL cloned" \
+    || bad "hub#1388: a manifest-less tree reports LOCAL and names the URL cloned" "$errs out=$(tail -c 600 "$OUT")"
+
+# ── 18. hub#1388: the inherited CONFIG environment cannot redirect a clone either ──
+#    Case 16 closes GIT_DIR. This one closes the rest of the same class, because
+#    a hand-written list of variables is exactly the kind of guard that rots: git
+#    itself considers FIFTEEN variables repository-local (`git rev-parse
+#    --local-env-vars`) and the first fix named eight of them.
+#    This is not hypothetical. `git -c <key>=<value> push` exports
+#    `GIT_CONFIG_PARAMETERS` into the pre-push hook — measured on git 2.50.1 —
+#    and `fleet-supervisor.sh` pushes EVERY fleet branch with
+#    `git -c credential.helper='!gh auth git-credential' push`. So the config
+#    environment reaches this script on every single push the fleet makes. An
+#    inherited `url.<x>.insteadOf` then rewrites where the clone connects, the
+#    tree that lands is not the module, and hub#1388 comes back through a
+#    different door with the identical symptom: a clone that WORKED and carries
+#    no module.json.
+base=$(make_catalogue 2)
+# A stand-in for the hub, reachable at the address an inherited rewrite sends us to.
+for i in 1 2; do
+    id=$(printf 'mod%02d' "$i")
+    evil="$base/build/evil-$id"
+    mkdir -p "$evil"
+    git -C "$evil" init -q -b main
+    git -C "$evil" config user.email hub@test
+    git -C "$evil" config user.name hub
+    echo 'ARQUITECTURA' > "$evil/ARQUITECTURA.md"
+    git -C "$evil" add -A
+    git -C "$evil" commit -qm hub
+    git init -q --bare "$base/evil/$id.git"
+    git -C "$evil" remote add origin "$base/evil/$id.git"
+    git -C "$evil" push -q origin main
+done
+# Both spellings git accepts for injected config: the one `git -c` exports, and
+# the numbered one. Either alone is enough to hijack all 27 clones.
+for spelling in parameters numbered; do
+    errs=""
+    rm -rf "$base/dest"
+    OUT="$base/out.$spelling"
+    code=$(
+        if [ "$spelling" = parameters ]; then
+            export GIT_CONFIG_PARAMETERS="'url.$base/evil/.insteadOf'='$base/origins/'"
+        else
+            export GIT_CONFIG_COUNT=1
+            export GIT_CONFIG_KEY_0="url.$base/evil/.insteadOf"
+            export GIT_CONFIG_VALUE_0="$base/origins/"
+        fi
+        bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 2 >"$OUT" 2>&1
+        echo $?
+    )
+    [ "$code" = 0 ] || errs="$errs exit=$code"
+    for i in 1 2; do
+        id=$(printf 'mod%02d' "$i")
+        [ -f "$base/dest/$id/module.json" ] || errs="$errs $id-has-no-module.json"
+        [ -e "$base/dest/$id/ARQUITECTURA.md" ] && errs="$errs the-hub-was-cloned-into-$id"
+    done
+    [ -z "$errs" ] \
+        && ok "hub#1388: an inherited git config ($spelling) does not redirect the clones" \
+        || bad "hub#1388: an inherited git config ($spelling) does not redirect the clones" \
+               "$errs out=$(tail -c 400 "$OUT")"
+done
+
+# ── 19. hub#1387: the run never reaches into the WORKTREE THAT IS PUSHING ─────
+#    The second symptom of the same cause, and the one that cost a worker its
+#    branch. With GIT_DIR inherited, `tree_is_the_module` compared the hub's
+#    origin against the hub's origin, agreed the cached tree WAS the module, and
+#    took the fetch path — where `git -C "$tree" checkout -qf --detach
+#    FETCH_HEAD` and `git -C "$tree" clean -qfdx` both ignore `-C` and land on
+#    GIT_DIR instead: the pushing worktree. It ends up detached on the hub's
+#    main with its untracked work deleted, which is exactly what hub#1387
+#    reported. Case 16 proves the clones are right; this proves the gate does
+#    not eat the branch it was invoked from.
+base=$(make_catalogue 2)
+OUT="$base/out"
+# The hub, and a checkout of it with a WORKTREE — the shape a fleet push has.
+hub_work="$base/build/hub"
+mkdir -p "$hub_work"
+git -C "$hub_work" init -q -b main
+git -C "$hub_work" config user.email hub@test
+git -C "$hub_work" config user.name hub
+echo 'ARQUITECTURA' > "$hub_work/ARQUITECTURA.md"
+git -C "$hub_work" add -A
+git -C "$hub_work" commit -qm hub
+git init -q --bare "$base/origins/hub.git"
+git -C "$hub_work" remote add origin "$base/origins/hub.git"
+git -C "$hub_work" push -q origin main
+git clone -q "$base/origins/hub.git" "$base/hubcheckout"
+git -C "$base/hubcheckout" worktree add -q "$base/pushing" -b feat/pushing
+echo 'work in progress' > "$base/pushing/WIP.txt"
+# A cache directory that already holds the hub — the poisoned state a previous
+# run left behind, and the only state in which the FETCH path is even reached.
+git clone -q "$base/origins/hub.git" "$base/dest/mod01"
+code=$(
+    export GIT_DIR="$base/hubcheckout/.git/worktrees/pushing"
+    bash "$SCRIPT" --dest "$base/dest" --ids-from "$base/workspace" --floor 2 >"$OUT" 2>&1
+    echo $?
+)
+errs=""
+[ "$code" = 0 ] || errs="$errs exit=$code"
+[ "$(git -C "$base/pushing" rev-parse --abbrev-ref HEAD)" = "feat/pushing" ] \
+    || errs="$errs the-pushing-worktree-was-left-detached"
+[ -f "$base/pushing/WIP.txt" ] || errs="$errs the-pushing-worktree-lost-its-untracked-work"
+[ -f "$base/dest/mod01/module.json" ] || errs="$errs mod01-has-no-module.json"
+[ -z "$errs" ] \
+    && ok "hub#1387: the pushing worktree keeps its branch and its untracked work" \
+    || bad "hub#1387: the pushing worktree keeps its branch and its untracked work" \
+           "$errs out=$(tail -c 400 "$OUT")"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

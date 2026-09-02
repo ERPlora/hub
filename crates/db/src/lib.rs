@@ -13,11 +13,15 @@
 //!   (Postgres). The module never sees the positional placeholder.
 //! - Rows are returned as `serde_json::Value` inside [`QueryResult`], ready for the SDK.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock};
+use std::time::{Duration, Instant};
+
 use async_trait::async_trait;
 use serde_json::{Map, Value as Json};
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
-use sqlx::{Column, Encode, Row, Type, TypeInfo, ValueRef};
+use sqlx::{Column, Connection, Encode, Row, Type, TypeInfo, ValueRef};
 
 mod migration_lock;
 pub use migration_lock::{MigrationLock, MigrationLockError};
@@ -178,6 +182,25 @@ pub trait DatabaseAdapter: Send + Sync {
 
     /// Runs a multi-statement script (migrations).
     async fn execute_batch(&self, sql: &str) -> Result<(), DbError>;
+
+    /// How many writes this adapter has had rejected by a read-only replica (`25006`) — i.e. how
+    /// many times the database switched over underneath it (hub#1376).
+    ///
+    /// Monotonic for the life of the process, and the number the health snapshot reports: a
+    /// switchover the hub survived silently is still something an operator has to be able to see.
+    /// Defaults to `0` for the in-memory adapters, which have no replica to be demoted to.
+    fn read_only_rejections(&self) -> u64 {
+        0
+    }
+
+    /// Hands over the rejections **not yet reported to monitoring** and resets that tally.
+    ///
+    /// Separate from [`DatabaseAdapter::read_only_rejections`] on purpose: the running total is
+    /// for whoever reads a health snapshot, while this one exists so the host raises exactly ONE
+    /// alert per switchover instead of repeating the same one on every health check forever.
+    fn take_unreported_read_only_rejections(&self) -> u64 {
+        0
+    }
 }
 
 // ── NULL binding (context-inferred OID on Postgres) ────────────────────────────────────────
@@ -231,7 +254,27 @@ macro_rules! build_query {
         // `AssertSqlSafe`: sqlx 0.9 requires `'static` SQL or an explicit assertion (anti-injection).
         // Correct here: the SQL skeleton comes from trusted module manifests and the values are
         // bound separately (`:name` → placeholder), never interpolated into the text.
-        let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql));
+        //
+        // `.persistent(false)`: do NOT let sqlx cache the prepared statement (ERPlora/hub#1348).
+        // That cache is keyed on the SQL **text** alone — `get_or_prepare` reads it BEFORE it
+        // looks at this flag — so the parameter types negotiated by the FIRST execution of a text
+        // stay pinned to it for the life of the connection. Our SQL is dynamic and our parameters
+        // are JSON, so the same text legitimately arrives with different parameter types: a `null`
+        // binds as `DynNull` (OID 0, server-inferred from context) while a value binds as
+        // int8/float8/text. Cache the first shape and the second is decoded against the wrong
+        // type — `22P03 incorrect binary data format in bind parameter N` when the widths differ,
+        // and silently wrong data when they do not.
+        //
+        // Cost, MEASURED and not assumed (during review of this fix; loopback Postgres 18, 400
+        // reps, pool pinned to one connection). An uncached statement is NOT free: sqlx's
+        // `prepare()` writes Parse+Describe, then flushes and AWAITS `ReadyForQuery` before it
+        // writes Bind/Execute, so every call pays a SECOND roundtrip that a cache hit does not.
+        // Point lookup 0.44 → 0.62 ms/query, list+join 0.72 → 1.00 ms, INSERT 0.57 → 0.70 ms:
+        // roughly +0.15…+0.28 ms, +24 %…+40 %. Accepted deliberately — it buys back a class of
+        // SILENT corruption of money and quantity fields, and a fraction of a millisecond per
+        // query is not where the POS spends its latency budget. What the flag does save is the
+        // `Close` on eviction: nothing is cached, so nothing is ever evicted.
+        let mut q = sqlx::query(sqlx::AssertSqlSafe($tsql)).persistent(false);
         for name in $names.iter() {
             q = match $params.get(name) {
                 // NULL — bound as `DynNull` (see its definition above): emits a NULL with OID 0
@@ -261,10 +304,11 @@ macro_rules! build_query {
 // ── Postgres backend (Hub Cloud) ─────────────────────────────────────────────────────────
 
 /// Postgres backend over `PgPool`. `max_connections` is injected via environment at
-/// construction ([`PG_MAX_CONNECTIONS_ENV`], per plan, managed by the SaaS); the rest of the
-/// pool tuning (TLS, timeouts) is pending (§8).
+/// construction ([`PG_MAX_CONNECTIONS_ENV`], per plan, managed by the SaaS).
 pub struct PgAdapter {
     pool: PgPool,
+    /// Shared with the pool's `before_acquire` hook — see [`ReplicaWatch`].
+    replica: Arc<ReplicaWatch>,
 }
 
 /// Default del pool Postgres cuando [`PG_MAX_CONNECTIONS_ENV`] no está configurado: **10**, el
@@ -315,21 +359,192 @@ impl PgAdapter {
     /// Connects with a standard Postgres DSN (`postgres://user:pass@host:5432/db`).
     /// `max_connections` comes from [`PG_MAX_CONNECTIONS_ENV`] (per-hub cap injected by the
     /// SaaS at deploy time; absent/invalid → the sqlx default of 10 — ERPlora/saas#609).
-    /// TODO §8: use `PgPoolOptions` with TLS require,
-    /// max_lifetime/idle_timeout to survive failovers.
     pub async fn connect(dsn: &str) -> Result<Self, DbError> {
-        let pool = PgPoolOptions::new()
-            .max_connections(pg_max_connections_from_env())
+        let replica = Arc::new(ReplicaWatch::default());
+        let pool = pg_pool_options(pg_max_connections_from_env(), Arc::clone(&replica))
             .connect(dsn)
             .await?;
-        Ok(Self { pool })
+        Ok(Self { pool, replica })
     }
 
-    /// Build an adapter over an already-configured pool (used by the test helpers).
+    /// Same, from explicit connect options — the door the test helpers use, so a test pool is
+    /// configured **exactly** like a production one (timeouts and switchover recycling included)
+    /// instead of proving things about a pool shape production does not have.
     #[cfg(any(test, feature = "test-util"))]
-    pub(crate) fn from_pool(pool: PgPool) -> Self {
-        Self { pool }
+    pub(crate) async fn connect_with_options(
+        opts: sqlx::postgres::PgConnectOptions,
+        max_connections: u32,
+    ) -> Result<Self, DbError> {
+        let replica = Arc::new(ReplicaWatch::default());
+        let pool = pg_pool_options(max_connections, Arc::clone(&replica))
+            .connect_with(opts)
+            .await?;
+        Ok(Self { pool, replica })
     }
+}
+
+// ── Leader switchover: recycling connections pinned to the replica (hub#1376) ────────────────
+
+/// The SQLSTATE Postgres answers with when a write reaches a read-only standby.
+const READ_ONLY_SQLSTATE: &str = "25006";
+
+/// `25006 read_only_sql_transaction`: the write was refused because this session is talking to a
+/// **standby**, not to the leader.
+///
+/// After a Patroni switchover the private LB is TCP-level: it routes only NEW connections to the
+/// promoted node, and never tears down the ones already established. Those stay pinned to the
+/// ex-leader — now a replica — perfectly healthy as sockets, and unable to write ever again. So
+/// `25006` is a **connection** fault dressed as a query error, and the only cure is to throw the
+/// connection away.
+fn is_read_only_transaction(error: &sqlx::Error) -> bool {
+    matches!(error.as_database_error().and_then(|e| e.code()), Some(code) if code == READ_ONLY_SQLSTATE)
+}
+
+/// Hard cap on how long a pooled connection may live. A hub with no write traffic never trips
+/// `25006`, so without this its connections would sit on the ex-leader indefinitely — serving
+/// reads from a node that is no longer the leader. Ten minutes bounds that window while staying
+/// far too long to cause connection churn in normal operation.
+const PG_MAX_LIFETIME: Duration = Duration::from_secs(600);
+
+/// Idle connections go sooner: nothing is in flight on them, so recycling costs nothing, and it
+/// keeps a quiet hub from holding a whole pool of sockets against the wrong node.
+const PG_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// Retries allowed for ONE operation after a `25006`.
+///
+/// With the generation drain in [`ReplicaWatch`] a single retry is already enough: the failing
+/// connection is closed and every connection opened before the switchover is refused at acquire
+/// time, so the retry necessarily runs on one opened afterwards. The second is margin for the
+/// window in which the LB has not yet flipped its health check and hands out one more ex-leader
+/// connection. It stays deliberately SMALL: if the whole cluster is read-only (Patroni with no
+/// leader, a full disk) no amount of retrying helps, and a large budget would turn every request
+/// into a connection storm against a database that is already in trouble.
+const READ_ONLY_MAX_RETRIES: u32 = 2;
+
+/// Monotonic process clock used to date connections. `Instant` cannot be dragged backwards by an
+/// NTP step the way wall-clock time can.
+static PROCESS_START: LazyLock<Instant> = LazyLock::new(Instant::now);
+
+fn now_ms() -> u64 {
+    // Saturating at u64 milliseconds would take ~584 million years of uptime.
+    PROCESS_START.elapsed().as_millis() as u64
+}
+
+/// Tracks the last switchover this pool noticed, and how many writes the replica rejected.
+///
+/// The pool's `before_acquire` hook asks [`ReplicaWatch::is_stale`] and refuses every connection
+/// **established before** that switchover. That is what makes the recovery deterministic instead
+/// of merely eventual: closing only the connection that happened to fail would leave the other
+/// idle ones — up to `max_connections` of them — still pinned to the ex-leader, so the next
+/// several requests would fail too, one per stale connection.
+#[derive(Default)]
+struct ReplicaWatch {
+    /// [`now_ms`] of the last `25006`; `0` means "no switchover seen yet".
+    poisoned_at_ms: AtomicU64,
+    /// Total writes the replica rejected. Monotonic on purpose: this is the number that still
+    /// says "this hub went through a switchover" long after the log line has scrolled away.
+    rejections: AtomicU64,
+    /// The share of `rejections` not yet handed to monitoring. Drained by
+    /// [`DatabaseAdapter::take_unreported_read_only_rejections`] so the host raises ONE alert per
+    /// switchover instead of one per health check for the rest of the process's life.
+    unreported: AtomicU64,
+}
+
+impl ReplicaWatch {
+    /// Records a rejected write and opens a new connection generation.
+    fn record_rejection(&self) {
+        self.rejections.fetch_add(1, Ordering::Relaxed);
+        self.unreported.fetch_add(1, Ordering::Relaxed);
+        // Stored offset by one so `0` can keep meaning "never" without colliding with millisecond
+        // zero — which is not a hypothetical: this is the call that initialises [`PROCESS_START`],
+        // so the very first rejection of a process really does land on `now_ms() == 0`.
+        self.poisoned_at_ms.store(now_ms() + 1, Ordering::Relaxed);
+    }
+
+    /// Was a connection of this age established before the last switchover we saw?
+    fn is_stale(&self, age: Duration) -> bool {
+        let Some(poisoned_at) = self.poisoned_at_ms.load(Ordering::Relaxed).checked_sub(1) else {
+            return false; // no switchover seen yet
+        };
+        // Compared as AGES rather than as absolute instants (`established_at < poisoned_at`):
+        // near process start the absolute form floors every subtraction to zero and calls an
+        // hour-old connection fresh.
+        //
+        // Strictly `>`. A connection established in the very millisecond of the switchover is
+        // ambiguous at this granularity, and the safe side of that doubt is to KEEP it: the retry
+        // is the backstop, so wrongly keeping one costs a single `25006` that is already handled,
+        // whereas wrongly discarding would throw away the fresh connection the retry just opened
+        // and make every burst after a switchover reconnect its whole pool a second time.
+        age.as_millis() as u64 > now_ms().saturating_sub(poisoned_at)
+    }
+
+    fn rejections(&self) -> u64 {
+        self.rejections.load(Ordering::Relaxed)
+    }
+
+    fn take_unreported(&self) -> u64 {
+        self.unreported.swap(0, Ordering::Relaxed)
+    }
+}
+
+/// The pool configuration EVERY [`PgAdapter`] uses, production and tests alike.
+fn pg_pool_options(max_connections: u32, replica: Arc<ReplicaWatch>) -> PgPoolOptions {
+    PgPoolOptions::new()
+        .max_connections(max_connections)
+        .max_lifetime(PG_MAX_LIFETIME)
+        .idle_timeout(PG_IDLE_TIMEOUT)
+        .before_acquire(move |_conn, meta| {
+            // Decided synchronously: this runs on every acquire and must not cost a round trip.
+            // sqlx never calls `before_acquire` for a connection it has just opened, so a fresh
+            // connection can never be refused here — no risk of an acquire loop.
+            let fresh = !replica.is_stale(meta.age);
+            Box::pin(async move { Ok(fresh) })
+        })
+}
+
+/// Runs `$body` on a pooled connection bound to `$conn` and, if Postgres answers `25006`, throws
+/// that connection out of the pool and runs `$body` again on a fresh one.
+///
+/// Retrying a write is safe here *precisely* because of what `25006` means: Postgres refused the
+/// statement, so the transaction it belonged to committed **nothing**. There is no partial effect
+/// to duplicate — which is why this treats `25006`, and only `25006`, this way. Every other error
+/// propagates untouched on the first try.
+///
+/// A macro rather than a generic helper: the closure would have to be generic over the borrowed
+/// connection's lifetime (`for<'c>`) while also capturing the caller's `sql`/`params`, which is
+/// not expressible today without boxing everything and fighting the borrow checker for no gain.
+macro_rules! on_the_leader {
+    ($self:expr, |$conn:ident| $body:block) => {{
+        let mut retries = 0u32;
+        loop {
+            let mut $conn = $self.pool.acquire().await?;
+            let outcome: Result<_, sqlx::Error> = async { $body }.await;
+            match outcome {
+                Ok(value) => break Ok(value),
+                Err(error) if is_read_only_transaction(&error) => {
+                    $self.replica.record_rejection();
+                    // Out of the pool for good: handing it back would give the next caller the
+                    // same dead end.
+                    let _ = $conn.close().await;
+                    if retries >= READ_ONLY_MAX_RETRIES {
+                        eprintln!(
+                            "db: database still read-only after {retries} retries \
+                             ({READ_ONLY_SQLSTATE}); is the cluster left without a leader? \
+                             (hub#1376)"
+                        );
+                        break Err(DbError::from(error));
+                    }
+                    retries += 1;
+                    eprintln!(
+                        "db: a replica rejected a write ({READ_ONLY_SQLSTATE}) — the database \
+                         switched over. Recycling the connections opened before it and retrying \
+                         ({retries}/{READ_ONLY_MAX_RETRIES}) — hub#1376"
+                    );
+                }
+                Err(error) => break Err(DbError::from(error)),
+            }
+        }
+    }};
 }
 
 /// `55P03 lock_not_available`: Postgres se rindió esperando el lock (lo puso `SET LOCAL
@@ -342,20 +557,28 @@ fn is_lock_timeout(error: &sqlx::Error) -> bool {
 impl DatabaseAdapter for PgAdapter {
     async fn execute(&self, sql: &str, params: &Params) -> Result<CommandResult, DbError> {
         let (tsql, names) = translate(sql);
-        let q = build_query!(tsql, names, params);
-        let res = q.execute(&self.pool).await?;
-        Ok(CommandResult::affected(res.rows_affected()))
+        let affected = on_the_leader!(self, |conn| {
+            // Rebuilt per attempt (`AssertSqlSafe` takes the string by value). One clone of the
+            // statement text against a network round trip is noise, and it keeps the retry able
+            // to run the very same SQL on the new connection.
+            let q = build_query!(tsql.clone(), names, params);
+            Ok(q.execute(&mut *conn).await?.rows_affected())
+        })?;
+        Ok(CommandResult::affected(affected))
     }
 
     async fn execute_tx(&self, ops: &[(String, Params)]) -> Result<CommandResult, DbError> {
-        let mut tx = self.pool.begin().await?;
-        let mut total = 0u64;
-        for (sql, params) in ops {
-            let (tsql, names) = translate(sql);
-            let q = build_query!(tsql, names, params);
-            total += q.execute(&mut *tx).await?.rows_affected();
-        }
-        tx.commit().await?;
+        let total = on_the_leader!(self, |conn| {
+            let mut tx = conn.begin().await?;
+            let mut total = 0u64;
+            for (sql, params) in ops {
+                let (tsql, names) = translate(sql);
+                let q = build_query!(tsql, names, params);
+                total += q.execute(&mut *tx).await?.rows_affected();
+            }
+            tx.commit().await?;
+            Ok(total)
+        })?;
         Ok(CommandResult::affected(total))
     }
 
@@ -364,7 +587,8 @@ impl DatabaseAdapter for PgAdapter {
         ops: &[(String, Params)],
         gates: &[RowGate],
     ) -> Result<TxGatedOutcome, DbError> {
-        let mut tx = self.pool.begin().await?;
+        on_the_leader!(self, |conn| {
+        let mut tx = conn.begin().await?;
         let mut per_op = Vec::with_capacity(ops.len());
         for (sql, params) in ops {
             let (tsql, names) = translate(sql);
@@ -392,8 +616,13 @@ impl DatabaseAdapter for PgAdapter {
         }
         tx.commit().await?;
         Ok(TxGatedOutcome::Committed { per_op })
+        })
     }
 
+    /// Reads never hit `25006` — a standby serves them happily — so there is nothing to retry
+    /// here. They still benefit from the switchover recycling: the moment any write trips the
+    /// error, the pool's `before_acquire` hook starts refusing every connection opened before it,
+    /// so reads stop being served from the node that is no longer the leader.
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError> {
         let (tsql, names) = translate(sql);
         let q = build_query!(tsql, names, params);
@@ -443,8 +672,18 @@ impl DatabaseAdapter for PgAdapter {
         // Migraciones: normaliza los tipos del `CREATE TABLE` al motor target (ADR-0007 §4b):
         // TEXT→TEXT, INTEGER→BIGINT, REAL→DOUBLE PRECISION, BLOB→BYTEA.
         let normalized = shim_ddl_types(sql);
-        sqlx::raw_sql(sqlx::AssertSqlSafe(normalized)).execute(&self.pool).await?;
-        Ok(())
+        on_the_leader!(self, |conn| {
+            sqlx::raw_sql(sqlx::AssertSqlSafe(normalized.clone())).execute(&mut *conn).await?;
+            Ok(())
+        })
+    }
+
+    fn read_only_rejections(&self) -> u64 {
+        self.replica.rejections()
+    }
+
+    fn take_unreported_read_only_rejections(&self) -> u64 {
+        self.replica.take_unreported()
     }
 }
 
@@ -553,9 +792,13 @@ pub const BRIDGE_FUNCTIONS: &[&str] = &[
 ///
 /// Funciones cubiertas (ver [`BRIDGE_FUNCTIONS`]):
 /// - `erp_now()` → `now()`. Timestamp del servidor (ADR-0007: fechas `TEXT` ISO-8601).
-/// - `erp_lpad(valor, ancho, relleno)` → `lpad((<valor>)::text, <ancho>, <relleno>)`.
+/// - `erp_lpad(valor, ancho, relleno)` → rellena por la izquierda hasta `ancho`.
 /// - `erp_pad(valor, ancho)` = atajo de `erp_lpad(valor, ancho, '0')` para números de documento
-///   (factura `FAC-00042`, ticket `TCK-0042`) → `lpad((<valor>)::text, <ancho>, '0')`.
+///   (factura `FAC-00042`, ticket `TCK-0042`).
+///
+///   🔴 En ambas, **`ancho` es un MÍNIMO, nunca un techo**: un valor más largo que `ancho` se
+///   conserva ENTERO. Ver [`pad_to_min_width`] — el `lpad` pelado de Postgres truncaba y hacía
+///   colisionar el documento 10.000 con el 1.000 (hub#1378).
 fn shim_functions(sql: &str) -> String {
     // Atajo: si ningún nombre del set aparece, no hay nada que reescribir.
     let lower = sql.to_ascii_lowercase();
@@ -661,6 +904,26 @@ fn next_call(bytes: &[u8], after_name: usize) -> Option<(usize, Vec<(usize, usiz
     None
 }
 
+/// Expresión Postgres que rellena `value` por la izquierda hasta `width` **sin truncar nunca**
+/// (hub#1378).
+///
+/// El `lpad(texto, ancho, relleno)` de Postgres impone un ancho **EXACTO**: recorta lo que sobra,
+/// así que `lpad('10000', 4, '0')` = `'1000'` y el número de documento 10.000 colisionaba con el
+/// 1.000 en el índice UNIQUE del ticket (ERPlora/sales#241; en `invoice`, 1.000.000 contra
+/// 100.000). El contrato de las funciones-puente dice ancho **MÍNIMO**, así que se le pide a
+/// `lpad` el mayor entre el ancho pedido y la longitud real del valor: lo que cabe se rellena
+/// igual que antes y lo que no cabe se conserva entero.
+///
+/// `length()` cuenta **caracteres**, no bytes, así que un valor acentuado no pierde posiciones de
+/// relleno.
+///
+/// ⚠️ La expresión del valor aparece **dos veces**, de modo que debe ser no-volátil. Las llamadas
+/// reales de los módulos son columnas o subconsultas de solo lectura, estables dentro del snapshot
+/// de la sentencia, y el validador del toolkit reescribe la misma expresión.
+fn pad_to_min_width(value: &str, width: &str, fill: &str) -> String {
+    format!("lpad(({value})::text, greatest({width}, length(({value})::text)), {fill})")
+}
+
 /// Renderiza una función-puente concreta a su expresión nativa Postgres. `None` = aridad
 /// incorrecta (se deja el texto intacto; el validador del toolkit debería haberlo atrapado en build).
 fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<String> {
@@ -681,7 +944,7 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             }
             let value = arg(0);
             let width = arg(1);
-            Some(format!("lpad(({value})::text, {width}, '0')"))
+            Some(pad_to_min_width(&value, &width, "'0'"))
         }
         "erp_lpad" => {
             if args.len() != 3 {
@@ -690,7 +953,7 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             let value = arg(0);
             let width = arg(1);
             let fill = arg(2); // literal `'x'` o expresión
-            Some(format!("lpad(({value})::text, {width}, {fill})"))
+            Some(pad_to_min_width(&value, &width, &fill))
         }
 
         // ── funciones-puente de fecha/hora ───────────────────────────────────────────────────
@@ -779,9 +1042,11 @@ fn render_bridge_fn(name: &str, sql: &str, args: &[(usize, usize)]) -> Option<St
             }
             let h = arg(0);
             let m = arg(1);
-            Some(format!(
-                "(lpad(({h})::text, 2, '0') || ':' || lpad(({m})::text, 2, '0'))"
-            ))
+            // Mismo contrato de ancho mínimo (hub#1378): una duración de 100 h se renderizaba
+            // "10:00" porque `lpad` recortaba las horas.
+            let hh = pad_to_min_width(&h, "2", "'0'");
+            let mm = pad_to_min_width(&m, "2", "'0'");
+            Some(format!("({hh} || ':' || {mm})"))
         }
         _ => None,
     }
@@ -1041,7 +1306,7 @@ pub(crate) fn translate(sql: &str) -> (String, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil::fresh_db;
+    use crate::testutil::{TestDb, demote_pooled_connections_to_replica, fresh_db};
     use serde_json::json;
 
     fn params(v: Json) -> Params {
@@ -1126,6 +1391,82 @@ mod tests {
         assert_eq!(q.rows[0]["num"], json!("FAC-00042"));
         assert_eq!(q.rows[0]["amount_cents"], json!(12345));
         assert_eq!(q.rows[0]["paid"], json!(1));
+    }
+
+    /// Regresión (hub#1378): `erp_pad` es padding **mínimo**, nunca un techo. En Postgres `lpad`
+    /// TRUNCA cuando el valor supera el ancho, así que el contador diario 10.000 se renderizaba
+    /// `1000` y COLISIONABA con la venta 1.000 en el índice UNIQUE del número de documento
+    /// (ERPlora/sales#241; en `invoice` el fallback de 6 dígitos choca en 1.000.000 con 100.000).
+    /// Reproduce la forma real de `sales._insert_sale`: el número se arma leyendo el contador
+    /// recién incrementado en la MISMA sentencia, con una subconsulta escalar.
+    #[tokio::test]
+    async fn erp_pad_never_truncates_so_document_numbers_stay_unique() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE counter (hub_id TEXT, day TEXT, last_number INTEGER, \
+               PRIMARY KEY (hub_id, day)); \
+             CREATE TABLE sale (id TEXT PRIMARY KEY, hub_id TEXT, sale_number TEXT); \
+             CREATE UNIQUE INDEX uq_sale_number ON sale (hub_id, sale_number);",
+        )
+        .await
+        .unwrap();
+        db.execute(
+            "INSERT INTO counter (hub_id, day, last_number) VALUES (:hub_id, :day, 1000)",
+            &params(json!({ "hub_id": "h1", "day": "20260901" })),
+        )
+        .await
+        .unwrap();
+
+        let insert_sale = "INSERT INTO sale (id, hub_id, sale_number) VALUES (:id, :hub_id, \
+             :day || '-' || erp_pad((SELECT last_number FROM counter \
+                                     WHERE hub_id = :hub_id AND day = :day), 4))";
+        db.execute(insert_sale, &params(json!({ "id": "s1", "hub_id": "h1", "day": "20260901" })))
+            .await
+            .unwrap();
+
+        // La venta 10.000 del día: cuatro dígitos ya no le bastan y el ancho es un MÍNIMO.
+        db.execute(
+            "UPDATE counter SET last_number = 10000 WHERE hub_id = :hub_id AND day = :day",
+            &params(json!({ "hub_id": "h1", "day": "20260901" })),
+        )
+        .await
+        .unwrap();
+        db.execute(insert_sale, &params(json!({ "id": "s2", "hub_id": "h1", "day": "20260901" })))
+            .await
+            .expect("la venta 10.000 no puede colisionar con la 1.000 en uq_sale_number");
+
+        let q = db
+            .query("SELECT sale_number FROM sale ORDER BY id", &Params::new())
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 2);
+        assert_eq!(q.rows[0]["sale_number"], json!("20260901-1000"));
+        assert_eq!(
+            q.rows[1]["sale_number"],
+            json!("20260901-10000"),
+            "erp_pad rellena hasta el ancho, no recorta a el"
+        );
+    }
+
+    /// Regresión (hub#1378): el contrato de anchura es un MÍNIMO en ambas funciones-puente, y el
+    /// relleno de `erp_lpad` cuenta CARACTERES (no bytes) para que el acento no coma una posición.
+    #[tokio::test]
+    async fn erp_pad_and_erp_lpad_pad_to_a_minimum_width() {
+        let db = fresh_db().await;
+        let q = db
+            .query(
+                "SELECT erp_pad(:small, 5) AS small, erp_pad(:big, 4) AS big, \
+                        erp_lpad(:word, 6, '.') AS narrow, erp_lpad(:phrase, 4, '.') AS wide",
+                &params(json!({
+                    "small": 42, "big": 10000, "word": "café", "phrase": "cafetería"
+                })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows[0]["small"], json!("00042"), "lo que cabe se rellena igual que antes");
+        assert_eq!(q.rows[0]["big"], json!("10000"), "lo que no cabe se conserva entero");
+        assert_eq!(q.rows[0]["narrow"], json!("..café"), "el relleno cuenta caracteres");
+        assert_eq!(q.rows[0]["wide"], json!("cafetería"), "9 caracteres no se recortan a 4");
     }
 
     /// Regresión (ADR-0154): `shim_ddl_types`/`translate` reconstruían el SQL byte-a-byte con
@@ -1354,7 +1695,7 @@ mod tests {
     #[test]
     fn shim_erp_pad() {
         let (sql, names) = translate("SELECT 'FAC-' || erp_pad(:n, 5)");
-        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, 5, '0')");
+        assert_eq!(sql, "SELECT 'FAC-' || lpad(($1)::text, greatest(5, length(($1)::text)), '0')");
         assert_eq!(names, vec!["n"]);
     }
 
@@ -1366,7 +1707,8 @@ mod tests {
         );
         assert_eq!(
             sql,
-            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, 6, '0')"
+            "SELECT lpad(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text, \
+             greatest(6, length(((SELECT max(seq) + 1 FROM t WHERE hub_id = $1))::text)), '0')"
         );
         assert_eq!(names, vec!["h"]);
     }
@@ -1429,7 +1771,7 @@ mod tests {
     #[test]
     fn shim_erp_lpad() {
         let (sql, names) = translate("SELECT erp_lpad(:code, 8, '*')");
-        assert_eq!(sql, "SELECT lpad(($1)::text, 8, '*')");
+        assert_eq!(sql, "SELECT lpad(($1)::text, greatest(8, length(($1)::text)), '*')");
         assert_eq!(names, vec!["code"]);
     }
 
@@ -1483,7 +1825,8 @@ mod tests {
         let (p, _) = translate("SELECT erp_timefmt(m / 60, m % 60)");
         assert_eq!(
             p,
-            "SELECT (lpad((m / 60)::text, 2, '0') || ':' || lpad((m % 60)::text, 2, '0'))"
+            "SELECT (lpad((m / 60)::text, greatest(2, length((m / 60)::text)), '0') || ':' || \
+             lpad((m % 60)::text, greatest(2, length((m % 60)::text)), '0'))"
         );
     }
 
@@ -1570,10 +1913,402 @@ mod tests {
         assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 10);
     }
 
+    // ── Statement cache vs. NULL binds (`DynNull`, OID 0) — ERPlora/hub#1348 ──────────────────
+    //
+    // sqlx keys its prepared-statement cache on the SQL **text** alone, and `get_or_prepare`
+    // consults that cache before it honours `persistent`. So the parameter types negotiated by the
+    // FIRST execution of a text stay pinned to it for the life of the connection.
+    //
+    // A JSON `null` binds as `DynNull` (OID 0 = "infer from context"), which hands the type choice
+    // to the server. With `CAST(:cost AS INTEGER)` — the shape
+    // `inventory/commands/_receive_line.sql` really uses — the server picks `int4`. The next
+    // execution binds an `i64`: 8 bytes of binary payload into a 4-byte slot, and Postgres answers
+    // `22P03 incorrect binary data format in bind parameter N`.
+    //
+    // It is not an inventory quirk: ANY optional `["integer","null"]` field that is sometimes sent
+    // and sometimes omitted hits it, and in production one pooled connection serves thousands of
+    // requests, so the two shapes meeting on one connection is the normal case, not the rare one.
+    // The pools below are capped at ONE connection so these tests prove that instead of hoping for
+    // it.
+
+    /// Write path: the same INSERT text run first with `null`, then with a typed value.
+    #[tokio::test]
+    async fn null_bind_then_typed_bind_on_the_same_sql_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost INTEGER);")
+            .await
+            .unwrap();
+
+        // The SAME text on both calls: that is what makes them meet on the cached statement.
+        let sql =
+            "INSERT INTO stock (id, hub_id, cost) VALUES (:id, :hub_id, CAST(:cost AS INTEGER))";
+
+        db.execute(sql, &params(json!({ "id": "a", "hub_id": "h1", "cost": Json::Null })))
+            .await
+            .expect("el bind NULL (DynNull, OID 0) debe insertar");
+
+        db.execute(sql, &params(json!({ "id": "b", "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect(
+                "tras preparar la sentencia con un bind NULL, un valor tipado en la MISMA \
+                 conexión debe seguir funcionando (hub#1348)",
+            );
+
+        // Not blowing up is not enough: both values have to have landed RIGHT. A slot with the
+        // wrong type can also swallow the bytes and store garbage without saying anything.
+        let rows = db
+            .query(
+                "SELECT id, cost FROM stock WHERE hub_id = :hub_id ORDER BY id",
+                &params(json!({ "hub_id": "h1" })),
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 2, "las dos filas se insertaron: {rows:?}");
+        assert_eq!(rows[0]["cost"], Json::Null, "la fila del bind NULL guarda NULL");
+        assert_eq!(rows[1]["cost"], json!(180), "la fila tipada guarda el valor exacto");
+    }
+
+    /// Read path: same story through `query`. A list that filters by an optional field breaks the
+    /// same way, and `build_query!` is the single door both paths go through.
+    #[tokio::test]
+    async fn null_bind_then_typed_bind_on_the_same_select_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost INTEGER);")
+            .await
+            .unwrap();
+        db.execute_batch(
+            "INSERT INTO stock (id, hub_id, cost) VALUES ('a', 'h1', NULL), ('b', 'h1', 180);",
+        )
+        .await
+        .unwrap();
+
+        let sql = "SELECT id FROM stock WHERE hub_id = :hub_id \
+                   AND cost IS NOT DISTINCT FROM CAST(:cost AS INTEGER) ORDER BY id";
+
+        let null_first = db
+            .query(sql, &params(json!({ "hub_id": "h1", "cost": Json::Null })))
+            .await
+            .expect("el bind NULL (DynNull, OID 0) debe consultar");
+        assert_eq!(null_first.rows.len(), 1, "el filtro NULL devuelve su fila");
+        assert_eq!(null_first.rows[0]["id"], json!("a"));
+
+        let typed_second = db
+            .query(sql, &params(json!({ "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect(
+                "tras preparar el SELECT con un bind NULL, un valor tipado en la MISMA conexión \
+                 debe seguir funcionando (hub#1348)",
+            );
+        assert_eq!(typed_second.rows.len(), 1, "el filtro tipado devuelve su fila");
+        assert_eq!(typed_second.rows[0]["id"], json!("b"));
+    }
+
+    /// The SILENT face of the same bug, and the reason the fix is a blanket one: no `NULL` is
+    /// involved here at all. `build_query!` picks the Rust type from the JSON value — `i64` for
+    /// `180`, `f64` for `180.5` (see the bind loop above) — so one SQL text legitimately reaches
+    /// the same slot as two different types. With the statement cached, the second execution's 8
+    /// bytes of `f64` are decoded as the `int8` the first execution pinned: same width, so
+    /// Postgres raises NOTHING and stores the IEEE-754 bit pattern as a number.
+    ///
+    /// This is what rules out the narrower fix of "skip the cache only when a bind is `DynNull`":
+    /// it would leave this open, and this one does not announce itself (ERPlora/hub#1348).
+    #[tokio::test]
+    async fn int_bind_then_float_bind_on_the_same_sql_hub1348() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch(
+            "CREATE TABLE stock (id TEXT PRIMARY KEY, hub_id TEXT, cost DOUBLE PRECISION);",
+        )
+        .await
+        .unwrap();
+
+        let sql = "INSERT INTO stock (id, hub_id, cost) VALUES (:id, :hub_id, \
+                   CAST(:cost AS DOUBLE PRECISION))";
+
+        db.execute(sql, &params(json!({ "id": "a", "hub_id": "h1", "cost": 180 })))
+            .await
+            .expect("el bind entero debe insertar");
+
+        db.execute(sql, &params(json!({ "id": "b", "hub_id": "h1", "cost": 180.5 })))
+            .await
+            .expect("el bind decimal en la MISMA conexión debe insertar (hub#1348)");
+
+        let rows = db
+            .query(
+                "SELECT id, cost FROM stock WHERE hub_id = :hub_id ORDER BY id",
+                &params(json!({ "hub_id": "h1" })),
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(rows.len(), 2, "las dos filas se insertaron: {rows:?}");
+        assert_eq!(rows[0]["cost"], json!(180.0), "la fila entera guarda 180");
+        assert_eq!(
+            rows[1]["cost"],
+            json!(180.5),
+            "la fila decimal guarda 180.5 y NO el patrón de bits reinterpretado como int8"
+        );
+    }
+
     #[test]
     fn portable_sql_normalizes_for_postgres() {
         let sql = "INSERT INTO t (n, ts) VALUES (erp_pad(:seq, 4), erp_now())";
         let (pg, _) = translate(sql);
-        assert_eq!(pg, "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, 4, '0'), now())");
+        assert_eq!(
+            pg,
+            "INSERT INTO t (n, ts) VALUES (lpad(($1)::text, greatest(4, length(($1)::text)), '0'), \
+             now())"
+        );
     }
+
+    // ── hub#1376: a database switchover must not leave the pool writing to the replica ───────
+    //
+    // Patroni promotes another node and the private LB (TCP level) only routes NEW connections to
+    // the leader: the ones the pool already had open stay pinned to the ex-leader, now a replica,
+    // which rejects every write with `25006 read_only_sql_transaction`. Without recycling them the
+    // hub is unusable FOREVER — measured in PRE on 2026-08-29: 25 minutes hammering the replica.
+    //
+    // `SET default_transaction_read_only = on` reproduces that EXACTLY on a live pooled connection:
+    // same SQLSTATE, same connection. sqlx runs no `DISCARD ALL` when a connection goes back to the
+    // pool (there is no `after_release` hook configured), so the poison survives the round trip.
+
+    fn sqlstate_of(err: &DbError) -> Option<String> {
+        let DbError::Sqlx(e) = err;
+        e.as_database_error().and_then(|e| e.code()).map(|c| c.to_string())
+    }
+
+    /// The single-statement write path (`execute`) — the one the outbox/flow-trigger/scheduled-task
+    /// claim loops hammer, and the one that logged 147 lines of `25006` during the incident.
+    #[tokio::test]
+    async fn execute_recovers_from_a_switchover_instead_of_writing_to_the_replica_hub1376() {
+        let tdb = TestDb::new().await;
+        // One connection: the test STATES that the write reuses the poisoned one instead of
+        // hoping the pool hands it back.
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE claims (id BIGINT PRIMARY KEY, n BIGINT);")
+            .await
+            .unwrap();
+        db.execute("INSERT INTO claims (id, n) VALUES (1, 1)", &params(json!({})))
+            .await
+            .unwrap();
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+
+        db.execute("UPDATE claims SET n = 2 WHERE id = 1", &params(json!({})))
+            .await
+            .expect(
+                "after a switchover the pooled connection talks to a replica: the write must \
+                 recycle it and land on a fresh one, not fail forever (hub#1376)",
+            );
+
+        let rows = db.query("SELECT n FROM claims WHERE id = 1", &params(json!({}))).await.unwrap().rows;
+        assert_eq!(rows[0]["n"], json!(2), "the retried write actually landed");
+    }
+
+    /// The transactional write path (`execute_tx`): a declarative command batches its mutation and
+    /// its `_event_outbox` INSERTs into one tx, so this is what a real sale goes through.
+    #[tokio::test]
+    async fn execute_tx_recovers_from_a_switchover_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE sales (id BIGINT PRIMARY KEY, total BIGINT);")
+            .await
+            .unwrap();
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+
+        db.execute_tx(&[
+            ("INSERT INTO sales (id, total) VALUES (1, 100)".to_string(), params(json!({}))),
+            ("INSERT INTO sales (id, total) VALUES (2, 200)".to_string(), params(json!({}))),
+        ])
+        .await
+        .expect("a transaction that opened on the replica must be retried on the leader (hub#1376)");
+
+        let rows = db.query("SELECT id FROM sales ORDER BY id", &params(json!({}))).await.unwrap().rows;
+        assert_eq!(rows.len(), 2, "the whole transaction landed exactly once: {rows:?}");
+    }
+
+    /// The gated transactional path (`execute_tx_gated`) — the door every declarative command with
+    /// `min_affected_rows` goes through.
+    #[tokio::test]
+    async fn execute_tx_gated_recovers_from_a_switchover_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE appts (id BIGINT PRIMARY KEY, state TEXT);")
+            .await
+            .unwrap();
+        db.execute("INSERT INTO appts (id, state) VALUES (1, 'booked')", &params(json!({})))
+            .await
+            .unwrap();
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+
+        let out = db
+            .execute_tx_gated(
+                &[("UPDATE appts SET state = 'done' WHERE id = 1".to_string(), params(json!({})))],
+                &[RowGate { first: 0, count: 1, min: 1 }],
+            )
+            .await
+            .expect("a gated transaction must survive a switchover too (hub#1376)");
+        assert!(
+            matches!(out, TxGatedOutcome::Committed { .. }),
+            "the gate saw the real affected-row count of the retried tx: {out:?}"
+        );
+    }
+
+    /// Migrations (`execute_batch`) run on boot, which is exactly when a hub is redeployed after a
+    /// switchover — the path must recycle the connection as well.
+    #[tokio::test]
+    async fn execute_batch_recovers_from_a_switchover_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE a (id BIGINT PRIMARY KEY);").await.unwrap();
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+
+        db.execute_batch("CREATE TABLE b (id BIGINT PRIMARY KEY);")
+            .await
+            .expect("DDL must be retried on a fresh connection after a switchover (hub#1376)");
+    }
+
+    /// More than one poisoned connection: after a switchover EVERY connection the pool holds is
+    /// stale, not just the one that happened to trip the error. Closing only the offending one
+    /// would leave the next request to fail again — which is how "it recovers" turns into "it
+    /// recovers eventually, maybe".
+    #[tokio::test]
+    async fn a_switchover_drains_every_stale_connection_not_just_the_failing_one_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(4).await;
+        db.execute_batch("CREATE TABLE claims (id BIGINT PRIMARY KEY, n BIGINT);")
+            .await
+            .unwrap();
+
+        demote_pooled_connections_to_replica(&db, 4).await;
+
+        // Every one of these would hit a different poisoned connection.
+        for id in 1..=4i64 {
+            db.execute(
+                "INSERT INTO claims (id, n) VALUES (:id, 1)",
+                &params(json!({ "id": id })),
+            )
+            .await
+            .unwrap_or_else(|e| panic!("write {id} after a switchover must succeed: {e}"));
+        }
+
+        let rows = db.query("SELECT id FROM claims", &params(json!({}))).await.unwrap().rows;
+        assert_eq!(rows.len(), 4, "all four writes landed: {rows:?}");
+    }
+
+    /// The other side of the coin: if the whole cluster really is read-only (Patroni with no
+    /// leader, a full disk), retrying cannot help. The error MUST come back — bounded — instead of
+    /// looping forever or being swallowed. A retry that never gives up is an outage that never
+    /// shows up in the logs.
+    #[tokio::test]
+    async fn a_genuinely_read_only_database_surfaces_the_error_instead_of_looping_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_read_only().await;
+        let err = db
+            .execute("CREATE TABLE nope (id BIGINT)", &params(json!({})))
+            .await
+            .expect_err("a read-only cluster must surface the error, not retry forever");
+        assert_eq!(
+            sqlstate_of(&err).as_deref(),
+            Some(READ_ONLY_SQLSTATE),
+            "the caller still sees the real SQLSTATE: {err:?}"
+        );
+    }
+
+
+    /// The switchover must not be silent. `/` answering 200 while every write fails is exactly how
+    /// this went unnoticed for 25 minutes in PRE, so the recovery leaves a number behind.
+    #[tokio::test]
+    async fn a_recovered_switchover_is_counted_so_it_is_not_silent_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE claims (id BIGINT PRIMARY KEY);").await.unwrap();
+        assert_eq!(db.read_only_rejections(), 0, "nothing has gone wrong yet");
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+        db.execute("INSERT INTO claims (id) VALUES (1)", &params(json!({}))).await.unwrap();
+
+        assert_eq!(
+            db.read_only_rejections(),
+            1,
+            "the write recovered, but the switchover it survived is still visible to the operator"
+        );
+    }
+
+    /// The alert is raised once per switchover, not once per health check: an alert that repeats
+    /// forever is an alert everyone learns to ignore, which is the same silence in a louder shirt.
+    #[tokio::test]
+    async fn the_switchover_alert_is_handed_over_once_hub1376() {
+        let tdb = TestDb::new().await;
+        let db = tdb.adapter_with_max_connections(1).await;
+        db.execute_batch("CREATE TABLE claims (id BIGINT PRIMARY KEY);").await.unwrap();
+
+        demote_pooled_connections_to_replica(&db, 1).await;
+        db.execute("INSERT INTO claims (id) VALUES (1)", &params(json!({}))).await.unwrap();
+
+        assert_eq!(db.take_unreported_read_only_rejections(), 1, "the host gets the alert once");
+        assert_eq!(
+            db.take_unreported_read_only_rejections(),
+            0,
+            "and not again on the next health check"
+        );
+        assert_eq!(
+            db.read_only_rejections(),
+            1,
+            "the running total survives the hand-over: it is what a later postmortem reads"
+        );
+    }
+
+    /// A hub with no write traffic never trips `25006`, so nothing would ever recycle its
+    /// connections: they would sit on the ex-leader serving reads from a node that is no longer
+    /// the leader. The lifetime cap is the only thing covering that hub, so it is not optional.
+    #[test]
+    fn the_pool_recycles_connections_even_without_write_traffic_hub1376() {
+        let opts = pg_pool_options(7, Arc::new(ReplicaWatch::default()));
+        assert_eq!(opts.get_max_connections(), 7, "the per-plan cap still comes from the caller");
+        assert_eq!(
+            opts.get_max_lifetime(),
+            Some(PG_MAX_LIFETIME),
+            "a pooled connection must not outlive the leader that answered it"
+        );
+        assert_eq!(
+            opts.get_idle_timeout(),
+            Some(PG_IDLE_TIMEOUT),
+            "an idle connection costs nothing to recycle, so it goes sooner"
+        );
+        assert!(
+            PG_IDLE_TIMEOUT < PG_MAX_LIFETIME,
+            "idle connections have to be dropped before the hard cap, not after"
+        );
+    }
+
+    /// The generation check itself, without a database in the way: it is what decides whether the
+    /// pool keeps a connection, so its edges deserve to be pinned down.
+    #[test]
+    fn only_connections_older_than_the_switchover_are_discarded_hub1376() {
+        let watch = ReplicaWatch::default();
+        assert!(
+            !watch.is_stale(Duration::from_secs(3600)),
+            "with no switchover seen, even an ancient connection is fine"
+        );
+
+        watch.record_rejection();
+        assert!(
+            watch.is_stale(Duration::from_secs(60)),
+            "a connection opened a minute before the switchover is pinned to the ex-leader"
+        );
+        assert!(
+            !watch.is_stale(Duration::ZERO),
+            "a connection opened after the switchover talks to the new leader and is kept — \
+             otherwise the retry would throw away the very connection it just opened"
+        );
+        assert_eq!(watch.rejections(), 1, "the rejection was counted exactly once");
+    }
+
 }

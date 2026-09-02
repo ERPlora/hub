@@ -355,6 +355,108 @@ check(
     f"got {require!r} — without it the e2e skip themselves and the job goes green empty",
 )
 
+# ── 5 · The module batteries are PAIRED with the e2e they inherit (hub#1381) ─────────
+# hub#1264 moves module-owned e2e into each module's `erplora test` battery. On 2026-08-30 the
+# coverage did not change place, it fell into a hole: hub#1372 deleted
+# `services_package_redeem_e2e.rs` (391 lines this very job ran) and its replacement battery was
+# run by NOBODY — `git grep against-hub` over `origin/develop` returned nothing, with both CIs
+# green. This job already materialises the published catalogue, so it is the one place that can
+# check, for free, that every retired e2e points at a battery that is really there.
+BATTERY_GUARD = "scripts/ci/module-hub-batteries.sh"
+BATTERY_LIST = "scripts/ci/module-hub-batteries.txt"
+
+battery_step = [s_ for s_ in steps if s_.get("id") == "batteries"]
+check(
+    "a step with `id: batteries` guards the module battery list",
+    len(battery_step) == 1,
+    f"{len(battery_step)} steps carry that id",
+)
+if len(battery_step) == 1:
+    battery_code = code_of(battery_step[0])
+    check(
+        f"the battery step runs `{BATTERY_GUARD}`",
+        BATTERY_GUARD in battery_code,
+        "the pairing has to be checked by the shipped guard, not re-inlined here",
+    )
+    check(
+        "the battery step is not allowed to fail softly",
+        battery_step[0].get("continue-on-error") in (None, False),
+        "a guard that cannot fail the job is a comment",
+    )
+    # It reads the catalogue, so it can only run once the catalogue is on disk. Ordered by index
+    # rather than by name: a rename of either step must not silently reorder the check.
+    clone_idx = min(i for i, s_ in enumerate(steps) if MATERIALIZER in code_of(s_))
+    battery_idx = steps.index(battery_step[0])
+    check(
+        "the battery step runs AFTER the catalogue is materialised",
+        battery_idx > clone_idx,
+        f"battery step at {battery_idx}, materialiser at {clone_idx}",
+    )
+
+for shipped in (BATTERY_GUARD, BATTERY_LIST):
+    check(
+        f"`{shipped}` really exists in this checkout",
+        os.path.isfile(os.path.join(os.environ["REPO_ROOT"], shipped)),
+        "a workflow that calls a file nobody shipped fails at 3am, not at review time",
+    )
+
+# A module publishing or withdrawing a battery breaks this guard on the CRON and on the
+# `module-published` dispatch — where nobody is watching. That is the exact mute red hub#1215 sat
+# in for a whole day, so it gets the same idempotent alert as the suite next to it.
+BATTERY_ALERT_TITLE = "La lista de baterías de módulo no cuadra con el catálogo publicado"
+battery_alert = [s_ for s_ in steps if BATTERY_ALERT_TITLE in str(s_.get("run", ""))]
+check(
+    f"a step opens the battery alert issue titled «{BATTERY_ALERT_TITLE}»",
+    len(battery_alert) == 1,
+    f"{len(battery_alert)} steps mention it",
+)
+check(
+    "the battery alert title carries no colon (colons are GitHub search syntax)",
+    ":" not in BATTERY_ALERT_TITLE,
+    BATTERY_ALERT_TITLE,
+)
+if len(battery_alert) == 1:
+    b_run = str(battery_alert[0].get("run", ""))
+    b_cond = str(battery_alert[0].get("if", ""))
+    b_code = "\n".join(l for l in b_run.splitlines() if not l.lstrip().startswith("#"))
+    check(
+        "the battery alert delegates to the shared scripts/ci/alert-issue.sh",
+        "./scripts/ci/alert-issue.sh" in b_code,
+        "a fourth copy of the list-and-filter logic is how they drift apart (hub#1246)",
+    )
+    check(
+        "the battery alert never inlines `--search`",
+        "--search" not in b_code,
+        "GitHub's search index lags behind reality (hub#1246)",
+    )
+    check(
+        "the battery alert is gated on the GUARD step's own outcome",
+        "steps.batteries.outcome == 'failure'" in b_cond,
+        f"if: {b_cond!r} — an environmental failure must not fake a pairing verdict",
+    )
+    check(
+        "the battery alert never fires on a `pull_request`",
+        "pull_request" not in b_cond,
+        f"if: {b_cond!r}",
+    )
+    for event in ("schedule", "repository_dispatch", "push"):
+        check(
+            f"the battery alert fires for `{event}` (nobody watches it otherwise)",
+            event in b_cond,
+            f"if: {b_cond!r}",
+        )
+    check(
+        "the battery alert carries a token",
+        "GH_TOKEN" in (battery_alert[0].get("env") or {}),
+        f"env is {battery_alert[0].get('env')}",
+    )
+    check(
+        "the battery alert quotes the guard's own verdict, not just the run URL",
+        "VERDICT" in b_run,
+        "an alert that does not say WHICH battery broke sends the reader back to the log",
+    )
+
+
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)
     for f in failures:

@@ -892,7 +892,7 @@ pub async fn regime_for_country(db: &dyn DatabaseAdapter, country_code: &str) ->
 ///
 /// So the direction is inverted. **The core RESPONDS, the till DECIDES.** This function states a
 /// fact about the country the hub files in; what to do about it is the POS's call, and the wire is
-/// backed independently by §15.8 in `crates/verifactu/src/xsd.rs`. Neither layer masks the other.
+/// backed independently by §15.8 in `crates/plugins/verifactu/src/xsd.rs`. Neither layer masks the other.
 ///
 /// # The three shapes of "no ceiling", and why they all answer `None`
 ///

@@ -71,6 +71,53 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
+# ── 0 · Drop the INHERITED repository environment (hub#1388) ─────────────────
+# This script only ever talks to OTHER repositories — the module checkouts it
+# reads remotes from, and the cache trees it owns — so a repo-scoped git
+# variable inherited from the caller is never anything but poison here.
+#
+# It arrives on its own: `git push` FROM A WORKTREE exports
+# `GIT_DIR=<repo>/.git/worktrees/<name>` into the pre-push hook (measured on
+# git 2.50.1; a push from the MAIN checkout exports nothing, which is why this
+# never reproduced by hand and always reproduced on the fleet, which works only
+# out of worktrees). `GIT_DIR` OVERRIDES `git -C <dir>`, so `remote_for()` below
+# asked each module checkout for its origin and got the HUB's back
+# (`git@github:ERPlora/hub.git`) for all 27 ids — both of its branches read
+# correctly in isolation, which is precisely what made this so hard to see. The
+# hub was then cloned into all 27 directories, not one carried a module.json,
+# and every push with HUB_GATE_WITH_MODULES=1 aborted for the whole fleet while
+# the summary pointed at deploy keys that were never broken.
+#
+# The same inherited GIT_DIR is why the cache could not heal itself: hub#1385's
+# `tree_is_the_module` compared the hub's origin with the hub's origin, agreed
+# it WAS the module, and took the fetch path — whose `checkout -qf --detach
+# FETCH_HEAD` then ran against the pushing worktree, which is hub#1387 (the gate
+# leaves the worktree in detached HEAD on main). One cause, both symptoms.
+#
+# The list is NOT hand-maintained, because a hand-written one is exactly the
+# guard that rots: git considers FIFTEEN variables repository-local on 2.50.1
+# and `GIT_DIR` is only the one that bit us. `git -c <key>=<value> push` exports
+# `GIT_CONFIG_PARAMETERS` into this hook too — and `fleet-supervisor.sh` pushes
+# EVERY fleet branch with `git -c credential.helper='!gh auth git-credential'`,
+# so the config environment arrives here on every single push. An inherited
+# `url.<x>.insteadOf` rewrites where a clone connects and lands a tree that is
+# not the module: hub#1388 again, through a different door, identical symptom.
+# So git itself names the set (`git rev-parse --local-env-vars`, which needs no
+# repository and survives a bogus GIT_DIR) and it stays correct across upgrades.
+# The literal list below is the floor, and it is NOT the same set: it keeps the
+# two git does not name (`GIT_NAMESPACE`, the ref namespace, and
+# `GIT_QUARANTINE_PATH`, which receive-pack exports), and it does not carry the
+# seven git adds — the config trio plus GIT_IMPLICIT_WORK_TREE, GIT_GRAFT_FILE,
+# GIT_NO_REPLACE_OBJECTS, GIT_REPLACE_REF_BASE and GIT_SHALLOW_FILE. The two
+# lines are a union on purpose: the literal one still clears the variable that
+# actually bit us if `git` is not yet on PATH — the run dies on that a few lines
+# further down with a message that says so.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_NAMESPACE \
+      GIT_PREFIX GIT_QUARANTINE_PATH
+# shellcheck disable=SC2046  # word splitting is the point: these are NAMES
+unset $(git rev-parse --local-env-vars 2>/dev/null)
+
 DEST=""
 FLOOR=25
 KEYS_DIR="${HUB_MODULE_KEYS_DIR:-${HOME:-}/.erplora/module-keys}"
@@ -214,6 +261,15 @@ module_version() {          # $1 = tree
 # report the same failure, so they are NOT in this list on purpose.
 RETRY_DELAYS="${HUB_MATERIALIZE_RETRY_DELAYS:-2 8 30}"
 
+# Which SIDE the failure is on, so the summary sends the reader to the right place
+# (hub#1380). Anything that smells of the remote — auth, the network, a repo that
+# is not there — is access; everything else is local, and the cache is the first
+# suspect.
+looks_like_access_failure() {  # $1 = path to the failed attempt's log
+    grep -qiE 'permission denied|could not read from remote|repository not found|does not appear to be a git repository|connection|timed out|host key|name or service not known|access denied' \
+        "$1" 2>/dev/null
+}
+
 is_transient_git_failure() {   # $1 = path to the failed attempt's log
     grep -qiE 'permission denied \(publickey\)|connection reset|early eof|could not read from remote|timed out' \
         "$1" 2>/dev/null
@@ -247,10 +303,27 @@ run_with_retry() {
 
 # The two network steps a module can need, each wrapped by run_with_retry so
 # a flaky attempt starts from a clean slate rather than a half-written tree.
+# `-f` on the checkout below is the hard reset the header already promises, and
+# hub#1380 is what its absence cost: the cache is SHARED by every worktree of the
+# hub, so ONE touched file inside it aborted the checkout — and the sanitising
+# step that would have removed it runs AFTER, so it never got to run at all. The
+# gate then stayed dead for the whole fleet, pointing at the deploy keys.
+# Forcing is safe HERE for the reason the header gives: $DEST is a DERIVED cache
+# this script owns end to end, and nobody edits inside it.
 fetch_existing_tree() {     # $1 = ssh_cmd  $2 = tree  $3 = url  $4 = branch
     git_with_key "$1" -C "$2" fetch -q --depth 1 "$3" "$4" \
-        && git -C "$2" checkout -q --detach FETCH_HEAD \
+        && git -C "$2" checkout -qf --detach FETCH_HEAD \
         && git -C "$2" clean -qfdx
+}
+
+# A cached directory is only reusable when it IS the module's own repo. On
+# 2026-08-30 all 27 held a clone of the HUB instead (639 MB, `origin` pointing at
+# ERPlora/hub), and the module checkout aborted against the hub's own files.
+# Fetching on top of the wrong repo never heals; re-cloning always does, and at
+# `--depth 1` it costs little. An unreadable or remote-less `.git` answers empty
+# here, which is also "not the module" — and also wants a re-clone.
+tree_is_the_module() {      # $1 = tree  $2 = expected url
+    [ "$(git -C "$1" remote get-url origin 2>/dev/null || true)" = "$2" ]
 }
 
 clone_new_tree() {          # $1 = ssh_cmd  $2 = url  $3 = tree  $4 = branch
@@ -278,7 +351,7 @@ for id in $ids; do
     ssh_cmd="$(ssh_for "$id")"
     tree="$DEST/$id"
     log="$DEST/.$id.log"
-    if [ -d "$tree/.git" ]; then
+    if [ -d "$tree/.git" ] && tree_is_the_module "$tree" "$url"; then
         if run_with_retry "$id" "$log" fetch_existing_tree "$ssh_cmd" "$tree" "$url" "$BRANCH"; then
             rm -f "$log"
         else
@@ -294,7 +367,19 @@ for id in $ids; do
         fi
     fi
     if [ ! -f "$tree/module.json" ]; then
+        # The clone SUCCEEDED — so this is never an access problem, and saying
+        # so is the whole point (hub#1388): 27 of these in a row read as "I
+        # cannot reach the module repos" and sent two separate diagnoses into
+        # deploy keys that were perfectly fine. Recording the URL we actually
+        # cloned FROM is what makes the real cause visible in one line: when it
+        # says `…/hub.git`, the remote resolution is what is broken, not the key.
         say "   ⚠️  $id: '${BRANCH}' carries no module.json"
+        {
+            printf 'cloned from: %s\n' "$url"
+            printf "that clone worked, but '%s' has no module.json at its root,\n" "$BRANCH"
+            printf 'so this tree is NOT the module %s. A wrong remote URL or a\n' "$id"
+            printf 'stale cache directory — never a deploy key.\n'
+        } > "$log"
         failed="$failed $id"
         continue
     fi
@@ -309,8 +394,27 @@ if [ -n "$failed" ]; then
         say "   ── $id ──"
         tail -5 "$DEST/.$id.log" | sed 's/^/     /' >&2
     done
-    say "   Nothing is measured against a partial catalogue: fix the access (deploy key,"
-    say "   ssh agent, network) and run again."
+    # Until hub#1380 EVERY failure read «fix the access», and half the time that is the
+    # wrong place to look: a dirty or foreign cache is LOCAL, and the hours went into
+    # deploy keys that were never broken. Say which side this was.
+    access=0
+    local_fail=0
+    for id in $failed; do
+        [ -f "$DEST/.$id.log" ] || continue
+        if looks_like_access_failure "$DEST/.$id.log"; then
+            access=1
+        else
+            local_fail=1
+        fi
+    done
+    say ""
+    say "   Nothing is measured against a partial catalogue."
+    [ "$access" = 1 ] && \
+        say "   → ACCESS: fix the deploy key / ssh agent / network, then run again."
+    [ "$local_fail" = 1 ] && {
+        say "   → LOCAL: this is not the access. The cache is DERIVED — nobody edits it and"
+        say "     nothing else reads it — so remove it and run again:  rm -rf $DEST"
+    }
     exit 1
 fi
 
