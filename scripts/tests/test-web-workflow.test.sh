@@ -220,11 +220,52 @@ guard_path="scripts/tests/no-dead-packages.test.mjs"
 if ! printf '%s' "$push_block" | grep -qF "$guard_path"; then
     bad "the \`no-dead-packages\` guard triggers test-web.yml on push" \
         "\`on.push.paths\` does not include \`$guard_path\` (hub#1247)"
-elif printf '%s' "$(on_block)" | grep -qE '^  pull_request:'; then
-    bad "test-web.yml has no \`pull_request\` trigger" \
-        "\`on.pull_request\` is back: the heavy suite moved to the pre-push gate on 2026-08-29, and \`merge-pr.sh\` authorises the merge with the \`local-gate/hub-tests\` attestation (pm#197). If it is back on purpose, this assertion is what has to change first"
 else
-    ok "\`$guard_path\` is in the push \`paths\`, and the gate does not run on \`pull_request\`"
+    ok "\`$guard_path\` is in the push \`paths\`"
+fi
+
+# ── 10bis. `pull_request` is BACK, with its draft filter (hub#1466, 2026-09-03) ──
+# From 2026-08-29 to 2026-09-03 this file asserted the opposite: the heavy suite ran in the
+# pre-push gate and a cloud run on PRs was a third execution of the same suite. Measured on
+# tanda R2 (02/09): that gate is ONE lock for the whole machine, ~20 min per pass, and every
+# reviewer fix pays it again — 6 serial passes were the whole 2 h of the tanda. hub#1466 splits
+# it: the local gate keeps only check + fmt + clippy (~27 s warm, no attestation) and the heavy
+# suite comes back here, where ci-runner-1 runs 4 at a time. `merge-pr.sh` authorises with THIS
+# check when the local attestation is absent (it always did; pm#197 only added the fallback).
+#
+# What must not come back with it: the 29/08 waste. Half the runner minutes went to runs
+# cancelled by the reviewer's re-push on DRAFT PRs, so the trigger returns WITH the draft
+# filter on every job that costs minutes — a draft PR is 0 CI minutes until `gh pr ready`.
+wf_self="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/workflows/test-web.yml"
+on_txt="$(on_block)"
+if ! printf '%s' "$on_txt" | grep -qE '^  pull_request:'; then
+    bad "test-web.yml runs on \`pull_request\` again (hub#1466)" \
+        "\`on.pull_request\` is missing: the heavy suite moved back to Actions on 2026-09-03 and the local gate no longer attests — without this trigger nothing green ever authorises a web PR"
+elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qE 'ready_for_review'; then
+    bad "\`pull_request.types\` includes \`ready_for_review\`" \
+        "without it a draft that becomes ready never gets a run (the draft filter skipped the earlier events)"
+else
+    ok "\`pull_request\` is back, with \`ready_for_review\` in its types"
+fi
+pr_paths="$(on_sub_block pull_request)"
+for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml"; do
+    printf '%s' "$pr_paths" | grep -qF "$p" \
+        && ok "\`pull_request.paths\` includes \`$p\`" \
+        || bad "\`pull_request.paths\` includes \`$p\`" "a PR touching it would open with no web check"
+done
+draft_if="github.event_name != 'pull_request' || !github.event.pull_request.draft"
+# Every job that runs pnpm/cargo costs minutes and must skip drafts; alert jobs are push-only.
+minute_jobs="$(awk '/^jobs:/{f=1;next} f&&/^  [a-z_-]+:$/{sub(/:$/,"",$1); j=$1} f&&j!=""&&/run: *(pnpm|cargo)/{print j; j=""}' "$wf_self" | sort -u)"
+[ -n "$minute_jobs" ] || bad "test-web.yml has jobs that run pnpm/cargo" "none parsed — the draft-filter assertion below would be vacuous"
+for job in $minute_jobs; do
+    if awk -v J="  $job:" '$0==J{f=1;next} f&&/^  [a-z-]+:$/{exit} f' "$wf_self" | grep -qF "$draft_if"; then
+        ok "job \`$job\` skips draft PRs (\`if:\` with the draft filter)"
+    else
+        bad "job \`$job\` skips draft PRs" "no \`if: $draft_if\` on the job: a draft PR would burn runner minutes and get cancelled on the reviewer's re-push (measured 29/08: half the minutes)"
+    fi
+done
+if false; then
+    :
 fi
 
 # ── 11. The runtime `webServer` never falls back to production (hub#1279) ─────
