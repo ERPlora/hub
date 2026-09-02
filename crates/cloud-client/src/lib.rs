@@ -314,19 +314,28 @@ impl CloudClient {
         self.get("/api/v1/hub/device/fiscal/certificate/", auth)
     }
 
-    /// **The short-lived authorisation for the fiscal gateway** (hub#1432, hub#985 §1).
-    /// `POST /api/v1/hub/device/fiscal/gateway-token/` → a 5-minute Bearer the cell verifies
-    /// offline, plus `gateway_url` (the ONE cell URL, behind the private LB — the hub reads no
-    /// `VERIFACTU_GATEWAY_URL` env, saas#1794) and `mtls_common_name`.
+    /// **One call an engine asked the runtime to make on its behalf** (hub#1459).
     ///
-    /// **Machine credential, and only that**, like its fiscal neighbours: the answer is a bearer
-    /// token, so the call is made BY the runtime with the `cloud_api_token` and its body must
-    /// never be proxied to the web app. A 409 (`own_certificate_direct`) is an ANSWER — that hub
-    /// transmits direct with its own certificate and no token exists for it.
-    pub fn fiscal_gateway_token(&self, auth: &Auth) -> PreparedRequest {
+    /// The generic shape of every machine call: the CALLER chooses the method, the path and the
+    /// body; this builder puts the destination (this hub's own cloud) and the machine credential.
+    /// It replaced `fiscal_gateway_token`, which named ONE caller's use case and so taught the
+    /// core what a fiscal gateway is — the path is now the engine's, and stays in the engine.
+    ///
+    /// **Machine credential, and only that**, like its fiscal neighbours: the answers travelling
+    /// this way carry bearers, so the call is made BY the runtime with the `cloud_api_token` and
+    /// its body must never be proxied to the web app.
+    ///
+    /// The path is validated by the runtime BEFORE it gets here (`cloud_call::check_path`): a
+    /// credential handed to a destination the caller chooses is a credential leaked.
+    pub fn machine_request(
+        &self,
+        method: &'static str,
+        path: &str,
+        auth: &Auth,
+    ) -> PreparedRequest {
         PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/fiscal/gateway-token/", self.base_url),
+            method,
+            url: format!("{}{}", self.base_url, path),
             headers: auth.headers(),
         }
     }
@@ -1132,23 +1141,22 @@ mod tests {
     /// The short-lived authorisation the fiscal cell verifies offline. Machine credential like
     /// its fiscal neighbours: the token endpoint answers a Bearer the browser must never see.
     #[test]
-    fn the_fiscal_gateway_token_request_is_a_machine_post() {
+    fn a_machine_request_carries_the_destination_and_the_machine_credential() {
         let c = CloudClient::new("https://erplora.com");
         let auth = Auth::HubToken {
-            hub_id: "h1".into(),
-            token: "t".into(),
+            hub_id: "hub-1".into(),
+            token: "machine".into(),
         };
 
-        let r = c.fiscal_gateway_token(&auth);
+        let r = c.machine_request("POST", "/api/v1/hub/device/fiscal/gateway-token/", &auth);
 
         assert_eq!(r.method, "POST");
-        assert!(
-            r.url.ends_with("/api/v1/hub/device/fiscal/gateway-token/"),
-            "la ruta real del SaaS: {}",
-            r.url
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/fiscal/gateway-token/"
         );
-        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
-        assert!(r.headers.contains(&("X-Hub-Token", "t".to_string())));
+        assert!(r.headers.iter().any(|(n, v)| *n == "X-Hub-Token" && v == "machine"));
+        assert!(r.headers.iter().any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
     }
 
     use super::*;

@@ -957,13 +957,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // arrancar. El seed de arriba sí aborta el boot, y es la excepción a propósito.
     fiscal_certificate::spawn_refetch_service(&state, certificate_budget);
 
-    // Broker de la pasarela fiscal (hub#1432, hub#985 §1): el motor pide un acceso por la
-    // capability `fiscal_gateway_access` y ESTE broker es quien de verdad lo consigue — token
-    // corto del plano de control (cacheado; la cuota es 60/h) + identidad mTLS de la BD. El
-    // motor nunca ve el token de máquina, igual que con el refetch del certificado.
-    erplora_runtime::fiscal_gateway::GatewayBrokerCell::global().install(std::sync::Arc::new(
-        fiscal_gateway::HubGatewayBroker::new(&state),
-    ));
+    // «Llama a MI nube con MI credencial de máquina» (hub#1459): el primitivo genérico con el
+    // que un motor first-party pide algo al plano de control sin sostener jamás el `X-Hub-Token`.
+    // El host pone destino y credencial; el motor pone método, ruta y cuerpo — y qué significa la
+    // respuesta (caché, 409, reintento) es del motor, no del core.
+    erplora_runtime::cloud_call::CloudCallerCell::global()
+        .install(cloud_call::HubCloudCaller::installed(&state));
 
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
