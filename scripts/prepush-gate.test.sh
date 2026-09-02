@@ -2048,6 +2048,19 @@ grep -qi 'no se atestigua' <<<"$out" || errs="$errs skipped-web-not-called-out"
     && ok "attestation: SKIP_HUB_WEB on a web-only diff posts nothing and says so" \
     || bad "attestation: SKIP_HUB_WEB on a web-only diff posts nothing and says so" "$errs"
 
+# Regression test for ERPlora/hub#1417
+# The local PR reviewer was removed on 2026-09-02 — and the first removal attempt
+# left its hook wiring alive for a whole day, spawning reviewers nobody wanted.
+# This guard keeps the gate from ever growing that call back: the hook must not
+# reference the reviewer handoff (or its fleet seal dir) in any form.
+# Positive control, verified when this landed: the pre-removal hook
+# (develop@dcdab145) had 3 matches; this check turns red on any of them.
+hook="$(dirname "$0")/../.githooks/pre-push"
+if grep -nE "pr-reviewer|review_handoff|/reviewed/" "$hook"; then
+    bad "hub#1417: the gate never calls the removed local PR reviewer again" "reference found (lines above)"
+else
+    ok "hub#1417: the gate never calls the removed local PR reviewer again"
+fi
 
 echo
 echo "  $pass passed, $fail failed"
