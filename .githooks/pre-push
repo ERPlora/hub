@@ -80,6 +80,7 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   HUB_GATE_DEPTH (fast|full, hub#1466) · HUB_GATE_FAST_CMD
 #   (HUB_GATE_STATUS_CMD is invoked with $1 = sha, $2 = context, $3 = description)
 #   HUB_GATE_METADATA_CMD · HUB_GATE_BASE_REFS · HUB_GATE_EXCLUDES ·
 #   HUB_GATE_RUST_DIRS · HUB_GATE_NO_SELFHEAL (hub#1207: the scope resolver and
@@ -1196,6 +1197,46 @@ else
     else
         test_cmd="cargo test --workspace --no-fail-fast --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
     fi
+fi
+
+# ── hub#1466: la PROFUNDIDAD del gate — rápido aquí, pesado en la nube ───────
+# Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
+# `fmt --check` 2,8 s, `clippy` 20 s → ~27 s en el caso que manda (rehacer un arreglo tras una
+# revisión), contra ~20 min de la suite. Y el problema no era la duración sino el LOCK: una
+# pasada cada 20 min para toda la máquina. En Actions corren 4 a la vez.
+#
+# Lo que el modo rápido SÍ protege: que una rama que no compila, no formatea o no pasa clippy
+# NO llegue a subir. Lo que NO hace, a propósito: ATESTIGUAR. La atestación es lo que
+# `merge-pr.sh` acepta como «la suite corrió sobre este sha»; firmarla tras un `cargo check`
+# sería responder que sí a una pregunta que no se probó. Sin sello, el merge lo autoriza el
+# check de `test-hub.yml`, que vuelve a correr en las PRs con este mismo cambio.
+case "${HUB_GATE_DEPTH:-fast}" in
+    fast|full) : ;;
+    *)
+        echo "❌ pre-push: HUB_GATE_DEPTH='${HUB_GATE_DEPTH}' no existe (valores: fast | full)." >&2
+        echo "   Un valor desconocido NO elige por su cuenta: eso degradaría la protección en silencio." >&2
+        exit 1 ;;
+esac
+
+if [ "${HUB_GATE_DEPTH:-fast}" = fast ]; then
+    fast_cmd="${HUB_GATE_FAST_CMD:-}"
+    if [ -z "$fast_cmd" ]; then
+        fast_cmd="cargo check --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+        fast_cmd="$fast_cmd && cargo fmt --all --check"
+        fast_cmd="$fast_cmd && cargo clippy --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android --all-targets -- -D warnings"
+    fi
+    echo "⚡ pre-push: gate RÁPIDO (check + fmt + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
+    if ! eval "$fast_cmd"; then
+        echo "" >&2
+        echo "❌ pre-push: el gate rápido es ROJO → push ABORTADO." >&2
+        echo "   Compila/formatea/pasa clippy y reintenta. Para correr además la suite entera aquí:" >&2
+        echo "     HUB_GATE_DEPTH=full git push" >&2
+        exit 1
+    fi
+    # Sin sello y sin cachear el verde: no se ha probado nada que atestiguar.
+    echo "✅ pre-push: gate rápido verde → sube. La suite pesada la corre test-hub.yml en la PR," >&2
+    echo "   y es su check verde el que autoriza el merge (merge-pr.sh)." >&2
+    exit 0
 fi
 
 if [ "$SCOPE_MODE" = packages ]; then
