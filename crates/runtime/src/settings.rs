@@ -853,13 +853,19 @@ fn enforce_demo_fiscal_identity_lock(
     Ok(())
 }
 
-/// The tax id a DEMO hub boots with (hub#684).
+/// The tax id a DEMO hub boots with (hub#684, changed by hub#985 §1 E2E on 2026-09-02).
 ///
-/// All-zero on purpose. It has the shape of a Spanish CIF —letter + 7 digits + a control digit that
-/// checks out for `0000000`— so every screen, document and validator downstream treats it as the
-/// real thing, and **no company has it**: sequential numbering never issues the zero. A random
-/// plausible-looking tax id would eventually be somebody's.
-pub const DEMO_BUSINESS_TAX_ID: &str = "B00000000";
+/// It used to be the all-zero `B00000000` — deliberately nobody's. Measured against the AEAT
+/// preproduction through the gateway cell, that id **cannot transmit**: the AEAT refuses it in
+/// the header with Fault `4116` («NIF con formato incorrecto»), a checksum-valid stranger gets
+/// Fault `4112` («el titular del certificado debe ser Obligado Emisión, Colaborador Social…» —
+/// the Convenio 017 collaborator status is still pending, pm#71), and an unregistered test id
+/// gets `4104`. The ONLY obligado the Sello can present for today is its own holder. So the demo
+/// boots with ERPlora's own id — which is also what its transmissions legally are: the demo is
+/// ERPlora's, pinned to `testing` (it can never file for real), and its tickets say «demo» in
+/// the legal name. This is what makes ADR-0274 («la demo transmite de verdad a preproducción»)
+/// actually true instead of silently failing on every send.
+pub const DEMO_BUSINESS_TAX_ID: &str = "B27593136";
 /// The legal name a DEMO hub boots with. It says *demo* out loud: it is printed on every ticket the
 /// visitor makes, and that ticket has to be readable as an example, not as a real business's.
 pub const DEMO_BUSINESS_LEGAL_NAME: &str = "ERPlora Demo SL";
@@ -2141,6 +2147,19 @@ mod tests {
     // demo's ⛔ without making one of them lie is to put the data there for real.
 
     /// 🔴 A demo hub is handed a fiscal identity at boot, so the gate of ADR-0203 has something to
+    /// 🔒 Decision pin (2026-09-02, hub#1452 · hub#985 §1 E2E): the demo boots as the Sello's OWN holder.
+    ///
+    /// Measured against the AEAT preproduction through the gateway: `B00000000` → Fault 4116
+    /// (malformed NIF), a checksum-valid stranger → Fault 4112 (the certificate holder may only
+    /// present for itself until the Convenio 017 collaborator status activates, pm#71). Reverting
+    /// this to a placeholder id silently kills every demo transmission again — that is the
+    /// regression this test exists to stop. If the value must change, re-run the probe against
+    /// prewww10 first and bring the new Fault evidence here.
+    #[test]
+    fn the_demo_tax_id_is_the_seals_own_holder() {
+        assert_eq!(DEMO_BUSINESS_TAX_ID, "B27593136");
+    }
+
     /// read and the ⛔ item is genuinely done — not hidden, not faked.
     #[tokio::test]
     async fn a_demo_hub_boots_with_its_fiscal_identity_already_filled_in() {
