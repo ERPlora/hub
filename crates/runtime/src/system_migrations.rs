@@ -1763,6 +1763,30 @@ CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
   PRIMARY KEY (hub_id));",
     },
 
+    // ── v56 — hub#1429: WHICH row belongs to the owner of the account ────────────────────────────
+    // The hub is the only party that can police the owner's row: the runtime talks to the SaaS with
+    // the MACHINE credential, which `assert_can_manage_hub_member` treats as owner rank, so the SaaS
+    // cannot tell the administrator from the cashier (saas#1638/#1788). But until now the hub could
+    // not tell either — hub#349 retired the local `owner` ROLE on purpose, so in the business plane
+    // the owner and any administrator are the same word.
+    //
+    // This column is that missing fact, and it is **derived, never typed**: `identity::seed_owner`
+    // asserts it at every boot from `HUB_OWNER_EMAIL` (the provisioning env, ADR-0157 — the same
+    // source that decides who the creator is), and NO HTTP door writes it. It is not a role: what
+    // an administrator MAY do stays `is_admin_role`; this says only who OWNS the account, which has
+    // always belonged to the account plane.
+    //
+    // Additive with a default, so an existing hub gets `0` everywhere and the next boot marks the
+    // one row that matches the env. Until that boot the guard protects nothing — the direction that
+    // keeps today's behaviour rather than locking a row nobody can name.
+    SystemMigration {
+        version: 56,
+        name: "hub_user_account_owner",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_user \
+          ADD COLUMN IF NOT EXISTS is_account_owner INTEGER NOT NULL DEFAULT 0;",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3649,6 +3673,13 @@ mod kind_contract_tests {
         // el hub y no sale (solo viaja el CSR), cert + CA públicos. PROHIBIDA en bundles de
         // export. Al escribirla el máximo era la v54 en `origin/develop` y en TODAS las ramas
         // remotas.
-        assert_eq!(MIGRATIONS.len(), 52, "el catálogo cambió de tamaño");
+        // + `hub_user_account_owner` (v56, hub#1429): la columna que dice QUÉ fila es la del dueño
+        // de la cuenta. Marca derivada, no un rol: la asienta `identity::seed_owner` en cada
+        // arranque desde `HUB_OWNER_EMAIL` y ninguna puerta HTTP la escribe; sin ella el hub no
+        // podía distinguir al dueño de cualquier otro administrador (hub#349 le quitó el rol) y era
+        // el único que podía, porque al SaaS le habla la credencial de máquina. `ALTER … ADD COLUMN
+        // IF NOT EXISTS` con default, re-ejecutable. Al escribirla el máximo era la v55 en
+        // `origin/develop` y en las 57 ramas remotas, y ningún worktree local de la flota la pedía.
+        assert_eq!(MIGRATIONS.len(), 53, "el catálogo cambió de tamaño");
     }
 }

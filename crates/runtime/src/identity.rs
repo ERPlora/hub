@@ -775,10 +775,18 @@ fn name_from_email(email: &str) -> String {
 /// concedía `owner` (el gate ya trataba igual a los dos y `permissions_for_role` ya resolvía
 /// `owner` como `admin`).
 ///
-/// **Idempotente**: si ya existe un `hub_user` con ese email, **no hace nada** (no duplica ni pisa
-/// un rol/estado existente). Devuelve `true` si sembró una fila nueva, `false` si ya existía.
+/// **Idempotente**: si ya existe un `hub_user` con ese email, **no crea otro** (no duplica ni pisa
+/// su rol/estado). Devuelve `true` si sembró una fila nueva, `false` si ya existía.
 /// Sustituye al bootstrap «primer login = owner» (retirado): el owner ya no depende de quién entre
 /// primero, sino de quién creó el hub.
+///
+/// **Además marca la fila como la del DUEÑO de la cuenta** (`is_account_owner`, hub#1429) — y lo
+/// hace SIEMPRE, también por el camino idempotente: en un hub que ya existe la fila del dueño lleva
+/// ahí desde antes de que la columna existiera, así que marcar solo al crearla dejaría a toda la
+/// flota sin dueño que nombrar y a la barandilla protegiendo nada, en silencio. La marca es
+/// **exclusiva**: se retira de cualquier otra fila, para que transferir la propiedad (el SaaS la
+/// transfiere y redespliega el hub con otro `HUB_OWNER_EMAIL`) la MUEVA en vez de acumularla —dos
+/// filas protegidas dejarían al ex-dueño con una ficha que ningún administrador puede tocar.
 pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> Result<bool> {
     let email = email.trim();
     if email.is_empty() {
@@ -794,7 +802,8 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> 
         )
         .await?;
     if !existing.rows.is_empty() {
-        return Ok(false); // ya sembrado: idempotente, no cambia nada.
+        mark_account_owner(db, hub_id, email).await?;
+        return Ok(false); // ya sembrado: idempotente, no crea ni cambia su rol.
     }
     let id = new_id();
     let mut ins = Params::new();
@@ -810,7 +819,37 @@ pub async fn seed_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> 
         &ins,
     )
     .await?;
+    mark_account_owner(db, hub_id, email).await?;
     Ok(true)
+}
+
+/// Deja la marca de **dueño de la cuenta** (hub#1429) exactamente en la fila cuyo email de ACCESO
+/// (`hub_user.email`, la columna contra la que resuelve el plano de acceso entero) es `email`, y en
+/// ninguna otra.
+///
+/// Se compara contra esa columna a propósito y no contra el email que pinta Personal, que es un
+/// `COALESCE(hub_user.email, perfil.email)`: el email del **perfil** lo edita cada uno en «Mi
+/// perfil» y sin control de unicidad, así que dejarlo decidir permitiría a cualquiera hacerse pasar
+/// por la fila del dueño con solo escribir su dirección. `hub_user.email` no: lo escriben el
+/// aprovisionamiento, `/api/members` y el alta de Personal, y `ensure_email_is_free` impide que dos
+/// filas del hub compartan uno.
+async fn mark_account_owner(db: &dyn DatabaseAdapter, hub_id: &str, email: &str) -> Result<()> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("email".into(), json!(email.trim().to_lowercase()));
+    db.execute(
+        "UPDATE hub_user SET is_account_owner = 0 \
+          WHERE hub_id = :hub_id AND LOWER(email) != :email AND is_account_owner != 0",
+        &p,
+    )
+    .await?;
+    db.execute(
+        "UPDATE hub_user SET is_account_owner = 1 \
+          WHERE hub_id = :hub_id AND LOWER(email) = :email",
+        &p,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Sube el rol de un `hub_user` **al suelo** que impone el rol de su cuenta en el Cloud, si aún no

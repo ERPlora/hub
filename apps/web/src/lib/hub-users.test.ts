@@ -14,6 +14,7 @@ import {
   accessEmailWarningOf,
   accessOf,
   canDeactivate,
+  canEditUser,
   createHubUser,
   deactivateHubUser,
   listHubRoles,
@@ -123,6 +124,25 @@ describe('hub-users: el personal sale del core', () => {
     expect(canDeactivate(withInactiveAdmin, 'u-caja', 'u-owner')).toBe(false);
     // Un id desconocido no ofrece acción.
     expect(canDeactivate(census, 'u-owner', 'fantasma')).toBe(false);
+  });
+
+  // hub#1429 — la ficha del DUEÑO de la cuenta solo la edita él. Espejo en UI del guard del
+  // servidor (`hub.users.owner_row`): la acción no se ofrece en vez de dejar que el administrador
+  // la pulse y coma un 403. El servidor sigue siendo la autoridad y revalida.
+  it('no ofrece editar ni dar de baja la ficha del dueño de la cuenta', () => {
+    const accountOwner: HubUser = { ...owner, role: 'admin', is_account_owner: true };
+    const ana: HubUser = { ...owner, id: 'u-ana', email: 'ana@example.com', role: 'admin' };
+    const census = [accountOwner, ana, cashier];
+
+    expect(canEditUser(census, 'u-ana', 'u-owner')).toBe(false);
+    expect(canDeactivate(census, 'u-ana', 'u-owner')).toBe(false);
+    // El propio dueño sí: rotar su PIN es justo lo que pm#167 pedía.
+    expect(canEditUser(census, 'u-owner', 'u-owner')).toBe(true);
+    // Y el resto del personal se administra como siempre.
+    expect(canEditUser(census, 'u-ana', 'u-caja')).toBe(true);
+    expect(canDeactivate(census, 'u-ana', 'u-caja')).toBe(true);
+    // Un hub que aún no ha arrancado con `HUB_OWNER_EMAIL` no marca ninguna fila: nada cambia.
+    expect(canEditUser([owner, ana, cashier], 'u-ana', 'u-owner')).toBe(true);
   });
 
   it('los roles vienen del core con permisos y miembros', async () => {

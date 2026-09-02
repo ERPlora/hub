@@ -12,18 +12,22 @@
 //!  - **Escribir** (`POST`/`PUT`/`DELETE`) = sesión **owner/admin** (`require_admin_session`), igual
 //!    que settings, ficheros, API keys y el ciclo de vida de módulos.
 //!
-//! Dos barandillas que el runtime no puede aplicar solo (necesitan saber *quién* pide): nadie se da
-//! de baja a sí mismo, y el hub nunca se queda sin un owner/admin **activo** —ni por baja ni por
-//! degradación de rol—. Viven en [`guard_decision`], una función **pura** sobre la lista ya leída.
+//! Las barandillas que el runtime no puede aplicar solo (necesitan saber *quién* pide): nadie se da
+//! de baja a sí mismo, nadie enrola su propia placa, el hub nunca se queda sin un owner/admin
+//! **activo** —ni por baja ni por degradación de rol—, nadie reparte un rol por encima del suyo, y
+//! **la fila del dueño de la cuenta solo la edita el dueño** (hub#1429). Viven en
+//! [`guard_decision`], una función **pura** sobre la lista ya leída.
 //!
 //! **El acceso lo administra el SaaS** (ADR-0157 §7): es la fuente de verdad de la identidad y de
-//! la membresía `(usuario → org/hub)`. Por eso un usuario **con email** no se puede dar de alta ni
-//! de baja solo en local — habría ficha sin invitación, y el invitado nunca podría entrar. Estos
+//! la membresía `(usuario → hub)`. Por eso un usuario **con email** no se puede dar de alta ni de
+//! baja solo en local — habría ficha sin invitación, y el invitado nunca podría entrar. Estos
 //! handlers hacen lo MISMO que `/api/members`: escriben en local y **notifican** al SaaS con la
-//! credencial de máquina. Orden local→SaaS: si el SaaS falla, lo local persiste (idempotente por
-//! email) y se devuelve un status honesto para que el admin reintente, nunca un 200 silencioso.
-//! Un usuario **solo-PIN** (personal de tienda, sin cuenta online) es identidad puramente local:
-//! ahí el SaaS no pinta nada y no se le llama.
+//! credencial de máquina. El **orden** lo decide la dirección del cambio ([`apply_update`]):
+//! conceder se le pregunta al SaaS ANTES de escribir en local (una negativa no puede dejar el
+//! cambio aplicado y la pantalla diciendo que falló), revocar se aplica en local primero (cerrar una
+//! puerta no depende de que el cloud esté en pie) y lo que el SaaS no sabe —PIN, placa, nombre— no
+//! le pregunta nada. Un usuario **solo-PIN** (personal de tienda, sin cuenta online) es identidad
+//! puramente local: ahí el SaaS no pinta nada y no se le llama.
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -181,8 +185,8 @@ pub async fn create_user(
         Err(e) => return unauthorized(e),
     };
     // Antes de escribir nada: nadie reparte un rol por encima del suyo (hub#356).
-    if let Some(Guard::Forbidden(message)) = grant_decision(&actor.role, &input.role) {
-        return forbidden(ROLE_ABOVE_INVITER, message);
+    if let Some(Guard::Forbidden { code, message }) = grant_decision(&actor.role, &input.role) {
+        return forbidden(code, message);
     }
     let id = match rt.create_hub_user(&input).await {
         Ok(id) => id,
@@ -213,28 +217,7 @@ pub async fn update_user(
     Path(id): Path<String>,
     Json(input): Json<UpdateHubUser>,
 ) -> Response {
-    let arc = match runtime(&st).await {
-        Ok(arc) => arc,
-        Err(response) => return response,
-    };
-    let rt = arc.read().await;
-    let admin = match auth::require_admin_session(&headers, &st.config, &rt).await {
-        Ok(user) => user,
-        Err(e) => return unauthorized(e),
-    };
-    if let Some(response) = guard(&rt, &admin, &id, &input).await {
-        return response;
-    }
-    let row = match rt.update_hub_user(&id, &input).await {
-        Ok(row) => row,
-        Err(e) => return crate::err_response(e),
-    };
-    drop(rt);
-    // Un cambio de rol también viaja: el SaaS guarda el rol con la membresía (ADR-0157 §6).
-    if let Some(failure) = sync_access(&st, &row, input.is_active == Some(false)).await {
-        return failure;
-    }
-    ok(row)
+    apply_update(st, headers, &id, input).await
 }
 
 /// DELETE /api/hub/users/{id} — **baja = desactivar**, nunca borrar: sesiones, auditoría
@@ -243,6 +226,41 @@ pub async fn deactivate_user(
     State(st): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
+) -> Response {
+    apply_update(
+        st,
+        headers,
+        &id,
+        UpdateHubUser {
+            is_active: Some(false),
+            ..UpdateHubUser::default()
+        },
+    )
+    .await
+}
+
+/// El cuerpo compartido de la edición y de la baja: barandillas → SaaS/local en el orden que le
+/// toca a lo que se está cambiando → respuesta.
+///
+/// **El orden lo decide la DIRECCIÓN del cambio** (hub#1429), no una regla única:
+///
+///  - Lo que el SaaS administra (**conceder**: rol, email de la membresía, reactivación) se le
+///    pregunta **ANTES** de escribir nada en local. Antes era al revés y una negativa volvía con el
+///    cambio ya aplicado: la pantalla decía «no se pudo guardar» y el PIN sí había cambiado. Con el
+///    403 que el SaaS devolvía a toda edición de la fila del owner (saas#1638) eso pasaba en cada
+///    intento.
+///  - **Revocar** (`is_active: false`) va al revés a propósito: cerrar una puerta no puede depender
+///    de que el cloud esté en pie. La baja local se aplica primero y el `502` sigue contando que la
+///    mitad de la membresía falló — que es justo lo que la pantalla ya traduce («el usuario queda
+///    guardado aquí»).
+///  - Y lo que el SaaS **no sabe** —PIN, placa, nombre— no se le pregunta siquiera: nada de eso
+///    viaja en una membresía, y hacerlo depender de una llamada de red dejaba a un TPV sin poder
+///    rotar un PIN con el cloud caído.
+async fn apply_update(
+    st: AppState,
+    headers: HeaderMap,
+    id: &str,
+    input: UpdateHubUser,
 ) -> Response {
     let arc = match runtime(&st).await {
         Ok(arc) => arc,
@@ -253,59 +271,141 @@ pub async fn deactivate_user(
         Ok(user) => user,
         Err(e) => return unauthorized(e),
     };
-    let input = UpdateHubUser {
-        is_active: Some(false),
-        ..UpdateHubUser::default()
+    let target = match guard(&rt, &admin, id, &input).await {
+        Ok(target) => target,
+        Err(response) => return response,
     };
-    if let Some(response) = guard(&rt, &admin, &id, &input).await {
-        return response;
+    let plan = access_sync_plan(&target, &input);
+    drop(rt); // Suelta el lock ANTES de la I/O de red (mismo patrón que `members::add_member`).
+
+    if let AccessSync::Grant { email, role } = &plan {
+        if let Err(e) = crate::members::notify_member_added(&st, email, role).await {
+            return crate::members::members_error_response(e);
+        }
     }
-    let row = match rt.update_hub_user(&id, &input).await {
-        Ok(row) => row,
-        Err(e) => return crate::err_response(e),
+
+    let row = {
+        let rt = arc.read().await;
+        match rt.update_hub_user(id, &input).await {
+            Ok(row) => row,
+            Err(e) => return crate::err_response(e),
+        }
     };
-    drop(rt);
-    if let Some(failure) = sync_access(&st, &row, true).await {
-        return failure;
+
+    if let AccessSync::Revoke { email } = &plan {
+        if let Err(e) = crate::members::notify_member_removed(&st, email).await {
+            return crate::members::members_error_response(e);
+        }
     }
     ok(row)
-}
-
-/// Refleja en el SaaS lo que acaba de cambiar en local para un usuario **con email** (ADR-0157 §7):
-/// `revoked = true` revoca la membresía; si no, re-manda el alta —idempotente por email— para que
-/// el rol de la membresía quede al día. `None` = nada que sincronizar o todo fue bien.
-async fn sync_access(st: &AppState, row: &HubUserRow, revoked: bool) -> Option<Response> {
-    if row.email.is_empty() {
-        return None; // Identidad puramente local (personal de tienda con PIN).
-    }
-    let result = if revoked {
-        crate::members::notify_member_removed(st, &row.email).await
-    } else {
-        crate::members::notify_member_added(st, &row.email, &row.role).await
-    };
-    result.err().map(crate::members::members_error_response)
 }
 
 async fn find(rt: &Runtime, id: &str) -> erplora_runtime::Result<Option<HubUserRow>> {
     Ok(rt.list_hub_users().await?.into_iter().find(|u| u.id == id))
 }
 
-/// Lee el estado actual y aplica [`guard_decision`]. `Some(response)` = rechazado.
-async fn guard(
+/// La misma barandilla de la fila del dueño (hub#1429) en **la otra puerta del mismo cambio**:
+/// `/api/members` (ADR-0157 §7), donde a la persona se la nombra por EMAIL y no por id.
+///
+/// Hace falta aquí y no basta con `guard_decision` porque `create_login_user` escribe el `role`
+/// directamente sobre la fila que encuentra por email —un alta con la dirección del dueño y
+/// `role: employee` lo DEGRADA— y `deactivate_login_user` la desactiva. Cerrar una puerta y dejar
+/// la otra abierta no es media guarda: es ninguna.
+///
+/// `Some(response)` = rechazado. Solo mira las filas ya marcadas como del dueño, así que compara
+/// contra el email de ACCESO de esa fila (el que siembra el aprovisionamiento), no contra el del
+/// perfil.
+pub(crate) async fn guard_owner_row_by_email(
     rt: &Runtime,
-    actor: &erplora_runtime::identity::HubUser,
-    target_id: &str,
-    input: &UpdateHubUser,
+    actor_id: &str,
+    email: &str,
 ) -> Option<Response> {
     let users = match rt.list_hub_users().await {
         Ok(users) => users,
         Err(e) => return Some(crate::err_response(e)),
     };
+    if owner_row_belongs_to_somebody_else(&users, actor_id, email) {
+        return Some(forbidden(
+            OWNER_ROW_IS_THE_OWNERS,
+            "this is the account owner's record: only they can change it",
+        ));
+    }
+    None
+}
+
+fn owner_row_belongs_to_somebody_else(users: &[HubUserRow], actor_id: &str, email: &str) -> bool {
+    let email = email.trim();
+    users.iter().any(|u| {
+        u.is_account_owner
+            && u.id != actor_id
+            && !email.is_empty()
+            && u.email.eq_ignore_ascii_case(email)
+    })
+}
+
+/// Qué hay que contarle al SaaS de esta edición (ADR-0157 §7). Pura: la decisión es la parte
+/// delicada y se testea sin BD ni red.
+#[derive(Debug, PartialEq, Eq)]
+enum AccessSync {
+    /// Nada que sincronizar: o la fila es identidad puramente local (personal de tienda con PIN, sin
+    /// email), o lo que cambia —PIN, placa, nombre— no vive en ninguna membresía.
+    Nothing,
+    /// Alta/actualización de la membresía, **idempotente por email**: el SaaS guarda el rol junto a
+    /// ella (ADR-0157 §6), así que un cambio de rol también viaja.
+    Grant { email: String, role: String },
+    /// Revocación de la membresía.
+    Revoke { email: String },
+}
+
+fn access_sync_plan(target: &HubUserRow, input: &UpdateHubUser) -> AccessSync {
+    let email = input
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .unwrap_or(&target.email)
+        .to_string();
+    if email.is_empty() {
+        return AccessSync::Nothing; // Identidad puramente local.
+    }
+    if input.is_active == Some(false) {
+        return AccessSync::Revoke { email };
+    }
+    let role = input.role.as_deref().unwrap_or(&target.role);
+    let changes_the_membership = role != target.role
+        || !email.eq_ignore_ascii_case(&target.email)
+        || (input.is_active == Some(true) && !target.is_active);
+    if changes_the_membership {
+        AccessSync::Grant {
+            email,
+            role: role.to_string(),
+        }
+    } else {
+        AccessSync::Nothing
+    }
+}
+
+/// Lee el estado actual y aplica [`guard_decision`]. `Err(response)` = rechazado; `Ok` devuelve la
+/// fila tal y como está ANTES de la edición, que es contra lo que se decide qué sabe el SaaS.
+async fn guard(
+    rt: &Runtime,
+    actor: &erplora_runtime::identity::HubUser,
+    target_id: &str,
+    input: &UpdateHubUser,
+) -> Result<HubUserRow, Response> {
+    let users = match rt.list_hub_users().await {
+        Ok(users) => users,
+        Err(e) => return Err(crate::err_response(e)),
+    };
     match guard_decision(&users, &actor.id, &actor.role, target_id, input) {
-        Some(Guard::NotFound) => Some(not_found()),
-        Some(Guard::Rejected { code, message }) => Some(rejected(code, message)),
-        Some(Guard::Forbidden(message)) => Some(forbidden(ROLE_ABOVE_INVITER, message)),
-        None => None,
+        Some(Guard::NotFound) => Err(not_found()),
+        Some(Guard::Rejected { code, message }) => Err(rejected(code, message)),
+        Some(Guard::Forbidden { code, message }) => Err(forbidden(code, message)),
+        // `guard_decision` ya ha probado que la fila existe: si no, habría devuelto `NotFound`.
+        None => users
+            .into_iter()
+            .find(|u| u.id == target_id)
+            .ok_or_else(not_found),
     }
 }
 
@@ -323,11 +423,21 @@ enum Guard {
     /// Lo que se pide es legítimo, pero **no para quien lo pide** (hub#356). Sale como `403` con el
     /// código estable del core para que la UI lo traduzca, no como el `400 rejected` de las otras
     /// dos barandillas: aquellas dicen «esto dejaría el hub inservible», esta dice «tú no».
-    Forbidden(&'static str),
+    ///
+    /// Lleva su propio `code` desde hub#1429: son ya dos motivos distintos —el rango que reparte y
+    /// la fila del dueño— y aplanarlos en uno le pediría a la pantalla que tradujese «no puedes» sin
+    /// poder decir por qué, que es justo lo que `error.code` existe para evitar (hub#1070).
+    Forbidden {
+        code: &'static str,
+        message: &'static str,
+    },
 }
 
 /// Código estable del rechazo de [`grant_decision`] (namespace reservado del core, ADR-0192).
 const ROLE_ABOVE_INVITER: &str = "hub.users.role_above_inviter";
+
+/// Código estable de la barandilla de la fila del DUEÑO de la cuenta (hub#1429).
+const OWNER_ROW_IS_THE_OWNERS: &str = "hub.users.owner_row";
 
 /// **Nadie concede un rol por encima del suyo** (hub#356). `None` = admisible.
 ///
@@ -348,9 +458,10 @@ const ROLE_ABOVE_INVITER: &str = "hub.users.role_above_inviter";
 /// quiere— sea un cambio y no una catástrofe.
 fn grant_decision(actor_role: &str, granted_role: &str) -> Option<Guard> {
     if is_admin_role(granted_role) && !is_admin_role(actor_role) {
-        return Some(Guard::Forbidden(
-            "only somebody who administers this hub can hand out administration",
-        ));
+        return Some(Guard::Forbidden {
+            code: ROLE_ABOVE_INVITER,
+            message: "only somebody who administers this hub can hand out administration",
+        });
     }
     None
 }
@@ -367,6 +478,29 @@ fn guard_decision(
     let Some(target) = users.iter().find(|u| u.id == target_id) else {
         return Some(Guard::NotFound);
     };
+
+    // **La fila del DUEÑO de la cuenta solo la edita el dueño** (hub#1429). Va la PRIMERA porque es
+    // la única regla sobre *a quién* se toca: las de abajo hablan de qué se cambia, y contestar
+    // «dejarías el hub sin administrador» a quien intenta cambiarle el PIN al dueño describe el
+    // problema equivocado.
+    //
+    // Es la mitad que el SaaS NO puede poner (el mismo argumento de `grant_decision`): el runtime
+    // habla con él con la credencial de máquina, que `assert_can_manage_hub_member` trata con rango
+    // de owner, así que allí un administrador y una cajera son la misma llamada. El 403 que el SaaS
+    // devolvía a TODA edición de esta fila lo tapaba por accidente —y de paso impedía al dueño rotar
+    // su propio PIN, pm#167—; al levantarlo (saas#1638/#1788) la puerta queda aquí o no queda.
+    //
+    // El mercado la pone igual: seis de ocho productos revisados —Shopify, Square, Toast,
+    // Lightspeed, Vagaro y Business Central, los cuatro TPV entre ellos— dejan la ficha del dueño en
+    // solo lectura para cualquier otro administrador y transfieren la propiedad por un flujo aparte
+    // del plano de la cuenta. Los dos que no (Odoo, WordPress) lo documentan como riesgo, no como
+    // diseño. Aquí la transferencia la hace el SaaS y llega por `HUB_OWNER_EMAIL`, que mueve la marca.
+    if target.is_account_owner && target_id != actor_id {
+        return Some(Guard::Forbidden {
+            code: OWNER_ROW_IS_THE_OWNERS,
+            message: "this is the account owner's record: only they can change it",
+        });
+    }
 
     // La misma regla de rango que la invitación (hub#356), aquí porque sin esta mitad la otra es
     // teatro: se invita como `employee` y se asciende a `admin` un segundo después. El rol del
@@ -396,7 +530,15 @@ fn guard_decision(
     // acaba de perder la tarjeta es la persona con más prisa por matarla, y hacerle buscar a otro
     // administrador convierte una pérdida en una ventana abierta. Es la misma asimetría que el
     // resto del subsistema — cerrar una puerta nunca necesita permiso, abrirla sí.
+    //
+    // ⚠️ Y no alcanza al DUEÑO de la cuenta (hub#1429). Desde que nadie más puede tocar su fila,
+    // exigirle cuatro ojos para su propia placa significaría que el dueño **no puede tener placa
+    // jamás** — la forma exacta de pm#167, donde un bloqueo indiscriminado dejó al dueño sin poder
+    // rotar un PIN filtrado. Lo que la regla protege es la relación de auditoría entre un
+    // administrador y el dueño del hub; por encima del dueño no hay nadie a quien proteger, y así lo
+    // hace Square, donde el passcode del dueño se pone en su propia cuenta.
     if target_id == actor_id
+        && !target.is_account_owner
         && input
             .badge
             .as_deref()
@@ -439,6 +581,7 @@ mod tests {
             role: role.into(),
             cloud_user_id: None,
             is_active,
+            is_account_owner: false,
             has_pin: false,
             has_badge: false,
             created_at: "2026-08-02T10:00:00Z".into(),
@@ -583,13 +726,19 @@ mod tests {
             assert!(
                 matches!(
                     grant_decision("manager", granted),
-                    Some(Guard::Forbidden(_))
+                    Some(Guard::Forbidden {
+                        code: ROLE_ABOVE_INVITER,
+                        ..
+                    })
                 ),
                 "a manager cannot hand out `{granted}`"
             );
             assert!(matches!(
                 grant_decision("employee", granted),
-                Some(Guard::Forbidden(_))
+                Some(Guard::Forbidden {
+                    code: ROLE_ABOVE_INVITER,
+                    ..
+                })
             ));
             // …and an administrator can: inviting another administrator is the legitimate door of
             // ADR-0157 §7, and refusing it would leave a hub unable to name a second owner.
@@ -613,7 +762,10 @@ mod tests {
         // A non-administrator promoting somebody to administrator, through the edit door.
         assert!(matches!(
             guard_decision(&census, "caja", "employee", "caja", &set_role("admin")),
-            Some(Guard::Forbidden(_))
+            Some(Guard::Forbidden {
+                code: ROLE_ABOVE_INVITER,
+                ..
+            })
         ));
         // An administrator doing the same thing is the ordinary way to name a second one.
         assert_eq!(
@@ -629,6 +781,224 @@ mod tests {
                 "caja",
                 &UpdateHubUser::default()
             ),
+            None
+        );
+    }
+
+    /// The row of the person who OWNS the account, as the deployment named them
+    /// (`is_account_owner`, hub#1429).
+    fn account_owner(id: &str) -> HubUserRow {
+        HubUserRow {
+            is_account_owner: true,
+            ..user(id, "admin", true)
+        }
+    }
+
+    fn set_pin(pin: &str) -> UpdateHubUser {
+        UpdateHubUser {
+            pin: Some(pin.into()),
+            ..UpdateHubUser::default()
+        }
+    }
+
+    /// hub#1429 — **the owner's row is edited by the owner and by nobody else.**
+    ///
+    /// Six of the eight products checked (Shopify, Square, Toast, Lightspeed, Vagaro, Business
+    /// Central — every one of the four POS among them) make the account owner's record read-only
+    /// for any other administrator: Lightspeed says it outright ("The Primary User account employee
+    /// page cannot be edited by anyone other than the Primary User"), Square keeps the owner
+    /// passcode in the owner's personal account instead of the Team screen, and Shopify refuses to
+    /// remove the store owner at all. The two that allow it — Odoo and WordPress — document it as a
+    /// hazard rather than a design.
+    #[test]
+    fn only_the_owner_edits_the_owners_row() {
+        let census = [account_owner("ioan"), user("ana", "admin", true)];
+        // Every field, one reason: another administrator is not the owner. The PIN is the one that
+        // matters most — it is the credential that opens the till AS the owner.
+        for change in [
+            set_pin("4271"),
+            set_role("employee"),
+            deactivate(),
+            set_badge("0009171456"),
+            UpdateHubUser {
+                name: Some("Otro".into()),
+                ..UpdateHubUser::default()
+            },
+        ] {
+            assert!(
+                matches!(
+                    guard_decision(&census, "ana", "admin", "ioan", &change),
+                    Some(Guard::Forbidden {
+                        code: OWNER_ROW_IS_THE_OWNERS,
+                        ..
+                    })
+                ),
+                "an administrator who is not the owner may not edit the owner's row: {change:?}"
+            );
+        }
+        // …and the owner editing their own row is exactly what the screen is for.
+        assert_eq!(
+            guard_decision(&census, "ioan", "admin", "ioan", &set_pin("4271")),
+            None
+        );
+        // The rule names ONE row: everybody else stays as manageable as before.
+        assert_eq!(
+            guard_decision(&census, "ioan", "admin", "ana", &set_pin("4271")),
+            None
+        );
+    }
+
+    /// The same rule from the other side: a **badge** on the owner's row would be a card that signs
+    /// in AS the owner, which is the worst version of this escalation and not an exception to it.
+    ///
+    /// Which forces the other half: since nobody else may enrol it, four eyes on the owner's own
+    /// badge (`self_badge_enrollment`, hub#658) would mean the owner can NEVER hold one — the very
+    /// shape of pm#167, where a blanket block left the owner unable to rotate a leaked PIN. So the
+    /// owner enrols their own, like Square, where the owner passcode is set in the owner's own
+    /// account. The four-eyes rule protects the audit relationship between an administrator and the
+    /// hub's owner; above the owner there is nobody for it to protect.
+    #[test]
+    fn the_owner_enrols_their_own_badge_and_nobody_enrols_it_for_them() {
+        let census = [account_owner("ioan"), user("ana", "admin", true)];
+        assert!(matches!(
+            guard_decision(&census, "ana", "admin", "ioan", &set_badge("0009171456")),
+            Some(Guard::Forbidden {
+                code: OWNER_ROW_IS_THE_OWNERS,
+                ..
+            })
+        ));
+        assert_eq!(
+            guard_decision(&census, "ioan", "admin", "ioan", &set_badge("0009171456")),
+            None,
+            "the owner is the only person who can give the owner a badge"
+        );
+        // Four eyes still bind everybody else, owner or not.
+        assert!(matches!(
+            guard_decision(&census, "ana", "admin", "ana", &set_badge("0009171456")),
+            Some(Guard::Rejected {
+                code: "self_badge_enrollment",
+                ..
+            })
+        ));
+    }
+
+    /// The email-shaped half of the same rule, for the `/api/members` door (hub#1429).
+    #[test]
+    fn the_owners_row_is_recognised_by_its_access_email_too() {
+        let owner = with_email(account_owner("ioan"), "Ioan@Example.com");
+        let census = [
+            owner,
+            with_email(user("ana", "admin", true), "ana@example.com"),
+        ];
+
+        assert!(owner_row_belongs_to_somebody_else(
+            &census,
+            "ana",
+            " ioan@example.com "
+        ));
+        assert!(
+            !owner_row_belongs_to_somebody_else(&census, "ioan", "ioan@example.com"),
+            "the owner naming their own address is not somebody else"
+        );
+        assert!(!owner_row_belongs_to_somebody_else(
+            &census,
+            "ana",
+            "ana@example.com"
+        ));
+        assert!(
+            !owner_row_belongs_to_somebody_else(&census, "ana", "   "),
+            "an empty address matches nobody — least of all a row whose email is empty"
+        );
+    }
+
+    fn with_email(mut row: HubUserRow, email: &str) -> HubUserRow {
+        row.email = email.into();
+        row
+    }
+
+    /// hub#1429 — **what the SaaS is told, and therefore what has to be asked first.**
+    ///
+    /// The handler used to notify the SaaS on EVERY edit of a row with an email, after writing
+    /// locally. That is how rotating a PIN — something no membership carries — ended up depending on
+    /// a network call, and how a refusal came back with the change already applied.
+    #[test]
+    fn only_what_lives_in_a_membership_reaches_the_saas() {
+        let ana = with_email(user("ana", "employee", true), "ana@example.com");
+
+        // A PIN, a badge and a name are not part of a membership: nothing to sync.
+        assert_eq!(
+            access_sync_plan(&ana, &set_pin("4271")),
+            AccessSync::Nothing
+        );
+        assert_eq!(
+            access_sync_plan(&ana, &set_badge("0009171456")),
+            AccessSync::Nothing
+        );
+        assert_eq!(
+            access_sync_plan(
+                &ana,
+                &UpdateHubUser {
+                    name: Some("Ana S.".into()),
+                    ..UpdateHubUser::default()
+                }
+            ),
+            AccessSync::Nothing
+        );
+        // Neither is a role that is not changing, nor an `is_active: true` on somebody active.
+        assert_eq!(
+            access_sync_plan(&ana, &set_role("employee")),
+            AccessSync::Nothing
+        );
+
+        // The role travels with the membership (ADR-0157 §6), so a real change does.
+        assert_eq!(
+            access_sync_plan(&ana, &set_role("manager")),
+            AccessSync::Grant {
+                email: "ana@example.com".into(),
+                role: "manager".into(),
+            }
+        );
+        // A baja revokes it…
+        assert_eq!(
+            access_sync_plan(&ana, &deactivate()),
+            AccessSync::Revoke {
+                email: "ana@example.com".into()
+            }
+        );
+        // …and reinstating somebody asks for the membership back.
+        let inactive = with_email(user("ana", "employee", false), "ana@example.com");
+        assert_eq!(
+            access_sync_plan(
+                &inactive,
+                &UpdateHubUser {
+                    is_active: Some(true),
+                    ..UpdateHubUser::default()
+                }
+            ),
+            AccessSync::Grant {
+                email: "ana@example.com".into(),
+                role: "employee".into(),
+            }
+        );
+    }
+
+    /// Store staff with a PIN and no account are purely local identity: the SaaS is never called for
+    /// them, whatever changes — that half of ADR-0157 §7 does not move.
+    #[test]
+    fn a_pin_only_user_never_reaches_the_saas() {
+        let marta = user("marta", "cashier", true); // no email at all
+        for change in [set_pin("4271"), set_role("manager"), deactivate()] {
+            assert_eq!(access_sync_plan(&marta, &change), AccessSync::Nothing);
+        }
+    }
+
+    /// A hub that never booted with `HUB_OWNER_EMAIL` has no marked row (`is_account_owner` false
+    /// everywhere). It keeps exactly today's rules instead of locking a row nobody can name.
+    #[test]
+    fn without_a_named_owner_nothing_new_is_refused() {
+        let census = [user("ioan", "admin", true), user("ana", "admin", true)];
+        assert_eq!(
+            guard_decision(&census, "ana", "admin", "ioan", &set_pin("4271")),
             None
         );
     }

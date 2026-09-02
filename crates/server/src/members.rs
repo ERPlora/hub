@@ -229,8 +229,16 @@ pub async fn add_member(
     // Gate admin + alta local bajo el MISMO lock; se suelta ANTES de la I/O de red al SaaS.
     let user = {
         let rt = st.runtime.read().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return crate::unauthorized(e);
+        let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
+            Ok(user) => user,
+            Err(e) => return crate::unauthorized(e),
+        };
+        // La fila del DUEÑO solo la toca el dueño (hub#1429). Esta puerta escribe el rol sobre la
+        // fila que encuentra por email, así que sin esto un alta con su dirección lo degrada.
+        if let Some(response) =
+            crate::hub_users::guard_owner_row_by_email(&rt, &actor.id, &email).await
+        {
+            return response;
         }
         match rt.create_login_user(&email, &role).await {
             Ok(user) => user,
@@ -255,8 +263,15 @@ pub async fn remove_member(
     let email = email.trim().to_string();
     let existed = {
         let rt = st.runtime.read().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return crate::unauthorized(e);
+        let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
+            Ok(user) => user,
+            Err(e) => return crate::unauthorized(e),
+        };
+        // Y la baja tampoco: es la simetría de la misma puerta (hub#1429).
+        if let Some(response) =
+            crate::hub_users::guard_owner_row_by_email(&rt, &actor.id, &email).await
+        {
+            return response;
         }
         match rt.deactivate_login_user(&email).await {
             Ok(existed) => existed,
