@@ -208,10 +208,9 @@ fn generate() -> String {
     for field in &dedup_fields {
         out.push_str(&format!("commands.*.emit[].{field}\n"));
     }
-    let keyed: erplora_runtime::manifest::EmitDef = serde_json::from_value(
-        json!({"event": "sale.completed", "dedup_key": "wa_message_id"}),
-    )
-    .expect("the object form of `emit[]` must parse");
+    let keyed: erplora_runtime::manifest::EmitDef =
+        serde_json::from_value(json!({"event": "sale.completed", "dedup_key": "wa_message_id"}))
+            .expect("the object form of `emit[]` must parse");
     assert_eq!(keyed.event(), "sale.completed");
     assert_eq!(keyed.dedup_key(), Some("wa_message_id"));
 

@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 
 fn mdir(name: &str) -> PathBuf {
@@ -64,7 +64,9 @@ async fn instalar_taxes_en_hub_es_siembra_iva_21_10_y_4_superreducido() {
     // El server llama `ensure_system_tables` al arrancar: crea `hub_settings` (migración de
     // sistema v4) que el instalador lee para resolver el `country_code`. Sin esto, el país
     // degrada al default ES (que también es el del test, pero lo dejamos explícito).
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
     rt.install_from_dir(&mdir("taxes"))
         .await
         .expect("instalar taxes");
@@ -98,7 +100,10 @@ async fn instalar_taxes_en_hub_es_siembra_iva_21_10_y_4_superreducido() {
         .execute_query("taxes.rules.list", &Params::new(), &admin("h1"))
         .await
         .expect("taxes.rules.list");
-    assert!(!rules.is_empty(), "un hub ES con `taxes` tiene reglas fiscales");
+    assert!(
+        !rules.is_empty(),
+        "un hub ES con `taxes` tiene reglas fiscales"
+    );
 }
 
 #[tokio::test]
@@ -109,14 +114,23 @@ async fn reinstalar_taxes_no_duplica_el_iva_es_suplementario() {
     }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
-    rt.install_from_dir(&mdir("taxes")).await.expect("primera instalación");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("primera instalación");
     let antes = count_es_rule(&rt, "h1", "product.super_reduced", 4.0).await;
 
-    rt.install_from_dir(&mdir("taxes")).await.expect("reinstalar");
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("reinstalar");
     let despues = count_es_rule(&rt, "h1", "product.super_reduced", 4.0).await;
 
-    assert_eq!(antes, 1, "precondición: una regla de 4% tras la primera instalación");
+    assert_eq!(
+        antes, 1,
+        "precondición: una regla de 4% tras la primera instalación"
+    );
     assert_eq!(
         despues, 1,
         "reinstalar `taxes` NO duplica la regla de 4% (seed idempotente, hub#107)"
@@ -135,13 +149,19 @@ async fn un_hub_no_espanol_no_recibe_reglas_iva_es_suplementarias() {
     }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h2");
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
     // Fija el país del hub a FR antes de instalar `taxes` (override del default ES).
     let mut updates = serde_json::Map::new();
     updates.insert("country_code".into(), serde_json::json!("FR"));
-    rt.set_settings(&updates, "system").await.expect("set country_code=FR");
+    rt.set_settings(&updates, "system")
+        .await
+        .expect("set country_code=FR");
 
-    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("instalar taxes");
 
     // El seed suplementario NO se aplicó: cero reglas del 4% superreducido ES en el hub FR.
     assert_eq!(

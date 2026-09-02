@@ -62,7 +62,10 @@ async fn system_migration_reaches_existing_db_and_is_idempotent() {
         db.execute(
             "INSERT INTO hub_module (module_id, version, status, installed_at, updated_at) \
              VALUES (:id, '1.0.0', 'active', :now, :now)",
-            &p(&[("id", json!("legacy_mod")), ("now", json!("2026-01-01T00:00:00Z"))]),
+            &p(&[
+                ("id", json!("legacy_mod")),
+                ("now", json!("2026-01-01T00:00:00Z")),
+            ]),
         )
         .await
         .unwrap();
@@ -79,16 +82,30 @@ async fn system_migration_reaches_existing_db_and_is_idempotent() {
 
         // La columna hub_id existe y la fila legacy quedó sellada con el hub_id del despliegue.
         let rows = db
-            .query("SELECT hub_id, module_id FROM hub_module WHERE module_id = 'legacy_mod'", &Params::new())
+            .query(
+                "SELECT hub_id, module_id FROM hub_module WHERE module_id = 'legacy_mod'",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
-        assert_eq!(rows.len(), 1, "la fila legacy debe seguir existiendo tras migrar");
-        assert_eq!(rows[0]["hub_id"], json!(hub_a), "hub_id sellado al del despliegue");
+        assert_eq!(
+            rows.len(),
+            1,
+            "la fila legacy debe seguir existiendo tras migrar"
+        );
+        assert_eq!(
+            rows[0]["hub_id"],
+            json!(hub_a),
+            "hub_id sellado al del despliegue"
+        );
 
         // La migración v1 quedó registrada en la tabla de control.
         let reg = db
-            .query("SELECT version FROM _hub_system_migrations WHERE version = 1", &Params::new())
+            .query(
+                "SELECT version FROM _hub_system_migrations WHERE version = 1",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
@@ -111,8 +128,15 @@ async fn system_migration_reaches_existing_db_and_is_idempotent() {
             .await
             .unwrap()
             .rows;
-        assert_eq!(reg.len(), count_after_first, "re-arrancar no reaplica (recuento estable)");
-        assert!(reg.iter().any(|r| r["version"] == json!(1)), "v1 sigue registrada");
+        assert_eq!(
+            reg.len(),
+            count_after_first,
+            "re-arrancar no reaplica (recuento estable)"
+        );
+        assert!(
+            reg.iter().any(|r| r["version"] == json!(1)),
+            "v1 sigue registrada"
+        );
         // La PK es ahora compuesta: insertar el mismo module_id con otro hub_id NO colisiona.
         db.execute(
             "INSERT INTO hub_module (hub_id, module_id, version, status, installed_at, updated_at) \
@@ -147,18 +171,27 @@ async fn two_hubs_share_db_with_independent_module_sets() {
     {
         let db = tdb.adapter().await;
         let rows_a = db
-            .query("SELECT module_id FROM hub_module WHERE hub_id = 'hub-A'", &Params::new())
+            .query(
+                "SELECT module_id FROM hub_module WHERE hub_id = 'hub-A'",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
         let rows_b = db
-            .query("SELECT module_id FROM hub_module WHERE hub_id = 'hub-B'", &Params::new())
+            .query(
+                "SELECT module_id FROM hub_module WHERE hub_id = 'hub-B'",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
         assert_eq!(rows_a.len(), 1, "hub A tiene inventory");
         assert_eq!(rows_a[0]["module_id"], json!("inventory"));
-        assert!(rows_b.is_empty(), "hub B no comparte el set de módulos de A");
+        assert!(
+            rows_b.is_empty(),
+            "hub B no comparte el set de módulos de A"
+        );
     }
 }
 
@@ -190,17 +223,27 @@ async fn uninstall_in_one_hub_does_not_affect_another() {
     {
         let db = tdb.adapter().await;
         let rows_a = db
-            .query("SELECT module_id FROM hub_module WHERE hub_id = 'hub-A'", &Params::new())
+            .query(
+                "SELECT module_id FROM hub_module WHERE hub_id = 'hub-A'",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
         let rows_b = db
-            .query("SELECT module_id FROM hub_module WHERE hub_id = 'hub-B'", &Params::new())
+            .query(
+                "SELECT module_id FROM hub_module WHERE hub_id = 'hub-B'",
+                &Params::new(),
+            )
             .await
             .unwrap()
             .rows;
         assert!(rows_a.is_empty(), "A desinstaló inventory");
-        assert_eq!(rows_b.len(), 1, "B conserva inventory (aislamiento por hub_id)");
+        assert_eq!(
+            rows_b.len(),
+            1,
+            "B conserva inventory (aislamiento por hub_id)"
+        );
     }
 }
 
@@ -224,8 +267,16 @@ async fn deactivate_in_one_hub_does_not_affect_another() {
         let db = tdb.adapter().await;
         let st_a = installer::installed_status(&db, "hub-A").await.unwrap();
         let st_b = installer::installed_status(&db, "hub-B").await.unwrap();
-        assert_eq!(st_a, vec![("inventory".to_string(), ModuleStatus::Inactive)], "A inactivo");
-        assert_eq!(st_b, vec![("inventory".to_string(), ModuleStatus::Active)], "B activo");
+        assert_eq!(
+            st_a,
+            vec![("inventory".to_string(), ModuleStatus::Inactive)],
+            "A inactivo"
+        );
+        assert_eq!(
+            st_b,
+            vec![("inventory".to_string(), ModuleStatus::Active)],
+            "B activo"
+        );
     }
 
     // Y la reconstrucción del Registry de A respeta el estado inactivo persistido por hub: monta
@@ -244,8 +295,16 @@ async fn deactivate_in_one_hub_does_not_affect_another() {
         let db = tdb.adapter().await;
         let mut rt_a = Runtime::with_hub_id(Box::new(db), "hub-A");
         rt_a.install_all_from_dir(&mods_dir).await.unwrap();
-        let inv = rt_a.modules().into_iter().find(|m| m.id == "inventory").expect("inventory presente");
-        assert_eq!(inv.status, ModuleStatus::Inactive, "A reconstruye inventory como inactivo");
+        let inv = rt_a
+            .modules()
+            .into_iter()
+            .find(|m| m.id == "inventory")
+            .expect("inventory presente");
+        assert_eq!(
+            inv.status,
+            ModuleStatus::Inactive,
+            "A reconstruye inventory como inactivo"
+        );
 
         let _ = std::fs::remove_dir_all(&mods_dir);
     }
@@ -292,6 +351,12 @@ async fn module_migrations_still_converge_once_per_db() {
         .rows
         .len()
     };
-    assert!(after_a > 0, "inventory aplicó al menos una migración de módulo");
-    assert_eq!(after_a, after_b, "el segundo hub NO reaplica migraciones de módulo (convergen por BD)");
+    assert!(
+        after_a > 0,
+        "inventory aplicó al menos una migración de módulo"
+    );
+    assert_eq!(
+        after_a, after_b,
+        "el segundo hub NO reaplica migraciones de módulo (convergen por BD)"
+    );
 }

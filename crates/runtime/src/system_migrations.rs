@@ -1743,6 +1743,26 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_by TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discard_reason TEXT NOT NULL DEFAULT '';",
     },
 
+    // hub#1432 (hub#985 §1) — the hub's MACHINE identity for the fiscal gateway (ADR-0419).
+    // The private key is GENERATED ON THE HUB and never leaves it (`gateway_identity.rs` is the
+    // only reader/writer): only a CSR travels to the operator, and a signed certificate + the
+    // internal CA come back. `private_key_pem` is encrypted at rest with `secret_box`
+    // (HUB_SECRETS_KEY, fail-closed on write); `certificate_pem`/`ca_pem` are public material.
+    // Singleton per hub (PK `hub_id`), like `_hub_certificate` — a hub has ONE machine identity.
+    // ⚠️ This table must NEVER enter an export bundle: the key not travelling is the whole point
+    // (same rule as ADR-0113's "the password does not travel").
+    SystemMigration {
+        version: 55,
+        name: "hub_gateway_identity",
+        kind: Kind::Expand,
+        postgres: "\
+CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
+  hub_id TEXT NOT NULL, private_key_pem TEXT NOT NULL, certificate_pem TEXT NOT NULL DEFAULT '', \
+  ca_pem TEXT NOT NULL DEFAULT '', common_name TEXT NOT NULL, \
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
+  PRIMARY KEY (hub_id));",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -2194,10 +2214,7 @@ mod tests {
         apply(&db, "hub-test").await.unwrap();
 
         let row = db
-            .query(
-                "SELECT email FROM hub_user WHERE id = 'u1'",
-                &Params::new(),
-            )
+            .query("SELECT email FROM hub_user WHERE id = 'u1'", &Params::new())
             .await
             .unwrap();
         assert_eq!(
@@ -2468,7 +2485,9 @@ mod tests {
     async fn the_elevation_audit_can_be_applied_twice() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2575,7 +2594,9 @@ mod tests {
     async fn the_device_tenancy_migration_can_be_applied_twice() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2613,7 +2634,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(rows.rows.len(), 1, "re-aplicar no se lleva la confianza viva");
+        assert_eq!(
+            rows.rows.len(),
+            1,
+            "re-aplicar no se lleva la confianza viva"
+        );
         assert_eq!(rows.rows[0]["hub_id"], json!("hub-test"));
         assert_eq!(
             rows.rows[0]["mode"],
@@ -2625,7 +2650,10 @@ mod tests {
     #[test]
     fn split_statements_keeps_each_terminated() {
         let stmts = split_statements("CREATE TABLE IF NOT EXISTS a (x);  DROP TABLE b; ");
-        assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
+        assert_eq!(
+            stmts,
+            vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]
+        );
     }
 
     /// The user-activity mark needs a table of its own (hub#670): kept only in memory it died with
@@ -2638,7 +2666,9 @@ mod tests {
     async fn apply_creates_the_activity_table_and_can_run_twice_without_losing_the_mark() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2679,7 +2709,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows.rows.len(), 1, "re-applying must not drop the mark");
-        assert_eq!(rows.rows[0]["last_activity_at"], json!("2026-08-10T09:00:00Z"));
+        assert_eq!(
+            rows.rows[0]["last_activity_at"],
+            json!("2026-08-10T09:00:00Z")
+        );
     }
 
     #[tokio::test]
@@ -3160,10 +3193,7 @@ mod tests {
         // `the_trust_a_shared_database_cannot_attribute_is_not_handed_to_whoever_boots_first`.
         apply(&db, "hub-test").await.unwrap();
         let after = db
-            .query(
-                "SELECT device_id FROM hub_trusted_device",
-                &Params::new(),
-            )
+            .query("SELECT device_id FROM hub_trusted_device", &Params::new())
             .await
             .unwrap();
         assert_eq!(
@@ -3266,7 +3296,9 @@ mod tests {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
         // Full baseline + the whole catalogue, genuinely applied once.
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         ensure_control_table(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
@@ -3277,7 +3309,9 @@ mod tests {
 
         // Wipe ALL control rows → `apply` sees a max of 0 and re-runs every migration. With the
         // objects already in the schema, a `CREATE TABLE` without `IF NOT EXISTS` dies on 42P07.
-        db.execute_batch("DELETE FROM _hub_system_migrations;").await.unwrap();
+        db.execute_batch("DELETE FROM _hub_system_migrations;")
+            .await
+            .unwrap();
         assert_eq!(
             max_applied_version(&db).await.unwrap(),
             0,
@@ -3288,7 +3322,7 @@ mod tests {
         // first `CREATE TABLE` without `IF NOT EXISTS`.
         apply(&db, "hub-test").await.expect(
             "re-aplicar el catálogo sobre un esquema ya creado no debe fallar: cada CREATE/ALTER \
-             necesita IF NOT EXISTS (hub#483)"
+             necesita IF NOT EXISTS (hub#483)",
         );
         // And it leaves the control table populated again — a re-run is a real apply, not a no-op
         // that silently skipped everything.
@@ -3479,7 +3513,9 @@ mod kind_contract_tests {
     #[test]
     fn every_system_migration_does_what_its_kind_says() {
         for migration in MIGRATIONS {
-            if let Err(error) = crate::migration_guard::kind_matches(migration.postgres, migration.kind) {
+            if let Err(error) =
+                crate::migration_guard::kind_matches(migration.postgres, migration.kind)
+            {
                 panic!(
                     "v{} `{}`: {error}\n\
                      Si de verdad no admite vuelta atrás, márcala `Kind::Contract` y añádela al \
@@ -3608,6 +3644,11 @@ mod kind_contract_tests {
         // haría invisible justo lo que pasó. Mismas columnas y mismos tipos que hub#660/hub#955
         // pusieron en `_event_outbox`, porque es el mismo gesto sobre la otra cola durable. Al
         // escribirla el máximo era la v53 en `origin/develop` y en TODAS las ramas remotas.
-        assert_eq!(MIGRATIONS.len(), 51, "el catálogo cambió de tamaño");
+        // + `hub_gateway_identity` (v55, hub#1432): la identidad de MÁQUINA para la pasarela
+        // fiscal (ADR-0419/0425) — singleton por hub, clave cifrada con `secret_box` que nace en
+        // el hub y no sale (solo viaja el CSR), cert + CA públicos. PROHIBIDA en bundles de
+        // export. Al escribirla el máximo era la v54 en `origin/develop` y en TODAS las ramas
+        // remotas.
+        assert_eq!(MIGRATIONS.len(), 52, "el catálogo cambió de tamaño");
     }
 }

@@ -36,6 +36,7 @@ mod config;
 mod diagnostics;
 mod engine;
 mod events;
+mod gateway;
 mod ingest;
 mod records;
 mod recovery;

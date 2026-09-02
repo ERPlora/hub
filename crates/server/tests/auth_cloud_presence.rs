@@ -215,10 +215,7 @@ async fn cloud_user_role(state: &AppState, cloud_user_id: &str) -> Option<String
     p.insert("cuid".to_string(), json!(cloud_user_id));
     let res = rt
         .db_for_test()
-        .query(
-            "SELECT role FROM hub_user WHERE cloud_user_id = :cuid",
-            &p,
-        )
+        .query("SELECT role FROM hub_user WHERE cloud_user_id = :cuid", &p)
         .await
         .unwrap();
     res.rows
@@ -356,8 +353,16 @@ async fn member_without_seed_is_never_owner() {
     let resp = router.oneshot(cloud_login_bare(&user)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let rol = cloud_user_role(&state, "2").await;
-    assert_ne!(rol.as_deref(), Some("owner"), "el owner es del env, NUNCA del token");
-    assert_eq!(rol.as_deref(), Some("admin"), "owner/admin de la org → admin local");
+    assert_ne!(
+        rol.as_deref(),
+        Some("owner"),
+        "el owner es del env, NUNCA del token"
+    );
+    assert_eq!(
+        rol.as_deref(),
+        Some("admin"),
+        "owner/admin de la org → admin local"
+    );
     std::fs::remove_dir_all(temp).ok();
 }
 
@@ -594,7 +599,10 @@ async fn losing_the_membership_deactivates_the_local_user() {
     let token = sign_user_jwt_role(20, "socio@bar.com", member, "employee");
     let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    assert!(cloud_user_is_active(&state, "20").await, "starts out inside");
+    assert!(
+        cloud_user_is_active(&state, "20").await,
+        "starts out inside"
+    );
 
     let elsewhere = json!([{ "id": "hub-9", "org": "org-B" }]);
     let revoked = sign_user_jwt_role(20, "socio@bar.com", elsewhere, "employee");
@@ -706,7 +714,10 @@ async fn regaining_the_membership_reuses_the_row_without_resurrecting_the_role()
     let boss = sign_user_jwt_role(23, "jefa@bar.com", member.clone(), "admin");
     let resp = router.oneshot(cloud_login_bare(&boss)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(cloud_user_role(&state, "23").await.as_deref(), Some("admin"));
+    assert_eq!(
+        cloud_user_role(&state, "23").await.as_deref(),
+        Some("admin")
+    );
 
     let revoked = sign_user_jwt_role(23, "jefa@bar.com", json!([]), "admin");
     app(state.clone())
@@ -721,8 +732,15 @@ async fn regaining_the_membership_reuses_the_row_without_resurrecting_the_role()
         .oneshot(cloud_login_bare(&back))
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "the membership lets them in again");
-    assert!(cloud_user_is_active(&state, "23").await, "the row is reinstated");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the membership lets them in again"
+    );
+    assert!(
+        cloud_user_is_active(&state, "23").await,
+        "the row is reinstated"
+    );
     assert_eq!(
         cloud_user_rows(&state, "23").await,
         1,
@@ -803,7 +821,9 @@ async fn a_user_the_hub_itself_deactivated_is_not_let_back_in_by_a_token() {
     let (router, state, temp) = fixture().await;
     {
         let rt = state.runtime.read().await;
-        rt.create_login_user("ana@bar.com", "manager").await.unwrap();
+        rt.create_login_user("ana@bar.com", "manager")
+            .await
+            .unwrap();
         assert!(rt.deactivate_login_user("ana@bar.com").await.unwrap());
     }
 
@@ -927,7 +947,10 @@ async fn both_shapes_agreeing_resolve_exactly_once() {
     let admin = sign_user_jwt_role_keys(32, "jefa2@bar.com", Some("admin"), Some("admin"));
     let resp = router.oneshot(cloud_login_bare(&admin)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(cloud_user_role(&state, "32").await.as_deref(), Some("admin"));
+    assert_eq!(
+        cloud_user_role(&state, "32").await.as_deref(),
+        Some("admin")
+    );
 
     // …and the same for the key that grants nothing, old spelling and new spelling alike.
     let plain = sign_user_jwt_role_keys(33, "curra2@bar.com", Some("member"), Some("employee"));
@@ -953,7 +976,10 @@ async fn when_the_two_shapes_disagree_the_hub_grants_the_least_of_the_two() {
     let (router, state, temp) = fixture().await;
 
     let mirror_higher = sign_user_jwt_role_keys(34, "a@bar.com", Some("member"), Some("owner"));
-    let resp = router.oneshot(cloud_login_bare(&mirror_higher)).await.unwrap();
+    let resp = router
+        .oneshot(cloud_login_bare(&mirror_higher))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
         cloud_user_role(&state, "34").await.as_deref(),
@@ -1003,7 +1029,11 @@ async fn a_token_with_no_role_in_either_shape_grants_nothing() {
     let token = sign_user_jwt_role_keys(37, "nadie@bar.com", None, None);
 
     let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "the presence gate still lets them in");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the presence gate still lets them in"
+    );
     assert_eq!(
         cloud_user_role(&state, "37").await.as_deref(),
         Some("employee"),
@@ -1058,7 +1088,15 @@ async fn the_new_key_can_never_write_owner_into_the_hub() {
     let resp = router.oneshot(cloud_login_bare(&token)).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let role = cloud_user_role(&state, "39").await;
-    assert_ne!(role.as_deref(), Some("owner"), "ownership is never derived from a token");
-    assert_eq!(role.as_deref(), Some("admin"), "the account owner administers, as `admin`");
+    assert_ne!(
+        role.as_deref(),
+        Some("owner"),
+        "ownership is never derived from a token"
+    );
+    assert_eq!(
+        role.as_deref(),
+        Some("admin"),
+        "the account owner administers, as `admin`"
+    );
     std::fs::remove_dir_all(temp).ok();
 }

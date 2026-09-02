@@ -49,12 +49,18 @@ async fn enqueue(rt: &Runtime, job_id: &str) {
 /// the state the queue actually produces.
 async fn kill(rt: &Runtime, job_id: &str) {
     for _ in 0..MAX_ATTEMPTS {
-        claim(rt, "till-1").await.expect("there is a job to hand out");
+        claim(rt, "till-1")
+            .await
+            .expect("there is a job to hand out");
         print_queue::mark_failed(rt.db_for_test(), rt.hub_id(), job_id, "printer offline")
             .await
             .unwrap();
     }
-    assert_eq!(status_of(rt, job_id).await, STATUS_DEAD, "the job must be dead");
+    assert_eq!(
+        status_of(rt, job_id).await,
+        STATUS_DEAD,
+        "the job must be dead"
+    );
 }
 
 /// Hands out the kitchen's next job to `device`, the way a print host draining the queue would.
@@ -129,7 +135,9 @@ async fn only_a_dead_job_can_be_requeued() {
     let outcome = rt.retry_print_job("waiting").await.unwrap();
     assert_eq!(
         outcome,
-        RequeueOutcome::NotRequeueable { status: STATUS_PENDING.to_string() },
+        RequeueOutcome::NotRequeueable {
+            status: STATUS_PENDING.to_string()
+        },
         "a job that is already waiting has nothing to retry"
     );
     assert_eq!(status_of(&rt, "waiting").await, STATUS_PENDING);
@@ -158,7 +166,10 @@ async fn discard_stamps_the_row_and_never_deletes_it() {
         panic!("a waiting job can be retired: {outcome:?}");
     };
     assert_eq!(stamp.job_id, "ghost");
-    assert_eq!(stamp.discarded_by, WHO, "the identity comes from the session, never the body");
+    assert_eq!(
+        stamp.discarded_by, WHO,
+        "the identity comes from the session, never the body"
+    );
     assert_eq!(
         stamp.discard_reason, "de una sesión de QA",
         "the reason is stored trimmed, and what comes back is what was STORED"
@@ -166,14 +177,20 @@ async fn discard_stamps_the_row_and_never_deletes_it() {
     assert!(!stamp.discarded_at.is_empty());
 
     let row = row(rt.db_for_test(), "hub-discard", "ghost").await;
-    assert!(!row.is_null(), "the row is the only proof the ticket existed: it STAYS");
+    assert!(
+        !row.is_null(),
+        "the row is the only proof the ticket existed: it STAYS"
+    );
     assert_eq!(row["status"], STATUS_DISCARDED);
     assert_eq!(row["discarded_by"], WHO);
     assert_eq!(row["discard_reason"], "de una sesión de QA");
 
     // And no print host will ever be handed it again.
     let handed = claim(&rt, "till-1").await;
-    assert!(handed.is_none(), "a discarded job is not claimable: {handed:?}");
+    assert!(
+        handed.is_none(),
+        "a discarded job is not claimable: {handed:?}"
+    );
 }
 
 /// A dead job is the other thing a person retires — the row that will never come out and is sitting
@@ -186,7 +203,10 @@ async fn a_dead_job_can_be_retired_too() {
 
     let outcome = rt.discard_print_job("j1", WHO, "").await.unwrap();
 
-    assert!(matches!(outcome, DiscardOutcome::Discarded(_)), "{outcome:?}");
+    assert!(
+        matches!(outcome, DiscardOutcome::Discarded(_)),
+        "{outcome:?}"
+    );
     assert_eq!(status_of(&rt, "j1").await, STATUS_DISCARDED);
 }
 
@@ -203,7 +223,9 @@ async fn a_job_a_host_is_printing_is_not_retired_under_its_hands() {
 
     assert_eq!(
         outcome,
-        DiscardOutcome::NotDiscardable { status: "printing".to_string() }
+        DiscardOutcome::NotDiscardable {
+            status: "printing".to_string()
+        }
     );
     assert_eq!(status_of(&rt, "in-flight").await, "printing");
 }
@@ -213,7 +235,9 @@ async fn a_job_a_host_is_printing_is_not_retired_under_its_hands() {
 async fn discarding_an_unknown_job_is_not_a_silent_success() {
     let rt = runtime("hub-discard-404").await;
     assert_eq!(
-        rt.discard_print_job("never-existed", WHO, "").await.unwrap(),
+        rt.discard_print_job("never-existed", WHO, "")
+            .await
+            .unwrap(),
         DiscardOutcome::NotFound
     );
 }

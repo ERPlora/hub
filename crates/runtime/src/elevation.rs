@@ -91,12 +91,7 @@ pub struct ElevationRequest<'a> {
 
 impl<'a> ElevationRequest<'a> {
     /// The manager taps their name and types four digits.
-    pub fn with_pin(
-        name: &'a str,
-        pin: &'a str,
-        command: &'a str,
-        payload: &'a Params,
-    ) -> Self {
+    pub fn with_pin(name: &'a str, pin: &'a str, command: &'a str, payload: &'a Params) -> Self {
         Self {
             credential: ApproverCredential::Pin { name, pin },
             command,
@@ -312,7 +307,10 @@ pub(crate) async fn record_spend(
         "payload_fingerprint".into(),
         Json::String(fingerprint.to_string()),
     );
-    p.insert("created_at".into(), Json::String(crate::registry::now_rfc3339()));
+    p.insert(
+        "created_at".into(),
+        Json::String(crate::registry::now_rfc3339()),
+    );
     // **Which credential said yes, and which card** (hub#658). This is the criterion the market
     // study called the one worth the most: no competitor records it, so in every one of them
     // «somebody used my card» is structurally unanswerable — their log only names the employee.
@@ -538,7 +536,12 @@ mod tests {
 
         let grants = Grants::new();
         let start = Instant::now();
-        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
+        let token = grants.mint_at(
+            binding(),
+            "u-manager",
+            crate::identity::Credential::pin(),
+            start,
+        );
         assert_eq!(
             grants.spend_at(&token, &binding(), start + Duration::from_secs(600)),
             None,
@@ -550,7 +553,12 @@ mod tests {
     fn an_unused_approval_stops_being_spendable_at_the_ceiling() {
         let grants = Grants::new();
         let start = Instant::now();
-        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
+        let token = grants.mint_at(
+            binding(),
+            "u-manager",
+            crate::identity::Credential::pin(),
+            start,
+        );
 
         // Still inside the ceiling: the retry that took a moment to arrive still works.
         assert!(grants
@@ -561,7 +569,12 @@ mod tests {
             )
             .is_some());
 
-        let token = grants.mint_at(binding(), "u-manager", crate::identity::Credential::pin(), start);
+        let token = grants.mint_at(
+            binding(),
+            "u-manager",
+            crate::identity::Credential::pin(),
+            start,
+        );
         // Exactly at the ceiling is already over: an approval that expires "at" a moment must not
         // still be usable during it.
         assert_eq!(grants.spend_at(&token, &binding(), start + GRANT_TTL), None);
@@ -786,8 +799,16 @@ mod tests {
             requester: "u-other".into(),
             ..binding()
         };
-        let a = grants.mint(mine.clone(), "u-manager", crate::identity::Credential::pin());
-        let b = grants.mint(theirs.clone(), "u-manager", crate::identity::Credential::pin());
+        let a = grants.mint(
+            mine.clone(),
+            "u-manager",
+            crate::identity::Credential::pin(),
+        );
+        let b = grants.mint(
+            theirs.clone(),
+            "u-manager",
+            crate::identity::Credential::pin(),
+        );
         assert_ne!(a, b);
 
         assert!(grants.spend(&a, &mine).is_some());

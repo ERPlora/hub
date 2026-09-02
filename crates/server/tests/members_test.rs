@@ -85,31 +85,40 @@ async fn spawn_mock_saas() -> (String, Arc<AsyncMutex<Vec<String>>>) {
     let mock = Router::new()
         .route(
             "/api/v1/hub/device/members/",
-            post(move |headers: axum::http::HeaderMap, Json(body): Json<Value>| {
-                let calls = add_calls.clone();
-                async move {
-                    if headers.get("x-hub-token").and_then(|v| v.to_str().ok())
-                        != Some("machine-secret")
-                    {
-                        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "no machine" })));
+            post(
+                move |headers: axum::http::HeaderMap, Json(body): Json<Value>| {
+                    let calls = add_calls.clone();
+                    async move {
+                        if headers.get("x-hub-token").and_then(|v| v.to_str().ok())
+                            != Some("machine-secret")
+                        {
+                            return (
+                                StatusCode::UNAUTHORIZED,
+                                Json(json!({ "error": "no machine" })),
+                            );
+                        }
+                        let email = body["email"].as_str().unwrap_or_default().to_string();
+                        let role = body["role"].as_str().unwrap_or_default().to_string();
+                        calls.lock().await.push(format!("add:{email}:{role}"));
+                        (StatusCode::CREATED, Json(json!({ "ok": true })))
                     }
-                    let email = body["email"].as_str().unwrap_or_default().to_string();
-                    let role = body["role"].as_str().unwrap_or_default().to_string();
-                    calls.lock().await.push(format!("add:{email}:{role}"));
-                    (StatusCode::CREATED, Json(json!({ "ok": true })))
-                }
-            }),
+                },
+            ),
         )
         .route(
             "/api/v1/hub/device/members/:email/",
             delete(
-                move |headers: axum::http::HeaderMap, axum::extract::Path(email): axum::extract::Path<String>| {
+                move |headers: axum::http::HeaderMap,
+                      axum::extract::Path(email): axum::extract::Path<String>| {
                     let calls = del_calls.clone();
                     async move {
                         if headers.get("x-hub-token").and_then(|v| v.to_str().ok())
                             != Some("machine-secret")
                         {
-                            return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "no machine" })));
+                            return (
+                                StatusCode::UNAUTHORIZED,
+                                Json(json!({ "error": "no machine" })),
+                            );
                         }
                         calls.lock().await.push(format!("del:{email}"));
                         (StatusCode::OK, Json(json!({ "ok": true })))
@@ -162,7 +171,9 @@ fn add_req(session: &str, email: &str, role: &str) -> Request<Body> {
         .uri("/api/members")
         .header("x-hub-session", session)
         .header("content-type", "application/json")
-        .body(Body::from(json!({ "email": email, "role": role }).to_string()))
+        .body(Body::from(
+            json!({ "email": email, "role": role }).to_string(),
+        ))
         .unwrap()
 }
 
@@ -219,7 +230,10 @@ async fn add_member_as_admin_creates_local_user_and_notifies_saas() {
     assert_eq!(listed[0].role, "manager");
 
     // El SaaS recibió el alta (fuente de verdad del acceso).
-    assert_eq!(*calls.lock().await, vec!["add:ana@bar.com:manager".to_string()]);
+    assert_eq!(
+        *calls.lock().await,
+        vec!["add:ana@bar.com:manager".to_string()]
+    );
 }
 
 #[tokio::test]

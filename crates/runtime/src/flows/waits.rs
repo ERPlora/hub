@@ -139,10 +139,16 @@ pub fn arm_ops(
         p.insert("kind".into(), json!(kind.as_str()));
         p.insert("event_name".into(), json!(hook.event));
         p.insert("filter".into(), json!(hook.filter.to_json().to_string()));
-        p.insert("correlate".into(), json!(Json::Object(resolved).to_string()));
+        p.insert(
+            "correlate".into(),
+            json!(Json::Object(resolved).to_string()),
+        );
         p.insert("correlate_key".into(), json!(first_key));
         p.insert("correlate_value".into(), json!(first_value));
-        p.insert("until_path".into(), json!(hook.until.clone().unwrap_or_default()));
+        p.insert(
+            "until_path".into(),
+            json!(hook.until.clone().unwrap_or_default()),
+        );
         p.insert("offset_seconds".into(), json!(delay.offset_seconds));
         p.insert("max_wait".into(), json!(delay.max_wait));
         p.insert("past_due_policy".into(), json!(delay.past_due.as_str()));
@@ -509,7 +515,10 @@ fn base_params(hub_id: &str, row: &Json) -> Params {
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("wait_id".into(), json!(text(row, "id")));
     p.insert("run_id".into(), json!(text(row, "run_id")));
-    p.insert("step_index".into(), json!(row["step_index"].as_i64().unwrap_or(0)));
+    p.insert(
+        "step_index".into(),
+        json!(row["step_index"].as_i64().unwrap_or(0)),
+    );
     p.insert("now".into(), json!(now_rfc3339()));
     p
 }
@@ -630,8 +639,14 @@ mod tests {
             "filter": "{}",
             "correlate": json!({ "event.id": "42", "event.tenant": "acme" }).to_string(),
         });
-        assert!(matches(&row, &json!({ "event": { "id": 42, "tenant": "acme" } })));
-        assert!(!matches(&row, &json!({ "event": { "id": 42, "tenant": "other" } })));
+        assert!(matches(
+            &row,
+            &json!({ "event": { "id": 42, "tenant": "acme" } })
+        ));
+        assert!(!matches(
+            &row,
+            &json!({ "event": { "id": 42, "tenant": "other" } })
+        ));
     }
 
     /// A row whose correlation cannot be read must match NOTHING. The alternative — an empty map
@@ -640,7 +655,10 @@ mod tests {
     fn an_unreadable_or_empty_correlation_matches_nothing() {
         for correlate in ["", "{}", "not json"] {
             let row = json!({ "filter": "{}", "correlate": correlate });
-            assert!(!matches(&row, &json!({ "event": { "id": 42 } })), "{correlate}");
+            assert!(
+                !matches(&row, &json!({ "event": { "id": 42 } })),
+                "{correlate}"
+            );
         }
     }
 
@@ -650,8 +668,14 @@ mod tests {
             "filter": json!({ "event.status": { "eq": "confirmed" } }).to_string(),
             "correlate": json!({ "event.id": "42" }).to_string(),
         });
-        assert!(matches(&row, &json!({ "event": { "id": 42, "status": "confirmed" } })));
-        assert!(!matches(&row, &json!({ "event": { "id": 42, "status": "draft" } })));
+        assert!(matches(
+            &row,
+            &json!({ "event": { "id": 42, "status": "confirmed" } })
+        ));
+        assert!(!matches(
+            &row,
+            &json!({ "event": { "id": 42, "status": "draft" } })
+        ));
     }
 
     #[test]

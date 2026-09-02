@@ -14,17 +14,23 @@
 //! `migration_guard::check`) against a real Postgres, the same way hub#1137's did.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
 fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixture_contract1145").join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixture_contract1145")
+        .join(name)
 }
 
 async fn rows_in(rt: &Runtime, table: &str) -> Result<Vec<serde_json::Value>, String> {
     rt.db_for_test()
-        .query(&format!("SELECT name FROM {table} ORDER BY name"), &Params::new())
+        .query(
+            &format!("SELECT name FROM {table} ORDER BY name"),
+            &Params::new(),
+        )
         .await
         .map(|res| res.rows)
         .map_err(|e| e.to_string())
@@ -52,7 +58,9 @@ async fn seed(rt: &Runtime, table: &str, id: &str, name: &str, legacy: &str) {
 async fn installed_base() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture("base")).await.expect("instalar la versión 1.0.0");
+    rt.install_from_dir(&fixture("base"))
+        .await
+        .expect("instalar la versión 1.0.0");
     seed(&rt, "contract1145_thing", "a1", "keep me", "yes").await;
     rt
 }
@@ -64,12 +72,14 @@ async fn a_contract_may_not_truncate_a_table() {
 
     let outcome = rt.install_from_dir(&fixture("truncate")).await;
 
-    let kept = rows_in(&rt, "contract1145_thing").await.unwrap_or_else(|e| {
-        panic!(
+    let kept = rows_in(&rt, "contract1145_thing")
+        .await
+        .unwrap_or_else(|e| {
+            panic!(
             "la tabla tendría que seguir viva y con su fila: un `contract` retira ESTRUCTURA, y \
              vaciarla no es retirarla: {e}"
         )
-    });
+        });
     assert_eq!(
         kept.len(),
         1,
@@ -100,9 +110,11 @@ async fn a_contract_may_not_delete_rows() {
 
     let outcome = rt.install_from_dir(&fixture("delete")).await;
 
-    let kept = rows_in(&rt, "contract1145_thing").await.unwrap_or_else(|e| {
-        panic!("la tabla tendría que seguir viva: {e}");
-    });
+    let kept = rows_in(&rt, "contract1145_thing")
+        .await
+        .unwrap_or_else(|e| {
+            panic!("la tabla tendría que seguir viva: {e}");
+        });
     assert_eq!(
         kept.len(),
         1,
@@ -129,7 +141,9 @@ async fn a_contract_may_not_delete_rows() {
 async fn a_contract_that_retires_a_table_still_sets_it_aside() {
     let mut rt = installed_base().await;
 
-    rt.install_from_dir(&fixture("retire")).await.expect("instalar la versión 1.1.0");
+    rt.install_from_dir(&fixture("retire"))
+        .await
+        .expect("instalar la versión 1.1.0");
 
     assert!(
         rows_in(&rt, "contract1145_thing").await.is_err(),

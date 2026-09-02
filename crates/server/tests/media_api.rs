@@ -48,7 +48,10 @@ async fn fixture() -> (axum::Router, String, String, Captured) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-media");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let employee_id = rt
         .create_user("Employee", "2222", "employee", None)
         .await
@@ -72,7 +75,12 @@ async fn fixture() -> (axum::Router, String, String, Captured) {
         dev_modules_dir: None,
         module_trusted_keys: Vec::new(),
     };
-    (app(AppState::with_config(rt, cfg)), admin, employee, captured)
+    (
+        app(AppState::with_config(rt, cfg)),
+        admin,
+        employee,
+        captured,
+    )
 }
 
 #[tokio::test]
@@ -193,7 +201,11 @@ impl erplora_runtime::module_storage::ModuleStorage for NoopStorage {
 fn unique() -> String {
     use std::sync::atomic::{AtomicUsize, Ordering};
     static N: AtomicUsize = AtomicUsize::new(0);
-    format!("{}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed))
+    format!(
+        "{}-{}",
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 /// Fixture con un módulo instalado que declara `static_files` con las acciones indicadas.
@@ -217,7 +229,10 @@ async fn fixture_with_module(user_actions: &str) -> (axum::Router, String, Captu
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
         demo: false,
@@ -345,7 +360,9 @@ fn rename_request(path: &str, name: &str, session: &str) -> Request {
         .uri("/api/media/rename")
         .header("x-hub-session", session)
         .header("content-type", "application/json")
-        .body(Body::from(json!({ "path": path, "name": name }).to_string()))
+        .body(Body::from(
+            json!({ "path": path, "name": name }).to_string(),
+        ))
         .unwrap()
 }
 
@@ -535,7 +552,10 @@ async fn the_listing_serves_files_through_the_runtime_not_a_signed_object_storag
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-media");
     rt.ensure_system_tables().await.unwrap();
-    let user_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let user_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&user_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
         demo: false,
@@ -564,13 +584,21 @@ async fn the_listing_serves_files_through_the_runtime_not_a_signed_object_storag
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json: Value = serde_json::from_slice(&body).unwrap();
     let url = json["data"]["files"][0]["url"].as_str().unwrap();
 
     assert_eq!(url, "/api/media/raw?path=facturas/a.pdf");
-    assert!(url.starts_with('/'), "mismo origen: el navegador la pide con su sesión");
-    assert!(!url.contains("your-objectstorage"), "la URL firmada no sale al navegador");
+    assert!(
+        url.starts_with('/'),
+        "mismo origen: el navegador la pide con su sesión"
+    );
+    assert!(
+        !url.contains("your-objectstorage"),
+        "la URL firmada no sale al navegador"
+    );
 }
 
 #[tokio::test]
@@ -587,7 +615,9 @@ async fn the_listing_tells_the_ui_what_can_be_done_in_the_current_folder() {
             .unwrap(),
     )
     .await;
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(json["data"]["policy"]["upload"], json!(false));
@@ -610,7 +640,10 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
         if req.headers().contains_key("x-hub-token") {
             TOKEN_LEAKED.store(true, Ordering::SeqCst);
         }
-        ([("content-type", "application/pdf")], Body::from(&b"%PDF-1.7 bytes"[..]))
+        (
+            [("content-type", "application/pdf")],
+            Body::from(&b"%PDF-1.7 bytes"[..]),
+        )
     });
     let storage_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let storage_addr = storage_listener.local_addr().unwrap();
@@ -629,7 +662,10 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-media");
     rt.ensure_system_tables().await.unwrap();
-    let user_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let user_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&user_id, 3600, None).await.unwrap();
     let cfg = HubConfig {
         demo: false,
@@ -659,7 +695,9 @@ async fn raw_downloads_the_file_server_side_and_never_leaks_the_hub_token_to_sto
     .await;
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     assert_eq!(&body[..], b"%PDF-1.7 bytes");
     assert!(
         !TOKEN_LEAKED.load(Ordering::SeqCst),

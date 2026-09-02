@@ -15,7 +15,10 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::{fresh_db, TestDb}};
+use erplora_db::{
+    testutil::{fresh_db, TestDb},
+    Params,
+};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -54,8 +57,12 @@ async fn fresh() -> Runtime {
 async fn fresh_as(hub: &str) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub); // ctx y runtime comparten hub (como en prod)
-    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("instalar inventory");
     rt
 }
 
@@ -75,7 +82,9 @@ async fn product_names(rt: &Runtime, hub: &str) -> Vec<String> {
         .execute_query("inventory.products.list", &params(json!({})), &ctx(hub))
         .await
         .expect("listar productos");
-    rows.iter().filter_map(|p| p["name"].as_str().map(str::to_string)).collect()
+    rows.iter()
+        .filter_map(|p| p["name"].as_str().map(str::to_string))
+        .collect()
 }
 
 fn full_selection() -> ExportSelection {
@@ -86,8 +95,16 @@ fn full_selection() -> ExportSelection {
         fiscal: false,
         media: false,
         modules: vec![
-            ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
-            ModuleDataSelection { module_id: "inventory".into(), with_data: true, tables: None },
+            ModuleDataSelection {
+                module_id: "taxes".into(),
+                with_data: true,
+                tables: None,
+            },
+            ModuleDataSelection {
+                module_id: "inventory".into(),
+                with_data: true,
+                tables: None,
+            },
         ],
         purpose: Default::default(),
     }
@@ -110,12 +127,16 @@ async fn exported_bundle() -> erplora_runtime::export::ExportBundle {
     let a = fresh().await;
     create_product(&a, "h1", "Café", "CAF").await;
     create_product(&a, "h1", "Té verde", "TEV").await;
-    export_hub(&a, "h1", &full_selection(), "barberia", "es", CREATED_AT).await.expect("export A")
+    export_hub(&a, "h1", &full_selection(), "barberia", "es", CREATED_AT)
+        .await
+        .expect("export A")
 }
 
 #[tokio::test]
 async fn round_trip_restores_equivalent_state_under_target_hub_id() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let bundle = exported_bundle().await;
 
     // Hub destino B, tenant DISTINTO (h2), con los módulos ya instalados (paso del server).
@@ -126,19 +147,32 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
 
     // Las secciones seleccionadas se aplicaron.
     for section in ["modules/taxes", "modules/inventory"] {
-        let r = report.sections.iter().find(|s| s.section == section).unwrap_or_else(|| panic!("sin resultado para {section}"));
-        assert!(matches!(r.status, SectionStatus::Applied), "{section} no aplicada: {:?}", r.status);
+        let r = report
+            .sections
+            .iter()
+            .find(|s| s.section == section)
+            .unwrap_or_else(|| panic!("sin resultado para {section}"));
+        assert!(
+            matches!(r.status, SectionStatus::Applied),
+            "{section} no aplicada: {:?}",
+            r.status
+        );
     }
 
     // El estado es equivalente BAJO EL hub_id DESTINO (la query scoped por h2 lo demuestra:
     // si la sustitución del placeholder fallara, h2 no vería nada).
     let names = product_names(&b, "h2").await;
-    assert!(names.contains(&"Café".to_string()) && names.contains(&"Té verde".to_string()),
-        "productos no restaurados bajo h2: {names:?}");
+    assert!(
+        names.contains(&"Café".to_string()) && names.contains(&"Té verde".to_string()),
+        "productos no restaurados bajo h2: {names:?}"
+    );
 
     // Y ningún dato se coló bajo el hub_id de ORIGEN.
     let leaked = product_names(&b, "h1").await;
-    assert!(leaked.is_empty(), "filas importadas bajo el hub_id de origen: {leaked:?}");
+    assert!(
+        leaked.is_empty(),
+        "filas importadas bajo el hub_id de origen: {leaked:?}"
+    );
 }
 
 /// Round-trip con una columna que es PALABRA RESERVADA de SQL (`order`, en `inventory_category` y
@@ -149,12 +183,16 @@ async fn round_trip_restores_equivalent_state_under_target_hub_id() {
 /// no tiene ninguna columna reservada.
 #[tokio::test]
 async fn round_trip_survives_reserved_word_columns() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let a = fresh().await;
     a.execute_command(
         "inventory.categories.create",
-        &params(json!({ "name": "Cafés e infusiones", "slug": "cafes", "icon": "cafe-outline",
-                        "color": "#3880ff", "description": "", "order": 3 })),
+        &params(
+            json!({ "name": "Cafés e infusiones", "slug": "cafes", "icon": "cafe-outline",
+                        "color": "#3880ff", "description": "", "order": 3 }),
+        ),
         &ctx("h1"),
     )
     .await
@@ -175,15 +213,27 @@ async fn round_trip_survives_reserved_word_columns() {
         .iter()
         .find(|s| s.section == "modules/inventory")
         .expect("sin resultado para modules/inventory");
-    assert!(matches!(r.status, SectionStatus::Applied), "inventory no aplicada: {:?}", r.status);
+    assert!(
+        matches!(r.status, SectionStatus::Applied),
+        "inventory no aplicada: {:?}",
+        r.status
+    );
 
     let cats = b
         .execute_query("inventory.categories.list", &Params::new(), &ctx("h2"))
         .await
         .unwrap();
-    assert_eq!(cats.len(), 1, "la categoría con la columna reservada `order` no sobrevivió");
+    assert_eq!(
+        cats.len(),
+        1,
+        "la categoría con la columna reservada `order` no sobrevivió"
+    );
     assert_eq!(cats[0]["name"], json!("Cafés e infusiones"));
-    assert_eq!(cats[0]["order"], json!(3), "el valor de la columna reservada se perdió");
+    assert_eq!(
+        cats[0]["order"],
+        json!(3),
+        "el valor de la columna reservada se perdió"
+    );
 
     // Y los productos del mismo módulo siguen ahí (la sección no se cayó entera).
     assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
@@ -191,7 +241,9 @@ async fn round_trip_survives_reserved_word_columns() {
 
 #[tokio::test]
 async fn unselected_sections_are_skipped() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let bundle = exported_bundle().await;
 
     let mut b = fresh().await;
@@ -206,15 +258,31 @@ async fn unselected_sections_are_skipped() {
         .await
         .expect("import selectivo");
 
-    let inv = report.sections.iter().find(|s| s.section == "modules/inventory").expect("inventory en informe");
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
     assert!(matches!(inv.status, SectionStatus::Applied));
-    let taxes = report.sections.iter().find(|s| s.section == "modules/taxes").expect("taxes en informe");
-    assert!(matches!(taxes.status, SectionStatus::Skipped), "taxes debía saltarse: {:?}", taxes.status);
+    let taxes = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/taxes")
+        .expect("taxes en informe");
+    assert!(
+        matches!(taxes.status, SectionStatus::Skipped),
+        "taxes debía saltarse: {:?}",
+        taxes.status
+    );
     // `hub_users` es la excepción, y a propósito (hub#331): el bundle es de OTRO hub, así que sus
     // identidades se descartan mirando el manifest, no la casilla — el resultado para el usuario es
     // el mismo (no se aplica nada), pero el informe dice que el bundle traía cuentas en vez de
     // callarlo detrás de un «Saltado» que solo significa «no la marqué».
-    let users = report.sections.iter().find(|s| s.section == "hub_users").expect("hub_users en informe");
+    let users = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_users")
+        .expect("hub_users en informe");
     assert!(
         matches!(users.status, SectionStatus::Ignored(_)),
         "las identidades de un bundle ajeno se descartan marque o no el usuario: {:?}",
@@ -240,7 +308,9 @@ async fn unselected_sections_are_skipped() {
 /// manipulado.
 #[tokio::test]
 async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let a = fresh().await;
     erplora_runtime::hub_users::create(
         a.db(),
@@ -278,11 +348,16 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
         .expect("import de la plantilla");
 
     // 1. Ninguna identidad aterriza en el hub destino.
-    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("listar usuarios de h2");
+    let users = erplora_runtime::hub_users::list(b.db(), "h2")
+        .await
+        .expect("listar usuarios de h2");
     assert!(
         users.is_empty(),
         "una plantilla repartió identidades en el hub destino: {:?}",
-        users.iter().map(|u| (&u.name, &u.role, u.has_pin)).collect::<Vec<_>>()
+        users
+            .iter()
+            .map(|u| (&u.name, &u.role, u.has_pin))
+            .collect::<Vec<_>>()
     );
 
     // 2. Y se DICE en el informe, con motivo legible: ni `Applied` (mentiría) ni un `Skipped` mudo
@@ -293,7 +368,10 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
         .find(|s| s.section == "hub_users")
         .expect("hub_users en el informe");
     let SectionStatus::Ignored(motivo) = &seccion.status else {
-        panic!("hub_users debía reportarse como Ignored con motivo, y salió {:?}", seccion.status);
+        panic!(
+            "hub_users debía reportarse como Ignored con motivo, y salió {:?}",
+            seccion.status
+        );
     };
     assert!(
         motivo.contains("plantilla"),
@@ -302,7 +380,10 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
 
     // 3. Lo que SÍ es una plantilla llega entero: los datos de negocio.
     let names = product_names(&b, "h2").await;
-    assert!(names.contains(&"Café".to_string()), "la plantilla no aplicó sus datos: {names:?}");
+    assert!(
+        names.contains(&"Café".to_string()),
+        "la plantilla no aplicó sus datos: {names:?}"
+    );
 }
 
 /// 🔴 [ADR-0195 §3, hub#331] **Third defense — the consumer one, and the only one that holds for a
@@ -316,7 +397,9 @@ async fn una_plantilla_no_importa_identidades_aunque_las_traiga() {
 /// control. The only thing the import can trust is which hub it is running for.
 #[tokio::test]
 async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // Origin hub: exactly what the published blueprint carries — accounts with a role and a PIN.
     let a = fresh().await;
     for (name, role, pin) in [("Demo", "admin", "4821"), ("Manager", "manager", "5390")] {
@@ -344,8 +427,15 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
         .expect("export A");
     // The artefact we are after: it says "backup" (or says nothing, which reads the same) and
     // carries identities inside. Without both, this test proves nothing.
-    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "the bundle must claim to be a backup");
-    assert!(bundle.files.contains_key("data/hub_users.sql"), "the bundle must carry identities");
+    assert_eq!(
+        bundle.manifest.purpose,
+        BundlePurpose::Backup,
+        "the bundle must claim to be a backup"
+    );
+    assert!(
+        bundle.files.contains_key("data/hub_users.sql"),
+        "the bundle must carry identities"
+    );
 
     // Destination: ANOTHER hub, with its own legitimate user already in place.
     let mut b = fresh().await;
@@ -373,16 +463,30 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
         .expect("import of the foreign bundle");
 
     // 1. Not one identity row landed, and the hub's own user is untouched (same role, same PIN).
-    let users = erplora_runtime::hub_users::list(b.db(), "h2").await.expect("list h2 users");
+    let users = erplora_runtime::hub_users::list(b.db(), "h2")
+        .await
+        .expect("list h2 users");
     assert_eq!(
         users.len(),
         1,
         "a foreign bundle handed out accounts in this hub: {:?}",
-        users.iter().map(|u| (&u.name, &u.role, u.has_pin)).collect::<Vec<_>>()
+        users
+            .iter()
+            .map(|u| (&u.name, &u.role, u.has_pin))
+            .collect::<Vec<_>>()
     );
-    assert_eq!(users[0].name, "Encargada", "the hub's own user was replaced");
-    assert_eq!(users[0].role, "manager", "the import altered the role of an existing user");
-    assert!(users[0].has_pin, "the import altered the PIN of an existing user");
+    assert_eq!(
+        users[0].name, "Encargada",
+        "the hub's own user was replaced"
+    );
+    assert_eq!(
+        users[0].role, "manager",
+        "the import altered the role of an existing user"
+    );
+    assert!(
+        users[0].has_pin,
+        "the import altered the PIN of an existing user"
+    );
 
     // 2. And the report SAYS it: `Ignored` with its reason and the number of discarded rows —
     //    never `Failed` (a `column "hub_id" does not exist` in the Usuarios section, seen live on
@@ -393,9 +497,15 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
         .find(|s| s.section == "hub_users")
         .expect("hub_users in the report");
     let SectionStatus::Ignored(reason) = &section.status else {
-        panic!("hub_users had to be reported as Ignored, and came out as {:?}", section.status);
+        panic!(
+            "hub_users had to be reported as Ignored, and came out as {:?}",
+            section.status
+        );
     };
-    assert!(!reason.trim().is_empty(), "an empty reason is a silent discard");
+    assert!(
+        !reason.trim().is_empty(),
+        "an empty reason is a silent discard"
+    );
     assert_eq!(
         section.discarded_rows, 2,
         "the report must say HOW MANY identity rows were discarded: {section:?}"
@@ -403,7 +513,10 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
 
     // 3. The rest of the bundle still lands: this is a filter, not a rejection.
     let names = product_names(&b, "h2").await;
-    assert!(names.contains(&"Café".to_string()), "the business data did not land: {names:?}");
+    assert!(
+        names.contains(&"Café".to_string()),
+        "the business data did not land: {names:?}"
+    );
 }
 
 /// The mirror, and the half that stops the fix from breaking backups: a hub restoring **its own**
@@ -415,7 +528,9 @@ async fn a_foreign_bundle_never_injects_users_even_when_it_claims_to_be_a_backup
 /// (`manifest.hub.hub_id` == the destination hub), not "any bundle that calls itself a backup".
 #[tokio::test]
 async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let a = fresh().await;
     erplora_runtime::hub_users::create(
         a.db(),
@@ -439,8 +554,15 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
     let bundle = export_hub(&a, "h1", &full_selection(), "copia", "es", CREATED_AT)
         .await
         .expect("export A");
-    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "backup is the default");
-    assert_eq!(bundle.manifest.hub.hub_id, "h1", "the bundle must record its origin hub");
+    assert_eq!(
+        bundle.manifest.purpose,
+        BundlePurpose::Backup,
+        "backup is the default"
+    );
+    assert_eq!(
+        bundle.manifest.hub.hub_id, "h1",
+        "the bundle must record its origin hub"
+    );
 
     // Same hub, rebuilt from scratch (a redeploy restoring its own backup): the destination is h1.
     let mut b = fresh().await;
@@ -459,7 +581,9 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
         section.status
     );
 
-    let users = erplora_runtime::hub_users::list(b.db(), "h1").await.expect("list h1 users");
+    let users = erplora_runtime::hub_users::list(b.db(), "h1")
+        .await
+        .expect("list h1 users");
     let manager = users
         .iter()
         .find(|u| u.name == "Encargada")
@@ -470,13 +594,18 @@ async fn a_hub_restoring_its_own_backup_gets_its_users_back() {
 
 #[tokio::test]
 async fn best_effort_a_broken_section_does_not_abort_the_rest() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut bundle = exported_bundle().await;
 
     // Rompemos el SQL de taxes (sintaxis inválida) PERO con sha256 coherente: la integridad
     // pasa, la aplicación falla → best-effort: se registra y se sigue con inventory.
     let broken = b"THIS IS NOT SQL;".to_vec();
-    bundle.manifest.sha256.insert("data/taxes.sql".into(), sha256_hex(&broken));
+    bundle
+        .manifest
+        .sha256
+        .insert("data/taxes.sql".into(), sha256_hex(&broken));
     bundle.files.insert("data/taxes.sql".into(), broken);
 
     let mut b = fresh().await;
@@ -484,21 +613,43 @@ async fn best_effort_a_broken_section_does_not_abort_the_rest() {
         .await
         .expect("el import NO debe romperse por una sección rota");
 
-    let taxes = report.sections.iter().find(|s| s.section == "modules/taxes").expect("taxes en informe");
-    assert!(matches!(taxes.status, SectionStatus::Failed(_)), "taxes debía fallar: {:?}", taxes.status);
-    let inv = report.sections.iter().find(|s| s.section == "modules/inventory").expect("inventory en informe");
-    assert!(matches!(inv.status, SectionStatus::Applied), "inventory debía aplicarse igualmente");
+    let taxes = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/taxes")
+        .expect("taxes en informe");
+    assert!(
+        matches!(taxes.status, SectionStatus::Failed(_)),
+        "taxes debía fallar: {:?}",
+        taxes.status
+    );
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert!(
+        matches!(inv.status, SectionStatus::Applied),
+        "inventory debía aplicarse igualmente"
+    );
 
     let names = product_names(&b, "h2").await;
-    assert!(names.contains(&"Café".to_string()), "best-effort no aplicó el resto");
+    assert!(
+        names.contains(&"Café".to_string()),
+        "best-effort no aplicó el resto"
+    );
 }
 
 #[tokio::test]
 async fn sha256_mismatch_rejects_the_import_without_effects() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut bundle = exported_bundle().await;
     // Manipulación del bundle: contenido cambiado sin actualizar el hash del manifest.
-    bundle.files.insert("data/inventory.sql".into(), b"tampered".to_vec());
+    bundle
+        .files
+        .insert("data/inventory.sql".into(), b"tampered".to_vec());
 
     let mut b = fresh().await;
     let res = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2").await;
@@ -511,7 +662,9 @@ async fn sha256_mismatch_rejects_the_import_without_effects() {
 
 #[tokio::test]
 async fn unknown_schema_version_rejects_without_effects() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut bundle = exported_bundle().await;
     bundle.manifest.schema_version = 999;
 
@@ -523,23 +676,38 @@ async fn unknown_schema_version_rejects_without_effects() {
 
 #[tokio::test]
 async fn module_data_for_uninstalled_module_fails_its_section_only() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let bundle = exported_bundle().await;
 
     // Destino SIN inventory (solo taxes): la sección de inventory falla con motivo claro,
     // la de taxes se aplica. (Instalar módulos que faltan es del server, no de este motor.)
     let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h2");
-    b.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
+    b.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
 
     let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_all(), "h2")
         .await
         .expect("best-effort también aquí");
 
-    let inv = report.sections.iter().find(|s| s.section == "modules/inventory").expect("inventory en informe");
-    assert!(matches!(&inv.status, SectionStatus::Failed(reason) if reason.contains("inventory")),
-        "sección de módulo no instalado debía fallar nombrándolo: {:?}", inv.status);
-    let taxes = report.sections.iter().find(|s| s.section == "modules/taxes").expect("taxes en informe");
+    let inv = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .expect("inventory en informe");
+    assert!(
+        matches!(&inv.status, SectionStatus::Failed(reason) if reason.contains("inventory")),
+        "sección de módulo no instalado debía fallar nombrándolo: {:?}",
+        inv.status
+    );
+    let taxes = report
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/taxes")
+        .expect("taxes en informe");
     assert!(matches!(taxes.status, SectionStatus::Applied));
 }
 
@@ -558,7 +726,9 @@ async fn module_data_for_uninstalled_module_fails_its_section_only() {
 /// El guard tiene que ir por `id` SOLO: es la clave primaria, y si existe, existe.
 #[tokio::test]
 async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let bundle = exported_bundle().await;
 
     // Destino con los módulos instalados — y por tanto con su semilla ya aplicada.
@@ -593,8 +763,12 @@ async fn una_fila_cuyo_id_ya_existe_no_rompe_la_seccion() {
 /// en prod), pero las tablas y los datos son los mismos.
 async fn fresh_over(db: &TestDb, hub: &str) -> Runtime {
     let mut rt = Runtime::with_hub_id(Box::new(db.adapter().await), hub);
-    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("instalar inventory");
     rt
 }
 
@@ -609,8 +783,14 @@ async fn product_with_category(rt: &Runtime, hub: &str, name: &str, sku: &str, c
     )
     .await
     .unwrap();
-    let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx(hub)).await.unwrap();
-    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx(hub)).await.unwrap();
+    let prods = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx(hub))
+        .await
+        .unwrap();
+    let cats = rt
+        .execute_query("inventory.categories.list", &Params::new(), &ctx(hub))
+        .await
+        .unwrap();
     rt.execute_command(
         "inventory.products.add_category",
         &params(json!({
@@ -637,7 +817,9 @@ async fn product_with_category(rt: &Runtime, hub: &str, name: &str, sku: &str, c
 /// `inventory_product_categories`) se remapean, y una re-importación sobre B no duplica.
 #[tokio::test]
 async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
 
     // UN esquema Postgres compartido entre los dos hubs (como en prod: una BD por organización).
     let shared = TestDb::new().await;
@@ -678,7 +860,11 @@ async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() 
 
     // El hub A sigue viendo EXACTAMENTE sus dos productos (no se corrompió ni se le añadió nada).
     let names_a = product_names(&a, "h1").await;
-    assert_eq!(names_a.len(), 2, "el hub origen cambió tras importar en el hermano: {names_a:?}");
+    assert_eq!(
+        names_a.len(),
+        2,
+        "el hub origen cambió tras importar en el hermano: {names_a:?}"
+    );
 
     // La FK interna del bundle se remapeó: el producto importado en B conserva su categoría.
     // (Sin remapeo, `inventory_product_categories` apuntaría a un id de A y la FK no casaría.)
@@ -686,7 +872,10 @@ async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() 
         .execute_query("inventory.products.list", &params(json!({})), &ctx("h2"))
         .await
         .expect("listar productos de B");
-    let tev = tev_rows.iter().find(|p| p["name"] == "Té verde").expect("Té verde en B");
+    let tev = tev_rows
+        .iter()
+        .find(|p| p["name"] == "Té verde")
+        .expect("Té verde en B");
     let tev_id = tev["id"].as_str().expect("id del Té verde en B");
     // El id de B es DISTINTO del del origen (que siguen siendo los de A): no reutiliza el bundle.
     let tev_a = a
@@ -697,7 +886,8 @@ async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() 
         .find(|p| p["name"] == "Té verde")
         .expect("Té verde en A");
     assert_ne!(
-        tev_id, tev_a["id"].as_str().unwrap(),
+        tev_id,
+        tev_a["id"].as_str().unwrap(),
         "el id importado en B debe ser NUEVO, no el del hub origen (PK global)"
     );
 
@@ -729,7 +919,9 @@ async fn importar_en_otro_hub_de_la_misma_bd_inserta_sus_filas_con_ids_nuevos() 
 /// verdad y B ve las filas. Este test clava ese contrato sobre el escenario real del bug.
 #[tokio::test]
 async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let shared = TestDb::new().await;
     let a = fresh_over(&shared, "h1").await;
     create_product(&a, "h1", "Café", "CAF").await;
@@ -747,7 +939,11 @@ async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino
         .iter()
         .find(|s| s.section == "modules/inventory")
         .unwrap();
-    assert!(matches!(inv.status, SectionStatus::Applied), "debe Applied: {:?}", inv.status);
+    assert!(
+        matches!(inv.status, SectionStatus::Applied),
+        "debe Applied: {:?}",
+        inv.status
+    );
     // `Applied` solo es cierto si B realmente tiene la fila bajo su hub_id (antes era 0 filas).
     assert_eq!(product_names(&b, "h2").await, vec!["Café".to_string()]);
 }
@@ -769,7 +965,9 @@ async fn cross_hub_en_bd_compartida_applied_implica_filas_reales_bajo_el_destino
 /// destino: si ya hay una fila equivalente, la fila del bundle se salta; nunca colisiona.
 #[tokio::test]
 async fn una_fila_con_la_misma_clave_natural_que_el_destino_no_rompe_la_seccion() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
 
     // Hub A (origen) con su catálogo.
     let a = fresh().await;
@@ -807,7 +1005,11 @@ async fn una_fila_con_la_misma_clave_natural_que_el_destino_no_rompe_la_seccion(
         names.contains(&"Té verde".to_string()),
         "la fila que NO chocaba tenía que entrar igual: {names:?}"
     );
-    assert_eq!(names.len(), 2, "clave natural duplicada en el destino: {names:?}");
+    assert_eq!(
+        names.len(),
+        2,
+        "clave natural duplicada en el destino: {names:?}"
+    );
 }
 
 // ── SERIES DE FACTURACIÓN: el caso reportado (hub#753) ───────────────────────────────────────
@@ -896,26 +1098,45 @@ fn import_series_only() -> ImportSelection {
 /// exactamente como estaban.
 #[tokio::test]
 async fn las_series_de_facturacion_del_destino_sobreviven_al_import() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
 
     // Hub A (origen): las dos series que trae cualquier plantilla.
     let a = fresh_series("h1").await;
     create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
     create_series(&a, "h1", "TCK", "Tiques", "receipt").await;
-    let bundle = export_hub(&a, "h1", &series_export_selection(), "peluqueria", "es", CREATED_AT)
-        .await
-        .expect("export A");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &series_export_selection(),
+        "peluqueria",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
 
     // Hub B (destino): YA tiene FAC y TCK, con ids propios y distintos.
     let mut b = fresh_series("h2").await;
     create_series(&b, "h2", "FAC", "Facturas", "invoice").await;
     create_series(&b, "h2", "TCK", "Tiques", "receipt").await;
     let antes = series_fingerprint(&b, "h2").await;
-    assert_eq!(antes.len(), 2, "el destino tenía que arrancar con sus dos series");
+    assert_eq!(
+        antes.len(),
+        2,
+        "el destino tenía que arrancar con sus dos series"
+    );
 
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h2")
-        .await
-        .expect("import en B");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_series_only(),
+        "h2",
+    )
+    .await
+    .expect("import en B");
     let sec = report
         .sections
         .iter()
@@ -945,19 +1166,34 @@ async fn las_series_de_facturacion_del_destino_sobreviven_al_import() {
 /// VeriFactu (`installation_bound_not_portable`, ADR-0202 §4.2 generalizada por hub#380).
 #[tokio::test]
 async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
 
     let a = fresh_series("h1").await;
     create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
-    let bundle = export_hub(&a, "h1", &series_export_selection(), "peluqueria", "es", CREATED_AT)
-        .await
-        .expect("export A");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &series_export_selection(),
+        "peluqueria",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
 
     // Destino LIMPIO: aquí no hay ninguna colisión que resolver, y aun así no se aplica.
     let mut b = fresh_series("h2").await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h2")
-        .await
-        .expect("import en B");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_series_only(),
+        "h2",
+    )
+    .await
+    .expect("import en B");
     let sec = report
         .sections
         .iter()
@@ -969,7 +1205,10 @@ async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
         "el descarte tiene que ir con su motivo estable: {:?}",
         sec.status
     );
-    assert!(sec.discarded_rows > 0, "un descarte que no dice CUÁNTAS filas eran es casi mudo");
+    assert!(
+        sec.discarded_rows > 0,
+        "un descarte que no dice CUÁNTAS filas eran es casi mudo"
+    );
     assert!(
         series_fingerprint(&b, "h2").await.is_empty(),
         "la serie de otra instalación no puede aterrizar aquí"
@@ -981,26 +1220,56 @@ async fn la_numeracion_de_otra_instalacion_se_descarta_diciendolo() {
 /// serie con la que el negocio venía numerando.
 #[tokio::test]
 async fn un_hub_que_restaura_su_propia_copia_recupera_sus_series() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
 
     let a = fresh_series("h1").await;
     create_series(&a, "h1", "FAC", "Facturas", "invoice").await;
-    let bundle = export_hub(&a, "h1", &series_export_selection(), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
-    assert_eq!(bundle.manifest.hub.hub_id, "h1", "el bundle registra su hub de origen");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &series_export_selection(),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
+    assert_eq!(
+        bundle.manifest.hub.hub_id, "h1",
+        "el bundle registra su hub de origen"
+    );
 
     // El MISMO hub, reconstruido desde cero (redespliegue restaurando su copia).
     let mut b = fresh_series("h1").await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_series_only(), "h1")
-        .await
-        .expect("restaurar su propia copia");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_series_only(),
+        "h1",
+    )
+    .await
+    .expect("restaurar su propia copia");
     let sec = report
         .sections
         .iter()
         .find(|s| s.section == "modules/invoice_series")
         .expect("invoice_series en informe");
-    assert!(matches!(sec.status, SectionStatus::Applied), "debía aplicarse: {:?}", sec.status);
-    let codes: Vec<String> = series_fingerprint(&b, "h1").await.into_iter().map(|(_, c, _)| c).collect();
-    assert_eq!(codes, vec!["FAC".to_string()], "el hub no recuperó su propia serie: {codes:?}");
+    assert!(
+        matches!(sec.status, SectionStatus::Applied),
+        "debía aplicarse: {:?}",
+        sec.status
+    );
+    let codes: Vec<String> = series_fingerprint(&b, "h1")
+        .await
+        .into_iter()
+        .map(|(_, c, _)| c)
+        .collect();
+    assert_eq!(
+        codes,
+        vec!["FAC".to_string()],
+        "el hub no recuperó su propia serie: {codes:?}"
+    );
 }

@@ -101,12 +101,23 @@ async fn full_lifecycle_create_use_rotate_revoke() {
     let (id, secret) = create_key(&app).await;
 
     // El listado muestra la key (sin secreto), con last_used_at vacío hasta el primer uso.
-    let resp = app.clone().oneshot(admin_post("/api/keys", json!({ "name": "x", "scope": [] }))).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(admin_post("/api/keys", json!({ "name": "x", "scope": [] })))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK); // (segunda key, ignoramos su secreto)
     let resp = app
         .clone()
-        .oneshot(Request::builder().method("GET").uri("/api/keys")
-            .header("x-hub-id", HUB_ID).header("x-permissions", "*").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/keys")
+                .header("x-hub-id", HUB_ID)
+                .header("x-permissions", "*")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let j = body_json(resp).await;
@@ -115,7 +126,11 @@ async fn full_lifecycle_create_use_rotate_revoke() {
     // Escribe un item con la key (command expuesto) → 200.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/c/item.create", &secret, json!({ "payload": { "name": "Widget" } })))
+        .oneshot(api_post(
+            "/api/v1/catalog/c/item.create",
+            &secret,
+            json!({ "payload": { "name": "Widget" } }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK, "{:?}", body_json(resp).await);
@@ -123,7 +138,11 @@ async fn full_lifecycle_create_use_rotate_revoke() {
     // Lee con la key (query de lista expuesta) → 200 con el item creado (página paginada).
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret, json!({ "params": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret,
+            json!({ "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -139,7 +158,10 @@ async fn full_lifecycle_create_use_rotate_revoke() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let new_secret = body_json(resp).await["data"]["secret"].as_str().unwrap().to_string();
+    let new_secret = body_json(resp).await["data"]["secret"]
+        .as_str()
+        .unwrap()
+        .to_string();
     // El secreto viejo ya no funciona; el nuevo sí.
     let resp = app
         .clone()
@@ -149,7 +171,11 @@ async fn full_lifecycle_create_use_rotate_revoke() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &new_secret, json!({})))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &new_secret,
+            json!({}),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -157,14 +183,25 @@ async fn full_lifecycle_create_use_rotate_revoke() {
     // Revocar = kill-switch inmediato.
     let resp = app
         .clone()
-        .oneshot(Request::builder().method("DELETE").uri(format!("/api/keys/{id}"))
-            .header("x-hub-id", HUB_ID).header("x-permissions", "*").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(format!("/api/keys/{id}"))
+                .header("x-hub-id", HUB_ID)
+                .header("x-permissions", "*")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &new_secret, json!({})))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &new_secret,
+            json!({}),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -178,7 +215,11 @@ async fn double_gate_blocks_unexposed_and_unknown() {
     // Operación NO expuesta (expose_api ausente) → 404 aunque exista y la key tenga scope.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.secret", &secret, json!({})))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.secret",
+            &secret,
+            json!({}),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -186,7 +227,11 @@ async fn double_gate_blocks_unexposed_and_unknown() {
     // Command no expuesto → 404.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/c/item.purge", &secret, json!({ "payload": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/c/item.purge",
+            &secret,
+            json!({ "payload": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -194,7 +239,11 @@ async fn double_gate_blocks_unexposed_and_unknown() {
     // Operación inexistente → 404.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/does.not.exist", &secret, json!({})))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/does.not.exist",
+            &secret,
+            json!({}),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -220,7 +269,10 @@ async fn read_only_key_cannot_write() {
         ))
         .await
         .unwrap();
-    let secret = body_json(resp).await["data"]["secret"].as_str().unwrap().to_string();
+    let secret = body_json(resp).await["data"]["secret"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Leer va bien.
     let resp = app
@@ -233,7 +285,11 @@ async fn read_only_key_cannot_write() {
     // Escribir con una key de solo-lectura → 403 (la key no tiene `catalog.write` en su scope).
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/c/item.create", &secret, json!({ "payload": { "name": "X" } })))
+        .oneshot(api_post(
+            "/api/v1/catalog/c/item.create",
+            &secret,
+            json!({ "payload": { "name": "X" } }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -285,7 +341,11 @@ async fn data_surface_rejects_non_api_key_bearer() {
     // Un Bearer que no es de API key (no empieza por erpl_live_) → 401 en la superficie de datos.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", "some-jwt-token", json!({})))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            "some-jwt-token",
+            json!({}),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -310,14 +370,16 @@ fn session_get(uri: &str) -> Request<Body> {
 async fn enable_api_docs(app: &axum::Router) {
     let resp = app
         .clone()
-        .oneshot(Request::builder()
-            .method("PUT")
-            .uri("/api/settings")
-            .header("content-type", "application/json")
-            .header("x-hub-id", HUB_ID)
-            .header("x-permissions", "*")
-            .body(Body::from(json!({ "api_docs_enabled": true }).to_string()))
-            .unwrap())
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/api/settings")
+                .header("content-type", "application/json")
+                .header("x-hub-id", HUB_ID)
+                .header("x-permissions", "*")
+                .body(Body::from(json!({ "api_docs_enabled": true }).to_string()))
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -328,7 +390,11 @@ async fn openapi_lists_only_exposed_operations() {
     let app = make_app().await;
     enable_api_docs(&app).await;
     // El spec interno exige sesión de usuario (ADR-0057 §4 refinado): mandamos la sesión del fixture.
-    let resp = app.clone().oneshot(session_get("/api/v1/openapi.json")).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(session_get("/api/v1/openapi.json"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let spec = body_json(resp).await;
     assert_eq!(spec["openapi"], json!("3.1.0"));
@@ -340,10 +406,13 @@ async fn openapi_lists_only_exposed_operations() {
     assert!(!paths.contains_key("/api/v1/catalog/q/items.secret"));
     assert!(!paths.contains_key("/api/v1/catalog/c/item.purge"));
     // El securityScheme es http bearer.
-    assert_eq!(spec["components"]["securitySchemes"]["ApiKey"]["scheme"], json!("bearer"));
+    assert_eq!(
+        spec["components"]["securitySchemes"]["ApiKey"]["scheme"],
+        json!("bearer")
+    );
     // El listSpec de la query se tradujo a params (search/sort/limit) en el requestBody.
-    let q_params = &spec["paths"]["/api/v1/catalog/q/items.list"]["post"]["requestBody"]
-        ["content"]["application/json"]["schema"]["properties"]["params"]["properties"];
+    let q_params = &spec["paths"]["/api/v1/catalog/q/items.list"]["post"]["requestBody"]["content"]
+        ["application/json"]["schema"]["properties"]["params"]["properties"];
     assert!(q_params.get("search").is_some());
     assert!(q_params.get("sort").is_some());
     assert!(q_params.get("limit").is_some());
@@ -416,7 +485,11 @@ async fn settings_put_admin_persists_and_returns_full_object() {
     let j = body_json(resp).await;
     assert_eq!(j["currency"], json!("USD"));
     assert_eq!(j["language"], json!("en"));
-    assert_eq!(j["api_docs_enabled"], json!(false), "clave no tocada conserva su default");
+    assert_eq!(
+        j["api_docs_enabled"],
+        json!(false),
+        "clave no tocada conserva su default"
+    );
 
     // Persistido: un GET posterior lo refleja.
     let resp = app.clone().oneshot(settings_get()).await.unwrap();
@@ -480,27 +553,35 @@ async fn settings_put_non_admin_is_403_in_session_mode() {
     // Cajero (no admin) → 403.
     let resp = app
         .clone()
-        .oneshot(Request::builder()
-            .method("PUT")
-            .uri("/api/settings")
-            .header("content-type", "application/json")
-            .header("x-hub-session", &cashier_token)
-            .body(Body::from(json!({ "currency": "GBP" }).to_string()))
-            .unwrap())
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/api/settings")
+                .header("content-type", "application/json")
+                .header("x-hub-session", &cashier_token)
+                .body(Body::from(json!({ "currency": "GBP" }).to_string()))
+                .unwrap(),
+        )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "no-admin → 401/403; el gate admin lo mapea a 401");
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNAUTHORIZED,
+        "no-admin → 401/403; el gate admin lo mapea a 401"
+    );
 
     // Admin → 200 y persiste.
     let resp = app
         .clone()
-        .oneshot(Request::builder()
-            .method("PUT")
-            .uri("/api/settings")
-            .header("content-type", "application/json")
-            .header("x-hub-session", &admin_token)
-            .body(Body::from(json!({ "currency": "GBP" }).to_string()))
-            .unwrap())
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/api/settings")
+                .header("content-type", "application/json")
+                .header("x-hub-session", &admin_token)
+                .body(Body::from(json!({ "currency": "GBP" }).to_string()))
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -509,12 +590,14 @@ async fn settings_put_non_admin_is_403_in_session_mode() {
     // El cajero SÍ puede leer (GET = cualquier sesión de usuario).
     let resp = app
         .clone()
-        .oneshot(Request::builder()
-            .method("GET")
-            .uri("/api/settings")
-            .header("x-hub-session", &cashier_token)
-            .body(Body::empty())
-            .unwrap())
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/settings")
+                .header("x-hub-session", &cashier_token)
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -529,12 +612,20 @@ async fn openapi_404_when_docs_disabled_then_200_when_enabled() {
     let app = make_app().await;
 
     // Por defecto (api_docs_enabled=false): 404 incluso con una sesión válida.
-    let resp = app.clone().oneshot(session_get("/api/v1/openapi.json")).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(session_get("/api/v1/openapi.json"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
     // Habilita el setting (PUT admin) → ahora el spec se sirve a una sesión válida (200).
     enable_api_docs(&app).await;
-    let resp = app.clone().oneshot(session_get("/api/v1/openapi.json")).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(session_get("/api/v1/openapi.json"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(body_json(resp).await["openapi"], json!("3.1.0"));
 }
@@ -552,10 +643,20 @@ async fn docs_html_route_is_gone() {
     ] {
         let resp = app
             .clone()
-            .oneshot(Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(uri)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{uri} ya no debe servirse");
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "{uri} ya no debe servirse"
+        );
     }
 }
 
@@ -598,7 +699,13 @@ async fn openapi_anonymous_in_session_mode_with_docs_off_is_404() {
 
     let resp = app
         .clone()
-        .oneshot(Request::builder().method("GET").uri("/api/v1/openapi.json").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/v1/openapi.json")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     // Docs apagadas por defecto → 404 server-side (defensa en profundidad), sin llegar al gate de sesión.
@@ -635,13 +742,21 @@ async fn an_undeclared_filter_is_422_on_the_public_door_hub1187() {
             ))
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK, "seeding `{name}` by the public door");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "seeding `{name}` by the public door"
+        );
     }
 
     // Positivo 1 — la puerta ABRE: sin params sale la lista entera.
     let resp = app
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret, json!({ "params": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret,
+            json!({ "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -661,7 +776,11 @@ async fn an_undeclared_filter_is_422_on_the_public_door_hub1187() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let j = body_json(resp).await;
-    assert_eq!(j["data"]["total"], json!(1), "un param declarado filtra: {j}");
+    assert_eq!(
+        j["data"]["total"],
+        json!(1),
+        "un param declarado filtra: {j}"
+    );
     assert_eq!(j["data"]["rows"][0]["name"], json!("Alpha"), "{j}");
 
     // Negativo 1 — el descuido clásico: la COLUMNA sin el prefijo `f_` del motor. Antes de
@@ -700,7 +819,10 @@ async fn an_undeclared_filter_is_422_on_the_public_door_hub1187() {
     let j = body_json(resp).await;
     assert_eq!(j["error"]["code"], json!("unknown_filter"), "{j}");
     assert!(
-        j["error"]["message"].as_str().unwrap_or_default().contains("active_only"),
+        j["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("active_only"),
         "el param rechazado se nombra o el tercero no puede arreglar la llamada: {j}"
     );
 }
@@ -763,7 +885,10 @@ async fn a_key_of_one_hub_never_reads_rows_of_another_hub1187() {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
-        let secret = body_json(resp).await["data"]["secret"].as_str().unwrap().to_string();
+        let secret = body_json(resp).await["data"]["secret"]
+            .as_str()
+            .unwrap()
+            .to_string();
         // Y su fila, escrita por la puerta pública: el `hub_id` lo pone el despliegue, no el body.
         let resp = app
             .clone()
@@ -774,7 +899,11 @@ async fn a_key_of_one_hub_never_reads_rows_of_another_hub1187() {
             ))
             .await
             .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK, "{hub_id} siembra su fila por su puerta");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "{hub_id} siembra su fila por su puerta"
+        );
         secrets.push(secret);
     }
     let (secret_a, secret_b) = (secrets[0].clone(), secrets[1].clone());
@@ -783,7 +912,10 @@ async fn a_key_of_one_hub_never_reads_rows_of_another_hub1187() {
     // aislamiento «verde» podría serlo porque la fila del vecino nunca llegó a existir.
     let probe = db.adapter().await;
     let rows = probe
-        .query("SELECT hub_id, name FROM catalog_items ORDER BY name", &Params::new())
+        .query(
+            "SELECT hub_id, name FROM catalog_items ORDER BY name",
+            &Params::new(),
+        )
         .await
         .unwrap()
         .rows;
@@ -794,30 +926,50 @@ async fn a_key_of_one_hub_never_reads_rows_of_another_hub1187() {
     // La key de A solo ve lo de A…
     let resp = app_a
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_a, json!({ "params": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret_a,
+            json!({ "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let j = body_json(resp).await;
-    assert_eq!(j["data"]["total"], json!(1), "la key de A no cuenta las filas de B: {j}");
+    assert_eq!(
+        j["data"]["total"],
+        json!(1),
+        "la key de A no cuenta las filas de B: {j}"
+    );
     assert_eq!(j["data"]["rows"][0]["name"], json!("Only in A"), "{j}");
 
     // …y la de B, solo lo de B (el aislamiento va en los dos sentidos, no solo hacia el que probé).
     let resp = app_b
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_b, json!({ "params": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret_b,
+            json!({ "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let j = body_json(resp).await;
-    assert_eq!(j["data"]["total"], json!(1), "la key de B no cuenta las filas de A: {j}");
+    assert_eq!(
+        j["data"]["total"],
+        json!(1),
+        "la key de B no cuenta las filas de A: {j}"
+    );
     assert_eq!(j["data"]["rows"][0]["name"], json!("Only in B"), "{j}");
 
     // Y la key de A presentada en el despliegue de B ni siquiera autentica: la búsqueda de la key
     // filtra por `hub_id`, así que un secreto robado de otro hub no abre esta puerta.
     let resp = app_b
         .clone()
-        .oneshot(api_post("/api/v1/catalog/q/items.list", &secret_a, json!({ "params": {} })))
+        .oneshot(api_post(
+            "/api/v1/catalog/q/items.list",
+            &secret_a,
+            json!({ "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(

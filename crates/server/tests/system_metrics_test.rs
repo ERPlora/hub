@@ -22,8 +22,12 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-metrics");
     rt.ensure_system_tables().await.unwrap();
-    rt.create_user("Admin", "1111", "admin", None).await.unwrap();
-    rt.create_user("Cajero", "2222", "cashier", None).await.unwrap();
+    rt.create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    rt.create_user("Cajero", "2222", "cashier", None)
+        .await
+        .unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-system-metrics-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
@@ -86,7 +90,10 @@ async fn session_token(resp: axum::response::Response) -> String {
     assert_eq!(resp.status(), StatusCode::OK, "login debe devolver 200");
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let v: Value = serde_json::from_slice(&bytes).unwrap();
-    v["token"].as_str().expect("token en la respuesta").to_string()
+    v["token"]
+        .as_str()
+        .expect("token en la respuesta")
+        .to_string()
 }
 
 async fn json_body(resp: axum::response::Response) -> Value {
@@ -104,9 +111,24 @@ async fn metrics_returns_plan_and_session_telemetry_for_admin() {
         .unwrap()
         .apply_success(claims("free", 1, 1), 1_500);
 
-    let tok = session_token(router.clone().oneshot(pin_login("Admin", "1111", "dev-A")).await.unwrap()).await;
-    let resp = router.clone().oneshot(get_metrics(Some(&tok))).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "admin puede leer las métricas");
+    let tok = session_token(
+        router
+            .clone()
+            .oneshot(pin_login("Admin", "1111", "dev-A"))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let resp = router
+        .clone()
+        .oneshot(get_metrics(Some(&tok)))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "admin puede leer las métricas"
+    );
     let body = json_body(resp).await;
     assert_eq!(body["ok"], json!(true));
     let data = &body["data"];
@@ -116,13 +138,23 @@ async fn metrics_returns_plan_and_session_telemetry_for_admin() {
 
     // Sesiones/dispositivos vs el límite del plan.
     assert_eq!(data["sessions"]["maxDevices"], json!(1));
-    assert_eq!(data["sessions"]["active"], json!(1), "una sesión activa (el propio admin)");
-    assert_eq!(data["sessions"]["devices"], json!(1), "un dispositivo distinto (dev-A)");
+    assert_eq!(
+        data["sessions"]["active"],
+        json!(1),
+        "una sesión activa (el propio admin)"
+    );
+    assert_eq!(
+        data["sessions"]["devices"],
+        json!(1),
+        "un dispositivo distinto (dev-A)"
+    );
 
     // Base de datos Postgres aislada del harness, con tamaño real medido y cuota firmada de 1 GiB.
     assert_eq!(data["database"]["engine"], json!("postgres"));
     assert!(
-        data["database"]["sizeBytes"].as_u64().is_some_and(|n| n > 0),
+        data["database"]["sizeBytes"]
+            .as_u64()
+            .is_some_and(|n| n > 0),
         "tamaño de BD medido: {:?}",
         data["database"]["sizeBytes"]
     );
@@ -135,10 +167,19 @@ async fn metrics_returns_plan_and_session_telemetry_for_admin() {
     // Memoria/CPU: objeto presente con sus claves (valor null fuera de contenedor).
     for metric in ["memory", "cpu"] {
         assert!(data[metric].is_object(), "{metric} debe ser un objeto");
-        assert!(data[metric].as_object().unwrap().contains_key("fraction"), "{metric}.fraction presente");
+        assert!(
+            data[metric].as_object().unwrap().contains_key("fraction"),
+            "{metric}.fraction presente"
+        );
     }
-    assert!(data["memory"].as_object().unwrap().contains_key("usedBytes"));
-    assert!(data["memory"].as_object().unwrap().contains_key("limitBytes"));
+    assert!(data["memory"]
+        .as_object()
+        .unwrap()
+        .contains_key("usedBytes"));
+    assert!(data["memory"]
+        .as_object()
+        .unwrap()
+        .contains_key("limitBytes"));
     assert!(data["cpu"].as_object().unwrap().contains_key("usedCores"));
     assert!(data["cpu"].as_object().unwrap().contains_key("limitCores"));
 
@@ -163,8 +204,23 @@ async fn metrics_rejects_non_admin_session() {
         .unwrap()
         .apply_success(claims("free", 0, 0), 1_500);
 
-    let tok = session_token(router.clone().oneshot(pin_login("Cajero", "2222", "dev-C")).await.unwrap()).await;
-    let resp = router.clone().oneshot(get_metrics(Some(&tok))).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "un cajero no puede leer métricas de gestión");
+    let tok = session_token(
+        router
+            .clone()
+            .oneshot(pin_login("Cajero", "2222", "dev-C"))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let resp = router
+        .clone()
+        .oneshot(get_metrics(Some(&tok)))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNAUTHORIZED,
+        "un cajero no puede leer métricas de gestión"
+    );
     std::fs::remove_dir_all(temp).ok();
 }

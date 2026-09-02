@@ -86,7 +86,9 @@ fn setup_status_request() -> Request<Body> {
         .header("x-hub-id", "h1")
         .header("x-user-id", "u1")
         .header("x-permissions", "*")
-        .body(Body::from(json!({ "name": "hub.setup.status", "params": {} }).to_string()))
+        .body(Body::from(
+            json!({ "name": "hub.setup.status", "params": {} }).to_string(),
+        ))
         .unwrap()
 }
 
@@ -129,11 +131,17 @@ async fn setup_status_omits_the_item_of_a_module_the_entitlement_no_longer_grant
         .apply_success(claims(&["otro_modulo"]), 1_000);
 
     let resp = router.oneshot(setup_status_request()).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "the checklist query itself is never gated");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "the checklist query itself is never gated"
+    );
     let body = body_json(resp).await;
     let doc = &body["data"][0];
     assert!(
-        items(doc).iter().all(|i| i["key"] != "invoice_series.setup"),
+        items(doc)
+            .iter()
+            .all(|i| i["key"] != "invoice_series.setup"),
         "an entitlement-blocked module must not offer a route the dispatcher will refuse: {doc}"
     );
 }
@@ -153,7 +161,9 @@ async fn setup_status_keeps_the_item_of_a_module_the_entitlement_still_grants_hu
     let body = body_json(resp).await;
     let doc = &body["data"][0];
     assert!(
-        items(doc).iter().any(|i| i["key"] == "invoice_series.setup"),
+        items(doc)
+            .iter()
+            .any(|i| i["key"] == "invoice_series.setup"),
         "an entitled module must keep its checklist item: {doc}"
     );
 }

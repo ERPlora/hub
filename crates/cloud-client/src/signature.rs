@@ -95,7 +95,10 @@ pub struct ModuleSignature {
 impl ModuleSignature {
     /// Construye la firma a partir de los bytes crudos (64).
     pub fn from_bytes(key_id: impl Into<String>, sig: &[u8]) -> Self {
-        Self { key_id: key_id.into(), sig_b64: base64::engine::general_purpose::STANDARD.encode(sig) }
+        Self {
+            key_id: key_id.into(),
+            sig_b64: base64::engine::general_purpose::STANDARD.encode(sig),
+        }
     }
 
     /// Decodifica la firma a sus 64 bytes crudos.
@@ -103,15 +106,12 @@ impl ModuleSignature {
         let raw = base64::engine::general_purpose::STANDARD
             .decode(self.sig_b64.trim())
             .map_err(|e| SignatureError::BadEncoding(e.to_string()))?;
-        let arr: [u8; SIGNATURE_LEN] = raw
-            .as_slice()
-            .try_into()
-            .map_err(|_: _| {
-                SignatureError::BadEncoding(format!(
-                    "esperaba {SIGNATURE_LEN} bytes, llegaron {}",
-                    raw.len()
-                ))
-            })?;
+        let arr: [u8; SIGNATURE_LEN] = raw.as_slice().try_into().map_err(|_: _| {
+            SignatureError::BadEncoding(format!(
+                "esperaba {SIGNATURE_LEN} bytes, llegaron {}",
+                raw.len()
+            ))
+        })?;
         Ok(arr)
     }
 }
@@ -144,7 +144,11 @@ impl TrustedKeyRing {
     }
 
     /// Añade una clave pública en raw 32 bytes. Devuelve error si la longitud no es correcta.
-    pub fn add_bytes(&mut self, key_id: impl Into<String>, pk: &[u8]) -> Result<(), SignatureError> {
+    pub fn add_bytes(
+        &mut self,
+        key_id: impl Into<String>,
+        pk: &[u8],
+    ) -> Result<(), SignatureError> {
         let key_id = key_id.into();
         let pk_bytes: [u8; PUBLIC_KEY_LEN] = pk.try_into().map_err(|_: _| {
             SignatureError::BadKey(format!(
@@ -157,7 +161,11 @@ impl TrustedKeyRing {
     }
 
     /// Añade una clave pública codificada en **hex** (64 chars) o **base64 (standard)**.
-    pub fn add_encoded(&mut self, key_id: impl Into<String>, encoded: &str) -> Result<(), SignatureError> {
+    pub fn add_encoded(
+        &mut self,
+        key_id: impl Into<String>,
+        encoded: &str,
+    ) -> Result<(), SignatureError> {
         let trimmed = encoded.trim();
         let bytes = decode_hex_or_b64(trimmed)
             .map_err(|e| SignatureError::BadKey(format!("clave {trimmed}: {e}")))?;
@@ -245,7 +253,11 @@ impl SignaturePolicy {
     /// Aplica la política a un módulo: bajo `Enforce` exige y verifica la firma; bajo `DevTrust`
     /// acepta cualquier cosa (incluido `None`). Devuelve el `key_id` de la **clave de confianza**
     /// que validó (autoritativa, no el auto-declarado en la firma) bajo `Enforce`.
-    pub fn check(&self, sig: Option<&ModuleSignature>, message: &[u8]) -> Result<Option<String>, SignatureError> {
+    pub fn check(
+        &self,
+        sig: Option<&ModuleSignature>,
+        message: &[u8],
+    ) -> Result<Option<String>, SignatureError> {
         match self {
             Self::DevTrust | Self::Sha256Only => Ok(None),
             Self::Enforce(ring) => {
@@ -344,7 +356,10 @@ mod tests {
 
         let msg = b"contenido del zip";
         let sig = signer.sign("marketplace", msg);
-        assert_eq!(policy.check(Some(&sig), msg), Ok(Some("marketplace".into())));
+        assert_eq!(
+            policy.check(Some(&sig), msg),
+            Ok(Some("marketplace".into()))
+        );
     }
 
     /// Módulo sin firma bajo `Enforce` ⇒ rechazado (`Missing`).
@@ -365,7 +380,10 @@ mod tests {
 
         let sig = signer.sign("marketplace", b"zip original");
         // se verifica contra otros bytes (tampering):
-        assert_eq!(policy.check(Some(&sig), b"zip MANIPULADO"), Err(SignatureError::Invalid));
+        assert_eq!(
+            policy.check(Some(&sig), b"zip MANIPULADO"),
+            Err(SignatureError::Invalid)
+        );
     }
 
     /// Firma de una clave que NO está en el anillo ⇒ rechazado (`Invalid`).
@@ -375,7 +393,8 @@ mod tests {
         let (signer_attacker, _) = Signer::generate(&rng());
         let mut ring = TrustedKeyRing::empty();
         // solo confiamos en la primera:
-        ring.add_bytes("marketplace", &signer_trusted.public_key()).unwrap();
+        ring.add_bytes("marketplace", &signer_trusted.public_key())
+            .unwrap();
         let policy = SignaturePolicy::Enforce(ring);
 
         let msg = b"zip";
@@ -418,8 +437,14 @@ mod tests {
 
         let msg = b"zip";
         let sig = signer.sign("k", msg);
-        assert!(matches!(SignaturePolicy::Enforce(r_hex).check(Some(&sig), msg), Ok(_)));
-        assert!(matches!(SignaturePolicy::Enforce(r_b64).check(Some(&sig), msg), Ok(_)));
+        assert!(matches!(
+            SignaturePolicy::Enforce(r_hex).check(Some(&sig), msg),
+            Ok(_)
+        ));
+        assert!(matches!(
+            SignaturePolicy::Enforce(r_b64).check(Some(&sig), msg),
+            Ok(_)
+        ));
     }
 
     /// from_env: entradas múltiples separadas por coma, hex y base64, con y sin key_id.
@@ -451,10 +476,16 @@ mod tests {
     /// Firma mal codificada (longitud errónea) => BadEncoding.
     #[test]
     fn firma_mal_codificada() {
-        let bad = ModuleSignature { key_id: "k".into(), sig_b64: "no-es-base64-valida@@@".into() };
+        let bad = ModuleSignature {
+            key_id: "k".into(),
+            sig_b64: "no-es-base64-valida@@@".into(),
+        };
         let mut ring = TrustedKeyRing::empty();
         ring.add_bytes("k", &[0u8; PUBLIC_KEY_LEN]).unwrap();
         let policy = SignaturePolicy::Enforce(ring);
-        assert!(matches!(policy.check(Some(&bad), b"zip"), Err(SignatureError::BadEncoding(_))));
+        assert!(matches!(
+            policy.check(Some(&bad), b"zip"),
+            Err(SignatureError::BadEncoding(_))
+        ));
     }
 }

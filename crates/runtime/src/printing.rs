@@ -174,12 +174,7 @@ impl Runtime {
     }
 
     /// The print host could not print it. `true` = back in the queue, `false` = dead-lettered.
-    pub async fn fail_print_job(
-        &self,
-        device_id: &str,
-        job_id: &str,
-        error: &str,
-    ) -> Result<bool> {
+    pub async fn fail_print_job(&self, device_id: &str, job_id: &str, error: &str) -> Result<bool> {
         print_drain::report_failure(self.db.as_ref(), &self.hub_id, device_id, job_id, error).await
     }
 

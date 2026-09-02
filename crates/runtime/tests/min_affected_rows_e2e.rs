@@ -261,9 +261,13 @@ async fn expect_rows_lets_a_real_mutation_commit_and_emit() {
     let ctx = admin_ctx();
     let id = create_item(&rt, &ctx, "Beans").await;
 
-    rt.execute_command("w140.items.consume", &params(json!({ "item_id": id })), &ctx)
-        .await
-        .expect("a matching UPDATE passes the expect_rows gate");
+    rt.execute_command(
+        "w140.items.consume",
+        &params(json!({ "item_id": id })),
+        &ctx,
+    )
+    .await
+    .expect("a matching UPDATE passes the expect_rows gate");
 
     assert_eq!(
         outbox_count(&rt, "h1", "w140.item.consumed").await,

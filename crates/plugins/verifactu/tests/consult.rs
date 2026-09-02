@@ -306,5 +306,8 @@ fn el_sobre_de_consulta_con_periodo_lo_incluye() {
     let xml = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08")
         .expect("con periodo se construye");
     assert!(xml.contains("<sum1:Periodo>08</sum1:Periodo>"), "{xml}");
-    assert!(xml.contains("<sum1:Ejercicio>2026</sum1:Ejercicio>"), "{xml}");
+    assert!(
+        xml.contains("<sum1:Ejercicio>2026</sum1:Ejercicio>"),
+        "{xml}"
+    );
 }

@@ -65,7 +65,10 @@ async fn runtime(hub_id: &str) -> Runtime {
 
 async fn install(rt: &mut Runtime, manifest: &str) -> String {
     let dir = fixture(manifest);
-    let id = rt.install_from_dir(&dir).await.expect("the module installs");
+    let id = rt
+        .install_from_dir(&dir)
+        .await
+        .expect("the module installs");
     std::fs::remove_dir_all(dir).unwrap();
     id
 }
@@ -103,12 +106,18 @@ async fn activation_rows(rt: &Runtime, hub_id: &str) -> Vec<String> {
 /// A reset that only asks for the role set. Everything else stays `false`: the reset never does
 /// more than it was asked for.
 fn wipe_roles() -> ResetSelection {
-    ResetSelection { roles: true, ..Default::default() }
+    ResetSelection {
+        roles: true,
+        ..Default::default()
+    }
 }
 
 /// The `roles` row of a reset plan.
 fn planned_roles(plan: &erplora_runtime::reset::ResetPlan) -> Option<i64> {
-    plan.sections.iter().find(|s| s.section == ROLES_SECTION).map(|s| s.rows)
+    plan.sections
+        .iter()
+        .find(|s| s.section == ROLES_SECTION)
+        .map(|s| s.rows)
 }
 
 // ── The round trip: a backup restores the role set ──────────────────────────────────────
@@ -126,11 +135,17 @@ async fn a_backup_restores_the_same_role_set_into_a_clean_hub() {
     let mut origin = runtime("h1").await;
     install(&mut origin, RESTAURANT_PACK).await;
     origin.set_role_active("waiter", true, ACTOR).await.unwrap();
-    origin.set_role_active("kitchen", true, ACTOR).await.unwrap();
+    origin
+        .set_role_active("kitchen", true, ACTOR)
+        .await
+        .unwrap();
     let captured = active(&origin).await;
 
     // A plain backup: no checkbox names the role set, because there is none (ADR-0242 §7).
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
         .await
         .expect("export");
@@ -139,12 +154,19 @@ async fn a_backup_restores_the_same_role_set_into_a_clean_hub() {
         vec!["kitchen".to_string(), "waiter".to_string()],
         "the backup has to carry the set, or there is nothing to restore"
     );
-    assert!(bundle.manifest.sections.contains(&ROLES_SECTION.to_string()));
+    assert!(bundle
+        .manifest
+        .sections
+        .contains(&ROLES_SECTION.to_string()));
 
     // The new deployment: same modules, nothing switched on yet.
     let mut restored = runtime("h2").await;
     install(&mut restored, RESTAURANT_PACK).await;
-    assert_eq!(active(&restored).await, BASE_ROLES.to_vec(), "a fresh hub starts with the base three");
+    assert_eq!(
+        active(&restored).await,
+        BASE_ROLES.to_vec(),
+        "a fresh hub starts with the base three"
+    );
 
     import_sections(
         &mut restored,
@@ -177,9 +199,16 @@ async fn a_backup_whose_modules_are_missing_activates_nothing_and_leaves_no_late
     let mut origin = runtime("h1").await;
     install(&mut origin, RESTAURANT_PACK).await;
     origin.set_role_active("waiter", true, ACTOR).await.unwrap();
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "bar-pepe", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "bar-pepe",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     // The destination never installed the restaurant pack.
     let mut bare = runtime("h2").await;
@@ -211,9 +240,14 @@ async fn resetting_the_roles_switches_off_what_the_hub_had_switched_on() {
     install(&mut rt, RESTAURANT_PACK).await;
     rt.set_role_active("waiter", true, ACTOR).await.unwrap();
     rt.set_role_active("kitchen", true, ACTOR).await.unwrap();
-    assert_eq!(activation_rows(&rt, "h1").await, vec!["kitchen".to_string(), "waiter".to_string()]);
+    assert_eq!(
+        activation_rows(&rt, "h1").await,
+        vec!["kitchen".to_string(), "waiter".to_string()]
+    );
 
-    let report = execute_reset(&rt, "h1", &wipe_roles(), ACTOR).await.expect("reset");
+    let report = execute_reset(&rt, "h1", &wipe_roles(), ACTOR)
+        .await
+        .expect("reset");
 
     assert!(
         activation_rows(&rt, "h1").await.is_empty(),
@@ -231,7 +265,10 @@ async fn resetting_the_roles_switches_off_what_the_hub_had_switched_on() {
         .iter()
         .find(|s| s.section == ROLES_SECTION)
         .expect("the report says what it did with the roles");
-    assert_eq!(section.rows_deleted, 2, "the report counts the rows it really took, not adjectives");
+    assert_eq!(
+        section.rows_deleted, 2,
+        "the report counts the rows it really took, not adjectives"
+    );
 }
 
 /// 🔴 Opt-in, like every other section: a reset that does not ask for the role set does not touch a
@@ -251,7 +288,9 @@ async fn the_reset_leaves_the_role_set_alone_unless_it_is_asked_for() {
         modules: vec!["restaurant_pack".into()],
         ..Default::default()
     };
-    execute_reset(&rt, "h1", &selection, ACTOR).await.expect("reset");
+    execute_reset(&rt, "h1", &selection, ACTOR)
+        .await
+        .expect("reset");
 
     assert_eq!(
         activation_rows(&rt, "h1").await,
@@ -273,7 +312,9 @@ async fn resetting_the_roles_of_one_hub_leaves_the_hub_next_door_alone() {
         .await
         .expect("the hub next door switches its own role on");
 
-    execute_reset(&rt, "h1", &wipe_roles(), ACTOR).await.expect("reset");
+    execute_reset(&rt, "h1", &wipe_roles(), ACTOR)
+        .await
+        .expect("reset");
 
     assert!(activation_rows(&rt, "h1").await.is_empty());
     assert_eq!(
@@ -299,9 +340,16 @@ async fn the_owner_can_take_back_a_role_a_bundle_switched_on() {
 
     // A bundle from somewhere else — another hub's id, published as a template — pre-activates the
     // vertical's role set. `purpose` does not filter roles (ADR-0242 §8) and neither does origin.
-    let mut foreign = export_hub(&rt, "h1", &ExportSelection::default(), "otro", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let mut foreign = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "otro",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     foreign.manifest.purpose = BundlePurpose::Template;
     foreign.manifest.hub.hub_id = "some-other-hub".into();
     foreign.manifest.active_roles = vec!["waiter".into()];
@@ -315,12 +363,17 @@ async fn the_owner_can_take_back_a_role_a_bundle_switched_on() {
     )
     .await
     .expect("the bundle is accepted");
-    assert!(active(&rt).await.contains(&"waiter".to_string()), "precondition: the bundle switched it on");
+    assert!(
+        active(&rt).await.contains(&"waiter".to_string()),
+        "precondition: the bundle switched it on"
+    );
     erplora_runtime::roles::ensure_assignable(rt.db(), rt.registry(), "h1", "waiter")
         .await
         .expect("precondition: while it is live the role can be handed to a person");
 
-    execute_reset(&rt, "h1", &wipe_roles(), ACTOR).await.expect("reset");
+    execute_reset(&rt, "h1", &wipe_roles(), ACTOR)
+        .await
+        .expect("reset");
 
     assert!(activation_rows(&rt, "h1").await.is_empty());
     assert!(
@@ -342,13 +395,19 @@ async fn a_hub_without_the_activation_table_still_resets_everything_else() {
     install(&mut rt, RESTAURANT_PACK).await;
     let mut updates = serde_json::Map::new();
     updates.insert("language".into(), serde_json::json!("es"));
-    rt.set_settings(&updates, ACTOR).await.expect("a setting to clear");
+    rt.set_settings(&updates, ACTOR)
+        .await
+        .expect("a setting to clear");
     rt.db()
         .execute("DROP TABLE hub_role_activation", &Params::new())
         .await
         .expect("take the activation table away");
 
-    let selection = ResetSelection { roles: true, settings: true, ..Default::default() };
+    let selection = ResetSelection {
+        roles: true,
+        settings: true,
+        ..Default::default()
+    };
     let report = execute_reset(&rt, "h1", &selection, ACTOR)
         .await
         .expect("a missing table is a no-op, never a reason to abort the whole reset");
@@ -380,7 +439,11 @@ async fn the_plan_counts_the_roles_it_would_switch_off_and_switches_off_none() {
 
     let plan = plan_reset(&rt, "h1").await.expect("plan");
 
-    assert_eq!(planned_roles(&plan), Some(2), "two rows of THIS hub would go");
+    assert_eq!(
+        planned_roles(&plan),
+        Some(2),
+        "two rows of THIS hub would go"
+    );
     assert_eq!(
         activation_rows(&rt, "h1").await,
         vec!["shift_lead".to_string(), "waiter".to_string()],

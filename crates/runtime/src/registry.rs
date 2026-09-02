@@ -120,8 +120,12 @@ impl CompiledSchema {
                 Some(t) => t,
                 None => continue, // sin declaración de tipo numérico → el valor manda, como siempre
             };
-            let Some(value) = params.get_mut(key) else { continue };
-            let serde_json::Value::Number(n) = value else { continue };
+            let Some(value) = params.get_mut(key) else {
+                continue;
+            };
+            let serde_json::Value::Number(n) = value else {
+                continue;
+            };
             match declared {
                 DeclaredNumberType::Number => {
                     if !n.is_f64() {
@@ -135,8 +139,7 @@ impl CompiledSchema {
                 DeclaredNumberType::Integer => {
                     if let Some(f) = n.as_f64() {
                         if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-                            *value =
-                                serde_json::Value::Number(serde_json::Number::from(f as i64));
+                            *value = serde_json::Value::Number(serde_json::Number::from(f as i64));
                         }
                     }
                 }
@@ -227,9 +230,7 @@ fn declared_number_type(prop: &serde_json::Value) -> Option<DeclaredNumberType> 
     };
     match prop.get("type")? {
         serde_json::Value::String(s) => pick(s.as_str()),
-        serde_json::Value::Array(types) => {
-            types.iter().find_map(|t| t.as_str().and_then(pick))
-        }
+        serde_json::Value::Array(types) => types.iter().find_map(|t| t.as_str().and_then(pick)),
         _ => None,
     }
 }
@@ -368,8 +369,7 @@ pub struct Registry {
     ///
     /// Vive en el Registry, y no en disco ni en `hub_module`, por lo mismo que el resto de lo que
     /// aporta un módulo: su vida ES la del módulo instalado.
-    pub(crate) seed_natural_keys:
-        HashMap<String, HashMap<String, Vec<crate::export::NaturalKey>>>,
+    pub(crate) seed_natural_keys: HashMap<String, HashMap<String, Vec<crate::export::NaturalKey>>>,
 }
 
 impl Registry {
@@ -590,13 +590,7 @@ impl Registry {
             }
         }
         seen.into_iter()
-            .map(|(id, bytes)| {
-                (
-                    id.to_string(),
-                    self.module_version(id),
-                    Some(bytes.clone()),
-                )
-            })
+            .map(|(id, bytes)| (id.to_string(), self.module_version(id), Some(bytes.clone())))
             .collect()
     }
 
@@ -647,8 +641,17 @@ impl Registry {
         let mut events: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
             std::collections::BTreeMap::new();
         for module in &self.installed {
-            let command_emits = module.commands.values().flat_map(|c| c.emit.iter().map(|e| e.event()));
-            for event in module.events.emits.iter().map(String::as_str).chain(command_emits) {
+            let command_emits = module
+                .commands
+                .values()
+                .flat_map(|c| c.emit.iter().map(|e| e.event()));
+            for event in module
+                .events
+                .emits
+                .iter()
+                .map(String::as_str)
+                .chain(command_emits)
+            {
                 events
                     .entry(event.to_string())
                     .or_default()
@@ -761,7 +764,11 @@ impl Registry {
                 .cloned()
                 .collect(),
             locales: self.locales.get(module_id).cloned().unwrap_or_default(),
-            seed_natural_keys: self.seed_natural_keys.get(module_id).cloned().unwrap_or_default(),
+            seed_natural_keys: self
+                .seed_natural_keys
+                .get(module_id)
+                .cloned()
+                .unwrap_or_default(),
             // A listener belongs to the module that owns the command it fires (hub#659 makes that
             // the only shape a manifest can declare), so this is exactly the module's own share of
             // the map — the same rule `remove_module` uses to prune it.
@@ -1366,7 +1373,11 @@ mod tests {
         let mut p = crate::Params::new();
         p.insert("qty".into(), serde_json::json!(4.5));
         schema.coerce_declared_number_shapes(&mut p);
-        assert_eq!(shape_of(&p["qty"]), "float", "4.5 no es integral: se queda como está");
+        assert_eq!(
+            shape_of(&p["qty"]),
+            "float",
+            "4.5 no es integral: se queda como está"
+        );
     }
 
     /// La forma nullable (`["number", "null"]`) es la misma declaración; strings, bools, `null`
@@ -1388,10 +1399,22 @@ mod tests {
         p.insert("qty".into(), serde_json::json!(3.0));
         p.insert("free".into(), serde_json::json!(7));
         schema.coerce_declared_number_shapes(&mut p);
-        assert_eq!(shape_of(&p["rate"]), "float", "['number','null'] declara number");
+        assert_eq!(
+            shape_of(&p["rate"]),
+            "float",
+            "['number','null'] declara number"
+        );
         assert_eq!(p["note"], serde_json::json!("21"), "un string no se toca");
-        assert_eq!(shape_of(&p["qty"]), "int", "['integer','null'] declara integer");
-        assert_eq!(p["free"], serde_json::json!(7), "sin tipo numérico declarado, el valor manda");
+        assert_eq!(
+            shape_of(&p["qty"]),
+            "int",
+            "['integer','null'] declara integer"
+        );
+        assert_eq!(
+            p["free"],
+            serde_json::json!(7),
+            "sin tipo numérico declarado, el valor manda"
+        );
     }
 
     /// Un `null` explícito sobre un campo `number` nullable sigue siendo `null`: se bindea como
@@ -1427,7 +1450,8 @@ mod tests {
 
     fn registry_with(name: &str, expose_api: bool, internal: bool) -> Registry {
         let mut reg = Registry::new();
-        reg.status.insert("pricing".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("pricing".to_string(), ModuleStatus::Active);
         reg.commands.insert(
             name.to_string(),
             RegisteredCommand {
@@ -1612,10 +1636,7 @@ mod tests {
     /// `fr`) renders the English translation, not the raw manifest value.
     #[test]
     fn setup_title_falls_back_to_en_before_the_manifest() {
-        let reg = registry_with_setup_locale(
-            "inventory",
-            &[("en", Some("Your catalog"), None)],
-        );
+        let reg = registry_with_setup_locale("inventory", &[("en", Some("Your catalog"), None)]);
         assert_eq!(
             reg.setup_title_localized("inventory", "Your catalog", "fr"),
             "Your catalog",

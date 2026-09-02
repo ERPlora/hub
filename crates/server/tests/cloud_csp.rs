@@ -23,7 +23,9 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{build_serving_router, default_csp, AppState, AuthMode, HubConfig, ServeConfig};
+use erplora_server::{
+    build_serving_router, default_csp, AppState, AuthMode, HubConfig, ServeConfig,
+};
 use std::collections::BTreeMap;
 use tower::ServiceExt; // oneshot
 
@@ -321,10 +323,28 @@ const JUSTIFIED_WIDENINGS: &[(&str, &str, &str)] = &[
     ),
 ];
 
+/// Directives whose values are NOT sources, so "the shell does not allow this" is a category
+/// error rather than a widening: they authorise nothing, and the comparison below cannot mean
+/// anything about them.
+///
+/// Nothing is being waved through here. A value that IS an origin —say a `report-uri` pointing at
+/// somebody else's collector, which would hand a third party the URL of every page a till
+/// visits— still fails `the_only_origins_besides_the_hub_are_its_cloud_and_the_tauri_ipc_channel`,
+/// which sweeps EVERY directive for `://`. What this list removes is only the source comparison.
+const NON_FETCH_DIRECTIVES: &[(&str, &str)] = &[(
+    "report-uri",
+    "hub#1447: it does not let anything load — it says where the browser posts what the policy \
+     REFUSED. The shell has no counterpart because it renders with no network at all and has \
+     nowhere to post to; this policy's report goes to the hub's own /csp-report/",
+)];
+
 #[test]
 fn every_way_the_served_policy_is_looser_than_the_shell_is_written_down() {
     let shell = shell_policy();
     for (directive, sources) in directives(&served()) {
+        if NON_FETCH_DIRECTIVES.iter().any(|(d, _)| *d == directive) {
+            continue;
+        }
         let allowed_by_shell = effective(&shell, &directive);
         for source in sources {
             if allowed_by_shell.contains(&source) {

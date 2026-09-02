@@ -414,12 +414,18 @@ async fn the_core_permission_does_not_pollute_the_role_catalogue() {
             "sin módulos instalados, el catálogo no concede nada a {role}"
         );
     }
-    assert!(rt.session_permissions("employee").contains("hub.users.view"));
+    assert!(rt
+        .session_permissions("employee")
+        .contains("hub.users.view"));
 
     // Y el catálogo de roles no cuenta ese permiso como si lo diera un módulo.
     let roles = rt.list_hub_roles().await.unwrap();
     assert_eq!(
-        roles.iter().find(|r| r.name == "employee").unwrap().permissions,
+        roles
+            .iter()
+            .find(|r| r.name == "employee")
+            .unwrap()
+            .permissions,
         0,
         "un rol sin módulos que le concedan nada muestra 0 permisos"
     );
@@ -501,7 +507,10 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
                 || matches!(&err, RuntimeError::Domain { code, .. } if code.starts_with("hub.users.pin_")),
             "the refusal names the PIN field: {err}"
         );
-        assert!(!row(&rt, &id).await.has_pin, "`{bad}` must not have been stored");
+        assert!(
+            !row(&rt, &id).await.has_pin,
+            "`{bad}` must not have been stored"
+        );
     }
 
     rt.set_pin(&id, "2580").await.unwrap();
@@ -543,7 +552,10 @@ async fn the_length_is_the_hubs_and_a_pin_of_another_length_is_refused() {
         })
         .await
         .expect_err("la longitud es fija: cuatro no cuela en un hub de seis");
-    assert!(format!("{err}").contains('6'), "el mensaje dice cuántos dígitos: {err}");
+    assert!(
+        format!("{err}").contains('6'),
+        "el mensaje dice cuántos dígitos: {err}"
+    );
 
     rt.create_hub_user(&NewHubUser {
         name: "Ana Soto".into(),
@@ -587,7 +599,10 @@ async fn a_hub_that_says_nothing_keeps_the_length_its_pins_were_typed_with() {
     let err = rt
         .update_hub_user(
             &id,
-            &UpdateHubUser { pin: Some("2580".into()), ..UpdateHubUser::default() },
+            &UpdateHubUser {
+                pin: Some("2580".into()),
+                ..UpdateHubUser::default()
+            },
         )
         .await
         .expect_err("pero uno nuevo ya tiene que ser de seis");

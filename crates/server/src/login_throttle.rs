@@ -39,7 +39,9 @@ impl Default for LoginThrottle {
 
 impl LoginThrottle {
     pub fn new() -> Self {
-        Self { entries: Mutex::new(HashMap::new()) }
+        Self {
+            entries: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Is this identity locked right now? `Some(secs)` = locked, and how long to wait.
@@ -118,7 +120,10 @@ mod tests {
         }
         t.record_success("Admin");
         t.record_failure("Admin");
-        assert!(t.locked_for("Admin").is_none(), "the counter restarted from zero");
+        assert!(
+            t.locked_for("Admin").is_none(),
+            "the counter restarted from zero"
+        );
     }
 
     #[test]
@@ -130,7 +135,10 @@ mod tests {
         }
         assert!(t.locked_for_at("Admin", now).is_some());
         let after = now + LOCK_WINDOW + Duration::from_secs(1);
-        assert!(t.locked_for_at("Admin", after).is_none(), "window elapsed → unlocked");
+        assert!(
+            t.locked_for_at("Admin", after).is_none(),
+            "window elapsed → unlocked"
+        );
         // And a single new failure must not re-lock: the counter was forgotten with the lock.
         t.record_failure_at("Admin", after);
         assert!(t.locked_for_at("Admin", after).is_none());
@@ -143,7 +151,10 @@ mod tests {
             t.record_failure("Admin");
         }
         assert!(t.locked_for("Admin").is_some());
-        assert!(t.locked_for("Cashier").is_none(), "brute-forcing one name cannot DoS the shop");
+        assert!(
+            t.locked_for("Cashier").is_none(),
+            "brute-forcing one name cannot DoS the shop"
+        );
     }
 
     #[test]

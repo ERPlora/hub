@@ -57,7 +57,9 @@ fn command_request(till: &str, name: &str, payload: Value) -> Request<Body> {
         .header("x-hub-id", "h1")
         .header("x-user-id", till)
         .header("x-permissions", "*")
-        .body(Body::from(json!({ "name": name, "payload": payload }).to_string()))
+        .body(Body::from(
+            json!({ "name": name, "payload": payload }).to_string(),
+        ))
         .unwrap()
 }
 
@@ -86,8 +88,18 @@ async fn hub978_two_concurrent_commands_overlap_instead_of_queueing() {
     );
     let elapsed = started.elapsed();
 
-    assert_eq!(first.status(), StatusCode::OK, "{:?}", body_json(first).await);
-    assert_eq!(second.status(), StatusCode::OK, "{:?}", body_json(second).await);
+    assert_eq!(
+        first.status(),
+        StatusCode::OK,
+        "{:?}",
+        body_json(first).await
+    );
+    assert_eq!(
+        second.status(),
+        StatusCode::OK,
+        "{:?}",
+        body_json(second).await
+    );
     let queued = Duration::from_millis(2 * SLOW_MS);
     let overlapping = Duration::from_millis(SLOW_MS + SLOW_MS / 2);
     assert!(
@@ -131,7 +143,10 @@ async fn hub978_a_relay_pass_does_not_wait_for_a_command_in_flight() {
 
     let resp = command.await.unwrap().unwrap();
     assert_eq!(resp.status(), StatusCode::OK, "{:?}", body_json(resp).await);
-    assert_eq!(relayed, 0, "nothing was pending; the pass is about the wait, not the work");
+    assert_eq!(
+        relayed, 0,
+        "nothing was pending; the pass is about the wait, not the work"
+    );
     assert!(
         waited < Duration::from_millis(SLOW_MS / 2),
         "the relay pass waited {waited:?} for a command that holds the database, not the runtime"
@@ -231,7 +246,11 @@ async fn hub978_an_approval_is_still_spent_exactly_once_without_the_mutex() {
         }
     }
     assert_eq!(ran, 1, "exactly one retry spends the approval");
-    assert_eq!(refused, RACERS - 1, "every other retry is sent back to the manager");
+    assert_eq!(
+        refused,
+        RACERS - 1,
+        "every other retry is sent back to the manager"
+    );
 
     // What the database saw: one sale, one receipt — never two of either.
     let rt = state.runtime.read().await;
@@ -245,7 +264,12 @@ async fn hub978_an_approval_is_still_spent_exactly_once_without_the_mutex() {
         )
         .await
         .unwrap();
-    assert_eq!(sales.rows[0]["n"].as_i64(), Some(1), "one sale: {:?}", sales.rows);
+    assert_eq!(
+        sales.rows[0]["n"].as_i64(),
+        Some(1),
+        "one sale: {:?}",
+        sales.rows
+    );
     let receipts = db
         .query(
             "SELECT COUNT(*) AS n FROM _elevation_audit WHERE hub_id = :hub_id",

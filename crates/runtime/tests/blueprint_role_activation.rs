@@ -81,7 +81,10 @@ async fn runtime(hub_id: &str) -> Runtime {
 
 async fn install(rt: &mut Runtime, manifest: &str) -> String {
     let dir = fixture(manifest);
-    let id = rt.install_from_dir(&dir).await.expect("the module installs");
+    let id = rt
+        .install_from_dir(&dir)
+        .await
+        .expect("the module installs");
     std::fs::remove_dir_all(dir).unwrap();
     id
 }
@@ -200,7 +203,10 @@ async fn importing_the_blueprint_of_a_vertical_activates_the_roles_of_that_verti
 
     let live = active(&rt).await;
     for role in ["waiter", "bartender", "kitchen", "cashier", "shift_lead"] {
-        assert!(live.contains(&role.to_string()), "`{role}` had to be live: {live:?}");
+        assert!(
+            live.contains(&role.to_string()),
+            "`{role}` had to be live: {live:?}"
+        );
     }
     // …and ONLY those: a declared role the blueprint does not name keeps the opt-in of hub#352.
     for off in ["hr_manager", "accountant"] {
@@ -216,7 +222,10 @@ async fn importing_the_blueprint_of_a_vertical_activates_the_roles_of_that_verti
 
     // The audit column says the template did it, not a person: no `hub_user` decided this.
     for (key, by) in activation_table(&rt, "h1").await {
-        assert_eq!(by, "blueprint", "`{key}` was switched on by the import, and says so");
+        assert_eq!(
+            by, "blueprint",
+            "`{key}` was switched on by the import, and says so"
+        );
     }
 }
 
@@ -235,7 +244,10 @@ async fn the_roles_land_in_the_target_hub_not_in_the_runtime_s_own() {
         activation_rows(&rt, "h1").await.is_empty(),
         "the runtime's own hub was not the destination: nothing may be switched on there"
     );
-    assert_eq!(roles_section(&report).map(|s| &s.status), Some(&SectionStatus::Applied));
+    assert_eq!(
+        roles_section(&report).map(|s| &s.status),
+        Some(&SectionStatus::Applied)
+    );
 }
 
 /// 🔴 A database that will not take the write is `Failed`, never a discard. They read the same on
@@ -259,7 +271,10 @@ async fn a_database_failure_is_reported_as_failed_not_as_a_discard() {
         "a write that could not happen is a failure, not «the hub said no»: {:?}",
         section.status
     );
-    assert_eq!(section.discarded_rows, 0, "nothing was discarded on purpose");
+    assert_eq!(
+        section.discarded_rows, 0,
+        "nothing was discarded on purpose"
+    );
 }
 
 /// 🔴 A blueprint cannot activate what nobody declares — and cannot MINT it either. A bundle is a
@@ -278,7 +293,10 @@ async fn a_role_no_installed_module_declares_is_never_activated_nor_minted() {
     );
     let report = import(&mut rt, &manifest, "h1").await;
 
-    assert!(active(&rt).await.contains(&"waiter".to_string()), "the declared one goes live");
+    assert!(
+        active(&rt).await.contains(&"waiter".to_string()),
+        "the declared one goes live"
+    );
 
     let keys = catalog_keys(&rt).await;
     for ghost in ["stylist", "sommelier"] {
@@ -361,10 +379,22 @@ async fn re_importing_the_same_blueprint_is_idempotent() {
 
     let second = import(&mut rt, &manifest, "h1").await;
 
-    assert_eq!(active(&rt).await, live_once, "the second import changes nothing");
-    assert_eq!(activation_rows(&rt, "h1").await, rows_once, "no duplicated rows");
+    assert_eq!(
+        active(&rt).await,
+        live_once,
+        "the second import changes nothing"
+    );
+    assert_eq!(
+        activation_rows(&rt, "h1").await,
+        rows_once,
+        "no duplicated rows"
+    );
     assert_eq!(rows_once, vec!["kitchen".to_string(), "waiter".to_string()]);
-    assert_eq!(roles_section(&second), roles_section(&first), "same report both times");
+    assert_eq!(
+        roles_section(&second),
+        roles_section(&first),
+        "same report both times"
+    );
 }
 
 /// A bundle that predates the field activates nothing — and does not grow a phantom row in the
@@ -405,20 +435,35 @@ async fn an_export_carries_the_roles_the_hub_has_switched_on() {
     let mut rt = runtime("h1").await;
     install(&mut rt, RESTAURANT_PACK).await;
 
-    let empty = export_hub(&rt, "h1", &ExportSelection::default(), "restaurante", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let empty = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "restaurante",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     assert!(
-        empty.manifest.active_roles.is_empty() && !empty.manifest.sections.contains(&"roles".to_string()),
+        empty.manifest.active_roles.is_empty()
+            && !empty.manifest.sections.contains(&"roles".to_string()),
         "a hub that switched nothing on has no role set to publish"
     );
 
     rt.set_role_active("waiter", true, "user-1").await.unwrap();
     rt.set_role_active("kitchen", true, "user-1").await.unwrap();
 
-    let bundle = export_hub(&rt, "h1", &ExportSelection::default(), "restaurante", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "restaurante",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     assert_eq!(
         bundle.manifest.active_roles,
         vec!["kitchen".to_string(), "waiter".to_string()],
@@ -434,7 +479,9 @@ async fn a_template_carries_the_role_set_but_never_the_accounts() {
     let mut rt = runtime("h1").await;
     install(&mut rt, RESTAURANT_PACK).await;
     rt.set_role_active("waiter", true, "user-1").await.unwrap();
-    rt.create_user("Ana", "1234", "waiter", None).await.expect("an employee of the hub");
+    rt.create_user("Ana", "1234", "waiter", None)
+        .await
+        .expect("an employee of the hub");
 
     let selection = ExportSelection {
         users: true, // asked for, and refused: a checkbox is not a control (ADR-0195)
@@ -460,9 +507,14 @@ async fn a_vertical_travels_from_the_hub_that_captured_it_to_a_brand_new_one() {
     let mut a = runtime("h1").await;
     install(&mut a, RESTAURANT_PACK).await;
     a.set_role_active("waiter", true, "user-1").await.unwrap();
-    a.set_role_active("shift_lead", true, "user-1").await.unwrap();
+    a.set_role_active("shift_lead", true, "user-1")
+        .await
+        .unwrap();
 
-    let selection = ExportSelection { purpose: BundlePurpose::Template, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Template,
+        ..Default::default()
+    };
     let bundle = export_hub(&a, "h1", &selection, "restaurante", "es", CREATED_AT)
         .await
         .expect("export");
@@ -471,7 +523,11 @@ async fn a_vertical_travels_from_the_hub_that_captured_it_to_a_brand_new_one() {
     let mut b = runtime("h2").await;
     install(&mut b, RESTAURANT_PACK).await;
     install(&mut b, BEAUTY_PACK).await;
-    assert_eq!(active(&b).await, BASE_ROLES.to_vec(), "a new hub starts with the base three");
+    assert_eq!(
+        active(&b).await,
+        BASE_ROLES.to_vec(),
+        "a new hub starts with the base three"
+    );
 
     let report = import_sections(
         &mut b,
@@ -489,5 +545,8 @@ async fn a_vertical_travels_from_the_hub_that_captured_it_to_a_brand_new_one() {
         !live.contains(&"stylist".to_string()),
         "the hairdresser role is installed but the restaurant blueprint does not name it"
     );
-    assert_eq!(roles_section(&report).map(|s| &s.status), Some(&SectionStatus::Applied));
+    assert_eq!(
+        roles_section(&report).map(|s| &s.status),
+        Some(&SectionStatus::Applied)
+    );
 }

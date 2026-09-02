@@ -63,7 +63,10 @@ async fn fixture(cloud_base_url: String, tag: &str) -> (Router, AppState, String
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-rl");
     rt.ensure_system_tables().await.unwrap();
-    let user = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let user = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&user, 3600, None).await.unwrap();
     let state = AppState::with_config(rt, config(cloud_base_url, tag));
     (app(state.clone()), state, session)
@@ -237,7 +240,8 @@ async fn sin_cache_previa_el_429_viaja_como_codigo_estable_y_no_como_prosa() {
         "sin caché el hub no puede inventarse un entitlement: dice que no pudo preguntar"
     );
     assert_eq!(
-        body["error"]["code"], "cloud_rate_limited",
+        body["error"]["code"],
+        "cloud_rate_limited",
         "la UI traduce por CÓDIGO, no parseando la frase del SaaS: {}",
         flat(&body)
     );

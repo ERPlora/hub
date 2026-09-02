@@ -104,13 +104,9 @@ async fn fixture(granted: bool) -> Fixture {
         std::process::id()
     ));
     let modules = temp.join("modules");
-    rt.install_from_dir(&module_dir(
-        &modules,
-        EDITOR,
-        json!({ "manage_flows": {} }),
-    ))
-    .await
-    .unwrap();
+    rt.install_from_dir(&module_dir(&modules, EDITOR, json!({ "manage_flows": {} })))
+        .await
+        .unwrap();
     rt.install_from_dir(&module_dir(&modules, INVENTORY, Value::Null))
         .await
         .unwrap();
@@ -187,11 +183,7 @@ fn every_flows_route(id: &str) -> Vec<(&'static str, String, Option<Value>)> {
         ("GET", "/api/hub/flows".to_string(), None),
         ("POST", "/api/hub/flows".to_string(), Some(welcome_flow())),
         ("GET", format!("/api/hub/flows/{id}"), None),
-        (
-            "PUT",
-            format!("/api/hub/flows/{id}"),
-            Some(welcome_flow()),
-        ),
+        ("PUT", format!("/api/hub/flows/{id}"), Some(welcome_flow())),
         ("DELETE", format!("/api/hub/flows/{id}"), None),
         ("GET", format!("/api/hub/flows/{id}/grants"), None),
         (

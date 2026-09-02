@@ -121,11 +121,9 @@ impl NotifyIntent {
     /// Extrae la intención del payload de un evento `*.reminder.due`. `Err` si falta/!encaja.
     pub fn from_event_payload(payload: &erplora_db::Params) -> Result<NotifyIntent> {
         let value = Json::Object(payload.clone());
-        serde_json::from_value(value).map_err(|e| {
-            RuntimeError::InvalidPayload {
-                name: "host.notify".to_string(),
-                detail: format!("intención de notificación inválida: {e}"),
-            }
+        serde_json::from_value(value).map_err(|e| RuntimeError::InvalidPayload {
+            name: "host.notify".to_string(),
+            detail: format!("intención de notificación inválida: {e}"),
         })
     }
 }
@@ -172,7 +170,11 @@ pub(crate) fn check_recipient_syntax(channel: Channel, to: &str) -> Result<()> {
             else {
                 return bad("no es una dirección de email");
             };
-            if local.is_empty() || !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+            if local.is_empty()
+                || !domain.contains('.')
+                || domain.starts_with('.')
+                || domain.ends_with('.')
+            {
                 return bad("no es una dirección de email");
             }
             if t.chars().any(char::is_whitespace) {
@@ -327,7 +329,9 @@ pub enum Routing {
 pub enum SendOutcome {
     Sent,
     /// What the proxy said, trimmed — the reason has to reach whoever reads the dead-letter row.
-    QuotaExceeded { detail: String },
+    QuotaExceeded {
+        detail: String,
+    },
 }
 
 /// Transporte de notificación: el cliente real de un canal. **Trait inyectable** para no atar el
@@ -372,12 +376,18 @@ impl MockTransport {
 
     /// Variante que siempre falla (para tests del backoff/dead-letter del relay).
     pub fn failing() -> Self {
-        Self { fail: true, ..Self::default() }
+        Self {
+            fail: true,
+            ..Self::default()
+        }
     }
 
     /// Variant whose every send is refused by quota (hub#971): terminal now, retryable by hand.
     pub fn quota_exhausted() -> Self {
-        Self { quota_exhausted: true, ..Self::default() }
+        Self {
+            quota_exhausted: true,
+            ..Self::default()
+        }
     }
 
     /// Envíos registrados (clon) — para aserciones en tests.
@@ -390,10 +400,14 @@ impl MockTransport {
 impl NotifyTransport for MockTransport {
     async fn send(&self, intent: &NotifyIntent, routing: Routing) -> Result<SendOutcome> {
         if self.fail {
-            return Err(RuntimeError::Notify("mock transport configured to fail".into()));
+            return Err(RuntimeError::Notify(
+                "mock transport configured to fail".into(),
+            ));
         }
         if self.quota_exhausted {
-            return Ok(SendOutcome::QuotaExceeded { detail: "quota_exceeded".into() });
+            return Ok(SendOutcome::QuotaExceeded {
+                detail: "quota_exceeded".into(),
+            });
         }
         if let Ok(mut g) = self.sent.lock() {
             g.push((intent.clone(), routing));
@@ -438,7 +452,10 @@ mod tests {
     #[test]
     fn rejects_unknown_channel() {
         let err = NotifyIntent::from_event_payload(&intent_params("carrier_pigeon")).unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "got {err:?}"
+        );
     }
 
     #[test]
@@ -543,7 +560,9 @@ mod tests {
     #[tokio::test]
     async fn recipient_resolves_from_an_active_hub_user_email() {
         let db = erplora_db::testutil::fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
 

@@ -540,7 +540,11 @@ pub(crate) struct RecordInput {
 /// `uq_verifactu_record_hub_seq (hub_id, issuer_nif, environment, sequence_number)` closes the
 /// TOCTOU window — if two creates race, the second INSERT violates the index and ITS whole
 /// transaction rolls back (no chain fork).
-pub(crate) async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: RecordInput) -> Result<Output> {
+pub(crate) async fn build_record_output(
+    host: &dyn NativeHost,
+    ctx: &Ctx,
+    r: RecordInput,
+) -> Result<Output> {
     // ADR-0202 §4.2 (phase 0, hub#312): `NumeroInstalacion` is this hub's UUID before the AEAT
     // and can never be reused — a record built under a slug or any non-UUID id would register a
     // bogus installation that Hacienda can neither reconcile nor keep unique. Hard fail, before
@@ -760,9 +764,10 @@ pub(crate) async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: Rec
     if let Some(cfg) = config.as_ref() {
         // Inline AEAT transmission on emit. Reuses `transmit_one`, which applies the result to
         // the record (accepted/rejected + CSV) and, on network failure, enqueues it in the
-        // contingency queue with backoff. Without a configured certificate → left `pending`
-        // (manual send later). Intentions apply AFTER the record INSERT (Output order).
-        if has_certificate(cfg) {
+        // contingency queue with backoff. With NO transmission road at all (neither a core
+        // certificate nor the fiscal gateway, hub#1432) → left `pending` (manual send later).
+        // Intentions apply AFTER the record INSERT (Output order).
+        if can_transmit(host, &ctx.hub_id, cfg).await? {
             let record_json = json!({
                 "id": record_id,
                 "record_type": r.record_type,
@@ -798,19 +803,18 @@ pub(crate) async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: Rec
                 "rectified_tax_amount": r.rectified_tax_amount,
                 "rectified_surcharge_amount": r.rectified_surcharge_amount,
             });
-            if let Ok((ops, events, _success)) =
-                transmit_one(
-                    host,
-                    ctx,
-                    &record_json,
-                    cfg,
-                    &ids[3],
-                    &ids[4],
-                    &ids[5],
-                    // Alta recién creada: se remite en el momento, no sale de ninguna cola.
-                    Remission::Punctual,
-                )
-                .await
+            if let Ok((ops, events, _success)) = transmit_one(
+                host,
+                ctx,
+                &record_json,
+                cfg,
+                &ids[3],
+                &ids[4],
+                &ids[5],
+                // Alta recién creada: se remite en el momento, no sale de ninguna cola.
+                Remission::Punctual,
+            )
+            .await
             {
                 for o in ops {
                     output = output.with_operation(o);

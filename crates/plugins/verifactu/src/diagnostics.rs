@@ -128,23 +128,25 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 });
                 match checked {
                     Err(error) => aeat = json!({ "ok": false, "error": error }),
-                    Ok(xml) => match aeat::post_soap(transmission_endpoint(&config), identity, xml).await {
-                        Ok(body) => {
-                            let r = aeat::parse_response(&body);
-                            let accepted = r.estado_registro == "Correcto"
-                                || r.estado_registro == "AceptadoConErrores"
-                                || r.estado_envio == "Correcto";
-                            aeat = json!({
-                                "ok": accepted,
-                                "estado_envio": r.estado_envio,
-                                "estado_registro": r.estado_registro,
-                                "csv": r.csv,
-                                "codigo_error": r.codigo_error,
-                                "descripcion_error": r.descripcion_error,
-                            });
-                        }
-                        Err(e) => {
-                            aeat = json!({ "ok": false, "error": e.to_string() });
+                    Ok(xml) => {
+                        match aeat::post_soap(transmission_endpoint(&config), identity, xml).await {
+                            Ok(body) => {
+                                let r = aeat::parse_response(&body);
+                                let accepted = r.estado_registro == "Correcto"
+                                    || r.estado_registro == "AceptadoConErrores"
+                                    || r.estado_envio == "Correcto";
+                                aeat = json!({
+                                    "ok": accepted,
+                                    "estado_envio": r.estado_envio,
+                                    "estado_registro": r.estado_registro,
+                                    "csv": r.csv,
+                                    "codigo_error": r.codigo_error,
+                                    "descripcion_error": r.descripcion_error,
+                                });
+                            }
+                            Err(e) => {
+                                aeat = json!({ "ok": false, "error": e.to_string() });
+                            }
                         }
                     }
                 }

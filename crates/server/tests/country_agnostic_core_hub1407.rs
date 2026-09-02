@@ -32,8 +32,16 @@ const RATCHET: [(&str, usize, &str); 11] = [
         2,
         "composition root — the ONE authorised engine-mounting point (hub#1404)",
     ),
-    ("crates/runtime/src/errors.rs", 1, "container-kind error message"),
-    ("crates/runtime/src/export.rs", 1, "verifactu_config gating in export"),
+    (
+        "crates/runtime/src/errors.rs",
+        1,
+        "container-kind error message",
+    ),
+    (
+        "crates/runtime/src/export.rs",
+        1,
+        "verifactu_config gating in export",
+    ),
     (
         "crates/runtime/src/import.rs",
         1,
@@ -221,7 +229,11 @@ fn hub1407_the_check_catches_a_seeded_violation() {
          mod tests {\n    const ID: &str = \"ticketbai\";\n}\n",
     )
     .unwrap();
-    fs::write(plugin.join("lib.rs"), "pub const REGIME: &str = \"verifactu\";\n").unwrap();
+    fs::write(
+        plugin.join("lib.rs"),
+        "pub const REGIME: &str = \"verifactu\";\n",
+    )
+    .unwrap();
 
     let found = scan(&root);
     let hits = found

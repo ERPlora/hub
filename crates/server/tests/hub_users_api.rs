@@ -162,7 +162,10 @@ async fn owner_creates_edits_and_deactivates_users() {
     assert_eq!(created.status(), StatusCode::OK);
     let created = body_json(created).await;
     let id = created["data"]["id"].as_str().unwrap().to_string();
-    assert_eq!(created["data"]["email"], "", "personal solo-local: sin cuenta online");
+    assert_eq!(
+        created["data"]["email"], "",
+        "personal solo-local: sin cuenta online"
+    );
     assert_eq!(created["data"]["has_pin"], true);
 
     let updated = send(
@@ -306,7 +309,10 @@ async fn roles_are_served_by_the_core_without_any_module() {
     let roles = body["data"].as_array().unwrap();
     let names: Vec<&str> = roles.iter().filter_map(|r| r["name"].as_str()).collect();
     for base in ["admin", "manager", "employee"] {
-        assert!(names.contains(&base), "falta el rol base {base} en {names:?}");
+        assert!(
+            names.contains(&base),
+            "falta el rol base {base} en {names:?}"
+        );
     }
     // `owner` salió del catálogo base (hub#349): es del plano CUENTA, no del de NEGOCIO, y ningún
     // módulo le concede nada. Nadie lo lleva en este hub, así que la API no lo ofrece.
@@ -373,7 +379,11 @@ async fn a_pin_only_user_never_touches_the_saas() {
         json!({ "name": "Luis Prat", "role": "cashier", "pin": "4242", "local": true }),
     )
     .await;
-    assert_eq!(res.status(), StatusCode::OK, "no debe intentar hablar con el SaaS");
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "no debe intentar hablar con el SaaS"
+    );
     let created = body_json(res).await;
     assert_eq!(created["data"]["has_pin"], true);
     assert_eq!(created["data"]["email"], "");
@@ -627,10 +637,7 @@ async fn the_profile_publishes_the_same_permissions_the_gate_grants() {
     // concede `hub.users.view` a la sesión pero el perfil no lo lista, la UI esconde acciones que
     // el runtime sí permite — una divergencia silenciosa entre las dos caras del mismo gate.
     let f = fixture().await;
-    let profile = body_json(
-        get(&f.router, "/api/profile", Some(&f.cashier)).await,
-    )
-    .await;
+    let profile = body_json(get(&f.router, "/api/profile", Some(&f.cashier)).await).await;
     let perms: Vec<&str> = profile["permissions"]
         .as_array()
         .unwrap()
@@ -643,4 +650,3 @@ async fn the_profile_publishes_the_same_permissions_the_gate_grants() {
     );
     std::fs::remove_dir_all(f.media).ok();
 }
-

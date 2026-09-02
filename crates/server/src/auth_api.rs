@@ -528,10 +528,17 @@ pub(crate) async fn auth_courier(
             "email": grant.user.email,
         }
     });
-    let access = cloud_tokens["access"].as_str().unwrap_or_default().to_string();
+    let access = cloud_tokens["access"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
     let login = CloudLoginReq {
-        name: cloud_tokens["cloud_user"]["name"].as_str().map(str::to_string),
-        email: cloud_tokens["cloud_user"]["email"].as_str().map(str::to_string),
+        name: cloud_tokens["cloud_user"]["name"]
+            .as_str()
+            .map(str::to_string),
+        email: cloud_tokens["cloud_user"]["email"]
+            .as_str()
+            .map(str::to_string),
         device_id: req.device_id,
     };
     open_cloud_session(

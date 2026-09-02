@@ -10,7 +10,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 
 fn mdir(name: &str) -> PathBuf {
@@ -29,7 +29,9 @@ async fn hub_with_taxes() -> Runtime {
 
 #[tokio::test]
 async fn query_de_un_modulo_no_instalado_es_module_not_installed() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = hub_with_taxes().await;
     let err = rt
         .execute_query_page("verifactu.records.by_invoice", &Params::new(), &admin())
@@ -43,7 +45,9 @@ async fn query_de_un_modulo_no_instalado_es_module_not_installed() {
 
 #[tokio::test]
 async fn query_inexistente_de_un_modulo_instalado_sigue_siendo_query_not_found() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = hub_with_taxes().await;
     let err = rt
         .execute_query_page("taxes.rates.list", &Params::new(), &admin()) // rates: retirado por ADR-0085

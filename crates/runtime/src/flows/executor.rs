@@ -224,7 +224,10 @@ async fn advance_run(
     // The event this run was born from. It travels into every command the run executes so the
     // events THOSE emit can name it too (hub#666): without it the chain breaks in the middle, at
     // precisely the point where the flow did something to somebody else's module.
-    let parent_event_id = run["parent_event_id"].as_str().unwrap_or_default().to_string();
+    let parent_event_id = run["parent_event_id"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
     let mut index = run["current_step"].as_i64().unwrap_or(0);
     let input: Json = parse_json(run["input"].as_str().unwrap_or("{}"));
     let mut vars: Json = parse_json(run["vars"].as_str().unwrap_or("{}"));
@@ -289,9 +292,12 @@ async fn advance_run(
 
     for _ in 0..MAX_STEPS_PER_TICK {
         let Some(step) = def.steps.get(index as usize) else {
-            return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None);
+            return finish(db, hub_id, &run_id, store::STATUS_DONE, "")
+                .await
+                .map(|()| None);
         };
-        let scope = json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
+        let scope =
+            json!({ "input": input, "steps": vars.get("steps").cloned().unwrap_or(json!({})) });
 
         match run_step(
             db,
@@ -318,15 +324,21 @@ async fn advance_run(
                 return Ok(Some(pending));
             }
             Outcome::Stopped => {
-                return finish(db, hub_id, &run_id, store::STATUS_DONE, "").await.map(|()| None)
+                return finish(db, hub_id, &run_id, store::STATUS_DONE, "")
+                    .await
+                    .map(|()| None)
             }
             Outcome::Sleep { wake_at, arm } => {
-                return sleep_until(db, hub_id, &run_id, &wake_at, &arm).await.map(|()| None)
+                return sleep_until(db, hub_id, &run_id, &wake_at, &arm)
+                    .await
+                    .map(|()| None)
             }
             Outcome::Failed { error } => {
                 // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
                 // and retrying a business command by itself is how a sale gets charged twice.
-                return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error).await.map(|()| None);
+                return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error)
+                    .await
+                    .map(|()| None);
             }
             // The question is asked; the run leaves the queue until somebody answers it. It goes
             // out through `complete_io` — the same door the `ai` step's proposal parks through —
@@ -361,10 +373,14 @@ async fn advance_run(
 }
 
 enum Outcome {
-    Continue { output: Json },
+    Continue {
+        output: Json,
+    },
     /// The step's work happens outside the lock (`http` and `ai`). The tick hands it to the server
     /// and this run pauses exactly here, claimed, until it comes back.
-    Io { pending: PendingIo },
+    Io {
+        pending: PendingIo,
+    },
     /// A `condition` said no. The run is complete, not failed: a guard that does not pass is the
     /// flow working exactly as written.
     Stopped,
@@ -374,7 +390,9 @@ enum Outcome {
         wake_at: String,
         arm: Vec<(String, Params)>,
     },
-    Failed { error: String },
+    Failed {
+        error: String,
+    },
     /// **The pause** (hub#950). The question is already written to `_flow_approvals` and the step
     /// row is `running`; what is left is to park the run, and that is done through the seam the
     /// `ai` step has parked through since hub#665 rather than beside it. One place decides what
@@ -401,8 +419,19 @@ async fn run_step(
             let matched = when.matches(scope);
             let output = json!({ "matched": matched });
             let status = if matched { STEP_DONE } else { STEP_STOPPED };
-            write_step(db, hub_id, run_id, index, step, status, &json!({}), &output, "", &now)
-                .await?;
+            write_step(
+                db,
+                hub_id,
+                run_id,
+                index,
+                step,
+                status,
+                &json!({}),
+                &output,
+                "",
+                &now,
+            )
+            .await?;
             Ok(if matched {
                 Outcome::Continue { output }
             } else {
@@ -425,7 +454,15 @@ async fn run_step(
                     output,
                 }) => {
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_DONE, &recorded_input, &output, "",
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_DONE,
+                        &recorded_input,
+                        &output,
+                        "",
                         &now,
                     )
                     .await?;
@@ -436,8 +473,16 @@ async fn run_step(
                     // the run says why at the step instead of carrying a null forward.
                     let error = format!("step `{}`: {}", step.id, error_text(&e));
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
-                        &error, &now,
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_FAILED,
+                        &json!({}),
+                        &json!({}),
+                        &error,
+                        &now,
                     )
                     .await?;
                     Ok(Outcome::Failed { error })
@@ -451,8 +496,16 @@ async fn run_step(
                 ($error:expr) => {{
                     let error = $error;
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
-                        &error, &now,
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_FAILED,
+                        &json!({}),
+                        &json!({}),
+                        &error,
+                        &now,
                     )
                     .await?;
                     return Ok(Outcome::Failed { error });
@@ -506,7 +559,15 @@ async fn run_step(
                     PastDuePolicy::Skip => {
                         let output = json!({ "past_due": true, "skipped": true });
                         write_step(
-                            db, hub_id, run_id, index, step, STEP_STOPPED, &json!({}), &output, "",
+                            db,
+                            hub_id,
+                            run_id,
+                            index,
+                            step,
+                            STEP_STOPPED,
+                            &json!({}),
+                            &output,
+                            "",
                             &now,
                         )
                         .await?;
@@ -523,7 +584,15 @@ async fn run_step(
                     PastDuePolicy::ContinueNow => {
                         let output = json!({ "past_due": true, "wake_at": Json::Null });
                         write_step(
-                            db, hub_id, run_id, index, step, STEP_DONE, &json!({}), &output, "",
+                            db,
+                            hub_id,
+                            run_id,
+                            index,
+                            step,
+                            STEP_DONE,
+                            &json!({}),
+                            &output,
+                            "",
                             &now,
                         )
                         .await?;
@@ -558,8 +627,19 @@ async fn run_step(
             };
 
             let output = json!({ "wake_at": wake_at, "waits": arm.len() });
-            write_step(db, hub_id, run_id, index, step, STEP_SLEEPING, &json!({}), &output, "", &now)
-                .await?;
+            write_step(
+                db,
+                hub_id,
+                run_id,
+                index,
+                step,
+                STEP_SLEEPING,
+                &json!({}),
+                &output,
+                "",
+                &now,
+            )
+            .await?;
             // The step index advances with the sleep: waking up resumes AFTER the delay, not on it.
             persist_step_index(db, hub_id, run_id, index + 1).await?;
             Ok(Outcome::Sleep { wake_at, arm })
@@ -595,7 +675,14 @@ async fn run_step(
             // bookkeeping commit together, so a crash never re-runs a command that already ran.
             let extra = [
                 write_step_op(
-                    hub_id, run_id, index, step, STEP_COMMITTED, &resolved_json, &json!({}), "",
+                    hub_id,
+                    run_id,
+                    index,
+                    step,
+                    STEP_COMMITTED,
+                    &resolved_json,
+                    &json!({}),
+                    "",
                     &now,
                 ),
                 advance_index_op(hub_id, run_id, index + 1, &now),
@@ -625,8 +712,16 @@ async fn run_step(
                     // failure on its own.
                     let error = step_error(command, &e);
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_FAILED, &resolved_json, &json!({}),
-                        &error, &now,
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_FAILED,
+                        &resolved_json,
+                        &json!({}),
+                        &error,
+                        &now,
                     )
                     .await?;
                     Ok(Outcome::Failed { error })
@@ -670,8 +765,16 @@ async fn run_step(
                     // says why. The message is already redacted by `http::prepare`.
                     let error = format!("step `{}`: {}", step.id, error_text(&e));
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
-                        &error, &now,
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_FAILED,
+                        &json!({}),
+                        &json!({}),
+                        &error,
+                        &now,
                     )
                     .await?;
                     Ok(Outcome::Failed { error })
@@ -689,7 +792,16 @@ async fn run_step(
         // and no assistant. The server reads the step back through `flows::agent::prepare`.
         StepSpec::Ai(_) => {
             write_step(
-                db, hub_id, run_id, index, step, STEP_RUNNING, &json!({}), &json!({}), "", &now,
+                db,
+                hub_id,
+                run_id,
+                index,
+                step,
+                STEP_RUNNING,
+                &json!({}),
+                &json!({}),
+                "",
+                &now,
             )
             .await?;
             Ok(Outcome::Io {
@@ -712,7 +824,15 @@ async fn run_step(
         StepSpec::Notify(_) => {
             let authority = grants::authority(db, hub_id, flow_id).await?;
             match notify::prepare(
-                db, registry, hub_id, flow_id, run_id, parent_event_id, depth, step, scope,
+                db,
+                registry,
+                hub_id,
+                flow_id,
+                run_id,
+                parent_event_id,
+                depth,
+                step,
+                scope,
                 &authority,
             )
             .await
@@ -747,8 +867,16 @@ async fn run_step(
                     // dead-letter.
                     let error = format!("step `{}`: {}", step.id, error_text(&e));
                     write_step(
-                        db, hub_id, run_id, index, step, STEP_FAILED, &json!({}), &json!({}),
-                        &error, &now,
+                        db,
+                        hub_id,
+                        run_id,
+                        index,
+                        step,
+                        STEP_FAILED,
+                        &json!({}),
+                        &json!({}),
+                        &error,
+                        &now,
                     )
                     .await?;
                     Ok(Outcome::Failed { error })
@@ -809,7 +937,15 @@ async fn run_step(
             // `running` and not `waiting_approval`: the park is `complete_io`'s job, and it only
             // accepts a result for a step the run is actually waiting on.
             write_step(
-                db, hub_id, run_id, index, step, STEP_RUNNING, &recorded_input, &json!({}), "",
+                db,
+                hub_id,
+                run_id,
+                index,
+                step,
+                STEP_RUNNING,
+                &recorded_input,
+                &json!({}),
+                "",
                 &now,
             )
             .await?;
@@ -915,7 +1051,9 @@ async fn write_step(
     error: &str,
     now: &str,
 ) -> Result<()> {
-    let (sql, p) = write_step_op(hub_id, run_id, index, step, status, input, output, error, now);
+    let (sql, p) = write_step_op(
+        hub_id, run_id, index, step, status, input, output, error, now,
+    );
     db.execute(&sql, &p).await?;
     Ok(())
 }
@@ -1303,9 +1441,11 @@ mod tests {
     async fn db() -> impl DatabaseAdapter {
         let db = fresh_db().await;
         test_support::ensure_schema(&db, HUB).await;
-        db.execute_batch("CREATE TABLE IF NOT EXISTS note (id TEXT PRIMARY KEY, text TEXT NOT NULL);")
-            .await
-            .unwrap();
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS note (id TEXT PRIMARY KEY, text TEXT NOT NULL);",
+        )
+        .await
+        .unwrap();
         db
     }
 
@@ -1376,7 +1516,10 @@ mod tests {
     }
 
     async fn run_of(db: &dyn DatabaseAdapter, flow_id: &str) -> store::FlowRun {
-        store::list_runs(db, HUB, flow_id, 10, None).await.unwrap().remove(0)
+        store::list_runs(db, HUB, flow_id, 10, None)
+            .await
+            .unwrap()
+            .remove(0)
     }
 
     async fn http_grant(db: &dyn DatabaseAdapter, flow_id: &str, pattern: &str) {
@@ -1466,9 +1609,19 @@ mod tests {
         .await;
         grant(&db, &flow_id, "notes.note.add").await;
 
-        store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({ "total": "9.90" }), 0, "t")
-            .await
-            .unwrap();
+        store::start_run(
+            &db,
+            HUB,
+            &flow_id,
+            "",
+            "manual",
+            "",
+            &json!({ "total": "9.90" }),
+            0,
+            "t",
+        )
+        .await
+        .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
         assert!(notes(&db).await.is_empty(), "the guard stopped the flow");
@@ -1512,7 +1665,11 @@ mod tests {
             .unwrap();
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[0].status, "done");
-        assert!(steps[0].output.get("ok").is_some(), "the output is kept: {:?}", steps[0].output);
+        assert!(
+            steps[0].output.get("ok").is_some(),
+            "the output is kept: {:?}",
+            steps[0].output
+        );
     }
 
     // ── the `query` step, end to end (hub#954) ────────────────────────────────────────────────
@@ -1653,7 +1810,10 @@ mod tests {
             .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
-        assert!(notes(&db).await.is_empty(), "the guard stopped it, the read did not");
+        assert!(
+            notes(&db).await.is_empty(),
+            "the guard stopped it, the read did not"
+        );
         let run = run_of(&db, &flow_id).await;
         assert_eq!(
             run.status,
@@ -1725,17 +1885,18 @@ mod tests {
         )
         .await;
         grant(&db, &flow_id, "notes.note.add").await;
-        let run_id =
-            store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
-                .await
-                .unwrap();
+        let run_id = store::start_run(&db, HUB, &flow_id, "", "manual", "", &json!({}), 0, "t")
+            .await
+            .unwrap();
 
         tick(&db, &reg, HUB).await.unwrap();
         assert_eq!(notes(&db).await, vec!["one"], "the first step ran");
 
         // The owner revokes while the run sleeps. This is the guarantee: effective at the NEXT
         // step, not at some restart.
-        grants::replace(&db, HUB, &flow_id, &reg, &[], "hub_user:2").await.unwrap();
+        grants::replace(&db, HUB, &flow_id, &reg, &[], "hub_user:2")
+            .await
+            .unwrap();
         let mut p = Params::new();
         p.insert("id".into(), json!(run_id));
         db.execute(
@@ -1749,7 +1910,11 @@ mod tests {
         assert_eq!(notes(&db).await, vec!["one"], "the second step never ran");
         let run = run_of(&db, &flow_id).await;
         assert_eq!(run.status, store::STATUS_FAILED);
-        assert!(run.last_error.contains(grants::ERR_GRANT_DENIED), "{}", run.last_error);
+        assert!(
+            run.last_error.contains(grants::ERR_GRANT_DENIED),
+            "{}",
+            run.last_error
+        );
     }
 
     #[tokio::test]
@@ -1777,7 +1942,10 @@ mod tests {
         .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
-        assert!(notes(&db).await.is_empty(), "a hub does not act on a withdrawn instruction");
+        assert!(
+            notes(&db).await.is_empty(),
+            "a hub does not act on a withdrawn instruction"
+        );
         assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_CANCELLED);
     }
 
@@ -1808,7 +1976,11 @@ mod tests {
 
         let run = run_of(&db, &flow_id).await;
         assert_eq!(run.status, store::STATUS_FAILED);
-        assert!(run.last_error.contains(ERR_STEP_OUTPUT_LOST), "{}", run.last_error);
+        assert!(
+            run.last_error.contains(ERR_STEP_OUTPUT_LOST),
+            "{}",
+            run.last_error
+        );
     }
 
     #[tokio::test]
@@ -1861,7 +2033,11 @@ mod tests {
             .unwrap()
             .rows;
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0]["hub_id"], json!(HUB), "the tenant is never negotiable");
+        assert_eq!(
+            rows[0]["hub_id"],
+            json!(HUB),
+            "the tenant is never negotiable"
+        );
         assert_eq!(
             rows[0]["created_by"],
             json!(format!("flow:{flow_id}")),
@@ -1875,7 +2051,9 @@ mod tests {
     async fn without_a_grant_an_http_step_never_becomes_a_request() {
         let db = db().await;
         let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping")).await;
-        start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
 
         let report = tick(&db, &registry(), HUB).await.unwrap();
 
@@ -1897,7 +2075,11 @@ mod tests {
     #[tokio::test]
     async fn with_the_grant_the_tick_hands_over_exactly_one_request_with_the_url_templated() {
         let db = db().await;
-        let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping?who={{input.who}}")).await;
+        let flow_id = flow(
+            &db,
+            http_flow("https://api.example.com/v1/ping?who={{input.who}}"),
+        )
+        .await;
         http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
         start_manual_run(&db, HUB, &flow_id, &json!({ "who": "marta" }), "hub_user:1")
             .await
@@ -1906,11 +2088,17 @@ mod tests {
         let report = tick(&db, &registry(), HUB).await.unwrap();
 
         assert_eq!(report.pending_io.len(), 1, "one step, one request");
-        let PendingIo::Http { step_id, request, .. } = &report.pending_io[0] else {
+        let PendingIo::Http {
+            step_id, request, ..
+        } = &report.pending_io[0]
+        else {
             panic!("an http step becomes an http PendingIo");
         };
         assert_eq!(step_id, "call");
-        assert_eq!(request.url.as_str(), "https://api.example.com/v1/ping?who=marta");
+        assert_eq!(
+            request.url.as_str(),
+            "https://api.example.com/v1/ping?who=marta"
+        );
         assert_eq!(request.method, "GET");
 
         // While it is out there the run is invisible: a second tick does not issue it again.
@@ -1950,7 +2138,9 @@ mod tests {
         )
         .await
         .unwrap();
-        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
 
         tick(&db, &registry(), HUB).await.unwrap();
         complete_io(
@@ -1996,7 +2186,9 @@ mod tests {
         )
         .await
         .unwrap();
-        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
         complete_io(
@@ -2013,7 +2205,11 @@ mod tests {
         // v1 is `on_error: stop`.
         let run = run_of(&db, &flow_id).await;
         assert_eq!(run.status, store::STATUS_FAILED);
-        assert!(run.last_error.contains("http_timeout"), "{}", run.last_error);
+        assert!(
+            run.last_error.contains("http_timeout"),
+            "{}",
+            run.last_error
+        );
         assert!(notes(&db).await.is_empty(), "the step after it never ran");
     }
 
@@ -2028,7 +2224,9 @@ mod tests {
         let writing = flow(&db, one_command_flow()).await;
         grant(&db, &writing, "notes.note.add").await;
 
-        start_manual_run(&db, HUB, &calling, &json!({}), "hub_user:1").await.unwrap();
+        start_manual_run(&db, HUB, &calling, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
         start_manual_run(&db, HUB, &writing, &json!({ "who": "Marta" }), "hub_user:1")
             .await
             .unwrap();
@@ -2052,12 +2250,20 @@ mod tests {
         let db = db().await;
         let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping")).await;
         http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
-        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
-        tick(&db, &registry(), HUB).await.unwrap();
-
-        complete_io(&db, HUB, &run_id, "call", IoResult::Done(json!({ "status": 200 })))
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
             .await
             .unwrap();
+        tick(&db, &registry(), HUB).await.unwrap();
+
+        complete_io(
+            &db,
+            HUB,
+            &run_id,
+            "call",
+            IoResult::Done(json!({ "status": 200 })),
+        )
+        .await
+        .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
         assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
 
@@ -2102,12 +2308,19 @@ mod tests {
         )
         .await;
         http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
-        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
 
         let report = tick(&db, &registry(), HUB).await.unwrap();
         // It really did go out with the credential…
-        let PendingIo::Http { request, .. } = &report.pending_io[0] else { panic!() };
-        assert!(request.headers.iter().any(|(_, v)| v.contains("sk-live-42")));
+        let PendingIo::Http { request, .. } = &report.pending_io[0] else {
+            panic!()
+        };
+        assert!(request
+            .headers
+            .iter()
+            .any(|(_, v)| v.contains("sk-live-42")));
 
         // …and nothing that was written down holds it. Not the step, not the run, not a `{:?}`.
         complete_io(
@@ -2121,11 +2334,20 @@ mod tests {
         .unwrap();
         let dump = format!(
             "{:?}{:?}{:?}",
-            db.query("SELECT * FROM _flow_run_steps", &Params::new()).await.unwrap().rows,
-            db.query("SELECT * FROM _flow_runs", &Params::new()).await.unwrap().rows,
+            db.query("SELECT * FROM _flow_run_steps", &Params::new())
+                .await
+                .unwrap()
+                .rows,
+            db.query("SELECT * FROM _flow_runs", &Params::new())
+                .await
+                .unwrap()
+                .rows,
             report.pending_io,
         );
-        assert!(!dump.contains("sk-live-42"), "the credential is nowhere: {dump}");
+        assert!(
+            !dump.contains("sk-live-42"),
+            "the credential is nowhere: {dump}"
+        );
         assert!(dump.contains("***"), "and its place is marked: {dump}");
     }
 
@@ -2200,14 +2422,27 @@ mod tests {
         )
         .await
         .unwrap();
-        let their_run =
-            store::start_run(&db, OTHER, &their_flow, "", "manual", "", &json!({}), 0, "t")
-                .await
-                .unwrap();
+        let their_run = store::start_run(
+            &db,
+            OTHER,
+            &their_flow,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "t",
+        )
+        .await
+        .unwrap();
         tick(&db, &reg, OTHER).await.unwrap();
         let their_run_before = raw_run(&db, &their_run).await;
         let their_steps_before = raw_steps(&db, &their_run).await;
-        assert_eq!(their_steps_before.len(), 1, "the neighbour really did run a step");
+        assert_eq!(
+            their_steps_before.len(),
+            1,
+            "the neighbour really did run a step"
+        );
 
         // And this hub has a run parked mid-flight.
         let flow_id = flow(&db, one_command_flow()).await;
@@ -2220,13 +2455,26 @@ mod tests {
         let steps_before = raw_steps(&db, &run_id).await;
 
         // Now the neighbour asks for every write this file performs, naming OUR run.
-        finish(&db, OTHER, &run_id, store::STATUS_FAILED, "not yours").await.unwrap();
-        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00", &[]).await.unwrap();
-        persist_vars(&db, OTHER, &run_id, 99, &json!({ "steps": { "x": 1 } })).await.unwrap();
-        persist_step_index(&db, OTHER, &run_id, 98).await.unwrap();
-        complete_step(&db, OTHER, &run_id, 0, &json!({ "stolen": true }), "2020-01-01T00:00:00+00:00")
+        finish(&db, OTHER, &run_id, store::STATUS_FAILED, "not yours")
             .await
             .unwrap();
+        sleep_until(&db, OTHER, &run_id, "2020-01-01T00:00:00+00:00", &[])
+            .await
+            .unwrap();
+        persist_vars(&db, OTHER, &run_id, 99, &json!({ "steps": { "x": 1 } }))
+            .await
+            .unwrap();
+        persist_step_index(&db, OTHER, &run_id, 98).await.unwrap();
+        complete_step(
+            &db,
+            OTHER,
+            &run_id,
+            0,
+            &json!({ "stolen": true }),
+            "2020-01-01T00:00:00+00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(
             interrupted_step(&db, OTHER, &run_id).await.unwrap(),
             None,
@@ -2234,7 +2482,11 @@ mod tests {
         );
 
         assert_eq!(raw_run(&db, &run_id).await, before, "our run is untouched");
-        assert_eq!(raw_steps(&db, &run_id).await, steps_before, "our steps are untouched");
+        assert_eq!(
+            raw_steps(&db, &run_id).await,
+            steps_before,
+            "our steps are untouched"
+        );
         assert_eq!(
             raw_run(&db, &their_run).await,
             their_run_before,
@@ -2250,14 +2502,22 @@ mod tests {
         let db = db().await;
         let flow_id = flow(&db, http_flow("https://api.example.com/v1/ping")).await;
         http_grant(&db, &flow_id, "https://api.example.com/v1/*").await;
-        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1").await.unwrap();
+        let run_id = start_manual_run(&db, HUB, &flow_id, &json!({}), "hub_user:1")
+            .await
+            .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
         let before = raw_run(&db, &run_id).await;
         let steps_before = raw_steps(&db, &run_id).await;
-        let err = complete_io(&db, OTHER, &run_id, "call", IoResult::Done(json!({ "status": 200 })))
-            .await
-            .unwrap_err();
+        let err = complete_io(
+            &db,
+            OTHER,
+            &run_id,
+            "call",
+            IoResult::Done(json!({ "status": 200 })),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_IO_STEP_GONE),
             "{err:?}"
@@ -2303,10 +2563,9 @@ mod tests {
     ) -> (String, String) {
         let flow_id = flow(db, wait_until_flow(past_due)).await;
         grant(db, &flow_id, "notes.note.add").await;
-        let run_id =
-            start_manual_run(db, HUB, &flow_id, &json!({ "when": when }), "hub_user:1")
-                .await
-                .unwrap();
+        let run_id = start_manual_run(db, HUB, &flow_id, &json!({ "when": when }), "hub_user:1")
+            .await
+            .unwrap();
         tick(db, &registry(), HUB).await.unwrap();
         (flow_id, run_id)
     }
@@ -2351,7 +2610,10 @@ mod tests {
         let due = at_offset(chrono::Utc::now() - chrono::Duration::minutes(1), 2);
         let (flow_id, _) = park_until_with(&db, &due, def::PastDuePolicy::default().as_str()).await;
 
-        assert!(notes(&db).await.is_empty(), "a reminder whose hour went by is not sent");
+        assert!(
+            notes(&db).await.is_empty(),
+            "a reminder whose hour went by is not sent"
+        );
         assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_DONE);
     }
 
@@ -2371,19 +2633,31 @@ mod tests {
             let (flow_id, run_id) = park_until(&db, &later).await;
             assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
 
-            let stored = raw_run(&db, &run_id).await["wake_at"].as_str().unwrap().to_string();
-            assert!(stored.ends_with("+00:00"), "stored with an offset of its own: {stored}");
+            let stored = raw_run(&db, &run_id).await["wake_at"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            assert!(
+                stored.ends_with("+00:00"),
+                "stored with an offset of its own: {stored}"
+            );
 
             // The question `wake_sleeping` asks, at a moment safely after the instant. The stored
             // text answers it; the text as it arrived does not — that IS hub#970.
             let after = (chrono::Utc::now() + chrono::Duration::hours(7)).to_rfc3339();
             assert!(stored <= after, "{stored} vs {after}");
             if hours > 0 {
-                assert!(later > after, "the raw `{later}` sorts late: the run would oversleep");
+                assert!(
+                    later > after,
+                    "the raw `{later}` sorts late: the run would oversleep"
+                );
             }
 
             tick(&db, &registry(), HUB).await.unwrap();
-            assert!(notes(&db).await.is_empty(), "the instant has not arrived yet");
+            assert!(
+                notes(&db).await.is_empty(),
+                "the instant has not arrived yet"
+            );
             assert_eq!(run_of(&db, &flow_id).await.status, store::STATUS_SLEEPING);
         }
     }
@@ -2405,9 +2679,12 @@ mod tests {
         let mut p = Params::new();
         p.insert("id".into(), json!(run_id));
         p.insert("wake_at".into(), json!(due));
-        db.execute("UPDATE _flow_runs SET wake_at = :wake_at WHERE id = :id", &p)
-            .await
-            .unwrap();
+        db.execute(
+            "UPDATE _flow_runs SET wake_at = :wake_at WHERE id = :id",
+            &p,
+        )
+        .await
+        .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
         assert!(
             notes(&db).await.is_empty(),

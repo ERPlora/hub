@@ -270,7 +270,10 @@ fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn build_media_zip(files: &[(String, Vec<u8>)]) -> Vec<u8> {
@@ -358,7 +361,9 @@ async fn el_export_mete_las_imagenes_del_gestor_media_en_el_zip() {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let entries = zip_entries(&bytes);
 
-    let imagen = entries.iter().find(|(n, _)| n == "media/catalogo/cafe.webp");
+    let imagen = entries
+        .iter()
+        .find(|(n, _)| n == "media/catalogo/cafe.webp");
     assert!(
         imagen.is_some(),
         "la imagen del catálogo tiene que viajar dentro del zip; entradas = {:?}",
@@ -464,7 +469,10 @@ async fn el_import_sube_las_imagenes_del_zip_al_gestor_media() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let resp = app
         .oneshot(post_json(
@@ -637,7 +645,11 @@ async fn el_import_marca_el_lote_completo_tras_agotar_reintentos() {
         .collect();
 
     let (status, body) = import_zip(app, build_media_zip(&files)).await;
-    assert_eq!(status, StatusCode::OK, "el import global sigue siendo best-effort: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "el import global sigue siendo best-effort: {body}"
+    );
     assert_eq!(body["report"]["media"]["copied"], json!(5), "{body}");
     assert_eq!(body["report"]["media"]["failed"], json!(40), "{body}");
     assert_eq!(state.upload_batches.lock().unwrap().len(), 4);

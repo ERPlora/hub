@@ -71,7 +71,9 @@ pub async fn granted_by_module(
         let (Some(module), Some(cap)) = (r["module_id"].as_str(), r["capability"].as_str()) else {
             continue;
         };
-        out.entry(module.to_string()).or_default().push(cap.to_string());
+        out.entry(module.to_string())
+            .or_default()
+            .push(cap.to_string());
     }
     Ok(out)
 }
@@ -199,7 +201,10 @@ pub async fn require(
         // No la declara: no se le puede conceder, luego no puede ejercerla.
         return Err(denied());
     }
-    if !granted_set(db, hub_id, module_id).await?.contains(kind.as_str()) {
+    if !granted_set(db, hub_id, module_id)
+        .await?
+        .contains(kind.as_str())
+    {
         return Err(denied());
     }
     Ok(())
@@ -294,10 +299,14 @@ mod tests {
 
     async fn db_with_migrations() -> PgAdapter {
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa.
         crate::identity::ensure_tables(&db).await.unwrap();
-        crate::system_migrations::apply(&db, "hub-test").await.unwrap();
+        crate::system_migrations::apply(&db, "hub-test")
+            .await
+            .unwrap();
         db
     }
 
@@ -327,15 +336,21 @@ mod tests {
         ));
 
         // Conceder solo network → sigue denegado (falta certificate).
-        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin").await.unwrap();
+        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin")
+            .await
+            .unwrap();
         assert!(enforce(&db, &reg, mid, hub).await.is_err());
 
         // Conceder certificate también → pasa.
-        set_grant(&db, &reg, hub, mid, "certificate", true, "hub_user:admin").await.unwrap();
+        set_grant(&db, &reg, hub, mid, "certificate", true, "hub_user:admin")
+            .await
+            .unwrap();
         enforce(&db, &reg, mid, hub).await.unwrap();
 
         // Revocar network → vuelve a denegar.
-        set_grant(&db, &reg, hub, mid, "network", false, "hub_user:admin").await.unwrap();
+        set_grant(&db, &reg, hub, mid, "network", false, "hub_user:admin")
+            .await
+            .unwrap();
         assert!(enforce(&db, &reg, mid, hub).await.is_err());
     }
 
@@ -347,17 +362,30 @@ mod tests {
                 "capabilities":{"certificate":{"purpose":"fiscal-sign"}}}"#,
         ));
         // No declarada por el módulo → rechazada.
-        assert!(set_grant(&db, &reg, "hub-test", "verifactu", "printer", true, "x").await.is_err());
+        assert!(
+            set_grant(&db, &reg, "hub-test", "verifactu", "printer", true, "x")
+                .await
+                .is_err()
+        );
         // Capability inexistente → rechazada.
-        assert!(set_grant(&db, &reg, "hub-test", "verifactu", "telepathy", true, "x").await.is_err());
+        assert!(
+            set_grant(&db, &reg, "hub-test", "verifactu", "telepathy", true, "x")
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
     async fn module_without_capabilities_passes_freely() {
         let db = db_with_migrations().await;
-        let reg = registry_with(manifest(r#"{"id":"sales","name":"Sales","version":"1.0.0"}"#));
+        let reg = registry_with(manifest(
+            r#"{"id":"sales","name":"Sales","version":"1.0.0"}"#,
+        ));
         enforce(&db, &reg, "sales", "hub-test").await.unwrap();
-        assert!(list_for_module(&db, &reg, "hub-test", "sales").await.unwrap().is_empty());
+        assert!(list_for_module(&db, &reg, "hub-test", "sales")
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     /// `require` gatea UNA capability: hace falta declararla Y tenerla concedida. Un módulo con
@@ -378,23 +406,39 @@ mod tests {
         ));
 
         // Conceder OTRA capability no abre `notify`.
-        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin").await.unwrap();
-        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify).await.is_err());
+        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin")
+            .await
+            .unwrap();
+        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify)
+            .await
+            .is_err());
 
         // Concedida → pasa. Y revocarla vuelve a cerrar.
-        set_grant(&db, &reg, hub, mid, "notify", true, "hub_user:admin").await.unwrap();
-        require(&db, &reg, mid, hub, CapabilityKind::Notify).await.unwrap();
-        set_grant(&db, &reg, hub, mid, "notify", false, "hub_user:admin").await.unwrap();
-        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify).await.is_err());
+        set_grant(&db, &reg, hub, mid, "notify", true, "hub_user:admin")
+            .await
+            .unwrap();
+        require(&db, &reg, mid, hub, CapabilityKind::Notify)
+            .await
+            .unwrap();
+        set_grant(&db, &reg, hub, mid, "notify", false, "hub_user:admin")
+            .await
+            .unwrap();
+        assert!(require(&db, &reg, mid, hub, CapabilityKind::Notify)
+            .await
+            .is_err());
     }
 
     /// Un módulo que NO declara la capability no puede ejercerla (no hay grant que conceder).
     #[tokio::test]
     async fn require_rejects_undeclared_capability() {
         let db = db_with_migrations().await;
-        let reg = registry_with(manifest(r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#));
+        let reg = registry_with(manifest(
+            r#"{"id":"notes","name":"Notes","version":"1.0.0"}"#,
+        ));
         assert!(matches!(
-            require(&db, &reg, "notes", "hub-test", CapabilityKind::Notify).await.unwrap_err(),
+            require(&db, &reg, "notes", "hub-test", CapabilityKind::Notify)
+                .await
+                .unwrap_err(),
             RuntimeError::CapabilityDenied { .. }
         ));
     }
@@ -406,11 +450,20 @@ mod tests {
             r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0",
                 "capabilities":{"certificate":{},"network":{}}}"#,
         ));
-        let list = list_for_module(&db, &reg, "hub-test", "verifactu").await.unwrap();
+        let list = list_for_module(&db, &reg, "hub-test", "verifactu")
+            .await
+            .unwrap();
         assert_eq!(list.len(), 2);
-        assert!(list.iter().all(|(_, g)| !*g), "default-deny: nada concedido");
-        set_grant(&db, &reg, "hub-test", "verifactu", "network", true, "x").await.unwrap();
-        let list = list_for_module(&db, &reg, "hub-test", "verifactu").await.unwrap();
+        assert!(
+            list.iter().all(|(_, g)| !*g),
+            "default-deny: nada concedido"
+        );
+        set_grant(&db, &reg, "hub-test", "verifactu", "network", true, "x")
+            .await
+            .unwrap();
+        let list = list_for_module(&db, &reg, "hub-test", "verifactu")
+            .await
+            .unwrap();
         assert!(list.iter().any(|(id, g)| id == "network" && *g));
     }
 }

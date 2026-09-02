@@ -261,11 +261,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<TrustedD
 /// hub#497. Before that, cutting off a lost tablet here signed the same tablet out of the business
 /// next door, which is a real case: `hub_trusted_device` is keyed `(hub_id, device_id)` precisely
 /// because one tablet legitimately works in two businesses.
-pub async fn revoke(
-    db: &dyn DatabaseAdapter,
-    hub_id: &str,
-    device_id: &str,
-) -> Result<Revocation> {
+pub async fn revoke(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> Result<Revocation> {
     let device_id = named(device_id)?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -336,7 +332,11 @@ mod tests {
         for blank in ["", " ", "\t", "   \n"] {
             assert!(named(blank).is_err(), "{blank:?} names no device");
         }
-        assert_eq!(named("  till-1 ").unwrap(), "till-1", "a real id is trimmed, not refused");
+        assert_eq!(
+            named("  till-1 ").unwrap(),
+            "till-1",
+            "a real id is trimmed, not refused"
+        );
     }
 
     #[test]
@@ -347,14 +347,25 @@ mod tests {
         assert_eq!(listed_mode(Some("shared")), "shared");
         assert_eq!(listed_mode(None), "shared");
         assert_eq!(listed_mode(Some("")), "shared");
-        assert_eq!(listed_mode(Some("Personal")), "shared", "no case folding, like the parser");
+        assert_eq!(
+            listed_mode(Some("Personal")),
+            "shared",
+            "no case folding, like the parser"
+        );
         assert_eq!(listed_mode(Some("trusted-forever")), "shared");
     }
 
     #[test]
     fn the_session_fold_answers_who_is_on_it_now_and_for_how_long() {
         let mut open = OpenSessions::default();
-        assert_eq!(open, OpenSessions { count: 0, last_sign_in: String::new(), until: String::new() });
+        assert_eq!(
+            open,
+            OpenSessions {
+                count: 0,
+                last_sign_in: String::new(),
+                until: String::new()
+            }
+        );
 
         open.saw("2026-08-01T08:00:00+00:00", "2026-08-01T20:00:00+00:00");
         open.saw("2026-08-01T09:30:00+00:00", "2026-08-01T18:00:00+00:00");

@@ -702,7 +702,8 @@ mod tests {
                 .unwrap_or_default();
             let mut pending = st.pending.lock().unwrap();
             let before = pending.len();
-            pending.retain(|m| !ids.contains(&m["wa_message_id"].as_str().unwrap_or("").to_string()));
+            pending
+                .retain(|m| !ids.contains(&m["wa_message_id"].as_str().unwrap_or("").to_string()));
             let acked = before - pending.len();
             (StatusCode::OK, Json(json!({"acked": acked})))
         }
@@ -805,15 +806,27 @@ mod tests {
 
         let rows = outbox_rows(&runtime).await;
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0]["id"], json!("wa-wamid.1"), "the id IS the dedup key");
+        assert_eq!(
+            rows[0]["id"],
+            json!("wa-wamid.1"),
+            "the id IS the dedup key"
+        );
         assert_eq!(rows[0]["event_name"], json!(EVENT_NAME));
-        assert_eq!(rows[0]["hub_id"], json!(HUB), "the event belongs to this hub");
+        assert_eq!(
+            rows[0]["hub_id"],
+            json!(HUB),
+            "the event belongs to this hub"
+        );
         assert_eq!(rows[0]["status"], json!("pending"));
 
         let payload: Value = serde_json::from_str(rows[0]["payload"].as_str().unwrap()).unwrap();
         assert_eq!(payload["wa_message_id"], json!("wamid.1"));
         assert_eq!(payload["from"], json!("34600999888"));
-        assert_eq!(payload["text"], json!("is the table free?"), "a flow reads this");
+        assert_eq!(
+            payload["text"],
+            json!("is the table free?"),
+            "a flow reads this"
+        );
         assert_eq!(payload["received_at"], json!("2026-08-09T10:00:00+00:00"));
         assert_eq!(
             payload["message"]["type"],
@@ -1033,8 +1046,10 @@ mod tests {
         poller.poll_once(&runtime, &entitled()).await.unwrap();
 
         assert!(
-            cloud.paths().iter().all(|p| p != "GET inbox?after="
-                && !p.starts_with("GET inbox?after=")),
+            cloud
+                .paths()
+                .iter()
+                .all(|p| p != "GET inbox?after=" && !p.starts_with("GET inbox?after=")),
             "no cursor ever travels: {:?}",
             cloud.paths()
         );
@@ -1045,7 +1060,11 @@ mod tests {
             .collect();
         assert_eq!(
             ids,
-            vec![json!("wa-wamid.0"), json!("wa-wamid.1"), json!("wa-wamid.2")],
+            vec![
+                json!("wa-wamid.0"),
+                json!("wa-wamid.1"),
+                json!("wa-wamid.2")
+            ],
             "the late arrival is ingested too"
         );
     }

@@ -237,7 +237,10 @@ impl StepKind {
 pub enum StepSpec {
     /// `{"kind":"command","command":"sales.sale.create","params":{…}}` — the params are mapped
     /// (paths/templates) against the run before the command sees them.
-    Command { command: String, params: Map<String, Json> },
+    Command {
+        command: String,
+        params: Map<String, Json>,
+    },
     /// `{"kind":"query","query":"sales.summary","params":{…},"result":"first","limit":50}` — a
     /// deterministic read (hub#954). See [`QueryStep`].
     Query(QueryStep),
@@ -858,7 +861,8 @@ impl Condition {
     pub fn matches(&self, scope: &Json) -> bool {
         self.0.iter().all(|(path, ops)| {
             let actual = resolve_path(path, scope).unwrap_or(Json::Null);
-            ops.iter().all(|(op, expected)| eval(*op, &actual, expected))
+            ops.iter()
+                .all(|(op, expected)| eval(*op, &actual, expected))
         })
     }
 
@@ -1117,7 +1121,10 @@ impl FlowDefinition {
     /// is how a caller ends up storing a document that never runs.
     pub fn parse(value: &Json) -> Result<Self> {
         let Json::Object(root) = value else {
-            return Err(invalid(ERR_INVALID_DEFINITION, "a flow definition is an object"));
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                "a flow definition is an object",
+            ));
         };
 
         // Version FIRST: everything below is the grammar of v1, and applying it to a document
@@ -1127,7 +1134,9 @@ impl FlowDefinition {
             Some(_) | None => {
                 return Err(invalid(
                     ERR_UNKNOWN_SCHEMA_VERSION,
-                    format!("`schema_version` is required and must be the integer {SCHEMA_VERSION}"),
+                    format!(
+                        "`schema_version` is required and must be the integer {SCHEMA_VERSION}"
+                    ),
                 ))
             }
         };
@@ -1142,7 +1151,10 @@ impl FlowDefinition {
         }
 
         for key in root.keys() {
-            if !matches!(key.as_str(), "schema_version" | "name" | "triggers" | "steps") {
+            if !matches!(
+                key.as_str(),
+                "schema_version" | "name" | "triggers" | "steps"
+            ) {
                 return Err(invalid(
                     ERR_INVALID_DEFINITION,
                     format!("unknown key `{key}` in the flow document"),
@@ -1157,7 +1169,10 @@ impl FlowDefinition {
                 .map(parse_trigger)
                 .collect::<Result<Vec<_>>>()?,
             Some(_) => {
-                return Err(invalid(ERR_INVALID_DEFINITION, "`triggers` must be an array"))
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    "`triggers` must be an array",
+                ))
             }
         };
         let steps = match root.get("steps") {
@@ -1797,11 +1812,7 @@ fn parse_hooks(id: &str, value: Option<&Json>, kind: WaitKind) -> Result<Vec<Wai
 }
 
 /// `{<path in the event>: <path in the run>}` — the frozen path language on both sides.
-fn parse_correlate(
-    id: &str,
-    list: &str,
-    value: Option<&Json>,
-) -> Result<BTreeMap<String, String>> {
+fn parse_correlate(id: &str, list: &str, value: Option<&Json>) -> Result<BTreeMap<String, String>> {
     let complain = |why: String| invalid(ERR_INVALID_DEFINITION, why);
     let Some(Json::Object(map)) = value else {
         return Err(complain(format!(
@@ -1836,8 +1847,7 @@ fn parse_correlate(
                  event (`event.<field>`), not `{event_path}`"
             )));
         }
-        if !is_path(run_path)
-            || !(run_path.starts_with("input.") || run_path.starts_with("steps."))
+        if !is_path(run_path) || !(run_path.starts_with("input.") || run_path.starts_with("steps."))
         {
             return Err(complain(format!(
                 "step `{id}`, `{list}_on`: the right of `correlate` is a path into THIS run \
@@ -1951,10 +1961,12 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         .and_then(|v| v.as_str())
         .unwrap_or_default()
         .trim();
-    let channel = Channel::parse(channel_text).filter(|c| c.is_deliverable()).ok_or_else(|| {
-        invalid(
-            ERR_INVALID_DEFINITION,
-            format!(
+    let channel = Channel::parse(channel_text)
+        .filter(|c| c.is_deliverable())
+        .ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
                 "step `{id}`: `channel` is one of {} (`sms` is in ADR-0012's vocabulary and this \
                  hub has no transport for it, so a step naming it would only ever dead-letter)",
                 Channel::DELIVERABLE
@@ -1963,8 +1975,8 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-        )
-    })?;
+            )
+        })?;
 
     let Some(Json::Object(to)) = map.get("to") else {
         return Err(invalid(
@@ -2655,7 +2667,11 @@ mod tests {
         assert_eq!(delay.offset_seconds, 0);
         assert_eq!(delay.max_wait, None);
         assert_eq!(delay.horizon_seconds(), MAX_DELAY_HORIZON);
-        assert_eq!(delay.past_due, PastDuePolicy::Skip, "the default is the restrictive one");
+        assert_eq!(
+            delay.past_due,
+            PastDuePolicy::Skip,
+            "the default is the restrictive one"
+        );
         assert!(delay.cancel_on.is_empty() && delay.reschedule_on.is_empty());
     }
 
@@ -2701,7 +2717,9 @@ mod tests {
             );
         }
         // And the horizon itself still saves: refused ABOVE, not at.
-        assert!(delay_of(json!({ "id": "w", "kind": "delay", "seconds": MAX_DELAY_HORIZON })).is_ok());
+        assert!(
+            delay_of(json!({ "id": "w", "kind": "delay", "seconds": MAX_DELAY_HORIZON })).is_ok()
+        );
     }
 
     #[test]
@@ -2748,10 +2766,16 @@ mod tests {
         assert_eq!(delay.cancel_on[0].event, "appointment.cancelled");
         assert!(delay.cancel_on[0].filter.is_empty());
         assert_eq!(
-            delay.cancel_on[0].correlate.get("event.id").map(String::as_str),
+            delay.cancel_on[0]
+                .correlate
+                .get("event.id")
+                .map(String::as_str),
             Some("input.appointment_id")
         );
-        assert_eq!(delay.reschedule_on[0].until.as_deref(), Some("event.appointment_at"));
+        assert_eq!(
+            delay.reschedule_on[0].until.as_deref(),
+            Some("event.appointment_at")
+        );
         assert!(!delay.reschedule_on[0].filter.is_empty());
     }
 
@@ -2802,7 +2826,10 @@ mod tests {
             }))
             .expect_err("only `event.<path>` → `input|steps.<path>` correlates");
             let text = format!("{err}");
-            assert!(text.contains("correlate") || text.contains("secret"), "{text}");
+            assert!(
+                text.contains("correlate") || text.contains("secret"),
+                "{text}"
+            );
         }
     }
 
@@ -2815,7 +2842,10 @@ mod tests {
             "id": "w", "kind": "delay", "until": "input.at", "cancel_on": hooks
         }))
         .expect_err("the match runs on the hot path of every event delivery");
-        assert!(format!("{err}").contains(&MAX_WAIT_HOOKS.to_string()), "{err}");
+        assert!(
+            format!("{err}").contains(&MAX_WAIT_HOOKS.to_string()),
+            "{err}"
+        );
     }
 
     #[test]
@@ -2840,7 +2870,11 @@ mod tests {
             json!({ "event": "a.b", "correlate": { "event.id": "input.id" },
                     "until": "secret.API_KEY" }),
         ] {
-            let list = if hook["until"].is_null() { "cancel_on" } else { "reschedule_on" };
+            let list = if hook["until"].is_null() {
+                "cancel_on"
+            } else {
+                "reschedule_on"
+            };
             let err = delay_of(json!({
                 "id": "w", "kind": "delay", "until": "input.at", list: [hook]
             }))
@@ -2888,7 +2922,13 @@ mod tests {
             "steps": [{ "id": "call", "kind": "http", "url": "https://api.example.com/ping" }]
         }))
         .unwrap();
-        let StepSpec::Http { method, timeout_seconds, body, .. } = &def.steps[0].spec else {
+        let StepSpec::Http {
+            method,
+            timeout_seconds,
+            body,
+            ..
+        } = &def.steps[0].spec
+        else {
             panic!()
         };
         assert_eq!(method, "GET");
@@ -2927,7 +2967,10 @@ mod tests {
             "steps": [{ "id": "c", "kind": "http", "url": "https://a.example.com/x", "timeout": 120 }]
         }))
         .expect_err("a 2-minute step is a run nobody can explain");
-        assert!(format!("{over}").contains(&MAX_TIMEOUT_SECONDS.to_string()), "{over}");
+        assert!(
+            format!("{over}").contains(&MAX_TIMEOUT_SECONDS.to_string()),
+            "{over}"
+        );
 
         assert!(FlowDefinition::parse(&json!({
             "schema_version": 1,
@@ -3258,7 +3301,10 @@ mod tests {
                 "`{expr}`: the author has to be told WHAT is wrong; expected `{needle}` in `{message}`"
             );
             // …and the same message tells them what they CAN write.
-            assert!(message.contains("*/N"), "`{expr}`: no syntax help in `{message}`");
+            assert!(
+                message.contains("*/N"),
+                "`{expr}`: no syntax help in `{message}`"
+            );
         }
     }
 
@@ -3318,14 +3364,20 @@ mod tests {
         assert_eq!(resolve(&json!("steps.create.lines"), &scope), json!(3));
         assert_eq!(resolve(&json!("steps.create.id"), &scope), json!("sale-1"));
         // Not a path: a literal string with a dot in it stays exactly what the author typed.
-        assert_eq!(resolve(&json!("sales.sale.create"), &scope), json!("sales.sale.create"));
+        assert_eq!(
+            resolve(&json!("sales.sale.create"), &scope),
+            json!("sales.sale.create")
+        );
     }
 
     #[test]
     fn a_template_renders_into_a_string_and_a_missing_path_renders_empty() {
         let scope = scope();
         assert_eq!(
-            resolve(&json!("Hola {{input.customer.email}} ({{steps.create.lines}})"), &scope),
+            resolve(
+                &json!("Hola {{input.customer.email}} ({{steps.create.lines}})"),
+                &scope
+            ),
             json!("Hola marta@example.com (3)")
         );
         assert_eq!(resolve(&json!("[{{input.nope}}]"), &scope), json!("[]"));
@@ -3337,7 +3389,10 @@ mod tests {
     fn mapping_recurses_into_objects_and_arrays() {
         let scope = scope();
         assert_eq!(
-            resolve(&json!({ "a": ["input.total", 7], "b": { "c": "steps.create.id" } }), &scope),
+            resolve(
+                &json!({ "a": ["input.total", 7], "b": { "c": "steps.create.id" } }),
+                &scope
+            ),
             json!({ "a": ["120.50", 7], "b": { "c": "sale-1" } })
         );
     }
@@ -3379,12 +3434,16 @@ mod tests {
     fn clauses_are_anded_and_an_empty_condition_matches() {
         let scope = json!({ "event": { "a": 1, "b": 2 } });
         assert!(Condition::default().matches(&scope));
-        assert!(Condition::parse(&json!({ "event.a": { "eq": 1 }, "event.b": { "eq": 2 } }))
-            .unwrap()
-            .matches(&scope));
-        assert!(!Condition::parse(&json!({ "event.a": { "eq": 1 }, "event.b": { "eq": 9 } }))
-            .unwrap()
-            .matches(&scope));
+        assert!(
+            Condition::parse(&json!({ "event.a": { "eq": 1 }, "event.b": { "eq": 2 } }))
+                .unwrap()
+                .matches(&scope)
+        );
+        assert!(
+            !Condition::parse(&json!({ "event.a": { "eq": 1 }, "event.b": { "eq": 9 } }))
+                .unwrap()
+                .matches(&scope)
+        );
     }
 
     #[test]
@@ -3449,12 +3508,17 @@ mod tests {
             "schema_version": 1,
             "steps": [{ "id": "w", "kind": "query", "query": "sales.summary", "limit": 1000 }]
         }))
-        .expect_err("a run that quietly reads a fifth of what was asked for is worse than a refusal");
+        .expect_err(
+            "a run that quietly reads a fifth of what was asked for is worse than a refusal",
+        );
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_LIMIT_OUT_OF_RANGE),
             "{err}"
         );
-        assert!(format!("{err}").contains(&MAX_QUERY_ROWS.to_string()), "{err}");
+        assert!(
+            format!("{err}").contains(&MAX_QUERY_ROWS.to_string()),
+            "{err}"
+        );
 
         // Zero and a negative are the same refusal: a read of no rows is not a read.
         for limit in [0, -1] {
@@ -3509,10 +3573,15 @@ mod tests {
         let scope = json!({ "event": {} });
         for op in ["eq", "gt", "gte", "lt", "lte", "in", "contains"] {
             let cond = Condition::parse(&json!({ "event.total": { op: json!(0) } })).unwrap();
-            assert!(!cond.matches(&scope), "`{op}` must not match a missing field");
+            assert!(
+                !cond.matches(&scope),
+                "`{op}` must not match a missing field"
+            );
         }
-        assert!(Condition::parse(&json!({ "event.total": { "exists": false } }))
-            .unwrap()
-            .matches(&scope));
+        assert!(
+            Condition::parse(&json!({ "event.total": { "exists": false } }))
+                .unwrap()
+                .matches(&scope)
+        );
     }
 }

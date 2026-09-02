@@ -264,7 +264,11 @@ pub async fn discard_dead(
     // Se recorta AQUÍ con la misma función que aplica el runtime al escribir, para devolver
     // exactamente lo que queda en la fila y no lo que llegó (una implementación, sin deriva).
     let reason = erplora_runtime::outbox::clamp_discard_reason(
-        &body.map(|b| b.0).unwrap_or_default().reason.unwrap_or_default(),
+        &body
+            .map(|b| b.0)
+            .unwrap_or_default()
+            .reason
+            .unwrap_or_default(),
     );
     match rt.discard_dead_event(&id, &discarded_by, &reason).await {
         Ok(true) => Json(json!({

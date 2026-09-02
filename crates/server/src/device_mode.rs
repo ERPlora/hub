@@ -100,9 +100,7 @@ fn unauthorized(e: auth::AuthError) -> Response {
         .into_response()
 }
 
-async fn runtime(
-    st: &AppState,
-) -> Result<crate::state::SharedRuntime, Response> {
+async fn runtime(st: &AppState) -> Result<crate::state::SharedRuntime, Response> {
     st.runtime_for(&st.hub_id())
         .await
         .map_err(crate::tenant_rejected)

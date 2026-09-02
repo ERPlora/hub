@@ -148,7 +148,11 @@ async fn an_approved_action_records_the_cashier_who_ran_it_and_the_manager_who_a
 
     let rows = recorded(&db).await;
     assert_eq!(rows.len(), 1, "one approval used, one record");
-    assert_eq!(rows[0]["created_by"], json!("u-cashier"), "who was at the till");
+    assert_eq!(
+        rows[0]["created_by"],
+        json!("u-cashier"),
+        "who was at the till"
+    );
     assert_eq!(rows[0]["approved_by"], json!(manager), "who authorised it");
     assert_eq!(rows[0]["command"], json!("till.sale.take_payment"));
     assert_eq!(
@@ -452,14 +456,25 @@ async fn an_admin_reads_the_audit_with_names_resolved() {
     assert_eq!(rows.len(), 1, "one approval spent, one row");
     assert_eq!(rows[0]["command"], json!("till.sale.take_payment"));
     assert_eq!(rows[0]["permission"], json!("till.take_payment"));
-    assert_eq!(rows[0]["created_by"], json!("u-cashier"), "who was at the till");
+    assert_eq!(
+        rows[0]["created_by"],
+        json!("u-cashier"),
+        "who was at the till"
+    );
     // The manager's name is resolved by JOIN against hub_user — the whole point of #512.
     // (The cashier id "u-cashier" is a fixture stand-in that does not exist as a hub_user, so its
     // name resolves to "" — which is also the right behaviour: a deleted employee's audit row must
     // not disappear.)
-    assert_eq!(rows[0]["approved_by_name"], json!("Sofía"), "not a UUID: a name");
+    assert_eq!(
+        rows[0]["approved_by_name"],
+        json!("Sofía"),
+        "not a UUID: a name"
+    );
     assert!(
-        !rows[0]["payload_fingerprint"].as_str().unwrap_or_default().is_empty(),
+        !rows[0]["payload_fingerprint"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
         "the fingerprint travels"
     );
 }
@@ -649,7 +664,11 @@ async fn the_audit_is_read_in_pages_with_a_real_total() {
     seed_audit(&db, 5).await;
 
     let page = rt
-        .execute_query_page("hub.approvals.list", &params(json!({ "limit": 2 })), &admin())
+        .execute_query_page(
+            "hub.approvals.list",
+            &params(json!({ "limit": 2 })),
+            &admin(),
+        )
         .await
         .expect("an admin may read the audit");
     assert_eq!(page.rows.len(), 2, "the page is the slice asked for");
@@ -658,7 +677,10 @@ async fn the_audit_is_read_in_pages_with_a_real_total() {
     assert_eq!(page.offset, 0);
     // Newest first is the default order — the question this screen answers is about «that Tuesday»,
     // and the reader starts from today.
-    assert_eq!(page.rows[0]["created_at"], json!("2026-07-01T00:04:00+00:00"));
+    assert_eq!(
+        page.rows[0]["created_at"],
+        json!("2026-07-01T00:04:00+00:00")
+    );
 
     let last = rt
         .execute_query_page(
@@ -669,7 +691,10 @@ async fn the_audit_is_read_in_pages_with_a_real_total() {
         .await
         .unwrap();
     assert_eq!(last.rows.len(), 1, "the last page holds the remainder");
-    assert_eq!(last.rows[0]["created_at"], json!("2026-07-01T00:00:00+00:00"));
+    assert_eq!(
+        last.rows[0]["created_at"],
+        json!("2026-07-01T00:00:00+00:00")
+    );
     assert_eq!(last.total, 5);
 }
 
@@ -685,7 +710,11 @@ async fn the_audit_never_ships_whole_by_default() {
         .execute_query_page("hub.approvals.list", &Params::new(), &admin())
         .await
         .unwrap();
-    assert_eq!(page.rows.len(), 50, "the default page size caps the response");
+    assert_eq!(
+        page.rows.len(),
+        50,
+        "the default page size caps the response"
+    );
     assert_eq!(page.total, 60, "…and the total still names the full trail");
 }
 
@@ -708,10 +737,23 @@ async fn the_audit_filters_by_date_range_on_the_server() {
         )
         .await
         .unwrap();
-    assert_eq!(page.rows.len(), 3, "r1..r3: the range is inclusive on both ends");
-    assert_eq!(page.total, 3, "the total is the FILTERED total: it feeds the pager");
-    assert_eq!(page.rows[0]["created_at"], json!("2026-07-01T00:03:00+00:00"));
-    assert_eq!(page.rows[2]["created_at"], json!("2026-07-01T00:01:00+00:00"));
+    assert_eq!(
+        page.rows.len(),
+        3,
+        "r1..r3: the range is inclusive on both ends"
+    );
+    assert_eq!(
+        page.total, 3,
+        "the total is the FILTERED total: it feeds the pager"
+    );
+    assert_eq!(
+        page.rows[0]["created_at"],
+        json!("2026-07-01T00:03:00+00:00")
+    );
+    assert_eq!(
+        page.rows[2]["created_at"],
+        json!("2026-07-01T00:01:00+00:00")
+    );
 }
 
 /// The wire knows it is a list: the server keys the `{rows,total,limit,offset}` envelope off

@@ -38,7 +38,11 @@ fn unauthorized(e: auth::AuthError) -> Response {
 
 /// Error en el envelope estándar `{ ok:false, error:{ message } }`.
 fn err(code: StatusCode, msg: &str) -> Response {
-    (code, Json(json!({ "ok": false, "error": { "message": msg } }))).into_response()
+    (
+        code,
+        Json(json!({ "ok": false, "error": { "message": msg } })),
+    )
+        .into_response()
 }
 
 /// Espejo serde de `ResetSelection` (que no deriva Deserialize). Todo por defecto en `false`:
@@ -140,13 +144,25 @@ pub async fn reset_hub(
         Err(e) => return unauthorized(e),
     };
     let Some(Json(req)) = body else {
-        return err(StatusCode::UNPROCESSABLE_ENTITY, "falta el body JSON { selection }");
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "falta el body JSON { selection }",
+        );
     };
 
-    match execute_reset(&rt, &data_hub_id, &req.selection.into_selection(), &admin.id).await {
-        Ok(report) => {
-            (StatusCode::OK, Json(json!({ "ok": true, "report": report }))).into_response()
-        }
+    match execute_reset(
+        &rt,
+        &data_hub_id,
+        &req.selection.into_selection(),
+        &admin.id,
+    )
+    .await
+    {
+        Ok(report) => (
+            StatusCode::OK,
+            Json(json!({ "ok": true, "report": report })),
+        )
+            .into_response(),
         // El motor rechaza aquí lo bloqueado por el límite fiscal: 409 (conflicto con el estado
         // del hub), no 500 — no es un fallo, es una regla. El mensaje ya explica el motivo legal.
         Err(e) => err(StatusCode::CONFLICT, &e.to_string()),
@@ -179,9 +195,11 @@ pub async fn import_batches(State(st): State<AppState>, headers: HeaderMap) -> R
         Err(e) => return unauthorized(e),
     };
     match list_import_batches(&rt, &data_hub_id).await {
-        Ok(batches) => {
-            (StatusCode::OK, Json(json!({ "ok": true, "batches": batches }))).into_response()
-        }
+        Ok(batches) => (
+            StatusCode::OK,
+            Json(json!({ "ok": true, "batches": batches })),
+        )
+            .into_response(),
         Err(e) => err(
             StatusCode::INTERNAL_SERVER_ERROR,
             &format!("no se pudieron listar las importaciones: {e}"),
@@ -265,16 +283,21 @@ pub async fn undo_import_batch(
         Err(e) => return unauthorized(e),
     };
     let Some(Json(req)) = body else {
-        return err(StatusCode::UNPROCESSABLE_ENTITY, "falta el body JSON { batch_id }");
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "falta el body JSON { batch_id }",
+        );
     };
     if req.batch_id.trim().is_empty() {
         return err(StatusCode::UNPROCESSABLE_ENTITY, "batch_id vacío");
     }
 
     match undo_import(&rt, &data_hub_id, req.batch_id.trim()).await {
-        Ok(report) => {
-            (StatusCode::OK, Json(json!({ "ok": true, "report": report }))).into_response()
-        }
+        Ok(report) => (
+            StatusCode::OK,
+            Json(json!({ "ok": true, "report": report })),
+        )
+            .into_response(),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     }
 }

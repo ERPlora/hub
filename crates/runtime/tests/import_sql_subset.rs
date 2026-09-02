@@ -108,11 +108,7 @@ async fn setting_value(rt: &Runtime, hub: &str, key: &str) -> Option<String> {
         )
         .await
         .ok()?;
-    res.rows
-        .first()?
-        .get("value")?
-        .as_str()
-        .map(str::to_string)
+    res.rows.first()?.get("value")?.as_str().map(str::to_string)
 }
 
 /// ¿Sigue existiendo `hub_settings`? (si un DROP se hubiera colado, esto falla).
@@ -233,7 +229,10 @@ async fn un_insert_que_lee_de_otra_tabla_no_exfiltra() {
         .expect("best-effort: el import no aborta");
 
     let reason = failure_reason(&report, "hub_settings");
-    assert!(reason.contains("literales"), "el motivo explica el subconjunto: {reason}");
+    assert!(
+        reason.contains("literales"),
+        "el motivo explica el subconjunto: {reason}"
+    );
     assert_eq!(
         setting_value(&rt, "h2", "robado").await,
         None,
@@ -267,9 +266,9 @@ async fn un_cte_que_borra_no_se_ejecuta() {
         .query("SELECT COUNT(*) AS c FROM hub_user", &Params::new())
         .await
         .expect("conteo de usuarios");
-    let count = users.rows[0]["c"].as_i64().or_else(|| {
-        users.rows[0]["c"].as_str().and_then(|s| s.parse().ok())
-    });
+    let count = users.rows[0]["c"]
+        .as_i64()
+        .or_else(|| users.rows[0]["c"].as_str().and_then(|s| s.parse().ok()));
     assert_eq!(count, Some(1), "el DELETE del CTE no se ejecutó");
 }
 
@@ -289,7 +288,10 @@ async fn un_fichero_de_datos_no_referenciado_nunca_se_ejecuta() {
         .await
         .expect("el fichero suelto no participa del import");
     assert!(
-        report.sections.iter().all(|s| s.section != "data/suelto.sql"),
+        report
+            .sections
+            .iter()
+            .all(|s| s.section != "data/suelto.sql"),
         "no hay sección para un fichero suelto: {report:?}"
     );
     assert!(settings_table_exists(&rt).await, "el DROP no se ejecutó");

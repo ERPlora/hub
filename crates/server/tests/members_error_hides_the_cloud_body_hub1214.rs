@@ -62,10 +62,8 @@ async fn fixture(cloud_base_url: String, tag: &str) -> Fixture {
         .await
         .unwrap();
     let session = rt.create_session(&admin.id, 3600, None).await.unwrap();
-    let media = std::env::temp_dir().join(format!(
-        "erplora-members-1214-{tag}-{}",
-        std::process::id()
-    ));
+    let media =
+        std::env::temp_dir().join(format!("erplora-members-1214-{tag}-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
         hub_id: "hub-1214".into(),
@@ -116,7 +114,10 @@ async fn post_json(router: &Router, uri: &str, session: &str, body: Value) -> (S
         .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// The whole body serialized — a leak that moves to another key is still a leak.
@@ -196,7 +197,8 @@ async fn a_business_rejection_keeps_its_own_code_and_hides_the_body_hub1214() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST, "{}", flat(&body));
     assert_eq!(
-        body["error"]["code"], "cloud_rejected",
+        body["error"]["code"],
+        "cloud_rejected",
         "a business refusal is NOT a rate limit: {}",
         flat(&body)
     );
@@ -228,7 +230,8 @@ async fn the_employees_screen_reads_the_code_inside_error_hub1214() {
 
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{}", flat(&body));
     assert_eq!(
-        body["error"]["code"], "cloud_rate_limited",
+        body["error"]["code"],
+        "cloud_rate_limited",
         "the shell reads `error.code`; a sibling `code` leaves it with nothing but the prose: {}",
         flat(&body)
     );
@@ -254,7 +257,8 @@ async fn a_malformed_alta_is_refused_with_a_stable_code_too_hub1214() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST, "{}", flat(&body));
     assert_eq!(
-        body["error"]["code"], "invalid_payload",
+        body["error"]["code"],
+        "invalid_payload",
         "the envelope is the same one everywhere, and the code is what the screen reads: {}",
         flat(&body)
     );

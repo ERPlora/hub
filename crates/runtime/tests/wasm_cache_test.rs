@@ -26,8 +26,10 @@ fn key(module: &str, version: &str) -> CacheKey {
 }
 
 /// El contador de compilaciones: lo que la caché tiene que reducir a uno.
-fn contador() -> (Arc<AtomicUsize>, impl Fn() -> Result<CompiledModule, erplora_runtime::errors::RuntimeError> + Clone)
-{
+fn contador() -> (
+    Arc<AtomicUsize>,
+    impl Fn() -> Result<CompiledModule, erplora_runtime::errors::RuntimeError> + Clone,
+) {
     let veces = Arc::new(AtomicUsize::new(0));
     let bytes = wasm_vacio();
     let contado = {
@@ -66,10 +68,18 @@ fn una_version_nueva_no_reutiliza_el_codigo_de_la_anterior() {
     let cache = WasmCache::default();
     let (veces, compilar) = contador();
 
-    cache.get_or_compile_with(key("sales", "2.14.1"), compilar.clone()).unwrap();
-    cache.get_or_compile_with(key("sales", "2.15.0"), compilar.clone()).unwrap();
+    cache
+        .get_or_compile_with(key("sales", "2.14.1"), compilar.clone())
+        .unwrap();
+    cache
+        .get_or_compile_with(key("sales", "2.15.0"), compilar.clone())
+        .unwrap();
 
-    assert_eq!(veces.load(Ordering::SeqCst), 2, "otra versión, otra compilación");
+    assert_eq!(
+        veces.load(Ordering::SeqCst),
+        2,
+        "otra versión, otra compilación"
+    );
     assert_eq!(cache.len(), 2);
 }
 
@@ -78,8 +88,12 @@ fn modulos_distintos_no_se_pisan() {
     let cache = WasmCache::default();
     let (veces, compilar) = contador();
 
-    cache.get_or_compile_with(key("sales", "1.0.0"), compilar.clone()).unwrap();
-    cache.get_or_compile_with(key("invoice", "1.0.0"), compilar.clone()).unwrap();
+    cache
+        .get_or_compile_with(key("sales", "1.0.0"), compilar.clone())
+        .unwrap();
+    cache
+        .get_or_compile_with(key("invoice", "1.0.0"), compilar.clone())
+        .unwrap();
 
     assert_eq!(veces.load(Ordering::SeqCst), 2);
     assert_eq!(cache.len(), 2);
@@ -93,13 +107,19 @@ fn desregistrar_un_modulo_tira_su_codigo_compilado() {
     let cache = WasmCache::default();
     let (veces, compilar) = contador();
 
-    cache.get_or_compile_with(key("sales", "2.14.1"), compilar.clone()).unwrap();
-    cache.get_or_compile_with(key("invoice", "1.0.0"), compilar.clone()).unwrap();
+    cache
+        .get_or_compile_with(key("sales", "2.14.1"), compilar.clone())
+        .unwrap();
+    cache
+        .get_or_compile_with(key("invoice", "1.0.0"), compilar.clone())
+        .unwrap();
     cache.forget_module("sales");
 
     assert_eq!(cache.len(), 1, "solo sobrevive el módulo que no se tocó");
 
-    cache.get_or_compile_with(key("sales", "2.14.1"), compilar.clone()).unwrap();
+    cache
+        .get_or_compile_with(key("sales", "2.14.1"), compilar.clone())
+        .unwrap();
     assert_eq!(
         veces.load(Ordering::SeqCst),
         3,
@@ -117,7 +137,9 @@ fn un_fallo_de_compilacion_no_se_queda_cacheado() {
         ))
     };
 
-    assert!(cache.get_or_compile_with(key("sales", "2.14.1"), roto).is_err());
+    assert!(cache
+        .get_or_compile_with(key("sales", "2.14.1"), roto)
+        .is_err());
     assert!(cache.is_empty(), "un fallo no deja entrada");
 
     let (_, compilar) = contador();
@@ -137,7 +159,11 @@ fn compilar_no_sostiene_el_candado() {
     let bytes = wasm_vacio();
 
     let resultado = cache.get_or_compile_with(key("sales", "2.14.1"), || {
-        assert_eq!(cache.len(), 0, "la caché es consultable mientras se compila");
+        assert_eq!(
+            cache.len(),
+            0,
+            "la caché es consultable mientras se compila"
+        );
         CompiledModule::compile(&bytes, WasmLimits::default())
             .map_err(|e| erplora_runtime::errors::RuntimeError::Wasm(e.to_string()))
     });
@@ -201,11 +227,19 @@ fn un_handler_roto_no_impide_calentar_los_demas() {
     // hub sigue en pie — ese comando fallará cuando alguien lo llame, con su error, no antes.
     let cache = WasmCache::default();
     let modulos = vec![
-        ("roto".to_string(), "1.0.0".to_string(), Some(vec![0u8, 1, 2, 3])),
+        (
+            "roto".to_string(),
+            "1.0.0".to_string(),
+            Some(vec![0u8, 1, 2, 3]),
+        ),
         modulo("sales", "2.14.1", true),
     ];
 
-    assert_eq!(warm_up(&cache, &modulos, WasmLimits::default()), 1, "solo cuenta el que compiló");
+    assert_eq!(
+        warm_up(&cache, &modulos, WasmLimits::default()),
+        1,
+        "solo cuenta el que compiló"
+    );
     assert_eq!(cache.len(), 1);
 }
 
@@ -217,7 +251,11 @@ fn precalentar_dos_veces_no_recompila() {
     warm_up(&cache, &modulos, WasmLimits::default());
     warm_up(&cache, &modulos, WasmLimits::default());
 
-    assert_eq!(cache.len(), 1, "la segunda pasada encuentra la caché caliente");
+    assert_eq!(
+        cache.len(),
+        1,
+        "la segunda pasada encuentra la caché caliente"
+    );
 }
 
 /// Qué handlers hay que precalentar: uno por MÓDULO, no uno por comando.
@@ -268,7 +306,11 @@ fn los_handlers_a_precalentar_van_uno_por_modulo() {
             schema: None,
         },
     );
-    for (id, version) in [("sales", "2.14.1"), ("invoice", "1.2.0"), ("printing", "1.0.0")] {
+    for (id, version) in [
+        ("sales", "2.14.1"),
+        ("invoice", "1.2.0"),
+        ("printing", "1.0.0"),
+    ] {
         registry.installed.push(manifest(id, version));
     }
 
@@ -278,6 +320,10 @@ fn los_handlers_a_precalentar_van_uno_por_modulo() {
     let ids: Vec<&str> = a_calentar.iter().map(|(id, _, _)| id.as_str()).collect();
     assert_eq!(ids, vec!["invoice", "sales"], "un módulo, una compilación");
     let versiones: Vec<&str> = a_calentar.iter().map(|(_, v, _)| v.as_str()).collect();
-    assert_eq!(versiones, vec!["1.2.0", "2.14.1"], "cada uno con SU versión instalada");
+    assert_eq!(
+        versiones,
+        vec!["1.2.0", "2.14.1"],
+        "cada uno con SU versión instalada"
+    );
     assert!(a_calentar.iter().all(|(_, _, w)| w.is_some()));
 }

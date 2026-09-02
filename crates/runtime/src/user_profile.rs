@@ -228,8 +228,7 @@ pub async fn update(
     ];
     if !name.is_empty() {
         ops.push((
-            "UPDATE hub_user SET name = :name WHERE hub_id = :hub_id AND id = :user_id"
-                .to_string(),
+            "UPDATE hub_user SET name = :name WHERE hub_id = :hub_id AND id = :user_id".to_string(),
             p,
         ));
     }

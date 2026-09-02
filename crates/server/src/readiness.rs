@@ -84,7 +84,10 @@ pub struct Check {
 
 impl Check {
     pub fn new(status: Health) -> Self {
-        Self { status, detail: json!({}) }
+        Self {
+            status,
+            detail: json!({}),
+        }
     }
 
     fn with(status: Health, detail: Value) -> Self {
@@ -147,7 +150,11 @@ pub fn modules_check(expected: &[String], registered: &[String]) -> Check {
     });
 
     Check::with(
-        if missing.is_empty() { Health::Up } else { Health::Down },
+        if missing.is_empty() {
+            Health::Up
+        } else {
+            Health::Down
+        },
         detail,
     )
 }
@@ -239,12 +246,22 @@ pub async fn snapshot(st: &AppState) -> Checks {
     // Sin BD no se puede saber: `UNKNOWN`, no `DOWN`. El fallo ya lo canta el chequeo de arriba, y
     // duplicarlo como si fuera un segundo problema manda a buscar dos causas donde hay una.
     let migrations = if database_up {
-        match db.query("SELECT COUNT(*) AS applied FROM _hub_migrations", &Default::default()).await {
+        match db
+            .query(
+                "SELECT COUNT(*) AS applied FROM _hub_migrations",
+                &Default::default(),
+            )
+            .await
+        {
             Ok(result) => {
                 let applied = result
                     .rows
                     .first()
-                    .and_then(|row| row["applied"].as_u64().or_else(|| row["applied"].as_str()?.parse().ok()))
+                    .and_then(|row| {
+                        row["applied"]
+                            .as_u64()
+                            .or_else(|| row["applied"].as_str()?.parse().ok())
+                    })
                     .unwrap_or(0);
                 Check::with(Health::Up, json!({ "applied": applied }))
             }
@@ -363,7 +380,10 @@ mod tests {
 
     #[test]
     fn every_expected_module_registered_is_up() {
-        let check = modules_check(&["sales".into(), "taxes".into()], &["taxes".into(), "sales".into()]);
+        let check = modules_check(
+            &["sales".into(), "taxes".into()],
+            &["taxes".into(), "sales".into()],
+        );
 
         assert_eq!(check.status, Health::Up);
         assert_eq!(check.detail["expected"], json!(2));
@@ -394,7 +414,11 @@ mod tests {
 
         for attempt in 1..=10 {
             let check = modules_check(&expected, &[]);
-            assert_eq!(check.status, Health::Down, "intento {attempt} dejó pasar el módulo que falta");
+            assert_eq!(
+                check.status,
+                Health::Down,
+                "intento {attempt} dejó pasar el módulo que falta"
+            );
         }
     }
 

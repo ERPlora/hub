@@ -196,7 +196,8 @@ pub async fn create_user(
     // Suelta el lock ANTES de la I/O de red al SaaS (mismo patrón que `members::add_member`).
     drop(rt);
     if !created.email.is_empty() {
-        if let Err(e) = crate::members::notify_member_added(&st, &created.email, &created.role).await
+        if let Err(e) =
+            crate::members::notify_member_added(&st, &created.email, &created.role).await
         {
             return crate::members::members_error_response(e);
         }
@@ -476,7 +477,10 @@ mod tests {
         // Hay otro admin, así que lo único que lo bloquea es que sea uno mismo.
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &deactivate()),
-            Some(Guard::Rejected { code: "self_deactivation", .. })
+            Some(Guard::Rejected {
+                code: "self_deactivation",
+                ..
+            })
         ));
         assert_eq!(
             guard_decision(&census, "owner", "admin", "admin", &deactivate()),
@@ -502,7 +506,10 @@ mod tests {
         let census = [user("owner", "owner", true), user("sofia", "manager", true)];
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &set_badge("0009171456")),
-            Some(Guard::Rejected { code: "self_badge_enrollment", .. })
+            Some(Guard::Rejected {
+                code: "self_badge_enrollment",
+                ..
+            })
         ));
         // …but enrolling somebody else's is exactly what an administrator is for.
         assert_eq!(
@@ -533,11 +540,17 @@ mod tests {
         let census = [user("owner", "owner", true), user("caja", "cashier", true)];
         assert!(matches!(
             guard_decision(&census, "caja", "cashier", "owner", &deactivate()),
-            Some(Guard::Rejected { code: "last_admin", .. })
+            Some(Guard::Rejected {
+                code: "last_admin",
+                ..
+            })
         ));
         assert!(matches!(
             guard_decision(&census, "owner", "admin", "owner", &set_role("employee")),
-            Some(Guard::Rejected { code: "last_admin", .. })
+            Some(Guard::Rejected {
+                code: "last_admin",
+                ..
+            })
         ));
         // Un admin INACTIVO no cuenta como relevo.
         let census = [
@@ -545,7 +558,9 @@ mod tests {
             user("ex", "admin", false),
             user("caja", "cashier", true),
         ];
-        assert!(guard_decision(&census, "owner", "admin", "owner", &set_role("employee")).is_some());
+        assert!(
+            guard_decision(&census, "owner", "admin", "owner", &set_role("employee")).is_some()
+        );
     }
 
     /// hub#356 — **nobody hands out a role above their own.**
@@ -566,7 +581,10 @@ mod tests {
         // closed, seen from the invitation.
         for granted in ["admin", "owner", "ADMIN"] {
             assert!(
-                matches!(grant_decision("manager", granted), Some(Guard::Forbidden(_))),
+                matches!(
+                    grant_decision("manager", granted),
+                    Some(Guard::Forbidden(_))
+                ),
                 "a manager cannot hand out `{granted}`"
             );
             assert!(matches!(
@@ -604,7 +622,13 @@ mod tests {
         );
         // An edit that does not touch the role never asks the question.
         assert_eq!(
-            guard_decision(&census, "caja", "employee", "caja", &UpdateHubUser::default()),
+            guard_decision(
+                &census,
+                "caja",
+                "employee",
+                "caja",
+                &UpdateHubUser::default()
+            ),
             None
         );
     }

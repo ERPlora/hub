@@ -70,7 +70,11 @@ fn verifactu_backup_selection() -> ExportSelection {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "verifactu".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "verifactu".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: Default::default(), // Backup
     }
 }
@@ -94,15 +98,27 @@ async fn a_backup_restored_into_a_different_hub_does_not_inherit_the_chain() {
     }
     let origin = runtime_with_fiscal_chain(HUB_ORIGIN).await;
     insert_chain_record(&origin, HUB_ORIGIN).await;
-    let bundle = export_hub(&origin, HUB_ORIGIN, &verifactu_backup_selection(), "backup", "es", "2026-08-05T12:00:00Z")
-        .await
-        .expect("export origin backup");
+    let bundle = export_hub(
+        &origin,
+        HUB_ORIGIN,
+        &verifactu_backup_selection(),
+        "backup",
+        "es",
+        "2026-08-05T12:00:00Z",
+    )
+    .await
+    .expect("export origin backup");
 
     let mut other = runtime_with_fiscal_chain(HUB_OTHER).await;
-    let report =
-        import_sections(&mut other, &bundle.manifest, &bundle.files, &import_verifactu(), HUB_OTHER)
-            .await
-            .expect("import into another hub");
+    let report = import_sections(
+        &mut other,
+        &bundle.manifest,
+        &bundle.files,
+        &import_verifactu(),
+        HUB_OTHER,
+    )
+    .await
+    .expect("import into another hub");
 
     assert_eq!(
         chain_rows(&other, HUB_OTHER).await,
@@ -122,14 +138,27 @@ async fn a_backup_restored_into_the_same_hub_keeps_the_chain() {
     }
     let origin = runtime_with_fiscal_chain(HUB_ORIGIN).await;
     insert_chain_record(&origin, HUB_ORIGIN).await;
-    let bundle = export_hub(&origin, HUB_ORIGIN, &verifactu_backup_selection(), "backup", "es", "2026-08-05T12:00:00Z")
-        .await
-        .expect("export origin backup");
+    let bundle = export_hub(
+        &origin,
+        HUB_ORIGIN,
+        &verifactu_backup_selection(),
+        "backup",
+        "es",
+        "2026-08-05T12:00:00Z",
+    )
+    .await
+    .expect("export origin backup");
 
     let mut same = runtime_with_fiscal_chain(HUB_ORIGIN).await;
-    import_sections(&mut same, &bundle.manifest, &bundle.files, &import_verifactu(), HUB_ORIGIN)
-        .await
-        .expect("import into the same hub");
+    import_sections(
+        &mut same,
+        &bundle.manifest,
+        &bundle.files,
+        &import_verifactu(),
+        HUB_ORIGIN,
+    )
+    .await
+    .expect("import into the same hub");
 
     assert_eq!(
         chain_rows(&same, HUB_ORIGIN).await,

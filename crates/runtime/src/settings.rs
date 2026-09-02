@@ -415,7 +415,11 @@ pub async fn timezone_of(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<chron
         return Ok(tz);
     }
     let country = read("country_code");
-    let country = if validate_country(&json!(country)).is_ok() { country } else { "ES".to_string() };
+    let country = if validate_country(&json!(country)).is_ok() {
+        country
+    } else {
+        "ES".to_string()
+    };
     Ok(zone_for_country(&country, &read("region_code")))
 }
 
@@ -538,8 +542,12 @@ pub const INVALID_TAX_ID_FORMAT: &str = "invalid_tax_id_format";
 pub const INVALID_TAX_ID_CONTROL: &str = "invalid_tax_id_control";
 
 /// The four codes, for `set_many`'s Err→[`RuntimeError::InvalidTaxId`] routing.
-const TAX_ID_CODES: [&str; 4] =
-    [INVALID_TAX_ID_TYPE, TAX_ID_TOO_LONG, INVALID_TAX_ID_FORMAT, INVALID_TAX_ID_CONTROL];
+const TAX_ID_CODES: [&str; 4] = [
+    INVALID_TAX_ID_TYPE,
+    TAX_ID_TOO_LONG,
+    INVALID_TAX_ID_FORMAT,
+    INVALID_TAX_ID_CONTROL,
+];
 
 /// The English fallback the runtime attaches to each code — for the log; what the person reads is
 /// the UI's translation keyed by the code (es/en).
@@ -550,9 +558,11 @@ fn tax_id_fallback_message(code: &str) -> &'static str {
         INVALID_TAX_ID_CONTROL => {
             "the control letter/digit does not check out against the official algorithm"
         }
-        _ => "not shaped like a Spanish NIF (DNI 8 digits + letter, NIE X/Y/Z + 7 digits + \
+        _ => {
+            "not shaped like a Spanish NIF (DNI 8 digits + letter, NIE X/Y/Z + 7 digits + \
               letter, CIF organization letter + 7 digits + control) or a foreign identifier \
-              with its ISO country prefix (e.g. FR123456789)",
+              with its ISO country prefix (e.g. FR123456789)"
+        }
     }
 }
 
@@ -591,18 +601,18 @@ fn check_spanish_tax_id(id: &str) -> Option<bool> {
         return None;
     }
     // DNI (8 digits + letter) and NIE (X/Y/Z + 7 digits + letter): one control-letter algorithm.
-    let personal: Option<u64> = if b[0].is_ascii_digit() && b[1..8].iter().all(u8::is_ascii_digit)
-    {
+    let personal: Option<u64> = if b[0].is_ascii_digit() && b[1..8].iter().all(u8::is_ascii_digit) {
         id[..8].parse().ok()
-    } else if matches!(b[0], b'X' | b'Y' | b'Z')
-        && b[1..8].iter().all(u8::is_ascii_digit)
-    {
+    } else if matches!(b[0], b'X' | b'Y' | b'Z') && b[1..8].iter().all(u8::is_ascii_digit) {
         let prefix = match b[0] {
             b'X' => 0,
             b'Y' => 1,
             _ => 2,
         };
-        id[1..8].parse::<u64>().ok().map(|n| prefix * 10_000_000 + n)
+        id[1..8]
+            .parse::<u64>()
+            .ok()
+            .map(|n| prefix * 10_000_000 + n)
     } else {
         None
     };
@@ -655,9 +665,7 @@ fn is_foreign_prefixed_tax_id(id: &str) -> bool {
         return false;
     }
     let prefix = &id[..2];
-    AEAT_COUNTRY_CODES
-        .binary_search(&prefix)
-        .is_ok()
+    AEAT_COUNTRY_CODES.binary_search(&prefix).is_ok()
         && b[2..].iter().all(u8::is_ascii_alphanumeric)
 }
 
@@ -833,7 +841,11 @@ fn enforce_demo_fiscal_identity_lock(
     updates: &serde_json::Map<String, Value>,
     demo_hub: bool,
 ) -> Result<()> {
-    if demo_hub && FISCAL_IDENTITY_SETTINGS.iter().any(|k| updates.contains_key(*k)) {
+    if demo_hub
+        && FISCAL_IDENTITY_SETTINGS
+            .iter()
+            .any(|k| updates.contains_key(*k))
+    {
         return Err(RuntimeError::DemoLocked {
             lock: DemoLock::FiscalIdentity,
         });
@@ -841,13 +853,19 @@ fn enforce_demo_fiscal_identity_lock(
     Ok(())
 }
 
-/// The tax id a DEMO hub boots with (hub#684).
+/// The tax id a DEMO hub boots with (hub#684, changed by hub#985 §1 E2E on 2026-09-02).
 ///
-/// All-zero on purpose. It has the shape of a Spanish CIF —letter + 7 digits + a control digit that
-/// checks out for `0000000`— so every screen, document and validator downstream treats it as the
-/// real thing, and **no company has it**: sequential numbering never issues the zero. A random
-/// plausible-looking tax id would eventually be somebody's.
-pub const DEMO_BUSINESS_TAX_ID: &str = "B00000000";
+/// It used to be the all-zero `B00000000` — deliberately nobody's. Measured against the AEAT
+/// preproduction through the gateway cell, that id **cannot transmit**: the AEAT refuses it in
+/// the header with Fault `4116` («NIF con formato incorrecto»), a checksum-valid stranger gets
+/// Fault `4112` («el titular del certificado debe ser Obligado Emisión, Colaborador Social…» —
+/// the Convenio 017 collaborator status is still pending, pm#71), and an unregistered test id
+/// gets `4104`. The ONLY obligado the Sello can present for today is its own holder. So the demo
+/// boots with ERPlora's own id — which is also what its transmissions legally are: the demo is
+/// ERPlora's, pinned to `testing` (it can never file for real), and its tickets say «demo» in
+/// the legal name. This is what makes ADR-0274 («la demo transmite de verdad a preproducción»)
+/// actually true instead of silently failing on every send.
+pub const DEMO_BUSINESS_TAX_ID: &str = "B27593136";
 /// The legal name a DEMO hub boots with. It says *demo* out loud: it is printed on every ticket the
 /// visitor makes, and that ticket has to be readable as an example, not as a real business's.
 pub const DEMO_BUSINESS_LEGAL_NAME: &str = "ERPlora Demo SL";
@@ -1082,7 +1100,11 @@ pub async fn ensure_provisioned_country(
     let Ok(normalized) = validate_country(&json!(country)) else {
         return Ok(false);
     };
-    if !stored_value(db, hub_id, "country_code").await?.trim().is_empty() {
+    if !stored_value(db, hub_id, "country_code")
+        .await?
+        .trim()
+        .is_empty()
+    {
         return Ok(false); // already answered — a default must not outrank a decision
     }
     let mut p = Params::new();
@@ -1436,8 +1458,14 @@ mod tests {
         // El XSD de VeriFactu lleva al extranjero por IDOtro{CodigoPais, IDType, ID≤20}: el país
         // VIAJA con el identificador. Aquí ese país es el prefijo — la forma documentada de
         // guardar un identificador que no es español en el mismo campo.
-        assert_eq!(validate_tax_id(&json!("fr123456789")).unwrap(), "FR123456789");
-        assert_eq!(validate_tax_id(&json!("GB999888777")).unwrap(), "GB999888777");
+        assert_eq!(
+            validate_tax_id(&json!("fr123456789")).unwrap(),
+            "FR123456789"
+        );
+        assert_eq!(
+            validate_tax_id(&json!("GB999888777")).unwrap(),
+            "GB999888777"
+        );
         // «ES» no es un prefijo extranjero: el propio XSD prohíbe CodigoPais=ES con
         // identificador «de otro tipo» — un obligado español ES su NIF, no un escape con
         // prefijo.
@@ -2036,7 +2064,10 @@ mod tests {
         // hub in Las Palmas closing the till at 21:00 would otherwise close it at 20:00.
         assert_eq!(zone_for_country("ES", "ES-CN"), chrono_tz::Atlantic::Canary);
         assert_eq!(zone_for_country("PT", "PT-20"), chrono_tz::Atlantic::Azores);
-        assert_eq!(zone_for_country("PT", "PT-30"), chrono_tz::Atlantic::Madeira);
+        assert_eq!(
+            zone_for_country("PT", "PT-30"),
+            chrono_tz::Atlantic::Madeira
+        );
     }
 
     #[test]
@@ -2056,7 +2087,12 @@ mod tests {
         );
         assert_eq!(validate_timezone(&Value::Null), Ok(String::new()));
         assert_eq!(validate_timezone(&json!("")), Ok(String::new()));
-        for bad in [json!("Europa/Madrid"), json!("CEST"), json!("+02:00"), json!(2)] {
+        for bad in [
+            json!("Europa/Madrid"),
+            json!("CEST"),
+            json!("+02:00"),
+            json!(2),
+        ] {
             assert!(validate_timezone(&bad).is_err(), "{bad}");
         }
     }
@@ -2066,18 +2102,31 @@ mod tests {
         let db = fresh_db().await;
         ensure_table(&db).await;
         // Nothing stored: the default country (`ES`) answers.
-        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Madrid);
+        assert_eq!(
+            timezone_of(&db, "hub-1").await.unwrap(),
+            chrono_tz::Europe::Madrid
+        );
 
         let mut updates = serde_json::Map::new();
         updates.insert("country_code".into(), json!("PT"));
-        set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
-        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Lisbon);
+        set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap();
+        assert_eq!(
+            timezone_of(&db, "hub-1").await.unwrap(),
+            chrono_tz::Europe::Lisbon
+        );
 
         // An explicit zone WINS over the derivation — that is the point of having it.
         let mut updates = serde_json::Map::new();
         updates.insert("timezone".into(), json!("Atlantic/Azores"));
-        set_many(&db, "hub-1", &updates, "hub_user:1", false).await.unwrap();
-        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Atlantic::Azores);
+        set_many(&db, "hub-1", &updates, "hub_user:1", false)
+            .await
+            .unwrap();
+        assert_eq!(
+            timezone_of(&db, "hub-1").await.unwrap(),
+            chrono_tz::Atlantic::Azores
+        );
 
         // …and a garbage row degrades to the derivation instead of exploding at 3 AM.
         db.execute_batch(
@@ -2086,7 +2135,10 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(timezone_of(&db, "hub-1").await.unwrap(), chrono_tz::Europe::Lisbon);
+        assert_eq!(
+            timezone_of(&db, "hub-1").await.unwrap(),
+            chrono_tz::Europe::Lisbon
+        );
     }
 
     // ── The DEMO boots with its fiscal identity ALREADY filled in (hub#684) ───────────────
@@ -2095,6 +2147,19 @@ mod tests {
     // demo's ⛔ without making one of them lie is to put the data there for real.
 
     /// 🔴 A demo hub is handed a fiscal identity at boot, so the gate of ADR-0203 has something to
+    /// 🔒 Decision pin (2026-09-02, hub#1452 · hub#985 §1 E2E): the demo boots as the Sello's OWN holder.
+    ///
+    /// Measured against the AEAT preproduction through the gateway: `B00000000` → Fault 4116
+    /// (malformed NIF), a checksum-valid stranger → Fault 4112 (the certificate holder may only
+    /// present for itself until the Convenio 017 collaborator status activates, pm#71). Reverting
+    /// this to a placeholder id silently kills every demo transmission again — that is the
+    /// regression this test exists to stop. If the value must change, re-run the probe against
+    /// prewww10 first and bring the new Fault evidence here.
+    #[test]
+    fn the_demo_tax_id_is_the_seals_own_holder() {
+        assert_eq!(DEMO_BUSINESS_TAX_ID, "B27593136");
+    }
+
     /// read and the ⛔ item is genuinely done — not hidden, not faked.
     #[tokio::test]
     async fn a_demo_hub_boots_with_its_fiscal_identity_already_filled_in() {
@@ -2107,7 +2172,11 @@ mod tests {
         let all = get_all(&db, "hub-1").await.unwrap();
         assert_eq!(all["business_tax_id"], json!(DEMO_BUSINESS_TAX_ID));
         assert_eq!(all["business_legal_name"], json!(DEMO_BUSINESS_LEGAL_NAME));
-        assert_ne!(all["business_address"], json!(""), "a demo ticket carries an address too");
+        assert_ne!(
+            all["business_address"],
+            json!(""),
+            "a demo ticket carries an address too"
+        );
     }
 
     /// Idempotent, and it never overwrites: re-running the boot is a no-op, and whatever the hub
@@ -2179,8 +2248,13 @@ mod tests {
         let db = fresh_db().await;
         ensure_table(&db).await;
 
-        assert!(ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap());
-        assert_eq!(get_all(&db, "hub-1").await.unwrap()["country_code"], json!("FR"));
+        assert!(ensure_provisioned_country(&db, "hub-1", "FR")
+            .await
+            .unwrap());
+        assert_eq!(
+            get_all(&db, "hub-1").await.unwrap()["country_code"],
+            json!("FR")
+        );
     }
 
     /// **Never overwrites.** A default must not outrank a decision: once there is a row, somebody
@@ -2191,12 +2265,23 @@ mod tests {
         let db = fresh_db().await;
         ensure_table(&db).await;
 
-        set_many(&db, "hub-1", &map(&[("country_code", json!("PT"))]), "owner", false)
-            .await
-            .unwrap();
+        set_many(
+            &db,
+            "hub-1",
+            &map(&[("country_code", json!("PT"))]),
+            "owner",
+            false,
+        )
+        .await
+        .unwrap();
 
-        assert!(!ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap());
-        assert_eq!(get_all(&db, "hub-1").await.unwrap()["country_code"], json!("PT"));
+        assert!(!ensure_provisioned_country(&db, "hub-1", "FR")
+            .await
+            .unwrap());
+        assert_eq!(
+            get_all(&db, "hub-1").await.unwrap()["country_code"],
+            json!("PT")
+        );
     }
 
     /// A second boot writes nothing, and an absent/blank env is not a country: it must not stamp a
@@ -2207,20 +2292,28 @@ mod tests {
         ensure_table(&db).await;
 
         assert!(!ensure_provisioned_country(&db, "hub-1", "").await.unwrap());
-        assert!(!ensure_provisioned_country(&db, "hub-1", "  ").await.unwrap());
+        assert!(!ensure_provisioned_country(&db, "hub-1", "  ")
+            .await
+            .unwrap());
         assert!(
-            !ensure_provisioned_country(&db, "hub-1", "Spain").await.unwrap(),
+            !ensure_provisioned_country(&db, "hub-1", "Spain")
+                .await
+                .unwrap(),
             "not an ISO-3166-1 alpha-2 code: refused, not persisted as garbage"
         );
 
-        assert!(ensure_provisioned_country(&db, "hub-1", "fr").await.unwrap());
+        assert!(ensure_provisioned_country(&db, "hub-1", "fr")
+            .await
+            .unwrap());
         assert_eq!(
             get_all(&db, "hub-1").await.unwrap()["country_code"],
             json!("FR"),
             "normalised through the same validator as the PUT"
         );
         assert!(
-            !ensure_provisioned_country(&db, "hub-1", "FR").await.unwrap(),
+            !ensure_provisioned_country(&db, "hub-1", "FR")
+                .await
+                .unwrap(),
             "the second boot writes nothing"
         );
     }
@@ -2236,7 +2329,9 @@ mod tests {
     async fn the_country_cannot_be_changed_once_the_hub_went_live() {
         let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-live");
         rt.ensure_system_tables().await.unwrap();
-        crate::fiscal_profile::ensure(rt.db(), "hub-live").await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-live")
+            .await
+            .unwrap();
         activate(rt.db(), "hub-live").await;
 
         let err = set_many(
@@ -2265,7 +2360,9 @@ mod tests {
     async fn resending_the_same_country_after_go_live_is_not_a_change() {
         let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-live");
         rt.ensure_system_tables().await.unwrap();
-        crate::fiscal_profile::ensure(rt.db(), "hub-live").await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-live")
+            .await
+            .unwrap();
         activate(rt.db(), "hub-live").await;
 
         set_many(
@@ -2277,7 +2374,10 @@ mod tests {
         )
         .await
         .expect("the same country, normalised, is a no-op and the batch goes through");
-        assert_eq!(get_all(rt.db(), "hub-live").await.unwrap()["currency"], json!("USD"));
+        assert_eq!(
+            get_all(rt.db(), "hub-live").await.unwrap()["currency"],
+            json!("USD")
+        );
     }
 
     /// 🔴 The other direction: before go-live the country is FREE. This is the ordinary case — the
@@ -2287,7 +2387,9 @@ mod tests {
     async fn before_go_live_the_country_is_free_to_change() {
         let rt = crate::Runtime::with_hub_id(Box::new(fresh_db().await), "hub-setup");
         rt.ensure_system_tables().await.unwrap();
-        crate::fiscal_profile::ensure(rt.db(), "hub-setup").await.unwrap();
+        crate::fiscal_profile::ensure(rt.db(), "hub-setup")
+            .await
+            .unwrap();
 
         set_many(
             rt.db(),
@@ -2338,6 +2440,10 @@ mod tests {
         .await
         .unwrap();
         let all = get_all(&db, "hub-1").await.unwrap();
-        assert_eq!(all["pin_inactivity_minutes"], json!(5), "corrupt row → default");
+        assert_eq!(
+            all["pin_inactivity_minutes"],
+            json!(5),
+            "corrupt row → default"
+        );
     }
 }

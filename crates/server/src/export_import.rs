@@ -204,7 +204,12 @@ pub async fn export_tables(State(st): State<AppState>, headers: HeaderMap) -> Re
         Ok(ctx) => ctx.hub_id,
         Err(e) => return unauthorized(e),
     };
-    let ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+    let ids: Vec<String> = rt
+        .registry()
+        .installed
+        .iter()
+        .map(|m| m.id.clone())
+        .collect();
     // `locked_purpose`: el formulario no puede ofrecer lo que el motor va a ignorar (hub#1249).
     let locked = locked_purpose(&st);
     match export::module_table_counts(&rt, &data_hub_id, &ids).await {
@@ -362,7 +367,10 @@ fn ensure_section(sections: &mut Vec<String>, section: &str) {
 /// que salen bytes de `.p12` en crudo, y la regla vive dentro de ella: aquí no hay filtro que
 /// alguien pueda olvidarse de repetir la próxima vez que se toque el export.
 async fn read_certificate_p12(rt: &Runtime, hub_id: &str) -> Option<Vec<u8>> {
-    erplora_runtime::certificate::exportable_der_bytes(rt.db(), hub_id).await.ok().flatten()
+    erplora_runtime::certificate::exportable_der_bytes(rt.db(), hub_id)
+        .await
+        .ok()
+        .flatten()
 }
 
 /// Construye el `.blueprint.zip` en memoria: `manifest.json` + cada fichero del bundle.
@@ -827,7 +835,9 @@ pub(crate) async fn run_import(
                 .await
                 .map_err(crate::tenant_rejected)?;
             let rt = arc.read().await;
-            let _ = reset::store_import_report(&rt, data_hub_id, batch, &manifest.name, &report_json).await;
+            let _ =
+                reset::store_import_report(&rt, data_hub_id, batch, &manifest.name, &report_json)
+                    .await;
         }
     }
     Ok(report_v)
@@ -878,8 +888,16 @@ fn stored_origin(report: &Value) -> Option<StoredOrigin> {
     if origin["source"].as_str()? != "catalog" {
         return None;
     }
-    let slug = origin["slug"].as_str().unwrap_or_default().trim().to_string();
-    let version = origin["version"].as_str().unwrap_or_default().trim().to_string();
+    let slug = origin["slug"]
+        .as_str()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let version = origin["version"]
+        .as_str()
+        .unwrap_or_default()
+        .trim()
+        .to_string();
     if slug.is_empty() || version.is_empty() {
         return None;
     }
@@ -888,7 +906,11 @@ fn stored_origin(report: &Value) -> Option<StoredOrigin> {
         .map(str::trim)
         .filter(|l| !l.is_empty())
         .map(str::to_string);
-    Some(StoredOrigin { slug, version, locale })
+    Some(StoredOrigin {
+        slug,
+        version,
+        locale,
+    })
 }
 
 /// `true` if a section's status is `Failed` (serde wire shape: `{"Failed": "reason"}`).
@@ -997,7 +1019,10 @@ pub async fn retry_import(
         };
     }
     let Some(Json(req)) = body else {
-        return err(StatusCode::UNPROCESSABLE_ENTITY, "missing JSON body { batch_id }");
+        return err(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "missing JSON body { batch_id }",
+        );
     };
     let batch_id = req.batch_id.trim().to_string();
     if batch_id.is_empty() {
@@ -1078,8 +1103,19 @@ pub async fn retry_import(
         );
     }
 
-    let origin_req = ImportOriginReq { slug: origin.slug, version: origin.version };
-    match run_import(&st, Some(cred), &fetched.zip, selection, &data_hub_id, Some(&origin_req)).await
+    let origin_req = ImportOriginReq {
+        slug: origin.slug,
+        version: origin.version,
+    };
+    match run_import(
+        &st,
+        Some(cred),
+        &fetched.zip,
+        selection,
+        &data_hub_id,
+        Some(&origin_req),
+    )
+    .await
     {
         Ok(report) => {
             Json(json!({ "ok": true, "retried": true, "report": report })).into_response()
@@ -1217,7 +1253,10 @@ mod tests {
         );
         assert_eq!(entry["status"], "installed");
         assert_eq!(entry["id"], "inventory");
-        assert_eq!(entry["version"], "1.2.0", "gana la versión realmente instalada");
+        assert_eq!(
+            entry["version"], "1.2.0",
+            "gana la versión realmente instalada"
+        );
     }
 
     /// Un fallo genérico viaja con su CÓDIGO estable (hub#139), no solo con el texto: la UI
@@ -1281,10 +1320,20 @@ mod tests {
         });
         let sel = retry_selection_from_report(&report);
         assert!(sel.users, "a failed section is retried");
-        assert!(!sel.settings, "an applied section is NOT re-applied blindly");
+        assert!(
+            !sel.settings,
+            "an applied section is NOT re-applied blindly"
+        );
         assert!(!sel.fiscal, "a skipped section stays out");
-        assert!(!sel.media, "an ignored section was a decision, not a breakage");
-        assert_eq!(sel.modules, vec!["inventory".to_string()], "only the failed module's data comes back");
+        assert!(
+            !sel.media,
+            "an ignored section was a decision, not a breakage"
+        );
+        assert_eq!(
+            sel.modules,
+            vec!["inventory".to_string()],
+            "only the failed module's data comes back"
+        );
     }
 
     /// A module the import could not install (`failed`) or left as a purchase decision (`blocked`,
@@ -1344,7 +1393,10 @@ mod tests {
             "media": { "selected": true, "copied": 4, "failed": 0 }
         });
         let sel = retry_selection_from_report(&report);
-        assert!(selection_is_empty(&sel), "nothing failed ⇒ nothing to retry");
+        assert!(
+            selection_is_empty(&sel),
+            "nothing failed ⇒ nothing to retry"
+        );
     }
 
     /// The report persists the EXACT origin of the import (hub#845): catalogue slug + version (the
@@ -1352,7 +1404,10 @@ mod tests {
     #[test]
     fn the_report_origin_says_catalog_or_local_explicitly() {
         let catalog = origin_json(
-            Some(&ImportOriginReq { slug: "peluqueria".into(), version: "1.0.4".into() }),
+            Some(&ImportOriginReq {
+                slug: "peluqueria".into(),
+                version: "1.0.4".into(),
+            }),
             "es",
         );
         assert_eq!(catalog["source"], "catalog");
@@ -1361,11 +1416,19 @@ mod tests {
         assert_eq!(catalog["locale"], "es");
 
         let local = origin_json(None, "es");
-        assert_eq!(local["source"], "local", "a hand-uploaded file SAYS it has no origin");
+        assert_eq!(
+            local["source"], "local",
+            "a hand-uploaded file SAYS it has no origin"
+        );
 
         // A half-empty origin cannot guarantee the same version ⇒ it is NOT a catalogue origin.
-        let empty_version =
-            origin_json(Some(&ImportOriginReq { slug: "peluqueria".into(), version: "".into() }), "es");
+        let empty_version = origin_json(
+            Some(&ImportOriginReq {
+                slug: "peluqueria".into(),
+                version: "".into(),
+            }),
+            "es",
+        );
         assert_eq!(empty_version["source"], "local");
     }
 

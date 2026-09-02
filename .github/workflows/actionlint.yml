@@ -73,6 +73,13 @@ on:
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
       - 'scripts/tests/service-container-ports.test.sh'
+      # La prosa de CI contra el `on:` real (hub#1438). Las DOS rutas hacen falta y por motivos
+      # distintos: el guardia mismo, para que una PR que solo lo toque corra sus casos; y
+      # `.githooks/pre-push`, porque es el ÚNICO fichero vigilado que no vive bajo
+      # `.github/workflows/**` — y es justo donde estaba la afirmación peligrosa, la que describía
+      # el gate local como una copia redundante de algo que ya corría gratis en Actions.
+      - 'scripts/tests/ci-prose-matches-triggers.test.sh'
+      - '.githooks/pre-push'
       # Y los propios e2e del kernel: la lista SOLO puede romperla una PR que añada o borre un
       # `crates/runtime/tests/*.rs`, y esa PR puede no tocar ninguna de las rutas de arriba. Lo
       # cubría el `pull_request` de `test-hub-modules.yml`, que hub#1362 retira (esos e2e pasan al
@@ -143,6 +150,19 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet --disable-pip-version-check pyyaml
           bash ./scripts/tests/test-hub-modules-workflow.test.sh
+
+      # ── La PROSA de CI contra el `on:` real (hub#1438) ───────────────────────────────
+      # Los contratos de arriba fijan la FORMA de un workflow; este fija lo que los ficheros
+      # DICEN de sí mismos y unos de otros. Hacía falta porque nada ataba un comentario a su
+      # bloque `on:`: `test-hub-modules.yml` documentaba un `pull_request` retirado por pm#197 y
+      # lo repetía en la issue de alerta que abre —replicando la falsedad en cada detección—, y
+      # `.githooks/pre-push` afirmaba que `test-hub.yml` corría la suite en cada PR, que es un
+      # argumento para BORRAR el gate escrito dentro del propio gate. Sin él no queda nada
+      # probando la Rust del hub antes de mergear.
+      - name: Contrato de la prosa de CI (hub#1438)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/ci-prose-matches-triggers.test.sh
 
       # ── Contrato de `canonical-mirrors.yml` (hub#1261) ───────────────────────────────
       # Mismo razonamiento y misma razón para vivir AQUÍ: `canonical-mirrors.yml` se dispara

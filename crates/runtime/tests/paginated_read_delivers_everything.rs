@@ -26,7 +26,9 @@ use std::path::PathBuf;
 const HUB: &str = "hub-650";
 
 fn fixture() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixture_paging")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixture_paging")
 }
 
 fn ctx() -> RequestContext {
@@ -40,7 +42,9 @@ fn params(v: serde_json::Value) -> Params {
 /// A hub with `rows` rows in a catalogue whose query declares `page_size: 2`.
 async fn hub_with(rows: u32) -> Runtime {
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), HUB);
-    rt.install_from_dir(&fixture()).await.expect("instalar el fixture");
+    rt.install_from_dir(&fixture())
+        .await
+        .expect("instalar el fixture");
     for n in 0..rows {
         rt.execute_command("paging.rows.create", &params(json!({ "n": n })), &ctx())
             .await
@@ -54,7 +58,10 @@ async fn hub_with(rows: u32) -> Runtime {
 async fn a_query_read_whole_delivers_every_row_not_just_the_first_page() {
     let rt = hub_with(5).await;
 
-    let rows = rt.execute_query("paging.rows.list", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("paging.rows.list", &Params::new(), &ctx())
+        .await
+        .unwrap();
 
     assert_eq!(
         rows.len(),
@@ -70,11 +77,18 @@ async fn a_query_read_whole_delivers_every_row_not_just_the_first_page() {
 async fn every_row_comes_back_exactly_once() {
     let rt = hub_with(5).await;
 
-    let rows = rt.execute_query("paging.rows.list", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("paging.rows.list", &Params::new(), &ctx())
+        .await
+        .unwrap();
 
     let mut seen: Vec<i64> = rows.iter().filter_map(|r| r["n"].as_i64()).collect();
     seen.sort_unstable();
-    assert_eq!(seen, vec![0, 1, 2, 3, 4], "filas duplicadas o saltadas: {rows:?}");
+    assert_eq!(
+        seen,
+        vec![0, 1, 2, 3, 4],
+        "filas duplicadas o saltadas: {rows:?}"
+    );
 }
 
 /// An explicit `limit` is the CALLER's cap and still wins — same rule the client SDK's `queryAll`
@@ -97,7 +111,10 @@ async fn an_explicit_limit_is_still_honoured() {
 async fn a_catalogue_smaller_than_a_page_is_untouched() {
     let rt = hub_with(1).await;
 
-    let rows = rt.execute_query("paging.rows.list", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("paging.rows.list", &Params::new(), &ctx())
+        .await
+        .unwrap();
 
     assert_eq!(rows.len(), 1);
 }
@@ -108,7 +125,10 @@ async fn a_catalogue_smaller_than_a_page_is_untouched() {
 async fn an_empty_catalogue_terminates() {
     let rt = hub_with(0).await;
 
-    let rows = rt.execute_query("paging.rows.list", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("paging.rows.list", &Params::new(), &ctx())
+        .await
+        .unwrap();
 
     assert!(rows.is_empty(), "{rows:?}");
 }

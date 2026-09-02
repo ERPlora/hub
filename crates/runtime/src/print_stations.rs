@@ -139,16 +139,18 @@ pub fn key_from_label(label: &str) -> String {
 
 /// Whether `key` is shaped like a wire identifier: alphanumeric, `_` or `-`, nothing else.
 fn key_is_wire_safe(key: &str) -> bool {
-    !key.is_empty() && key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
 }
 
 /// Every station of this hub, by key.
 pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<PrintStation>> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    let sql = format!(
-        "SELECT {STATION_FIELDS} FROM _print_station WHERE hub_id = :hub_id ORDER BY key"
-    );
+    let sql =
+        format!("SELECT {STATION_FIELDS} FROM _print_station WHERE hub_id = :hub_id ORDER BY key");
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.iter().map(row_to_station).collect())
 }
@@ -162,8 +164,9 @@ pub async fn find(
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("key".into(), json!(normalize_key(key)));
-    let sql =
-        format!("SELECT {STATION_FIELDS} FROM _print_station WHERE hub_id = :hub_id AND key = :key");
+    let sql = format!(
+        "SELECT {STATION_FIELDS} FROM _print_station WHERE hub_id = :hub_id AND key = :key"
+    );
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.first().map(row_to_station))
 }
@@ -317,7 +320,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<
     q.insert("hub_id".into(), json!(hub_id));
     q.insert("id".into(), json!(id));
     q.insert("pending".into(), json!(crate::print_queue::STATUS_PENDING));
-    q.insert("printing".into(), json!(crate::print_queue::STATUS_PRINTING));
+    q.insert(
+        "printing".into(),
+        json!(crate::print_queue::STATUS_PRINTING),
+    );
     let res = db
         .query(
             "SELECT COUNT(*) AS n FROM _print_queue \
@@ -536,7 +542,10 @@ mod tests {
             matches!(err, RuntimeError::InvalidPayload { .. }),
             "an unresolvable station is a bad payload (422), not a missing page: {msg}"
         );
-        assert!(msg.contains("kitchn"), "it has to say what was rejected: {msg}");
+        assert!(
+            msg.contains("kitchn"),
+            "it has to say what was rejected: {msg}"
+        );
         for expected in ["bar", "kitchen", "label", "receipt"] {
             assert!(
                 msg.contains(expected),
@@ -559,7 +568,10 @@ mod tests {
         // Resolution goes by **key**, never by the display name: matching what a human typed on a
         // screen would be the very string comparison this issue removes, one layer up.
         assert_eq!(
-            resolve(&db, "h1", " Barra_De_La_Terraza ").await.unwrap().id,
+            resolve(&db, "h1", " Barra_De_La_Terraza ")
+                .await
+                .unwrap()
+                .id,
             created.id
         );
         assert!(
@@ -622,7 +634,9 @@ mod tests {
             DeleteOutcome::HasWork(1)
         );
 
-        crate::print_queue::mark_done(&db, "h1", "j1").await.unwrap();
+        crate::print_queue::mark_done(&db, "h1", "j1")
+            .await
+            .unwrap();
         assert_eq!(
             delete(&db, "h1", &bar.id).await.unwrap(),
             DeleteOutcome::Deleted,
@@ -644,7 +658,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(delete(&db, "h1", &bar.id).await.unwrap(), DeleteOutcome::Deleted);
+        assert_eq!(
+            delete(&db, "h1", &bar.id).await.unwrap(),
+            DeleteOutcome::Deleted
+        );
         let hosts = crate::print_hosts::list(&db, "h1").await.unwrap();
         assert_eq!(
             hosts.iter().map(|h| h.role.clone()).collect::<Vec<_>>(),
@@ -672,7 +689,10 @@ mod tests {
     async fn a_deleted_station_does_not_come_back_on_the_next_boot() {
         let db = station_db().await;
         let bar = resolve(&db, "h1", "bar").await.unwrap();
-        assert_eq!(delete(&db, "h1", &bar.id).await.unwrap(), DeleteOutcome::Deleted);
+        assert_eq!(
+            delete(&db, "h1", &bar.id).await.unwrap(),
+            DeleteOutcome::Deleted
+        );
 
         ensure_stations(&db, "h1").await.unwrap();
 
@@ -743,7 +763,10 @@ mod tests {
             "a queued string nobody hosts is the typo, not a station: {all:?}"
         );
         let hosts = crate::print_hosts::list(&db, "h1").await.unwrap();
-        assert_eq!(hosts[0].role, "terraza", "the legacy row is normalised onto its key");
+        assert_eq!(
+            hosts[0].role, "terraza",
+            "the legacy row is normalised onto its key"
+        );
         assert!(
             !hosts[0].station_id.is_empty(),
             "and it is pointed at the station, so `claim_next` can find it"

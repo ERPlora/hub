@@ -8,7 +8,7 @@
 //! defecto. Esto demuestra que el COALESCE por-módulo es ahora redundante (no necesario).
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -23,7 +23,9 @@ fn module_dir() -> PathBuf {
 async fn fresh_runtime() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&module_dir()).await.expect("instalar defaults");
+    rt.install_from_dir(&module_dir())
+        .await
+        .expect("instalar defaults");
     rt
 }
 
@@ -39,15 +41,29 @@ async fn omitted_defaulted_fields_are_injected_and_inserted_without_coalesce() {
     let ctx = admin_ctx();
 
     // Solo `name`; `status` y `priority` se omiten → el binder debe inyectar sus defaults.
-    rt.execute_command("defaults.items.create", &params(json!({ "name": "alpha" })), &ctx)
-        .await
-        .expect("crear con defaults omitidos NO debe petar por NOT NULL");
+    rt.execute_command(
+        "defaults.items.create",
+        &params(json!({ "name": "alpha" })),
+        &ctx,
+    )
+    .await
+    .expect("crear con defaults omitidos NO debe petar por NOT NULL");
 
-    let rows =
-        rt.execute_query("defaults.items.list", &Params::new(), &ctx).await.unwrap();
+    let rows = rt
+        .execute_query("defaults.items.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["status"], json!("open"), "default de status no aplicado");
-    assert_eq!(rows[0]["priority"], json!(3), "default de priority no aplicado");
+    assert_eq!(
+        rows[0]["status"],
+        json!("open"),
+        "default de status no aplicado"
+    );
+    assert_eq!(
+        rows[0]["priority"],
+        json!(3),
+        "default de priority no aplicado"
+    );
 }
 
 /// Los valores aportados por el caller NO se sobreescriben con el `default`.
@@ -64,10 +80,20 @@ async fn provided_values_are_not_overwritten_by_defaults() {
     .await
     .unwrap();
 
-    let rows =
-        rt.execute_query("defaults.items.list", &Params::new(), &ctx).await.unwrap();
-    assert_eq!(rows[0]["status"], json!("done"), "el valor aportado se respeta");
-    assert_eq!(rows[0]["priority"], json!(9), "el valor aportado se respeta");
+    let rows = rt
+        .execute_query("defaults.items.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
+    assert_eq!(
+        rows[0]["status"],
+        json!("done"),
+        "el valor aportado se respeta"
+    );
+    assert_eq!(
+        rows[0]["priority"],
+        json!(9),
+        "el valor aportado se respeta"
+    );
 }
 
 /// Decisión documentada: un `null` EXPLÍCITO es un valor presente, NO una ausencia → NO se

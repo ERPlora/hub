@@ -47,7 +47,9 @@ async fn product_names(rt: &Runtime, hub: &str) -> Vec<String> {
         .execute_query("inventory.products.list", &params(json!({})), &ctx(hub))
         .await
         .expect("list products");
-    rows.iter().filter_map(|p| p["name"].as_str().map(str::to_string)).collect()
+    rows.iter()
+        .filter_map(|p| p["name"].as_str().map(str::to_string))
+        .collect()
 }
 
 fn full_export_selection() -> ExportSelection {
@@ -58,8 +60,16 @@ fn full_export_selection() -> ExportSelection {
         fiscal: false,
         media: false,
         modules: vec![
-            ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
-            ModuleDataSelection { module_id: "inventory".into(), with_data: true, tables: None },
+            ModuleDataSelection {
+                module_id: "taxes".into(),
+                with_data: true,
+                tables: None,
+            },
+            ModuleDataSelection {
+                module_id: "inventory".into(),
+                with_data: true,
+                tables: None,
+            },
         ],
         purpose: Default::default(),
     }
@@ -92,13 +102,24 @@ const CREATED_AT: &str = "2026-08-14T09:00:00Z";
 async fn exported_bundle() -> erplora_runtime::export::ExportBundle {
     let db = fresh_db().await;
     let mut a = Runtime::with_hub_id(Box::new(db), "h1");
-    a.install_from_dir(&modules_root().join("taxes")).await.expect("install taxes in A");
-    a.install_from_dir(&modules_root().join("inventory")).await.expect("install inventory in A");
+    a.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("install taxes in A");
+    a.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("install inventory in A");
     create_product(&a, "h1", "Café", "CAF").await;
     create_product(&a, "h1", "Té verde", "TEV").await;
-    export_hub(&a, "h1", &full_export_selection(), "barberia", "es", CREATED_AT)
-        .await
-        .expect("export A")
+    export_hub(
+        &a,
+        "h1",
+        &full_export_selection(),
+        "barberia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A")
 }
 
 /// hub#845 acceptance: a partial import (a module data section failed because the module was not
@@ -115,11 +136,19 @@ async fn retry_applies_only_the_failed_section_and_never_duplicates_what_is_pres
     // Destination hub B (tenant h2) with ONLY `taxes` installed: the `inventory` section fails.
     let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h2");
-    b.install_from_dir(&modules_root().join("taxes")).await.expect("install taxes in B");
-
-    let first = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_everything(), "h2")
+    b.install_from_dir(&modules_root().join("taxes"))
         .await
-        .expect("first (partial) import");
+        .expect("install taxes in B");
+
+    let first = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_everything(),
+        "h2",
+    )
+    .await
+    .expect("first (partial) import");
     let inv = first
         .sections
         .iter()
@@ -133,13 +162,21 @@ async fn retry_applies_only_the_failed_section_and_never_duplicates_what_is_pres
 
     // The admin fixes the cause (the module gets installed) and creates their OWN product whose
     // SKU collides with one the bundle carries: the retry must respect it, not duplicate it.
-    b.install_from_dir(&modules_root().join("inventory")).await.expect("install inventory in B");
+    b.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("install inventory in B");
     create_product(&b, "h2", "Local brew", "CAF").await;
 
     // Retry = re-execute the SAME bundle with selection narrowed to what failed.
-    let retry = import_sections(&mut b, &bundle.manifest, &bundle.files, &retry_only_inventory(), "h2")
-        .await
-        .expect("retry");
+    let retry = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &retry_only_inventory(),
+        "h2",
+    )
+    .await
+    .expect("retry");
     let inv = retry
         .sections
         .iter()
@@ -183,19 +220,38 @@ async fn a_blind_full_reimport_of_an_applied_bundle_is_a_noop() {
 
     let db = fresh_db().await;
     let mut b = Runtime::with_hub_id(Box::new(db), "h2");
-    b.install_from_dir(&modules_root().join("taxes")).await.expect("install taxes in B");
-    b.install_from_dir(&modules_root().join("inventory")).await.expect("install inventory in B");
-
-    import_sections(&mut b, &bundle.manifest, &bundle.files, &import_everything(), "h2")
+    b.install_from_dir(&modules_root().join("taxes"))
         .await
-        .expect("first import");
+        .expect("install taxes in B");
+    b.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("install inventory in B");
+
+    import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_everything(),
+        "h2",
+    )
+    .await
+    .expect("first import");
     let after_first = product_names(&b, "h2").await.len();
-    assert_eq!(after_first, 2, "the first import brings the bundle's two products");
+    assert_eq!(
+        after_first, 2,
+        "the first import brings the bundle's two products"
+    );
 
     // Blind re-import of the SAME bundle with the SAME full selection.
-    let second = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_everything(), "h2")
-        .await
-        .expect("blind re-import");
+    let second = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_everything(),
+        "h2",
+    )
+    .await
+    .expect("blind re-import");
     let inv = second
         .sections
         .iter()

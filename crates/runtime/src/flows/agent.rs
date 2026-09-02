@@ -86,10 +86,7 @@ pub async fn prepare(
     let StepSpec::Ai(ai) = &step.spec else {
         return Err(RuntimeError::Domain {
             code: ERR_NOT_IN_FLIGHT.to_string(),
-            message: format!(
-                "step `{step_id}` is `{}`, not `ai`",
-                step.kind.as_str()
-            ),
+            message: format!("step `{step_id}` is `{}`, not `ai`", step.kind.as_str()),
         });
     };
 
@@ -161,9 +158,19 @@ mod tests {
         )
         .await
         .unwrap();
-        store::start_run(db, HUB, &flow.id, "", "manual", "", &json!({ "who": "Marta" }), 0, "t")
-            .await
-            .unwrap();
+        store::start_run(
+            db,
+            HUB,
+            &flow.id,
+            "",
+            "manual",
+            "",
+            &json!({ "who": "Marta" }),
+            0,
+            "t",
+        )
+        .await
+        .unwrap();
         let report = executor::tick(db, &Registry::new(), HUB).await.unwrap();
         assert_eq!(report.pending_io.len(), 1, "the tick hands the turn over");
         report.pending_io[0].run_id().to_string()
@@ -176,7 +183,11 @@ mod tests {
         let request = prepare(&db, HUB, &run_id, "agent").await.unwrap();
         assert_eq!(request.prompt, "answer Marta");
         assert_eq!(request.queries, vec!["crm.note.list".to_string()]);
-        assert_eq!(request.policy, AiPolicy::Manual, "the default (ADR-0283 D3)");
+        assert_eq!(
+            request.policy,
+            AiPolicy::Manual,
+            "the default (ADR-0283 D3)"
+        );
         assert_eq!(request.max_iters, def::DEFAULT_MAX_ITERS);
     }
 
@@ -214,6 +225,8 @@ mod tests {
         let db = db().await;
         test_support::ensure_schema(&db, "hub-next-door").await;
         let run_id = parked(&db).await;
-        assert!(prepare(&db, "hub-next-door", &run_id, "agent").await.is_err());
+        assert!(prepare(&db, "hub-next-door", &run_id, "agent")
+            .await
+            .is_err());
     }
 }

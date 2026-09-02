@@ -217,7 +217,9 @@ mod ingest_tests {
     }
     impl RectifyingInvoiceHost {
         fn new() -> Self {
-            Self { reads: std::sync::Mutex::new(Vec::new()) }
+            Self {
+                reads: std::sync::Mutex::new(Vec::new()),
+            }
         }
     }
     #[async_trait::async_trait]
@@ -257,7 +259,9 @@ mod ingest_tests {
                 "new_ids": ["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3"]
             }
         });
-        let out = ingest_invoice(&input, &host).await.expect("la R5 se ingesta");
+        let out = ingest_invoice(&input, &host)
+            .await
+            .expect("la R5 se ingesta");
 
         let sql = host.reads.lock().unwrap().join("\n");
         assert!(
@@ -350,7 +354,11 @@ mod ingest_integrity_tests {
             Self::with_lines(invoice, 1)
         }
         fn with_lines(invoice: Json, line_count: i64) -> Self {
-            Self { invoice, line_count, reads: std::sync::Mutex::new(Vec::new()) }
+            Self {
+                invoice,
+                line_count,
+                reads: std::sync::Mutex::new(Vec::new()),
+            }
         }
     }
     #[async_trait::async_trait]
@@ -375,9 +383,7 @@ mod ingest_integrity_tests {
     }
 
     fn ids() -> Json {
-        json!([
-            "id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3", "id-warn", "id-x"
-        ])
+        json!(["id-rec", "id-evt", "id-queue", "id-t1", "id-t2", "id-t3", "id-warn", "id-x"])
     }
 
     fn context() -> Json {
@@ -408,7 +414,14 @@ mod ingest_integrity_tests {
     }
 
     /// Factura de `invoice` con los importes y el destinatario que se le pasen.
-    fn invoice_row(invoice_type: &str, customer_tax_id: &str, base: i64, tax: i64, total: i64, breakdown: &str) -> Json {
+    fn invoice_row(
+        invoice_type: &str,
+        customer_tax_id: &str,
+        base: i64,
+        tax: i64,
+        total: i64,
+        breakdown: &str,
+    ) -> Json {
         json!({
             "invoice_type": invoice_type, "number": "FACT-2026-000009",
             "issue_date": "2026-08-25", "issuer_nif": NIF, "issuer_name": "Test Business SL",
@@ -428,7 +441,10 @@ mod ingest_integrity_tests {
         match res {
             Ok(out) => panic!(
                 "esperaba un RECHAZO y el registro se selló: {:?}",
-                out.operations.iter().map(|o| o.command.clone()).collect::<Vec<_>>()
+                out.operations
+                    .iter()
+                    .map(|o| o.command.clone())
+                    .collect::<Vec<_>>()
             ),
             Err(e) => e.to_string(),
         }
@@ -457,7 +473,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
         );
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// Sin desglose legible solo queda el `tax_rate` de la fila, y tiene que juzgarse igual.
@@ -465,7 +484,10 @@ mod ingest_integrity_tests {
     async fn without_a_breakdown_the_row_rate_still_has_to_explain_the_quota() {
         let input = create_payload("F1", 545, 21.0, 9999, 10544, "");
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// `base + cuota ≠ total`: la cabecera se contradice a sí misma. Ninguna de las tres reglas de
@@ -481,7 +503,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":114}]"#,
         );
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("totals_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("totals_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// El desglose tiene que sumar lo que dice la cabecera: es el cruce que hace la AEAT
@@ -497,7 +522,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":5000,"quota":1050}]"#,
         );
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("totals_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("totals_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// Una ordinaria no totaliza negativo: lo negativo es una RECTIFICATIVA.
@@ -512,7 +540,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":-500,"quota":-105}]"#,
         );
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("negative_total"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("negative_total"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// 🔴 **La trampa de esta issue.** El criterio escrito pedía rechazar `total ≤ 0`, y eso
@@ -532,7 +563,9 @@ mod ingest_integrity_tests {
             .await
             .expect("un tique invitado se sella: 0,00 € cuadra");
         assert!(
-            out.operations.iter().any(|o| o.command == "verifactu._insert_record"),
+            out.operations
+                .iter()
+                .any(|o| o.command == "verifactu._insert_record"),
             "el registro tiene que existir"
         );
     }
@@ -566,7 +599,10 @@ mod ingest_integrity_tests {
                  "surcharge_rate":5.2,"surcharge_quota":999}]"#,
         );
         let err = error_of(create_record(&input, &GateHost).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// Un ticket de bar legítimo (21 % + 10 %, con el céntimo de redondeo por línea) pasa: la
@@ -599,7 +635,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
         ));
         let err = error_of(ingest_invoice(&ingest_input(), &host).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// 🔴 **The counterexample that sent this PR back with CHANGES** — still a live requirement,
@@ -652,7 +691,10 @@ mod ingest_integrity_tests {
             20,
         );
         let err = error_of(ingest_invoice(&ingest_input(), &host).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// The twelve-cover table of the counterexample: 12 lines of 0,55 € at 10 % rounded per line —
@@ -694,7 +736,10 @@ mod ingest_integrity_tests {
             40,
         );
         let err = error_of(ingest_invoice(&ingest_input(), &host).await);
-        assert!(err.contains("quota_rate_mismatch"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// La lectura del número de líneas viaja en la MISMA lectura acotada de la factura (ADR-0058),
@@ -713,10 +758,14 @@ mod ingest_integrity_tests {
             ),
             4,
         );
-        ingest_invoice(&ingest_input(), &host).await.expect("se ingesta");
+        ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("se ingesta");
         let reads = host.reads.lock().unwrap();
-        let invoice_reads: Vec<&String> =
-            reads.iter().filter(|s| s.contains("invoice_invoice")).collect();
+        let invoice_reads: Vec<&String> = reads
+            .iter()
+            .filter(|s| s.contains("invoice_invoice"))
+            .collect();
         assert_eq!(
             invoice_reads.len(),
             1,
@@ -759,12 +808,18 @@ mod ingest_integrity_tests {
             .expect("la degradación tiene que dejar su evento");
         assert_eq!(warn.params.get("severity"), Some(&json!("warning")));
         let details: Json = serde_json::from_str(
-            warn.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+            warn.params
+                .get("details")
+                .and_then(Json::as_str)
+                .unwrap_or("{}"),
         )
         .expect("los detalles son JSON");
         assert_eq!(details.get("declared"), Some(&json!("F1")));
         assert_eq!(details.get("effective"), Some(&json!("F2")));
-        assert_eq!(details.get("reason"), Some(&json!(REASON_MISSING_RECIPIENT)));
+        assert_eq!(
+            details.get("reason"),
+            Some(&json!(REASON_MISSING_RECIPIENT))
+        );
     }
 
     /// No es solo F1→F2: una rectificativa CON destinatario degradada a R5 cambia de naturaleza
@@ -791,7 +846,10 @@ mod ingest_integrity_tests {
         let warn = event_of(&out, EVENT_TYPE_INVOICE_TYPE_DOWNGRADED)
             .expect("la degradación R1→R5 tiene que dejar su evento");
         let details: Json = serde_json::from_str(
-            warn.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+            warn.params
+                .get("details")
+                .and_then(Json::as_str)
+                .unwrap_or("{}"),
         )
         .unwrap();
         assert_eq!(details.get("declared"), Some(&json!("R1")));
@@ -810,7 +868,9 @@ mod ingest_integrity_tests {
             12100,
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":10000,"quota":2100}]"#,
         ));
-        let out = ingest_invoice(&ingest_input(), &host).await.expect("se ingesta");
+        let out = ingest_invoice(&ingest_input(), &host)
+            .await
+            .expect("se ingesta");
         let insert = out
             .operations
             .iter()
@@ -837,7 +897,10 @@ mod ingest_integrity_tests {
             r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":400000,"quota":84000}]"#,
         ));
         let err = error_of(ingest_invoice(&ingest_input(), &host).await);
-        assert!(err.contains("f2_limit_exceeded"), "código esperado, llegó: {err}");
+        assert!(
+            err.contains("f2_limit_exceeded"),
+            "código esperado, llegó: {err}"
+        );
     }
 
     /// Y justo por debajo del techo (3.010,00 €) se sella: el margen de la AEAT es parte de la
@@ -883,7 +946,11 @@ mod ingest_integrity_tests {
             "el veredicto tiene que nombrar la HUELLA, no afirmar sobre los importes: {message}"
         );
         let details: Json = serde_json::from_str(
-            event.params.get("details").and_then(Json::as_str).unwrap_or("{}"),
+            event
+                .params
+                .get("details")
+                .and_then(Json::as_str)
+                .unwrap_or("{}"),
         )
         .expect("los detalles son JSON");
         assert_eq!(

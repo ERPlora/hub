@@ -34,7 +34,9 @@ async fn rt_staff() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.ensure_system_tables().await.unwrap();
-    rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
+    rt.install_from_dir(&mdir("staff"))
+        .await
+        .expect("instalar staff");
     rt
 }
 
@@ -143,7 +145,11 @@ async fn the_link_can_be_set_and_cleared_later() {
     .await
     .unwrap();
     let detail = rt
-        .execute_query("staff.members.get", &params(json!({ "staff_id": id })), &ctx)
+        .execute_query(
+            "staff.members.get",
+            &params(json!({ "staff_id": id })),
+            &ctx,
+        )
         .await
         .unwrap();
     assert_eq!(detail[0]["user_id"], luis);
@@ -157,10 +163,17 @@ async fn the_link_can_be_set_and_cleared_later() {
     .await
     .unwrap();
     let detail = rt
-        .execute_query("staff.members.get", &params(json!({ "staff_id": id })), &ctx)
+        .execute_query(
+            "staff.members.get",
+            &params(json!({ "staff_id": id })),
+            &ctx,
+        )
         .await
         .unwrap();
-    assert_eq!(detail[0]["user_id"], luis, "editar el teléfono no desvincula");
+    assert_eq!(
+        detail[0]["user_id"], luis,
+        "editar el teléfono no desvincula"
+    );
 
     // Desvincular explícitamente: cadena vacía = «ninguno» (un NULL en COALESCE significa
     // «no lo toques», así que hace falta un centinela distinto para poder borrar el vínculo).
@@ -172,7 +185,11 @@ async fn the_link_can_be_set_and_cleared_later() {
     .await
     .unwrap();
     let detail = rt
-        .execute_query("staff.members.get", &params(json!({ "staff_id": id })), &ctx)
+        .execute_query(
+            "staff.members.get",
+            &params(json!({ "staff_id": id })),
+            &ctx,
+        )
         .await
         .unwrap();
     assert!(detail[0]["user_id"].is_null(), "se puede desvincular");

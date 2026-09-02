@@ -85,7 +85,10 @@ async fn seal_first_record(rt: &Runtime, hub: &str) {
         )
         .await
         .expect("sellar first_record_at");
-    assert_eq!(res.affected, 1, "el perfil fiscal del hub debe existir para poder sellarlo");
+    assert_eq!(
+        res.affected, 1,
+        "el perfil fiscal del hub debe existir para poder sellarlo"
+    );
 }
 
 /// Inserta un registro VeriFactu real en la tabla del módulo. `status`/`csv` deciden si cuenta
@@ -118,21 +121,29 @@ async fn count(rt: &Runtime, table: &str, hub: &str) -> i64 {
     p.insert("hub_id".into(), json!(hub));
     let res = rt
         .db()
-        .query(&format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"), &p)
+        .query(
+            &format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"),
+            &p,
+        )
         .await
         .unwrap_or_else(|e| panic!("contar {table}: {e}"));
     res.rows[0]["n"].as_i64().expect("count(*)")
 }
 
 fn blocked(plan: &erplora_runtime::reset::ResetPlan, section: &str) -> Option<String> {
-    plan.sections.iter().find(|s| s.section == section).and_then(|s| s.blocked_by.clone())
+    plan.sections
+        .iter()
+        .find(|s| s.section == section)
+        .and_then(|s| s.blocked_by.clone())
 }
 
 // ── El bloqueo se VE antes de pulsar ────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     insert_record(&rt, "h1", 2, "FAC-002", "transmitted", "").await;
@@ -142,14 +153,20 @@ async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
     let motivo = blocked(&plan, "modules/verifactu")
         .expect("modules/verifactu debe llegar BLOQUEADA a la UI, no fallar al pulsar");
     // El motivo es legible y dice CUÁNTAS: un bloqueo sin cifra no explica nada.
-    assert!(motivo.contains('2'), "el motivo debe decir cuántas facturas lo bloquean: {motivo}");
+    assert!(
+        motivo.contains('2'),
+        "el motivo debe decir cuántas facturas lo bloquean: {motivo}"
+    );
     assert!(
         motivo.to_lowercase().contains("aeat"),
         "el motivo debe nombrar a la AEAT para que se entienda que es legal, no un fallo: {motivo}"
     );
     // Las secciones que SUSTENTAN esas facturas también quedan bloqueadas.
     for s in ["modules/invoice", "modules/sales"] {
-        assert!(blocked(&plan, s).is_some(), "{s} debe bloquearse: sostiene las facturas remitidas");
+        assert!(
+            blocked(&plan, s).is_some(),
+            "{s} debe bloquearse: sostiene las facturas remitidas"
+        );
     }
 }
 
@@ -157,7 +174,9 @@ async fn plan_bloquea_las_secciones_fiscales_si_hay_facturas_remitidas() {
 /// exactamente el estado de los datos de demo, y bloquear ahí haría inútil la feature.
 #[tokio::test]
 async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "pending", "").await;
     insert_record(&rt, "h1", 2, "FAC-002", "error", "").await;
@@ -176,7 +195,9 @@ async fn plan_no_bloquea_nada_si_las_facturas_no_se_han_remitido() {
 /// el reset de este hub (misma BD, distinto tenant).
 #[tokio::test]
 async fn plan_no_se_bloquea_por_las_facturas_de_otro_hub() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h2", 1, "FAC-VECINO", "accepted", "CSV-VECINO").await;
 
@@ -229,11 +250,16 @@ async fn execute_rechaza_lo_fiscal_por_el_perfil_del_core_y_no_borra_lo_de_al_la
     .await
     .expect("crear producto");
 
-    let sel =
-        ResetSelection { modules: vec!["inventory".into(), "sales".into()], ..Default::default() };
+    let sel = ResetSelection {
+        modules: vec!["inventory".into(), "sales".into()],
+        ..Default::default()
+    };
     let res = execute_reset(&rt, "h1", &sel, "u1").await;
 
-    assert!(res.is_err(), "el servidor debe RECHAZAR el reset de las ventas de un hub que emitió");
+    assert!(
+        res.is_err(),
+        "el servidor debe RECHAZAR el reset de las ventas de un hub que emitió"
+    );
     assert_eq!(
         count(&rt, "inventory_product", "h1").await,
         1,
@@ -292,16 +318,24 @@ async fn plan_sigue_bloqueando_por_facturas_remitidas_con_el_perfil_aun_vacio() 
 
 #[tokio::test]
 async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     let antes = count(&rt, "verifactu_record", "h1").await;
 
     // Un cliente manipulado pide borrar lo fiscal pese al bloqueo.
-    let sel = ResetSelection { modules: vec!["verifactu".into()], ..Default::default() };
+    let sel = ResetSelection {
+        modules: vec!["verifactu".into()],
+        ..Default::default()
+    };
     let res = execute_reset(&rt, "h1", &sel, "u1").await;
 
-    assert!(res.is_err(), "el servidor debe RECHAZAR el reset de una sección bloqueada");
+    assert!(
+        res.is_err(),
+        "el servidor debe RECHAZAR el reset de una sección bloqueada"
+    );
     let err = res.unwrap_err().to_string();
     assert!(
         err.to_lowercase().contains("aeat") || err.to_lowercase().contains("remit"),
@@ -318,7 +352,9 @@ async fn execute_rechaza_la_seccion_bloqueada_y_no_borra_nada() {
 /// catálogo de la demo — que es el caso que motiva todo el ADR.
 #[tokio::test]
 async fn execute_deja_resetear_lo_no_fiscal_aunque_haya_facturas_remitidas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh_fiscal().await;
     insert_record(&rt, "h1", 1, "FAC-001", "accepted", "CSV-AEAT-001").await;
     rt.execute_command(
@@ -329,10 +365,19 @@ async fn execute_deja_resetear_lo_no_fiscal_aunque_haya_facturas_remitidas() {
     .await
     .expect("crear producto");
 
-    let sel = ResetSelection { modules: vec!["inventory".into()], ..Default::default() };
-    execute_reset(&rt, "h1", &sel, "u1").await.expect("el catálogo SÍ se puede limpiar");
+    let sel = ResetSelection {
+        modules: vec!["inventory".into()],
+        ..Default::default()
+    };
+    execute_reset(&rt, "h1", &sel, "u1")
+        .await
+        .expect("el catálogo SÍ se puede limpiar");
 
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 0, "el catálogo se limpió");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        0,
+        "el catálogo se limpió"
+    );
     assert_eq!(
         count(&rt, "verifactu_record", "h1").await,
         1,

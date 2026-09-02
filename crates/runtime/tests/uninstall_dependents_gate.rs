@@ -21,7 +21,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
-use erplora_runtime::{RuntimeError, Runtime};
+use erplora_runtime::{Runtime, RuntimeError};
 use erplora_wasm_host::Output;
 
 fn fixture(name: &str) -> PathBuf {
@@ -115,7 +115,9 @@ async fn the_top_of_the_chain_is_never_blocked_by_what_it_itself_depends_on() {
     rt.uninstall("dmid")
         .await
         .expect("with `dtop` gone, nothing needs `dmid` either");
-    rt.uninstall("dbase").await.expect("and now `dbase` is free");
+    rt.uninstall("dbase")
+        .await
+        .expect("and now `dbase` is free");
     assert_eq!(installed(&rt), vec!["dloose"]);
 }
 
@@ -133,7 +135,10 @@ async fn force_is_the_owner_who_was_shown_the_list_and_said_yes() {
 async fn a_module_that_is_not_installed_still_reports_that_and_not_the_dependents_error() {
     let mut rt = hub_with_chain().await;
 
-    let err = rt.uninstall("nope").await.expect_err("nothing to uninstall");
+    let err = rt
+        .uninstall("nope")
+        .await
+        .expect_err("nothing to uninstall");
     assert!(
         matches!(err, RuntimeError::CommandNotFound(_)),
         "expected the usual not-installed error, got {err:?}"

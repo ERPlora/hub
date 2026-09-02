@@ -186,7 +186,12 @@ async fn turn(rt: &Runtime, limits: &Limits) -> Vec<IoResult> {
     let report = rt.process_flows().await.unwrap();
     let mut results = Vec::new();
     for io in &report.pending_io {
-        let PendingIo::Http { run_id, step_id, request } = io else {
+        let PendingIo::Http {
+            run_id,
+            step_id,
+            request,
+        } = io
+        else {
             continue;
         };
         let result = flow_io::execute(request, limits).await;
@@ -209,7 +214,9 @@ async fn without_a_grant_not_one_request_reaches_the_server() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/ok"), 5).await;
     // No grants at all — the default answer of `_flow_grants`.
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -225,11 +232,17 @@ async fn with_the_grant_exactly_one_request_reaches_it_and_its_answer_comes_back
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let results = turn(&rt, &Limits::allowing_private_addresses()).await;
 
-    assert_eq!(server.hits(), 1, "one step, one request — no retries, no doubles");
+    assert_eq!(
+        server.hits(),
+        1,
+        "one step, one request — no retries, no doubles"
+    );
     assert_eq!(
         results,
         vec![IoResult::Done(json!({
@@ -252,7 +265,9 @@ async fn a_body_that_is_not_json_comes_back_as_text() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/text"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let results = turn(&rt, &Limits::allowing_private_addresses()).await;
     assert_eq!(
@@ -272,7 +287,9 @@ async fn a_server_that_never_answers_fails_the_step_and_stops_the_run() {
     // One second, so the test costs a second and not thirty.
     let flow_id = flow_calling(&rt, &server.url("/slow"), 1).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let started = std::time::Instant::now();
     turn(&rt, &Limits::allowing_private_addresses()).await;
@@ -291,13 +308,18 @@ async fn an_error_status_fails_the_step_instead_of_being_read_as_success() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/boom"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::allowing_private_addresses()).await;
 
     let (status, error) = run_status(&rt, &flow_id).await;
     assert_eq!(status, "failed");
-    assert!(error.contains("flow.http_status") && error.contains("500"), "{error}");
+    assert!(
+        error.contains("flow.http_status") && error.contains("500"),
+        "{error}"
+    );
     // The body is in the error, because "500" alone is not something anybody can act on.
     assert!(error.contains("the till is on fire"), "{error}");
 }
@@ -308,7 +330,9 @@ async fn an_enormous_answer_is_truncated_instead_of_becoming_the_hubs_memory() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/big"), 10).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let results = turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -333,7 +357,9 @@ async fn a_name_that_resolves_inside_this_network_is_refused_and_nothing_is_dial
     let url = format!("http://localhost:{port}/ok");
     let flow_id = flow_calling(&rt, &url, 5).await;
     allow(&rt, &flow_id, &format!("http://localhost:{port}/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     // The limits that SHIP — this test is about the guard, so it does not bend them.
     turn(&rt, &Limits::default()).await;
@@ -356,7 +382,9 @@ async fn a_literal_address_inside_this_network_is_refused_even_with_a_grant_for_
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::default()).await;
 
@@ -383,7 +411,9 @@ async fn an_address_written_in_decimal_is_the_loopback_it_spells() {
     let flow_id = flow_calling(&rt, &decimal, 5).await;
     // The grant an admin would really write, in the notation they would really read.
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::default()).await;
 
@@ -408,7 +438,9 @@ async fn the_same_decimal_address_reaches_the_same_server_when_the_guard_is_bent
     let port = server.base.rsplit(':').next().unwrap().to_string();
     let flow_id = flow_calling(&rt, &format!("http://2130706433:{port}/ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let results = turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -429,7 +461,9 @@ async fn a_dot_segment_that_leaves_the_granted_path_never_reaches_the_server() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/ok/../boom"), 5).await;
     allow(&rt, &flow_id, &server.url("/ok*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -448,7 +482,9 @@ async fn a_dot_segment_that_lands_back_inside_the_grant_still_goes_out() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/text/../ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/ok*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let results = turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -473,7 +509,9 @@ async fn the_url_that_is_judged_is_the_url_that_is_dialled() {
     // Every trap of both issues in one URL: a decimal host, a `..`, a `\`, and a default port.
     let flow_id = flow_calling(&rt, &format!("http://2130706433:{port}/text/..\\ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/ok*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let report = rt.process_flows().await.unwrap();
     let PendingIo::Http { request, .. } = &report.pending_io[0] else {
@@ -502,14 +540,23 @@ async fn a_redirect_is_not_followed_because_the_second_hop_was_never_granted() {
     let rt = runtime().await;
     let flow_id = flow_calling(&rt, &server.url("/redirect"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::allowing_private_addresses()).await;
 
-    assert_eq!(server.hits(), 1, "the redirect itself, and nothing after it");
+    assert_eq!(
+        server.hits(),
+        1,
+        "the redirect itself, and nothing after it"
+    );
     let (status, error) = run_status(&rt, &flow_id).await;
     assert_eq!(status, "failed");
-    assert!(error.contains("302"), "the step reports the 3xx it got: {error}");
+    assert!(
+        error.contains("302"),
+        "the step reports the 3xx it got: {error}"
+    );
 }
 
 /// The wiring the 1 s loop uses: `process_flows` → [`flow_io::dispatch`] → `complete_flow_io`,
@@ -526,7 +573,9 @@ async fn the_background_loop_completes_what_it_dispatched() {
     rt.ensure_system_tables().await.unwrap();
     let flow_id = flow_calling(&rt, &server.url("/ok"), 5).await;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     let mut config = HubConfig::from_env();
     config.hub_id = HUB.to_string();
@@ -544,15 +593,30 @@ async fn the_background_loop_completes_what_it_dispatched() {
     for _ in 0..50 {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let rt = state.runtime.read().await;
-        let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
+        let run = rt
+            .list_flow_runs(&flow_id, 1, None)
+            .await
+            .unwrap()
+            .remove(0);
         status = run.status.clone();
         if status == "failed" || status == "pending" {
-            assert!(run.last_error.contains("flow.http_blocked"), "{}", run.last_error);
+            assert!(
+                run.last_error.contains("flow.http_blocked"),
+                "{}",
+                run.last_error
+            );
             break;
         }
     }
-    assert_eq!(status, "failed", "the run came back from its I/O instead of hanging");
-    assert_eq!(server.hits(), 0, "and the guard that ships refused loopback");
+    assert_eq!(
+        status, "failed",
+        "the run came back from its I/O instead of hanging"
+    );
+    assert_eq!(
+        server.hits(),
+        0,
+        "and the guard that ships refused loopback"
+    );
 }
 
 // ── secrets, on the wire ──────────────────────────────────────────────────────────────────────
@@ -561,11 +625,18 @@ async fn the_background_loop_completes_what_it_dispatched() {
 async fn the_credential_arrives_at_the_server_and_never_at_the_run_history() {
     // SAFETY: every test in this binary that touches the master key sets it to the same value, so
     // there is nothing for a parallel test to observe changing.
-    unsafe { std::env::set_var("HUB_SECRETS_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") };
+    unsafe {
+        std::env::set_var(
+            "HUB_SECRETS_KEY",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        )
+    };
 
     let server = start_server().await;
     let rt = runtime().await;
-    rt.put_flow_secret("API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+    rt.put_flow_secret("API_KEY", "sk-live-42", "hub_user:1")
+        .await
+        .unwrap();
     let flow_id = rt
         .create_flow(
             &NewFlow {
@@ -585,7 +656,9 @@ async fn the_credential_arrives_at_the_server_and_never_at_the_run_history() {
         .unwrap()
         .id;
     allow(&rt, &flow_id, &server.url("/*")).await;
-    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1").await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), "hub_user:1")
+        .await
+        .unwrap();
 
     turn(&rt, &Limits::allowing_private_addresses()).await;
 
@@ -596,11 +669,18 @@ async fn the_credential_arrives_at_the_server_and_never_at_the_run_history() {
     // …and it is nowhere in what the hub wrote down — not in the step's input, and not in the
     // OUTPUT either, because this server echoed the key back inside its answer.
     let (run, steps) = {
-        let run = rt.list_flow_runs(&flow_id, 1, None).await.unwrap().remove(0);
+        let run = rt
+            .list_flow_runs(&flow_id, 1, None)
+            .await
+            .unwrap()
+            .remove(0);
         rt.get_flow_run(&run.id).await.unwrap()
     };
     let written = format!("{:?}{:?}", run, steps);
-    assert!(!written.contains("sk-live-42"), "the run history holds the credential: {written}");
+    assert!(
+        !written.contains("sk-live-42"),
+        "the run history holds the credential: {written}"
+    );
 
     // Two layers, and this is what each of them caught — they are not redundant:
     //
@@ -623,9 +703,16 @@ async fn the_credential_arrives_at_the_server_and_never_at_the_run_history() {
 #[tokio::test]
 async fn the_secret_names_are_listed_and_the_values_have_no_way_out() {
     // SAFETY: see above — same value, every test.
-    unsafe { std::env::set_var("HUB_SECRETS_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") };
+    unsafe {
+        std::env::set_var(
+            "HUB_SECRETS_KEY",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        )
+    };
     let rt = runtime().await;
-    rt.put_flow_secret("API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+    rt.put_flow_secret("API_KEY", "sk-live-42", "hub_user:1")
+        .await
+        .unwrap();
 
     let listed = rt.list_flow_secrets().await.unwrap();
     let as_json: Value = serde_json::to_value(&listed).unwrap();
@@ -635,6 +722,8 @@ async fn the_secret_names_are_listed_and_the_values_have_no_way_out() {
         "the listing is names: {as_json}"
     );
 
-    rt.delete_flow_secret("API_KEY", "hub_user:1").await.unwrap();
+    rt.delete_flow_secret("API_KEY", "hub_user:1")
+        .await
+        .unwrap();
     assert!(rt.list_flow_secrets().await.unwrap().is_empty());
 }

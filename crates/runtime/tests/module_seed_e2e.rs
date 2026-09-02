@@ -18,7 +18,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 
 fn mdir(name: &str) -> PathBuf {
@@ -30,10 +30,14 @@ fn admin() -> RequestContext {
 
 #[tokio::test]
 async fn instalar_taxes_siembra_sus_categorias_fiscales() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("instalar taxes");
 
     let cats = rt
         .execute_query("taxes.categories.list", &Params::new(), &admin())
@@ -45,32 +49,53 @@ async fn instalar_taxes_siembra_sus_categorias_fiscales() {
         "instalar `taxes` tiene que dejar sembradas sus categorías canónicas: {cats:?}"
     );
     assert!(
-        cats.iter().any(|c| c["key"] == serde_json::json!("restaurant.food")),
+        cats.iter()
+            .any(|c| c["key"] == serde_json::json!("restaurant.food")),
         "falta la categoría canónica de restauración: {cats:?}"
     );
 }
 
 #[tokio::test]
 async fn la_semilla_es_idempotente_reinstalar_no_duplica() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // El seed es DML re-ejecutable (WHERE NOT EXISTS por la clave natural). Si no lo fuera, una
     // reinstalación —o un reintento del instalador— dejaría el catálogo fiscal duplicado.
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&mdir("taxes")).await.expect("primera instalación");
-    let antes = rt.execute_query("taxes.categories.list", &Params::new(), &admin()).await.unwrap();
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("primera instalación");
+    let antes = rt
+        .execute_query("taxes.categories.list", &Params::new(), &admin())
+        .await
+        .unwrap();
 
-    rt.install_from_dir(&mdir("taxes")).await.expect("reinstalar");
-    let despues = rt.execute_query("taxes.categories.list", &Params::new(), &admin()).await.unwrap();
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("reinstalar");
+    let despues = rt
+        .execute_query("taxes.categories.list", &Params::new(), &admin())
+        .await
+        .unwrap();
 
-    assert_eq!(antes.len(), despues.len(), "reinstalar NO puede duplicar la semilla");
+    assert_eq!(
+        antes.len(),
+        despues.len(),
+        "reinstalar NO puede duplicar la semilla"
+    );
 }
 
 #[tokio::test]
 async fn un_modulo_sin_bloque_seed_se_instala_igual() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // La inmensa mayoría de los módulos no siembra nada: la ausencia del bloque no es un error.
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&mdir("customers")).await.expect("instalar un módulo sin seed");
+    rt.install_from_dir(&mdir("customers"))
+        .await
+        .expect("instalar un módulo sin seed");
 }

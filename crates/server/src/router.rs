@@ -166,9 +166,15 @@ mod tests {
         let allowed = vec!["sales".to_string()];
         let kept = filter_tools_by_modules(tools, Some(&allowed));
         let names: Vec<&str> = kept.iter().filter_map(|t| t["name"].as_str()).collect();
-        assert!(names.contains(&"hub.setup.status"), "core tool must survive: {names:?}");
+        assert!(
+            names.contains(&"hub.setup.status"),
+            "core tool must survive: {names:?}"
+        );
         assert!(names.contains(&"sales.today"));
-        assert!(!names.contains(&"inventory.products.list"), "module filtering still works");
+        assert!(
+            !names.contains(&"inventory.products.list"),
+            "module filtering still works"
+        );
     }
 
     /// Embedder de juguete: mapea texto → vector por palabras-clave, determinista y sin red. Cada

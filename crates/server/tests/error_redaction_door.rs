@@ -30,7 +30,10 @@ async fn make_app() -> axum::Router {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
-    app(AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev)))
+    app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ))
 }
 
 fn post(uri: &str, body: Value) -> Request<Body> {
@@ -53,7 +56,14 @@ async fn call(uri: &str, body: Value) -> Value {
 
 /// Every fragment that betrays the engine, its driver or the shape of our schema. Asserted on the
 /// WHOLE response body, not just on `message`: a leak that moves to another key is still a leak.
-const NEVER: [&str; 6] = ["sqlx", "db: ", "constraint", "_fkey", "at line", "dberr_note"];
+const NEVER: [&str; 6] = [
+    "sqlx",
+    "db: ",
+    "constraint",
+    "_fkey",
+    "at line",
+    "dberr_note",
+];
 
 fn assert_redacted(body: &Value) {
     let raw = body.to_string();
@@ -99,11 +109,15 @@ async fn a_redacted_failure_still_carries_a_stable_code() {
     .await;
 
     assert_eq!(
-        body["error"]["code"], json!("db"),
+        body["error"]["code"],
+        json!("db"),
         "a database failure keeps the stable code the error registry already publishes: {body}"
     );
     assert!(
-        !body["error"]["message"].as_str().unwrap_or_default().is_empty(),
+        !body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
         "the redacted answer still says something: {body}"
     );
 }
@@ -183,19 +197,32 @@ async fn every_refusal_of_the_authenticated_door_carries_a_code_hub1241() {
     let refusals: [(&str, Value); 6] = [
         // Plumbing (redacted), a module's own rejection, a typo in the name, an undeclared filter,
         // a query whose SQL cannot run, and a command the caller may not even name.
-        ("/api/command", json!({ "name": "dberr.notes.create", "payload": { "topic_id": "nope" } })),
+        (
+            "/api/command",
+            json!({ "name": "dberr.notes.create", "payload": { "topic_id": "nope" } }),
+        ),
         ("/api/command", json!({ "name": "dberr.notes.reject" })),
         ("/api/command", json!({ "name": "dberr.notes.nope" })),
-        ("/api/query", json!({ "name": "dberr.notes.paged", "params": { "nosuchfilter": "x" } })),
+        (
+            "/api/query",
+            json!({ "name": "dberr.notes.paged", "params": { "nosuchfilter": "x" } }),
+        ),
         ("/api/query", json!({ "name": "dberr.notes.broken" })),
         ("/api/query", json!({ "name": "dberr.notes.nope" })),
     ];
 
     for (uri, request) in refusals {
         let body = call(uri, request.clone()).await;
-        assert_eq!(body["ok"], json!(false), "{request} should have been refused: {body}");
+        assert_eq!(
+            body["ok"],
+            json!(false),
+            "{request} should have been refused: {body}"
+        );
         let code = body["error"]["code"].as_str().unwrap_or_default();
-        assert!(!code.is_empty(), "{request} was refused with NO code: {body}");
+        assert!(
+            !code.is_empty(),
+            "{request} was refused with NO code: {body}"
+        );
         assert_ne!(
             code, "error",
             "{request} falls into the flat `error` bucket, so a screen has nothing to branch on \

@@ -247,7 +247,9 @@ async fn register_module(
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
         }
         if !declared.is_empty() {
-            registry.seed_natural_keys.insert(manifest.id.clone(), declared);
+            registry
+                .seed_natural_keys
+                .insert(manifest.id.clone(), declared);
         }
     }
 
@@ -395,18 +397,24 @@ fn validate_table_scope(dir: &Path, manifest: &Manifest) -> Result<()> {
                 continue;
             }
             let (code, why) = if crate::export::is_system_table(table) {
-                ("system_table_write", format!(
+                (
+                    "system_table_write",
+                    format!(
                     "`{table}` is a system table of the hub: the fiscal profile, the certificate \
                      and the runtime's own bookkeeping are the identity of this installation, out \
                      of reach of every module (ADR-0273 D8)"
-                ))
+                ),
+                )
             } else {
-                ("foreign_table_write", format!(
-                    "`{table}` is outside the module's own prefix (`{id}`/`{id}_*`): a module \
+                (
+                    "foreign_table_write",
+                    format!(
+                        "`{table}` is outside the module's own prefix (`{id}`/`{id}_*`): a module \
                      only writes its own tables; another module's data is composed through its \
                      public queries/commands (ADR-0127), never by direct SQL",
-                    id = manifest.id
-                ))
+                        id = manifest.id
+                    ),
+                )
             };
             return Err(RuntimeError::ManifestRejected {
                 module: manifest.id.clone(),
@@ -452,8 +460,13 @@ fn write_targets(sql: &str) -> WriteTargets {
                 let prev = i.checked_sub(1).and_then(w);
                 let statement = !matches!(
                     prev,
-                    Some("do") | Some("for") | Some("key") | Some("before") | Some("after")
-                        | Some("or") | Some("of")
+                    Some("do")
+                        | Some("for")
+                        | Some("key")
+                        | Some("before")
+                        | Some("after")
+                        | Some("or")
+                        | Some("of")
                 );
                 if statement {
                     let at = skip_modifiers(i + 1, &["only"]);
@@ -930,10 +943,11 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
             return reject(
                 "role_key_invalid",
                 format!(
-                "has an invalid key: expected snake_case ASCII (`^[a-z][a-z0-9_]*$`, up to \
+                    "has an invalid key: expected snake_case ASCII (`^[a-z][a-z0-9_]*$`, up to \
                  {MAX_ROLE_KEY_LEN} chars), because the key is what `role_permissions` grants \
                  against and what `hub_user.role` stores"
-            ));
+                ),
+            );
         }
         if crate::hub_users::is_base_role(key) {
             return reject(
@@ -942,7 +956,8 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
                 "collides with a base role of the hub ({}): a module EXTENDS the base catalogue, \
                  it never redefines an entry of it",
                 crate::hub_users::BASE_ROLES.join(", ")
-            ));
+            ),
+            );
         }
         if !seen.insert(key) {
             return reject(
@@ -967,7 +982,8 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
                  the floor the account role imposes at login, never from a manifest. Extend \
                  `manager` instead",
                 role.extends
-            ));
+            ),
+            );
         }
         if !crate::hub_users::is_extendable_base_role(&role.extends) {
             return reject(
@@ -976,7 +992,8 @@ fn validate_role_declarations(manifest: &Manifest) -> Result<()> {
                 "declares `extends: {}`, which is not a base role of the hub: expected one of {}",
                 role.extends,
                 extendable_base_roles().join(", ")
-            ));
+            ),
+            );
         }
     }
     Ok(())
@@ -1863,17 +1880,32 @@ mod tests {
     fn write_targets_reads_statements_not_clauses() {
         let targets = |sql: &str| super::write_targets(sql).tables;
 
-        assert_eq!(targets("INSERT INTO inventory_product (id) VALUES (:id);"), ["inventory_product"]);
+        assert_eq!(
+            targets("INSERT INTO inventory_product (id) VALUES (:id);"),
+            ["inventory_product"]
+        );
         assert_eq!(targets("UPDATE taxes_rule SET rate = 21;"), ["taxes_rule"]);
-        assert_eq!(targets("DELETE FROM sales_line WHERE id = :id;"), ["sales_line"]);
-        assert_eq!(targets("CREATE TABLE IF NOT EXISTS kitchen_log (id TEXT);"), ["kitchen_log"]);
-        assert_eq!(targets("ALTER TABLE staff_member ADD COLUMN x TEXT;"), ["staff_member"]);
+        assert_eq!(
+            targets("DELETE FROM sales_line WHERE id = :id;"),
+            ["sales_line"]
+        );
+        assert_eq!(
+            targets("CREATE TABLE IF NOT EXISTS kitchen_log (id TEXT);"),
+            ["kitchen_log"]
+        );
+        assert_eq!(
+            targets("ALTER TABLE staff_member ADD COLUMN x TEXT;"),
+            ["staff_member"]
+        );
         assert_eq!(targets("DROP TABLE IF EXISTS tasks_done;"), ["tasks_done"]);
         assert_eq!(
             targets("CREATE UNIQUE INDEX IF NOT EXISTS idx_x ON printing_job (status);"),
             ["printing_job"]
         );
-        assert_eq!(targets("TRUNCATE TABLE payments_intent;"), ["payments_intent"]);
+        assert_eq!(
+            targets("TRUNCATE TABLE payments_intent;"),
+            ["payments_intent"]
+        );
 
         // `ON CONFLICT … DO UPDATE SET` is a clause of the INSERT, not an UPDATE of `set` — the
         // false positive that would have flagged 19 of the 25 published modules.
@@ -1886,7 +1918,10 @@ mod tests {
         );
         // The lock clause and quoted/cased identifiers.
         assert!(targets("SELECT * FROM sales_order FOR UPDATE;").is_empty());
-        assert_eq!(targets("UPDATE \"Sales_Order\" SET x = 1;"), ["sales_order"]);
+        assert_eq!(
+            targets("UPDATE \"Sales_Order\" SET x = 1;"),
+            ["sales_order"]
+        );
         // Literals and comments are data, not statements.
         assert!(targets("-- UPDATE hub_user\nSELECT 'DELETE FROM hub_user';").is_empty());
     }
@@ -1916,12 +1951,19 @@ mod tests {
         }
         let root = crate::e2e_support::modules_root();
         let mut checked = 0;
-        for entry in std::fs::read_dir(&root).expect("modules root is readable").flatten() {
+        for entry in std::fs::read_dir(&root)
+            .expect("modules root is readable")
+            .flatten()
+        {
             let dir = entry.path();
             if !dir.join("module.json").is_file() {
                 continue;
             }
-            let module = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let module = dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
                 continue; // A manifest that does not parse is another test's business.
             };
@@ -2021,12 +2063,19 @@ mod tests {
         let root = crate::e2e_support::modules_root();
         let mut found = std::collections::BTreeSet::new();
         let mut parsed = 0;
-        for entry in std::fs::read_dir(&root).expect("modules root is readable").flatten() {
+        for entry in std::fs::read_dir(&root)
+            .expect("modules root is readable")
+            .flatten()
+        {
             let dir = entry.path();
             if !dir.join("module.json").is_file() {
                 continue;
             }
-            let module = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let module = dir
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
                 continue; // A manifest that does not parse is another test's business.
             };
@@ -2086,11 +2135,14 @@ mod tests {
             return;
         }
         let live = published_manifest_warnings();
-        let stale: Vec<String> = crate::manifest_warning_grandfather::GRANDFATHERED_MANIFEST_WARNINGS
-            .iter()
-            .filter(|(module, path)| !live.contains(&((*module).to_string(), (*path).to_string())))
-            .map(|(module, path)| format!("(\"{module}\", \"{path}\")"))
-            .collect();
+        let stale: Vec<String> =
+            crate::manifest_warning_grandfather::GRANDFATHERED_MANIFEST_WARNINGS
+                .iter()
+                .filter(|(module, path)| {
+                    !live.contains(&((*module).to_string(), (*path).to_string()))
+                })
+                .map(|(module, path)| format!("(\"{module}\", \"{path}\")"))
+                .collect();
         assert!(
             stale.is_empty(),
             "{} grandfather entr(y/ies) no longer match a real warning:\n  {}\n\

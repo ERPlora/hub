@@ -1864,6 +1864,7 @@ dependencies = [
  "erplora-db",
  "erplora-runtime",
  "erplora-wasm-host",
+ "openssl",
  "reqwest 0.12.28",
  "serde_json",
  "sha2 0.10.9",

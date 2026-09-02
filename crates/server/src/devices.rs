@@ -133,9 +133,7 @@ fn unauthorized(e: auth::AuthError) -> Response {
         .into_response()
 }
 
-async fn runtime(
-    st: &AppState,
-) -> Result<crate::state::SharedRuntime, Response> {
+async fn runtime(st: &AppState) -> Result<crate::state::SharedRuntime, Response> {
     st.runtime_for(&st.hub_id())
         .await
         .map_err(crate::tenant_rejected)
@@ -326,7 +324,11 @@ mod tests {
         // "unnamed" and what an owner is invited to fix. Making something up ("Device 1") would be
         // the same lie as the person's name it replaces.
         for silent in ["", "   ", "curl/8.6.0", "PostmanRuntime/7.39.0"] {
-            assert_eq!(default_device_name(silent), "", "{silent:?} says nothing about the device");
+            assert_eq!(
+                default_device_name(silent),
+                "",
+                "{silent:?} says nothing about the device"
+            );
         }
     }
 
@@ -334,7 +336,10 @@ mod tests {
     fn half_an_answer_is_still_worth_more_than_none() {
         // A platform with no recognisable browser (or the other way round) still tells the owner
         // which of the three tablets they are looking at, so it is not thrown away.
-        assert_eq!(default_device_name("Mozilla/5.0 (Linux; Android 14)"), "Android");
+        assert_eq!(
+            default_device_name("Mozilla/5.0 (Linux; Android 14)"),
+            "Android"
+        );
         assert_eq!(default_device_name("Firefox/128.0"), "Firefox");
     }
 
@@ -349,9 +354,15 @@ mod tests {
         // A paragraph in the column that exists to be read at a glance would push the row the
         // owner is looking for off the screen.
         assert_eq!(clean_name(&"B".repeat(MAX_DEVICE_NAME + 1)), None);
-        assert!(clean_name(&"B".repeat(MAX_DEVICE_NAME)).is_some(), "the limit itself is allowed");
+        assert!(
+            clean_name(&"B".repeat(MAX_DEVICE_NAME)).is_some(),
+            "the limit itself is allowed"
+        );
         // Counted in characters: an accented name must not be refused sooner than a plain one.
-        assert!(clean_name(&"á".repeat(MAX_DEVICE_NAME)).is_some(), "60 accented characters fit");
+        assert!(
+            clean_name(&"á".repeat(MAX_DEVICE_NAME)).is_some(),
+            "60 accented characters fit"
+        );
     }
 
     #[test]
@@ -362,6 +373,10 @@ mod tests {
 
         let mut named = HeaderMap::new();
         named.insert("x-device-id", HeaderValue::from_static(" laptop-1 "));
-        assert_eq!(device_id_of(&named), "laptop-1", "trimmed, like every other door");
+        assert_eq!(
+            device_id_of(&named),
+            "laptop-1",
+            "trimmed, like every other door"
+        );
     }
 }

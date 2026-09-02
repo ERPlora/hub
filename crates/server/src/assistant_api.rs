@@ -68,7 +68,8 @@ pub(crate) async fn assistant_checkout(
     }
     match r.json(&body).send().await {
         Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
             let bytes = resp.bytes().await.unwrap_or_default();
             cloud_json_passthrough(status, bytes)
         }
@@ -114,7 +115,11 @@ pub(crate) async fn assistant_chat_stream(
         let instructions = assistant::build_instructions(
             rt.registry(),
             &assistant::client_system_messages(&frontend),
-            &format!("{} ({})", now.format("%Y-%m-%dT%H:%M:%SZ"), now.format("%A")),
+            &format!(
+                "{} ({})",
+                now.format("%Y-%m-%dT%H:%M:%SZ"),
+                now.format("%A")
+            ),
         );
         (tools, ctx.user_id.clone(), active, instructions)
     };
@@ -225,7 +230,8 @@ pub(crate) async fn assistant_chat_stream(
                     // Fin del stream del Cloud: procesa cualquier resto + cierra.
                     if !buf.is_empty() {
                         let rest = std::mem::take(&mut buf);
-                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_notes) {
+                        if let Some(frame) = assistant::translate_sse_line(rest.trim(), &tool_notes)
+                        {
                             return Poll::Ready(Some(Ok(bytes_from(frame))));
                         }
                     }

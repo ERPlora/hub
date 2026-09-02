@@ -250,7 +250,10 @@ nQIDAQAB
             "hubs": [{"id": "hub-1", "org": "org-A"}],
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
-        assert_eq!(claims.email, "ana@bar.com", "el email del payload se parsea");
+        assert_eq!(
+            claims.email, "ana@bar.com",
+            "el email del payload se parsea"
+        );
 
         // Sin claim `email` → cadena vacía (retrocompat).
         let no_email = sign(json!({
@@ -261,7 +264,6 @@ nQIDAQAB
         let claims = verify_user_jwt(&no_email, PUB).unwrap();
         assert!(claims.email.is_empty(), "sin `email` → cadena vacía");
     }
-
 
     /// The LEGACY wire shape, which is all a deployed hub reads today: the SaaS sends the role in
     /// `organizations: [{id, role}]` next to `hubs: [{id, org}]`, and crossing them yields the role.
@@ -278,7 +280,10 @@ nQIDAQAB
         }));
         let claims = verify_user_jwt(&token, PUB).unwrap();
         assert_eq!(claims.role_keys_for_hub("hub-a"), vec!["admin".to_string()]);
-        assert_eq!(claims.role_keys_for_hub("hub-b"), vec!["employee".to_string()]);
+        assert_eq!(
+            claims.role_keys_for_hub("hub-b"),
+            vec!["employee".to_string()]
+        );
     }
 
     /// The NEW wire shape (hub#350): the role rides inside the hub membership itself. This is the
@@ -359,7 +364,10 @@ nQIDAQAB
         let claims = verify_user_jwt(&token, PUB).unwrap();
         assert!(claims.organizations.is_empty());
         assert!(claims.role_keys_for_hub("hub-a").is_empty());
-        assert!(claims.is_member_of_hub("hub-a"), "the presence gate still works");
+        assert!(
+            claims.is_member_of_hub("hub-a"),
+            "the presence gate still works"
+        );
     }
 
     /// An `org` that is not listed under `organizations` yields nothing through the legacy shape:

@@ -281,7 +281,13 @@ fn error_chain(error: &dyn std::error::Error) -> String {
 }
 
 fn first_line(body: &str) -> String {
-    let line: String = body.lines().next().unwrap_or_default().chars().take(200).collect();
+    let line: String = body
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .take(200)
+        .collect();
     if line.is_empty() {
         "(empty body)".to_string()
     } else {
@@ -459,7 +465,12 @@ mod tests {
     #[test]
     fn only_http_and_https_ever_leave() {
         let limits = Limits::default();
-        for url in ["file:///etc/passwd", "ftp://example.com/x", "gopher://x/", "/x"] {
+        for url in [
+            "file:///etc/passwd",
+            "ftp://example.com/x",
+            "gopher://x/",
+            "/x",
+        ] {
             assert!(refused(url, &limits), "{url}");
         }
     }
@@ -470,6 +481,9 @@ mod tests {
         // and there is deliberately no environment variable that would.
         assert!(!Limits::default().allow_private_addresses);
         assert!(refused("http://127.0.0.1:9/x", &Limits::default()));
-        assert!(!refused("http://127.0.0.1:9/x", &Limits::allowing_private_addresses()));
+        assert!(!refused(
+            "http://127.0.0.1:9/x",
+            &Limits::allowing_private_addresses()
+        ));
     }
 }

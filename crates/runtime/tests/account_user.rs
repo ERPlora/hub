@@ -353,7 +353,13 @@ async fn editing_the_email_keeps_the_access_plane_and_the_profile_in_step() {
     .unwrap();
 
     let linked = rt
-        .get_or_link_cloud_user("cloud-9", "Ana", "employee", Some("a.soto@example.com"), None)
+        .get_or_link_cloud_user(
+            "cloud-9",
+            "Ana",
+            "employee",
+            Some("a.soto@example.com"),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(linked.id, id, "the new email reaches the same row");

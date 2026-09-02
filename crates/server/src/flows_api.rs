@@ -180,7 +180,10 @@ fn new_flow(body: &Value) -> Result<NewFlow, Response> {
     };
     Ok(NewFlow {
         name,
-        enabled: body.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true),
+        enabled: body
+            .get("enabled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true),
         definition: definition.clone(),
     })
 }
@@ -310,7 +313,11 @@ pub async fn create_flow(
     };
     let rt = arc.read().await;
     match rt.create_flow(&new, &who).await {
-        Ok(flow) => (StatusCode::CREATED, Json(json!({ "ok": true, "data": flow }))).into_response(),
+        Ok(flow) => (
+            StatusCode::CREATED,
+            Json(json!({ "ok": true, "data": flow })),
+        )
+            .into_response(),
         Err(e) => flow_err(e),
     }
 }
@@ -358,7 +365,9 @@ pub async fn delete_flow(
     let (arc, who) = admin_session!(st, headers);
     let rt = arc.read().await;
     match rt.delete_flow(&id, &who).await {
-        Ok(()) => Json(json!({ "ok": true, "data": { "id": id, "deleted": true } })).into_response(),
+        Ok(()) => {
+            Json(json!({ "ok": true, "data": { "id": id, "deleted": true } })).into_response()
+        }
         Err(e) => flow_err(e),
     }
 }
@@ -557,7 +566,9 @@ pub async fn delete_secret(
     let (arc, who) = admin_session!(st, headers);
     let rt = arc.read().await;
     match rt.delete_flow_secret(&name, &who).await {
-        Ok(()) => Json(json!({ "ok": true, "data": { "name": name, "deleted": true } })).into_response(),
+        Ok(()) => {
+            Json(json!({ "ok": true, "data": { "name": name, "deleted": true } })).into_response()
+        }
         Err(e) => flow_err(e),
     }
 }
@@ -604,7 +615,10 @@ pub async fn list_approvals(
 ) -> Response {
     let (arc, _) = admin_session!(st, headers);
     let rt = arc.read().await;
-    let status = params.get("status").map(String::as_str).filter(|s| !s.is_empty());
+    let status = params
+        .get("status")
+        .map(String::as_str)
+        .filter(|s| !s.is_empty());
     match rt.list_flow_approvals(status, APPROVALS_PAGE).await {
         Ok(items) => Json(json!({ "ok": true, "data": items })).into_response(),
         Err(e) => flow_err(e),
@@ -645,8 +659,12 @@ pub async fn reject(
 /// and a required extractor would answer `400` to every existing caller. Anything that is not a
 /// string is the empty comment: a decision must never fail over the note attached to it.
 fn comment_of(body: Option<Json<Value>>) -> String {
-    body.and_then(|Json(v)| v.get("comment").and_then(|c| c.as_str()).map(str::to_string))
-        .unwrap_or_default()
+    body.and_then(|Json(v)| {
+        v.get("comment")
+            .and_then(|c| c.as_str())
+            .map(str::to_string)
+    })
+    .unwrap_or_default()
 }
 
 async fn decide(
@@ -707,17 +725,29 @@ mod tests {
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),
             // A kind of the frozen vocabulary this core cannot execute yet.
-            (def::ERR_STEP_KIND_NOT_AVAILABLE, StatusCode::NOT_IMPLEMENTED),
-            (grants::ERR_GRANT_KIND_NOT_AVAILABLE, StatusCode::NOT_IMPLEMENTED),
+            (
+                def::ERR_STEP_KIND_NOT_AVAILABLE,
+                StatusCode::NOT_IMPLEMENTED,
+            ),
+            (
+                grants::ERR_GRANT_KIND_NOT_AVAILABLE,
+                StatusCode::NOT_IMPLEMENTED,
+            ),
             // Real conflicts: well formed, allowed, and the state says no.
             (ERR_FLOW_DISABLED, StatusCode::CONFLICT),
-            (approvals::ERR_APPROVAL_ALREADY_DECIDED, StatusCode::CONFLICT),
+            (
+                approvals::ERR_APPROVAL_ALREADY_DECIDED,
+                StatusCode::CONFLICT,
+            ),
             (approvals::ERR_APPROVAL_EXPIRED, StatusCode::CONFLICT),
             (store::ERR_FLOW_DELETED, StatusCode::CONFLICT),
             (agent::ERR_NOT_IN_FLIGHT, StatusCode::CONFLICT),
             (secrets::ERR_SECRETS_KEY_MISSING, StatusCode::CONFLICT),
             // Not the caller's fault at all.
-            (secrets::ERR_SECRET_UNREADABLE, StatusCode::INTERNAL_SERVER_ERROR),
+            (
+                secrets::ERR_SECRET_UNREADABLE,
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
             // …and the family default: what the caller sent cannot be accepted.
             (def::ERR_UNKNOWN_SCHEMA_VERSION, StatusCode::BAD_REQUEST),
             (def::ERR_INVALID_DEFINITION, StatusCode::BAD_REQUEST),
@@ -750,7 +780,11 @@ mod tests {
     #[test]
     fn a_code_from_outside_the_namespace_is_not_reclassified_here() {
         assert_eq!(flow_status("stock.insufficient"), None);
-        assert_eq!(flow_status("not_found"), None, "a bare code is not a flow's");
+        assert_eq!(
+            flow_status("not_found"),
+            None,
+            "a bare code is not a flow's"
+        );
         let response = flow_err(RuntimeError::Domain {
             code: "stock.insufficient".to_string(),
             message: "no hay bastante".to_string(),

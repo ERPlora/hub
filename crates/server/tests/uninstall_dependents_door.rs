@@ -44,13 +44,17 @@ fn write_module(root: &std::path::Path, id: &str, depends_on: &[&str]) -> std::p
 
 /// A hub with `dbase` ← `dmid` ← `dtop` installed, plus `dloose` depending on nobody.
 async fn fixture(tag: &str) -> (axum::Router, String) {
-    let temp = std::env::temp_dir().join(format!("erplora-uninst-1101-{}-{tag}", std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-uninst-1101-{}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&temp);
     std::fs::create_dir_all(&temp).unwrap();
 
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-1101");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&admin_id, 3600, None).await.unwrap();
 
     for (id, deps) in [
@@ -176,7 +180,11 @@ async fn an_explicit_force_removes_it_anyway() {
 
     let res = router
         .clone()
-        .oneshot(uninstall_with_body(&session, "dbase", json!({ "force": true })))
+        .oneshot(uninstall_with_body(
+            &session,
+            "dbase",
+            json!({ "force": true }),
+        ))
         .await
         .unwrap();
 
@@ -194,12 +202,19 @@ async fn force_false_is_the_same_as_not_sending_it() {
 
     let res = router
         .clone()
-        .oneshot(uninstall_with_body(&session, "dbase", json!({ "force": false })))
+        .oneshot(uninstall_with_body(
+            &session,
+            "dbase",
+            json!({ "force": false }),
+        ))
         .await
         .unwrap();
 
     assert_eq!(res.status(), StatusCode::CONFLICT);
-    assert_eq!(json_body(res).await["error"]["code"], json!("has_dependents"));
+    assert_eq!(
+        json_body(res).await["error"]["code"],
+        json!("has_dependents")
+    );
 }
 
 #[tokio::test]
@@ -229,7 +244,11 @@ async fn force_does_not_turn_an_unknown_module_into_a_success() {
 
     let res = router
         .clone()
-        .oneshot(uninstall_with_body(&session, "nope", json!({ "force": true })))
+        .oneshot(uninstall_with_body(
+            &session,
+            "nope",
+            json!({ "force": true }),
+        ))
         .await
         .unwrap();
 

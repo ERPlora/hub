@@ -289,7 +289,11 @@ pub async fn status(
     // manifest (a third-party module with no `locales/` still renders, just untranslated).
     let locale = {
         let lang = setting("language");
-        if lang.is_empty() { "en".to_string() } else { lang }
+        if lang.is_empty() {
+            "en".to_string()
+        } else {
+            lang
+        }
     };
     // The second arm of ADR-0203, resolved against THIS hub. Read here for the same reason the
     // settings are: the reserved `hub.` path answers before the dispatcher enriches the context,
@@ -308,7 +312,9 @@ pub async fn status(
     // hub#1087): the gate itself does not demand the certificate there, so the arm follows it —
     // the profile's own word decides, and an unread profile (None/error) degrades to the
     // production answer, the same fail-closed direction the gate takes.
-    let certificate_present = crate::certificate::can_sign(db, hub_id).await.unwrap_or(false);
+    let certificate_present = crate::certificate::can_sign(db, hub_id)
+        .await
+        .unwrap_or(false);
     let fiscal_environment = match crate::fiscal_profile::load(db, hub_id).await {
         Ok(Some(p)) => p.environment,
         _ => String::new(),
@@ -428,7 +434,11 @@ pub async fn status(
             // say today which blueprint section fills it.
             &["manual", "assistant"],
             actionable,
-            if imported.contains(&manifest.id) { ORIGIN_BLUEPRINT } else { ORIGIN_USER },
+            if imported.contains(&manifest.id) {
+                ORIGIN_BLUEPRINT
+            } else {
+                ORIGIN_USER
+            },
         ));
     }
 
@@ -563,7 +573,9 @@ fn catalog_offer_at(marker: &str, now: DateTime<Utc>) -> Option<u64> {
     let installable = marker.get("installable")?.as_u64()?;
     let at = DateTime::parse_from_rfc3339(marker.get("at")?.as_str()?).ok()?;
     // `abs`: a timestamp from the future is a broken clock, not a fresh answer.
-    let age = now.signed_duration_since(at.with_timezone(&Utc)).num_seconds();
+    let age = now
+        .signed_duration_since(at.with_timezone(&Utc))
+        .num_seconds();
     (age.abs() <= CATALOG_OFFER_TTL_SECS).then_some(installable)
 }
 
@@ -599,7 +611,11 @@ fn item_key(module_id: &str) -> String {
 /// in `testing` there is nothing to authorize, and a ⛔ that names a rejection the runtime will
 /// never make is the exact lie this arm exists not to tell. Anything that is not `testing`
 /// (production, unresolved) keeps the arm — the conservative answer, same as the gate.
-fn certificate_arm(registry: &Registry, certificate_present: bool, environment: &str) -> Vec<String> {
+fn certificate_arm(
+    registry: &Registry,
+    certificate_present: bool,
+    environment: &str,
+) -> Vec<String> {
     if certificate_present || environment == crate::fiscal_profile::ENV_TESTING {
         return Vec::new();
     }
@@ -913,7 +929,11 @@ mod tests {
     use super::*;
 
     fn check(field: &str, truthy: Option<bool>, equals: Option<Json>) -> SetupCheck {
-        SetupCheck { field: field.to_string(), truthy, equals }
+        SetupCheck {
+            field: field.to_string(),
+            truthy,
+            equals,
+        }
     }
 
     #[test]
@@ -945,10 +965,25 @@ mod tests {
     fn truthy_reads_the_shapes_a_database_actually_returns() {
         // The same `false` arrives as 0 from Postgres, as "0" from a text column and as false from
         // JSON. All three mean the same thing to a person, so they must here too.
-        for falsy in [json!(null), json!(0), json!(""), json!("0"), json!(false), json!("false"), json!("  ")] {
+        for falsy in [
+            json!(null),
+            json!(0),
+            json!(""),
+            json!("0"),
+            json!(false),
+            json!("false"),
+            json!("  "),
+        ] {
             assert!(!truthy(&falsy), "{falsy} must not count as configured");
         }
-        for t in [json!(1), json!("1"), json!(true), json!("yes"), json!(-3), json!(0.5)] {
+        for t in [
+            json!(1),
+            json!("1"),
+            json!(true),
+            json!("yes"),
+            json!(-3),
+            json!(0.5),
+        ] {
             assert!(truthy(&t), "{t} must count as configured");
         }
     }
@@ -958,17 +993,32 @@ mod tests {
         // `truthy: false` is "configured when this is EMPTY" — a module may well define it that way
         // (no pending migrations, no unassigned tables).
         let row = json!({ "pending_steps": 0 });
-        assert!(is_configured(Some(&row), &[check("pending_steps", Some(false), None)]));
+        assert!(is_configured(
+            Some(&row),
+            &[check("pending_steps", Some(false), None)]
+        ));
         let row = json!({ "pending_steps": 3 });
-        assert!(!is_configured(Some(&row), &[check("pending_steps", Some(false), None)]));
+        assert!(!is_configured(
+            Some(&row),
+            &[check("pending_steps", Some(false), None)]
+        ));
     }
 
     #[test]
     fn equals_compares_as_text_on_both_sides() {
         let row = json!({ "mode": 1 });
-        assert!(is_configured(Some(&row), &[check("mode", None, Some(json!("1")))]));
-        assert!(is_configured(Some(&row), &[check("mode", None, Some(json!(1)))]));
-        assert!(!is_configured(Some(&row), &[check("mode", None, Some(json!(2)))]));
+        assert!(is_configured(
+            Some(&row),
+            &[check("mode", None, Some(json!("1")))]
+        ));
+        assert!(is_configured(
+            Some(&row),
+            &[check("mode", None, Some(json!(1)))]
+        ));
+        assert!(!is_configured(
+            Some(&row),
+            &[check("mode", None, Some(json!(2)))]
+        ));
     }
 
     #[test]
@@ -982,7 +1032,10 @@ mod tests {
     fn a_missing_column_is_not_configured() {
         // The module renamed the column and forgot the manifest: pending, not done.
         let row = json!({ "other": 1 });
-        assert!(!is_configured(Some(&row), &[check("ready", Some(true), None)]));
+        assert!(!is_configured(
+            Some(&row),
+            &[check("ready", Some(true), None)]
+        ));
     }
 
     #[test]
@@ -995,7 +1048,10 @@ mod tests {
     fn a_country_scoped_item_only_applies_where_it_was_declared() {
         let es = vec!["ES".to_string()];
         assert!(applies_to_country(&es, "ES"));
-        assert!(applies_to_country(&es, "es"), "the comparison is case-insensitive");
+        assert!(
+            applies_to_country(&es, "es"),
+            "the comparison is case-insensitive"
+        );
         assert!(!applies_to_country(&es, "FR"));
         assert!(
             !applies_to_country(&es, ""),
@@ -1008,7 +1064,10 @@ mod tests {
         // The gaps are the contract eight module repos are about to fill; closing one would push a
         // module in front of a core item it is supposed to follow.
         let orders: Vec<i64> = CORE_ITEMS.iter().map(|c| c.order).collect();
-        assert_eq!(orders, vec![ORDER_APPS, ORDER_BUSINESS_IDENTITY, ORDER_TEAM]);
+        assert_eq!(
+            orders,
+            vec![ORDER_APPS, ORDER_BUSINESS_IDENTITY, ORDER_TEAM]
+        );
         assert!(
             orders.windows(2).all(|w| w[1] - w[0] > 1),
             "core slots must leave room between them"
@@ -1121,9 +1180,7 @@ mod tests {
         // With the certificate in the hub the gate accepts, so there is nothing left to block on —
         // even though the module that carries it may still be half-configured.
         let mut registry = Registry::new();
-        registry
-            .installed
-            .push(certificate_manifest("verifactu"));
+        registry.installed.push(certificate_manifest("verifactu"));
         assert_eq!(
             certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION),
             vec!["verifactu.setup"]
@@ -1139,9 +1196,7 @@ mod tests {
         // answer identically (hub#319); here that means the arm is empty while the module item
         // stays 🔴/🟡 pending, which is honest: it is still worth configuring.
         let mut registry = Registry::new();
-        registry
-            .installed
-            .push(certificate_manifest("verifactu"));
+        registry.installed.push(certificate_manifest("verifactu"));
         assert!(certificate_arm(&registry, false, crate::fiscal_profile::ENV_TESTING).is_empty());
     }
 
@@ -1163,7 +1218,9 @@ mod tests {
         // Spain must not be told it is blocked by something nothing will ever ask it for.
         let mut registry = Registry::new();
         registry.installed.push(plain_manifest("inventory"));
-        assert!(certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION).is_empty());
+        assert!(
+            certificate_arm(&registry, false, crate::fiscal_profile::ENV_PRODUCTION).is_empty()
+        );
     }
 
     fn certificate_manifest(id: &str) -> crate::manifest::Manifest {
@@ -1238,7 +1295,9 @@ mod tests {
             Some(0)
         );
         assert_eq!(
-            installable_modules(&json!([{ "id": "sales", "can_install": true, "is_active": false }])),
+            installable_modules(
+                &json!([{ "id": "sales", "can_install": true, "is_active": false }])
+            ),
             Some(1),
             "`can_install` is the SaaS's verdict for this hub and it wins over the generic flag"
         );
@@ -1268,7 +1327,10 @@ mod tests {
         let now = chrono::Utc::now();
         let marker = catalog_offer_marker(0, now);
         assert_eq!(catalog_offer_at(&marker, now), Some(0));
-        assert_eq!(catalog_offer_at(&catalog_offer_marker(26, now), now), Some(26));
+        assert_eq!(
+            catalog_offer_at(&catalog_offer_marker(26, now), now),
+            Some(26)
+        );
     }
 
     #[test]
@@ -1278,9 +1340,15 @@ mod tests {
         // screen that would refresh it. Past the TTL the hub goes back to not knowing, which is
         // pending, which is the state that sends them to look.
         let now = chrono::Utc::now();
-        let marker = catalog_offer_marker(0, now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS + 1));
+        let marker = catalog_offer_marker(
+            0,
+            now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS + 1),
+        );
         assert_eq!(catalog_offer_at(&marker, now), None);
-        let fresh = catalog_offer_marker(0, now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS - 1));
+        let fresh = catalog_offer_marker(
+            0,
+            now - chrono::Duration::seconds(CATALOG_OFFER_TTL_SECS - 1),
+        );
         assert_eq!(catalog_offer_at(&fresh, now), Some(0));
     }
 
@@ -1306,6 +1374,9 @@ mod tests {
     fn the_third_state_is_a_third_string_not_a_second_boolean() {
         // `state` was already a string precisely so this could be an addition (hub#369 §7). Pinning
         // the three values keeps a rename from silently splitting the surfaces.
-        assert_eq!([STATE_DONE, STATE_PENDING, STATE_UNAVAILABLE], ["done", "pending", "unavailable"]);
+        assert_eq!(
+            [STATE_DONE, STATE_PENDING, STATE_UNAVAILABLE],
+            ["done", "pending", "unavailable"]
+        );
     }
 }

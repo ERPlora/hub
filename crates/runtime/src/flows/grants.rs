@@ -433,9 +433,7 @@ fn check_recipient_pattern(registry: &Registry, value: &str) -> Result<()> {
     if registry.get_query(query).is_none() {
         return Err(RuntimeError::QueryNotFound(query.to_string()));
     }
-    if !field
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    if !field.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         || field.chars().next().is_some_and(|c| c.is_ascii_digit())
     {
         return refuse(format!(
@@ -478,7 +476,10 @@ pub async fn check_command_grant(
     flow_id: &str,
     command: &str,
 ) -> Result<()> {
-    if authority(db, hub_id, flow_id).await?.allows_command(command) {
+    if authority(db, hub_id, flow_id)
+        .await?
+        .allows_command(command)
+    {
         return Ok(());
     }
     Err(RuntimeError::Domain {
@@ -636,7 +637,10 @@ pub async fn check_notify_release(
             "el grant `recipient_query` del flujo `{flow_id}` fue REVOCADO"
         ));
     }
-    if !authority(db, hub_id, &flow_id).await?.allows_notify(channel) {
+    if !authority(db, hub_id, &flow_id)
+        .await?
+        .allows_notify(channel)
+    {
         return refuse(format!(
             "el flujo `{flow_id}` ya no tiene grant `notify` para el canal `{}`",
             channel.as_str()
@@ -969,12 +973,18 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(check_command_grant(&db, HUB, "flow-2", "sales.sale.create")
-            .await
-            .is_err(), "another flow of the same hub is not covered");
-        assert!(check_command_grant(&db, "hub-other", FLOW, "sales.sale.create")
-            .await
-            .is_err(), "the same flow id in another tenant is not covered");
+        assert!(
+            check_command_grant(&db, HUB, "flow-2", "sales.sale.create")
+                .await
+                .is_err(),
+            "another flow of the same hub is not covered"
+        );
+        assert!(
+            check_command_grant(&db, "hub-other", FLOW, "sales.sale.create")
+                .await
+                .is_err(),
+            "the same flow id in another tenant is not covered"
+        );
     }
 
     #[tokio::test]
@@ -982,13 +992,21 @@ mod tests {
         let db = db_with_schema().await;
         let reg = registry();
         let grants = [(GrantKind::Command, "sales.sale.create".to_string())];
-        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1").await.unwrap();
-        check_command_grant(&db, HUB, FLOW, "sales.sale.create").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
+            .await
+            .unwrap();
+        check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+            .await
+            .unwrap();
 
         // The owner empties the list — this is what `PUT …/grants` with `[]` does.
-        replace(&db, HUB, FLOW, &reg, &[], "hub_user:2").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &[], "hub_user:2")
+            .await
+            .unwrap();
 
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create").await.is_err());
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+            .await
+            .is_err());
         assert!(list(&db, HUB, FLOW).await.unwrap().is_empty());
         // The row survives, naming who took it away: that is the audit trail.
         let rows = db
@@ -1008,11 +1026,19 @@ mod tests {
         let db = db_with_schema().await;
         let reg = registry();
         let grants = [(GrantKind::Command, "sales.sale.create".to_string())];
-        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1").await.unwrap();
-        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:2").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
+            .await
+            .unwrap();
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:2")
+            .await
+            .unwrap();
 
         let live = list(&db, HUB, FLOW).await.unwrap();
-        assert_eq!(live.len(), 1, "saving the same screen twice is not a conflict");
+        assert_eq!(
+            live.len(),
+            1,
+            "saving the same screen twice is not a conflict"
+        );
         assert_eq!(live[0].granted_by, "hub_user:1", "who granted it first");
     }
 
@@ -1177,7 +1203,10 @@ mod tests {
         let db = db_with_schema().await;
         let grants = [
             (GrantKind::Notify, "whatsapp".to_string()),
-            (GrantKind::RecipientQuery, "sales.sale.list#phone".to_string()),
+            (
+                GrantKind::RecipientQuery,
+                "sales.sale.list#phone".to_string(),
+            ),
         ];
         replace(&db, HUB, FLOW, &registry(), &grants, "hub_user:1")
             .await
@@ -1197,7 +1226,8 @@ mod tests {
         .expect("both grants are live");
         let live = list(&db, HUB, FLOW).await.unwrap();
         assert!(
-            live.iter().any(|g| g.id == id && g.kind == "recipient_query"),
+            live.iter()
+                .any(|g| g.id == id && g.kind == "recipient_query"),
             "the id names the recipient grant itself"
         );
 
@@ -1234,9 +1264,14 @@ mod tests {
         let reg = registry();
         let grants = [
             (GrantKind::Notify, "whatsapp".to_string()),
-            (GrantKind::RecipientQuery, "sales.sale.list#phone".to_string()),
+            (
+                GrantKind::RecipientQuery,
+                "sales.sale.list#phone".to_string(),
+            ),
         ];
-        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
+            .await
+            .unwrap();
         let authority = authority(&db, HUB, FLOW).await.unwrap();
         let id = check_notify_grants(
             &db,
@@ -1253,7 +1288,15 @@ mod tests {
 
         // A run of this flow, which is what the outbox row would point at.
         let run_id = crate::flows::store::start_run(
-            &db, HUB, FLOW, "", "manual", "", &json!({}), 0, "hub_user:1",
+            &db,
+            HUB,
+            FLOW,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
         )
         .await
         .unwrap();
@@ -1262,12 +1305,17 @@ mod tests {
             .expect("both grants alive, the message may go");
 
         // A release that names a grant of ANOTHER flow, or nothing at all, is not a release.
-        assert!(check_notify_release(&db, HUB, &run_id, "flow_grant:made-up", Channel::Whatsapp)
-            .await
-            .is_err());
-        assert!(check_notify_release(&db, HUB, &run_id, &id, Channel::Whatsapp)
-            .await
-            .is_err(), "without the prefix it names nothing");
+        assert!(
+            check_notify_release(&db, HUB, &run_id, "flow_grant:made-up", Channel::Whatsapp)
+                .await
+                .is_err()
+        );
+        assert!(
+            check_notify_release(&db, HUB, &run_id, &id, Channel::Whatsapp)
+                .await
+                .is_err(),
+            "without the prefix it names nothing"
+        );
 
         // Revoke the recipient grant only: the channel is still allowed and the message still
         // stops, because whose address it was is the question that was withdrawn.
@@ -1287,7 +1335,9 @@ mod tests {
         assert!(format!("{err}").contains("REVOCADO"), "{err}");
 
         // And the mirror: recipient back, channel gone.
-        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:3").await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &grants, "hub_user:3")
+            .await
+            .unwrap();
         let regranted = super::authority(&db, HUB, FLOW).await.unwrap();
         let id = check_notify_grants(
             &db,
@@ -1306,7 +1356,10 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::RecipientQuery, "sales.sale.list#phone".to_string())],
+            &[(
+                GrantKind::RecipientQuery,
+                "sales.sale.list#phone".to_string(),
+            )],
             "hub_user:4",
         )
         .await
@@ -1349,12 +1402,12 @@ mod tests {
     async fn a_recipient_grant_that_is_not_one_field_of_one_query_is_refused() {
         let db = db_with_schema().await;
         for value in [
-            "sales.sale.list",             // no field
-            "#email",                      // no query
-            "sales.sale.list#",            // no field
-            "ghost.query#email",           // a query that does not exist
+            "sales.sale.list",                // no field
+            "#email",                         // no query
+            "sales.sale.list#",               // no field
+            "ghost.query#email",              // a query that does not exist
             "sales.sale.list#customer.email", // a path, not a column
-            "sales.sale.list#*",           // not a column name either
+            "sales.sale.list#*",              // not a column name either
         ] {
             let err = replace(
                 &db,
@@ -1424,7 +1477,9 @@ mod tests {
         // The scheme is part of the origin: a grant for https never authorises cleartext.
         assert!(!authority.allows_http(&url("http://api.example.com/v1/messages")));
         // And an URL that merely CONTAINS the pattern is not covered by it.
-        assert!(!authority.allows_http(&url("https://evil.test/?u=https://api.example.com/v1/messages")));
+        assert!(!authority.allows_http(&url(
+            "https://evil.test/?u=https://api.example.com/v1/messages"
+        )));
     }
 
     #[tokio::test]
@@ -1491,7 +1546,10 @@ mod tests {
             ("http://2130706433:8791/api*", "http://127.0.0.1:8791/api*"),
             ("http://0x7f000001/x*", "http://127.0.0.1/x*"),
             ("http://127.1/x*", "http://127.0.0.1/x*"),
-            ("http://2852039166/latest*", "http://169.254.169.254/latest*"),
+            (
+                "http://2852039166/latest*",
+                "http://169.254.169.254/latest*",
+            ),
             // A pattern that does not say what it covers: it reads `/v1/…` and grants `/admin*`.
             (
                 "https://api.example.com/v1/../admin*",
@@ -1502,7 +1560,10 @@ mod tests {
                 "https://api.example.com/admin*",
             ),
             // A shouted host and a default port are the same origin written twice.
-            ("https://API.EXAMPLE.COM:443/v1*", "https://api.example.com/v1*"),
+            (
+                "https://API.EXAMPLE.COM:443/v1*",
+                "https://api.example.com/v1*",
+            ),
         ] {
             let err = replace(
                 &db,
@@ -1529,7 +1590,10 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Http, "https://user:pass@api.example.com/v1*".into())],
+            &[(
+                GrantKind::Http,
+                "https://user:pass@api.example.com/v1*".into(),
+            )],
             "hub_user:1",
         )
         .await
@@ -1577,7 +1641,9 @@ mod tests {
                 "hub_user:1",
             )
             .await
-            .expect_err("a grant that does not name one host and one path prefix is no containment");
+            .expect_err(
+                "a grant that does not name one host and one path prefix is no containment",
+            );
             assert!(format!("{err}").contains(pattern), "{err}");
         }
     }
@@ -1679,7 +1745,10 @@ mod tests {
             HashSet::from(["sales.add_sale".to_string(), "sales.void_sale".to_string()]),
             "a flow behaves downstream like a user holding exactly these, and no wildcard"
         );
-        assert!(!permissions.contains("*"), "a grant never becomes a wildcard");
+        assert!(
+            !permissions.contains("*"),
+            "a grant never becomes a wildcard"
+        );
     }
 
     #[test]

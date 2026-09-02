@@ -25,7 +25,8 @@ use tower::ServiceExt;
 const RELEASE_URI: &str = "/api/app/release";
 
 fn config(hub_id: &str, cloud_base_url: String, tag: &str) -> HubConfig {
-    let temp = std::env::temp_dir().join(format!("erplora-app-release-{tag}-{}", std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-app-release-{tag}-{}", std::process::id()));
     HubConfig {
         demo: false,
         hub_id: hub_id.into(),
@@ -48,7 +49,10 @@ async fn fixture(cloud_base_url: String, tag: &str) -> (Router, String) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-release");
     rt.ensure_system_tables().await.unwrap();
-    let user = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let user = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&user, 3600, None).await.unwrap();
     (
         app(AppState::with_config(
@@ -126,7 +130,12 @@ async fn an_error_from_the_cloud_is_passed_on_as_an_error() {
     let address = listener.local_addr().unwrap();
     let mock_cloud = Router::new().route(
         "/api/v1/app/release/",
-        get(|| async { (StatusCode::SERVICE_UNAVAILABLE, Json(json!({ "detail": "nope" }))) }),
+        get(|| async {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "detail": "nope" })),
+            )
+        }),
     );
     let cloud = tokio::spawn(async move { axum::serve(listener, mock_cloud).await.unwrap() });
 

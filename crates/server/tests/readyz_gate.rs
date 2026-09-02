@@ -22,10 +22,10 @@ async fn get(state: AppState, path: &str) -> (StatusCode, Value) {
         .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let body = serde_json::from_slice(&bytes).unwrap_or_else(|_| json!(String::from_utf8_lossy(&bytes)));
+    let body =
+        serde_json::from_slice(&bytes).unwrap_or_else(|_| json!(String::from_utf8_lossy(&bytes)));
     (status, body)
 }
-
 
 /// Un hub **arrancado del todo**: lo que hace el boot real, en el mismo orden.
 ///
@@ -35,10 +35,16 @@ async fn get(state: AppState, path: &str) -> (StatusCode, Value) {
 /// en producción no existe.
 async fn booted_hub() -> AppState {
     let db = fresh_db().await;
-    erplora_runtime::migrations::ensure_table(&db).await.unwrap();
-    erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+    erplora_runtime::migrations::ensure_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db)
+        .await
+        .unwrap();
     erplora_runtime::identity::ensure_tables(&db).await.unwrap();
-    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID).await.unwrap();
+    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID)
+        .await
+        .unwrap();
     AppState::with_config(
         Runtime::new(Box::new(db)),
         HubConfig::from_env_with_auth(AuthMode::Dev),
@@ -99,8 +105,12 @@ async fn a_missing_module_is_not_ready_and_says_which_one() {
 #[tokio::test]
 async fn a_hub_with_migrations_half_applied_is_not_ready() {
     let db = fresh_db().await;
-    erplora_runtime::migrations::ensure_table(&db).await.unwrap();
-    erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+    erplora_runtime::migrations::ensure_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db)
+        .await
+        .unwrap();
     let state = AppState::with_config(
         Runtime::new(Box::new(db)),
         HubConfig::from_env_with_auth(AuthMode::Dev),
@@ -138,7 +148,11 @@ async fn liveness_stays_up_while_readiness_is_down() {
     let (alive, _) = get(state, "/healthz").await;
 
     assert_eq!(ready, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(alive, StatusCode::OK, "el proceso vive: reiniciarlo no traeria el modulo de vuelta");
+    assert_eq!(
+        alive,
+        StatusCode::OK,
+        "el proceso vive: reiniciarlo no traeria el modulo de vuelta"
+    );
 }
 
 /// Un módulo **desactivado a propósito** no bloquea: está instalado y apagado, así que no cargar es
@@ -171,14 +185,32 @@ async fn a_fresh_hub_with_zero_modules_booted_the_real_way_is_ready() {
 
     let (status, body) = get(state, "/readyz").await;
 
-    assert_eq!(status, StatusCode::OK, "un hub virgen debe estar READY; cuerpo: {body}");
-    assert_eq!(body["checks"]["migrations"]["status"], "UP", "cuerpo: {body}");
-    assert_eq!(body["checks"]["modules"]["status"], "UP", "cero módulos esperados = cero cargados: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "un hub virgen debe estar READY; cuerpo: {body}"
+    );
+    assert_eq!(
+        body["checks"]["migrations"]["status"], "UP",
+        "cuerpo: {body}"
+    );
+    assert_eq!(
+        body["checks"]["modules"]["status"], "UP",
+        "cero módulos esperados = cero cargados: {body}"
+    );
     // Y **cero de verdad**: desde ADR-0293 un hub nace vacío, así que este ya no es el caso raro de
     // un provisioning a medias — es el estado normal del primer arranque de todo hub. Contarlo aquí
     // deja el número a la vista: si algo volviera a instalar módulos al nacer, se vería en el 0.
-    assert_eq!(body["checks"]["modules"]["expected"], json!(0), "cuerpo: {body}");
-    assert_eq!(body["checks"]["modules"]["registered"], json!(0), "cuerpo: {body}");
+    assert_eq!(
+        body["checks"]["modules"]["expected"],
+        json!(0),
+        "cuerpo: {body}"
+    );
+    assert_eq!(
+        body["checks"]["modules"]["registered"],
+        json!(0),
+        "cuerpo: {body}"
+    );
 }
 
 /// **…y sigue READY en cuanto instala el primero.** El otro extremo de ADR-0293: nacer vacío solo
@@ -207,8 +239,16 @@ async fn installing_the_first_module_keeps_the_hub_ready() {
     let (status, body) = get(state, "/readyz").await;
 
     assert_eq!(status, StatusCode::OK, "cuerpo: {body}");
-    assert_eq!(body["checks"]["modules"]["expected"], json!(1), "cuerpo: {body}");
-    assert_eq!(body["checks"]["modules"]["registered"], json!(1), "cuerpo: {body}");
+    assert_eq!(
+        body["checks"]["modules"]["expected"],
+        json!(1),
+        "cuerpo: {body}"
+    );
+    assert_eq!(
+        body["checks"]["modules"]["registered"],
+        json!(1),
+        "cuerpo: {body}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -224,10 +264,16 @@ async fn a_switchover_the_hub_recovered_from_shows_up_in_readyz_hub1376() {
     // Una sola conexión: así la escritura de abajo usa forzosamente la que se degrada a réplica,
     // en vez de que el pool le dé otra limpia y el test pase sin probar nada.
     let db = tdb.adapter_with_max_connections(1).await;
-    erplora_runtime::migrations::ensure_table(&db).await.unwrap();
-    erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+    erplora_runtime::migrations::ensure_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db)
+        .await
+        .unwrap();
     erplora_runtime::identity::ensure_tables(&db).await.unwrap();
-    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID).await.unwrap();
+    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID)
+        .await
+        .unwrap();
 
     // La BD hace switchover: la conexión del pool se queda hablando con el ex-líder.
     erplora_db::testutil::demote_pooled_connections_to_replica(&db, 1).await;
@@ -242,8 +288,16 @@ async fn a_switchover_the_hub_recovered_from_shows_up_in_readyz_hub1376() {
     );
     let (status, body) = get(state, "/readyz").await;
 
-    assert_eq!(status, StatusCode::OK, "la BD atiende: el hub sigue listo. cuerpo: {body}");
-    assert_eq!(body["checks"]["database"]["status"], json!("UP"), "cuerpo: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "la BD atiende: el hub sigue listo. cuerpo: {body}"
+    );
+    assert_eq!(
+        body["checks"]["database"]["status"],
+        json!("UP"),
+        "cuerpo: {body}"
+    );
     assert_eq!(
         body["checks"]["database"]["read_only_rejections"],
         json!(1),

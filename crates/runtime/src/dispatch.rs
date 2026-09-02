@@ -126,7 +126,13 @@ impl Runtime {
     /// El contexto incluye el `kind`/`name` de la capacidad y las **claves** del payload (no los
     /// valores, para no arrastrar PII). El `module_id` se resuelve del registry sin filtrar por
     /// estado activo: un error sobre un command/query de un módulo desactivado igual se atribuye a él.
-    pub(crate) fn report_dispatch_error(&self, err: &RuntimeError, kind: &str, name: &str, payload: &Params) {
+    pub(crate) fn report_dispatch_error(
+        &self,
+        err: &RuntimeError,
+        kind: &str,
+        name: &str,
+        payload: &Params,
+    ) {
         let module_id = self
             .registry
             .commands
@@ -375,8 +381,8 @@ pub(crate) async fn effective_caller_lang(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::testutil::fresh_db;
     use crate::registry::{ModuleStatus, RegisteredCommand, RequestContext};
+    use erplora_db::testutil::fresh_db;
 
     fn underscore_cmd(module: &str, sql: &str) -> RegisteredCommand {
         RegisteredCommand {
@@ -443,7 +449,11 @@ mod tests {
     fn hub1135_system_params_expose_the_demo_mark_both_ways() {
         let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
         let p = system_params(&Params::new(), &ctx);
-        assert_eq!(p["is_demo_hub"], json!(0), "a normal hub reads 0, never absent");
+        assert_eq!(
+            p["is_demo_hub"],
+            json!(0),
+            "a normal hub reads 0, never absent"
+        );
 
         let ctx = ctx.with_demo_hub(true);
         let p = system_params(&Params::new(), &ctx);
@@ -487,7 +497,9 @@ mod tests {
     #[tokio::test]
     async fn public_gate_rejects_underscore_but_internal_entrypoint_runs_it() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
 
         let mut rt = Runtime::new(Box::new(db));
         rt.registry

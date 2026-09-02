@@ -41,9 +41,14 @@ fn the_bare_path_stays_valid_and_reads_as_expand() {
         schema.is_valid(&manifest_with_migrations("postgres", entries.clone())),
         "the bare path is the form of every published manifest"
     );
-    let parsed: Migrations = serde_json::from_value(serde_json::json!({ "postgres": entries })).unwrap();
+    let parsed: Migrations =
+        serde_json::from_value(serde_json::json!({ "postgres": entries })).unwrap();
     assert!(matches!(parsed.postgres[0], MigrationEntry::Path(_)));
-    assert_eq!(parsed.postgres[0].kind(), Kind::Expand, "a bare path is read as expand");
+    assert_eq!(
+        parsed.postgres[0].kind(),
+        Kind::Expand,
+        "a bare path is read as expand"
+    );
 }
 
 #[test]
@@ -61,7 +66,10 @@ fn the_declared_form_is_valid_and_parses_to_what_it_declares() {
     );
     // …in `sqlite` too (deprecated, but `Migrations` still parses it as `MigrationEntry`)…
     assert!(
-        schema.is_valid(&manifest_with_migrations("sqlite", serde_json::json!([declared.clone()]))),
+        schema.is_valid(&manifest_with_migrations(
+            "sqlite",
+            serde_json::json!([declared.clone()])
+        )),
         "the deprecated dialect parses the same entries"
     );
     // …and the two forms mix, which is the shape a module that grows a `contract` ends up with.
@@ -108,7 +116,8 @@ fn an_entry_without_file_is_refused_by_both_doors() {
 #[test]
 fn an_unknown_kind_is_refused_by_both_doors() {
     let schema = schema();
-    let unknown_kind = serde_json::json!([{ "file": "migrations/postgres/009_x.sql", "kind": "destroy" }]);
+    let unknown_kind =
+        serde_json::json!([{ "file": "migrations/postgres/009_x.sql", "kind": "destroy" }]);
     assert!(
         !schema.is_valid(&manifest_with_migrations("postgres", unknown_kind.clone())),
         "`kind` is a closed vocabulary: expand · backfill · contract"

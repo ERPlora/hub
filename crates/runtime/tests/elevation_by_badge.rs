@@ -36,7 +36,9 @@ async fn a_till_where_everybody_carries_a_card() -> (TestDb, Runtime) {
     let db = TestDb::new().await;
     let mut rt = Runtime::with_hub_id(Box::new(db.adapter().await), "h1");
     rt.ensure_system_tables().await.unwrap();
-    rt.install_from_dir(&module_dir()).await.expect("till installs");
+    rt.install_from_dir(&module_dir())
+        .await
+        .expect("till installs");
     let manager = rt
         .create_user("Sofía", MANAGER_PIN, "manager", None)
         .await
@@ -97,7 +99,10 @@ async fn swiping_the_managers_card_approves_the_action() {
     );
     assert_eq!(by_badge.permission, "till.void_sale");
     assert!(!by_badge.token.is_empty());
-    assert_ne!(by_badge.token, by_pin.token, "each approval is its own single-use grant");
+    assert_ne!(
+        by_badge.token, by_pin.token,
+        "each approval is its own single-use grant"
+    );
 }
 
 /// Rule 5 survives untouched: what authorises is the ROLE. The cashier's own card cannot approve
@@ -191,7 +196,10 @@ async fn the_receipt_says_the_approval_came_from_a_card_and_which_one() {
     assert_eq!(rows[0]["created_by"].as_str().unwrap(), "u-cashier");
     assert_eq!(rows[0]["credential_kind"].as_str().unwrap(), "badge");
     let badge_ref = rows[0]["credential_ref"].as_str().unwrap();
-    assert!(!badge_ref.is_empty(), "the receipt names WHICH card was swiped");
+    assert!(
+        !badge_ref.is_empty(),
+        "the receipt names WHICH card was swiped"
+    );
     assert!(
         !badge_ref.contains(MANAGER_BADGE),
         "…by its index, never by the number printed on it"

@@ -244,10 +244,7 @@ impl Runtime {
     /// Parks a write the model proposed: the row a person reads in the morning, and the run
     /// stopped in the same gesture. A proposal with a run still marching forward would be a
     /// question nobody is waiting for.
-    pub async fn request_flow_approval(
-        &self,
-        new: &flows::NewApproval,
-    ) -> Result<flows::Approval> {
+    pub async fn request_flow_approval(&self, new: &flows::NewApproval) -> Result<flows::Approval> {
         let approval = flows::approvals::create(self.db.as_ref(), &self.hub_id, new).await?;
         // The park goes through the SAME seam an `http` step completes by (hub#662): one place
         // decides what «this run stopped on its I/O step» means, and a second one would drift.
@@ -462,11 +459,7 @@ impl Runtime {
         .await?;
 
         // Step 3 — exactly what was proposed.
-        let payload: Params = approval
-            .payload
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        let payload: Params = approval.payload.as_object().cloned().unwrap_or_default();
 
         // Step 3a (hub#825) — **the net, not the first line.** The runner refuses to park a payload
         // the schema already rejects, so nothing reaches this tray that could not run when it was
@@ -495,8 +488,8 @@ impl Runtime {
             });
         }
 
-        let (run, _) = flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id)
-            .await?;
+        let (run, _) =
+            flows::store::get_run(self.db.as_ref(), &self.hub_id, &approval.run_id).await?;
         let outcome = self
             .execute_flow_command(
                 &approval.flow_id,

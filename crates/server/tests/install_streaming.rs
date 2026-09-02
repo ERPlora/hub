@@ -40,7 +40,10 @@ fn module_zip(id: &str) -> Vec<u8> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// id → (zip, sha256 expuesto en `versions/`). El sha lo elige el test: correcto o corrupto.
@@ -63,7 +66,10 @@ async fn spawn_mock_cloud(catalog: Catalog) -> String {
     let app = Router::new()
         .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
-        .route("/api/v1/marketplace/modules/:id/mark_installed/", post(mark_installed))
+        .route(
+            "/api/v1/marketplace/modules/:id/mark_installed/",
+            post(mark_installed),
+        )
         .with_state(catalog);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -76,7 +82,9 @@ fn files_under(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let p = entry.path();
             if p.is_dir() {
@@ -107,7 +115,10 @@ async fn streamed_download_installs_and_leaves_only_the_extracted_module() {
     let base_url = spawn_mock_cloud(Arc::new(cat)).await;
 
     let http = reqwest::Client::new();
-    let auth = Auth::HubToken { hub_id: "hub-test".into(), token: "tok".into() };
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
     let cache = fresh_cache("ok");
     let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.ensure_system_tables().await.unwrap();
@@ -150,7 +161,10 @@ async fn wrong_sha_rejects_installs_nothing_and_cleans_the_temp_file() {
     let base_url = spawn_mock_cloud(Arc::new(cat)).await;
 
     let http = reqwest::Client::new();
-    let auth = Auth::HubToken { hub_id: "hub-test".into(), token: "tok".into() };
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
     let cache = fresh_cache("badsha");
     let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.ensure_system_tables().await.unwrap();
@@ -169,10 +183,16 @@ async fn wrong_sha_rejects_installs_nothing_and_cleans_the_temp_file() {
     .await
     .expect_err("a zip whose sha does not match must be rejected (ADR-0015)");
     assert_eq!(err.code(), "install_download_failed", "{err:?}");
-    assert!(!rt.registry().is_installed("notes"), "nothing must be installed");
+    assert!(
+        !rt.registry().is_installed("notes"),
+        "nothing must be installed"
+    );
 
     // No temp download, no staging, no extracted files: the rejection leaves no trace.
     let files = files_under(&cache);
-    assert!(files.is_empty(), "a rejected download must clean up after itself: {files:?}");
+    assert!(
+        files.is_empty(),
+        "a rejected download must clean up after itself: {files:?}"
+    );
     let _ = std::fs::remove_dir_all(&cache);
 }

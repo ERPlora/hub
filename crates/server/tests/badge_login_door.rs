@@ -47,7 +47,10 @@ async fn fixture(device_trust: bool) -> (axum::Router, TestDb, Runtime) {
     let test_db = TestDb::new().await;
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-badge");
     rt.ensure_system_tables().await.unwrap();
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
     rt.trust_device("till-1", "Counter till").await.unwrap();
 
@@ -91,7 +94,11 @@ async fn post_badge(router: &axum::Router, body: Value) -> Response {
 async fn a_swipe_opens_a_session_without_a_name() {
     let (router, _db, _rt) = fixture(false).await;
 
-    let response = post_badge(&router, json!({ "badge": ANA_BADGE, "device_id": "till-1" })).await;
+    let response = post_badge(
+        &router,
+        json!({ "badge": ANA_BADGE, "device_id": "till-1" }),
+    )
+    .await;
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = body_json(response).await;
@@ -144,13 +151,23 @@ async fn the_device_trust_gate_applies_to_a_card_exactly_as_it_does_to_a_pin() {
     );
 
     // A device the hub has never seen an account sign in on.
-    let untrusted =
-        post_badge(&router, json!({ "badge": ANA_BADGE, "device_id": "stranger" })).await;
+    let untrusted = post_badge(
+        &router,
+        json!({ "badge": ANA_BADGE, "device_id": "stranger" }),
+    )
+    .await;
     assert_eq!(untrusted.status(), StatusCode::FORBIDDEN);
-    assert_eq!(body_json(untrusted).await["code"], json!("device_untrusted"));
+    assert_eq!(
+        body_json(untrusted).await["code"],
+        json!("device_untrusted")
+    );
 
     // The trusted till still works, so the gate is refusing the device and not the card.
-    let ok = post_badge(&router, json!({ "badge": ANA_BADGE, "device_id": "till-1" })).await;
+    let ok = post_badge(
+        &router,
+        json!({ "badge": ANA_BADGE, "device_id": "till-1" }),
+    )
+    .await;
     assert_eq!(ok.status(), StatusCode::OK);
 }
 

@@ -124,7 +124,11 @@ async fn a_stored_policy_the_hub_cannot_read_is_never_taken_as_never() {
             .await
             .unwrap();
         let read = rt.pin_policy().await.unwrap();
-        assert_eq!(read, PinPolicy::default(), "`{corrupt}` was read as {read:?}");
+        assert_eq!(
+            read,
+            PinPolicy::default(),
+            "`{corrupt}` was read as {read:?}"
+        );
         assert!(read.asks_for_pin(), "`{corrupt}` stopped the hub asking");
     }
 }
@@ -134,7 +138,17 @@ fn a_policy_the_hub_does_not_know_is_refused_not_guessed() {
     // The set is CLOSED, with no trimming and no case folding — the same door as
     // `DeviceMode::parse`. Two spellings on the wire would mean the one that slips through is
     // always the lax one, and here the lax one gives up the name on every sale.
-    for candidate in ["", " ", "Never", "never ", "NEVER", "nunca", "per shift", "shift", "0"] {
+    for candidate in [
+        "",
+        " ",
+        "Never",
+        "never ",
+        "NEVER",
+        "nunca",
+        "per shift",
+        "shift",
+        "0",
+    ] {
         let refused = PinPolicy::parse(candidate).expect_err(candidate);
         assert_eq!(payload_name_of(&refused), "hub.pin_policy", "{candidate}");
     }
@@ -173,7 +187,10 @@ fn neither_control_can_lengthen_what_the_other_shortened() {
                     "{mode:?} lengthened {policy:?}: {effective}s > {cap}s"
                 );
             }
-            assert!(effective > 0, "no pair may produce a session that is already over");
+            assert!(
+                effective > 0,
+                "no pair may produce a session that is already over"
+            );
         }
     }
 }
@@ -191,9 +208,21 @@ fn the_rule_is_the_shorter_window_even_for_a_dial_position_that_does_not_exist_y
         shift,
         "a dial cap LONGER than the device window must not lengthen the session"
     );
-    assert_eq!(shorter_window(shift, Some(60)), 60, "a shorter cap does tighten");
-    assert_eq!(shorter_window(shift, None), shift, "no cap leaves the device's own window");
-    assert_eq!(shorter_window(60, Some(60)), 60, "equal windows are that window");
+    assert_eq!(
+        shorter_window(shift, Some(60)),
+        60,
+        "a shorter cap does tighten"
+    );
+    assert_eq!(
+        shorter_window(shift, None),
+        shift,
+        "no cap leaves the device's own window"
+    );
+    assert_eq!(
+        shorter_window(60, Some(60)),
+        60,
+        "equal windows are that window"
+    );
 
     // And the composition really is that rule, not a second copy of it.
     for mode in EVERY_MODE {
@@ -297,7 +326,9 @@ fn the_default_position_changes_nothing() {
 fn the_positions_of_the_dial_are_ordered_and_each_one_is_a_different_promise() {
     // «always» has to be strictly stricter than a shift, or the dial has two positions painted as
     // three and the owner is choosing between a difference that does not exist.
-    let always = PinPolicy::Always.max_session_ttl_secs().expect("always caps");
+    let always = PinPolicy::Always
+        .max_session_ttl_secs()
+        .expect("always caps");
     assert!(
         always < DeviceMode::Shared.session_ttl_secs(),
         "«always» ({always}s) must be shorter than the shift window a shared till already has"

@@ -49,7 +49,10 @@ use std::path::PathBuf;
 /// Pública para que los tests puedan construir rutas de módulo con la MISMA resolución que usa el
 /// guard, evitando divergencias.
 pub fn modules_root() -> PathBuf {
-    resolve_root(std::env::var("ERPLORA_MODULES_DIR").ok(), default_modules_root)
+    resolve_root(
+        std::env::var("ERPLORA_MODULES_DIR").ok(),
+        default_modules_root,
+    )
 }
 
 /// La política «override si lo hay, si no el default», factorizada para poder probarla sin mutar el
@@ -270,7 +273,11 @@ pub fn require_module_version(module_id: &str, needed: &str) -> bool {
          El checkout de módulos lo comparte toda la flota y suele ir por detrás: \
          actualízalo (`git -C <ese checkout> fetch && git checkout main`) o apunta a otro con \
          ERPLORA_MODULES_DIR=... para ejecutarlo de verdad.",
-        if found.is_empty() { "ilegible/ausente".to_string() } else { found },
+        if found.is_empty() {
+            "ilegible/ausente".to_string()
+        } else {
+            found
+        },
         manifest.display(),
     );
     false
@@ -431,4 +438,3 @@ mod tests {
         assert!(require_modules_workspace());
     }
 }
-

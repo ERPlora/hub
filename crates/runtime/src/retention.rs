@@ -334,7 +334,11 @@ pub async fn prune(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<PruneReport
 fn cell(res: &erplora_db::QueryResult, key: &str) -> u64 {
     res.rows
         .first()
-        .and_then(|r| r[key].as_i64().or_else(|| r[key].as_f64().map(|f| f as i64)))
+        .and_then(|r| {
+            r[key]
+                .as_i64()
+                .or_else(|| r[key].as_f64().map(|f| f as i64))
+        })
         .unwrap_or(0)
         .max(0) as u64
 }
@@ -445,7 +449,10 @@ mod tests {
 
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
-        r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
+        r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1)
     }
 
     /// The whole point: a terminal event past the window goes, and its idempotency marker goes
@@ -464,7 +471,10 @@ mod tests {
 
         assert_eq!(rep.events, 2, "both terminal rows pruned");
         assert_eq!(rep.delivery_markers, 2, "their markers pruned with them");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await, 0);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await,
+            0
+        );
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM _event_delivery").await,
             0,
@@ -483,9 +493,16 @@ mod tests {
 
         let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
 
-        assert_eq!(rep.events, 0, "a ten-year-old undelivered event is still owed");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            rep.events, 0,
+            "a ten-year-old undelivered event is still owed"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
             1
         );
     }
@@ -503,7 +520,11 @@ mod tests {
 
         assert_eq!(rep.events, 0, "the dead-letter is not a log");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             1
         );
     }
@@ -519,8 +540,14 @@ mod tests {
         let rep = prune_once(&db, HUB, &cutoff()).await.unwrap();
 
         assert!(rep.is_empty(), "89 days old is inside the window: {rep:?}");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await, 1);
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_delivery").await, 1);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await,
+            1
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery").await,
+            1
+        );
     }
 
     /// A finished run goes with its steps; a run still running does not, at any age. The steps are
@@ -750,21 +777,37 @@ mod tests {
         assert_eq!(rep.events, 1);
         assert_eq!(rep.runs, 1);
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE hub_id='neighbour'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE hub_id='neighbour'"
+            )
+            .await,
             1,
             "the neighbour's event is untouched"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE event_id='theirs'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE event_id='theirs'"
+            )
+            .await,
             1,
             "and so is its marker: the doomed set is the hub's own events, and nothing else"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _flow_runs WHERE hub_id='neighbour'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _flow_runs WHERE hub_id='neighbour'"
+            )
+            .await,
             1
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _flow_run_steps WHERE hub_id='neighbour'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _flow_run_steps WHERE hub_id='neighbour'"
+            )
+            .await,
             1
         );
     }
@@ -781,12 +824,21 @@ mod tests {
         }
 
         let first = prune_once(&db, HUB, &cutoff()).await.unwrap();
-        assert_eq!(first.events, BATCH as u64, "one pass never exceeds the batch");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await, 7);
+        assert_eq!(
+            first.events, BATCH as u64,
+            "one pass never exceeds the batch"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await,
+            7
+        );
 
         let rest = prune(&db, HUB).await.unwrap();
         assert_eq!(rest.events, 7, "the driver finishes the job and reports it");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await, 0);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox").await,
+            0
+        );
     }
 
     /// A quiet hub must report nothing, so the caller can stay silent instead of logging

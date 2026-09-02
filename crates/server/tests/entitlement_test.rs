@@ -79,7 +79,10 @@ async fn query_de_modulo_bloqueado_devuelve_module_entitlement_blocked() {
         .apply_success(claims(&["otro_modulo"], i64::MAX), 1_000);
 
     let resp = router
-        .oneshot(post("/api/query", json!({ "name": "inventory.products.list", "params": {} })))
+        .oneshot(post(
+            "/api/query",
+            json!({ "name": "inventory.products.list", "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::PAYMENT_REQUIRED);
@@ -123,7 +126,10 @@ async fn modulo_entitled_pasa_con_normalidad() {
         .apply_success(claims(&["inventory"], i64::MAX), 1_000);
 
     let resp = router
-        .oneshot(post("/api/query", json!({ "name": "inventory.products.list", "params": {} })))
+        .oneshot(post(
+            "/api/query",
+            json!({ "name": "inventory.products.list", "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -136,7 +142,10 @@ async fn sin_refresh_exitoso_el_gate_es_fail_open() {
     // Estado inicial (dev/local sin enrolar): nada bloqueado, todo funciona como hoy.
     let (router, _state) = make_app().await;
     let resp = router
-        .oneshot(post("/api/query", json!({ "name": "inventory.products.list", "params": {} })))
+        .oneshot(post(
+            "/api/query",
+            json!({ "name": "inventory.products.list", "params": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -177,7 +186,12 @@ async fn proxy_entitlement_incluye_revalidation_aunque_el_cloud_no_responda() {
     let router = app(state.clone());
 
     let resp = router
-        .oneshot(Request::builder().uri("/api/entitlement").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/entitlement")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::BAD_GATEWAY); // contrato actual intacto

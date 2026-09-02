@@ -37,13 +37,19 @@ fn build_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// `module.zip` mínimo instalable: `module.json` con id/name/version + depends_on.
 fn module_zip(id: &str, deps: &[&str]) -> Vec<u8> {
     let manifest = json!({ "id": id, "name": id, "version": "1.0.0", "depends_on": deps });
-    build_zip(&[("module.json", serde_json::to_string(&manifest).unwrap().as_bytes())])
+    build_zip(&[(
+        "module.json",
+        serde_json::to_string(&manifest).unwrap().as_bytes(),
+    )])
 }
 
 /// id → (zip, sha256) del catálogo publicado en el mini-Cloud.
@@ -51,7 +57,10 @@ type Catalog = Arc<HashMap<String, (Vec<u8>, String)>>;
 
 /// Levanta el mini-Cloud en un puerto efímero y devuelve su base URL.
 async fn spawn_mock_cloud(catalog: Catalog) -> String {
-    async fn versions(State(cat): State<Catalog>, Path(id): Path<String>) -> Json<serde_json::Value> {
+    async fn versions(
+        State(cat): State<Catalog>,
+        Path(id): Path<String>,
+    ) -> Json<serde_json::Value> {
         let sha = cat.get(&id).map(|(_, s)| s.clone()).unwrap_or_default();
         Json(json!([{ "version": "1.0.0", "is_active": true, "sha256": sha }]))
     }
@@ -64,7 +73,10 @@ async fn spawn_mock_cloud(catalog: Catalog) -> String {
     let app = Router::new()
         .route("/api/v1/marketplace/modules/:id/versions/", get(versions))
         .route("/api/v1/marketplace/modules/:id/download/", get(download))
-        .route("/api/v1/marketplace/modules/:id/mark_installed/", post(mark_installed))
+        .route(
+            "/api/v1/marketplace/modules/:id/mark_installed/",
+            post(mark_installed),
+        )
         .with_state(catalog);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -79,12 +91,19 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     let leaf = module_zip("leaf", &[]);
     let dependent = module_zip("dependent", &["leaf"]);
     cat.insert("leaf".to_string(), (leaf.clone(), sha256_hex(&leaf)));
-    cat.insert("dependent".to_string(), (dependent.clone(), sha256_hex(&dependent)));
+    cat.insert(
+        "dependent".to_string(),
+        (dependent.clone(), sha256_hex(&dependent)),
+    );
     let base_url = spawn_mock_cloud(Arc::new(cat)).await;
 
     let http = reqwest::Client::new();
-    let auth = Auth::HubToken { hub_id: "hub-test".into(), token: "tok".into() };
-    let cache = std::env::temp_dir().join(format!("erplora-install-progress-{}", std::process::id()));
+    let auth = Auth::HubToken {
+        hub_id: "hub-test".into(),
+        token: "tok".into(),
+    };
+    let cache =
+        std::env::temp_dir().join(format!("erplora-install-progress-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
     let mut rt = Runtime::new(Box::new(fresh_db().await));
 
@@ -92,7 +111,9 @@ async fn install_from_cloud_reports_progress_phases_including_nested_deps() {
     let seen: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
     let on_progress = move |module_id: &str, phase: &str| {
-        sink.lock().unwrap().push((module_id.to_string(), phase.to_string()));
+        sink.lock()
+            .unwrap()
+            .push((module_id.to_string(), phase.to_string()));
     };
 
     let installed = install_from_cloud(

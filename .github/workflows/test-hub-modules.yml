@@ -16,20 +16,23 @@
 # Este workflow se trae el catálogo de módulos (~27 repos) por su estado PUBLICADO (`main`) y
 # corre esos targets más el `--lib` del runtime.
 #
-# ── Los TRES disparadores, y por qué hacen falta los tres (hub#1239) ─────────
-# La ADR «El Hub se CIERRA como KERNEL» (2026-08-27) convierte esta pasada en la
-# condición de mergeo de una PR `kind:contract`: es el «crater/runbot» del hub —
-# los 27 módulos PUBLICADOS se prueban contra el runtime nuevo ANTES de mergear.
-# El contrato completo: `architecture/hub/kernel-contract.md`.
+# ── Los CUATRO disparadores, y por qué hacen falta los cuatro (hub#1239, hub#1438) ──
+# La ADR «El Hub se CIERRA como KERNEL» (2026-08-27) fija la regla que esta pasada mide —el
+# kernel no rompe a un módulo publicado, nunca—: es el «crater/runbot» del hub, los 27 módulos
+# PUBLICADOS contra este runtime. El contrato completo: `architecture/hub/kernel-contract.md`.
 #
-#   · `pull_request` con `paths` = las SEIS superficies que la ADR congela
-#     (`crates/runtime`, `crates/server`, `schemas`, `crates/db`, `crates/guest-sdk`,
-#     `crates/wasm-host`). Antes eran DOS rutas, así que un cambio de runtime
-#     mergeaba sin que ningún módulo publicado se hubiera ejecutado contra él.
-#     ⚠️ Esto cuesta: el job comparte las dos ranuras de `ci-runner-1` con la suite
-#     larga (hub#1207). Es un coste ACEPTADO a cambio de la regla de Linux —el
-#     kernel no rompe a un módulo publicado, nunca—; si una PR no toca esas rutas,
-#     no lo paga.
+# 🔴 La pasada PRE-MERGE no está aquí, está en el GATE LOCAL. Hasta el 2026-08-29 este fichero
+# llevaba además un bloque `pull_request:` con las seis superficies que la ADR congela
+# (`crates/runtime`, `crates/server`, `schemas`, `crates/db`, `crates/guest-sdk`,
+# `crates/wasm-host`), y era esa la puerta de una PR `kind:contract`. pm#197 la retiró (decisión
+# de Ioan, con `ci-runner-1` saturado): el gate pre-push materializa el catálogo PUBLICADO y
+# ejecuta estos mismos e2e por defecto (hub#1353), rojo = push abortado, y sin push no hay PR.
+# Antes de mergear, lo que `merge-pr.sh` exige es el sello `local-gate/hub-tests` — nunca un run
+# de este workflow. Lo que queda aquí es la red de FUERA de la PR:
+#
+#   · `push` a `main`/`develop`: la red POST-MERGE (hub#572), que el gate local no puede dar —
+#     dos PRs verdes por separado pueden romper `develop` juntas, y eso solo se ve sobre el
+#     árbol resultante.
 #
 #   · `schedule` diario: el rojo de hub#1215 lo causó una RELEASE DE MÓDULO
 #     (`invoice` v1.2.27, ADR-0405), no un commit del hub, y ningún trigger por
@@ -39,6 +42,8 @@
 #     al publicar, así el rojo sale EN EL MOMENTO de publicar y con el nombre del
 #     culpable en el título del run, en vez de a las horas y en el push de otro.
 #     (El emisor está pendiente: module-toolkit, el workflow de release reutilizable.)
+#
+#   · `workflow_dispatch`: la vía a mano, para reverificar el catálogo sin esperar al cron.
 #
 # Y en los tres casos el fallo es RUIDOSO: hasta hub#1239 este job fallaba MUDO —
 # nadie mira un cron, y hub#1215 aguantó un día entero en rojo con Actions en verde.
@@ -453,7 +458,7 @@ jobs:
 
           Este job clona los ~27 módulos por su estado PUBLICADO (\`main\`) y los corre contra este runtime, que es la regla del kernel: **el hub no rompe a un módulo publicado, nunca** (ADR «El Hub se CIERRA como KERNEL»). Así que hay dos salidas, y solo dos: se revierte el cambio del hub, o —si el contrato tenía que cambiar de verdad— se convierte en una PR \`kind:contract\` y el módulo se adapta DESPUÉS (orden core → flota → módulo).
 
-          Mientras esto siga rojo, ninguna PR \`kind:contract\` puede mergear.
+          Mientras esto siga rojo, el CRATER NO SE EJECUTA: el guard de baterías corre ANTES de \`cargo test\`, así que ningún módulo publicado se está verificando contra el kernel y una regresión real queda tapada por un fallo de contabilidad. En hub#1396 fue un día entero, 14 runs. Esto NO bloquea ninguna PR —la puerta pre-merge es el sello \`local-gate/hub-tests\` del gate pre-push (pm#197)—, y por eso el rojo hay que mirarlo: nada más lo va a parar.
 
           Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando el catálogo vuelva a verde."
 

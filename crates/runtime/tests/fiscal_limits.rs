@@ -188,7 +188,11 @@ async fn a_neighbouring_name_in_the_namespace_is_still_not_found() {
     let rt = runtime("hub-es").await;
 
     let err = rt
-        .execute_query("hub.fiscal.ceiling", &Params::new(), &ctx("hub-es", &[SESSION]))
+        .execute_query(
+            "hub.fiscal.ceiling",
+            &Params::new(),
+            &ctx("hub-es", &[SESSION]),
+        )
         .await
         .expect_err("`hub.fiscal.ceiling` does not exist");
 

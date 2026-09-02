@@ -44,10 +44,22 @@ use erplora_runtime::money_backfill::MONEY_COLUMNS;
 /// `published_contracts_still_install.rs`: the runtime cannot read `modules-workspace` in CI, so the
 /// SQL that retires a table lives here as a fixture.
 const PUBLISHED_CONTRACTS: &[(&str, &str)] = &[
-    ("kitchen/007_retire_order_modifier.sql", include_str!("fixtures/published_contracts/kitchen__007_retire_order_modifier.sql")),
-    ("services/009_retire_addon_tables.sql", include_str!("fixtures/published_contracts/services__009_retire_addon_tables.sql")),
-    ("services/010_retire_variant_table.sql", include_str!("fixtures/published_contracts/services__010_retire_variant_table.sql")),
-    ("verifactu/012_named_gate_constraints.sql", include_str!("fixtures/published_contracts/verifactu__012_named_gate_constraints.sql")),
+    (
+        "kitchen/007_retire_order_modifier.sql",
+        include_str!("fixtures/published_contracts/kitchen__007_retire_order_modifier.sql"),
+    ),
+    (
+        "services/009_retire_addon_tables.sql",
+        include_str!("fixtures/published_contracts/services__009_retire_addon_tables.sql"),
+    ),
+    (
+        "services/010_retire_variant_table.sql",
+        include_str!("fixtures/published_contracts/services__010_retire_variant_table.sql"),
+    ),
+    (
+        "verifactu/012_named_gate_constraints.sql",
+        include_str!("fixtures/published_contracts/verifactu__012_named_gate_constraints.sql"),
+    ),
 ];
 
 /// Tables the frozen `contract` migrations retire, as `table -> migration that retired it`.
@@ -68,7 +80,9 @@ fn tables_retired_by_published_contracts() -> BTreeMap<String, String> {
                 .join(" ");
             let code = code.split_whitespace().collect::<Vec<_>>().join(" ");
             let upper = code.to_uppercase();
-            let Some(rest) = upper.strip_prefix("DROP TABLE ") else { continue };
+            let Some(rest) = upper.strip_prefix("DROP TABLE ") else {
+                continue;
+            };
             let rest = rest.strip_prefix("IF EXISTS ").unwrap_or(rest);
             if let Some(name) = rest.split_whitespace().next() {
                 retired.insert(name.to_ascii_lowercase(), (*source).to_string());
@@ -83,15 +97,23 @@ fn tables_retired_by_published_contracts() -> BTreeMap<String, String> {
 fn tables_created_by_the_catalogue() -> BTreeMap<String, String> {
     let root = erplora_runtime::modules_root();
     let mut created = BTreeMap::new();
-    let entries = std::fs::read_dir(&root)
-        .unwrap_or_else(|e| panic!("cannot read the module catalogue at {}: {e}", root.display()));
+    let entries = std::fs::read_dir(&root).unwrap_or_else(|e| {
+        panic!(
+            "cannot read the module catalogue at {}: {e}",
+            root.display()
+        )
+    });
     for entry in entries.flatten() {
         let module_dir = entry.path();
         let migrations = module_dir.join("migrations").join("postgres");
         if !migrations.is_dir() {
             continue;
         }
-        let module = module_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let module = module_dir
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let mut files: Vec<_> = std::fs::read_dir(&migrations)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", migrations.display()))
             .flatten()
@@ -100,10 +122,18 @@ fn tables_created_by_the_catalogue() -> BTreeMap<String, String> {
             .collect();
         files.sort();
         for file in files {
-            let Ok(sql) = std::fs::read_to_string(&file) else { continue };
-            let name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let Ok(sql) = std::fs::read_to_string(&file) else {
+                continue;
+            };
+            let name = file
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             for table in tables_created_in(&sql) {
-                created.entry(table).or_insert_with(|| format!("{module}/{name}"));
+                created
+                    .entry(table)
+                    .or_insert_with(|| format!("{module}/{name}"));
             }
         }
     }
@@ -121,7 +151,9 @@ fn tables_created_in(sql: &str) -> Vec<String> {
             .join(" ");
         let code = code.split_whitespace().collect::<Vec<_>>().join(" ");
         let upper = code.to_uppercase();
-        let Some(idx) = upper.find("CREATE TABLE ") else { continue };
+        let Some(idx) = upper.find("CREATE TABLE ") else {
+            continue;
+        };
         let rest = &upper[idx + "CREATE TABLE ".len()..];
         let rest = rest.strip_prefix("IF NOT EXISTS ").unwrap_or(rest);
         if let Some(name) = rest.split(|c: char| c.is_whitespace() || c == '(').next() {
@@ -143,7 +175,11 @@ fn no_money_column_names_a_table_a_published_contract_retired() {
     // POSITIVE CONTROL: the parser must actually find the retirements we know are in the fixtures.
     // Without this, a parser that returned an empty map would make the assertion below vacuously
     // green — the exact failure mode this ratchet exists to prevent.
-    for known in ["services_addon", "services_variant", "kitchen_order_modifier"] {
+    for known in [
+        "services_addon",
+        "services_variant",
+        "kitchen_order_modifier",
+    ] {
         assert!(
             retired.contains_key(known),
             "positive control FAILED: `{known}` is retired by a frozen `contract` fixture and the \
@@ -156,7 +192,9 @@ fn no_money_column_names_a_table_a_published_contract_retired() {
     let offenders: Vec<String> = MONEY_COLUMNS
         .iter()
         .filter_map(|(table, _)| {
-            retired.get(*table).map(|source| format!("  · `{table}` — retired by `{source}`"))
+            retired
+                .get(*table)
+                .map(|source| format!("  · `{table}` — retired by `{source}`"))
         })
         .collect();
 
@@ -192,7 +230,12 @@ fn every_money_table_is_created_by_a_published_module_migration() {
         created.len(),
         erplora_runtime::modules_root().display()
     );
-    for alive in ["sales_sale", "services_service", "services_package", "inventory_product"] {
+    for alive in [
+        "sales_sale",
+        "services_service",
+        "services_package",
+        "inventory_product",
+    ] {
         assert!(
             created.contains_key(alive),
             "positive control FAILED: `{alive}` is a LIVE money table and the sweep did not find \

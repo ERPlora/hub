@@ -1,7 +1,7 @@
 //! Test de integración del walking skeleton (Fase 1, §12). `cargo test -p erplora-runtime`.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 use serde_json::json;
 
@@ -20,7 +20,9 @@ async fn fresh_runtime() -> Runtime {
     // installs the catalog in one hub and queries it from another: seeded reference data becomes
     // invisible and handlers silently fall back to their degraded paths (hub#594).
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&module_dir()).await.expect("install inventory");
+    rt.install_from_dir(&module_dir())
+        .await
+        .expect("install inventory");
     rt
 }
 
@@ -37,7 +39,10 @@ async fn install_registers_capabilities() {
     assert!(reg.get_command("inventory.products.create").is_some());
     assert!(reg.get_command("inventory.stock.decrease").is_some());
     assert_eq!(rt.navigation().len(), 1);
-    assert_eq!(reg.listeners_for("pos.sale.completed"), ["inventory.stock.decrease"]);
+    assert_eq!(
+        reg.listeners_for("pos.sale.completed"),
+        ["inventory.stock.decrease"]
+    );
 }
 
 #[tokio::test]
@@ -45,7 +50,10 @@ async fn create_then_list_scoped_by_hub() {
     let rt = fresh_runtime().await;
     let ctx = admin_ctx();
 
-    let before = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
+    let before = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(before.len(), 0);
 
     rt.execute_command(
@@ -56,14 +64,20 @@ async fn create_then_list_scoped_by_hub() {
     .await
     .unwrap();
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
+    let rows = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["name"], json!("Café"));
     assert_eq!(rows[0]["stock"], json!(10.0));
 
     // Otro hub no ve el producto (scope hub_id).
     let other = RequestContext::new("h2", "u9", ["*".to_string()]);
-    let rows2 = rt.execute_query("inventory.products.list", &Params::new(), &other).await.unwrap();
+    let rows2 = rt
+        .execute_query("inventory.products.list", &Params::new(), &other)
+        .await
+        .unwrap();
     assert_eq!(rows2.len(), 0, "hub_id debe aislar los datos entre hubs");
 }
 
@@ -78,7 +92,10 @@ async fn stock_decrease_updates_value() {
     )
     .await
     .unwrap();
-    let id = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap()[0]["id"]
+    let id = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx)
+        .await
+        .unwrap()[0]["id"]
         .as_str()
         .unwrap()
         .to_string();
@@ -91,7 +108,10 @@ async fn stock_decrease_updates_value() {
     .await
     .unwrap();
 
-    let rows = rt.execute_query("inventory.products.list", &Params::new(), &ctx).await.unwrap();
+    let rows = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(rows[0]["stock"], json!(6.0));
 }
 
@@ -110,7 +130,10 @@ async fn permission_is_enforced() {
         .unwrap_err();
     assert!(matches!(err, RuntimeError::PermissionDenied(p) if p == "inventory.products.create"));
 
-    assert!(rt.execute_query("inventory.products.list", &Params::new(), &ro).await.is_ok());
+    assert!(rt
+        .execute_query("inventory.products.list", &Params::new(), &ro)
+        .await
+        .is_ok());
 }
 
 #[tokio::test]
@@ -121,11 +144,15 @@ async fn unknown_capabilities_error() {
     // queries (es lo que permite a `queryOptional` distinguirla de un contrato roto). Los commands
     // conservan `CommandNotFound`: no hay `commandOptional` que necesite la distinción.
     assert!(matches!(
-        rt.execute_query("nope.query", &Params::new(), &ctx).await.unwrap_err(),
+        rt.execute_query("nope.query", &Params::new(), &ctx)
+            .await
+            .unwrap_err(),
         RuntimeError::ModuleNotInstalled { .. }
     ));
     assert!(matches!(
-        rt.execute_command("nope.cmd", &Params::new(), &ctx).await.unwrap_err(),
+        rt.execute_command("nope.cmd", &Params::new(), &ctx)
+            .await
+            .unwrap_err(),
         RuntimeError::CommandNotFound(_)
     ));
 }

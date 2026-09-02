@@ -36,7 +36,8 @@ async fn body_json(response: Response) -> Value {
 }
 
 fn config(hub_id: &str, demo: bool, tag: &str) -> HubConfig {
-    let temp = std::env::temp_dir().join(format!("erplora-demo-locks-{}-{tag}", std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-demo-locks-{}-{tag}", std::process::id()));
     HubConfig {
         demo,
         hub_id: hub_id.into(),
@@ -64,7 +65,10 @@ async fn fixture(demo: bool, tag: &str) -> (axum::Router, String) {
     // y un hub real NO. Sin esto los tests de abajo probarían un estado que no existe.
     rt.set_demo_hub(demo);
     rt.ensure_demo_fiscal_identity().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let state = AppState::with_config(rt, config(hub_id, demo, tag));
     (app(state), admin)
@@ -179,11 +183,17 @@ async fn the_demo_boots_with_an_identity_and_still_refuses_to_let_anyone_change_
         .unwrap();
     let settings = body_json(read).await;
     assert!(
-        !settings["business_tax_id"].as_str().unwrap_or_default().is_empty(),
+        !settings["business_tax_id"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
         "una demo arranca con NIF: {settings}"
     );
     assert!(
-        !settings["business_legal_name"].as_str().unwrap_or_default().is_empty(),
+        !settings["business_legal_name"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
         "…y con razón social: {settings}"
     );
 
@@ -253,7 +263,11 @@ async fn a_demo_refuses_to_take_a_business_certificate_over_http() {
     .await;
     assert_eq!(response.status(), StatusCode::CONFLICT);
     let body = body_json(response).await;
-    assert_eq!(error_code(&body), "demo_business_certificate_locked", "{body}");
+    assert_eq!(
+        error_code(&body),
+        "demo_business_certificate_locked",
+        "{body}"
+    );
 
     // Borrar tampoco: si no, reemplazar sería borrar y volver a subir.
     let response = delete(&router, "/api/business/certificate", &admin).await;
@@ -271,8 +285,16 @@ async fn the_three_locks_answer_with_three_different_codes() {
     let (router, admin) = fixture(true, "codes").await;
 
     let identity = error_code(
-        &body_json(put(&router, "/api/settings", &admin, json!({ "business_tax_id": "B1" })).await)
+        &body_json(
+            put(
+                &router,
+                "/api/settings",
+                &admin,
+                json!({ "business_tax_id": "B1" }),
+            )
             .await,
+        )
+        .await,
     );
     let certificate = error_code(
         &body_json(
@@ -366,7 +388,9 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
                 .header("x-hub-session", &admin)
                 .header("x-hub-demo", "1")
                 .header("x-demo", "true")
-                .body(Body::from(json!({ "business_tax_id": "B12345674" }).to_string()))
+                .body(Body::from(
+                    json!({ "business_tax_id": "B12345674" }).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -376,7 +400,10 @@ async fn no_caller_can_declare_its_own_hub_a_demo() {
         StatusCode::OK,
         "una cabecera del navegador no convierte el hub en una demo"
     );
-    assert_eq!(body_json(response).await["business_tax_id"], json!("B12345674"));
+    assert_eq!(
+        body_json(response).await["business_tax_id"],
+        json!("B12345674")
+    );
 }
 
 /// 🔴 **Las dos claves son INDEPENDIENTES, y esta es la mitad que lo demuestra.** Un hub de

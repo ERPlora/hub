@@ -255,7 +255,10 @@ async fn an_event_with_no_examples_is_not_an_event_that_does_not_exist() {
     )
     .await;
     assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
-    assert_eq!(body_json(unknown).await["error"]["code"], json!("not_found"));
+    assert_eq!(
+        body_json(unknown).await["error"]["code"],
+        json!("not_found")
+    );
 
     // And asking for nothing is a bad request, not an empty shape.
     let nameless = send(
