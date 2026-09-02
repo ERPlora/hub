@@ -229,8 +229,28 @@ pub async fn add_member(
     // Gate admin + alta local bajo el MISMO lock; se suelta ANTES de la I/O de red al SaaS.
     let user = {
         let rt = st.runtime.read().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return crate::unauthorized(e);
+        let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
+            Ok(user) => user,
+            Err(e) => return crate::unauthorized(e),
+        };
+        // Las mismas barandillas que Personal, antes de escribir nada (hub#1429, hub#1444). Esta
+        // puerta escribe el rol sobre la fila que encuentra por email (`SET role = :role,
+        // is_active = 1`), así que el equivalente exacto de lo que va a pasar es ese
+        // `UpdateHubUser`: sin él, un alta con la dirección del dueño lo DEGRADA y el último
+        // administrador puede degradarse a sí mismo dejando el hub sin nadie que lo administre.
+        if let Some(response) = crate::hub_users::guard_members_door_by_email(
+            &rt,
+            &actor,
+            &email,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                role: Some(role.clone()),
+                is_active: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        {
+            return response;
         }
         match rt.create_login_user(&email, &role).await {
             Ok(user) => user,
@@ -255,8 +275,26 @@ pub async fn remove_member(
     let email = email.trim().to_string();
     let existed = {
         let rt = st.runtime.read().await;
-        if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
-            return crate::unauthorized(e);
+        let actor = match auth::require_admin_session(&headers, &st.config, &rt).await {
+            Ok(user) => user,
+            Err(e) => return crate::unauthorized(e),
+        };
+        // Y la baja tampoco: es la simetría de la misma puerta (hub#1429, hub#1444). Aquí lo que
+        // se escribe es una desactivación, así que además de la fila del dueño decide
+        // `self_deactivation` (nadie se da de baja a sí mismo) y `last_admin` (el hub no se queda
+        // sin administrador activo).
+        if let Some(response) = crate::hub_users::guard_members_door_by_email(
+            &rt,
+            &actor,
+            &email,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                is_active: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        {
+            return response;
         }
         match rt.deactivate_login_user(&email).await {
             Ok(existed) => existed,

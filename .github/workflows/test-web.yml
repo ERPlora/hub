@@ -105,6 +105,9 @@ on:
   # romper develop juntas, y eso solo se ve sobre el árbol resultante).
   # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
   # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
+  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
+  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
+  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
   # Nightly on develop, with NO `paths` filter (hub#1253 — see header above). This is the only
   # cloud run that no longer depends on what a change touched: the pre-push gate covers each push,
   # and `push` above covers the merged tree, but neither catches what rots on its own — a pinned
@@ -127,10 +130,6 @@ permissions:
 
 jobs:
   verify:
-    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
-    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
-    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: pnpm verify (vue-tsc + vitest + module-sdk)
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo con lo
     # que este job NO es: desde hub#1352 este workflow no tiene `pull_request`, así que en una PR
@@ -179,10 +178,6 @@ jobs:
         run: bash ./scripts/tests/test-web-workflow.test.sh
 
   e2e:
-    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
-    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
-    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: playwright (test:e2e, runtime real)
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 40

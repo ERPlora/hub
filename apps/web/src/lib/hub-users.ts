@@ -30,6 +30,13 @@ export interface HubUser {
   cloud_user_id: string | null;
   /** `false` = dado de baja. Sigue listado (histórico y auditoría apuntan a su id). */
   is_active: boolean;
+  /**
+   * `true` en la ficha del **dueño de la cuenta** (hub#1429). No es un rol —lo que puede hacer sigue
+   * saliendo de `role`—: es la marca que el hub deriva del `HUB_OWNER_EMAIL` del aprovisionamiento,
+   * y lo único que cambia es que esa ficha solo la edita esa misma persona. Ausente en un runtime
+   * anterior a hub#1429, que no manda el campo.
+   */
+  is_account_owner?: boolean;
   /** `true` si puede entrar con PIN local; el owner normalmente entra por Cloud. */
   has_pin: boolean;
   /**
@@ -486,6 +493,23 @@ export function accountUserIssue(
   return '';
 }
 
+/**
+ * ¿Puede `actorId` editar la ficha de `targetId`? Espejo en UI del guard del servidor
+ * (`hub.users.owner_row`, hub#1429): **la ficha del dueño de la cuenta solo la edita el dueño** —su
+ * PIN, su placa, su nombre—, porque una credencial nueva en esa fila es una entrada al TPV COMO el
+ * dueño y el SaaS no puede vigilarlo (el hub le habla con la credencial de máquina, que allí tiene
+ * rango de owner). La propiedad se traspasa en la cuenta de ERPlora, no en esta pantalla, que es
+ * como lo resuelven Shopify, Square, Toast, Lightspeed y Vagaro.
+ *
+ * Solo para mostrar/ocultar la acción: la autoridad sigue siendo el runtime, que revalida y
+ * responde 403. Un runtime anterior a hub#1429 no manda la marca y aquí no cambia nada.
+ */
+export function canEditUser(users: HubUser[], actorId: string, targetId: string): boolean {
+  const target = users.find((u) => u.id === targetId);
+  if (!target) return false;
+  return !target.is_account_owner || target.id === actorId;
+}
+
 /** ¿Este usuario administra el hub y está activo? */
 function isActiveAdmin(user: HubUser): boolean {
   return user.is_active && ADMIN_ROLES.includes(user.role.toLowerCase());
@@ -501,6 +525,7 @@ export function canDeactivate(users: HubUser[], actorId: string, targetId: strin
   const target = users.find((u) => u.id === targetId);
   if (!target || !target.is_active) return false;
   if (target.id === actorId) return false;
+  if (!canEditUser(users, actorId, targetId)) return false;
   if (!isActiveAdmin(target)) return true;
   return users.some((u) => u.id !== targetId && isActiveAdmin(u));
 }

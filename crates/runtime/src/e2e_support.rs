@@ -41,7 +41,7 @@
 //! módulos se hayan declarado obligatorios**, y `ERPLORA_MODULES_DIR` apunta la raíz de módulos
 //! manualmente para que un worktree fuera del monorepo pueda resolverlos sin tocar el código.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Raíz canónica de los módulos: `$ERPLORA_MODULES_DIR` si está definida, si no
 /// `<CARGO_MANIFEST_DIR>/../../../modules-workspace/modules` (relativa al monorepo).
@@ -75,6 +75,65 @@ fn default_modules_root() -> PathBuf {
     // `crates/runtime`. `../../../modules-workspace/modules` sube tres niveles hasta la raíz del
     // monorepo (donde vive `modules-workspace` como repo hermano del hub).
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../modules-workspace/modules")
+}
+
+/// Every module of the PUBLISHED catalogue under [`modules_root`], as `(id, dir)` sorted by id.
+///
+/// **The one door for every catalogue sweep** (hub#1448). A bare `read_dir` is not that door: the
+/// fleet creates its git WORKTREES *inside* `modules-workspace/modules` (`.wt-inventory-71`,
+/// `tables-wt-70`…), and a worktree of a module carries that module's `module.json`, so a plain
+/// sweep reads it as one more published module — under the DIRECTORY's name. With 37 of them on
+/// disk, `installer::every_published_manifest_has_no_unexpected_warnings_hub1243` went red on
+/// every machine of the fleet, naming manifests nobody had touched. The symmetric risk is worse:
+/// a stale worktree can also make a sweep PASS that should have failed.
+///
+/// Two exclusions, both about the same thing — a directory here is a module only if it is the
+/// module's own checkout:
+///
+/// * its `.git` is a **file** → it is a worktree, never a checkout (`git` writes `gitdir: …`
+///   there instead of a directory);
+/// * its name starts with `.` → not a module id, and the shape half the fleet's worktrees use.
+///
+/// A directory with **no** `.git` at all is KEPT on purpose: that is a legitimate materialisation
+/// of the catalogue (a copy, a tarball), and excluding it would empty the sweep exactly where it
+/// matters most — CI, where the modules are mandatory.
+pub fn published_module_dirs() -> Vec<(String, PathBuf)> {
+    published_module_dirs_in(&modules_root())
+}
+
+/// [`published_module_dirs`] against an explicit root.
+///
+/// Public so the filter can be proven against a fixture tree instead of against the real
+/// `modules-workspace`, whose contents are other agents' working state.
+pub fn published_module_dirs_in(root: &Path) -> Vec<(String, PathBuf)> {
+    // An unreadable root returns EMPTY rather than panicking here, and that is not a silent
+    // failure: [`require_modules_workspace`] already fails loudly when the catalogue is missing,
+    // and every sweep that calls this asserts a floor on what it found ("only N parsed in …").
+    // An empty catalogue therefore surfaces as that floor breaking, naming the root.
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<(String, PathBuf)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let dir = entry.path();
+            if !dir.join("module.json").is_file() {
+                return None;
+            }
+            // A worktree's `.git` is a file (`gitdir: …`); a checkout's is a directory.
+            if dir.join(".git").is_file() {
+                return None;
+            }
+            let id = dir.file_name()?.to_string_lossy().to_string();
+            if id.starts_with('.') {
+                return None;
+            }
+            Some((id, dir))
+        })
+        .collect();
+    // Sorted so two runs of any sweep report in the same order.
+    found.sort();
+    found
 }
 
 // There was a `blueprints_root()` here (plus `$ERPLORA_BLUEPRINTS_DIR`), because
@@ -393,6 +452,84 @@ mod tests {
     }
 
     // ── Integración del guard real (sin mutar entorno de forma racy) ──────────────────────
+
+    // ── hub#1448: the catalogue is the CHECKOUTS, never the fleet's worktrees ─────────────
+
+    /// A worktree of a module carries that module's `module.json`, so a bare `read_dir` of
+    /// `modules-workspace/modules` reads it as one more published module — under the DIRECTORY's
+    /// name. That is not hypothetical: on 2026-09-02 the fleet had 37 worktrees living there and
+    /// `installer::every_published_manifest_has_no_unexpected_warnings_hub1243` went red on every
+    /// machine, naming `.wt-inventory-67` and `.wt-inventory-71` for manifests nobody had touched.
+    ///
+    /// The fixture is built by hand instead of pointing at the real tree: the real tree is other
+    /// agents' working state and would make this test's verdict depend on what the fleet is doing.
+    #[test]
+    fn published_module_dirs_skips_worktrees_and_dot_directories_hub1448() {
+        let root = std::env::temp_dir().join(format!("erplora-catalogue-{}", uuid::Uuid::new_v4()));
+
+        let module = |name: &str| {
+            let dir = root.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(
+                dir.join("module.json"),
+                r#"{"id":"x","name":"X","version":"1.0.0"}"#,
+            )
+            .unwrap();
+            dir
+        };
+
+        // Two real checkouts: one cloned (`.git` is a directory) and one materialised without git
+        // at all — which is how a tarball or a plain copy of the catalogue arrives.
+        std::fs::create_dir_all(module("sales").join(".git")).unwrap();
+        module("invoice");
+        // Three worktrees, in the two shapes the fleet actually creates. `.git` is a FILE.
+        std::fs::write(
+            module(".wt-inventory-71").join(".git"),
+            "gitdir: /elsewhere",
+        )
+        .unwrap();
+        std::fs::write(module("tables-wt-70").join(".git"), "gitdir: /elsewhere").unwrap();
+        std::fs::write(module(".wt-sales-242").join(".git"), "gitdir: /elsewhere").unwrap();
+        // And two directories that are not modules at all.
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::create_dir_all(root.join(".cache")).unwrap();
+
+        let found: Vec<String> = published_module_dirs_in(&root)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(
+            found,
+            ["invoice", "sales"],
+            "the catalogue is the checkouts; a worktree is the same module seen twice"
+        );
+    }
+
+    /// The other half, and the one that makes the filter honest: it must not eat a real module.
+    /// A filter that returns nothing would satisfy the test above and silently disarm every
+    /// catalogue sweep in the repo.
+    #[test]
+    fn published_module_dirs_still_finds_the_real_catalogue_hub1448() {
+        if !modules_root().is_dir() {
+            return;
+        }
+        let found = published_module_dirs_in(&modules_root());
+        assert!(
+            found.len() >= 20,
+            "the published catalogue is ~27 modules, the filter left {} in {}",
+            found.len(),
+            modules_root().display()
+        );
+        assert!(
+            !found
+                .iter()
+                .any(|(id, _)| id.starts_with('.') || id.contains("-wt-")),
+            "a worktree got through: {:?}",
+            found.iter().map(|(id, _)| id).collect::<Vec<_>>()
+        );
+    }
 
     #[test]
     fn modules_root_por_defecto_apunta_a_monorepo() {

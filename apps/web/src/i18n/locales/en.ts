@@ -961,6 +961,7 @@ export default {
     deactivateTitle: 'Deactivate user',
     deactivateBody: 'You are about to deactivate “{name}”. They lose access to the Hub, but their history is kept.',
     deactivateBlocked: 'You cannot deactivate yourself or leave the Hub without an administrator.',
+    ownerRowBlocked: 'Only the account owner can change their own record. To hand the business over, transfer the account in ERPlora.',
     active: 'Active',
     inactive: 'Deactivated',
   },
@@ -1114,6 +1115,9 @@ export default {
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
+      // hub#1429 — the account owner's record is theirs alone. Every other administrator sees it,
+      // nobody else edits it, and ownership changes in the ERPlora account, not on this screen.
+      owner_row: 'This is the account owner’s record, and only they can change it — their PIN included. To hand the business over, transfer the account in ERPlora.',
       invalid_email: 'Enter a valid email.',
       pin_length: 'The PIN must be {n} digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',

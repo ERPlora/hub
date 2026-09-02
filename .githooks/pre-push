@@ -363,9 +363,9 @@ mkdir -p "$STATE_DIR"
 # default was `workspace`); what it still refuses is an ABSENT seal, or one that is
 # not `success`. Only a real full run seals `local-gate/hub-tests`.
 #
-# Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
-# `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
-# deliberately conservative in three places:
+# Ownership is asked of `cargo metadata`, never hand-mapped, by the canonical resolver
+# (`scripts/ci/test-scope.py`) — this gate is its only consumer since hub#1463 took the
+# unreachable scope step out of `test-hub.yml`. It is deliberately conservative in three places:
 #   · DEPENDENTS come along — touching `erplora-db` runs whoever builds on it,
 #     because that is the breakage a scoped gate would otherwise wave through;
 #   · anything TRANSVERSAL (Cargo.lock, the workspace manifest, the toolchain,

@@ -54,19 +54,9 @@ fn every_published_migration_still_passes_the_guard() {
 
     let mut modules = 0;
     let mut migrations = 0;
-    for entry in std::fs::read_dir(&root)
-        .expect("modules root is readable")
-        .flatten()
-    {
-        let dir = entry.path();
-        if !dir.join("module.json").is_file() {
-            continue;
-        }
-        let module = dir
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+    // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
+    // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    for (module, dir) in erplora_runtime::published_module_dirs() {
         // Un manifest que no parsea es asunto de otro test, no de este.
         let Ok(manifest) = Manifest::load(&dir) else {
             continue;

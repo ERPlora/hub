@@ -1763,6 +1763,30 @@ CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
   PRIMARY KEY (hub_id));",
     },
 
+    // ── v56 — hub#1429: WHICH row belongs to the owner of the account ────────────────────────────
+    // The hub is the only party that can police the owner's row: the runtime talks to the SaaS with
+    // the MACHINE credential, which `assert_can_manage_hub_member` treats as owner rank, so the SaaS
+    // cannot tell the administrator from the cashier (saas#1638/#1788). But until now the hub could
+    // not tell either — hub#349 retired the local `owner` ROLE on purpose, so in the business plane
+    // the owner and any administrator are the same word.
+    //
+    // This column is that missing fact, and it is **derived, never typed**: `identity::seed_owner`
+    // asserts it at every boot from `HUB_OWNER_EMAIL` (the provisioning env, ADR-0157 — the same
+    // source that decides who the creator is), and NO HTTP door writes it. It is not a role: what
+    // an administrator MAY do stays `is_admin_role`; this says only who OWNS the account, which has
+    // always belonged to the account plane.
+    //
+    // Additive with a default, so an existing hub gets `0` everywhere and the next boot marks the
+    // one row that matches the env. Until that boot the guard protects nothing — the direction that
+    // keeps today's behaviour rather than locking a row nobody can name.
+    SystemMigration {
+        version: 56,
+        name: "hub_user_account_owner",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_user \
+          ADD COLUMN IF NOT EXISTS is_account_owner INTEGER NOT NULL DEFAULT 0;",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3649,6 +3673,94 @@ mod kind_contract_tests {
         // el hub y no sale (solo viaja el CSR), cert + CA públicos. PROHIBIDA en bundles de
         // export. Al escribirla el máximo era la v54 en `origin/develop` y en TODAS las ramas
         // remotas.
-        assert_eq!(MIGRATIONS.len(), 52, "el catálogo cambió de tamaño");
+        // + `hub_user_account_owner` (v56, hub#1429): la columna que dice QUÉ fila es la del dueño
+        // de la cuenta. Marca derivada, no un rol: la asienta `identity::seed_owner` en cada
+        // arranque desde `HUB_OWNER_EMAIL` y ninguna puerta HTTP la escribe; sin ella el hub no
+        // podía distinguir al dueño de cualquier otro administrador (hub#349 le quitó el rol) y era
+        // el único que podía, porque al SaaS le habla la credencial de máquina. `ALTER … ADD COLUMN
+        // IF NOT EXISTS` con default, re-ejecutable. Al escribirla el máximo era la v55 en
+        // `origin/develop` y en las 57 ramas remotas, y ningún worktree local de la flota la pedía.
+        assert_eq!(MIGRATIONS.len(), 53, "el catálogo cambió de tamaño");
+    }
+
+    /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO
+    /// necesitan montar: `hub_id` ya viene en el baseline v0 (`identity::ENSURE_TABLES`, la v42
+    /// solo la lleva a las bases que nacieron antes) y las dos de la **placa** (v48, hub#658) las
+    /// ejercitan los tests de integración, que sí arrancan el motor entero.
+    ///
+    /// Añadir aquí una columna es una decisión consciente: significa «ningún camino que estos unit
+    /// tests recorren la escribe ni la lee».
+    const HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED: &[&str] =
+        &["hub_id", "badge_index", "badge_hash"];
+
+    /// **Guardia del olvido de hub#1429.** Los unit tests de `identity` no pasan por `apply`: montan
+    /// el baseline v0 y le añaden a mano las columnas posteriores que necesitan
+    /// (`identity::UNIT_TEST_HUB_USER_COLUMNS`). Esa lista es la que se quedó atrás cuando la v56
+    /// añadió `is_account_owner`, y el precio fue tres panics `42703` de Postgres que había que
+    /// interpretar — en una suite que además solo los enseña si corres el `--lib` entero.
+    ///
+    /// Aquí eso se convierte en un fallo que NOMBRA la columna y el fichero donde falta, antes de
+    /// tocar ninguna base de datos. Es la forma mecánica de la regla: la incidencia deja un guardia,
+    /// no solo un parche.
+    #[test]
+    fn every_hub_user_column_a_migration_adds_is_in_the_identity_unit_test_fixture() {
+        let fixture = crate::identity::UNIT_TEST_HUB_USER_COLUMNS;
+        let mut missing = Vec::new();
+        for m in MIGRATIONS {
+            for column in hub_user_columns_added_by(m.postgres) {
+                if HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED.contains(&column.as_str())
+                    || fixture.contains(&format!("ADD COLUMN {column} "))
+                {
+                    continue;
+                }
+                missing.push(format!("{column} (v{}, {})", m.version, m.name));
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "`identity::UNIT_TEST_HUB_USER_COLUMNS` se quedó atrás: las migraciones añaden a \
+             `hub_user` columnas que la fixture de los unit tests no monta, así que todo test que \
+             escriba o lea esa columna morirá 42703 «column does not exist». Añádelas a la fixture \
+             (`crates/runtime/src/identity.rs`) o, si ningún unit test las toca, a \
+             `HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED`. Faltan: {missing:?}"
+        );
+    }
+
+    /// Los nombres de columna que un SQL de migración añade a `hub_user`. Reconoce las dos formas
+    /// que usa el catálogo (`ADD COLUMN x` y `ADD COLUMN IF NOT EXISTS x`) y nada más: si algún día
+    /// aparece otra, esta función deja de verla y el guardia calla — por eso
+    /// [`the_parser_sees_the_column_the_catalogue_actually_adds`] comprueba que caza el positivo
+    /// contra el SQL REAL de la v56.
+    fn hub_user_columns_added_by(sql: &str) -> Vec<String> {
+        let mut found = Vec::new();
+        for statement in sql.split(';') {
+            let flat = statement.split_whitespace().collect::<Vec<_>>().join(" ");
+            let Some(rest) = flat.strip_prefix("ALTER TABLE hub_user ADD COLUMN ") else {
+                continue;
+            };
+            let rest = rest.strip_prefix("IF NOT EXISTS ").unwrap_or(rest);
+            if let Some(name) = rest.split_whitespace().next() {
+                found.push(name.to_string());
+            }
+        }
+        found
+    }
+
+    /// El control tiene que detectar el positivo (regla de la casa): el parser lee del catálogo REAL
+    /// la columna de la v56 —la que se olvidó— y una fixture sin ella se declara incompleta.
+    #[test]
+    fn the_parser_sees_the_column_the_catalogue_actually_adds() {
+        let v56 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_user_account_owner")
+            .expect("la v56 sigue en el catálogo");
+        assert_eq!(
+            hub_user_columns_added_by(v56.postgres),
+            vec!["is_account_owner".to_string()],
+            "el parser dejó de reconocer la forma del `ALTER` del catálogo: el guardia quedaría mudo"
+        );
+        // Y una fixture a la que le falta esa columna NO cuela por el `contains`.
+        let incomplete = "ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';";
+        assert!(!incomplete.contains("ADD COLUMN is_account_owner "));
     }
 }

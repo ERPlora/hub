@@ -1076,22 +1076,44 @@ mod tests {
         }
     }
 
-    /// A host whose broker answers with a gateway access — the enrolled, certless hub.
+    /// The common name the enrolled test hub is issued for. It has to match what the fake
+    /// control plane mints, or the cross-check refuses the token — which is the point of it.
+    const GATEWAY_CN: &str = "hub-gateway-test.fiscal.erplora.internal";
+
+    /// A host that lends what hub#1459 says a host lends: an identity of its own, and a call to
+    /// its own cloud. The enrolled, certless hub — the one that goes through the cell.
     struct GatewayHost;
     #[async_trait::async_trait]
     impl NativeHost for GatewayHost {
         async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
             Ok(vec![])
         }
-        async fn fiscal_gateway_access(
+        async fn machine_identity(
             &self,
             _hub_id: &str,
-        ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
-            Ok(Some(erplora_runtime::fiscal_gateway::GatewayAccess {
-                url: "https://cell.internal.example".into(),
-                token: "bearer".into(),
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
                 identity: throwaway_identity(),
                 ca_pem: b"irrelevant-here".to_vec(),
+                common_name: GATEWAY_CN.to_owned(),
+            }))
+        }
+        async fn cloud_call(
+            &self,
+            _request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                status: 200,
+                body: serde_json::json!({
+                    "token": "bearer",
+                    "expires_in": 300,
+                    "gateway_url": "https://cell.internal.example",
+                    "obligado_nif": "B12345678",
+                    "presenter_nif": "B27593136",
+                    "presenter_name": "ERPLORA CLOUD SL",
+                    "mtls_common_name": GATEWAY_CN,
+                })
+                .to_string(),
             }))
         }
     }
@@ -1105,7 +1127,7 @@ mod tests {
         let host = NoRoadHost;
         let config = serde_json::json!({ "environment": "testing" });
 
-        let err = crate::config::resolve_route(&host, "hub-1", &config)
+        let err = crate::config::resolve_route(&host, "hub-no-road", &config)
             .await
             .err()
             .expect("no road = a visible error, never a silent direct");
@@ -1114,7 +1136,7 @@ mod tests {
         assert!(message.contains("pasarela"), "{message}");
 
         assert!(
-            !crate::config::can_transmit(&host, "hub-1", &config)
+            !crate::config::can_transmit(&host, "hub-no-road", &config)
                 .await
                 .unwrap(),
             "the contingency gate must leave the queue untouched"
@@ -1128,13 +1150,15 @@ mod tests {
         let host = GatewayHost;
         let config = serde_json::json!({ "environment": "testing" });
 
-        let route = crate::config::resolve_route(&host, "hub-1", &config)
+        let route = crate::config::resolve_route(&host, "hub-route-gateway", &config)
             .await
             .unwrap();
         assert!(matches!(route, crate::config::TransmitRoute::Gateway(_)));
-        assert!(crate::config::can_transmit(&host, "hub-1", &config)
-            .await
-            .unwrap());
+        assert!(
+            crate::config::can_transmit(&host, "hub-route-gateway", &config)
+                .await
+                .unwrap()
+        );
     }
 
     /// El certificado del core GANA: un negocio con su propio `.p12` sigue firmando y
@@ -1150,11 +1174,17 @@ mod tests {
             async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
                 Ok(throwaway_identity())
             }
-            async fn fiscal_gateway_access(
+            async fn machine_identity(
                 &self,
                 _hub_id: &str,
-            ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
-                panic!("the broker must not be consulted when the core certificate signs");
+            ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+                panic!("the gateway road must not be resolved when the core certificate signs");
+            }
+            async fn cloud_call(
+                &self,
+                _request: erplora_runtime::cloud_call::CloudRequest,
+            ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+                panic!("the control plane must not be asked when the core certificate signs");
             }
         }
 

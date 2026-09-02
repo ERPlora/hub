@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # Contract test for `scripts/ci/test-scope.py` — the resolver that decides which
-# Rust packages a PR's `cargo test` must cover, so that `test-hub.yml` runs the
-# packages a diff can reach instead of the whole workspace on every push.
+# Rust packages a push's `cargo test` must cover, instead of the whole workspace
+# every time.
 #
 # Why: measured on 2026-08-29, `cargo test --workspace` takes 25 min of a runner
-# slot and a PR is re-pushed 2-3 times during review, so HALF of the runner
-# minutes of the day were burnt on runs cancelled by the next push. The local
-# pre-push gate has run scoped since hub#1207; this brings the same rule to CI.
+# slot, and the pre-push gate runs on every push of every worker of the fleet.
+# The gate has run scoped since hub#1207 and scoped is its default outside
+# develop/main since hub#1451 — it is the resolver's ONLY consumer.
+#
+# It was CI's too, briefly, and that is the second half of this file: `test-hub.yml`
+# carried a scope step that branched on `pull_request` after pm#197 took that
+# trigger away, so the branch was unreachable and the assertions that pinned it
+# were green over nothing. hub#1463 removed the step; the cases at the bottom pin
+# what is true instead — CI runs the workspace, always, and nothing branches on an
+# event that never arrives.
 #
 # The contract (same as the gate's, on purpose):
 #   · a file owned by a package selects that package AND every package that
@@ -27,6 +34,17 @@ set -uo pipefail
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 resolver="$repo_root/scripts/ci/test-scope.py"
+
+# `--workflow PATH` points the CI-wiring cases at a COPY, so the guard can be proven to catch the
+# positive without editing the real file: copy the tree, put the dead scope step back, run this
+# against the copy, watch it fail naming it. Same reasoning as `ci-prose-matches-triggers.test.sh`.
+workflow="$repo_root/.github/workflows/test-hub.yml"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --workflow) workflow="$2"; shift 2 ;;
+        *) printf 'usage: %s [--workflow PATH]\n' "$0" >&2; exit 2 ;;
+    esac
+done
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
 pass=0; fail=0
@@ -82,25 +100,102 @@ echo "reaching every testable package collapses to workspace"
 echo "the reason line is human-readable"
 resolve crates/server/src/main.rs | sed -n 2p | grep -qE 'of [0-9]+ packages reachable' && ok "reason names the count" || bad "reason line missing"
 
-echo "en una PR con Rust NO se acota: el check del workspace autoriza el merge (pm#58/#60)"
-wf0="$repo_root/.github/workflows/test-hub.yml"
-grep -qE "event_name.*==.*pull_request.*mode=workspace|PR con Rust.*workspace" "$wf0" \
-    && ok "el workflow fuerza workspace en PRs con Rust" || bad "una PR con Rust podria correr acotada y mentir en el nombre del check"
-# Ningun `cargo test` puede correr sin consultar el alcance: si lo hiciera, una PR sin Rust
-# volveria a compilar el workspace entero (25 min) para no probar nada.
-unguarded=$(awk '
-    /^ *- name:/ { step=$0; has_if=0 }
-    /^ *if:/     { if (index($0, "steps.scope.outputs.mode")) has_if=1 }
-    /run: *cargo test/ { if (!has_if) print step }
-' "$wf0")
-[ -z "$unguarded" ] && ok "todo cargo test consulta steps.scope.outputs.mode" || bad "hay cargo test sin guardia de alcance" "$unguarded"
+# ── hub#1463: en CI la suite NO se acota, y eso se AFIRMA en vez de suponerse ────────────────
+# Lo que había aquí eran cinco aserciones sobre un contrato imposible: pinaban el paso `scope` de
+# `test-hub.yml`, que bifurcaba por `github.event_name == 'pull_request'`. Ese trigger salió del
+# `on:` el 2026-08-29 (pm#197), así que la rama de la PR era INALCANZABLE y las cinco pasaban sin
+# ejercer nada — el verde de una comprobación que no podía fallar.
+#
+# El alcance en CI se decide ahora en una frase: a este workflow solo lo disparan `push` a
+# develop/main y `workflow_dispatch`, y en los dos se corre el WORKSPACE entero. Quien acota es el
+# gate pre-push (hub#1207/#1451), que es también el consumidor vivo del resolutor.
+wf="$workflow"
 
-echo "test-hub.yml is wired to the resolver"
-wf="$repo_root/.github/workflows/test-hub.yml"
-grep -q 'scripts/ci/test-scope.py' "$wf" && ok "workflow calls the resolver" || bad "workflow does not call scripts/ci/test-scope.py"
-grep -q 'scripts/tests/test-scope.test.sh' "$wf" && ok "workflow runs this test" || bad "workflow does not run this test"
-grep -qE "steps\.scope\.outputs\.mode == 'workspace'" "$wf" && ok "the workspace run is gated on the scope" || bad "no workspace gate on the scope"
-grep -qE "steps\.scope\.outputs\.mode == 'packages'" "$wf" && ok "the scoped run is gated on the scope" || bad "no packages gate on the scope"
+echo "el resolutor tiene un consumidor VIVO: el gate pre-push (hub#1346/#1347)"
+grep -q 'scripts/ci/test-scope.py' "$repo_root/.githooks/pre-push" \
+    && ok "el hook pre-push llama al resolutor canonico" \
+    || bad "nadie consume scripts/ci/test-scope.py: el resolutor y esta bateria sobrarian"
+grep -q 'scripts/tests/test-scope.test.sh' "$wf" \
+    && ok "test-hub.yml corre esta bateria" \
+    || bad "esta bateria no la invoca ningun workflow (hub#1392): no deja rojo en ningun sitio"
+
+echo "hub#1463: ningun PASO de test-hub.yml bifurca por un evento que su on: no produce"
+# Sobre el YAML PARSEADO, y con las DOS formas dentro del mismo patron: la expresion de Actions
+# y la de bash dentro de un run:, que es la que tenia el paso `scope` y la que no vigilaba nadie.
+#
+# Solo los PASOS, a proposito. El `if:` a nivel de JOB es la superficie de la regla D de
+# `scripts/tests/ci-prose-matches-triggers.test.sh` (hub#1443); duplicarla aqui crearia dos
+# guardias que pueden discrepar sobre el mismo fichero, que es la deriva que ya tumbo `main`
+# una vez (hub#647). Cada uno vigila su mitad: alli el job, aqui los pasos que deciden el alcance.
+python3 - "$wf" > "$tmp/dead" <<'PYEOF'
+import re
+import sys
+
+import yaml
+
+TRIGGERS = {"pull_request_target", "repository_dispatch", "workflow_dispatch",
+            "workflow_call", "pull_request", "schedule", "push"}
+QUOTE = "[\x22\x27]"
+EVENT = re.compile(r"github\.event_name[^\n]{0,24}?(?:==|!=)\s*" + QUOTE + r"([a-z_]+)" + QUOTE)
+
+doc = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+# YAML 1.1 turns the bare key `on` into the boolean True — the classic Actions gotcha.
+on = doc.get("on", doc.get(True))
+real = set(on) if isinstance(on, (dict, list)) else {on}
+steps = [step for job in (doc.get("jobs") or {}).values() for step in (job.get("steps") or [])]
+
+
+def strings(node):
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            yield from strings(key)
+            yield from strings(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from strings(value)
+
+
+for text in strings(steps):
+    for event in sorted(set(EVENT.findall(text))):
+        if event in TRIGGERS and event not in real:
+            print("bifurca por %s, pero el on: es %s" % (event, sorted(real)))
+PYEOF
+# A dead interpreter must not look like a clean file: the redirect creates $tmp/dead empty, so
+# without this check a missing PyYAML would pass the case vacuously (ci-prose-matches-triggers
+# fails closed on the same dependency).
+[ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
+dead=$(sort -u "$tmp/dead")
+[ -z "$dead" ] && ok "ningun paso filtra por un evento imposible" \
+    || bad "hay una rama inalcanzable en test-hub.yml" "$dead"
+
+echo "hub#1463: la suite del workspace corre SIEMPRE, sin condicion que la pueda saltar"
+python3 - "$wf" > "$tmp/gated" <<'PYEOF'
+import sys
+
+import yaml
+
+doc = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+for job in (doc.get("jobs") or {}).values():
+    for step in (job.get("steps") or []):
+        if "cargo test" not in (step.get("run") or ""):
+            continue
+        if step.get("if"):
+            print("%s -> if: %s" % (step.get("name", "?"), step["if"]))
+PYEOF
+[ $? -eq 0 ] || bad "the guard itself could not run (python3 with PyYAML is required)"
+gated=$(cat "$tmp/gated")
+[ -z "$gated" ] && ok "cargo test --workspace no lleva if:" \
+    || bad "un cargo test puede saltarse en silencio" "$gated"
+
+echo "hub#1463: nadie lee una salida del paso borrado"
+# Una referencia colgante a steps.<id>.outputs.* NO es un error en Actions: evalua a cadena vacia.
+# Un `if:` comparado con 'workspace' seria entonces falso y la suite se saltaria EN SILENCIO, que
+# es peor que el paso muerto que se quita.
+dangling=$(grep -n "steps\.scope\.outputs" "$wf" || true)
+[ -z "$dangling" ] && ok "no quedan referencias a steps.scope.outputs" \
+    || bad "referencia colgante: evalua a cadena vacia y salta el paso sin avisar" "$dangling"
 
 echo
 echo "$pass passed, $fail failed"
