@@ -127,6 +127,20 @@ pub fn app(state: AppState) -> Router {
                 .put(settings::put_business_certificate)
                 .delete(settings::delete_business_certificate),
         )
+        // Identidad de MÁQUINA para la pasarela fiscal (hub#1432): la clave nace en el hub y no
+        // sale; el CSR viaja al operador y vuelve firmado con la CA interna (ADR-0419).
+        .route(
+            "/api/business/gateway-identity",
+            get(settings::get_gateway_identity).delete(settings::delete_gateway_identity),
+        )
+        .route(
+            "/api/business/gateway-identity/csr",
+            post(settings::post_gateway_identity_csr),
+        )
+        .route(
+            "/api/business/gateway-identity/certificate",
+            axum::routing::put(settings::put_gateway_identity_certificate),
+        )
         // Export/import del hub a blueprint (ADR-0113): capa server sobre el motor del runtime
         // (`export_hub`/`import_sections`). Auth = sesión admin (owner/admin), como /api/settings.
         // El inspect recibe el zip crudo → body limit propio (el default de axum son 2 MiB).

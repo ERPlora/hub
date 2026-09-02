@@ -952,6 +952,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // arrancar. El seed de arriba sí aborta el boot, y es la excepción a propósito.
     fiscal_certificate::spawn_refetch_service(&state, certificate_budget);
 
+    // Broker de la pasarela fiscal (hub#1432, hub#985 §1): el motor pide un acceso por la
+    // capability `fiscal_gateway_access` y ESTE broker es quien de verdad lo consigue — token
+    // corto del plano de control (cacheado; la cuota es 60/h) + identidad mTLS de la BD. El
+    // motor nunca ve el token de máquina, igual que con el refetch del certificado.
+    erplora_runtime::fiscal_gateway::GatewayBrokerCell::global()
+        .install(std::sync::Arc::new(fiscal_gateway::HubGatewayBroker::new(&state)));
+
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
     // ruta del `dist/` empaquetado (`resource_dir()`), para que el webview cargue front + datos del

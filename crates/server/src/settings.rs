@@ -279,6 +279,130 @@ pub async fn put_business_certificate(
     }
 }
 
+/// GET /api/business/gateway-identity — estado de la identidad de MÁQUINA para la pasarela
+/// fiscal (hub#1432): nombres y fechas, nunca material de clave. Auth = sesión de usuario.
+pub async fn get_gateway_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match erplora_runtime::gateway_identity::status(rt.db(), &st.hub_id()).await {
+        Ok(s) => Json(json!({
+            "has_key": s.has_key,
+            "has_certificate": s.has_certificate,
+            "common_name": s.common_name,
+            "not_after": s.not_after,
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/business/gateway-identity/csr — genera (si no existe) la clave EN el hub y devuelve
+/// el CSR para que el operador lo firme con la CA fiscal interna. Idempotente: repetirlo
+/// re-deriva el CSR de la MISMA clave. Auth = sesión admin.
+pub async fn post_gateway_identity_csr(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let hub_id = st.hub_id();
+    match erplora_runtime::gateway_identity::ensure_key_and_csr(rt.db(), &hub_id).await {
+        Ok(csr_pem) => Json(json!({
+            "csr_pem": csr_pem,
+            "common_name": erplora_runtime::gateway_identity::common_name(&hub_id),
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// PUT /api/business/gateway-identity/certificate — instala el certificado firmado por el
+/// operador + la CA interna. Body `{ certificate_pem, ca_pem }`. Auth = sesión admin.
+pub async fn put_gateway_identity_certificate(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<Map<String, Value>>>,
+) -> Response {
+    let updates = body.map(|b| b.0).unwrap_or_default();
+    let certificate_pem = updates
+        .get("certificate_pem")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let ca_pem = updates
+        .get("ca_pem")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    if certificate_pem.trim().is_empty() || ca_pem.trim().is_empty() {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "ok": false, "error": "faltan certificate_pem y/o ca_pem (PEM)" })),
+        )
+            .into_response();
+    }
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    match erplora_runtime::gateway_identity::install_certificate(
+        rt.db(),
+        &st.hub_id(),
+        &certificate_pem,
+        &ca_pem,
+    )
+    .await
+    {
+        Ok(s) => Json(json!({
+            "has_key": s.has_key,
+            "has_certificate": s.has_certificate,
+            "common_name": s.common_name,
+            "not_after": s.not_after,
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
+/// DELETE /api/business/gateway-identity — olvida la identidad entera (clave incluida), el
+/// camino de rotación del operador. Auth = sesión admin.
+pub async fn delete_gateway_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    if let Err(e) = erplora_runtime::gateway_identity::delete(rt.db(), &st.hub_id()).await {
+        return crate::err_response(e);
+    }
+    match erplora_runtime::gateway_identity::status(rt.db(), &st.hub_id()).await {
+        Ok(s) => Json(json!({
+            "has_key": s.has_key,
+            "has_certificate": s.has_certificate,
+            "common_name": s.common_name,
+            "not_after": s.not_after,
+        }))
+        .into_response(),
+        Err(e) => crate::err_response(e),
+    }
+}
+
 /// DELETE /api/business/certificate — elimina el certificado del negocio. Auth = sesión admin.
 pub async fn delete_business_certificate(
     State(st): State<AppState>,
