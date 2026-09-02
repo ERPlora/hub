@@ -103,6 +103,52 @@ pub(crate) fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
 }
 
+/// The two roads of ADR-0320, resolved in ONE place (hub#1432 — the hub#319/#320 lesson: one
+/// question, one owner). The core's certificate WINS: a business that uploaded its own signs
+/// with its own, direct to the AEAT, exactly as today. Without one, the gateway — the host's
+/// broker answers with a [`GatewayAccess`] when the machine identity is enrolled and the control
+/// plane authorises. Without EITHER, the same visible error as always: the record stays pending,
+/// never a panic, never a silent skip.
+pub(crate) enum TransmitRoute {
+    Direct(reqwest::Identity),
+    Gateway(erplora_runtime::fiscal_gateway::GatewayAccess),
+}
+
+pub(crate) async fn resolve_route(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+) -> Result<TransmitRoute> {
+    if has_certificate(config) {
+        return Ok(TransmitRoute::Direct(
+            host.certificate_identity(hub_id).await?,
+        ));
+    }
+    match host.fiscal_gateway_access(hub_id).await? {
+        Some(access) => Ok(TransmitRoute::Gateway(access)),
+        None => Err(VerifactuError::Certificate(
+            "no hay vía de transmisión: ni certificado del negocio (súbelo en Ajustes → Negocio) \
+             ni pasarela fiscal disponible (identidad de máquina sin enrolar)"
+                .into(),
+        )
+        .into()),
+    }
+}
+
+/// ¿Hay ALGUNA vía — certificado del core O pasarela? El gate de la cola de contingencia: sin
+/// ninguna, los registros se quedan `pending` (comportamiento de siempre) en vez de quemar
+/// reintentos que no pueden salir.
+pub(crate) async fn can_transmit(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+) -> Result<bool> {
+    if has_certificate(config) {
+        return Ok(true);
+    }
+    Ok(host.fiscal_gateway_access(hub_id).await?.is_some())
+}
+
 /// **¿Puede este motor firmar por `hub_id` ahora mismo?** — exactamente el predicado con el que
 /// [`build_identity`] deja pasar o rechaza.
 ///
@@ -183,7 +229,9 @@ pub async fn transmission_endpoint_for(
     host: &dyn NativeHost,
     hub_id: &str,
 ) -> Result<&'static str> {
-    let config = read_config(host, hub_id).await?.unwrap_or_else(|| json!({}));
+    let config = read_config(host, hub_id)
+        .await?
+        .unwrap_or_else(|| json!({}));
     Ok(transmission_endpoint(&config))
 }
 
@@ -256,7 +304,10 @@ pub(crate) fn record_environment(record: &Json) -> Option<String> {
 /// second place in the engine that multiplies the two axes, so it is also the second place that has
 /// to read the same value as [`transmission_endpoint`] — reading one from the type and the other
 /// from the slot is exactly the shape of defect this whole chain keeps producing.
-pub(crate) fn destination_of(record: &Json, config: &Json) -> std::result::Result<Destination, String> {
+pub(crate) fn destination_of(
+    record: &Json,
+    config: &Json,
+) -> std::result::Result<Destination, String> {
     let hub_environment = environment_of(config);
     let Some(environment) = record_environment(record) else {
         return Err(format!(
@@ -437,7 +488,10 @@ mod cert_source_tests {
     async fn a_delegated_only_hub_can_transmit() {
         let host = SlotHost::new(Some("delegated"), vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
-        assert!(has_certificate(&cfg), "con el delegado el motor SÍ puede transmitir");
+        assert!(
+            has_certificate(&cfg),
+            "con el delegado el motor SÍ puede transmitir"
+        );
         assert_eq!(signing_kind(&cfg), "delegated");
     }
 
@@ -470,10 +524,13 @@ mod cert_source_tests {
     /// chain (ADR-0189).
     #[tokio::test]
     async fn the_entry_point_follows_what_the_certificate_is() {
-        let seal = read_config(&SlotHost::new(Some("delegated"), vec![]).holding("seal"), "h1")
-            .await
-            .unwrap()
-            .unwrap();
+        let seal = read_config(
+            &SlotHost::new(Some("delegated"), vec![]).holding("seal"),
+            "h1",
+        )
+        .await
+        .unwrap()
+        .unwrap();
         assert_eq!(
             transmission_endpoint(&seal),
             "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
@@ -541,7 +598,10 @@ mod cert_source_tests {
             .await
             .unwrap()
             .unwrap();
-        assert!(has_certificate(&cfg), "not knowing the type does not stop it signing");
+        assert!(
+            has_certificate(&cfg),
+            "not knowing the type does not stop it signing"
+        );
         assert_eq!(signing_type(&cfg), "");
         assert_eq!(
             transmission_endpoint(&cfg),
@@ -698,7 +758,10 @@ mod cert_source_tests {
             "sin la capacidad no hay con qué firmar: el motor NO transmite"
         );
         let cfg = read_config(&BareHost, "h1").await.unwrap().unwrap();
-        assert!(cfg.get("certificate_source").is_none(), "y no se marca un certificado que no hay");
+        assert!(
+            cfg.get("certificate_source").is_none(),
+            "y no se marca un certificado que no hay"
+        );
         assert!(build_identity(&BareHost, "h1", &cfg).await.is_err());
     }
 
@@ -711,7 +774,11 @@ mod cert_source_tests {
     /// cross-package test does later.
     #[tokio::test]
     async fn can_sign_answers_exactly_what_build_identity_gates_on() {
-        for (signing, expected) in [(Some("delegated"), true), (Some("own"), true), (None, false)] {
+        for (signing, expected) in [
+            (Some("delegated"), true),
+            (Some("own"), true),
+            (None, false),
+        ] {
             let host = SlotHost::new(signing, vec![]);
             assert_eq!(
                 can_sign(&host, "h1").await.unwrap(),
@@ -737,8 +804,14 @@ mod cert_source_tests {
     async fn the_error_without_any_certificate_names_both_halves() {
         let host = SlotHost::new(None, vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
-        let err = build_identity(&host, "h1", &cfg).await.unwrap_err().to_string();
-        assert!(err.contains("Ajustes → Negocio"), "sigue diciendo dónde subir el propio: {err}");
+        let err = build_identity(&host, "h1", &cfg)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("Ajustes → Negocio"),
+            "sigue diciendo dónde subir el propio: {err}"
+        );
         assert!(
             err.to_lowercase().contains("erplora"),
             "y que ERPlora tampoco entregó uno delegado: {err}"
@@ -765,7 +838,10 @@ mod certificate_refetch_trigger_tests {
             DELEGATED,
             &signal,
         );
-        assert!(signal.take(), "un rechazo del certificado tiene que pedir el vigente");
+        assert!(
+            signal.take(),
+            "un rechazo del certificado tiene que pedir el vigente"
+        );
     }
 
     /// 🔒 **El certificado que falló tiene que ser el DELEGADO** (hub#319).
@@ -835,12 +911,17 @@ mod certificate_refetch_trigger_tests {
         let signal = RefetchSignal::new();
         for _ in 0..200 {
             request_certificate_refetch_on_tls(
-                &VerifactuError::Tls("conexión AEAT: received fatal alert: CertificateRevoked".into()),
+                &VerifactuError::Tls(
+                    "conexión AEAT: received fatal alert: CertificateRevoked".into(),
+                ),
                 DELEGATED,
                 &signal,
             );
         }
         assert!(signal.take());
-        assert!(!signal.take(), "200 registros varados piden UN refetch, no 200");
+        assert!(
+            !signal.take(),
+            "200 registros varados piden UN refetch, no 200"
+        );
     }
 }

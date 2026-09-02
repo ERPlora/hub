@@ -80,7 +80,10 @@ async fn an_administrator_marks_a_known_device_personal_and_it_is_persisted() {
     rt.set_device_mode("laptop-1", DeviceMode::Personal, "hub_user:admin")
         .await
         .unwrap();
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Personal);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Personal
+    );
 
     // Lowering the identity friction of a terminal leaves a trace: WHO decided, and WHEN.
     let audit = rt
@@ -91,7 +94,10 @@ async fn an_administrator_marks_a_known_device_personal_and_it_is_persisted() {
         )
         .await
         .unwrap();
-    assert_eq!(audit.rows[0]["mode_set_by"], serde_json::json!("hub_user:admin"));
+    assert_eq!(
+        audit.rows[0]["mode_set_by"],
+        serde_json::json!("hub_user:admin")
+    );
     assert!(
         !audit.rows[0]["mode_set_at"]
             .as_str()
@@ -104,7 +110,10 @@ async fn an_administrator_marks_a_known_device_personal_and_it_is_persisted() {
     rt.set_device_mode("laptop-1", DeviceMode::Shared, "hub_user:admin")
         .await
         .unwrap();
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Shared);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Shared
+    );
 }
 
 #[tokio::test]
@@ -122,7 +131,10 @@ async fn the_mode_is_of_the_device_not_of_the_hub() {
         DeviceMode::Shared,
         "the till of the very same business stays shared: this is not a hub-wide setting"
     );
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Personal);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Personal
+    );
 }
 
 #[tokio::test]
@@ -130,7 +142,11 @@ async fn a_device_that_never_proved_itself_online_cannot_be_personal() {
     let rt = runtime("hub-dm").await;
 
     let refused = rt
-        .set_device_mode("some-id-from-a-header", DeviceMode::Personal, "hub_user:admin")
+        .set_device_mode(
+            "some-id-from-a-header",
+            DeviceMode::Personal,
+            "hub_user:admin",
+        )
         .await
         .expect_err("a device id nobody has ever seen is not a device: it is a string");
     assert_eq!(code_of(&refused), "hub.device.unknown_device");
@@ -142,9 +158,15 @@ async fn a_device_that_never_proved_itself_online_cannot_be_personal() {
 
     // Not even to `shared`: the write door does not create devices either.
     let refused_shared = rt
-        .set_device_mode("some-id-from-a-header", DeviceMode::Shared, "hub_user:admin")
+        .set_device_mode(
+            "some-id-from-a-header",
+            DeviceMode::Shared,
+            "hub_user:admin",
+        )
         .await
-        .expect_err("the write door records a decision about a known device, it does not enrol one");
+        .expect_err(
+            "the write door records a decision about a known device, it does not enrol one",
+        );
     assert_eq!(code_of(&refused_shared), "hub.device.unknown_device");
 }
 
@@ -187,7 +209,10 @@ async fn an_online_login_never_resets_the_mode_an_administrator_chose() {
     // next sign-in and nobody would understand why the pinpad came back.
     rt.trust_device("laptop-1", "Marta Ruiz").await.unwrap();
 
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Personal);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Personal
+    );
 }
 
 #[tokio::test]
@@ -203,7 +228,10 @@ async fn the_mode_survives_a_restart_of_the_runtime() {
 
     // Same database, new runtime: the mode is state of the hub, not of the process.
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-dm");
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Personal);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Personal
+    );
 }
 
 #[tokio::test]
@@ -278,5 +306,8 @@ async fn a_stored_mode_the_hub_cannot_read_is_taken_as_shared() {
         .await
         .unwrap();
 
-    assert_eq!(rt.device_mode("laptop-1").await.unwrap(), DeviceMode::Shared);
+    assert_eq!(
+        rt.device_mode("laptop-1").await.unwrap(),
+        DeviceMode::Shared
+    );
 }

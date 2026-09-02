@@ -123,7 +123,10 @@ mod tests {
             signal.request();
         }
         assert!(signal.take());
-        assert!(!signal.take(), "mil fallos del mismo certificado piden UN refetch");
+        assert!(
+            !signal.take(),
+            "mil fallos del mismo certificado piden UN refetch"
+        );
     }
 
     /// A request raised while the reader was busy must still be there when it comes back. The lost

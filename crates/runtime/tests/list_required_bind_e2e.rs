@@ -19,8 +19,8 @@
 //! optional by design: an absent filter means "no condition".
 //!
 //! Real Postgres, ephemeral schema per test.
-use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::{RequestContext, RuntimeError, Runtime};
+use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 use serde_json::json;
 
 fn fixture() -> std::path::PathBuf {
@@ -33,7 +33,9 @@ fn fixture() -> std::path::PathBuf {
 async fn hub() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture()).await.expect("install lbind");
+    rt.install_from_dir(&fixture())
+        .await
+        .expect("install lbind");
     rt
 }
 
@@ -87,7 +89,11 @@ async fn coalesce_wrapped_bind_stays_optional_with_its_default_scope() {
         .execute_query("lbind.carts.list", &Params::new(), &ctx())
         .await
         .expect("a COALESCE-guarded bind absent is the declared default, not a failure");
-    assert_eq!(active.len(), 2, "default scope hides the archived cart: {active:?}");
+    assert_eq!(
+        active.len(),
+        2,
+        "default scope hides the archived cart: {active:?}"
+    );
 
     // Present → the declared wider scope.
     let all = rt

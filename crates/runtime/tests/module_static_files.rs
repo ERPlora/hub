@@ -12,7 +12,10 @@ struct RecordingStorage {
 #[async_trait::async_trait]
 impl ModuleStorage for RecordingStorage {
     async fn ensure_module_folder(&self, hub_id: &str, folder: &str) -> Result<()> {
-        self.ensured.lock().unwrap().push((hub_id.to_string(), folder.to_string()));
+        self.ensured
+            .lock()
+            .unwrap()
+            .push((hub_id.to_string(), folder.to_string()));
         Ok(())
     }
 
@@ -74,7 +77,11 @@ async fn install_rejects_static_files_path_traversal() {
         }"#,
     );
 
-    let error = runtime.install_from_dir(&dir).await.unwrap_err().to_string();
+    let error = runtime
+        .install_from_dir(&dir)
+        .await
+        .unwrap_err()
+        .to_string();
 
     assert!(error.contains("static_files.folder"));
     std::fs::remove_dir_all(dir).unwrap();

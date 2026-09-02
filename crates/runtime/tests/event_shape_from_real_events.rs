@@ -144,7 +144,12 @@ async fn the_shape_carries_a_real_value_from_a_real_event() {
 async fn it_offers_only_paths_the_mapping_language_can_resolve() {
     let db = TestDb::new().await;
     let rt = hub_on(&db, "hub-paths").await;
-    sell(&rt, "hub-paths", a_sale("10.00", "a@b.com", "600111222", "")).await;
+    sell(
+        &rt,
+        "hub-paths",
+        a_sale("10.00", "a@b.com", "600111222", ""),
+    )
+    .await;
 
     let shape = rt
         .event_shape("shop.sale_completed", 5)
@@ -220,7 +225,10 @@ async fn a_value_that_could_be_about_a_person_never_leaves_the_hub() {
         "Marta",
         "alérgica al amoniaco",
     ] {
-        assert!(!body.contains(secret), "the shape leaked `{secret}`: {body}");
+        assert!(
+            !body.contains(secret),
+            "the shape leaked `{secret}`: {body}"
+        );
     }
 
     // The point of redacting rather than dropping: the mapping is still offerable.
@@ -274,7 +282,10 @@ async fn a_hub_never_sees_the_events_of_its_neighbour() {
 
     assert_eq!(shape.samples, 1, "only OUR sale was sampled");
     assert!(
-        !shape.fields.iter().any(|f| f.path == "neighbour_only_field"),
+        !shape
+            .fields
+            .iter()
+            .any(|f| f.path == "neighbour_only_field"),
         "a field only the neighbour emits appeared in our shape"
     );
     let body = serde_json::to_string(&shape).unwrap();

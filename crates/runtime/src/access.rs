@@ -11,7 +11,15 @@ impl Runtime {
         role: &str,
         cloud_user_id: Option<&str>,
     ) -> Result<String> {
-        identity::create_user(self.db.as_ref(), &self.hub_id, name, pin, role, cloud_user_id).await
+        identity::create_user(
+            self.db.as_ref(),
+            &self.hub_id,
+            name,
+            pin,
+            role,
+            cloud_user_id,
+        )
+        .await
     }
 
     #[doc(hidden)]
@@ -223,7 +231,14 @@ impl Runtime {
         user_id: &str,
         input: &hub_users::UpdateHubUser,
     ) -> Result<hub_users::HubUserRow> {
-        hub_users::update(self.db.as_ref(), &self.registry, &self.hub_id, user_id, input).await
+        hub_users::update(
+            self.db.as_ref(),
+            &self.registry,
+            &self.hub_id,
+            user_id,
+            input,
+        )
+        .await
     }
 
     /// Roles del hub (catálogo base ∪ módulos activos ∪ en uso) con permisos y miembros.
@@ -439,7 +454,8 @@ impl Runtime {
     /// El dispositivo queda **sin nombre** (hub#494): quien sepa con qué nombre debería nacer usa
     /// [`Self::trust_device_with_default_name`].
     pub async fn trust_device(&self, device_id: &str, label: &str) -> Result<()> {
-        self.trust_device_with_default_name(device_id, label, "").await
+        self.trust_device_with_default_name(device_id, label, "")
+            .await
     }
 
     /// Igual que [`Self::trust_device`], más el nombre con el que nace el dispositivo la **primera**
@@ -587,7 +603,15 @@ impl Runtime {
         rate_limit_per_minute: i64,
         created_by: &str,
     ) -> Result<api_keys::ApiKeySecret> {
-        api_keys::create(self.db.as_ref(), &self.hub_id, name, scope, rate_limit_per_minute, created_by).await
+        api_keys::create(
+            self.db.as_ref(),
+            &self.hub_id,
+            name,
+            scope,
+            rate_limit_per_minute,
+            created_by,
+        )
+        .await
     }
 
     /// The read-only key the hub issues to **itself** so our own app reads the event stream
@@ -631,7 +655,12 @@ impl Runtime {
         &self,
         principal: &api_keys::ApiKeyPrincipal,
     ) -> Result<api_keys::RateLimitDecision> {
-        api_keys::consume_rate_limit(self.db.as_ref(), &principal.key_id, principal.rate_limit_per_minute).await
+        api_keys::consume_rate_limit(
+            self.db.as_ref(),
+            &principal.key_id,
+            principal.rate_limit_per_minute,
+        )
+        .await
     }
 
     // ── Settings del hub (store key/value de sistema, scoped por hub_id) ────────────────────────

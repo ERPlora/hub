@@ -53,14 +53,14 @@ const POS_MODULES_ORDERED: &[&str] = &[
     "staff",
     "customers",
     "schedules",
-    "inventory",   // dep: taxes
-    "services",    // dep: taxes
-    "sales",       // dep: inventory, taxes
-    "invoice",     // dep: taxes, sales  ← DESPUÉS de sales (invoice v1.2.x, hub#540)
-    "kitchen",     // dep: sales, inventory
-    "appointments",// dep: customers, services
-    "reservations",// dep: tables, customers
-    "verifactu",   // dep: invoice
+    "inventory",      // dep: taxes
+    "services",       // dep: taxes
+    "sales",          // dep: inventory, taxes
+    "invoice",        // dep: taxes, sales  ← DESPUÉS de sales (invoice v1.2.x, hub#540)
+    "kitchen",        // dep: sales, inventory
+    "appointments",   // dep: customers, services
+    "reservations",   // dep: tables, customers
+    "verifactu",      // dep: invoice
     "online_booking", // dep: customers
 ];
 
@@ -88,10 +88,19 @@ async fn install_pack(rt: &mut Runtime, failures: &mut Vec<String>) {
 /// verde, que es la prueba sobre PG de que el escáner no da falsos requeridos con su idioma.
 const REQUIRED_LIST_BINDS: &[(&str, &[(&str, &str)])] = &[
     // Arqueos y movimientos de UNA sesión de caja — el caso real de hub#1086.
-    ("cash_register.counts.list", &[("session_id", "session-smoke")]),
-    ("cash_register.movements.list", &[("session_id", "session-smoke")]),
+    (
+        "cash_register.counts.list",
+        &[("session_id", "session-smoke")],
+    ),
+    (
+        "cash_register.movements.list",
+        &[("session_id", "session-smoke")],
+    ),
     // Líneas de servicios de UN pack.
-    ("services.package_items.list", &[("package_id", "package-smoke")]),
+    (
+        "services.package_items.list",
+        &[("package_id", "package-smoke")],
+    ),
     // Bloqueos a partir de la fecha visible del calendario (ISO 8601; la columna es TEXT).
     (
         "appointments.blocked_times.list",
@@ -107,9 +116,15 @@ const REQUIRED_LIST_BINDS: &[(&str, &[(&str, &str)])] = &[
 async fn exercise_list_queries(rt: &Runtime, ctx: &RequestContext, failures: &mut Vec<String>) {
     for id in POS_MODULES_ORDERED {
         let mj = module_dir(id).join("module.json");
-        let Ok(txt) = std::fs::read_to_string(&mj) else { continue };
-        let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else { continue };
-        let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else { continue };
+        let Ok(txt) = std::fs::read_to_string(&mj) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) else {
+            continue;
+        };
+        let Some(queries) = json.get("queries").and_then(|q| q.as_object()) else {
+            continue;
+        };
         for name in queries.keys().filter(|n| n.ends_with(".list")) {
             let mut params = Params::new();
             for (query, binds) in REQUIRED_LIST_BINDS {
@@ -159,7 +174,9 @@ async fn run_sector(sector: &str) {
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // El server llama esto al arrancar: crea las tablas de sistema (incl. identidad `hub_user`)
     // que el blueprint necesita para sembrar los cajeros. Sin esto el seed fallaría por hub_user.
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
     let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
     let mut failures: Vec<String> = Vec::new();
 
@@ -189,7 +206,10 @@ fn sector_seeds_are_fixtures_of_this_repo() {
     for sector in ["restaurant", "beauty"] {
         let path = blueprint_seed(sector);
         let sql = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-            panic!("the '{sector}' seed fixture is unreadable at {}: {e}", path.display())
+            panic!(
+                "the '{sector}' seed fixture is unreadable at {}: {e}",
+                path.display()
+            )
         });
         assert!(
             sql.contains("INSERT INTO"),

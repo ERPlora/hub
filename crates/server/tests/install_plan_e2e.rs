@@ -141,10 +141,8 @@ fn node(module_id: &str, sha: &str, reason: &str) -> Value {
 }
 
 fn cache_dir(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "erplora-install-plan-{}-{tag}",
-        std::process::id()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("erplora-install-plan-{}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }
@@ -197,7 +195,10 @@ async fn executes_the_plan_in_order_installing_missing_dependencies() {
     .await
     .expect("the plan resolves and installs the whole closure");
 
-    assert_eq!(installed.module_id, "dependent", "headline = requested module");
+    assert_eq!(
+        installed.module_id, "dependent",
+        "headline = requested module"
+    );
     assert!(
         rt.registry().is_installed("leaf"),
         "the missing dependency must be installed by the plan"

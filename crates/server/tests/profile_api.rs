@@ -173,7 +173,10 @@ async fn dev_mode_materializes_the_header_user_without_a_fake_session() {
     let db = fresh_db().await;
     let rt = Runtime::new(Box::new(db));
     rt.ensure_system_tables().await.unwrap();
-    let router = app(AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev)));
+    let router = app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ));
 
     let response = router
         .oneshot(

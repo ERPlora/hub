@@ -298,9 +298,12 @@ pub(crate) async fn update_module(
             .find(|m| m.id == module_id)
             .map(|m| m.name.clone())
             .unwrap_or_else(|| module_id.clone());
-        if let Some(change) =
-            erplora_runtime::update_history::from_module_outcome(&module_id, &module_name, &target, &outcome)
-        {
+        if let Some(change) = erplora_runtime::update_history::from_module_outcome(
+            &module_id,
+            &module_name,
+            &target,
+            &outcome,
+        ) {
             if let Err(e) =
                 erplora_runtime::update_history::record(rt.db(), &st.hub_id(), change).await
             {
@@ -371,7 +374,10 @@ pub(crate) async fn update_module(
 /// la actualización automática haría sola: nunca una versión en cuarentena, nunca hacia atrás, y el
 /// pin de soporte gana. Si el Cloud no contesta, `latest == installed` y no se ofrece nada —
 /// inventar una versión sería peor que no decir nada.
-pub(crate) async fn list_module_updates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+pub(crate) async fn list_module_updates(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
     let installed: Vec<(String, String, Option<String>)> = {
         let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
@@ -511,7 +517,9 @@ pub(crate) fn install_error_status(e: &install::InstallError) -> StatusCode {
         install::InstallError::Runtime(_) => StatusCode::UNPROCESSABLE_ENTITY,
         // Fallo de FIRMA (hub#239): el módulo no verifica — sin firma, firma inválida o
         // clave ajena. Es un rechazo de seguridad, NO un fallo de gateway: 403.
-        install::InstallError::Source(source::SourceError::BadSignature(_)) => StatusCode::FORBIDDEN,
+        install::InstallError::Source(source::SourceError::BadSignature(_)) => {
+            StatusCode::FORBIDDEN
+        }
         // ADR-0060: el plan exige comprar dependencias. NO es un fallo del hub ni del
         // Cloud: es una decisión que le toca al usuario → 409 con los datos de compra.
         install::InstallError::Blocked { .. } => StatusCode::CONFLICT,
@@ -827,7 +835,10 @@ pub(crate) async fn install_module(
 /// Respuesta estable a un `dir` de instalación rechazado (hub#239). `403` cuando la vía está
 /// cerrada por política (producción / fuera del staging), `422` cuando la ruta simplemente no
 /// sirve. Se registra a WARN: un intento fuera del staging es señal de abuso, no ruido.
-pub(crate) fn install_dir_rejected(requested: &str, rejection: install_guard::InstallDirRejection) -> Response {
+pub(crate) fn install_dir_rejected(
+    requested: &str,
+    rejection: install_guard::InstallDirRejection,
+) -> Response {
     use install_guard::InstallDirRejection as R;
     let status = match rejection {
         R::DevModeRequired | R::OutsideStaging => StatusCode::FORBIDDEN,

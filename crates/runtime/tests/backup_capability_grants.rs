@@ -66,7 +66,10 @@ async fn runtime(hub_id: &str) -> Runtime {
 
 async fn install(rt: &mut Runtime, manifest: &str) -> String {
     let dir = fixture(manifest);
-    let id = rt.install_from_dir(&dir).await.expect("the module installs");
+    let id = rt
+        .install_from_dir(&dir)
+        .await
+        .expect("the module installs");
     std::fs::remove_dir_all(dir).unwrap();
     id
 }
@@ -126,7 +129,10 @@ async fn grant_rows(rt: &Runtime, hub_id: &str) -> Vec<String> {
 fn grants_row(
     report: &erplora_runtime::import::ImportReport,
 ) -> Option<&erplora_runtime::import::SectionResult> {
-    report.sections.iter().find(|s| s.section == CAPABILITY_GRANTS_SECTION)
+    report
+        .sections
+        .iter()
+        .find(|s| s.section == CAPABILITY_GRANTS_SECTION)
 }
 
 // ── The round trip the issue is about ───────────────────────────────────────────────────
@@ -146,7 +152,10 @@ async fn a_backup_restores_the_capabilities_the_owner_had_granted() {
     grant(&origin, "h1", "verifactu", "network").await;
     grant(&origin, "h1", "appointments", "notify").await;
 
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
         .await
         .expect("export");
@@ -163,7 +172,10 @@ async fn a_backup_restores_the_capabilities_the_owner_had_granted() {
         "the backup carries WHAT was granted to WHOM, per module — or there is nothing to restore"
     );
     assert!(
-        bundle.manifest.sections.contains(&CAPABILITY_GRANTS_SECTION.to_string()),
+        bundle
+            .manifest
+            .sections
+            .contains(&CAPABILITY_GRANTS_SECTION.to_string()),
         "the inventory the user confirms before importing has to show the bundle brings grants"
     );
     assert!(
@@ -191,15 +203,24 @@ async fn a_backup_restores_the_capabilities_the_owner_had_granted() {
     .await
     .expect("the backup is accepted");
 
-    assert_eq!(granted(&restored, "h1", "verifactu").await, vec!["certificate", "network"]);
-    assert_eq!(granted(&restored, "h1", "appointments").await, vec!["notify"]);
+    assert_eq!(
+        granted(&restored, "h1", "verifactu").await,
+        vec!["certificate", "network"]
+    );
+    assert_eq!(
+        granted(&restored, "h1", "appointments").await,
+        vec!["notify"]
+    );
     // Proven at the door that actually enforces it, not on a helper: `enforce` is what the
     // dispatcher calls before a native handler runs.
     erplora_runtime::capabilities::enforce(restored.db(), restored.registry(), "verifactu", "h1")
         .await
         .expect("after the restore the module can sign again");
     assert!(
-        matches!(grants_row(&report).map(|r| &r.status), Some(SectionStatus::Applied)),
+        matches!(
+            grants_row(&report).map(|r| &r.status),
+            Some(SectionStatus::Applied)
+        ),
         "the report says what it did with the grants: {:?}",
         report.sections
     );
@@ -218,9 +239,16 @@ async fn a_capability_the_installed_module_does_not_declare_is_refused_and_leave
     install(&mut origin, VERIFACTU).await;
     grant(&origin, "h1", "verifactu", "certificate").await;
     grant(&origin, "h1", "verifactu", "network").await;
-    let mut bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let mut bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     // …and the bundle also claims a capability nobody ever declared.
     bundle
         .manifest
@@ -264,7 +292,10 @@ async fn a_capability_the_installed_module_does_not_declare_is_refused_and_leave
         "part of it landed, so the report says exactly that: {:?}",
         row.status
     );
-    assert_eq!(row.discarded_rows, 2, "`network` and `printer` were left out, and they are counted");
+    assert_eq!(
+        row.discarded_rows, 2,
+        "`network` and `printer` were left out, and they are counted"
+    );
 }
 
 /// 🔴 A backup restored where the module is **not installed** grants nothing and parks nothing.
@@ -275,9 +306,16 @@ async fn a_backup_whose_module_is_missing_grants_nothing_and_leaves_no_latent_ro
     let mut origin = runtime("h1").await;
     install(&mut origin, VERIFACTU).await;
     grant(&origin, "h1", "verifactu", "certificate").await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     let mut bare = runtime("h1").await; // same hub, but the module never got installed
     let report = import_sections(
@@ -295,7 +333,10 @@ async fn a_backup_whose_module_is_missing_grants_nothing_and_leaves_no_latent_ro
         "nothing is granted and nothing is parked for a module that is not here"
     );
     assert!(
-        matches!(grants_row(&report).map(|r| &r.status), Some(SectionStatus::Ignored(_))),
+        matches!(
+            grants_row(&report).map(|r| &r.status),
+            Some(SectionStatus::Ignored(_))
+        ),
         "none of it landed: {:?}",
         report.sections
     );
@@ -315,18 +356,33 @@ async fn a_backup_whose_module_is_missing_grants_nothing_and_leaves_no_latent_ro
 async fn a_bundle_from_another_hub_grants_nothing() {
     let mut rt = runtime("h1").await;
     install(&mut rt, VERIFACTU).await;
-    let mut foreign = export_hub(&rt, "h1", &ExportSelection::default(), "otro", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let mut foreign = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "otro",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     foreign.manifest.hub.hub_id = "some-other-hub".into();
     foreign.manifest.capability_grants =
         BTreeMap::from([("verifactu".to_string(), vec!["certificate".to_string()])]);
-    foreign.manifest.sections.push(CAPABILITY_GRANTS_SECTION.to_string());
+    foreign
+        .manifest
+        .sections
+        .push(CAPABILITY_GRANTS_SECTION.to_string());
 
-    let report =
-        import_sections(&mut rt, &foreign.manifest, &foreign.files, &ImportSelection::default(), "h1")
-            .await
-            .expect("the bundle is accepted, its grants are not");
+    let report = import_sections(
+        &mut rt,
+        &foreign.manifest,
+        &foreign.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("the bundle is accepted, its grants are not");
 
     assert!(
         grant_rows(&rt, "h1").await.is_empty(),
@@ -345,7 +401,10 @@ async fn a_bundle_from_another_hub_grants_nothing() {
         "with the stable reason code the shell translates: {:?}",
         row.status
     );
-    assert_eq!(row.discarded_rows, 1, "«1 permiso descartado» is what makes the row actionable");
+    assert_eq!(
+        row.discarded_rows, 1,
+        "«1 permiso descartado» is what makes the row actionable"
+    );
 }
 
 /// 🔴 An **unknown origin** never matches, exactly as it does not for identities: a bundle older
@@ -355,18 +414,34 @@ async fn a_bundle_from_another_hub_grants_nothing() {
 async fn a_bundle_of_unknown_origin_grants_nothing() {
     let mut rt = runtime("h1").await;
     install(&mut rt, VERIFACTU).await;
-    let mut old = export_hub(&rt, "h1", &ExportSelection::default(), "viejo", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let mut old = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "viejo",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     old.manifest.hub.hub_id = String::new();
     old.manifest.capability_grants =
         BTreeMap::from([("verifactu".to_string(), vec!["certificate".to_string()])]);
 
-    import_sections(&mut rt, &old.manifest, &old.files, &ImportSelection::default(), "h1")
-        .await
-        .expect("accepted");
+    import_sections(
+        &mut rt,
+        &old.manifest,
+        &old.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("accepted");
 
-    assert!(grant_rows(&rt, "h1").await.is_empty(), "unknown origin is not this hub");
+    assert!(
+        grant_rows(&rt, "h1").await.is_empty(),
+        "unknown origin is not this hub"
+    );
 }
 
 /// 🔴 A **template** is a public artefact and does not carry the grants of the hub that produced
@@ -379,7 +454,10 @@ async fn a_template_carries_no_grants_at_all() {
     install(&mut rt, VERIFACTU).await;
     grant(&rt, "h1", "verifactu", "certificate").await;
 
-    let selection = ExportSelection { purpose: BundlePurpose::Template, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Template,
+        ..Default::default()
+    };
     let bundle = export_hub(&rt, "h1", &selection, "restaurante", "es", CREATED_AT)
         .await
         .expect("export");
@@ -388,7 +466,10 @@ async fn a_template_carries_no_grants_at_all() {
         bundle.manifest.capability_grants.is_empty(),
         "the grants do not enter the zip: not filtered on import, not there at all"
     );
-    assert!(!bundle.manifest.sections.contains(&CAPABILITY_GRANTS_SECTION.to_string()));
+    assert!(!bundle
+        .manifest
+        .sections
+        .contains(&CAPABILITY_GRANTS_SECTION.to_string()));
 }
 
 // ── Shape of what travels ───────────────────────────────────────────────────────────────
@@ -413,9 +494,16 @@ async fn a_revoked_grant_does_not_travel() {
     .await
     .expect("the owner says no to the network");
 
-    let bundle = export_hub(&rt, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     assert_eq!(
         bundle.manifest.capability_grants,
@@ -436,9 +524,16 @@ async fn the_export_carries_only_the_grants_of_its_own_hub() {
     // The neighbour lives in the SAME database, one row apart, and granted something else.
     grant(&rt, "h2", "appointments", "notify").await;
 
-    let bundle = export_hub(&rt, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     assert_eq!(
         bundle.manifest.capability_grants,
@@ -456,18 +551,31 @@ async fn restoring_never_revokes_what_the_bundle_does_not_name() {
     let mut origin = runtime("h1").await;
     install(&mut origin, VERIFACTU).await;
     grant(&origin, "h1", "verifactu", "certificate").await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     // The hub granted the network AFTER that backup was taken.
     let mut rt = runtime("h1").await;
     install(&mut rt, VERIFACTU).await;
     grant(&rt, "h1", "verifactu", "network").await;
 
-    import_sections(&mut rt, &bundle.manifest, &bundle.files, &ImportSelection::default(), "h1")
-        .await
-        .expect("accepted");
+    import_sections(
+        &mut rt,
+        &bundle.manifest,
+        &bundle.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("accepted");
 
     assert_eq!(
         granted(&rt, "h1", "verifactu").await,

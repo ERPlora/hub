@@ -415,7 +415,10 @@ pub async fn forward_capture(
         .await
         .map_err(|error| CloudRefusal::status(status, error.to_string()))?;
     serde_json::from_str(&body).map_err(|error| {
-        CloudRefusal::status(status, format!("{}: unreadable answer ({error})", request.url))
+        CloudRefusal::status(
+            status,
+            format!("{}: unreadable answer ({error})", request.url),
+        )
     })
 }
 
@@ -487,7 +490,10 @@ pub async fn fetch_state(
         .await
         .map_err(|error| CloudRefusal::status(status, error.to_string()))?;
     serde_json::from_str(&body).map_err(|error| {
-        CloudRefusal::status(status, format!("{}: unreadable answer ({error})", request.url))
+        CloudRefusal::status(
+            status,
+            format!("{}: unreadable answer ({error})", request.url),
+        )
     })
 }
 
@@ -789,11 +795,27 @@ mod tests {
     /// baker for one would be asking for something that does not exist.
     #[test]
     fn a_nif_that_starts_with_an_entity_letter_is_a_legal_person() {
-        for nif in ["B12345674", "A28001234", "G12345678", "W1234567H", "J99999999"] {
-            assert!(is_legal_person_nif(nif), "{nif} debería ser persona jurídica");
+        for nif in [
+            "B12345674",
+            "A28001234",
+            "G12345678",
+            "W1234567H",
+            "J99999999",
+        ] {
+            assert!(
+                is_legal_person_nif(nif),
+                "{nif} debería ser persona jurídica"
+            );
         }
         // Personas físicas (DNI) y extranjeros (NIE: X/Y/Z) NO lo son.
-        for nif in ["12345678Z", "X1234567L", "Y1234567X", "Z1234567R", "", "K1234567L"] {
+        for nif in [
+            "12345678Z",
+            "X1234567L",
+            "Y1234567X",
+            "Z1234567R",
+            "",
+            "K1234567L",
+        ] {
             assert!(!is_legal_person_nif(nif), "{nif} NO es persona jurídica");
         }
     }
@@ -824,10 +846,7 @@ mod tests {
             signed_document: None,
             ..natural_capture()
         };
-        assert_eq!(
-            validate(&without_document),
-            Err("signed_document_required")
-        );
+        assert_eq!(validate(&without_document), Err("signed_document_required"));
 
         let without_dni = Capture {
             dni_copy: None,
@@ -938,7 +957,10 @@ mod tests {
 
         let cases = [
             Capture {
-                signed_document: Some(("anexo-i.pdf".into(), [b"%PDF".to_vec(), huge.clone()].concat())),
+                signed_document: Some((
+                    "anexo-i.pdf".into(),
+                    [b"%PDF".to_vec(), huge.clone()].concat(),
+                )),
                 ..company_capture()
             },
             Capture {
@@ -1350,7 +1372,8 @@ mod tests {
         assert_eq!(refusal.status_code, None);
         assert!(!refusal.detail.is_empty());
 
-        let (base, _h, _b, server) = cloud_stub(StatusCode::NOT_FOUND, "<html>Not Found</html>").await;
+        let (base, _h, _b, server) =
+            cloud_stub(StatusCode::NOT_FOUND, "<html>Not Found</html>").await;
         let refusal = fetch_model_pdf(
             &reqwest::Client::new(),
             &base,

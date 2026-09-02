@@ -98,7 +98,9 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
              something cannot be done: the answer to a missing capability is usually a module.",
             "query",
             erplora_runtime::hub_users::VIEW_USERS_PERMISSION,
-            Some(r#"{"type":"object","properties":{"search":{"type":"string","description":"Free-text filter over name/description/tags. Omit to list everything."}}}"#),
+            Some(
+                r#"{"type":"object","properties":{"search":{"type":"string","description":"Free-text filter over name/description/tags. Omit to list everything."}}}"#,
+            ),
         ),
         (
             "hub.blueprints.list",
@@ -127,7 +129,9 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
              hub.blueprints.list returned it.",
             "command",
             erplora_runtime::hub_users::ADMINISTER_PERMISSION,
-            Some(r#"{"type":"object","properties":{"slug":{"type":"string","description":"Blueprint slug, exactly as hub.blueprints.list returned it."}},"required":["slug"]}"#),
+            Some(
+                r#"{"type":"object","properties":{"slug":{"type":"string","description":"Blueprint slug, exactly as hub.blueprints.list returned it."}},"required":["slug"]}"#,
+            ),
         ),
         (
             "hub.modules.install",
@@ -137,7 +141,9 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
              the module_id exactly as hub.marketplace.search returned it.",
             "command",
             erplora_runtime::hub_users::ADMINISTER_PERMISSION,
-            Some(r#"{"type":"object","properties":{"module_id":{"type":"string","description":"Marketplace module id, e.g. \"inventory\""},"version":{"type":"string","description":"Optional. Omit to install the latest published version."}},"required":["module_id"]}"#),
+            Some(
+                r#"{"type":"object","properties":{"module_id":{"type":"string","description":"Marketplace module id, e.g. \"inventory\""},"version":{"type":"string","description":"Optional. Omit to install the latest published version."}},"required":["module_id"]}"#,
+            ),
         ),
     ];
     for (name, description, kind, permission, schema) in core_tools {
@@ -268,16 +274,16 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
         ));
         for m in modules {
             match &m.agent {
-                Some(a) => s.push_str(&format!("- **{}** (`{}`) — {}\n", m.name, m.id, a.description)),
+                Some(a) => s.push_str(&format!(
+                    "- **{}** (`{}`) — {}\n",
+                    m.name, m.id, a.description
+                )),
                 None => s.push_str(&format!("- **{}** (`{}`)\n", m.name, m.id)),
             }
             // Each tab, with the route the shell actually serves. This is what turns "how do I
             // change a price?" into a real answer instead of an invented menu.
             for nav in &m.navigation {
-                s.push_str(&format!(
-                    "    - {} → `/m/{}/{}`\n",
-                    nav.label, m.id, nav.id
-                ));
+                s.push_str(&format!("    - {} → `/m/{}/{}`\n", nav.label, m.id, nav.id));
             }
         }
         s.push('\n');
@@ -296,7 +302,11 @@ pub fn build_instructions(registry: &Registry, client_system: &[String], now: &s
     // Only the IMMUTABLE ones are listed: a mutable record needs no explanation, its update tool
     // is already on the table, and a prompt that lists everything stops being read.
     let mut immutable: Vec<(&str, &str, &erplora_runtime::manifest::RecordDef)> = Vec::new();
-    for m in registry.installed.iter().filter(|m| registry.is_active(&m.id)) {
+    for m in registry
+        .installed
+        .iter()
+        .filter(|m| registry.is_active(&m.id))
+    {
         for (record, def) in &m.records {
             if !def.mutable {
                 immutable.push((m.id.as_str(), record.as_str(), def));
@@ -317,7 +327,9 @@ These records cannot be edited after              they exist — the module says
         for (module, record, def) in immutable {
             let reason = def.reason.as_deref().unwrap_or("declared immutable");
             if def.correct_with.is_empty() {
-                s.push_str(&format!("- `{module}` · **{record}** — {reason}. No correction tool.\n"));
+                s.push_str(&format!(
+                    "- `{module}` · **{record}** — {reason}. No correction tool.\n"
+                ));
             } else {
                 s.push_str(&format!(
                     "- `{module}` · **{record}** — {reason}. Correct it with: {}\n",
@@ -682,7 +694,11 @@ mod tests {
 
     /// Same, plus the `records` block a module uses to declare what is corrected and never
     /// edited (ADR-0331). Deserialized like the rest, so it exercises the real parse.
-    fn manifest_with_records(id: &str, name: &str, records: Value) -> erplora_runtime::manifest::Manifest {
+    fn manifest_with_records(
+        id: &str,
+        name: &str,
+        records: Value,
+    ) -> erplora_runtime::manifest::Manifest {
         let m = json!({ "id": id, "name": name, "version": "1.0.0", "records": records });
         serde_json::from_value(m).expect("fixture manifest must parse")
     }
@@ -723,13 +739,22 @@ mod tests {
             json!({ "invoice": { "mutable": false, "reason": "fiscal",
                                  "correct_with": ["invoice.rectify"] } }),
         ));
-        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+        reg.status.insert(
+            "invoice".to_string(),
+            erplora_runtime::registry::ModuleStatus::Active,
+        );
 
         let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
 
-        assert!(ins.contains("invoice.rectify"), "the correction door must be named: {ins}");
+        assert!(
+            ins.contains("invoice.rectify"),
+            "the correction door must be named: {ins}"
+        );
         let lower = ins.to_lowercase();
-        assert!(lower.contains("fiscal"), "the closed reason must travel: {ins}");
+        assert!(
+            lower.contains("fiscal"),
+            "the closed reason must travel: {ins}"
+        );
     }
 
     /// A record the module declares MUTABLE says nothing worth a line in the prompt: the tools
@@ -743,7 +768,10 @@ mod tests {
             "Sales",
             json!({ "order": { "mutable": true, "update": "sales.order.update_line" } }),
         ));
-        reg.status.insert("sales".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+        reg.status.insert(
+            "sales".to_string(),
+            erplora_runtime::registry::ModuleStatus::Active,
+        );
 
         let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
 
@@ -771,11 +799,17 @@ mod tests {
             json!({ "invoice": { "mutable": false, "reason": "fiscal",
                                  "correct_with": ["invoice.rectify"] } }),
         ));
-        reg.status.insert("invoice".to_string(), erplora_runtime::registry::ModuleStatus::Inactive);
+        reg.status.insert(
+            "invoice".to_string(),
+            erplora_runtime::registry::ModuleStatus::Inactive,
+        );
 
         let ins = build_instructions(&reg, &[], "2026-08-19T14:30:00Z (Tuesday)");
 
-        assert!(!ins.contains("invoice.rectify"), "an inactive module says nothing: {ins}");
+        assert!(
+            !ins.contains("invoice.rectify"),
+            "an inactive module says nothing: {ins}"
+        );
     }
 
     /// Which arguments of a command are MONEY (hub#1040).
@@ -834,7 +868,10 @@ mod tests {
     fn instructions_name_the_currency_subunit_as_spain_says_it() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-19T14:30:00Z (Tuesday)");
         let lower = ins.to_lowercase();
-        assert!(lower.contains("céntimo"), "la palabra correcta tiene que estar: {ins}");
+        assert!(
+            lower.contains("céntimo"),
+            "la palabra correcta tiene que estar: {ins}"
+        );
         assert!(
             lower.contains("never «centavos»") || lower.contains("not «centavos»"),
             "y hay que decir explícitamente cuál NO es, o el modelo vuelve a derivar: {ins}"
@@ -986,7 +1023,12 @@ mod tests {
     #[test]
     fn instructions_identify_erplora_and_list_active_modules() {
         let reg = registry_with(&[
-            ("inventory", "Inventory", Some("Product catalog and basic stock control"), true),
+            (
+                "inventory",
+                "Inventory",
+                Some("Product catalog and basic stock control"),
+                true,
+            ),
             ("kitchen", "Kitchen", Some("Kitchen order display"), false),
         ]);
         let ins = build_instructions(&reg, &[], "2026-08-09T14:30:00Z (Sunday)");
@@ -1001,7 +1043,10 @@ mod tests {
         );
         // An INACTIVE module is not part of this hub's capabilities: offering it would have the
         // model promise something the dispatcher refuses.
-        assert!(!ins.contains("Kitchen order display"), "inactive module leaked: {ins}");
+        assert!(
+            !ins.contains("Kitchen order display"),
+            "inactive module leaked: {ins}"
+        );
     }
 
     /// The production failure this pins: asked "¿qué necesito configurar para poder empezar a
@@ -1023,7 +1068,11 @@ mod tests {
             .expect("hub.setup.status must be offered even with zero modules installed");
         assert_eq!(setup["kind"], "query", "a read: auto-run, no confirm-card");
         assert!(
-            setup["description"].as_str().unwrap_or("").to_lowercase().contains("configur"),
+            setup["description"]
+                .as_str()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains("configur"),
             "the description must say it answers configuration questions: {setup}"
         );
     }
@@ -1051,7 +1100,6 @@ mod tests {
         );
     }
 
-
     /// The production complaint this pins (2026-08-09): asked to install a module, the assistant
     /// INVENTED a security policy («solo tú puedes hacerlo desde tu Hub») — because it had no
     /// tool, and a model with no tool rationalizes. The design truth is the opposite: the
@@ -1066,9 +1114,14 @@ mod tests {
             .expect("search must be offered even on an empty hub — it is HOW an empty hub stops being empty");
         assert_eq!(search["kind"], "query", "a read: auto-run");
 
-        let install = tools.iter().find(|t| t["name"] == "hub.modules.install")
+        let install = tools
+            .iter()
+            .find(|t| t["name"] == "hub.modules.install")
             .expect("install must be offered to an admin");
-        assert_eq!(install["kind"], "command", "a mutation: the confirm-card gates it");
+        assert_eq!(
+            install["kind"], "command",
+            "a mutation: the confirm-card gates it"
+        );
         assert_eq!(install["parameters"]["required"][0], "module_id");
     }
 
@@ -1081,7 +1134,10 @@ mod tests {
         let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
         assert!(names.contains(&"hub.setup.status"));
         assert!(names.contains(&"hub.marketplace.search"));
-        assert!(!names.contains(&"hub.modules.install"), "a non-admin must not see install: {names:?}");
+        assert!(
+            !names.contains(&"hub.modules.install"),
+            "a non-admin must not see install: {names:?}"
+        );
     }
 
     /// hub#631 steps 2-3: the guided flow «I have a restaurant in Madrid, set it up for me» needs
@@ -1102,7 +1158,10 @@ mod tests {
             .iter()
             .find(|t| t["name"] == "hub.blueprints.apply")
             .expect("blueprints.apply must be offered to an admin");
-        assert_eq!(apply["kind"], "command", "a mutation: the confirm-card gates it");
+        assert_eq!(
+            apply["kind"], "command",
+            "a mutation: the confirm-card gates it"
+        );
         assert_eq!(apply["parameters"]["required"][0], "slug");
     }
 
@@ -1121,7 +1180,10 @@ mod tests {
             .find(|t| t["name"] == "hub.blueprints.apply")
             .expect("apply must be offered to an admin");
         let desc = apply["description"].as_str().unwrap_or("").to_lowercase();
-        assert!(desc.contains("additive"), "must state the verified semantics: {desc}");
+        assert!(
+            desc.contains("additive"),
+            "must state the verified semantics: {desc}"
+        );
         assert!(
             desc.contains("never") && (desc.contains("overwrit") || desc.contains("delet")),
             "must promise existing data is kept: {desc}"
@@ -1151,13 +1213,14 @@ mod tests {
         for t in &tools {
             let name = t["name"].as_str().unwrap_or("");
             assert!(
-                !name.contains("uninstall") && !name.contains("reset") && !name.contains("purge")
+                !name.contains("uninstall")
+                    && !name.contains("reset")
+                    && !name.contains("purge")
                     && !name.contains("delete"),
                 "destructive host tool offered: {name}"
             );
         }
     }
-
 
     /// The sweep above runs over `Registry::new()` — EMPTY — so it only ever constrained the
     /// five core tools. Every destructive command of every MODULE walked straight past it: the
@@ -1205,8 +1268,10 @@ mod tests {
                 },
             );
         }
-        reg.status
-            .insert("appointments".to_string(), erplora_runtime::registry::ModuleStatus::Active);
+        reg.status.insert(
+            "appointments".to_string(),
+            erplora_runtime::registry::ModuleStatus::Active,
+        );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         let tools = assemble_tools(&reg, &ctx);
@@ -1239,8 +1304,14 @@ mod tests {
     fn instructions_state_that_destructive_actions_belong_to_the_user() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
-        assert!(lower.contains("destructive"), "the destructive-actions rule must be stated: {ins}");
-        assert!(lower.contains("uninstall"), "with its concrete examples: {ins}");
+        assert!(
+            lower.contains("destructive"),
+            "the destructive-actions rule must be stated: {ins}"
+        );
+        assert!(
+            lower.contains("uninstall"),
+            "with its concrete examples: {ins}"
+        );
     }
 
     /// The money contract (ADR-0123) is a HUB-WIDE invariant, so it belongs in the system prompt
@@ -1282,7 +1353,10 @@ mod tests {
     fn instructions_state_the_money_contract_in_cents() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
         let lower = ins.to_lowercase();
-        assert!(lower.contains("cent"), "the money contract must be stated: {ins}");
+        assert!(
+            lower.contains("cent"),
+            "the money contract must be stated: {ins}"
+        );
         // The worked example is what makes it stick — a rule without one is re-derived wrong.
         assert!(
             ins.contains("1250"),
@@ -1290,7 +1364,9 @@ mod tests {
         );
         // And it must be explicit that a decimal is never sent on the wire.
         assert!(
-            lower.contains("never send") || lower.contains("not a decimal") || lower.contains("no decimal"),
+            lower.contains("never send")
+                || lower.contains("not a decimal")
+                || lower.contains("no decimal"),
             "must forbid sending a decimal amount: {ins}"
         );
     }
@@ -1333,7 +1409,8 @@ mod tests {
                 { "id": "movements", "label": "Movements", "component": "erp-inventory-movements" }
             ]
         });
-        reg.installed.push(serde_json::from_value(m).expect("manifest parses"));
+        reg.installed
+            .push(serde_json::from_value(m).expect("manifest parses"));
         reg.status.insert("inventory".into(), ModuleStatus::Active);
 
         let ins = build_instructions(&reg, &[], "2026-08-09T14:30:00Z (Sunday)");
@@ -1342,7 +1419,10 @@ mod tests {
             ins.contains("/m/inventory/products"),
             "the real route the shell serves must be there: {ins}"
         );
-        assert!(ins.contains("/m/inventory/movements"), "every tab, not just the first: {ins}");
+        assert!(
+            ins.contains("/m/inventory/movements"),
+            "every tab, not just the first: {ins}"
+        );
     }
 
     /// The standing order: answer from THIS hub. The Cloud may also offer a server-side
@@ -1389,7 +1469,10 @@ mod tests {
     #[test]
     fn instructions_without_modules_still_identify_erplora() {
         let ins = build_instructions(&Registry::new(), &[], "2026-08-09T14:30:00Z (Sunday)");
-        assert!(ins.contains("ERPlora"), "must name the product even with no modules: {ins}");
+        assert!(
+            ins.contains("ERPlora"),
+            "must name the product even with no modules: {ins}"
+        );
         assert!(!ins.trim().is_empty());
     }
 
@@ -1401,7 +1484,11 @@ mod tests {
     #[test]
     fn instructions_fold_in_the_client_system_briefing() {
         let briefing = "SETUP BRIEFING: the fiscal identity is pending.";
-        let ins = build_instructions(&Registry::new(), &[briefing.to_string()], "2026-08-09T14:30:00Z (Sunday)");
+        let ins = build_instructions(
+            &Registry::new(),
+            &[briefing.to_string()],
+            "2026-08-09T14:30:00Z (Sunday)",
+        );
         assert!(
             ins.contains(briefing),
             "the client briefing must survive into instructions: {ins}"
@@ -1430,15 +1517,25 @@ mod tests {
             {"role":"system","content":"SETUP BRIEFING"},
             {"role":"user","content":"¿qué falta por configurar?"}
         ]});
-        let ins = build_instructions(&Registry::new(), &client_system_messages(&fe), "2026-08-09T14:30:00Z (Sunday)");
+        let ins = build_instructions(
+            &Registry::new(),
+            &client_system_messages(&fe),
+            "2026-08-09T14:30:00Z (Sunday)",
+        );
         let body = build_cloud_body(&fe, vec![], None, &ins);
 
         assert!(
-            body["instructions"].as_str().unwrap_or("").contains("ERPlora"),
+            body["instructions"]
+                .as_str()
+                .unwrap_or("")
+                .contains("ERPlora"),
             "instructions must reach the Cloud: {body}"
         );
         assert!(
-            body["instructions"].as_str().unwrap_or("").contains("SETUP BRIEFING"),
+            body["instructions"]
+                .as_str()
+                .unwrap_or("")
+                .contains("SETUP BRIEFING"),
             "the briefing must reach the Cloud: {body}"
         );
         let roles: Vec<&str> = body["messages"]
@@ -1447,7 +1544,11 @@ mod tests {
             .iter()
             .filter_map(|m| m.get("role").and_then(Value::as_str))
             .collect();
-        assert_eq!(roles, vec!["user"], "client `system` turns must be stripped: {body}");
+        assert_eq!(
+            roles,
+            vec!["user"],
+            "client `system` turns must be stripped: {body}"
+        );
     }
 
     #[test]
@@ -1533,7 +1634,8 @@ mod tests {
         // this event was dropped (§9.2 keystone).
         let kinds = std::collections::HashMap::new();
         let line = r#"data: {"type":"function_call","name":"inventory.products.list","call_id":"c1","arguments":"{}"}"#;
-        let out = translate_sse_line(line, &kinds).expect("function_call must be forwarded, not dropped");
+        let out =
+            translate_sse_line(line, &kinds).expect("function_call must be forwarded, not dropped");
         assert!(out.contains("function_call"));
         assert!(out.contains("inventory.products.list"));
         assert!(out.contains("c1"));
@@ -1549,7 +1651,8 @@ mod tests {
         let out = translate_sse_line(line, &kinds).expect("forwarded");
         assert!(out.contains("\"kind\":\"command\""));
         // An unknown tool (not in the map) is forwarded without a kind → treated as read.
-        let line2 = r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
+        let line2 =
+            r#"data: {"type":"function_call","name":"who.knows","call_id":"c0","arguments":"{}"}"#;
         let out2 = translate_sse_line(line2, &kinds).expect("forwarded");
         assert!(!out2.contains("\"kind\""));
     }
@@ -1571,7 +1674,10 @@ mod tests {
 
         assert!(out.contains("\"kind\":\"command\""), "{out}");
         assert!(out.contains("\"risk\":\"normal\""), "{out}");
-        assert!(out.contains("price_cents"), "the money marking must reach the card: {out}");
+        assert!(
+            out.contains("price_cents"),
+            "the money marking must reach the card: {out}"
+        );
     }
 
     /// Regression test for ERPlora/hub#1183 — the POST-turn `usage` frame must CROSS the runtime.
@@ -1588,12 +1694,18 @@ mod tests {
         let notes = std::collections::HashMap::new();
         let line = r#"data: {"type":"usage","tier":"free","messages_used":24,"messages_limit":30,"resets_at":"2026-09-01T00:00:00+00:00"}"#;
 
-        let out =
-            translate_sse_line(line, &notes).expect("the usage frame must be forwarded, not dropped");
+        let out = translate_sse_line(line, &notes)
+            .expect("the usage frame must be forwarded, not dropped");
 
         assert!(out.contains("\"type\":\"usage\""), "{out}");
-        assert!(out.contains("\"messages_used\":24"), "the counters must survive: {out}");
-        assert!(out.contains("\"messages_limit\":30"), "the counters must survive: {out}");
+        assert!(
+            out.contains("\"messages_used\":24"),
+            "the counters must survive: {out}"
+        );
+        assert!(
+            out.contains("\"messages_limit\":30"),
+            "the counters must survive: {out}"
+        );
         assert!(
             out.contains("2026-09-01T00:00:00+00:00"),
             "resets_at is what turns \"0 left\" into something actionable: {out}"
@@ -1615,8 +1727,16 @@ mod tests {
     fn tool_def_carries_params_schema() {
         // The op's input schema becomes the tool's `parameters` so the model calls
         // with valid arguments (the Cloud reads `fn.parameters`).
-        let schema = r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
-        let t = tool_def("sales.list", "List sales", "query", "sales", Some(schema), None);
+        let schema =
+            r#"{"type":"object","properties":{"since":{"type":"string"}},"required":["since"]}"#;
+        let t = tool_def(
+            "sales.list",
+            "List sales",
+            "query",
+            "sales",
+            Some(schema),
+            None,
+        );
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
     }
@@ -1651,7 +1771,8 @@ mod tests {
         }
 
         let mut reg = Registry::new();
-        reg.status.insert("cash_register".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("cash_register".to_string(), ModuleStatus::Active);
         // Interno por CONVENCIÓN (prefijo `_`), sin declarar `internal:true`.
         reg.commands.insert(
             "cash_register._reverse_sale".to_string(),
@@ -1680,10 +1801,7 @@ mod tests {
         // Antes esto afirmaba `is_empty()` — un proxy que valía cuando SOLO los módulos aportaban
         // tools. Hoy el catálogo lleva además las tools del CORE (`module_id: "hub"`), así que el
         // contrato se afirma directo: ninguna tool de MÓDULO interna, vengan las core que vengan.
-        let module_tools: Vec<_> = tools
-            .iter()
-            .filter(|t| t["module_id"] != "hub")
-            .collect();
+        let module_tools: Vec<_> = tools.iter().filter(|t| t["module_id"] != "hub").collect();
         assert!(
             module_tools.is_empty(),
             "ningún command interno debe exponerse como tool: {module_tools:?}"

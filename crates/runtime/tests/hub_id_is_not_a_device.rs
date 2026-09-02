@@ -126,8 +126,18 @@ async fn one_hub_sweeping_its_own_id_does_not_touch_another_hub_sharing_the_data
     assert_eq!(
         devices(&db).await,
         vec![
-            ("hub-b".to_string(), "hub-b".to_string(), "Legacy of B".to_string(), "personal".to_string()),
-            ("hub-b".to_string(), "till-of-b".to_string(), "Till of B".to_string(), "personal".to_string()),
+            (
+                "hub-b".to_string(),
+                "hub-b".to_string(),
+                "Legacy of B".to_string(),
+                "personal".to_string()
+            ),
+            (
+                "hub-b".to_string(),
+                "till-of-b".to_string(),
+                "Till of B".to_string(),
+                "personal".to_string()
+            ),
         ],
         "A swept A's row and nothing of B's — not its legacy row, not its personal till"
     );
@@ -210,8 +220,18 @@ async fn an_administrator_cannot_mark_the_hub_itself_personal() {
     assert_eq!(
         devices(&db).await,
         vec![
-            (HUB_ID.to_string(), HUB_ID.to_string(), "Marta Ruiz".to_string(), "personal".to_string()),
-            (HUB_ID.to_string(), "till-1".to_string(), "Counter till".to_string(), "shared".to_string()),
+            (
+                HUB_ID.to_string(),
+                HUB_ID.to_string(),
+                "Marta Ruiz".to_string(),
+                "personal".to_string()
+            ),
+            (
+                HUB_ID.to_string(),
+                "till-1".to_string(),
+                "Counter till".to_string(),
+                "shared".to_string()
+            ),
         ],
         "a refused write changes nothing — not even the row it was aimed at"
     );

@@ -245,7 +245,11 @@ pub(crate) async fn proxy_entitlement(State(st): State<AppState>, headers: Heade
 /// Respuesta del proxy de entitlement: el cuerpo del Cloud con el bloque aditivo `revalidation`,
 /// que SIEMPRE se recalcula (es estado local, y es justo lo que la UI necesita cuando el Cloud no
 /// contesta) y por eso nunca se guarda en la caché.
-pub(crate) fn entitlement_response(status: StatusCode, body: Value, revalidation: Value) -> Response {
+pub(crate) fn entitlement_response(
+    status: StatusCode,
+    body: Value,
+    revalidation: Value,
+) -> Response {
     match body {
         Value::Object(mut obj) => {
             obj.insert("revalidation".into(), revalidation);
@@ -442,12 +446,21 @@ pub(crate) async fn proxy_marketplace_catalog(
         hub_id: st.hub_id(),
         token: String::new(),
     };
-    match cloud_get_raw(&st, &headers, cloud.marketplace_modules(&placeholder, &catalog)).await {
+    match cloud_get_raw(
+        &st,
+        &headers,
+        cloud.marketplace_modules(&placeholder, &catalog),
+    )
+    .await
+    {
         Ok((status, body)) => {
             let rt = st.runtime.read().await;
-            if let Err(e) =
-                erplora_runtime::setup_status::record_catalog_response(rt.db(), status.as_u16(), &body)
-                    .await
+            if let Err(e) = erplora_runtime::setup_status::record_catalog_response(
+                rt.db(),
+                status.as_u16(),
+                &body,
+            )
+            .await
             {
                 // Recording is a side effect of the proxy: if it fails the catalogue is served all
                 // the same and the checklist is left not knowing — which is "pending", never a
@@ -463,7 +476,10 @@ pub(crate) async fn proxy_marketplace_catalog(
 /// GET /api/blueprints/catalog — catálogo de blueprints (proxy de `/api/v1/catalog/blueprints/`).
 ///
 /// La **«fuente nube»** del panel de import (Ajustes → Datos). [ADR-0121]
-pub(crate) async fn proxy_blueprints_catalog(State(st): State<AppState>, headers: HeaderMap) -> Response {
+pub(crate) async fn proxy_blueprints_catalog(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
     {
         let rt = st.runtime.read().await;
         if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {

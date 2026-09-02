@@ -311,8 +311,14 @@ fn el_1237_no_deja_informar_tipo_ni_cuota_con_n2() {
     );
     let err = xsd::validate_registro(&con_desglose(&malo)).expect_err("N2 con tipo y cuota");
     let msg = err.to_string();
-    assert!(msg.contains("1237"), "el código de la AEAT, para buscarlo: {msg}");
-    assert!(msg.contains("TipoImpositivo") || msg.contains("CuotaRepercutida"), "{msg}");
+    assert!(
+        msg.contains("1237"),
+        "el código de la AEAT, para buscarlo: {msg}"
+    );
+    assert!(
+        msg.contains("TipoImpositivo") || msg.contains("CuotaRepercutida"),
+        "{msg}"
+    );
 }
 
 /// El régimen 17 (OSS) **no** es una excepción al 1237 desde la revisión v1.0.6 (25/04/2025) del
@@ -351,13 +357,19 @@ fn calificacion_y_exenta_son_excluyentes() {
         "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
          <sum1:OperacionExenta>E1</sum1:OperacionExenta>",
     );
-    assert!(xsd::validate_registro(&con_desglose(&ambos)).is_err(), "los dos a la vez");
+    assert!(
+        xsd::validate_registro(&con_desglose(&ambos)).is_err(),
+        "los dos a la vez"
+    );
 
     let ninguno = DETALLE_OK.replace(
         "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
         "",
     );
-    assert!(xsd::validate_registro(&con_desglose(&ninguno)).is_err(), "ninguno de los dos");
+    assert!(
+        xsd::validate_registro(&con_desglose(&ninguno)).is_err(),
+        "ninguno de los dos"
+    );
 }
 
 /// **§15.4.** `S2` exige `TipoImpositivo = 0` y `CuotaRepercutida = 0` **presentes**: es el caso
@@ -379,7 +391,10 @@ fn la_s2_exige_ceros_explicitos() {
             "<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>",
         )
         .replace("21.00</sum1:TipoImpositivo>", "0.00</sum1:TipoImpositivo>")
-        .replace("21.00</sum1:CuotaRepercutida>", "0.00</sum1:CuotaRepercutida>");
+        .replace(
+            "21.00</sum1:CuotaRepercutida>",
+            "0.00</sum1:CuotaRepercutida>",
+        );
     xsd::validate_registro(&con_desglose(&con_ceros)).expect("S2 con ceros explícitos");
 }
 
@@ -425,7 +440,10 @@ fn un_tipo_de_igic_es_valido_con_impuesto_03() {
             "<sum1:Impuesto>03</sum1:Impuesto>",
         )
         .replace("21.00</sum1:TipoImpositivo>", "7.00</sum1:TipoImpositivo>")
-        .replace("21.00</sum1:CuotaRepercutida>", "7.00</sum1:CuotaRepercutida>");
+        .replace(
+            "21.00</sum1:CuotaRepercutida>",
+            "7.00</sum1:CuotaRepercutida>",
+        );
     xsd::validate_registro(&con_desglose(&canario)).expect("IGIC al 7 %");
 }
 
@@ -433,7 +451,10 @@ fn un_tipo_de_igic_es_valido_con_impuesto_03() {
 #[test]
 fn las_enumeraciones_del_detalle_son_cerradas() {
     for (de, a) in [
-        ("<sum1:Impuesto>01</sum1:Impuesto>", "<sum1:Impuesto>04</sum1:Impuesto>"),
+        (
+            "<sum1:Impuesto>01</sum1:Impuesto>",
+            "<sum1:Impuesto>04</sum1:Impuesto>",
+        ),
         (
             "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
             "<sum1:CalificacionOperacion>S3</sum1:CalificacionOperacion>",
@@ -472,7 +493,10 @@ fn las_exenciones_e7_e8_son_solo_de_igic() {
 /// un desglose.
 #[test]
 fn el_desglose_lleva_entre_uno_y_doce_detalles() {
-    assert!(xsd::validate_registro(&con_desglose("")).is_err(), "sin detalle");
+    assert!(
+        xsd::validate_registro(&con_desglose("")).is_err(),
+        "sin detalle"
+    );
     let trece = DETALLE_OK.repeat(13);
     let err = xsd::validate_registro(&con_desglose(&trece)).expect_err("13 detalles");
     assert!(err.to_string().contains("12"), "{err}");
@@ -506,7 +530,10 @@ fn las_enumeraciones_del_detalle_salen_del_xsd_oficial() {
         ("ImpuestoType", xsd::IMPUESTO),
         ("CalificacionOperacionType", xsd::CALIFICACION),
         ("OperacionExentaType", xsd::OPERACION_EXENTA),
-        ("IdOperacionesTrascendenciaTributariaType", xsd::CLAVE_REGIMEN),
+        (
+            "IdOperacionesTrascendenciaTributariaType",
+            xsd::CLAVE_REGIMEN,
+        ),
     ] {
         let del_esquema = xsd::enumeration_of(xsd_src, tipo)
             .unwrap_or_else(|| panic!("{tipo} no está en el XSD vendorizado"));

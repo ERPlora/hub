@@ -16,7 +16,7 @@
 //! ficheros vistos cuando el catálogo está, y comprueba que la misma puerta **rechaza el
 //! positivo** — si `check` empezara a devolver `Ok` siempre, este test se pone rojo.
 use erplora_runtime::manifest::Manifest;
-use erplora_runtime::migration_guard::{Kind, check};
+use erplora_runtime::migration_guard::{check, Kind};
 
 /// La misma lista efectiva que aplica el instalador: `manifest ∪ migrations/postgres/*.sql`, con
 /// el `kind` declarado (y `expand` para lo que el manifest no lista). Recorrer solo el manifest
@@ -54,12 +54,19 @@ fn every_published_migration_still_passes_the_guard() {
 
     let mut modules = 0;
     let mut migrations = 0;
-    for entry in std::fs::read_dir(&root).expect("modules root is readable").flatten() {
+    for entry in std::fs::read_dir(&root)
+        .expect("modules root is readable")
+        .flatten()
+    {
         let dir = entry.path();
         if !dir.join("module.json").is_file() {
             continue;
         }
-        let module = dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let module = dir
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         // Un manifest que no parsea es asunto de otro test, no de este.
         let Ok(manifest) = Manifest::load(&dir) else {
             continue;

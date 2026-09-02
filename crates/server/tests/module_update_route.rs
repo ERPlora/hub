@@ -22,7 +22,7 @@ use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::{Request, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::Runtime;
 use erplora_server::{app, AppState, AuthMode, HubConfig};
 use serde_json::{json, Value};
@@ -126,13 +126,19 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
         Query(q): Query<VersionQuery>,
     ) -> Vec<u8> {
         let asked = q.version.unwrap_or_default();
-        m.calls.lock().unwrap().push(format!("download:{id}@{asked}"));
+        m.calls
+            .lock()
+            .unwrap()
+            .push(format!("download:{id}@{asked}"));
         m.packages
             .get(&(id, asked))
             .map(|(z, _)| z.clone())
             .unwrap_or_default()
     }
-    async fn mark_installed(State(m): State<Shared>, AxumPath(id): AxumPath<String>) -> Json<Value> {
+    async fn mark_installed(
+        State(m): State<Shared>,
+        AxumPath(id): AxumPath<String>,
+    ) -> Json<Value> {
         m.calls.lock().unwrap().push(format!("mark:{id}"));
         Json(json!({ "ok": true }))
     }
@@ -159,10 +165,10 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_string();
-        m.calls
-            .lock()
-            .unwrap()
-            .push(format!("plan:{requested}@{version}:known={}", already.len()));
+        m.calls.lock().unwrap().push(format!(
+            "plan:{requested}@{version}:known={}",
+            already.len()
+        ));
 
         if already.contains(&requested) {
             return Json(json!({
@@ -212,17 +218,17 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
 // ── Hub under test ───────────────────────────────────────────────────────────────────────
 
 /// A hub with `parts@1.0.0` already installed, its router, and an admin session.
-async fn fixture(
-    tag: &str,
-    mock: Shared,
-) -> (axum::Router, String, AppState, std::path::PathBuf) {
+async fn fixture(tag: &str, mock: Shared) -> (axum::Router, String, AppState, std::path::PathBuf) {
     let cloud_base_url = spawn_mock_cloud(mock).await;
     let temp = std::env::temp_dir().join(format!("erplora-upd-route-{}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&temp);
 
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-upd");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&admin_id, 3600, None).await.unwrap();
 
     // The starting point: v1 installed from a package on disk (as a boot would leave it).
@@ -237,13 +243,11 @@ async fn fixture(
         .unwrap(),
     )
     .unwrap();
-    std::fs::write(
-        v1_dir.join("migrations/postgres/001_init.sql"),
-        PARTS_INIT,
-    )
-    .unwrap();
+    std::fs::write(v1_dir.join("migrations/postgres/001_init.sql"), PARTS_INIT).unwrap();
     let mut rt = rt;
-    rt.install_from_dir(&v1_dir).await.expect("seed parts@1.0.0");
+    rt.install_from_dir(&v1_dir)
+        .await
+        .expect("seed parts@1.0.0");
 
     let cfg = HubConfig {
         demo: false,
@@ -310,7 +314,13 @@ async fn recorded_version(state: &AppState) -> String {
 /// can answer «updated» having downloaded nothing. Here the version must MOVE.
 #[tokio::test]
 async fn updating_really_installs_the_new_version_and_does_not_just_say_it_did() {
-    let v2 = parts_package("2.0.0", Some(("002_add_note.sql", "ALTER TABLE parts_item ADD COLUMN IF NOT EXISTS note TEXT;")));
+    let v2 = parts_package(
+        "2.0.0",
+        Some((
+            "002_add_note.sql",
+            "ALTER TABLE parts_item ADD COLUMN IF NOT EXISTS note TEXT;",
+        )),
+    );
     let mut packages = HashMap::new();
     packages.insert(
         ("parts".to_string(), "2.0.0".to_string()),
@@ -346,7 +356,12 @@ async fn updating_really_installs_the_new_version_and_does_not_just_say_it_did()
         "hub_module must point at the new version, or the next restart undoes the update"
     );
     assert_eq!(
-        state.runtime.read().await.registry().module_version("parts"),
+        state
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
         "2.0.0",
         "and the live runtime serves it"
     );
@@ -362,7 +377,13 @@ async fn updating_really_installs_the_new_version_and_does_not_just_say_it_did()
 async fn a_version_that_cannot_install_keeps_the_old_one_and_says_so_without_a_5xx() {
     // The v2 package is corrupt: its migration explodes (the table it alters does not exist).
     // Passes the migration guard (expand, own table prefix) but explodes: the table is not there.
-    let broken = parts_package("2.0.0", Some(("002_broken.sql", "ALTER TABLE parts_missing ADD COLUMN note TEXT;")));
+    let broken = parts_package(
+        "2.0.0",
+        Some((
+            "002_broken.sql",
+            "ALTER TABLE parts_missing ADD COLUMN note TEXT;",
+        )),
+    );
     let mut packages = HashMap::new();
     packages.insert(
         ("parts".to_string(), "2.0.0".to_string()),
@@ -396,7 +417,12 @@ async fn a_version_that_cannot_install_keeps_the_old_one_and_says_so_without_a_5
     );
 
     assert_eq!(
-        state.runtime.read().await.registry().module_version("parts"),
+        state
+            .runtime
+            .read()
+            .await
+            .registry()
+            .module_version("parts"),
         "1.0.0",
         "the module still serves the version that works"
     );
@@ -498,7 +524,10 @@ async fn an_update_leaves_a_trace_the_owner_can_read_later() {
     });
     let (router, session, state, temp) = fixture("history", mock).await;
 
-    let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
+    let response = router
+        .oneshot(update_request(&session, "{}"))
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
     let rt = state.runtime.read().await;
@@ -518,7 +547,10 @@ async fn an_update_leaves_a_trace_the_owner_can_read_later() {
         history[0].name, "Parts",
         "the name the owner reads, not the id (ADR-0254)"
     );
-    assert_eq!(history[0].from_version, "1.0.0", "«2.0.0» alone says nothing");
+    assert_eq!(
+        history[0].from_version, "1.0.0",
+        "«2.0.0» alone says nothing"
+    );
     assert_eq!(history[0].to_version, "2.0.0");
     assert_eq!(history[0].outcome, "updated");
     drop(rt);
@@ -540,7 +572,10 @@ async fn pressing_update_on_something_already_current_writes_nothing() {
     });
     let (router, session, state, temp) = fixture("nonevent", mock).await;
 
-    let response = router.oneshot(update_request(&session, "{}")).await.unwrap();
+    let response = router
+        .oneshot(update_request(&session, "{}"))
+        .await
+        .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
     let rt = state.runtime.read().await;

@@ -24,7 +24,7 @@ use axum::extract::{Path as AxumPath, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use cloud_client::Auth;
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::Runtime;
 use erplora_server::install::{update_from_cloud, InstallError};
 use serde_json::{json, Value};
@@ -140,7 +140,10 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
         Query(q): Query<VersionQuery>,
     ) -> Vec<u8> {
         let asked = q.version.unwrap_or_default();
-        m.calls.lock().unwrap().push(format!("download:{id}@{asked}"));
+        m.calls
+            .lock()
+            .unwrap()
+            .push(format!("download:{id}@{asked}"));
         m.catalog
             .get(&id)
             .and_then(|versions| {
@@ -152,7 +155,10 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
             .map(|v| v.zip.clone())
             .unwrap_or_default()
     }
-    async fn mark_installed(State(m): State<Shared>, AxumPath(id): AxumPath<String>) -> Json<Value> {
+    async fn mark_installed(
+        State(m): State<Shared>,
+        AxumPath(id): AxumPath<String>,
+    ) -> Json<Value> {
         m.calls.lock().unwrap().push(format!("mark:{id}"));
         Json(json!({ "ok": true }))
     }
@@ -192,8 +198,7 @@ async fn spawn_mock_cloud(mock: Shared) -> String {
 }
 
 fn cache_dir(tag: &str) -> std::path::PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("erplora-mod-update-{}-{tag}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("erplora-mod-update-{}-{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }
@@ -210,9 +215,18 @@ fn dev_policy() -> cloud_client::SignaturePolicy {
 }
 
 /// Installs `id`@`version` straight from a package written on disk (the hub's starting point).
-async fn install_locally(rt: &mut Runtime, tag: &str, id: &str, version: &str, files: &[(&str, &str)]) {
+async fn install_locally(
+    rt: &mut Runtime,
+    tag: &str,
+    id: &str,
+    version: &str,
+    files: &[(&str, &str)],
+) {
     let dir = std::env::temp_dir()
-        .join(format!("erplora-mod-update-seed-{}-{tag}", std::process::id()))
+        .join(format!(
+            "erplora-mod-update-seed-{}-{tag}",
+            std::process::id()
+        ))
         .join(version);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();

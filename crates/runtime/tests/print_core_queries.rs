@@ -16,7 +16,10 @@
 //! The gate is the namespace's own (`hub.users.view`, any local session and no API key) and NOT
 //! admin, which is the audience hub#987 already decided for the same facts over HTTP: a queue
 //! nobody is draining needs whoever is standing at the counter, not whoever can administer the hub.
-use erplora_db::{testutil::{fresh_db, two_adapters_sharing_a_schema}, Params};
+use erplora_db::{
+    testutil::{fresh_db, two_adapters_sharing_a_schema},
+    Params,
+};
 use erplora_runtime::print_queue::NewPrintJob;
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value as Json};
@@ -60,7 +63,13 @@ async fn a_module_reads_the_coverage_of_every_station() {
     let rt = runtime("hub-cov").await;
     enqueue(&rt, "j1", "kitchen", "kitchen_order").await;
 
-    let rows = query(&rt, "hub.print.coverage", Params::new(), &ctx("hub-cov", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.coverage",
+        Params::new(),
+        &ctx("hub-cov", &[SESSION]),
+    )
+    .await;
 
     let kitchen = rows
         .iter()
@@ -85,7 +94,13 @@ async fn a_module_reads_the_queue_in_hand_out_order() {
     enqueue(&rt, "first", "receipt", "receipt").await;
     enqueue(&rt, "second", "receipt", "receipt").await;
 
-    let rows = query(&rt, "hub.print.jobs", Params::new(), &ctx("hub-jobs", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-jobs", &[SESSION]),
+    )
+    .await;
 
     assert_eq!(rows.len(), 2, "both jobs are visible: {rows:?}");
     assert_eq!(rows[0]["jobId"], "first", "delivery order, oldest first");
@@ -117,7 +132,13 @@ async fn the_document_never_leaves_through_the_status_view() {
     .unwrap();
     rt.enqueue_print_job(&job).await.unwrap();
 
-    let rows = query(&rt, "hub.print.jobs", Params::new(), &ctx("hub-doc", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-doc", &[SESSION]),
+    )
+    .await;
 
     assert_eq!(rows.len(), 1);
     assert!(
@@ -125,7 +146,9 @@ async fn the_document_never_leaves_through_the_status_view() {
         "the ticket's contents must not come back with the status: {rows:?}"
     );
     assert!(
-        !serde_json::to_string(&rows[0]).unwrap().contains("Ana Pérez"),
+        !serde_json::to_string(&rows[0])
+            .unwrap()
+            .contains("Ana Pérez"),
         "nothing of the document may leak into the view: {rows:?}"
     );
 }
@@ -139,13 +162,25 @@ async fn the_queue_filters_by_station_and_by_status() {
 
     let mut by_role = Params::new();
     by_role.insert("role".into(), json!("kitchen"));
-    let rows = query(&rt, "hub.print.jobs", by_role, &ctx("hub-filter", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        by_role,
+        &ctx("hub-filter", &[SESSION]),
+    )
+    .await;
     assert_eq!(rows.len(), 1, "only the kitchen's: {rows:?}");
     assert_eq!(rows[0]["jobId"], "k1");
 
     let mut by_status = Params::new();
     by_status.insert("status".into(), json!("dead"));
-    let rows = query(&rt, "hub.print.jobs", by_status, &ctx("hub-filter", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        by_status,
+        &ctx("hub-filter", &[SESSION]),
+    )
+    .await;
     assert!(rows.is_empty(), "nothing died yet: {rows:?}");
 }
 
@@ -160,14 +195,26 @@ async fn the_queue_of_another_hub_is_not_visible() {
     theirs.ensure_system_tables().await.unwrap();
     enqueue(&theirs, "not-yours", "receipt", "receipt").await;
 
-    let rows = query(&mine, "hub.print.jobs", Params::new(), &ctx("hub-mine", &[SESSION])).await;
-    assert!(rows.is_empty(), "another hub's tickets are not mine: {rows:?}");
+    let rows = query(
+        &mine,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-mine", &[SESSION]),
+    )
+    .await;
+    assert!(
+        rows.is_empty(),
+        "another hub's tickets are not mine: {rows:?}"
+    );
 
     // …and a payload that tries to name the other tenant changes nothing: `hub_id` is not a filter.
     let mut spoof = Params::new();
     spoof.insert("hub_id".into(), json!("hub-theirs"));
     let rows = query(&mine, "hub.print.jobs", spoof, &ctx("hub-mine", &[SESSION])).await;
-    assert!(rows.is_empty(), "the payload cannot pick the tenant: {rows:?}");
+    assert!(
+        rows.is_empty(),
+        "the payload cannot pick the tenant: {rows:?}"
+    );
 }
 
 /// The audience decision of hub#987, applied to the door: **the cashier reads it**. Restricting the
@@ -177,9 +224,21 @@ async fn the_cashier_reads_the_queue_without_administering_the_hub() {
     let rt = runtime("hub-cashier").await;
     enqueue(&rt, "j1", "receipt", "receipt").await;
 
-    let rows = query(&rt, "hub.print.jobs", Params::new(), &ctx("hub-cashier", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-cashier", &[SESSION]),
+    )
+    .await;
     assert_eq!(rows.len(), 1);
-    let rows = query(&rt, "hub.print.coverage", Params::new(), &ctx("hub-cashier", &[SESSION])).await;
+    let rows = query(
+        &rt,
+        "hub.print.coverage",
+        Params::new(),
+        &ctx("hub-cashier", &[SESSION]),
+    )
+    .await;
     assert!(!rows.is_empty());
 }
 
@@ -208,7 +267,11 @@ async fn a_neighbouring_name_in_the_namespace_is_still_not_found() {
     let rt = runtime("hub-typo").await;
 
     let err = rt
-        .execute_query("hub.print.queue", &Params::new(), &ctx("hub-typo", &[SESSION]))
+        .execute_query(
+            "hub.print.queue",
+            &Params::new(),
+            &ctx("hub-typo", &[SESSION]),
+        )
         .await
         .expect_err("`hub.print.queue` does not exist");
     assert!(

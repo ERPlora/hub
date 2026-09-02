@@ -392,7 +392,9 @@ pub(crate) fn declared_natural_keys(
     let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
         std::collections::HashMap::new();
     for stmt in split_statements(sql) {
-        let Some((table, key)) = parse_seed_guard(&stmt) else { continue };
+        let Some((table, key)) = parse_seed_guard(&stmt) else {
+            continue;
+        };
         let keys = out.entry(table).or_default();
         // El seed planta una fila por sentencia y todas comparten la clave (cambia el VALOR, no la
         // columna): basta con quedarse una vez con cada juego de columnas.
@@ -413,7 +415,11 @@ pub(crate) fn declared_natural_keys(
 /// donde cada `<cond>` es `columna = <lo que sea>` (el valor lo pondrá la fila del bundle, no el
 /// seed) o `columna IS NULL`.
 fn parse_seed_guard(stmt: &str) -> Option<(String, crate::export::NaturalKey)> {
-    let table = stmt.trim().strip_prefix("INSERT INTO ")?.split_whitespace().next()?;
+    let table = stmt
+        .trim()
+        .strip_prefix("INSERT INTO ")?
+        .split_whitespace()
+        .next()?;
     if !crate::export::safe_ident(table) {
         return None;
     }
@@ -458,7 +464,12 @@ fn parse_seed_guard(stmt: &str) -> Option<(String, crate::export::NaturalKey)> {
     }
     Some((
         table.to_string(),
-        crate::export::NaturalKey { cols, predicate, nulls_not_distinct: false, seeded_only: true },
+        crate::export::NaturalKey {
+            cols,
+            predicate,
+            nulls_not_distinct: false,
+            seeded_only: true,
+        },
     ))
 }
 
@@ -609,7 +620,11 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
                    -- another comment;\n\
                    INSERT INTO t VALUES (2);";
         let stmts = split_statements(sql);
-        assert_eq!(stmts.len(), 2, "solo las dos sentencias, no los comentarios: {stmts:?}");
+        assert_eq!(
+            stmts.len(),
+            2,
+            "solo las dos sentencias, no los comentarios: {stmts:?}"
+        );
         assert!(stmts[0].starts_with("INSERT INTO t VALUES (1)"));
         assert!(stmts[1].starts_with("INSERT INTO t VALUES (2)"));
     }
@@ -620,7 +635,10 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         let err = apply(&db, "SELECT * FROM no_such_table;", "hub-test")
             .await
             .unwrap_err();
-        assert!(format!("{err}").contains("seed:"), "error de seed claro: {err}");
+        assert!(
+            format!("{err}").contains("seed:"),
+            "error de seed claro: {err}"
+        );
     }
 
     /// GARANTÍA del seed del demo (hub#36): aplicar `demo.sql` sobre un Runtime SQLite real deja
@@ -642,7 +660,10 @@ INSERT INTO t (id, v) SELECT 'b', '2' WHERE NOT EXISTS (SELECT 1 FROM t WHERE id
         // quien pone el `hub_id` del despliegue: llamar a `apply` a pelo dejaría sin probar
         // justamente el punto donde se decide de qué hub es lo que se siembra (hub#489).
         let n = runtime.apply_seed(DEMO_SEED).await.unwrap();
-        assert!(n >= 1, "el seed del demo aplica al menos el usuario, fue {n}");
+        assert!(
+            n >= 1,
+            "el seed del demo aplica al menos el usuario, fue {n}"
+        );
 
         // El PIN "0000" del usuario "Demo" verifica (valida el formato del hash).
         let user = runtime.verify_pin("Demo", "0000").await.unwrap();
@@ -701,9 +722,16 @@ WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND 
     fn el_seed_declara_su_clave_natural_y_solo_una_vez_por_juego_de_columnas() {
         let keys = declared_natural_keys(SALES_SEED);
         let payment = keys.get("sales_payment_method").expect("la tabla del seed");
-        assert_eq!(payment.len(), 1, "dos sentencias, una sola clave: {payment:?}");
+        assert_eq!(
+            payment.len(),
+            1,
+            "dos sentencias, una sola clave: {payment:?}"
+        );
         assert_eq!(payment[0].cols, vec!["hub_id", "type", "is_deleted"]);
-        assert!(payment[0].seeded_only, "una clave de seed solo pregunta por lo que sembró el módulo");
+        assert!(
+            payment[0].seeded_only,
+            "una clave de seed solo pregunta por lo que sembró el módulo"
+        );
         assert!(payment[0].predicate.is_empty());
     }
 
@@ -726,7 +754,10 @@ WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND 
     fn una_guarda_que_solo_mira_el_hub_no_declara_nada() {
         let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
                    WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id);";
-        assert!(declared_natural_keys(sql).is_empty(), "«toda la tabla» no es una clave");
+        assert!(
+            declared_natural_keys(sql).is_empty(),
+            "«toda la tabla» no es una clave"
+        );
     }
 
     /// Una guarda que pregunta por OTRA tabla no habla de la fila que se inserta.

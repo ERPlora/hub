@@ -123,7 +123,10 @@ impl RevalidationState {
     /// autoridad del límite es el SaaS; sin claim conocido, el hub no aplica takeover local).
     /// Lo lee `mint_session` para desalojar sesiones de otros dispositivos al abrir una nueva.
     pub fn max_devices(&self) -> u32 {
-        self.last_claims.as_ref().map(|c| c.max_devices).unwrap_or(0)
+        self.last_claims
+            .as_ref()
+            .map(|c| c.max_devices)
+            .unwrap_or(0)
     }
 
     /// Cuota de base de datos del plan en GiB según el último token válido (saas#817).
@@ -390,7 +393,10 @@ mod proxy_cache_tests {
         cache.store_success(body(), 1_000);
 
         assert_eq!(cache.decide(1_000), Decision::Serve(body()));
-        assert_eq!(cache.decide(1_000 + PROXY_TTL_SECS - 1), Decision::Serve(body()));
+        assert_eq!(
+            cache.decide(1_000 + PROXY_TTL_SECS - 1),
+            Decision::Serve(body())
+        );
         assert_eq!(cache.decide(1_000 + PROXY_TTL_SECS), Decision::Ask);
     }
 
@@ -404,7 +410,11 @@ mod proxy_cache_tests {
 
         assert!(!cache.is_fresh(1_001), "el cuerpo ya está caducado");
         assert_eq!(cache.decide(1_001), Decision::Serve(body()));
-        assert_eq!(cache.decide(1_600), Decision::Ask, "cerrada la ventana, se vuelve a preguntar");
+        assert_eq!(
+            cache.decide(1_600),
+            Decision::Ask,
+            "cerrada la ventana, se vuelve a preguntar"
+        );
     }
 
     /// Sin nada bueno guardado, el rate-limit sí se le cuenta al shell — pero como decisión

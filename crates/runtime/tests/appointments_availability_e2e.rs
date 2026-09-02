@@ -24,7 +24,7 @@
 use std::path::PathBuf;
 
 use chrono::{Datelike, Duration, Utc, Weekday};
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -50,14 +50,26 @@ async fn rt_appts() -> Runtime {
     // appointments `depends_on` customers + services + staff (FK lógicas cross-módulo; staff por
     // ADR-0074, selector de profesional) y services `depends_on` taxes (ADR-0066); el installer
     // valida la cadena, así que las instalamos en orden topológico primero (staff no depende de nada).
-    rt.install_from_dir(&mdir("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&mdir("customers")).await.expect("instalar customers");
-    rt.install_from_dir(&mdir("services")).await.expect("instalar services");
-    rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
+    rt.install_from_dir(&mdir("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&mdir("customers"))
+        .await
+        .expect("instalar customers");
+    rt.install_from_dir(&mdir("services"))
+        .await
+        .expect("instalar services");
+    rt.install_from_dir(&mdir("staff"))
+        .await
+        .expect("instalar staff");
     // appointments 1.1.57 added `depends_on: schedules >= 2.0.17` (the working-hours engine it
     // asserts against in scenario 4); schedules itself depends on nothing.
-    rt.install_from_dir(&mdir("schedules")).await.expect("instalar schedules");
-    rt.install_from_dir(&mdir("appointments")).await.expect("instalar appointments");
+    rt.install_from_dir(&mdir("schedules"))
+        .await
+        .expect("instalar schedules");
+    rt.install_from_dir(&mdir("appointments"))
+        .await
+        .expect("instalar appointments");
     rt
 }
 
@@ -88,7 +100,10 @@ async fn check(
         .await
         .expect("availability.check");
     let row = rows.first().expect("availability.check devuelve una fila");
-    (row["available"].as_i64().unwrap_or(-1), row["reason"].as_str().unwrap_or("?").to_string())
+    (
+        row["available"].as_i64().unwrap_or(-1),
+        row["reason"].as_str().unwrap_or("?").to_string(),
+    )
 }
 
 /// Settings del hub con el toggle de solape indicado y sin antelación mínima (determinismo).
@@ -213,7 +228,12 @@ async fn seed_links(rt: &Runtime, ctx: &RequestContext) -> Links {
         .expect("staff.members.list");
     let other_staff_id = id_where(&members, "last_name", "Dos");
 
-    Links { customer_id, service_id, staff_id, other_staff_id }
+    Links {
+        customer_id,
+        service_id,
+        staff_id,
+        other_staff_id,
+    }
 }
 
 /// Crea un horario de trabajo (lun–vie, 09:00–18:00) con tramos en cada día laborable.
@@ -229,7 +249,10 @@ async fn seed_weekday_schedule(rt: &Runtime, ctx: &RequestContext) {
         .execute_query("appointments.schedules.list", &Params::new(), ctx)
         .await
         .expect("schedules.list");
-    let sid = schedules.last().unwrap()["id"].as_str().unwrap().to_string();
+    let sid = schedules.last().unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     for dow in 0..=4 {
         // 0=lunes .. 4=viernes
         rt.execute_command(
@@ -248,7 +271,14 @@ async fn seed_weekday_schedule(rt: &Runtime, ctx: &RequestContext) {
 /// Inserta una cita "viva" de un profesional vía el command público de create (handler WASM
 /// si está compilado) o, si el .wasm no está, directamente con el sub-command SQL para no
 /// depender del guest. Devuelve sin asumir el número de cita.
-async fn book(rt: &Runtime, ctx: &RequestContext, links: &Links, staff_id: &str, start: &str, dur: i64) {
+async fn book(
+    rt: &Runtime,
+    ctx: &RequestContext,
+    links: &Links,
+    staff_id: &str,
+    start: &str,
+    dur: i64,
+) {
     // El handler WASM calcula end = start+dur; aquí lo precomputamos para el insert directo.
     let wasm = mdir("appointments").join("dist/handler.wasm").exists();
     if wasm {
@@ -270,9 +300,8 @@ async fn book(rt: &Runtime, ctx: &RequestContext, links: &Links, staff_id: &str,
     } else {
         // Sin guest compilado: insertamos la fila por el sub-command SQL (misma forma que
         // produce el handler). El motor de disponibilidad solo lee la tabla, así basta.
-        let end = (chrono::DateTime::parse_from_rfc3339(start).unwrap()
-            + Duration::minutes(dur))
-        .to_rfc3339();
+        let end = (chrono::DateTime::parse_from_rfc3339(start).unwrap() + Duration::minutes(dur))
+            .to_rfc3339();
         // `execute_command_internal`: los sub-commands `_` son INTERNOS (hub#131/#145) y la puerta
         // pública (`execute_command`) los rechaza; aquí el test actúa como host embebedor
         // sembrando la intención exacta que el handler emitiría.
@@ -314,8 +343,12 @@ async fn install_registers_availability_engine() {
     let reg = rt.registry();
     assert!(reg.is_installed("appointments"));
     assert!(reg.get_query("appointments.availability.check").is_some());
-    assert!(reg.get_command("appointments.appointments.create").is_some());
-    assert!(reg.get_command("appointments.appointments.reschedule").is_some());
+    assert!(reg
+        .get_command("appointments.appointments.create")
+        .is_some());
+    assert!(reg
+        .get_command("appointments.appointments.reschedule")
+        .is_some());
 }
 
 #[tokio::test]
@@ -351,13 +384,19 @@ async fn overlap_same_staff_rejected_distinct_staff_ok() {
 
     // Peluquera2 @ 12:00 → ACEPTADA (capacidad = nº de empleados, comprobado por staff_id).
     let (avail_p2, reason_p2) = check(&rt, &ctx, &p1_start, dur, Some(&links.other_staff_id)).await;
-    assert_eq!(avail_p2, 1, "P2 a la misma hora debe aceptarse (otra profesional)");
+    assert_eq!(
+        avail_p2, 1,
+        "P2 a la misma hora debe aceptarse (otra profesional)"
+    );
     assert_eq!(reason_p2, "", "P2 no tiene motivo de rechazo");
 
     // Después de la ventana de P1 (12:30) P1 vuelve a estar libre.
     let after = format!("{day}T12:30:00+00:00");
     let (avail_after, _) = check(&rt, &ctx, &after, dur, Some(&p1)).await;
-    assert_eq!(avail_after, 1, "a las 12:30 P1 ya está libre (ventana [12:00,12:30) cerrada)");
+    assert_eq!(
+        avail_after, 1,
+        "a las 12:30 P1 ya está libre (ventana [12:00,12:30) cerrada)"
+    );
 }
 
 #[tokio::test]
@@ -382,8 +421,14 @@ async fn toggle_allow_overlapping_permits_double_booking() {
 
     // Con el toggle ON, una 2ª cita de P1 a la misma hora se ACEPTA (no se comprueba solape).
     let (avail, reason) = check(&rt, &ctx, &start, dur, Some(&links.staff_id)).await;
-    assert_eq!(avail, 1, "con allow_overlapping=true la doble reserva se permite");
-    assert_eq!(reason, "", "sin motivo de rechazo cuando el solape está permitido");
+    assert_eq!(
+        avail, 1,
+        "con allow_overlapping=true la doble reserva se permite"
+    );
+    assert_eq!(
+        reason, "",
+        "sin motivo de rechazo cuando el solape está permitido"
+    );
 }
 
 #[tokio::test]
@@ -410,7 +455,10 @@ async fn outside_working_schedule_rejected() {
     let before = format!("{day}T08:00:00+00:00");
     let (avail_out, reason_out) = check(&rt, &ctx, &before, 30, Some("P1")).await;
     assert_eq!(avail_out, 0, "08:00 está fuera del horario de trabajo");
-    assert_eq!(reason_out, "outside_schedule", "el motivo debe ser fuera de horario");
+    assert_eq!(
+        reason_out, "outside_schedule",
+        "el motivo debe ser fuera de horario"
+    );
 }
 
 /// Reproducción directa de hub#110 (P0): el command público `appointments.appointments.create`
@@ -463,7 +511,11 @@ async fn create_rejects_overlap_and_list_works_after_creation() {
         )
         .await
         .expect("appointments.list no debe romper tras crear (hub#110)");
-    assert_eq!(rows.len(), 1, "tras 1 cita creada, el listado debe devolver 1 fila");
+    assert_eq!(
+        rows.len(),
+        1,
+        "tras 1 cita creada, el listado debe devolver 1 fila"
+    );
     assert_eq!(rows[0]["staff_name"].as_str(), Some("Pro Uno"));
 
     // Bug (a) de #110: 2ª cita SOLAPADA (12:15, misma P1) → el command create debe RECHAZARLA.

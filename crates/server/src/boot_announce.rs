@@ -82,9 +82,12 @@ pub async fn announce_when_ready(state: AppState, timeout: Duration, poll: Durat
     };
     // hub#975: el latido de arranque lleva la misma telemetría de recursos que el diario —
     // fuera del lock del runtime (el sampler de CPU duerme 100 ms) y best-effort igual que él.
-    daily_usage::sample_resource_metrics().await.apply_to(&mut usage);
+    daily_usage::sample_resource_metrics()
+        .await
+        .apply_to(&mut usage);
 
-    match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage).await
+    match daily_usage::send_heartbeat(&state.http, &state.config.cloud_base_url, &auth, &usage)
+        .await
     {
         Ok(_) => tracing::info!("arranque: avisado al Cloud de que este hub ya atiende"),
         // Best-effort literal: el sondeo del SaaS es exactamente el respaldo de este caso.
@@ -138,7 +141,11 @@ mod tests {
         .await;
 
         assert!(ready);
-        assert_eq!(looks.get(), 1, "un hub ya listo no puede costar más de un vistazo");
+        assert_eq!(
+            looks.get(),
+            1,
+            "un hub ya listo no puede costar más de un vistazo"
+        );
     }
 
     /// Un hub que tarda en abrir su BD no se pierde el aviso: se vuelve a mirar.
@@ -162,9 +169,11 @@ mod tests {
     async fn it_gives_up_instead_of_waiting_forever() {
         let started = std::time::Instant::now();
 
-        let ready = wait_until(Duration::from_millis(100), Duration::from_millis(10), || async {
-            false
-        })
+        let ready = wait_until(
+            Duration::from_millis(100),
+            Duration::from_millis(10),
+            || async { false },
+        )
         .await;
 
         assert!(!ready);
@@ -181,7 +190,12 @@ mod tests {
     async fn it_never_sleeps_past_the_deadline() {
         let started = std::time::Instant::now();
 
-        wait_until(Duration::from_millis(30), Duration::from_secs(30), || async { false }).await;
+        wait_until(
+            Duration::from_millis(30),
+            Duration::from_secs(30),
+            || async { false },
+        )
+        .await;
 
         assert!(
             started.elapsed() < Duration::from_secs(1),

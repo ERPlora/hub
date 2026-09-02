@@ -80,7 +80,9 @@ async fn fixture(enforce: bool, trusted_device: Option<&str>) -> axum::Router {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
-    rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    rt.create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     if let Some(device_id) = trusted_device {
         rt.trust_device(device_id, "Admin").await.unwrap();
     }
@@ -113,7 +115,9 @@ async fn fixture_with_revoked(device_id: &str) -> axum::Router {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), HUB_ID);
     rt.ensure_system_tables().await.unwrap();
-    rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    rt.create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     rt.trust_device(device_id, "Admin").await.unwrap();
     rt.untrust_device(device_id).await.unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-device-trust-{}", std::process::id()));
@@ -196,8 +200,16 @@ async fn get_device_mode(app_: &axum::Router, device_id: Option<&str>) -> Value 
     if let Some(id) = device_id {
         req = req.header("x-device-id", id);
     }
-    let res = app_.clone().oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.status(), StatusCode::OK, "the read door answers without session");
+    let res = app_
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "the read door answers without session"
+    );
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
     json["data"].clone()
@@ -300,7 +312,11 @@ async fn the_adopted_device_keeps_getting_in() {
     )
     .await;
 
-    assert_eq!(status, StatusCode::OK, "the visitor must not be locked out of their own demo: {body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the visitor must not be locked out of their own demo: {body}"
+    );
 }
 
 #[tokio::test]
@@ -344,7 +360,11 @@ async fn a_demo_does_not_hand_the_door_to_a_WRONG_pin() {
     )
     .await;
 
-    assert_ne!(status, StatusCode::OK, "a wrong PIN must not open a demo: {body}");
+    assert_ne!(
+        status,
+        StatusCode::OK,
+        "a wrong PIN must not open a demo: {body}"
+    );
 }
 
 // ── Demo: the login screen must be TOLD the PIN is usable (regression of hub#514 × hub#630) ──
@@ -382,15 +402,30 @@ async fn once_adopted_the_demo_login_screen_stops_vouching_for_strangers() {
     // strangers the truth — otherwise whoever guesses the URL later is offered a pinpad the PIN
     // door will refuse, which is the exact desync hub#514 existed to close.
     let app_ = demo_fixture().await;
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" })).await;
-    assert_eq!(status, StatusCode::OK, "the adoption must happen for this test to mean anything: {body}");
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Demo", "pin": "0000", "device_id": "dev_visitor" }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the adoption must happen for this test to mean anything: {body}"
+    );
 
     let stranger = get_device_mode(&app_, Some("dev_stranger")).await;
     let adopted = get_device_mode(&app_, Some("dev_visitor")).await;
 
-    assert_eq!(stranger["trusted"], json!(false), "adopted once, refuse the rest: {stranger}");
-    assert_eq!(adopted["trusted"], json!(true), "the visitor keeps their own demo: {adopted}");
+    assert_eq!(
+        stranger["trusted"],
+        json!(false),
+        "adopted once, refuse the rest: {stranger}"
+    );
+    assert_eq!(
+        adopted["trusted"],
+        json!(true),
+        "the visitor keeps their own demo: {adopted}"
+    );
 }
 
 #[tokio::test]
@@ -402,7 +437,11 @@ async fn a_demo_does_not_vouch_for_a_client_that_names_no_device() {
 
     let data = get_device_mode(&app_, None).await;
 
-    assert_eq!(data["trusted"], json!(false), "no name, no vouching: {data}");
+    assert_eq!(
+        data["trusted"],
+        json!(false),
+        "no name, no vouching: {data}"
+    );
 }
 
 #[tokio::test]
@@ -414,7 +453,11 @@ async fn a_NORMAL_hub_login_screen_never_vouches_for_a_stranger() {
 
     let data = get_device_mode(&app_, Some("dev_stranger")).await;
 
-    assert_eq!(data["trusted"], json!(false), "a normal hub only trusts an online login: {data}");
+    assert_eq!(
+        data["trusted"],
+        json!(false),
+        "a normal hub only trusts an online login: {data}"
+    );
 }
 
 #[tokio::test]
@@ -432,8 +475,11 @@ async fn enforce_on_without_device_id_is_refused() {
 #[tokio::test]
 async fn enforce_on_with_an_untrusted_device_is_refused() {
     let app_ = fixture(true, None).await;
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-1" })).await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-1" }),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
     assert_eq!(body["code"], json!("device_untrusted"), "{body}");
 }
@@ -441,9 +487,16 @@ async fn enforce_on_with_an_untrusted_device_is_refused() {
 #[tokio::test]
 async fn enforce_on_with_a_trusted_device_is_allowed() {
     let app_ = fixture(true, Some("tablet-ok")).await;
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-ok" })).await;
-    assert_eq!(status, StatusCode::OK, "a trusted device still logs in: {body}");
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-ok" }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a trusted device still logs in: {body}"
+    );
     assert_eq!(body["ok"], json!(true), "{body}");
 }
 
@@ -464,8 +517,11 @@ async fn enforce_off_without_device_id_still_works() {
 async fn a_device_id_of_blanks_names_no_device() {
     let app_ = fixture(true, None).await;
     for blank in ["", " ", "   ", "\t", "\n"] {
-        let (status, body) =
-            post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": blank })).await;
+        let (status, body) = post_pin(
+            &app_,
+            json!({ "name": "Admin", "pin": "1111", "device_id": blank }),
+        )
+        .await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{blank:?}: {body}");
         assert_eq!(
             body["code"],
@@ -487,8 +543,11 @@ async fn the_online_login_is_what_earns_the_pin() {
     let app_ = fixture(true, None).await;
 
     // Before the online login, this device is nobody.
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-bar" })).await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-bar" }),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
 
     assert_eq!(
@@ -497,13 +556,23 @@ async fn the_online_login_is_what_earns_the_pin() {
         "the online login must succeed for this test to mean anything"
     );
 
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-bar" })).await;
-    assert_eq!(status, StatusCode::OK, "the online login earned the PIN: {body}");
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-bar" }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the online login earned the PIN: {body}"
+    );
 
     // …and it earned it for THAT device only: the trust is not hub-wide (hub#454).
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-kitchen" })).await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "1111", "device_id": "tablet-kitchen" }),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "trust is per device: {body}");
     assert_eq!(body["code"], json!("device_untrusted"), "{body}");
 }
@@ -546,7 +615,11 @@ async fn the_device_gate_does_not_hide_the_brute_force_lock() {
     let wrong = json!({ "name": "Admin", "pin": "9999", "device_id": "till-1" });
     for attempt in 1..=5 {
         let (status, body) = post_pin(&app_, wrong.clone()).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "attempt {attempt}: {body}");
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "attempt {attempt}: {body}"
+        );
     }
     let (status, body) = post_pin(&app_, wrong).await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
@@ -558,8 +631,11 @@ async fn the_device_gate_does_not_hide_the_brute_force_lock() {
 #[tokio::test]
 async fn the_device_gate_does_not_hide_a_wrong_pin() {
     let app_ = fixture(true, Some("till-2")).await;
-    let (status, body) =
-        post_pin(&app_, json!({ "name": "Admin", "pin": "9999", "device_id": "till-2" })).await;
+    let (status, body) = post_pin(
+        &app_,
+        json!({ "name": "Admin", "pin": "9999", "device_id": "till-2" }),
+    )
+    .await;
     assert_eq!(
         status,
         StatusCode::UNAUTHORIZED,

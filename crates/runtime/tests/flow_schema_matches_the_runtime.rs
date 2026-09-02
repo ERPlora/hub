@@ -257,7 +257,14 @@ fn the_extended_delay_is_declared_with_the_same_horizon_the_runtime_refuses_abov
 fn the_approval_step_is_declared_with_the_same_policies_and_the_same_ceiling() {
     let schema = schema();
     let declared = keys_at(&schema, "/$defs/step/properties");
-    for key in ["title", "summary", "assignee", "expires_in", "on_expire", "on_reject"] {
+    for key in [
+        "title",
+        "summary",
+        "assignee",
+        "expires_in",
+        "on_expire",
+        "on_reject",
+    ] {
         assert!(
             declared.contains(key),
             "the schema must declare `{key}` of an `approval` step; it has {declared:?}"

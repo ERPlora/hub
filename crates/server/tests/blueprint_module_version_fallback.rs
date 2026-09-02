@@ -199,14 +199,10 @@ fn test_config(cloud_base_url: &str, tag: &str) -> HubConfig {
 async fn make_app(cloud_base_url: &str, tag: &str) -> axum::Router {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-test");
-    let _ = std::fs::remove_dir_all(std::env::temp_dir().join(format!(
-        "erplora_bp_ver_{}_{tag}",
-        std::process::id()
-    )));
-    app(AppState::with_config(
-        rt,
-        test_config(cloud_base_url, tag),
-    ))
+    let _ = std::fs::remove_dir_all(
+        std::env::temp_dir().join(format!("erplora_bp_ver_{}_{tag}", std::process::id())),
+    );
+    app(AppState::with_config(rt, test_config(cloud_base_url, tag)))
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
@@ -268,7 +264,10 @@ async fn a_pin_the_marketplace_no_longer_publishes_installs_the_newest_compatibl
             vec!["2.13.10".to_string(), "2.13.9".to_string()],
         )]),
         artifacts: HashMap::from([
-            (("sales".into(), "2.13.10".into()), (zip.clone(), sha.clone())),
+            (
+                ("sales".into(), "2.13.10".into()),
+                (zip.clone(), sha.clone()),
+            ),
             (("sales".into(), "2.13.9".into()), (zip, sha)),
         ]),
         downloads: Mutex::new(Vec::new()),

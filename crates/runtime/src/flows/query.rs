@@ -75,7 +75,14 @@ pub(crate) async fn run(
 
     let params: Params = def::resolve_map(&spec.params, scope);
     let page = execute_flow_query_page(
-        db, registry, hub_id, flow_id, run_id, &spec.query, &params, spec.limit,
+        db,
+        registry,
+        hub_id,
+        flow_id,
+        run_id,
+        &spec.query,
+        &params,
+        spec.limit,
     )
     .await?;
 
@@ -196,7 +203,11 @@ mod tests {
         );
         reg.queries.insert(
             "sales.all".into(),
-            test_support::query("sales", "sales.view_sale", "SELECT id, total FROM sale ORDER BY id"),
+            test_support::query(
+                "sales",
+                "sales.view_sale",
+                "SELECT id, total FROM sale ORDER BY id",
+            ),
         );
         reg
     }
@@ -273,10 +284,18 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(read.output["id"], json!("s-1"), "the fields of the FIRST row");
+        assert_eq!(
+            read.output["id"],
+            json!("s-1"),
+            "the fields of the FIRST row"
+        );
         assert_eq!(read.output["total"], json!("120.50"));
         assert_eq!(read.output["found"], json!(true));
-        assert_eq!(read.output["count"], json!(2), "how many MATCH, not how many were carried");
+        assert_eq!(
+            read.output["count"],
+            json!(2),
+            "how many MATCH, not how many were carried"
+        );
         assert_eq!(read.recorded_input["query"], json!("sales.summary"));
         assert_eq!(read.recorded_input["params"]["day"], json!("2026-08-15"));
     }
@@ -438,7 +457,11 @@ mod tests {
         .await
         .expect("a read whose schema forbids extra keys still runs");
 
-        assert_eq!(read.output["count"], json!(3), "and the total is still the truth");
+        assert_eq!(
+            read.output["count"],
+            json!(3),
+            "and the total is still the truth"
+        );
     }
 
     /// A row whose own column is called `count` must not be able to redefine what the contract key
@@ -458,7 +481,11 @@ mod tests {
         let mut reg = registry();
         reg.queries.insert(
             "sales.shadow".into(),
-            test_support::query("sales", "sales.view_sale", "SELECT count, found FROM shadow"),
+            test_support::query(
+                "sales",
+                "sales.view_sale",
+                "SELECT count, found FROM shadow",
+            ),
         );
         grants::replace(
             &db,

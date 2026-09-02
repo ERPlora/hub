@@ -6,31 +6,43 @@
 //! terminados.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
-fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
+fn params(v: serde_json::Value) -> Params {
+    v.as_object().cloned().unwrap_or_default()
+}
 fn mdir(n: &str) -> PathBuf {
     erplora_runtime::e2e_support::modules_root().join(n)
 }
-fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
+fn admin() -> RequestContext {
+    RequestContext::new("h1", "u1", ["*".to_string()])
+}
 
 async fn rt_staff() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&mdir("staff")).await.expect("instalar staff");
+    rt.install_from_dir(&mdir("staff"))
+        .await
+        .expect("instalar staff");
     rt
 }
 
 /// Alta de miembro pasando el payload completo (el runtime aún no aplica defaults de schema:
 /// el command SQL bindea todos los campos — ver memoria "defaults de schema no aplicados").
 async fn create_member(rt: &Runtime, ctx: &RequestContext, first: &str, rate: f64, status: &str) {
-    rt.execute_command("staff.members.create", &params(json!({
-        "first_name": first, "last_name": "Pro", "email": "", "phone": "", "employee_id": "",
-        "role_id": null, "hire_date": null, "status": status, "bio": "", "specialties": "",
-        "is_bookable": 1, "color": "", "hourly_rate": 0, "commission_rate": rate, "notes": ""
-    })), ctx).await.unwrap();
+    rt.execute_command(
+        "staff.members.create",
+        &params(json!({
+            "first_name": first, "last_name": "Pro", "email": "", "phone": "", "employee_id": "",
+            "role_id": null, "hire_date": null, "status": status, "bio": "", "specialties": "",
+            "is_bookable": 1, "color": "", "hourly_rate": 0, "commission_rate": rate, "notes": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap();
 }
 
 /// Da de baja a un miembro por la puerta que lo hace de verdad (`staff.members.delete`:
@@ -57,17 +69,23 @@ async fn terminate_member(rt: &Runtime, ctx: &RequestContext, first: &str) {
 
 #[tokio::test]
 async fn install_registers_commissions_query() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = rt_staff().await;
     let reg = rt.registry();
     assert!(reg.is_installed("staff"));
-    assert!(reg.get_query("staff.commissions.summary").is_some(),
-        "staff.commissions.summary debe registrarse");
+    assert!(
+        reg.get_query("staff.commissions.summary").is_some(),
+        "staff.commissions.summary debe registrarse"
+    );
 }
 
 #[tokio::test]
 async fn commissions_summary_returns_rate_per_active_member() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = rt_staff().await;
     let ctx = admin();
     create_member(&rt, &ctx, "Ana", 15.0, "active").await;
@@ -75,29 +93,43 @@ async fn commissions_summary_returns_rate_per_active_member() {
     // Caro nace activa y se DA DE BAJA: el alta ya no puede nacer `terminated` (staff 36c0bd2),
     // la baja es su propia puerta con fecha y motivo. Así el test ejerce el camino real.
     create_member(&rt, &ctx, "Caro", 20.0, "active").await;
-    terminate_member(&rt, &ctx, "Caro").await;                  // excluido
-    create_member(&rt, &ctx, "Dani", 0.0, "inactive").await;    // excluido
+    terminate_member(&rt, &ctx, "Caro").await; // excluido
+    create_member(&rt, &ctx, "Dani", 0.0, "inactive").await; // excluido
 
-    let rows = rt.execute_query("staff.commissions.summary", &Params::new(), &ctx).await.unwrap();
+    let rows = rt
+        .execute_query("staff.commissions.summary", &Params::new(), &ctx)
+        .await
+        .unwrap();
     // Solo los activos (Ana, Beto); ordenados por full_name asc.
     assert_eq!(rows.len(), 2, "{rows:?}");
-    let ana = rows.iter().find(|r| r["full_name"] == json!("Ana Pro")).unwrap();
+    let ana = rows
+        .iter()
+        .find(|r| r["full_name"] == json!("Ana Pro"))
+        .unwrap();
     assert_eq!(ana["commission_rate"].as_f64().unwrap(), 15.0);
     assert!(ana["staff_id"].is_string());
-    let beto = rows.iter().find(|r| r["full_name"] == json!("Beto Pro")).unwrap();
+    let beto = rows
+        .iter()
+        .find(|r| r["full_name"] == json!("Beto Pro"))
+        .unwrap();
     assert_eq!(beto["commission_rate"].as_f64().unwrap(), 10.0);
 }
 
 #[tokio::test]
 async fn commission_amount_combines_with_sales_by_staff() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // Demuestra el SEAM del cierre del día: comisión = gross_total × commission_rate/100,
     // cruzando staff.commissions.summary (rate) con la fila simulada de sales.by_staff por
     // staff_id. (sales.by_staff lo prueba la batería `tests/checkout.hub.test.py` del repo de sales — hub#1264; aquí validamos la aritmética del seam.)
     let rt = rt_staff().await;
     let ctx = admin();
     create_member(&rt, &ctx, "Ana", 15.0, "active").await;
-    let rows = rt.execute_query("staff.commissions.summary", &Params::new(), &ctx).await.unwrap();
+    let rows = rt
+        .execute_query("staff.commissions.summary", &Params::new(), &ctx)
+        .await
+        .unwrap();
     let ana = &rows[0];
     let staff_id = ana["staff_id"].as_str().unwrap().to_string();
     let rate = ana["commission_rate"].as_f64().unwrap();
@@ -105,7 +137,7 @@ async fn commission_amount_combines_with_sales_by_staff() {
     // Fila que aportaría sales.by_staff para ese staff_id: gross 100.00€ = 10000 céntimos.
     let by_staff_gross_cents: i64 = 10000;
     assert_eq!(by_staff_gross_cents, by_staff_gross_cents); // gross corresponde a ese staff_id
-    // Comisión en céntimos (half para evitar deriva): 10000 × 15 / 100 = 1500 céntimos = 15.00€.
+                                                            // Comisión en céntimos (half para evitar deriva): 10000 × 15 / 100 = 1500 céntimos = 15.00€.
     let commission_cents = (by_staff_gross_cents as f64 * rate / 100.0).round() as i64;
     assert_eq!(commission_cents, 1500);
     assert!(!staff_id.is_empty());

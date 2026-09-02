@@ -20,13 +20,18 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
 /// Writes a module package on disk under `root/<version>/`. Each version is its own directory,
 /// exactly like the download cache (`<cache>/<module_id>/<version>/`).
-fn write_module(root: &Path, version: &str, manifest: serde_json::Value, files: &[(&str, &str)]) -> PathBuf {
+fn write_module(
+    root: &Path,
+    version: &str,
+    manifest: serde_json::Value,
+    files: &[(&str, &str)],
+) -> PathBuf {
     let dir = root.join(version);
     fs::create_dir_all(&dir).unwrap();
     fs::write(
@@ -207,8 +212,10 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     ]);
     // The new version also renames its nav and drops the query, so restoring the old manifest is
     // observable and not a coincidence.
-    broken["navigation"] = json!([{ "id": "parts2", "label": "Parts v2", "component": "parts-page-2" }]);
-    broken["queries"] = json!({ "parts.list_v2": { "permission": "parts.read", "sql": "sql/list.sql" } });
+    broken["navigation"] =
+        json!([{ "id": "parts2", "label": "Parts v2", "component": "parts-page-2" }]);
+    broken["queries"] =
+        json!({ "parts.list_v2": { "permission": "parts.read", "sql": "sql/list.sql" } });
     let v2 = write_module(
         &root,
         "2.0.0",
@@ -227,7 +234,10 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&v1).await.expect("install v1");
 
-    let error = rt.update_from_dir(&v2).await.expect_err("the update must fail");
+    let error = rt
+        .update_from_dir(&v2)
+        .await
+        .expect_err("the update must fail");
     assert!(
         !error.to_string().is_empty(),
         "a failed update says why: {error}"
@@ -240,7 +250,11 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
         "a failed update must never leave the hub WITHOUT the module"
     );
     assert_eq!(
-        registry.installed.iter().find(|m| m.id == "parts").map(|m| m.version.as_str()),
+        registry
+            .installed
+            .iter()
+            .find(|m| m.id == "parts")
+            .map(|m| m.version.as_str()),
         Some("1.0.0"),
         "the previous version keeps running"
     );
@@ -253,12 +267,20 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
         "nothing of the version that failed is left behind"
     );
     assert_eq!(
-        registry.navigation.iter().filter(|n| n.module_id == "parts").count(),
+        registry
+            .navigation
+            .iter()
+            .filter(|n| n.module_id == "parts")
+            .count(),
         1,
         "v1's navigation entry is back, exactly once"
     );
     assert_eq!(
-        registry.navigation.iter().find(|n| n.module_id == "parts").map(|n| n.nav.id.as_str()),
+        registry
+            .navigation
+            .iter()
+            .find(|n| n.module_id == "parts")
+            .map(|n| n.nav.id.as_str()),
         Some("parts"),
         "and it is v1's, not the one the failed version declared"
     );
@@ -350,7 +372,9 @@ async fn a_first_install_that_fails_leaves_no_module_behind() {
     );
 
     let mut rt = Runtime::new(Box::new(fresh_db().await));
-    rt.install_from_dir(&dir).await.expect_err("the install fails");
+    rt.install_from_dir(&dir)
+        .await
+        .expect_err("the install fails");
 
     assert!(!rt.registry().is_installed("parts"));
     assert!(!rt.registry().queries.contains_key("parts.list"));

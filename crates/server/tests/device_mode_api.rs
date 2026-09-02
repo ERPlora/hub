@@ -38,7 +38,10 @@ async fn fixture() -> (axum::Router, String, String) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-dm");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let employee_id = rt
         .create_user("Employee", "2222", "employee", None)
         .await
@@ -86,7 +89,10 @@ async fn get_mode(router: &axum::Router, device_id: Option<&str>) -> (StatusCode
 async fn mode_of(router: &axum::Router, device_id: &str) -> String {
     let (status, body) = get_mode(router, Some(device_id)).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    body["data"]["mode"].as_str().unwrap_or_default().to_string()
+    body["data"]["mode"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string()
 }
 
 async fn put_mode(
@@ -194,7 +200,13 @@ async fn without_a_device_in_the_body_the_administrator_marks_the_device_in_fron
 
     // The realistic gesture: "this device is mine" from the device itself. The header only NAMES
     // the device — what authorises the write is the admin session.
-    let response = put_mode(&router, Some(&admin), Some("laptop-1"), json!({ "mode": "personal" })).await;
+    let response = put_mode(
+        &router,
+        Some(&admin),
+        Some("laptop-1"),
+        json!({ "mode": "personal" }),
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::OK, "{:?}", response.status());
     assert_eq!(mode_of(&router, "laptop-1").await, "personal");
 
@@ -252,7 +264,12 @@ async fn a_device_the_hub_never_met_cannot_be_declared_personal() {
 async fn a_mode_outside_the_catalogue_is_refused_instead_of_guessed() {
     let (router, admin, _employee) = fixture().await;
 
-    for candidate in [json!("Personal"), json!("trusted"), json!(""), json!("root")] {
+    for candidate in [
+        json!("Personal"),
+        json!("trusted"),
+        json!(""),
+        json!("root"),
+    ] {
         let refused = put_mode(
             &router,
             Some(&admin),
@@ -301,7 +318,11 @@ async fn a_login_cannot_smuggle_a_mode_for_its_own_device() {
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK, "the login itself still works");
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "the login itself still works"
+    );
 
     assert_eq!(
         mode_of(&router, "till-1").await,

@@ -15,7 +15,9 @@ use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
 
 fn notes_fixture() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixture_notes")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixture_notes")
 }
 
 #[tokio::test]
@@ -26,11 +28,25 @@ async fn installer_loads_wasm_bytes_into_registry() {
     assert_eq!(id, "notes");
 
     // El command con handler tiene bytes wasm cargados; el SQL-only no.
-    let bulk = rt.registry().commands.get("notes.bulk").expect("notes.bulk registrado");
-    let bytes = bulk.wasm.as_ref().expect("notes.bulk debe tener bytes wasm cargados");
+    let bulk = rt
+        .registry()
+        .commands
+        .get("notes.bulk")
+        .expect("notes.bulk registrado");
+    let bytes = bulk
+        .wasm
+        .as_ref()
+        .expect("notes.bulk debe tener bytes wasm cargados");
     assert!(!bytes.is_empty());
     assert_eq!(&bytes[..4], b"\xde\xad\xbe\xef");
 
-    let create = rt.registry().commands.get("notes.create").expect("notes.create registrado");
-    assert!(create.wasm.is_none(), "command SQL-only no debe tener bytes wasm");
+    let create = rt
+        .registry()
+        .commands
+        .get("notes.create")
+        .expect("notes.create registrado");
+    assert!(
+        create.wasm.is_none(),
+        "command SQL-only no debe tener bytes wasm"
+    );
 }

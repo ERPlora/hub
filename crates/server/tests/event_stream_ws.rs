@@ -260,11 +260,11 @@ async fn a_client_that_can_set_headers_authenticates_at_the_handshake() {
 
     let srv = serve().await;
     let token = key_with(&srv, ApiKeyAccess::ReadOnly).await;
-    let mut req = format!("ws://{}/ws", srv.addr).into_client_request().unwrap();
-    req.headers_mut().insert(
-        "authorization",
-        format!("Bearer {token}").parse().unwrap(),
-    );
+    let mut req = format!("ws://{}/ws", srv.addr)
+        .into_client_request()
+        .unwrap();
+    req.headers_mut()
+        .insert("authorization", format!("Bearer {token}").parse().unwrap());
     let (mut socket, _) = tokio_tungstenite::connect_async(req).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -306,7 +306,10 @@ async fn sse(srv: &Server, uri: &str, bearer: Option<&str>) -> axum::response::R
 async fn code_of(resp: axum::response::Response) -> String {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&bytes).unwrap();
-    json["error"]["code"].as_str().unwrap_or_default().to_string()
+    json["error"]["code"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// The other half of the same hole: `curl -N https://<slug>.erplora.com/api/events`, no headers.
@@ -379,7 +382,11 @@ async fn the_ticket_door_needs_a_session() {
     let arc = srv.state.runtime_for(&srv.state.hub_id()).await.unwrap();
     let rt = arc.read().await;
     let keys = rt.list_api_keys().await.unwrap();
-    assert_eq!(keys.len(), 1, "one key, however many tickets were asked for");
+    assert_eq!(
+        keys.len(),
+        1,
+        "one key, however many tickets were asked for"
+    );
     assert!(keys[0].system);
     assert_eq!(keys[0].access, ApiKeyAccess::ReadOnly);
 }

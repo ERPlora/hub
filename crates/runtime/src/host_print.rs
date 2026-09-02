@@ -169,14 +169,19 @@ mod tests {
         let mut p = intent_params();
         p.remove("jobId");
         let err = PrintIntent::from_event_payload(&p).unwrap_err();
-        assert!(matches!(err, RuntimeError::InvalidPayload { .. }), "got {err:?}");
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "got {err:?}"
+        );
     }
 
     /// Sin `format` el trabajo sale en papel de tique, que es el defecto del shell; con él, manda
     /// lo que diga el emisor (y si es una palabra que la cola no conoce, lo rechaza la cola).
     #[test]
     fn the_default_paper_is_the_receipt_one() {
-        let job = PrintIntent::from_event_payload(&intent_params()).unwrap().into_job();
+        let job = PrintIntent::from_event_payload(&intent_params())
+            .unwrap()
+            .into_job();
         assert_eq!(job.format, FORMAT_RECEIPT);
 
         let mut p = intent_params();

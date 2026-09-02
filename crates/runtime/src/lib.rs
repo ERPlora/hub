@@ -27,8 +27,10 @@ pub mod errors;
 pub mod event_shape;
 pub mod events;
 pub mod export;
+pub mod fiscal_gateway;
 pub mod fiscal_profile;
 pub mod flows;
+pub mod gateway_identity;
 pub mod host_notify;
 pub mod host_print;
 pub mod hub_meta;
@@ -163,5 +165,5 @@ mod module_lifecycle;
 mod printing;
 mod settings_api;
 
-pub use dispatch::system_params;
 pub(crate) use dispatch::effective_caller_lang;
+pub use dispatch::system_params;

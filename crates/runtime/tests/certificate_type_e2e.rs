@@ -26,8 +26,10 @@ use erplora_runtime::certificate::{self, CertificateKind, CertificateType};
 use erplora_runtime::native::DbHost;
 use erplora_runtime::{Runtime, RuntimeError};
 
-const HOLDER_DOOR: &str = "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
-const SEAL_DOOR: &str = "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
+const HOLDER_DOOR: &str =
+    "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
+const SEAL_DOOR: &str =
+    "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
 
 const HUB: &str = "hub-test";
 
@@ -62,7 +64,8 @@ fn pkcs12(qc_type: QcType) -> (String, String) {
 
     let key = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
     let mut name = X509NameBuilder::new().unwrap();
-    name.append_entry_by_text("CN", "ERPlora hub470 fixture").unwrap();
+    name.append_entry_by_text("CN", "ERPlora hub470 fixture")
+        .unwrap();
     let name = name.build();
 
     let mut cert = X509::builder().unwrap();
@@ -70,8 +73,10 @@ fn pkcs12(qc_type: QcType) -> (String, String) {
     cert.set_subject_name(&name).unwrap();
     cert.set_issuer_name(&name).unwrap();
     cert.set_pubkey(&key).unwrap();
-    cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-    cert.set_not_after(&Asn1Time::days_from_now(365).unwrap()).unwrap();
+    cert.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+        .unwrap();
+    cert.set_not_after(&Asn1Time::days_from_now(365).unwrap())
+        .unwrap();
     let oid = Asn1Object::from_str("1.3.6.1.5.5.7.1.3").unwrap();
     let value = Asn1OctetString::new_from_bytes(&extension_value).unwrap();
     cert.append_extension(X509Extension::new_from_der(&oid, false, &value).unwrap())
@@ -152,7 +157,9 @@ async fn entry_point(rt: &Runtime) -> &'static str {
         module_id: "verifactu",
         static_folder: None,
     };
-    erplora_verifactu::transmission_endpoint_for(&host, HUB).await.unwrap()
+    erplora_verifactu::transmission_endpoint_for(&host, HUB)
+        .await
+        .unwrap()
 }
 
 /// 🔴 **The bug.** A representative container in the DELEGATED slot must transmit through the
@@ -184,7 +191,9 @@ async fn an_entity_seal_in_the_delegated_slot_uses_the_seal_door() {
     let rt = hub().await;
     let (b64, password) = pkcs12(QcType::ESeal);
 
-    certificate::set_delegated(rt.db(), HUB, &b64, &password, 4, Some("seal")).await.unwrap();
+    certificate::set_delegated(rt.db(), HUB, &b64, &password, 4, Some("seal"))
+        .await
+        .unwrap();
 
     assert_eq!(entry_point(&rt).await, SEAL_DOOR);
 }
@@ -200,7 +209,9 @@ async fn a_business_that_uploads_its_own_seal_uses_the_seal_door() {
 
     // The REAL door the owner's upload comes through (`PUT /api/business/certificate`), not a
     // hand-written write into the table: the type has to be derived by the writer the product uses.
-    rt.set_business_certificate(&b64, &password, "hub_user:admin").await.unwrap();
+    rt.set_business_certificate(&b64, &password, "hub_user:admin")
+        .await
+        .unwrap();
 
     assert_eq!(
         certificate::active_kind(rt.db(), HUB).await.unwrap(),
@@ -234,7 +245,9 @@ async fn a_contested_declaration_is_refused_and_the_hub_keeps_its_certificate() 
     ensure_master_key();
     let rt = hub().await;
     let (seal_b64, seal_pw) = pkcs12(QcType::ESeal);
-    certificate::set_delegated(rt.db(), HUB, &seal_b64, &seal_pw, 4, Some("seal")).await.unwrap();
+    certificate::set_delegated(rt.db(), HUB, &seal_b64, &seal_pw, 4, Some("seal"))
+        .await
+        .unwrap();
 
     let (representative_b64, representative_pw) = pkcs12(QcType::ESign);
     let err = certificate::set_delegated(
@@ -280,8 +293,13 @@ async fn the_core_and_the_engine_never_disagree_about_the_type() {
         ),
     ] {
         let (b64, password) = pkcs12(qc_type);
-        certificate::set_delegated(rt.db(), HUB, &b64, &password, 9, None).await.unwrap();
-        assert_eq!(certificate::active_type(rt.db(), HUB).await.unwrap(), expected_type);
+        certificate::set_delegated(rt.db(), HUB, &b64, &password, 9, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            certificate::active_type(rt.db(), HUB).await.unwrap(),
+            expected_type
+        );
         assert_eq!(entry_point(&rt).await, expected_door);
     }
 }

@@ -18,7 +18,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
@@ -56,7 +56,9 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
 /// equivalent rules does NOT duplicate them: the natural-key guard skips them one by one.
 #[tokio::test]
 async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // ORIGEN h1 → bundle con taxes (los `id` embeben 'h1'; created_by='system').
     let a = hub_con_taxes("h1").await;
     let selection = ExportSelection {
@@ -97,8 +99,15 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
     // un test rojo que no dice nada. Lo que este test afirma no es «cuántas hay» sino «importar no
     // añade ninguna», así que la referencia es el propio estado de antes.
     let mut b = hub_con_taxes("h2").await;
-    let antes = count(&b, "SELECT count(*) AS n FROM taxes_rule WHERE hub_id = 'h2'").await;
-    assert!(antes > 0, "precondición: el módulo siembra sus reglas al instalarse");
+    let antes = count(
+        &b,
+        "SELECT count(*) AS n FROM taxes_rule WHERE hub_id = 'h2'",
+    )
+    .await;
+    assert!(
+        antes > 0,
+        "precondición: el módulo siembra sus reglas al instalarse"
+    );
 
     let import = ImportSelection {
         users: false,
@@ -158,7 +167,9 @@ async fn importar_blueprint_no_duplica_las_reglas_de_iva_sembradas() {
 /// whoever imports a template: **after importing, can the hub charge VAT?**
 #[tokio::test]
 async fn importar_una_plantilla_deja_el_hub_con_los_impuestos_puestos() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // ORIGEN: un hub con `taxes`, exportado como PLANTILLA.
     let origen = hub_con_taxes("h1").await;
     let selection = ExportSelection {
@@ -167,12 +178,23 @@ async fn importar_una_plantilla_deja_el_hub_con_los_impuestos_puestos() {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "taxes".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: erplora_runtime::export::BundlePurpose::Template,
     };
-    let bundle = export_hub(&origen, "h1", &selection, "restaurante", "es", "2026-08-08T10:00:00Z")
-        .await
-        .expect("export plantilla");
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &selection,
+        "restaurante",
+        "es",
+        "2026-08-08T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
     let sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
     assert!(
         sql.contains("INSERT INTO taxes_rule"),

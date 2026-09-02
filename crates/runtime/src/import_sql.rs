@@ -250,8 +250,7 @@ impl Tok {
     fn is_literal(&self) -> bool {
         match self {
             Self::Lit => true,
-            Self::Word(w) => ["null", "true", "false"]
-                .contains(&w.to_ascii_lowercase().as_str()),
+            Self::Word(w) => ["null", "true", "false"].contains(&w.to_ascii_lowercase().as_str()),
             _ => false,
         }
     }
@@ -351,7 +350,9 @@ fn check_statement(stmt: &str, scope: &TableScope) -> std::result::Result<(), St
     let toks = tokenize(stmt).map_err(|e| shape_error(stmt, &e))?;
     let mut p = 0usize;
     // INSERT INTO <tabla>
-    if !toks.get(p).is_some_and(|t| t.is_kw("INSERT")) || !toks.get(p + 1).is_some_and(|t| t.is_kw("INTO")) {
+    if !toks.get(p).is_some_and(|t| t.is_kw("INSERT"))
+        || !toks.get(p + 1).is_some_and(|t| t.is_kw("INTO"))
+    {
         return Err(format!(
             "solo se permiten sentencias `INSERT INTO` en los datos del bundle; se encontró: {}",
             preview(stmt)
@@ -373,7 +374,8 @@ fn check_statement(stmt: &str, scope: &TableScope) -> std::result::Result<(), St
     }
     p += 1;
     // ( <col> {, <col>} )
-    p = idents_in_parens(&toks, p).ok_or_else(|| shape_error(stmt, "falta la lista de columnas"))?;
+    p = idents_in_parens(&toks, p)
+        .ok_or_else(|| shape_error(stmt, "falta la lista de columnas"))?;
     // VALUES (…) {, (…)}  |  SELECT <literales>
     if toks.get(p).is_some_and(|t| t.is_kw("VALUES")) {
         p += 1;
@@ -508,7 +510,9 @@ fn not_exists_guard(
         if toks.get(p).is_some_and(|t| t.is_kw(kw)) {
             Ok(p + 1)
         } else {
-            Err(bad("la única guarda admitida es `WHERE NOT EXISTS (SELECT 1 FROM … WHERE …)`"))
+            Err(bad(
+                "la única guarda admitida es `WHERE NOT EXISTS (SELECT 1 FROM … WHERE …)`",
+            ))
         }
     };
     p = expect_kw(p, "WHERE")?;
@@ -522,7 +526,9 @@ fn not_exists_guard(
         p += 1;
         p = expect_kw(p, "SELECT")?;
         if !toks.get(p).is_some_and(Tok::is_literal) {
-            return Err(bad("la guarda solo puede proyectar un literal (`SELECT 1`)"));
+            return Err(bad(
+                "la guarda solo puede proyectar un literal (`SELECT 1`)",
+            ));
         }
         p += 1;
         p = expect_kw(p, "FROM")?;
@@ -728,7 +734,11 @@ mod tests {
     #[test]
     fn destino_cualificado_por_esquema_se_rechaza() {
         let scope = TableScope::Module("inventory".into());
-        assert!(validate("INSERT INTO public.inventory_product (id) SELECT 'p1';", &scope).is_err());
+        assert!(validate(
+            "INSERT INTO public.inventory_product (id) SELECT 'p1';",
+            &scope
+        )
+        .is_err());
     }
 
     /// Un `;` DENTRO de un literal no parte la sentencia (dato legítimo: «Café; té»).
@@ -879,8 +889,15 @@ mod tests {
     #[test]
     fn a_bundle_never_writes_a_system_table() {
         let scope = TableScope::Module("_hub".into());
-        for table in ["_hub_fiscal_profile", "_hub_fiscal_regime_registry", "_hub_certificate"] {
-            assert!(!scope.allows(table), "`{table}` is out of reach of every section");
+        for table in [
+            "_hub_fiscal_profile",
+            "_hub_fiscal_regime_registry",
+            "_hub_certificate",
+        ] {
+            assert!(
+                !scope.allows(table),
+                "`{table}` is out of reach of every section"
+            );
         }
         for sql in [
             "INSERT INTO _hub_fiscal_profile (\"hub_id\", \"status\") SELECT 'h2', 'ACTIVE';",
@@ -895,7 +912,10 @@ mod tests {
         // point it at the profile would leak whether this hub is live and under which tax id.
         let leak = "INSERT INTO _hub (\"a\") SELECT 'x' \
                     WHERE NOT EXISTS (SELECT 1 FROM _hub_fiscal_profile WHERE hub_id = 'h2');";
-        assert!(validate(leak, &scope).is_err(), "a guard must not read a system table either");
+        assert!(
+            validate(leak, &scope).is_err(),
+            "a guard must not read a system table either"
+        );
 
         // …and the door BEFORE that one: a data file cannot even name the namespace, so a bundle
         // does not get to build the scope in the first place.

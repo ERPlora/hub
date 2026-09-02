@@ -146,7 +146,10 @@ async fn a_local_user_never_administers_the_hub() {
     assert!(rt.list_hub_users().await.unwrap().is_empty());
 
     // Everything the business plane offers below administration stays available.
-    for (name, pin, role) in [("Ana Soto", "4821", "manager"), ("Luis Prat", "5390", "employee")] {
+    for (name, pin, role) in [
+        ("Ana Soto", "4821", "manager"),
+        ("Luis Prat", "5390", "employee"),
+    ] {
         rt.create_hub_user(&local(name, pin, role))
             .await
             .unwrap_or_else(|e| panic!("`{role}` is a legitimate local role: {e}"));
@@ -305,7 +308,13 @@ async fn a_membership_revoked_by_the_saas_is_not_worked_around_with_a_local_alta
     // membership at all to re-check on the next login.
     let rt = runtime("hub-local").await;
     let cloud = rt
-        .get_or_link_cloud_user("cloud-9", "Ana Soto", "manager", Some("ana@example.com"), None)
+        .get_or_link_cloud_user(
+            "cloud-9",
+            "Ana Soto",
+            "manager",
+            Some("ana@example.com"),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(

@@ -174,11 +174,8 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
     // dueño no concede ninguna acción de modificación (carpetas reservadas del hub `_logs/_system`,
     // `modules/` raíz o un módulo que no opte en `static_files.user_actions`). La UI lo usa para
     // marcarlas como no arrastrables y no receptoras de drops (ADR-0172, arrastrar-y-soltar).
-    let folders = decorate_folders(
-        raw.get("folders").cloned().unwrap_or_else(|| json!([])),
-        st,
-    )
-    .await;
+    let folders =
+        decorate_folders(raw.get("folders").cloned().unwrap_or_else(|| json!([])), st).await;
     let data = json!({
         "folders": folders,
         "files": files,
@@ -270,7 +267,10 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
-    let mut r = st.http.post(&url).json(&json!({ "path": path, "name": name }));
+    let mut r = st
+        .http
+        .post(&url)
+        .json(&json!({ "path": path, "name": name }));
     for (k, v) in headers {
         r = r.header(k, v);
     }
@@ -355,11 +355,18 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     // la firma caduca. Se pide con un cliente LIMPIO —sin las cabeceras de máquina del hub—:
     // `X-Hub-Token` es un secreto del hub y no puede viajar a un tercero (ADR-0003).
     let signed = match resp.json::<Value>().await {
-        Ok(v) => v.get("url").and_then(Value::as_str).unwrap_or_default().to_string(),
+        Ok(v) => v
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
         Err(e) => return err(StatusCode::BAD_GATEWAY, &e.to_string()),
     };
     if signed.is_empty() {
-        return err(StatusCode::BAD_GATEWAY, "el Cloud no devolvió la URL del fichero");
+        return err(
+            StatusCode::BAD_GATEWAY,
+            "el Cloud no devolvió la URL del fichero",
+        );
     }
     let object = match st.http.get(&signed).send().await {
         Ok(o) if o.status().is_success() => o,
@@ -428,7 +435,10 @@ async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
 /// Recorre el árbol de carpetas y añade `readOnly: true` a cada nodo cuya política no conceda
 /// ninguna acción de modificación. El `id` de cada carpeta es su ruta relativa; la política se
 /// resuelve contra el registro de módulos instalados.
-fn decorate_folders(folders: Value, st: &AppState) -> std::pin::Pin<Box<dyn Future<Output = Value> + Send + '_>> {
+fn decorate_folders(
+    folders: Value,
+    st: &AppState,
+) -> std::pin::Pin<Box<dyn Future<Output = Value> + Send + '_>> {
     Box::pin(async move {
         let Some(arr) = folders.as_array().cloned() else {
             return folders;
@@ -718,12 +728,16 @@ pub async fn media_move(
 /// Carpetas de PRIMER nivel que no son datos del negocio (`_logs`, `_system`, `_import_tmp`…) y
 /// por tanto no entran en un bundle.
 fn is_system_folder(path: &str) -> bool {
-    path.split('/').next().is_some_and(|top| top.starts_with('_'))
+    path.split('/')
+        .next()
+        .is_some_and(|top| top.starts_with('_'))
 }
 
 /// Aplana el árbol de carpetas del listado (`[{id, children:[…]}]`) en rutas.
 fn flatten_folder_ids(folders: &Value, out: &mut Vec<String>) {
-    let Some(arr) = folders.as_array() else { return };
+    let Some(arr) = folders.as_array() else {
+        return;
+    };
     for node in arr {
         if let Some(id) = node.get("id").and_then(Value::as_str) {
             if !id.is_empty() {
@@ -797,12 +811,18 @@ async fn fetch_object_bytes(st: &AppState, path: &str) -> Option<Vec<u8>> {
         .content_length()
         .is_some_and(|len| len > MAX_MEDIA_OBJECT_BYTES)
     {
-        tracing::warn!(path, "export: objeto de media por encima del tope, se omite");
+        tracing::warn!(
+            path,
+            "export: objeto de media por encima del tope, se omite"
+        );
         return None;
     }
     let bytes = object.bytes().await.ok()?;
     if bytes.len() as u64 > MAX_MEDIA_OBJECT_BYTES {
-        tracing::warn!(path, "export: objeto de media por encima del tope, se omite");
+        tracing::warn!(
+            path,
+            "export: objeto de media por encima del tope, se omite"
+        );
         return None;
     }
     Some(bytes.to_vec())
@@ -980,8 +1000,8 @@ async fn upload_bundle_batch(
         // attempt; the byte cap above keeps this owned copy within the Hub's memory budget.
         let mut form = reqwest::multipart::Form::new().text("folder", folder.to_string());
         for file in batch {
-            let part = reqwest::multipart::Part::bytes(file.bytes.to_vec())
-                .file_name(file.name.clone());
+            let part =
+                reqwest::multipart::Part::bytes(file.bytes.to_vec()).file_name(file.name.clone());
             let part = match part.mime_str(content_type(&file.name)) {
                 Ok(part) => part,
                 Err(error) => {
@@ -1229,8 +1249,16 @@ pub struct MediaPolicy {
 }
 
 impl MediaPolicy {
-    pub const FULL: Self = Self { upload: true, rename: true, delete: true };
-    pub const READ_ONLY: Self = Self { upload: false, rename: false, delete: false };
+    pub const FULL: Self = Self {
+        upload: true,
+        rename: true,
+        delete: true,
+    };
+    pub const READ_ONLY: Self = Self {
+        upload: false,
+        rename: false,
+        delete: false,
+    };
 
     fn allows(&self, action: UserFileAction) -> bool {
         match action {
@@ -1285,7 +1313,9 @@ pub fn policy_for(rel: &str, owner: Option<&StaticFilesDef>) -> MediaPolicy {
     if first_segment(rel) == MODULES_ROOT {
         // Dentro del árbol de módulos manda el manifest; sin manifest (raíz o módulo
         // desinstalado) nadie ha autorizado nada.
-        return owner.map(MediaPolicy::from).unwrap_or(MediaPolicy::READ_ONLY);
+        return owner
+            .map(MediaPolicy::from)
+            .unwrap_or(MediaPolicy::READ_ONLY);
     }
     MediaPolicy::FULL
 }
@@ -1347,7 +1377,11 @@ mod bundle_tests {
             "sub/../../evil.png",
             "modules\\..\\evil.png",
         ] {
-            assert_eq!(bundle_media_destination(evil), None, "{evil} debía rechazarse");
+            assert_eq!(
+                bundle_media_destination(evil),
+                None,
+                "{evil} debía rechazarse"
+            );
         }
     }
 
@@ -1356,7 +1390,10 @@ mod bundle_tests {
     fn una_entrada_sin_nombre_de_fichero_no_produce_destino() {
         assert_eq!(bundle_media_destination(""), None);
         assert_eq!(bundle_media_destination("."), None);
-        assert_eq!(bundle_media_destination("sub/"), Some(("".into(), "sub".into())));
+        assert_eq!(
+            bundle_media_destination("sub/"),
+            Some(("".into(), "sub".into()))
+        );
     }
 
     #[test]
@@ -1385,23 +1422,35 @@ mod bundle_tests {
         let payload = json!({ "saved": 39, "failed": 1 });
         assert_eq!(
             bundle_upload_response_counts(false, Some(&payload), 40),
-            BundleMediaUploadReport { copied: 39, failed: 1 }
+            BundleMediaUploadReport {
+                copied: 39,
+                failed: 1
+            }
         );
         // Una respuesta que no cubre el lote completo es desconocida y por tanto falla cerrada.
         let inconsistent = json!({ "saved": 38, "failed": 1 });
         assert_eq!(
             bundle_upload_response_counts(true, Some(&inconsistent), 40),
-            BundleMediaUploadReport { copied: 0, failed: 40 }
+            BundleMediaUploadReport {
+                copied: 0,
+                failed: 40
+            }
         );
         let missing_failed = json!({ "saved": 39 });
         assert_eq!(
             bundle_upload_response_counts(true, Some(&missing_failed), 40),
-            BundleMediaUploadReport { copied: 0, failed: 40 },
+            BundleMediaUploadReport {
+                copied: 0,
+                failed: 40
+            },
             "un 201 con un contador incompleto nunca cae al fallback legacy"
         );
         assert_eq!(
             bundle_upload_response_counts(true, Some(&json!({ "success": true })), 40),
-            BundleMediaUploadReport { copied: 40, failed: 0 },
+            BundleMediaUploadReport {
+                copied: 40,
+                failed: 0
+            },
             "el Cloud antiguo no tenía contadores; su 2xx sigue siendo compatible"
         );
     }
@@ -1453,7 +1502,12 @@ mod policy_tests {
     #[test]
     fn the_hubs_own_folders_are_read_only_even_for_an_admin() {
         // `_logs` ya tiene retención automática; borrarlos a mano solo sirve para tapar el rastro.
-        for path in ["_logs", "_logs/hub.2026-07-31", "_system", "_system/activity.json"] {
+        for path in [
+            "_logs",
+            "_logs/hub.2026-07-31",
+            "_system",
+            "_system/activity.json",
+        ] {
             assert_eq!(policy_for(path, None), MediaPolicy::READ_ONLY, "{path}");
         }
     }
@@ -1494,7 +1548,10 @@ mod policy_tests {
 
     #[test]
     fn identifies_the_owning_module_folder() {
-        assert_eq!(module_folder_of("modules/verifactu/xml/a.xml"), Some("verifactu"));
+        assert_eq!(
+            module_folder_of("modules/verifactu/xml/a.xml"),
+            Some("verifactu")
+        );
         assert_eq!(module_folder_of("modules/verifactu"), Some("verifactu"));
         assert_eq!(module_folder_of("modules"), None);
         assert_eq!(module_folder_of("facturas/modules/x"), None);

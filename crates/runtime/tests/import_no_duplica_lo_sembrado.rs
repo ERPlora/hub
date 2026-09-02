@@ -22,7 +22,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
@@ -37,7 +37,9 @@ async fn hub_con_sales(hub_id: &str) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
-    rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
+    rt.install_from_dir(&mdir("inventory"))
+        .await
+        .expect("inventory");
     rt.install_from_dir(&mdir("sales")).await.expect("sales");
     rt
 }
@@ -56,13 +58,23 @@ async fn payment_methods(rt: &Runtime, hub_id: &str) -> Vec<(String, String)> {
         "SELECT name, type FROM sales_payment_method \
          WHERE hub_id = '{hub_id}' AND is_deleted = 0 ORDER BY type, name"
     );
-    let res = rt.db().query(&sql, &Params::new()).await.expect("payment methods");
+    let res = rt
+        .db()
+        .query(&sql, &Params::new())
+        .await
+        .expect("payment methods");
     res.rows
         .iter()
         .map(|r| {
             (
-                r.get("name").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
-                r.get("type").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                r.get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                r.get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
             )
         })
         .collect()
@@ -80,15 +92,32 @@ async fn owner_adds_method(rt: &Runtime, hub_id: &str, id: &str, name: &str, kin
          VALUES ('{id}', '{hub_id}', '{name}', '{kind}', '', 1, 10, 0, 0, 0, \
                  'u-owner', 'u-owner', '2026-08-15T10:00:00Z', '2026-08-15T10:00:00Z')"
     );
-    rt.db().execute(&sql, &Params::new()).await.expect("owner adds a payment method");
+    rt.db()
+        .execute(&sql, &Params::new())
+        .await
+        .expect("owner adds a payment method");
 }
 
 /// The published `peluqueria` template, rebuilt: a hub whose owner created `Efectivo` and
 /// `Tarjeta`, exported with `purpose: template`.
 async fn plantilla_con_formas_de_pago() -> (erplora_runtime::export::ExportBundle, Runtime) {
     let origen = hub_con_sales("h1").await;
-    owner_adds_method(&origen, "h1", "bad260fd-0642-4a70-9d65-6cac4503b7f6", "Efectivo", "cash").await;
-    owner_adds_method(&origen, "h1", "34fa35c7-2b20-419a-ab9c-023642439abf", "Tarjeta", "card").await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "bad260fd-0642-4a70-9d65-6cac4503b7f6",
+        "Efectivo",
+        "cash",
+    )
+    .await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "34fa35c7-2b20-419a-ab9c-023642439abf",
+        "Tarjeta",
+        "card",
+    )
+    .await;
     let selection = ExportSelection {
         users: false,
         settings: false,
@@ -102,9 +131,16 @@ async fn plantilla_con_formas_de_pago() -> (erplora_runtime::export::ExportBundl
         }],
         purpose: BundlePurpose::Template,
     };
-    let bundle = export_hub(&origen, "h1", &selection, "peluqueria", "es", "2026-08-15T10:00:00Z")
-        .await
-        .expect("export plantilla");
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &selection,
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
     (bundle, origen)
 }
 
@@ -118,10 +154,20 @@ fn import_selection() -> ImportSelection {
     }
 }
 
-async fn aplica(destino: &mut Runtime, bundle: &erplora_runtime::export::ExportBundle, hub_id: &str) {
-    let report = import_sections(destino, &bundle.manifest, &bundle.files, &import_selection(), hub_id)
-        .await
-        .expect("best-effort");
+async fn aplica(
+    destino: &mut Runtime,
+    bundle: &erplora_runtime::export::ExportBundle,
+    hub_id: &str,
+) {
+    let report = import_sections(
+        destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(),
+        hub_id,
+    )
+    .await
+    .expect("best-effort");
     let sales = report
         .sections
         .iter()
@@ -159,7 +205,10 @@ async fn importar_una_plantilla_no_duplica_las_formas_de_pago_del_seed() {
     let mut destino = hub_con_sales("h2").await;
     assert_eq!(
         payment_methods(&destino, "h2").await,
-        vec![("Card".into(), "card".into()), ("Cash".into(), "cash".into())],
+        vec![
+            ("Card".into(), "card".into()),
+            ("Cash".into(), "cash".into())
+        ],
         "precondición: instalar `sales` siembra Cash/Card"
     );
 
@@ -167,7 +216,10 @@ async fn importar_una_plantilla_no_duplica_las_formas_de_pago_del_seed() {
 
     assert_eq!(
         payment_methods(&destino, "h2").await,
-        vec![("Card".into(), "card".into()), ("Cash".into(), "cash".into())],
+        vec![
+            ("Card".into(), "card".into()),
+            ("Cash".into(), "cash".into())
+        ],
         "el TPV ofrece «Efectivo, Tarjeta, Cash, Card»: cuatro botones donde debe haber dos"
     );
 }
@@ -199,20 +251,45 @@ async fn una_forma_de_pago_propia_del_vertical_si_aterriza() {
         return;
     }
     let origen = hub_con_sales("h1").await;
-    owner_adds_method(&origen, "h1", "bad260fd-0642-4a70-9d65-6cac4503b7f6", "Efectivo", "cash").await;
-    owner_adds_method(&origen, "h1", "9a1d0f4e-2c33-4a41-9f0b-6b2c5d7e8f01", "Bizum", "bizum").await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "bad260fd-0642-4a70-9d65-6cac4503b7f6",
+        "Efectivo",
+        "cash",
+    )
+    .await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "9a1d0f4e-2c33-4a41-9f0b-6b2c5d7e8f01",
+        "Bizum",
+        "bizum",
+    )
+    .await;
     let selection = ExportSelection {
         users: false,
         settings: false,
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "sales".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "sales".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: BundlePurpose::Template,
     };
-    let bundle = export_hub(&origen, "h1", &selection, "peluqueria", "es", "2026-08-15T10:00:00Z")
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &selection,
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export");
 
     let mut destino = hub_con_sales("h2").await;
     aplica(&mut destino, &bundle, "h2").await;
@@ -237,22 +314,47 @@ async fn lo_que_creo_el_dueno_del_destino_no_tapa_la_aportacion_de_la_plantilla(
         return;
     }
     let origen = hub_con_sales("h1").await;
-    owner_adds_method(&origen, "h1", "9a1d0f4e-2c33-4a41-9f0b-6b2c5d7e8f01", "Bizum salon", "bizum").await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "9a1d0f4e-2c33-4a41-9f0b-6b2c5d7e8f01",
+        "Bizum salon",
+        "bizum",
+    )
+    .await;
     let selection = ExportSelection {
         users: false,
         settings: false,
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "sales".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "sales".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: BundlePurpose::Template,
     };
-    let bundle = export_hub(&origen, "h1", &selection, "peluqueria", "es", "2026-08-15T10:00:00Z")
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &selection,
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export");
 
     let mut destino = hub_con_sales("h2").await;
-    owner_adds_method(&destino, "h2", "c0ffee00-0000-4000-8000-000000000001", "Bizum", "bizum").await;
+    owner_adds_method(
+        &destino,
+        "h2",
+        "c0ffee00-0000-4000-8000-000000000001",
+        "Bizum",
+        "bizum",
+    )
+    .await;
     aplica(&mut destino, &bundle, "h2").await;
 
     assert_eq!(
@@ -276,19 +378,37 @@ async fn restaurar_el_backup_propio_no_pierde_una_forma_de_pago_del_dueno() {
         return;
     }
     let origen = hub_con_sales("h1").await;
-    owner_adds_method(&origen, "h1", "1f0a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8", "Amex", "card").await;
+    owner_adds_method(
+        &origen,
+        "h1",
+        "1f0a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8",
+        "Amex",
+        "card",
+    )
+    .await;
     let selection = ExportSelection {
         users: false,
         settings: false,
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "sales".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "sales".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: BundlePurpose::Backup,
     };
-    let bundle = export_hub(&origen, "h1", &selection, "backup", "es", "2026-08-15T10:00:00Z")
-        .await
-        .expect("export backup");
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &selection,
+        "backup",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export backup");
 
     // Restoring over a REDEPLOY of the same hub: the modules are installed again (the seed runs
     // again) and then the data lands. `manifest.hub.hub_id` says h1, so this is `same_hub`.
@@ -305,7 +425,11 @@ async fn restaurar_el_backup_propio_no_pierde_una_forma_de_pago_del_dueno() {
         "restaurar tu propia copia no puede tirar un método que creaste tú"
     );
     assert_eq!(
-        count(&destino, "SELECT count(*) AS n FROM sales_payment_method WHERE hub_id = 'h1'").await,
+        count(
+            &destino,
+            "SELECT count(*) AS n FROM sales_payment_method WHERE hub_id = 'h1'"
+        )
+        .await,
         3,
     );
 }

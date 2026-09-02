@@ -130,7 +130,8 @@ fn validacion_xsd_sobre_el_xml_real() {
     );
     xsd::validate_registro(&xml_f2).expect("una simplificada no lleva destinatario: es válida");
 
-    let xml_f1 = aeat::build_soap(&f1_sin_destinatario, &cfg, None, "hub-preproduccion").expect("declarable");
+    let xml_f1 = aeat::build_soap(&f1_sin_destinatario, &cfg, None, "hub-preproduccion")
+        .expect("declarable");
     let err = xsd::validate_registro(&xml_f1).expect_err("una F1 sin Destinatarios es un 1189");
     println!("F1 SIN destinatario → BLOQUEADO: {err}");
 }

@@ -36,16 +36,32 @@ struct Slots {
     delegated: bool,
 }
 
-const NEITHER: Slots = Slots { own: false, delegated: false };
-const OWN_ONLY: Slots = Slots { own: true, delegated: false };
-const DELEGATED_ONLY: Slots = Slots { own: false, delegated: true };
-const BOTH: Slots = Slots { own: true, delegated: true };
+const NEITHER: Slots = Slots {
+    own: false,
+    delegated: false,
+};
+const OWN_ONLY: Slots = Slots {
+    own: true,
+    delegated: false,
+};
+const DELEGATED_ONLY: Slots = Slots {
+    own: false,
+    delegated: true,
+};
+const BOTH: Slots = Slots {
+    own: true,
+    delegated: true,
+};
 
 fn ctx(hub_id: &str) -> RequestContext {
     RequestContext::new(
         hub_id,
         "u1",
-        [SESSION.to_string(), "fiscal.configure".to_string(), "fiscal.issue".to_string()],
+        [
+            SESSION.to_string(),
+            "fiscal.configure".to_string(),
+            "fiscal.issue".to_string(),
+        ],
     )
 }
 
@@ -169,7 +185,10 @@ async fn store_slot(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKin
 
 /// Reader 1+2 — the dispatcher's fiscal gate. `true` = the hub is allowed to issue.
 async fn the_gate_accepts(rt: &Runtime, hub_id: &str) -> bool {
-    match rt.execute_command("fiscal.issue", &Params::new(), &ctx(hub_id)).await {
+    match rt
+        .execute_command("fiscal.issue", &Params::new(), &ctx(hub_id))
+        .await
+    {
         Ok(_) => true,
         Err(RuntimeError::FiscalPrecondition { missing }) => {
             assert_eq!(
@@ -197,7 +216,9 @@ async fn the_engine_can_sign(rt: &Runtime, hub_id: &str) -> bool {
         module_id: "fiscal",
         static_folder: None,
     };
-    erplora_verifactu::can_sign(&host, hub_id).await.expect("the engine answers")
+    erplora_verifactu::can_sign(&host, hub_id)
+        .await
+        .expect("the engine answers")
 }
 
 /// Reader 3 — the ⛔ arm of the onboarding checklist. `true` = the checklist claims the runtime is
@@ -238,7 +259,10 @@ async fn assert_the_readers_agree(slots: Slots, expected_can_issue: bool) {
         can_sign, expected_can_issue,
         "{slots:?}: the core's own answer to «can this hub sign?»"
     );
-    assert_eq!(gate, can_sign, "{slots:?}: the dispatcher gate disagrees with `can_sign`");
+    assert_eq!(
+        gate, can_sign,
+        "{slots:?}: the dispatcher gate disagrees with `can_sign`"
+    );
     assert_eq!(
         !blocks, can_sign,
         "{slots:?}: the checklist ⛔ disagrees with `can_sign` — a ⛔ that does not block, or a \
@@ -293,7 +317,9 @@ async fn the_own_certificate_wins_and_deleting_it_falls_back_without_reconfiguri
         "with both slots full the business's own certificate signs"
     );
 
-    certificate::delete(rt.db(), hub_id, CertificateKind::Own).await.unwrap();
+    certificate::delete(rt.db(), hub_id, CertificateKind::Own)
+        .await
+        .unwrap();
 
     assert_eq!(
         certificate::active_kind(rt.db(), hub_id).await.unwrap(),
@@ -322,7 +348,9 @@ async fn a_delegated_only_hub_that_can_issue_still_exports_no_certificate() {
         "precondition: this hub can issue"
     );
     assert_eq!(
-        certificate::exportable_der_bytes(rt.db(), hub_id).await.unwrap(),
+        certificate::exportable_der_bytes(rt.db(), hub_id)
+            .await
+            .unwrap(),
         None,
         "the delegated certificate is ERPlora's private key: it never travels in an export"
     );

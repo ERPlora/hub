@@ -29,7 +29,13 @@ use tower::ServiceExt; // oneshot
 
 /// Boots a mock SaaS on `path` that records the query string it was called with, and answers a
 /// one-module catalogue. Returns the address and the recorded-query handle.
-async fn mock_cloud(path: &'static str) -> (String, Arc<Mutex<Option<String>>>, tokio::task::JoinHandle<()>) {
+async fn mock_cloud(
+    path: &'static str,
+) -> (
+    String,
+    Arc<Mutex<Option<String>>>,
+    tokio::task::JoinHandle<()>,
+) {
     let seen: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     let recorder = seen.clone();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -92,13 +98,19 @@ async fn a_registered_hub_asks_the_marketplace_about_its_own_country() {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "real-hub");
     rt.ensure_system_tables().await.unwrap();
     rt.set_settings(
-        &[("country_code".to_string(), json!("FR"))].into_iter().collect(),
+        &[("country_code".to_string(), json!("FR"))]
+            .into_iter()
+            .collect(),
         "test",
     )
     .await
     .unwrap();
 
-    ask_catalogue(rt, config(url, "real-hub", Some("machine-secret"), "registered")).await;
+    ask_catalogue(
+        rt,
+        config(url, "real-hub", Some("machine-secret"), "registered"),
+    )
+    .await;
 
     assert_eq!(
         seen.lock().unwrap().clone().unwrap(),
@@ -132,7 +144,11 @@ async fn a_region_travels_alongside_the_country() {
     .await
     .unwrap();
 
-    ask_catalogue(rt, config(url, "real-hub", Some("machine-secret"), "region")).await;
+    ask_catalogue(
+        rt,
+        config(url, "real-hub", Some("machine-secret"), "region"),
+    )
+    .await;
 
     assert_eq!(
         seen.lock().unwrap().clone().unwrap(),
@@ -151,7 +167,9 @@ async fn the_demo_catalogue_is_filtered_by_country_too() {
     let rt = Runtime::new(Box::new(fresh_db().await));
     rt.ensure_system_tables().await.unwrap();
     rt.set_settings(
-        &[("country_code".to_string(), json!("PT"))].into_iter().collect(),
+        &[("country_code".to_string(), json!("PT"))]
+            .into_iter()
+            .collect(),
         "test",
     )
     .await
@@ -159,7 +177,10 @@ async fn the_demo_catalogue_is_filtered_by_country_too() {
 
     ask_catalogue(rt, config(url, DEV_HUB_ID, None, "demo")).await;
 
-    assert_eq!(seen.lock().unwrap().clone().unwrap(), "countries=PT&lang=es");
+    assert_eq!(
+        seen.lock().unwrap().clone().unwrap(),
+        "countries=PT&lang=es"
+    );
     task.abort();
 }
 

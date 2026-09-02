@@ -71,7 +71,10 @@ async fn fixture(tag: &str, mock: Shared) -> (axum::Router, String, String, std:
 
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-vers");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let session = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let cashier_id = rt
         .create_user("Cashier", "2222", "employee", None)
@@ -92,7 +95,9 @@ async fn fixture(tag: &str, mock: Shared) -> (axum::Router, String, String, std:
     .unwrap();
     std::fs::write(v1_dir.join("migrations/postgres/001_init.sql"), PARTS_INIT).unwrap();
     let mut rt = rt;
-    rt.install_from_dir(&v1_dir).await.expect("seed parts@1.0.0");
+    rt.install_from_dir(&v1_dir)
+        .await
+        .expect("seed parts@1.0.0");
 
     let cfg = HubConfig {
         demo: false,
@@ -220,7 +225,11 @@ async fn a_module_this_hub_does_not_have_yet_offers_every_published_version() {
     let body = json_body(response).await;
 
     assert_eq!(body["data"]["installed"], json!(null), "{body}");
-    assert_eq!(body["data"]["versions"], json!(["1.2.0", "1.0.0"]), "{body}");
+    assert_eq!(
+        body["data"]["versions"],
+        json!(["1.2.0", "1.0.0"]),
+        "{body}"
+    );
 
     let _ = std::fs::remove_dir_all(temp);
 }

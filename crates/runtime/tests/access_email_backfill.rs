@@ -135,7 +135,11 @@ async fn is_active(raw: &PgAdapter, id: &str) -> bool {
     .unwrap()
     .rows
     .first()
-    .map(|r| r["is_active"].as_bool().unwrap_or_else(|| r["is_active"].as_i64() == Some(1)))
+    .map(|r| {
+        r["is_active"]
+            .as_bool()
+            .unwrap_or_else(|| r["is_active"].as_i64() == Some(1))
+    })
     .unwrap_or(false)
 }
 
@@ -212,12 +216,24 @@ async fn the_first_login_of_a_row_written_before_the_fix_keeps_the_granted_role(
 
     let rt = reboot(&tdb).await;
     let signed_in = rt
-        .get_or_link_cloud_user("cloud-ana", "Ana Soto", "employee", Some("ana@example.com"), None)
+        .get_or_link_cloud_user(
+            "cloud-ana",
+            "Ana Soto",
+            "employee",
+            Some("ana@example.com"),
+            None,
+        )
         .await
         .unwrap();
 
-    assert_eq!(signed_in.id, "u-ana", "the login lands on the row that was already there");
-    assert_eq!(signed_in.role, "manager", "and keeps the role the administrator granted");
+    assert_eq!(
+        signed_in.id, "u-ana",
+        "the login lands on the row that was already there"
+    );
+    assert_eq!(
+        signed_in.role, "manager",
+        "and keeps the role the administrator granted"
+    );
     assert_eq!(
         rt.list_hub_users().await.unwrap().len(),
         1,
@@ -253,7 +269,9 @@ async fn an_email_another_row_already_answers_for_is_never_copied() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
     // Ana is a real account user: her email is where access looks for it.
-    rt.create_login_user("ana@example.com", "admin").await.unwrap();
+    rt.create_login_user("ana@example.com", "admin")
+        .await
+        .unwrap();
     // Bob works the till and typed Ana's address into his own profile.
     row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "ana@example.com").await;
 
@@ -264,12 +282,25 @@ async fn an_email_another_row_already_answers_for_is_never_copied() {
         "",
         "Bob never receives an access key that answers for somebody else"
     );
-    assert_eq!(role_of(&raw, "u-bob").await, "employee", "and is not raised by Ana's login");
+    assert_eq!(
+        role_of(&raw, "u-bob").await,
+        "employee",
+        "and is not raised by Ana's login"
+    );
     let ana = rt
-        .get_or_link_cloud_user("cloud-ana", "Ana", "employee", Some("ana@example.com"), Some("admin"))
+        .get_or_link_cloud_user(
+            "cloud-ana",
+            "Ana",
+            "employee",
+            Some("ana@example.com"),
+            Some("admin"),
+        )
         .await
         .unwrap();
-    assert_ne!(ana.id, "u-bob", "Ana's login links to Ana's row, never to Bob's");
+    assert_ne!(
+        ana.id, "u-bob",
+        "Ana's login links to Ana's row, never to Bob's"
+    );
     assert_eq!(role_of(&raw, "u-bob").await, "employee");
 }
 
@@ -280,7 +311,9 @@ async fn an_email_another_row_already_answers_for_is_never_copied() {
 async fn the_refusal_ignores_case() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin").await.unwrap();
+    rt.create_login_user("ana@example.com", "admin")
+        .await
+        .unwrap();
     row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "Ana@Example.com").await;
 
     reboot(&tdb).await;
@@ -317,7 +350,10 @@ async fn a_row_with_its_own_access_key_does_not_block_the_address_its_profile_cl
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
     // Bob has his own access key; his profile says Ana's address (his own doing, `/api/profile`).
-    let bob = rt.create_login_user("bob@example.com", "employee").await.unwrap();
+    let bob = rt
+        .create_login_user("bob@example.com", "employee")
+        .await
+        .unwrap();
     rt.update_user_profile(
         &bob.id,
         &UpdateUserProfile {
@@ -335,7 +371,11 @@ async fn a_row_with_its_own_access_key_does_not_block_the_address_its_profile_cl
     let rt = reboot(&tdb).await;
 
     assert_eq!(access_email(&raw, "u-ana").await, "ana@example.com");
-    assert_eq!(access_email(&raw, &bob.id).await, "bob@example.com", "Bob keeps his own");
+    assert_eq!(
+        access_email(&raw, &bob.id).await,
+        "bob@example.com",
+        "Bob keeps his own"
+    );
     assert!(rt.unresolved_access_emails().await.unwrap().is_empty());
 }
 
@@ -389,7 +429,11 @@ async fn a_rival_profile_of_another_hub_does_not_block_this_hub() {
     reboot(&tdb).await;
 
     assert_eq!(access_email(&raw, "u-ana").await, "ana@example.com");
-    assert_eq!(access_email(&raw, "u-other").await, "", "the other hub's row is not this run's");
+    assert_eq!(
+        access_email(&raw, "u-other").await,
+        "",
+        "the other hub's row is not this run's"
+    );
 }
 
 /// The profile of **another hub** is not this hub's to read. Both tables carry `hub_id` now
@@ -446,7 +490,10 @@ async fn the_copied_address_is_trimmed() {
 async fn a_profile_email_that_diverges_from_the_access_email_is_left_alone() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
-    let ana = rt.create_login_user("ana@work.example", "manager").await.unwrap();
+    let ana = rt
+        .create_login_user("ana@work.example", "manager")
+        .await
+        .unwrap();
     rt.update_user_profile(
         &ana.id,
         &UpdateUserProfile {
@@ -466,7 +513,10 @@ async fn a_profile_email_that_diverges_from_the_access_email_is_left_alone() {
         "ana@work.example",
         "the key her membership hangs from is not replaced by the one she edits herself"
     );
-    assert_eq!(rt.user_profile(&ana.id).await.unwrap().email, "ana@home.example");
+    assert_eq!(
+        rt.user_profile(&ana.id).await.unwrap().email,
+        "ana@home.example"
+    );
     assert!(
         rt.unresolved_access_emails().await.unwrap().is_empty(),
         "a divergence by design is not something a human has to look at"
@@ -506,8 +556,14 @@ async fn a_healthy_hub_is_untouched_and_running_it_twice_changes_nothing() {
     reboot(&tdb).await;
     let after_second = snapshot(&raw).await;
 
-    assert_eq!(before, after_first, "a hub with nothing wrong is not touched");
-    assert_eq!(after_first, after_second, "re-running corrects nothing a second time");
+    assert_eq!(
+        before, after_first,
+        "a hub with nothing wrong is not touched"
+    );
+    assert_eq!(
+        after_first, after_second,
+        "re-running corrects nothing a second time"
+    );
     assert!(rt.unresolved_access_emails().await.unwrap().is_empty());
 }
 
@@ -571,8 +627,12 @@ async fn a_hub_whose_profile_table_is_missing_still_boots() {
     let tdb = TestDb::new().await;
     let rt = reboot(&tdb).await;
     let raw = tdb.adapter().await;
-    rt.create_login_user("ana@example.com", "manager").await.unwrap();
-    raw.execute_batch("DROP TABLE hub_user_profile;").await.unwrap();
+    rt.create_login_user("ana@example.com", "manager")
+        .await
+        .unwrap();
+    raw.execute_batch("DROP TABLE hub_user_profile;")
+        .await
+        .unwrap();
 
     reboot(&tdb).await; // panics if `ensure_system_tables` propagated the failure
 
@@ -625,7 +685,9 @@ async fn no_alta_path_writes_the_profile_email_without_the_access_email() {
     assert_access_email_is_written(&raw, "after editing an email in Personal").await;
 
     // 3) `POST /api/members` (ADR-0157 §7).
-    rt.create_login_user("carla@example.com", "employee").await.unwrap();
+    rt.create_login_user("carla@example.com", "employee")
+        .await
+        .unwrap();
     assert_access_email_is_written(&raw, "after the /api/members alta").await;
 
     // 4) The owner seeded by provisioning (`HUB_OWNER_EMAIL`, ADR-0157).
@@ -633,9 +695,15 @@ async fn no_alta_path_writes_the_profile_email_without_the_access_email() {
     assert_access_email_is_written(&raw, "after seeding the hub owner").await;
 
     // 5) The row a first cloud login provisions when nobody matched.
-    rt.get_or_link_cloud_user("cloud-new", "Nuevo", "employee", Some("nuevo@example.com"), None)
-        .await
-        .unwrap();
+    rt.get_or_link_cloud_user(
+        "cloud-new",
+        "Nuevo",
+        "employee",
+        Some("nuevo@example.com"),
+        None,
+    )
+    .await
+    .unwrap();
     assert_access_email_is_written(&raw, "after a cloud login provisioned a row").await;
 
     // 6) Personal, local user: no email anywhere — the invariant is about agreement, not presence.
@@ -680,7 +748,10 @@ async fn editing_your_own_profile_never_writes_the_access_email() {
     let tdb = TestDb::new().await;
     let rt = reboot(&tdb).await;
     let raw = tdb.adapter().await;
-    let ana = rt.create_login_user("ana@example.com", "manager").await.unwrap();
+    let ana = rt
+        .create_login_user("ana@example.com", "manager")
+        .await
+        .unwrap();
 
     rt.update_user_profile(
         &ana.id,
@@ -725,7 +796,10 @@ async fn the_staff_list_flags_the_row_whose_email_revokes_nothing() {
     let rt = reboot(&tdb).await;
     let rows = rt.list_hub_users().await.unwrap();
 
-    let ana = rows.iter().find(|u| u.id == "u-ana-1").expect("Ana está en la lista");
+    let ana = rows
+        .iter()
+        .find(|u| u.id == "u-ana-1")
+        .expect("Ana está en la lista");
     assert_eq!(
         ana.access_email_conflict,
         Some(erplora_runtime::access_email::AccessEmailConflict::TwoProfilesClaimIt),
@@ -741,13 +815,18 @@ async fn the_staff_list_flags_the_row_whose_email_revokes_nothing() {
 async fn a_row_whose_address_belongs_to_somebody_else_says_so() {
     let tdb = TestDb::new().await;
     let (rt, raw) = hub_deployed_before_the_fix(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin").await.unwrap();
+    rt.create_login_user("ana@example.com", "admin")
+        .await
+        .unwrap();
     row_written_before_the_fix(&raw, "u-bob", "Bob Ruiz", "employee", "ana@example.com").await;
 
     let rt = reboot(&tdb).await;
     let rows = rt.list_hub_users().await.unwrap();
 
-    let bob = rows.iter().find(|u| u.id == "u-bob").expect("Bob está en la lista");
+    let bob = rows
+        .iter()
+        .find(|u| u.id == "u-bob")
+        .expect("Bob está en la lista");
     assert_eq!(
         bob.access_email_conflict,
         Some(erplora_runtime::access_email::AccessEmailConflict::AnotherRowAnswersForIt),
@@ -760,8 +839,12 @@ async fn a_row_whose_address_belongs_to_somebody_else_says_so() {
 async fn nobody_is_flagged_in_a_hub_with_nothing_to_resolve() {
     let tdb = TestDb::new().await;
     let rt = reboot(&tdb).await;
-    rt.create_login_user("ana@example.com", "admin").await.unwrap();
-    rt.create_login_user("bob@example.com", "employee").await.unwrap();
+    rt.create_login_user("ana@example.com", "admin")
+        .await
+        .unwrap();
+    rt.create_login_user("bob@example.com", "employee")
+        .await
+        .unwrap();
 
     let rows = rt.list_hub_users().await.unwrap();
 

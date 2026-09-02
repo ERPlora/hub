@@ -90,9 +90,13 @@ async fn parked(rt: &Runtime, approval: Value) -> (String, String) {
         .await
         .unwrap()
         .id;
-    rt.replace_flow_grants(&flow_id, &[(GrantKind::Command, "crm.note.add".into())], OWNER)
-        .await
-        .unwrap();
+    rt.replace_flow_grants(
+        &flow_id,
+        &[(GrantKind::Command, "crm.note.add".into())],
+        OWNER,
+    )
+    .await
+    .unwrap();
     let run_id = rt
         .start_flow_run(
             &flow_id,
@@ -186,7 +190,10 @@ async fn a_flow_stops_on_its_approval_step_and_the_tray_carries_the_question() {
     );
     assert_eq!(question.on_expire, approvals::ON_EXPIRE_REJECT);
     assert_eq!(question.on_reject, approvals::ON_REJECT_CANCEL);
-    assert!(question.expires_at.is_some(), "a question is never open-ended");
+    assert!(
+        question.expires_at.is_some(),
+        "a question is never open-ended"
+    );
 
     // And it stays stopped: ticking again neither runs the write nor asks a second time.
     rt.process_flows().await.unwrap();
@@ -215,10 +222,16 @@ async fn the_pause_needs_no_grant_and_no_language_model() {
         .unwrap()
         .id;
     // Deliberately no grants at all: asking a person is not reaching for a capability.
-    let run_id = rt.start_flow_run(&flow_id, &json!({}), OWNER).await.unwrap();
+    let run_id = rt
+        .start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
 
-    assert_eq!(run_status(&rt, &run_id).await, store::STATUS_WAITING_APPROVAL);
+    assert_eq!(
+        run_status(&rt, &run_id).await,
+        store::STATUS_WAITING_APPROVAL
+    );
     assert_eq!(only_pending(&rt).await.title, "¿Seguimos?");
 }
 
@@ -248,7 +261,10 @@ async fn a_replayed_step_finds_the_question_it_already_asked_instead_of_asking_t
         first.id,
         "the same question, not a second one nobody would ever close"
     );
-    assert_eq!(run_status(&rt, &run_id).await, store::STATUS_WAITING_APPROVAL);
+    assert_eq!(
+        run_status(&rt, &run_id).await,
+        store::STATUS_WAITING_APPROVAL
+    );
 }
 
 // ── approved ──────────────────────────────────────────────────────────────────────────────────
@@ -286,7 +302,9 @@ async fn approving_carries_the_run_on_and_leaves_the_decision_for_the_next_steps
     );
     assert_eq!(output["comment"], json!("conforme"));
     assert!(
-        output["decided_at"].as_str().is_some_and(|s| s.contains('T')),
+        output["decided_at"]
+            .as_str()
+            .is_some_and(|s| s.contains('T')),
         "when it was decided is part of what the flow can read: {output}"
     );
 }
@@ -309,7 +327,11 @@ async fn deciding_twice_writes_once_and_the_second_press_is_refused_by_name() {
     assert!(format!("{err}").contains(OWNER), "{err}");
 
     rt.process_flows().await.unwrap();
-    assert_eq!(notes(&rt).await.len(), 1, "exactly one note, whatever the tray did");
+    assert_eq!(
+        notes(&rt).await.len(),
+        1,
+        "exactly one note, whatever the tray did"
+    );
     assert_eq!(run_status(&rt, &run_id).await, store::STATUS_DONE);
 }
 
@@ -423,7 +445,10 @@ async fn the_expiry_policy_travels_in_the_row_the_step_wrote() {
         let rt = runtime().await;
         parked(&rt, ask(json!({ "on_expire": policy }))).await;
         let question = only_pending(&rt).await;
-        assert_eq!(question.on_expire, policy, "written where the sweep reads it");
+        assert_eq!(
+            question.on_expire, policy,
+            "written where the sweep reads it"
+        );
         assert_eq!(ExpiryPolicy::parse(&question.on_expire), parsed);
     }
 }
@@ -465,7 +490,9 @@ async fn editing_the_flow_does_not_change_a_question_already_in_the_tray() {
     );
 
     // …and the edit does not change what her refusal costs either.
-    rt.decide_flow_approval(&asked.id, false, OWNER, "").await.unwrap();
+    rt.decide_flow_approval(&asked.id, false, OWNER, "")
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
     assert_eq!(run_status(&rt, &run_id).await, store::STATUS_CANCELLED);
     assert!(notes(&rt).await.is_empty());
@@ -528,7 +555,10 @@ async fn only_the_role_the_document_named_may_decide_and_an_administrator_always
                  if code == approvals::ERR_APPROVAL_NOT_YOURS),
         "{err}"
     );
-    assert!(notes(&rt).await.is_empty(), "a refused decider changes nothing");
+    assert!(
+        notes(&rt).await.is_empty(),
+        "a refused decider changes nothing"
+    );
     assert_eq!(
         rt.get_flow_approval(&question.id).await.unwrap().status,
         approvals::STATUS_PENDING,
@@ -603,11 +633,20 @@ async fn the_question_of_one_hub_is_invisible_and_undecidable_from_its_neighbour
     // The neighbour's own sweep does not close my question, and mine stays exactly as it was.
     theirs.sweep_expired_flow_approvals().await.unwrap();
     assert_eq!(
-        mine.get_flow_approval(&my_question.id).await.unwrap().status,
+        mine.get_flow_approval(&my_question.id)
+            .await
+            .unwrap()
+            .status,
         approvals::STATUS_PENDING
     );
-    assert_eq!(run_status(&mine, &my_run).await, store::STATUS_WAITING_APPROVAL);
-    assert_eq!(run_status(&theirs, &their_run).await, store::STATUS_WAITING_APPROVAL);
+    assert_eq!(
+        run_status(&mine, &my_run).await,
+        store::STATUS_WAITING_APPROVAL
+    );
+    assert_eq!(
+        run_status(&theirs, &their_run).await,
+        store::STATUS_WAITING_APPROVAL
+    );
     assert_eq!(only_pending(&mine).await.id, my_question.id);
 }
 
@@ -633,7 +672,10 @@ async fn an_unrecognised_reject_policy_in_the_row_ends_the_run() {
         .unwrap();
     rt.process_flows().await.unwrap();
 
-    assert_eq!(RejectPolicy::parse("nonsense-from-v2"), RejectPolicy::Cancel);
+    assert_eq!(
+        RejectPolicy::parse("nonsense-from-v2"),
+        RejectPolicy::Cancel
+    );
     assert_eq!(run_status(&rt, &run_id).await, store::STATUS_CANCELLED);
     assert!(notes(&rt).await.is_empty());
 }
@@ -688,5 +730,9 @@ async fn asking_emits_the_same_ephemeral_fact_a_model_s_proposal_does() {
         .await
         .unwrap();
     rt.process_flows().await.unwrap();
-    assert_eq!(created(&sink).len(), 1, "still one: the same question, asked once");
+    assert_eq!(
+        created(&sink).len(),
+        1,
+        "still one: the same question, asked once"
+    );
 }

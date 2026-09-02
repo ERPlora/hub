@@ -31,7 +31,9 @@ fn fixture(name: &str) -> PathBuf {
 async fn runtime_with_base() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture("base")).await.expect("install base 1.2.0");
+    rt.install_from_dir(&fixture("base"))
+        .await
+        .expect("install base 1.2.0");
     rt
 }
 
@@ -90,8 +92,14 @@ fn plain_and_versioned_entries_parse_side_by_side() {
     .expect("both shapes parse");
     let ids: Vec<&str> = manifest.depends_on.iter().map(|d| d.id.as_str()).collect();
     assert_eq!(ids, ["taxes", "inventory"]);
-    assert_eq!(manifest.depends_on[0].min_version, None, "a plain id floors nothing");
-    assert_eq!(manifest.depends_on[1].min_version.as_deref(), Some("1.2.20"));
+    assert_eq!(
+        manifest.depends_on[0].min_version, None,
+        "a plain id floors nothing"
+    );
+    assert_eq!(
+        manifest.depends_on[1].min_version.as_deref(),
+        Some("1.2.20")
+    );
 }
 
 /// An object entry with a field this core does not know is refused at parse: a dependency entry
@@ -104,5 +112,8 @@ fn an_unknown_field_in_a_versioned_entry_is_refused() {
     }))
     .expect_err("`max_version` is not part of the dependency contract")
     .to_string();
-    assert!(err.contains("max_version"), "the refusal names the field, got: {err}");
+    assert!(
+        err.contains("max_version"),
+        "the refusal names the field, got: {err}"
+    );
 }

@@ -29,7 +29,9 @@ fn params(v: serde_json::Value) -> Params {
 async fn hub_with_a_module() -> Runtime {
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), "h1");
     rt.ensure_system_tables().await.unwrap();
-    rt.install_from_dir(&fixture_dir()).await.expect("install w140");
+    rt.install_from_dir(&fixture_dir())
+        .await
+        .expect("install w140");
     rt
 }
 

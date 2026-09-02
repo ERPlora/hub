@@ -19,8 +19,12 @@ async fn fixture() -> axum::Router {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-rate");
     rt.ensure_system_tables().await.unwrap();
-    rt.create_user("Admin", "1111", "admin", None).await.unwrap();
-    rt.create_user("Cashier", "2222", "employee", None).await.unwrap();
+    rt.create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    rt.create_user("Cashier", "2222", "employee", None)
+        .await
+        .unwrap();
     let temp = std::env::temp_dir().join(format!("erplora-pin-rate-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
@@ -58,11 +62,19 @@ async fn body_json(resp: axum::response::Response) -> Value {
 async fn five_straight_failures_lock_the_identity_even_for_the_right_pin() {
     let router = fixture().await;
     for _ in 0..5 {
-        let resp = router.clone().oneshot(pin_login("Admin", "0000")).await.unwrap();
+        let resp = router
+            .clone()
+            .oneshot(pin_login("Admin", "0000"))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
     // The 6th attempt is throttled BEFORE verification: even the right pin gets 429.
-    let resp = router.clone().oneshot(pin_login("Admin", "1111")).await.unwrap();
+    let resp = router
+        .clone()
+        .oneshot(pin_login("Admin", "1111"))
+        .await
+        .unwrap();
     assert_eq!(
         resp.status(),
         StatusCode::TOO_MANY_REQUESTS,
@@ -80,13 +92,29 @@ async fn five_straight_failures_lock_the_identity_even_for_the_right_pin() {
 async fn a_success_before_the_threshold_resets_the_counter() {
     let router = fixture().await;
     for _ in 0..4 {
-        let resp = router.clone().oneshot(pin_login("Admin", "0000")).await.unwrap();
+        let resp = router
+            .clone()
+            .oneshot(pin_login("Admin", "0000"))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
-    let resp = router.clone().oneshot(pin_login("Admin", "1111")).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "4 failures + the right pin must still log in");
+    let resp = router
+        .clone()
+        .oneshot(pin_login("Admin", "1111"))
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "4 failures + the right pin must still log in"
+    );
     // Counter is clean again: a fresh failure is a plain 401, not a lock.
-    let resp = router.clone().oneshot(pin_login("Admin", "0000")).await.unwrap();
+    let resp = router
+        .clone()
+        .oneshot(pin_login("Admin", "0000"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -94,10 +122,18 @@ async fn a_success_before_the_threshold_resets_the_counter() {
 async fn the_lock_is_per_identity_not_global() {
     let router = fixture().await;
     for _ in 0..5 {
-        let resp = router.clone().oneshot(pin_login("Admin", "0000")).await.unwrap();
+        let resp = router
+            .clone()
+            .oneshot(pin_login("Admin", "0000"))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
     // Admin is locked; the cashier keeps working (a brute-force on one name must not DoS the shop).
-    let resp = router.clone().oneshot(pin_login("Cashier", "2222")).await.unwrap();
+    let resp = router
+        .clone()
+        .oneshot(pin_login("Cashier", "2222"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 }

@@ -117,7 +117,8 @@ fn free_port() -> u16 {
 
 /// Arranca el hub por su punto de entrada REAL y espera a que conteste. Devuelve la base HTTP.
 async fn boot_hub(hub_id: &str, schema: &str, cloud: &str, tag: &str) -> String {
-    let base_dir = std::env::temp_dir().join(format!("erplora_newborn_{}_{tag}", std::process::id()));
+    let base_dir =
+        std::env::temp_dir().join(format!("erplora_newborn_{}_{tag}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base_dir);
     let cfg = ServeConfig {
         database_url: dsn_for(schema),
@@ -264,7 +265,9 @@ async fn a_hub_that_already_had_modules_keeps_them() {
         erplora_runtime::installer::ensure_hub_module_table(&adapter)
             .await
             .unwrap();
-        erplora_runtime::identity::ensure_tables(&adapter).await.unwrap();
+        erplora_runtime::identity::ensure_tables(&adapter)
+            .await
+            .unwrap();
         erplora_runtime::system_migrations::apply(&adapter, hub_id)
             .await
             .unwrap();

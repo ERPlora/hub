@@ -21,13 +21,13 @@
 
 use std::collections::BTreeMap;
 
-use erplora_db::{DatabaseAdapter, Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, DatabaseAdapter, Params};
 use erplora_runtime::export::{
-    BlueprintManifest, BundlePurpose, HubMeta, ManifestModule, HUB_ID_PLACEHOLDER, SCHEMA_VERSION,
-    sha256_hex,
+    sha256_hex, BlueprintManifest, BundlePurpose, HubMeta, ManifestModule, HUB_ID_PLACEHOLDER,
+    SCHEMA_VERSION,
 };
 use erplora_runtime::fiscal_profile::{self, FiscalStatus};
-use erplora_runtime::import::{ImportSelection, SectionStatus, ignore_reason, import_sections};
+use erplora_runtime::import::{ignore_reason, import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
@@ -101,7 +101,10 @@ fn tampered_bundle() -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
         .into_bytes(),
     );
 
-    let sha256 = files.iter().map(|(p, b)| (p.clone(), sha256_hex(b))).collect();
+    let sha256 = files
+        .iter()
+        .map(|(p, b)| (p.clone(), sha256_hex(b)))
+        .collect();
     let manifest = BlueprintManifest {
         schema_version: SCHEMA_VERSION,
         // `backup` on purpose: the permissive end of `purpose`. If not even a backup of ANOTHER
@@ -116,7 +119,11 @@ fn tampered_bundle() -> (BlueprintManifest, BTreeMap<String, Vec<u8>>) {
             hub_id: ORIGIN.into(),
         },
         created_at: "2026-08-08T00:00:00Z".into(),
-        modules: vec![ManifestModule { id: "_hub".into(), version: "1.0.0".into(), with_data: true }],
+        modules: vec![ManifestModule {
+            id: "_hub".into(),
+            version: "1.0.0".into(),
+            with_data: true,
+        }],
         sections: vec![
             "hub_settings".into(),
             "_hub_fiscal_profile".into(),
@@ -147,28 +154,49 @@ async fn a_bundle_from_another_hub_never_touches_the_fiscal_profile() {
     let mut rt = Runtime::with_hub_id(Box::new(fresh_db().await), TARGET);
     rt.ensure_system_tables().await.expect("boot");
     go_live(rt.db(), TARGET).await;
-    let before = fiscal_profile::load(rt.db(), TARGET).await.unwrap().expect("a live profile");
+    let before = fiscal_profile::load(rt.db(), TARGET)
+        .await
+        .unwrap()
+        .expect("a live profile");
 
     let (manifest, files) = tampered_bundle();
     let report = import_sections(&mut rt, &manifest, &files, &import_everything(), TARGET)
         .await
-        .expect("a bundle that oversteps is refused section by section, it does not kill the import");
+        .expect(
+            "a bundle that oversteps is refused section by section, it does not kill the import",
+        );
 
     // ── The profile did not move. Not one field. ─────────────────────────────
-    let after = fiscal_profile::load(rt.db(), TARGET).await.unwrap().expect("the profile survives");
+    let after = fiscal_profile::load(rt.db(), TARGET)
+        .await
+        .unwrap()
+        .expect("the profile survives");
     assert_eq!(after, before, "no bundle writes the hub's fiscal profile");
-    assert_eq!(after.taxpayer_id, "B12345674", "the tax id the emitted chain is anchored to");
-    assert_eq!(after.system_id, TARGET, "NumeroInstalacion = hub_id (ADR-0202)");
+    assert_eq!(
+        after.taxpayer_id, "B12345674",
+        "the tax id the emitted chain is anchored to"
+    );
+    assert_eq!(
+        after.system_id, TARGET,
+        "NumeroInstalacion = hub_id (ADR-0202)"
+    );
     assert_eq!(after.status, FiscalStatus::Active);
 
     // …and neither did the registry that says WHAT this country owes: one extra row there and a
     // Spanish hub would resolve to «owes nothing» on its next boot.
     let regimes = rt
         .db()
-        .query("SELECT country_code, regime_key FROM _hub_fiscal_regime_registry", &Params::new())
+        .query(
+            "SELECT country_code, regime_key FROM _hub_fiscal_regime_registry",
+            &Params::new(),
+        )
         .await
         .unwrap();
-    assert_eq!(regimes.rows.len(), 1, "the regime registry is core data, not bundle payload");
+    assert_eq!(
+        regimes.rows.len(),
+        1,
+        "the regime registry is core data, not bundle payload"
+    );
     assert_eq!(regimes.rows[0]["regime_key"].as_str(), Some("verifactu"));
 
     // ── It was IGNORED, and said so — not skipped in silence, not a crash. ───
@@ -186,7 +214,11 @@ async fn a_bundle_from_another_hub_never_touches_the_fiscal_profile() {
     }
 
     // ── The rest of the bundle landed: this is a discard, not a broken import. ─
-    let settings = report.sections.iter().find(|s| s.section == "hub_settings").expect("settings");
+    let settings = report
+        .sections
+        .iter()
+        .find(|s| s.section == "hub_settings")
+        .expect("settings");
     assert!(
         matches!(settings.status, SectionStatus::Applied),
         "the legitimate section still applies: {:?}",
@@ -206,10 +238,16 @@ async fn a_reboot_after_the_tampered_import_still_owes_verifactu() {
         .await
         .expect("import");
 
-    let profile = fiscal_profile::ensure(rt.db(), TARGET).await.expect("re-resolve at boot");
+    let profile = fiscal_profile::ensure(rt.db(), TARGET)
+        .await
+        .expect("re-resolve at boot");
 
     assert_eq!(profile.fiscal_system, "verifactu");
-    assert_eq!(profile.status, FiscalStatus::Unconfigured, "still unconfigured, never «already live»");
+    assert_eq!(
+        profile.status,
+        FiscalStatus::Unconfigured,
+        "still unconfigured, never «already live»"
+    );
     assert_eq!(profile.system_id, TARGET);
     assert_eq!(profile.taxpayer_id, "", "no bundle hands this hub a tax id");
 }

@@ -71,7 +71,12 @@ impl MemoryMetric {
     /// `pub(crate)`: el heartbeat (hub#975) la usa como degradación honesta si el hilo de
     /// muestreo no vuelve.
     pub(crate) fn unavailable() -> Self {
-        Self { used_bytes: None, limit_bytes: None, fraction: None, peak_bytes: None }
+        Self {
+            used_bytes: None,
+            limit_bytes: None,
+            fraction: None,
+            peak_bytes: None,
+        }
     }
 }
 
@@ -85,7 +90,11 @@ pub struct CpuMetric {
 
 impl CpuMetric {
     pub(crate) fn unavailable() -> Self {
-        Self { used_cores: None, limit_cores: None, fraction: None }
+        Self {
+            used_cores: None,
+            limit_cores: None,
+            fraction: None,
+        }
     }
 }
 
@@ -155,7 +164,9 @@ fn parse_cpu_max_cores(s: &str) -> Option<f64> {
 
 /// Fracción de uso 0..1 = `used / limit`, saturada; `None` si no hay límite conocido (`> 0`).
 fn fraction(used: f64, limit: Option<f64>) -> Option<f64> {
-    limit.filter(|l| *l > 0.0).map(|l| (used / l).clamp(0.0, 1.0))
+    limit
+        .filter(|l| *l > 0.0)
+        .map(|l| (used / l).clamp(0.0, 1.0))
 }
 
 // ─────────────────────────── Lectura de memoria/CPU vía el trait ───────────────────────────
@@ -226,7 +237,12 @@ pub(crate) fn sample_cgroup(r: &dyn CgroupReader) -> (MemoryMetric, CpuMetric) {
     let start = read_cpu_usage_usec(r);
     std::thread::sleep(std::time::Duration::from_millis(CPU_SAMPLE_GAP_MS));
     let end = read_cpu_usage_usec(r);
-    let cpu = cpu_metric(start, end, CPU_SAMPLE_GAP_MS * 1_000, read_cpu_limit_cores(r));
+    let cpu = cpu_metric(
+        start,
+        end,
+        CPU_SAMPLE_GAP_MS * 1_000,
+        read_cpu_limit_cores(r),
+    );
     (memory, cpu)
 }
 
@@ -293,7 +309,11 @@ async fn read_sessions(
     )
     .await
     .unwrap_or(0);
-    SessionMetric { active, devices, max_devices }
+    SessionMetric {
+        active,
+        devices,
+        max_devices,
+    }
 }
 
 /// Ejecuta una query escalar y devuelve el primer valor de la primera fila como `i64` (tolera
@@ -493,9 +513,15 @@ mod tests {
     fn cgroup_parsers_cover_numbers_and_unlimited() {
         assert_eq!(parse_mem_max("134217728\n"), Some(134_217_728));
         assert_eq!(parse_mem_max("max\n"), None);
-        assert_eq!(parse_inactive_file("anon 1\ninactive_file 4096\nfile 8\n"), 4096);
+        assert_eq!(
+            parse_inactive_file("anon 1\ninactive_file 4096\nfile 8\n"),
+            4096
+        );
         assert_eq!(parse_inactive_file("anon 1\n"), 0);
-        assert_eq!(parse_cpu_usage_usec("usage_usec 999\nuser_usec 1\n"), Some(999));
+        assert_eq!(
+            parse_cpu_usage_usec("usage_usec 999\nuser_usec 1\n"),
+            Some(999)
+        );
         assert_eq!(parse_cpu_usage_usec("nr_throttled 0\n"), None);
         assert_eq!(parse_cpu_max_cores("50000 100000"), Some(0.5));
         assert_eq!(parse_cpu_max_cores("100000 100000"), Some(1.0));
@@ -522,14 +548,17 @@ mod tests {
         // y cuota de BD).
         let r = FakeCgroup::new(&[
             ("memory.current", "11534336\n"), // 11 MiB
-            ("memory.stat", "anon 7340032\ninactive_file 4194304\nfile 4194304\n"), // 4 MiB caché
+            (
+                "memory.stat",
+                "anon 7340032\ninactive_file 4194304\nfile 4194304\n",
+            ), // 4 MiB caché
             ("memory.max", "100663296\n"),    // 96 MiB (NUNCA 64: eso sería otro contenedor)
             ("cpu.max", "10000 100000"),      // 0,1 vCPU
         ]);
         let m = read_memory(&r);
         assert_eq!(m.limit_bytes, Some(100_663_296));
         assert_eq!(m.used_bytes, Some(7_340_032)); // 11 MiB − 4 MiB caché = 7 MiB
-        // 7 MiB de 96 MiB ≈ 7% — el «7% de RAM» observado en prod es coherente con estos valores.
+                                                   // 7 MiB de 96 MiB ≈ 7% — el «7% de RAM» observado en prod es coherente con estos valores.
         let pct = (m.fraction.expect("fracción con límite") * 100.0).round();
         assert_eq!(pct, 7.0);
         assert_eq!(read_cpu_limit_cores(&r), Some(0.1));

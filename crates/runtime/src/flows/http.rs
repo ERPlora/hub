@@ -331,7 +331,9 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(3));
         let db = db().await;
-        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
         let authority = allow(&db, "https://api.example.com/v1/*").await;
 
         let prepared = prepare(&db, HUB, FLOW, &calling_step(), &scope(), &authority)
@@ -353,7 +355,10 @@ mod tests {
 
         // What is written down: the same request with `***` where the credential was.
         let recorded = prepared.recorded_input.to_string();
-        assert!(!recorded.contains("sk-live-42"), "the run history never holds it: {recorded}");
+        assert!(
+            !recorded.contains("sk-live-42"),
+            "the run history never holds it: {recorded}"
+        );
         assert!(recorded.contains(REDACTED), "{recorded}");
         // …and the rest of the request IS there, or the audit would be useless.
         assert!(recorded.contains("+34600111222"), "{recorded}");
@@ -368,7 +373,9 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(3));
         let db = db().await;
-        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
         let authority = allow(&db, "https://api.example.com/v1/*").await;
         let prepared = prepare(&db, HUB, FLOW, &calling_step(), &scope(), &authority)
             .await
@@ -387,7 +394,9 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(3));
         let db = db().await;
-        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+        secrets::put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
         // A grant for a NEIGHBOURING path of the same host: the flow may call, just not this.
         let authority = allow(&db, "https://api.example.com/v2/*").await;
 
@@ -396,7 +405,10 @@ mod tests {
             .expect_err("no grant covers this URL");
         let text = format!("{err}");
         assert!(text.contains("api.example.com/v1/send"), "{text}");
-        assert!(!text.contains("sk-live-42"), "not even in the refusal: {text}");
+        assert!(
+            !text.contains("sk-live-42"),
+            "not even in the refusal: {text}"
+        );
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_GRANT_DENIED),
             "the code the module `flows` offers «grant it» from: {err}"
@@ -415,8 +427,11 @@ mod tests {
 
         // The same document, two runs. Only the one whose input lands inside the grant goes out —
         // which is the whole reason the match happens after templating.
-        let inside = json!({ "input": { "target": "https://api.example.com/v1/ping" }, "steps": {} });
-        assert!(prepare(&db, HUB, FLOW, &templated, &inside, &authority).await.is_ok());
+        let inside =
+            json!({ "input": { "target": "https://api.example.com/v1/ping" }, "steps": {} });
+        assert!(prepare(&db, HUB, FLOW, &templated, &inside, &authority)
+            .await
+            .is_ok());
 
         let outside = json!({ "input": { "target": "https://evil.test/steal" }, "steps": {} });
         assert!(prepare(&db, HUB, FLOW, &templated, &outside, &authority)
@@ -512,7 +527,9 @@ mod tests {
         for target in ["file:///etc/passwd", "", "//evil.test/x"] {
             let scope = json!({ "input": { "target": target }, "steps": {} });
             assert!(
-                prepare(&db, HUB, FLOW, &templated, &scope, &authority).await.is_err(),
+                prepare(&db, HUB, FLOW, &templated, &scope, &authority)
+                    .await
+                    .is_err(),
                 "`{target}` is not something this hub calls"
             );
         }

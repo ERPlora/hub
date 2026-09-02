@@ -65,7 +65,11 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
         .unwrap()
         .rows
         .first()
-        .and_then(|r| r["c"].as_i64().or_else(|| r["c"].as_f64().map(|f| f as i64)))
+        .and_then(|r| {
+            r["c"]
+                .as_i64()
+                .or_else(|| r["c"].as_f64().map(|f| f as i64))
+        })
         .unwrap_or(-1)
 }
 
@@ -179,7 +183,11 @@ async fn a_sale_triggers_a_flow_that_writes_in_another_module_and_its_cascade_su
     // `sales` could ever reach (hub#659).
     rt.process_flows().await.unwrap();
 
-    let notes = rows(&rt, "SELECT hub_id, created_by, customer_id, text FROM crm_note").await;
+    let notes = rows(
+        &rt,
+        "SELECT hub_id, created_by, customer_id, text FROM crm_note",
+    )
+    .await;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0]["customer_id"], json!("c-1"));
     assert_eq!(
@@ -198,7 +206,11 @@ async fn a_sale_triggers_a_flow_that_writes_in_another_module_and_its_cascade_su
         "the audit says a flow wrote this, and which one"
     );
 
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_DONE);
     let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
     assert_eq!(steps.len(), 1);
@@ -260,9 +272,14 @@ async fn the_chain_from_the_sale_to_the_last_event_is_reconstructible_from_the_r
     assert_eq!(sale["run_id"], json!(""), "no automation was running yet");
 
     // 2. The run names the event that caused it.
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(
-        json!(run.parent_event_id), sale["id"],
+        json!(run.parent_event_id),
+        sale["id"],
         "the run remembers which sale set it off"
     );
 
@@ -287,10 +304,7 @@ async fn the_chain_from_the_sale_to_the_last_event_is_reconstructible_from_the_r
     assert_eq!(steps[0].status, "done");
 
     // 5. And the same chain read the other way: from the sale, everything it set off.
-    let trace = rt
-        .events_of_run(&run.id)
-        .await
-        .unwrap();
+    let trace = rt.events_of_run(&run.id).await.unwrap();
     assert_eq!(trace.len(), 1, "one event came out of this run");
     assert_eq!(trace[0].event_name, "crm.note.added");
     assert_eq!(trace[0].status, "delivered");
@@ -315,10 +329,18 @@ async fn a_run_that_died_keeps_the_step_that_killed_it_and_its_error() {
     rt.drain_outbox().await.unwrap();
     rt.process_flows().await.unwrap();
 
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     let (_, steps) = rt.get_flow_run(&run.id).await.unwrap();
-    assert_eq!(steps.len(), 2, "the step that worked is kept next to the one that did not");
+    assert_eq!(
+        steps.len(),
+        2,
+        "the step that worked is kept next to the one that did not"
+    );
     assert_eq!(steps[0].step_id, "first");
     assert_eq!(steps[0].status, "done");
     assert_eq!(steps[1].step_id, "boom");
@@ -340,7 +362,11 @@ async fn the_filter_is_what_decides_and_a_sale_below_it_starts_nothing() {
     rt.drain_outbox().await.unwrap();
     rt.process_flows().await.unwrap();
 
-    assert!(rt.list_flow_runs(&flow_id, 10, None).await.unwrap().is_empty());
+    assert!(rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .is_empty());
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);
 }
 
@@ -357,7 +383,11 @@ async fn without_a_grant_the_flow_runs_and_writes_nothing() {
     rt.process_flows().await.unwrap();
 
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("flow.grant_denied"),
@@ -381,7 +411,11 @@ async fn a_grant_for_one_command_does_not_open_its_neighbour() {
     rt.process_flows().await.unwrap();
 
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_counter").await, 0);
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
 }
 
@@ -409,7 +443,10 @@ async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
         )
         .await
         .expect_err("a document the kernel can never execute is not stored");
-    assert!(format!("{refused}").contains("crm._purge_notes"), "{refused}");
+    assert!(
+        format!("{refused}").contains("crm._purge_notes"),
+        "{refused}"
+    );
 
     let flow_id = create_flow(&rt, welcome_definition()).await;
     let refused = rt
@@ -420,7 +457,10 @@ async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
         )
         .await
         .expect_err("a grant nobody can honour reads as authorisation on the screen");
-    assert!(format!("{refused}").contains("crm._purge_notes"), "{refused}");
+    assert!(
+        format!("{refused}").contains("crm._purge_notes"),
+        "{refused}"
+    );
     assert!(rt.list_flow_grants(&flow_id).await.unwrap().is_empty());
 
     // …and the ENGINE still refuses, which is the half that must never be traded for the doors.
@@ -456,7 +496,11 @@ async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
     rt.drain_outbox().await.unwrap();
     rt.process_flows().await.unwrap();
 
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("crm._purge_notes"),
@@ -489,7 +533,12 @@ async fn revoking_a_grant_stops_the_run_at_its_next_step() {
     rt.replace_flow_grants(&flow_id, &[], "hub_user:owner")
         .await
         .unwrap();
-    let run_id = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0).id;
+    let run_id = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0)
+        .id;
     let mut p = Params::new();
     p.insert("id".into(), json!(run_id));
     rt.db_for_test()
@@ -506,9 +555,17 @@ async fn revoking_a_grant_stops_the_run_at_its_next_step() {
         1,
         "the second write never happened"
     );
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
-    assert!(run.last_error.contains("flow.grant_denied"), "{}", run.last_error);
+    assert!(
+        run.last_error.contains("flow.grant_denied"),
+        "{}",
+        run.last_error
+    );
 }
 
 // ── the gates a flow inherits by going through `execute_at` ───────────────────────────────────
@@ -533,7 +590,11 @@ async fn the_fiscal_precondition_refuses_a_flow_exactly_as_it_refuses_a_person()
         0,
         "a grant authorises WHAT a flow may run, never WHETHER the hub may issue"
     );
-    let run = rt.list_flow_runs(&flow_id, 10, None).await.unwrap().remove(0);
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
     assert_eq!(run.status, store::STATUS_FAILED);
     assert!(
         run.last_error.contains("business_tax_id"),
@@ -610,7 +671,10 @@ async fn a_flow_of_another_hub_never_sees_this_hubs_events() {
     rt.process_flows().await.unwrap();
 
     assert!(
-        rt.list_flow_runs(&flow_id, 10, None).await.unwrap().is_empty(),
+        rt.list_flow_runs(&flow_id, 10, None)
+            .await
+            .unwrap()
+            .is_empty(),
         "a flow reacts to its own hub and to nothing else"
     );
     assert_eq!(count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await, 0);

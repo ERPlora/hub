@@ -30,7 +30,11 @@ impl NativeHost for MockHost {
 }
 
 fn empty_host() -> MockHost {
-    MockHost { config: vec![], chain_rows: vec![], anchor: vec![] }
+    MockHost {
+        config: vec![],
+        chain_rows: vec![],
+        anchor: vec![],
+    }
 }
 
 fn context(now: &str, ids: usize) -> Value {
@@ -69,25 +73,54 @@ async fn recover_manual_inserts_anchor_with_normalized_hash() {
         "payload": { "issuer_nif": "B12345678", "record_hash": hash_lower },
         "context": context("2026-06-10T10:00:00+00:00", 8),
     });
-    let out = VerifactuEngine.call("recover_manual", &input, &host).await.unwrap();
+    let out = VerifactuEngine
+        .call("recover_manual", &input, &host)
+        .await
+        .unwrap();
     assert_eq!(out.operations.len(), 2, "ancla + evento");
     let anchor = &out.operations[0];
     assert_eq!(anchor.command, "verifactu._insert_recovery");
-    assert_eq!(anchor.params.get("record_hash").unwrap().as_str().unwrap(), "A".repeat(64));
-    assert_eq!(anchor.params.get("sequence_number").unwrap().as_i64().unwrap(), 1);
+    assert_eq!(
+        anchor.params.get("record_hash").unwrap().as_str().unwrap(),
+        "A".repeat(64)
+    );
+    assert_eq!(
+        anchor
+            .params
+            .get("sequence_number")
+            .unwrap()
+            .as_i64()
+            .unwrap(),
+        1
+    );
     assert_eq!(out.operations[1].command, "verifactu._insert_event");
 }
 
 #[tokio::test]
 async fn recover_manual_continues_from_existing_sequence() {
     // Ya hay registros: la última secuencia es 7 → el ancla debe ir a 8.
-    let host = MockHost { config: vec![], chain_rows: vec![], anchor: vec![json!({ "sequence_number": 7 })] };
+    let host = MockHost {
+        config: vec![],
+        chain_rows: vec![],
+        anchor: vec![json!({ "sequence_number": 7 })],
+    };
     let input = json!({
         "payload": { "issuer_nif": "B12345678", "record_hash": "b".repeat(64) },
         "context": context("2026-06-10T10:00:00+00:00", 8),
     });
-    let out = VerifactuEngine.call("recover_manual", &input, &host).await.unwrap();
-    assert_eq!(out.operations[0].params.get("sequence_number").unwrap().as_i64().unwrap(), 8);
+    let out = VerifactuEngine
+        .call("recover_manual", &input, &host)
+        .await
+        .unwrap();
+    assert_eq!(
+        out.operations[0]
+            .params
+            .get("sequence_number")
+            .unwrap()
+            .as_i64()
+            .unwrap(),
+        8
+    );
 }
 
 #[tokio::test]
@@ -97,7 +130,10 @@ async fn recover_manual_rejects_bad_hash() {
         "payload": { "issuer_nif": "B12345678", "record_hash": "no-es-hex" },
         "context": context("2026-06-10T10:00:00+00:00", 8),
     });
-    assert!(VerifactuEngine.call("recover_manual", &input, &host).await.is_err());
+    assert!(VerifactuEngine
+        .call("recover_manual", &input, &host)
+        .await
+        .is_err());
 }
 
 // ── validate_chain ──────────────────────────────────────────────────────────────
@@ -106,16 +142,26 @@ async fn recover_manual_rejects_bad_hash() {
 async fn validate_chain_ok_for_consistent_chain() {
     let (r1, h1) = alta_row(1, "FA/001", "", "2026-06-10T12:00:00+00:00", 1);
     let (r2, _) = alta_row(2, "FA/002", &h1, "2026-06-10T13:00:00+00:00", 0);
-    let host = MockHost { config: vec![], chain_rows: vec![r1, r2], anchor: vec![] };
+    let host = MockHost {
+        config: vec![],
+        chain_rows: vec![r1, r2],
+        anchor: vec![],
+    };
     let input = json!({
         "payload": { "issuer_nif": "B12345678" },
         "context": context("2026-06-10T14:00:00+00:00", 4),
     });
-    let out = VerifactuEngine.call("validate_chain", &input, &host).await.unwrap();
+    let out = VerifactuEngine
+        .call("validate_chain", &input, &host)
+        .await
+        .unwrap();
     assert_eq!(out.operations.len(), 1);
     let ev = &out.operations[0];
     assert_eq!(ev.command, "verifactu._insert_event");
-    assert_eq!(ev.params.get("event_type").unwrap().as_str().unwrap(), "chain_validated");
+    assert_eq!(
+        ev.params.get("event_type").unwrap().as_str().unwrap(),
+        "chain_validated"
+    );
 }
 
 #[tokio::test]
@@ -123,13 +169,28 @@ async fn validate_chain_detects_tampering() {
     let (r1, h1) = alta_row(1, "FA/001", "", "2026-06-10T12:00:00+00:00", 1);
     let (mut r2, _) = alta_row(2, "FA/002", &h1, "2026-06-10T13:00:00+00:00", 0);
     r2["record_hash"] = json!("DEADBEEF"); // huella almacenada falseada
-    let host = MockHost { config: vec![], chain_rows: vec![r1, r2], anchor: vec![] };
+    let host = MockHost {
+        config: vec![],
+        chain_rows: vec![r1, r2],
+        anchor: vec![],
+    };
     let input = json!({
         "payload": { "issuer_nif": "B12345678" },
         "context": context("2026-06-10T14:00:00+00:00", 4),
     });
-    let out = VerifactuEngine.call("validate_chain", &input, &host).await.unwrap();
-    assert_eq!(out.operations[0].params.get("event_type").unwrap().as_str().unwrap(), "chain_error");
+    let out = VerifactuEngine
+        .call("validate_chain", &input, &host)
+        .await
+        .unwrap();
+    assert_eq!(
+        out.operations[0]
+            .params
+            .get("event_type")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "chain_error"
+    );
 }
 
 #[tokio::test]
@@ -144,13 +205,28 @@ async fn validate_chain_trusts_recovery_anchor() {
         "generation_timestamp": "2026-06-10T11:00:00+00:00",
     });
     let (next, _) = alta_row(6, "FA/100", &anchor_hash, "2026-06-10T12:00:00+00:00", 0);
-    let host = MockHost { config: vec![], chain_rows: vec![anchor, next], anchor: vec![] };
+    let host = MockHost {
+        config: vec![],
+        chain_rows: vec![anchor, next],
+        anchor: vec![],
+    };
     let input = json!({
         "payload": { "issuer_nif": "B12345678" },
         "context": context("2026-06-10T14:00:00+00:00", 4),
     });
-    let out = VerifactuEngine.call("validate_chain", &input, &host).await.unwrap();
-    assert_eq!(out.operations[0].params.get("event_type").unwrap().as_str().unwrap(), "chain_validated");
+    let out = VerifactuEngine
+        .call("validate_chain", &input, &host)
+        .await
+        .unwrap();
+    assert_eq!(
+        out.operations[0]
+            .params
+            .get("event_type")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "chain_validated"
+    );
 }
 
 // ── consulta AEAT ─────────────────────────────────────────────────────────────

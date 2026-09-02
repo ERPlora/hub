@@ -129,7 +129,12 @@ impl Runtime {
     /// reemplazo en dos pasos.
     pub async fn delete_business_certificate(&self) -> Result<()> {
         self.refuse_if_demo(DemoLock::BusinessCertificate)?;
-        certificate::delete(self.db.as_ref(), &self.hub_id, certificate::CertificateKind::Own).await
+        certificate::delete(
+            self.db.as_ref(),
+            &self.hub_id,
+            certificate::CertificateKind::Own,
+        )
+        .await
     }
 
     /// Escribe el techo de la simplificada que declara un módulo fiscal (hub#1010). Lo llama el
@@ -141,8 +146,13 @@ impl Runtime {
         regime_key: &str,
         max_cents: Option<i64>,
     ) -> Result<()> {
-        fiscal_profile::apply_regime_declaration(self.db.as_ref(), country_code, regime_key, max_cents)
-            .await
+        fiscal_profile::apply_regime_declaration(
+            self.db.as_ref(),
+            country_code,
+            regime_key,
+            max_cents,
+        )
+        .await
     }
 }
 

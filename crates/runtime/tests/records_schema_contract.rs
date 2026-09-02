@@ -61,7 +61,10 @@ fn the_reason_vocabulary_is_closed() {
         let ok = manifest_with_records(serde_json::json!({
             "sale": { "mutable": false, "reason": reason }
         }));
-        assert!(schema.is_valid(&ok), "`{reason}` belongs to the closed vocabulary");
+        assert!(
+            schema.is_valid(&ok),
+            "`{reason}` belongs to the closed vocabulary"
+        );
     }
     let bad = manifest_with_records(serde_json::json!({
         "sale": { "mutable": false, "reason": "marketing" }

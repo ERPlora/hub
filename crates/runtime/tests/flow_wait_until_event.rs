@@ -100,8 +100,12 @@ fn reschedule_hook() -> Value {
 
 /// Crea el flujo, le concede la escritura de después y arranca un run que llega a dormir.
 async fn sleeping(rt: &Runtime, step: Value) -> (String, String) {
-    sleeping_with(rt, step, json!({ "appointment_at": appointment(), "appointment_id": "a-42" }))
-        .await
+    sleeping_with(
+        rt,
+        step,
+        json!({ "appointment_at": appointment(), "appointment_id": "a-42" }),
+    )
+    .await
 }
 
 async fn sleeping_with(rt: &Runtime, step: Value, input: Value) -> (String, String) {
@@ -117,9 +121,13 @@ async fn sleeping_with(rt: &Runtime, step: Value, input: Value) -> (String, Stri
         .await
         .unwrap()
         .id;
-    rt.replace_flow_grants(&flow_id, &[(GrantKind::Command, "crm.note.add".into())], OWNER)
-        .await
-        .unwrap();
+    rt.replace_flow_grants(
+        &flow_id,
+        &[(GrantKind::Command, "crm.note.add".into())],
+        OWNER,
+    )
+    .await
+    .unwrap();
     let run_id = rt.start_flow_run(&flow_id, &input, OWNER).await.unwrap();
     rt.process_flows().await.unwrap();
     (flow_id, run_id)
@@ -215,16 +223,26 @@ async fn la_espera_se_arma_veinticuatro_horas_antes_del_instante_del_evento() {
     .await;
 
     assert_eq!(status(&rt, &run_id).await, store::STATUS_SLEEPING);
-    let armed_at = wake_at(&rt, &run_id).await.expect("duerme como una fila con `wake_at`");
+    let armed_at = wake_at(&rt, &run_id)
+        .await
+        .expect("duerme como una fila con `wake_at`");
     assert_eq!(
         armed_at,
-        (chrono::DateTime::parse_from_rfc3339(&cita).unwrap().with_timezone(&chrono::Utc)
+        (chrono::DateTime::parse_from_rfc3339(&cita)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
             - chrono::Duration::seconds(86400))
         .to_rfc3339(),
         "el desplazamiento se aplica al instante del evento, y se persiste en UTC (hub#970)"
     );
-    assert!(armed_at.ends_with("+00:00"), "UTC dentro, la zona del negocio en pantalla");
-    assert!(notes(&rt).await.is_empty(), "lo que espera es el recordatorio");
+    assert!(
+        armed_at.ends_with("+00:00"),
+        "UTC dentro, la zona del negocio en pantalla"
+    );
+    assert!(
+        notes(&rt).await.is_empty(),
+        "lo que espera es el recordatorio"
+    );
 }
 
 // ── cancelar ──────────────────────────────────────────────────────────────────────────────────
@@ -234,21 +252,43 @@ async fn la_espera_se_arma_veinticuatro_horas_antes_del_instante_del_evento() {
 async fn una_cita_cancelada_no_recibe_su_recordatorio() {
     let rt = runtime().await;
     let (_, run_id) = sleeping(&rt, wait_step(json!({ "cancel_on": cancel_hook() }))).await;
-    assert_eq!(armed(&rt, &run_id).await, 1, "la espera queda armada al dormirse");
+    assert_eq!(
+        armed(&rt, &run_id).await,
+        1,
+        "la espera queda armada al dormirse"
+    );
 
-    deliver(&rt, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
 
     assert_eq!(
         status(&rt, &run_id).await,
         store::STATUS_CANCELLED,
         "el evento saca el run del estado de espera"
     );
-    assert_eq!(wake_at(&rt, &run_id).await, None, "y deja de estar «esperando a despertar»");
-    assert_eq!(armed(&rt, &run_id).await, 0, "sus esperas se desarman con él");
+    assert_eq!(
+        wake_at(&rt, &run_id).await,
+        None,
+        "y deja de estar «esperando a despertar»"
+    );
+    assert_eq!(
+        armed(&rt, &run_id).await,
+        0,
+        "sus esperas se desarman con él"
+    );
 
     // Y el reloj ya no puede resucitarlo: ni el tick posterior escribe el recordatorio.
     rt.process_flows().await.unwrap();
-    assert!(notes(&rt).await.is_empty(), "una cita cancelada NO recibe recordatorio");
+    assert!(
+        notes(&rt).await.is_empty(),
+        "una cita cancelada NO recibe recordatorio"
+    );
 }
 
 /// La correlación es lo que hace que «esta cita» signifique esta. Sin ella, la primera cancelación
@@ -258,14 +298,28 @@ async fn la_cancelacion_de_otra_cita_deja_la_espera_intacta() {
     let rt = runtime().await;
     let (_, run_id) = sleeping(&rt, wait_step(json!({ "cancel_on": cancel_hook() }))).await;
 
-    deliver(&rt, HUB, "evt-other", "appointment.cancelled", json!({ "id": "a-99" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-other",
+        "appointment.cancelled",
+        json!({ "id": "a-99" }),
+    )
+    .await;
 
     assert_eq!(status(&rt, &run_id).await, store::STATUS_SLEEPING);
     assert_eq!(armed(&rt, &run_id).await, 1, "la espera sigue armada");
 
     // Control positivo en el mismo test: el mecanismo SÍ dispara cuando el id es el suyo. Sin
     // esto, un fallo que no cancelara nunca pasaría por «aislamiento correcto».
-    deliver(&rt, HUB, "evt-mine", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-mine",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
     assert_eq!(status(&rt, &run_id).await, store::STATUS_CANCELLED);
 }
 
@@ -277,7 +331,14 @@ async fn el_mismo_evento_cancelador_entregado_dos_veces_cancela_una_vez() {
     let rt = runtime().await;
     let (_, run_id) = sleeping(&rt, wait_step(json!({ "cancel_on": cancel_hook() }))).await;
 
-    deliver(&rt, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
     let first = rt.get_flow_run(&run_id).await.unwrap().0;
 
     // El mismo id de evento, reintentado por el relay.
@@ -311,13 +372,28 @@ async fn si_el_reloj_gana_la_cancelacion_posterior_no_toca_el_run() {
 
     ring_the_clock(&rt, &run_id).await;
     rt.process_flows().await.unwrap();
-    assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE, "el reloj ganó y el run terminó");
+    assert_eq!(
+        status(&rt, &run_id).await,
+        store::STATUS_DONE,
+        "el reloj ganó y el run terminó"
+    );
     assert_eq!(notes(&rt).await.len(), 1, "el recordatorio salió");
 
     // La cancelación llega tarde. No puede deshacer un run terminado ni marcarlo cancelado.
-    deliver(&rt, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
     assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE);
-    assert_eq!(notes(&rt).await.len(), 1, "y desde luego no manda un segundo recordatorio");
+    assert_eq!(
+        notes(&rt).await.len(),
+        1,
+        "y desde luego no manda un segundo recordatorio"
+    );
 }
 
 // ── reprogramar ───────────────────────────────────────────────────────────────────────────────
@@ -328,7 +404,11 @@ async fn si_el_reloj_gana_la_cancelacion_posterior_no_toca_el_run() {
 #[tokio::test]
 async fn reprogramar_la_cita_mueve_la_espera_y_no_deja_el_reloj_viejo() {
     let rt = runtime().await;
-    let (_, run_id) = sleeping(&rt, wait_step(json!({ "reschedule_on": reschedule_hook() }))).await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook() })),
+    )
+    .await;
     let before = wake_at(&rt, &run_id).await.unwrap();
 
     let moved = (chrono::Utc::now() + chrono::Duration::days(45)).to_rfc3339();
@@ -341,7 +421,9 @@ async fn reprogramar_la_cita_mueve_la_espera_y_no_deja_el_reloj_viejo() {
     )
     .await;
 
-    let after = wake_at(&rt, &run_id).await.expect("sigue dormido, con otro instante");
+    let after = wake_at(&rt, &run_id)
+        .await
+        .expect("sigue dormido, con otro instante");
     assert_ne!(after, before);
     assert_eq!(
         after,
@@ -354,7 +436,11 @@ async fn reprogramar_la_cita_mueve_la_espera_y_no_deja_el_reloj_viejo() {
         "«24 h antes» SIGUE siendo 24 h antes cuando la cita se mueve: el offset se reaplica"
     );
     assert_eq!(status(&rt, &run_id).await, store::STATUS_SLEEPING);
-    assert_eq!(armed(&rt, &run_id).await, 1, "y la espera sigue armada por si vuelve a moverse");
+    assert_eq!(
+        armed(&rt, &run_id).await,
+        1,
+        "y la espera sigue armada por si vuelve a moverse"
+    );
 
     // Y al llegar el nuevo instante, el recordatorio sale una sola vez.
     ring_the_clock(&rt, &run_id).await;
@@ -367,7 +453,11 @@ async fn reprogramar_la_cita_mueve_la_espera_y_no_deja_el_reloj_viejo() {
 #[tokio::test]
 async fn una_espera_movida_demasiadas_veces_para_de_moverse() {
     let rt = runtime().await;
-    let (_, run_id) = sleeping(&rt, wait_step(json!({ "reschedule_on": reschedule_hook() }))).await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook() })),
+    )
+    .await;
 
     for i in 0..=def::MAX_RESCHEDULES {
         deliver(
@@ -398,9 +488,20 @@ async fn cancelar_y_reprogramar_conviven_y_cancelar_desarma_a_su_hermana() {
     .await;
     assert_eq!(armed(&rt, &run_id).await, 2);
 
-    deliver(&rt, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
     assert_eq!(status(&rt, &run_id).await, store::STATUS_CANCELLED);
-    assert_eq!(armed(&rt, &run_id).await, 0, "la hermana se desarma con la que ganó");
+    assert_eq!(
+        armed(&rt, &run_id).await,
+        0,
+        "la hermana se desarma con la que ganó"
+    );
 
     // Y una reprogramación posterior ya no mueve nada.
     deliver(
@@ -428,7 +529,10 @@ async fn un_instante_ya_vencido_sigue_la_politica_elegida() {
     let rt = runtime().await;
     let (_, run_id) = sleeping_with(&rt, wait_step(json!({})), past.clone()).await;
     assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE);
-    assert!(notes(&rt).await.is_empty(), "el recordatorio de una hora que ya pasó no sale");
+    assert!(
+        notes(&rt).await.is_empty(),
+        "el recordatorio de una hora que ya pasó no sale"
+    );
 
     // `continue_now`: el comportamiento de Salesforce, para quien lo escriba.
     let rt = runtime().await;
@@ -465,7 +569,11 @@ async fn una_espera_mas_alla_del_horizonte_para_el_run_en_vez_de_dormir_para_sie
     assert_eq!(status(&rt, &run_id).await, store::STATUS_FAILED);
     let why = rt.get_flow_run(&run_id).await.unwrap().0.last_error;
     assert!(why.contains(def::ERR_DELAY_HORIZON), "{why}");
-    assert_eq!(wake_at(&rt, &run_id).await, None, "no queda una fila durmiendo mil años");
+    assert_eq!(
+        wake_at(&rt, &run_id).await,
+        None,
+        "no queda una fila durmiendo mil años"
+    );
 
     // Y un `max_wait` propio recorta el techo del hub: la misma cita de dentro de 30 días es una
     // espera que este flujo no quiso.
@@ -503,7 +611,14 @@ async fn la_cancelacion_de_un_hub_no_toca_la_espera_del_vecino() {
         sleeping(&neighbour, wait_step(json!({ "cancel_on": cancel_hook() }))).await;
     assert_eq!(armed(&neighbour, &their_run).await, 1);
 
-    deliver(&mine, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &mine,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
 
     assert_eq!(status(&mine, &mine_run).await, store::STATUS_CANCELLED);
     assert_eq!(
@@ -552,8 +667,14 @@ async fn una_espera_armada_no_guarda_el_payload_de_nadie() {
         .rows
         .remove(0);
     let dump = row.to_string();
-    assert!(dump.contains("a-42"), "el id correlacionado sí: es para lo que sirve");
-    assert!(!dump.contains("600111222"), "el teléfono del cliente NO: {dump}");
+    assert!(
+        dump.contains("a-42"),
+        "el id correlacionado sí: es para lo que sirve"
+    );
+    assert!(
+        !dump.contains("600111222"),
+        "el teléfono del cliente NO: {dump}"
+    );
     assert!(!dump.contains("Marta"), "ni su nombre: {dump}");
 }
 
@@ -563,7 +684,14 @@ async fn una_espera_armada_no_guarda_el_payload_de_nadie() {
 async fn la_idempotencia_se_reserva_bajo_un_listener_que_ningun_modulo_puede_usar() {
     let rt = runtime().await;
     let (_, run_id) = sleeping(&rt, wait_step(json!({ "cancel_on": cancel_hook() }))).await;
-    deliver(&rt, HUB, "evt-cancel", "appointment.cancelled", json!({ "id": "a-42" })).await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-cancel",
+        "appointment.cancelled",
+        json!({ "id": "a-42" }),
+    )
+    .await;
 
     let listeners: Vec<String> = rt
         .db_for_test()
@@ -575,7 +703,12 @@ async fn la_idempotencia_se_reserva_bajo_un_listener_que_ningun_modulo_puede_usa
         .unwrap()
         .rows
         .iter()
-        .map(|r| r["listener_command"].as_str().unwrap_or_default().to_string())
+        .map(|r| {
+            r["listener_command"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string()
+        })
         .collect();
     assert!(
         listeners.iter().any(|l| l.starts_with("_flow_wait:")),

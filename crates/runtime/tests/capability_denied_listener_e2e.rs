@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::outbox::{FAILURE_CAPABILITY_DENIED, RetryOutcome};
+use erplora_runtime::outbox::{RetryOutcome, FAILURE_CAPABILITY_DENIED};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -57,7 +57,14 @@ async fn hub_with_the_switch_off() -> Runtime {
     // The host mounts the first-party engine at boot (`crates/server/src/lib.rs`); the test is the
     // host here.
     rt.register_native("verifactu", Arc::new(erplora_verifactu::VerifactuEngine));
-    for m in ["taxes", "inventory", "customers", "sales", "invoice", "verifactu"] {
+    for m in [
+        "taxes",
+        "inventory",
+        "customers",
+        "sales",
+        "invoice",
+        "verifactu",
+    ] {
         rt.install_from_dir(&mdir(m))
             .await
             .unwrap_or_else(|e| panic!("install {m}: {e}"));
@@ -65,7 +72,9 @@ async fn hub_with_the_switch_off() -> Runtime {
     let mut identity = serde_json::Map::new();
     identity.insert("business_legal_name".into(), json!("Bar Manolo SL"));
     identity.insert("business_tax_id".into(), json!("B12345674"));
-    rt.set_settings(&identity, "u1").await.expect("fiscal identity");
+    rt.set_settings(&identity, "u1")
+        .await
+        .expect("fiscal identity");
     // Exactly what the QA hub had: `enabled:1, mode:"verifactu", environment:"testing"`. The save
     // is plain SQL, so the ungranted capability does not stop it — the config AFFIRMS it works.
     rt.execute_command(
@@ -99,10 +108,18 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
         .unwrap_or(-1)
 }
 async fn chain_records(rt: &Runtime) -> i64 {
-    count(rt, "SELECT COUNT(*) AS c FROM verifactu_record WHERE hub_id = :hub_id").await
+    count(
+        rt,
+        "SELECT COUNT(*) AS c FROM verifactu_record WHERE hub_id = :hub_id",
+    )
+    .await
 }
 async fn pending_rows(rt: &Runtime) -> i64 {
-    count(rt, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status = 'pending'").await
+    count(
+        rt,
+        "SELECT COUNT(*) AS c FROM _event_outbox WHERE status = 'pending'",
+    )
+    .await
 }
 
 async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
@@ -124,7 +141,11 @@ async fn charge_one_sale(rt: &Runtime, ctx: &RequestContext) -> String {
         .execute_query("invoice.list", &Params::new(), ctx)
         .await
         .expect("invoice.list");
-    assert_eq!(invoices.len(), 1, "the sale IS invoiced — that link has no capability in front of it: {invoices:?}");
+    assert_eq!(
+        invoices.len(),
+        1,
+        "the sale IS invoiced — that link has no capability in front of it: {invoices:?}"
+    );
     invoices[0]["id"].as_str().expect("invoice id").to_string()
 }
 
@@ -144,22 +165,43 @@ async fn the_unsealed_invoice_is_seen_at_once_and_seals_itself_when_the_capabili
 
     // ── 1 · The symptom, reproduced ────────────────────────────────────────────────────────────
     let invoice_id = charge_one_sale(&rt, &ctx).await;
-    assert_eq!(chain_records(&rt).await, 0, "the chain is empty: nothing was sealed");
+    assert_eq!(
+        chain_records(&rt).await,
+        0,
+        "the chain is empty: nothing was sealed"
+    );
 
     // ── 2 · …and it is SEEN, on the first pass ─────────────────────────────────────────────────
     // Before hub#1171 this row was `pending` with `attempts = 1` and a due time minutes away: the
     // badge read 0, the screen said «Todo en orden», and it stayed that way for ~4 minutes per
     // invoice. A capability nobody granted is not a stumble the ladder can outwait.
-    assert_eq!(pending_rows(&rt).await, 0, "nothing is left circling on the ladder");
-    assert_eq!(rt.count_dead_events().await.unwrap(), 1, "the badge (hub#747) lights up NOW");
+    assert_eq!(
+        pending_rows(&rt).await,
+        0,
+        "nothing is left circling on the ladder"
+    );
+    assert_eq!(
+        rt.count_dead_events().await.unwrap(),
+        1,
+        "the badge (hub#747) lights up NOW"
+    );
     let dead = rt.list_dead_events(50).await.expect("dead-letter listing");
     let row = dead
         .iter()
         .find(|d| d.event_name == "invoice.created")
         .unwrap_or_else(|| panic!("the dead-letter holds the invoice's event: {dead:?}"));
-    assert_eq!(row.failure_kind, FAILURE_CAPABILITY_DENIED, "machine-readable reason: {row:?}");
-    assert!(row.retryable, "granting is the remedy, so the button must be offered: {row:?}");
-    assert_eq!(row.attempts, 0, "it died on the FIRST pass, not after the ladder: {row:?}");
+    assert_eq!(
+        row.failure_kind, FAILURE_CAPABILITY_DENIED,
+        "machine-readable reason: {row:?}"
+    );
+    assert!(
+        row.retryable,
+        "granting is the remedy, so the button must be offered: {row:?}"
+    );
+    assert_eq!(
+        row.attempts, 0,
+        "it died on the FIRST pass, not after the ladder: {row:?}"
+    );
     assert!(
         row.last_error.contains("verifactu.records.ingest_invoice"),
         "the operator reads WHICH listener was refused: {}",
@@ -177,12 +219,22 @@ async fn the_unsealed_invoice_is_seen_at_once_and_seals_itself_when_the_capabili
     );
 
     // ── 3 · Visibility is not permissiveness: a retry WITHOUT the grant never runs the engine ──
-    assert_eq!(rt.retry_dead_event(&row.id).await.unwrap(), RetryOutcome::Requeued);
+    assert_eq!(
+        rt.retry_dead_event(&row.id).await.unwrap(),
+        RetryOutcome::Requeued
+    );
     rt.drain_outbox().await.expect("drain");
-    assert_eq!(chain_records(&rt).await, 0, "the gate still fails CLOSED: no record without the grant");
+    assert_eq!(
+        chain_records(&rt).await,
+        0,
+        "the gate still fails CLOSED: no record without the grant"
+    );
     let again = rt.list_dead_events(50).await.unwrap();
     assert_eq!(again.len(), 1, "dead again, at once: {again:?}");
-    assert_eq!(again[0].failure_kind, FAILURE_CAPABILITY_DENIED, "classified afresh: {again:?}");
+    assert_eq!(
+        again[0].failure_kind, FAILURE_CAPABILITY_DENIED,
+        "classified afresh: {again:?}"
+    );
 
     // ── 4 · The remedy is the switch, and only the switch ──────────────────────────────────────
     rt.set_module_capability("verifactu", "certificate", true, "hub_user:1")
@@ -196,8 +248,16 @@ async fn the_unsealed_invoice_is_seen_at_once_and_seals_itself_when_the_capabili
     rt.drain_outbox().await.expect("drain");
 
     assert_eq!(pending_rows(&rt).await, 0);
-    assert_eq!(rt.count_dead_events().await.unwrap(), 0, "nothing died on the way back");
-    assert_eq!(chain_records(&rt).await, 1, "the invoice that could not be sealed is sealed now");
+    assert_eq!(
+        rt.count_dead_events().await.unwrap(),
+        0,
+        "nothing died on the way back"
+    );
+    assert_eq!(
+        chain_records(&rt).await,
+        1,
+        "the invoice that could not be sealed is sealed now"
+    );
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(erplora_runtime::DEV_HUB_ID));
     let rec = rt
@@ -209,7 +269,11 @@ async fn the_unsealed_invoice_is_seen_at_once_and_seals_itself_when_the_capabili
         .await
         .unwrap()
         .rows;
-    assert_eq!(rec[0]["invoice_id"], json!(invoice_id), "…and it is THAT invoice: {rec:?}");
+    assert_eq!(
+        rec[0]["invoice_id"],
+        json!(invoice_id),
+        "…and it is THAT invoice: {rec:?}"
+    );
     assert_eq!(rec[0]["record_type"], json!("alta"), "{rec:?}");
     assert_eq!(
         count(&rt, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status = 'delivered' AND event_name = 'invoice.created'").await,

@@ -3,10 +3,10 @@
 //! tests that deliberately name one live here. The seam they prove is the one the
 //! registry uses in production: engine answer → wire report → heartbeat fields.
 
-use erplora_runtime::native::PendingObligation;
-use erplora_server::daily_usage::collect_daily_usage;
 use erplora_db::testutil::fresh_db;
 use erplora_db::DatabaseAdapter;
+use erplora_runtime::native::PendingObligation;
+use erplora_server::daily_usage::collect_daily_usage;
 use serde_json::json;
 
 /// The REAL engine, asked through the same trait door the registry uses
@@ -71,9 +71,13 @@ async fn the_heartbeat_carries_the_contingency_queue_depth_and_its_oldest_entry(
     // The count comes from the ENGINE (the same query that blocks an uninstall,
     // hub#314), through the seam the registry uses: engine answer → wire report.
     let answer = ask_verifactu_engine(&db).await.expect("queue readable");
-    let usage =
-        collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z", &[("verifactu".into(), answer)])
-            .await;
+    let usage = collect_daily_usage(
+        &db,
+        "hub-a",
+        "2026-08-08T10:00:00Z",
+        &[("verifactu".into(), answer)],
+    )
+    .await;
     let body = serde_json::to_value(&usage).unwrap();
 
     assert_eq!(
@@ -101,10 +105,17 @@ async fn a_hub_that_owes_the_aeat_nothing_reports_an_explicit_zero() {
     .await;
 
     let answer = ask_verifactu_engine(&db).await.expect("queue readable");
-    assert!(answer.is_none(), "an engine that owes nothing SAYS so (Ok(None))");
-    let usage =
-        collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z", &[("verifactu".into(), answer)])
-            .await;
+    assert!(
+        answer.is_none(),
+        "an engine that owes nothing SAYS so (Ok(None))"
+    );
+    let usage = collect_daily_usage(
+        &db,
+        "hub-a",
+        "2026-08-08T10:00:00Z",
+        &[("verifactu".into(), answer)],
+    )
+    .await;
     let body = serde_json::to_value(&usage).unwrap();
 
     assert_eq!(body["verifactu_pending_depth"], json!(0));
@@ -130,11 +141,13 @@ async fn a_hub_without_the_verifactu_module_says_nothing_instead_of_zero() {
 
     // Without the module its table does not exist: the ENGINE errs, so the registry
     // reports no entry at all — and an engine with no entry sends NOTHING.
-    assert!(ask_verifactu_engine(&db).await.is_err(), "no table = no answer");
+    assert!(
+        ask_verifactu_engine(&db).await.is_err(),
+        "no table = no answer"
+    );
     let usage = collect_daily_usage(&db, "hub-a", "2026-08-08T10:00:00Z", &[]).await;
     let body = serde_json::to_value(&usage).unwrap();
 
     assert!(body.get("verifactu_pending_depth").is_none(), "{body}");
     assert!(body.get("verifactu_oldest_pending_at").is_none(), "{body}");
 }
-

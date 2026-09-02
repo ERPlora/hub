@@ -139,7 +139,9 @@ pub async fn import_sections(
     // Un lote por importación, con el nombre del blueprint: es la unidad que el usuario
     // reconoce y deshace («quitar la demo del restaurante»). Si el registro del lote falla, el
     // import NO se aborta — se pierde la trazabilidad, no los datos.
-    let batch_id = crate::reset::begin_batch(rt, target_hub_id, &manifest.name).await.ok();
+    let batch_id = crate::reset::begin_batch(rt, target_hub_id, &manifest.name)
+        .await
+        .ok();
 
     let mut report = ImportReport::default();
     // Whose hub is this? Asked ONCE: it is what tells a same-hub restore (which may write back the
@@ -172,13 +174,28 @@ pub async fn import_sections(
         {
             // A discard reports HOW MANY rows it dropped: «4 accounts kept out» is what turns a
             // status the user skims past into something they can act on (hub#331).
-            Some(motivo) => (SectionStatus::Ignored(motivo), rows_in_section(section, files)),
+            Some(motivo) => (
+                SectionStatus::Ignored(motivo),
+                rows_in_section(section, files),
+            ),
             None => {
-                apply_section(rt, section, files, selection, target_hub_id, same_hub, batch_id.as_deref())
-                    .await
+                apply_section(
+                    rt,
+                    section,
+                    files,
+                    selection,
+                    target_hub_id,
+                    same_hub,
+                    batch_id.as_deref(),
+                )
+                .await
             }
         };
-        report.sections.push(SectionResult { section: section.clone(), status, discarded_rows });
+        report.sections.push(SectionResult {
+            section: section.clone(),
+            status,
+            discarded_rows,
+        });
     }
 
     // ── The role set of the vertical (paso 2b, hub#354) ─────────────────────
@@ -233,7 +250,9 @@ pub async fn import_sections(
     // same `batch_id` once its orchestration finishes, so what a reload reads is the full picture.
     if let Some(ref batch) = batch_id {
         if let Ok(json) = serde_json::to_string(&report) {
-            let _ = crate::reset::store_import_report(rt, target_hub_id, batch, &manifest.name, &json).await;
+            let _ =
+                crate::reset::store_import_report(rt, target_hub_id, batch, &manifest.name, &json)
+                    .await;
         }
     }
     report.batch_id = batch_id;
@@ -297,7 +316,11 @@ async fn apply_capability_grants(
     target_hub_id: &str,
     same_hub: bool,
 ) -> (SectionStatus, u32) {
-    let asked: u32 = manifest.capability_grants.values().map(|c| c.len() as u32).sum();
+    let asked: u32 = manifest
+        .capability_grants
+        .values()
+        .map(|c| c.len() as u32)
+        .sum();
     if !same_hub {
         return (
             SectionStatus::Ignored(ignore_reason::CAPABILITY_GRANTS_NOT_PORTABLE.into()),
@@ -401,7 +424,9 @@ async fn apply_flows(
         .await
         {
             Ok(flow) => flow,
-            Err(e) if is_write_failure(&e) => return (SectionStatus::Failed(e.to_string()), refused),
+            Err(e) if is_write_failure(&e) => {
+                return (SectionStatus::Failed(e.to_string()), refused)
+            }
             Err(_) => {
                 refused += 1;
                 continue;
@@ -429,16 +454,13 @@ async fn apply_flows(
                     authority_complete = false;
                     continue;
                 };
-                let mut candidate: Vec<(GrantKind, String)> = crate::flows::grants::list(
-                    db,
-                    target_hub_id,
-                    &flow.id,
-                )
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|g| GrantKind::parse(&g.kind).map(|k| (k, g.value)))
-                .collect();
+                let mut candidate: Vec<(GrantKind, String)> =
+                    crate::flows::grants::list(db, target_hub_id, &flow.id)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter_map(|g| GrantKind::parse(&g.kind).map(|k| (k, g.value)))
+                        .collect();
                 candidate.push((kind, wanted.value.clone()));
                 match crate::flows::grants::replace(
                     db,
@@ -460,7 +482,10 @@ async fn apply_flows(
         }
 
         if spec.enabled && authority_complete {
-            let armed = crate::flows::NewFlow { enabled: true, ..new };
+            let armed = crate::flows::NewFlow {
+                enabled: true,
+                ..new
+            };
             match crate::flows::store::update(
                 db,
                 target_hub_id,
@@ -649,10 +674,18 @@ fn identity_not_portable(
 /// have been applied. A file that does not parse counts as 0: this is a number for the report, and
 /// it must not turn into a second way for a broken bundle to fail.
 fn rows_in_section(section: &str, files: &BTreeMap<String, Vec<u8>>) -> u32 {
-    let Some(path) = data_file_for_section(section) else { return 0 };
-    let Some(bytes) = files.get(&path) else { return 0 };
-    let Ok(sql) = std::str::from_utf8(bytes) else { return 0 };
-    crate::import_sql::split_statements(sql).map(|s| s.len() as u32).unwrap_or(0)
+    let Some(path) = data_file_for_section(section) else {
+        return 0;
+    };
+    let Some(bytes) = files.get(&path) else {
+        return 0;
+    };
+    let Ok(sql) = std::str::from_utf8(bytes) else {
+        return 0;
+    };
+    crate::import_sql::split_statements(sql)
+        .map(|s| s.len() as u32)
+        .unwrap_or(0)
 }
 
 /// The `data/*.sql` a section is applied from, or `None` for the sections with no SQL of their own
@@ -664,7 +697,9 @@ fn data_file_for_section(section: &str) -> Option<String> {
         // fiscal/media las materializa el SERVER (certificado por su endpoint, imágenes por el
         // gestor media); a nivel runtime se registran como Skipped y el server sobrescribe.
         "fiscal" | "media" => None,
-        s => s.strip_prefix("modules/").map(|id| format!("data/{id}.sql")),
+        s => s
+            .strip_prefix("modules/")
+            .map(|id| format!("data/{id}.sql")),
     }
 }
 
@@ -773,17 +808,30 @@ async fn apply_section(
     // Un módulo del manifest debe estar instalado en destino (lo instala el server ANTES).
     if let Some(id) = section.strip_prefix("modules/") {
         if !rt.registry().is_installed(id) {
-            return (SectionStatus::Failed(format!("módulo `{id}` no instalado en el hub destino")), 0);
+            return (
+                SectionStatus::Failed(format!("módulo `{id}` no instalado en el hub destino")),
+                0,
+            );
         }
     }
 
-    let Some(path) = path else { return (SectionStatus::Skipped, 0) };
+    let Some(path) = path else {
+        return (SectionStatus::Skipped, 0);
+    };
     let Some(bytes) = files.get(&path) else {
-        return (SectionStatus::Failed(format!("fichero {path} ausente del bundle")), 0);
+        return (
+            SectionStatus::Failed(format!("fichero {path} ausente del bundle")),
+            0,
+        );
     };
     let sql = match std::str::from_utf8(bytes) {
         Ok(s) => s.replace(crate::export::HUB_ID_PLACEHOLDER, target_hub_id),
-        Err(_) => return (SectionStatus::Failed(format!("{path} no es UTF-8 válido")), 0),
+        Err(_) => {
+            return (
+                SectionStatus::Failed(format!("{path} no es UTF-8 válido")),
+                0,
+            )
+        }
     };
     if sql.trim().is_empty() {
         return (SectionStatus::Applied, 0); // sección presente pero sin filas: nada que hacer
@@ -792,7 +840,10 @@ async fn apply_section(
     // primera fila (solo `INSERT INTO` en sus propias tablas). Validar y ejecutar viven en la
     // misma función para que lo validado sea EXACTAMENTE lo ejecutado (mismo troceo).
     let Some(scope) = crate::import_sql::scope_for_data_file(&path) else {
-        return (SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida")), 0);
+        return (
+            SectionStatus::Failed(format!("{path} no corresponde a ninguna sección conocida")),
+            0,
+        );
     };
     // ADR-0195 §4 (hub#405): the settings of a bundle that is NOT this hub's own are filtered to
     // the configuration keys. `hub_settings` is the one section that legitimately mixes what may
@@ -837,7 +888,11 @@ async fn apply_section(
         // Sin filtro (`reason == None`) esto solo puede pasar con un fichero de datos en blanco,
         // que ya se atendió arriba con `Applied`/0 filas.
         return (
-            SectionStatus::Ignored(reason.unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE).into()),
+            SectionStatus::Ignored(
+                reason
+                    .unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE)
+                    .into(),
+            ),
             discarded,
         );
     }
@@ -875,7 +930,9 @@ async fn apply_section(
         // Applied — but say so honestly when part of it was left out on purpose (hub#405).
         Ok(_) if discarded > 0 => (
             SectionStatus::PartiallyApplied(
-                reason.unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE).into(),
+                reason
+                    .unwrap_or(ignore_reason::SETTINGS_NOT_PORTABLE)
+                    .into(),
             ),
             discarded,
         ),
@@ -888,7 +945,9 @@ async fn apply_section(
             if section == "hub_users" {
                 for extra in ["data/hub_user_profile.sql", "data/hub_user_pref.sql"] {
                     if let Some(bytes) = files.get(extra) {
-                        if let Err(e) = apply_identity_extra(rt, extra, bytes, target_hub_id, batch_id).await {
+                        if let Err(e) =
+                            apply_identity_extra(rt, extra, bytes, target_hub_id, batch_id).await
+                        {
                             return (SectionStatus::Failed(e.to_string()), 0);
                         }
                     }
@@ -914,15 +973,15 @@ async fn apply_identity_extra(
     target_hub_id: &str,
     batch_id: Option<&str>,
 ) -> Result<(), crate::RuntimeError> {
-    let raw = std::str::from_utf8(bytes).map_err(|_| {
-        crate::RuntimeError::Other(format!("{path} no es UTF-8 válido"))
-    })?;
+    let raw = std::str::from_utf8(bytes)
+        .map_err(|_| crate::RuntimeError::Other(format!("{path} no es UTF-8 válido")))?;
     let sql = raw.replace(crate::export::HUB_ID_PLACEHOLDER, target_hub_id);
     if sql.trim().is_empty() {
         return Ok(()); // sin filas: nada que hacer
     }
-    let scope = crate::import_sql::scope_for_data_file(path)
-        .ok_or_else(|| crate::RuntimeError::Other(format!("{path} no corresponde a ninguna sección conocida")))?;
+    let scope = crate::import_sql::scope_for_data_file(path).ok_or_else(|| {
+        crate::RuntimeError::Other(format!("{path} no corresponde a ninguna sección conocida"))
+    })?;
     // Sin claves de seed (hub#842): estas son tablas de IDENTIDAD del core, que ningún módulo
     // siembra — y esta ruta solo corre para la copia del PROPIO hub (`identity_not_portable`).
     let keys = natural_keys_for_sql(rt.db(), None, &sql).await;
@@ -977,7 +1036,9 @@ fn keep_portable_settings(
 /// Cheap pre-check: ¿esta sección menciona siquiera una tabla de numeración fiscal? Evita pagar la
 /// validación completa en las secciones que no pueden traerla (que son casi todas).
 fn carries_a_foreign_numbering(sql: &str) -> bool {
-    crate::export::TEMPLATE_EXCLUDED_TABLES.iter().any(|t| sql.contains(t))
+    crate::export::TEMPLATE_EXCLUDED_TABLES
+        .iter()
+        .any(|t| sql.contains(t))
 }
 
 /// La mitad CONSUMIDORA de [`crate::export::TEMPLATE_EXCLUDED_TABLES`] (hub#753).
@@ -1019,7 +1080,11 @@ fn drop_foreign_numbering(
         let table = parse_insert(stmt).map(|p| p.table.to_ascii_lowercase());
         let excluded = table
             .as_deref()
-            .map(|t| crate::export::TEMPLATE_EXCLUDED_TABLES.iter().any(|x| *x == t))
+            .map(|t| {
+                crate::export::TEMPLATE_EXCLUDED_TABLES
+                    .iter()
+                    .any(|x| *x == t)
+            })
             .unwrap_or(false);
         if excluded {
             dropped += 1;
@@ -1034,11 +1099,15 @@ fn drop_foreign_numbering(
 /// Does this statement write a `hub_settings` row whose key is portable configuration?
 /// `false` for anything that cannot be read as one — see the fail-closed note above.
 fn writes_a_portable_setting(stmt: &str) -> bool {
-    let Some(parsed) = parse_insert(stmt) else { return false };
+    let Some(parsed) = parse_insert(stmt) else {
+        return false;
+    };
     if parsed.table != "hub_settings" {
         return false;
     }
-    let Some(i) = parsed.cols.iter().position(|c| c == "key") else { return false };
+    let Some(i) = parsed.cols.iter().position(|c| c == "key") else {
+        return false;
+    };
     let Some(key) = parsed.vals.get(i).and_then(|v| unquote_string_literal(v)) else {
         return false;
     };
@@ -1079,7 +1148,9 @@ fn remap_section_ids(
     // de reescribir, así una fila HIJA que se emita ANTES que su padre sigue remapeando su FK.
     let mut id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for stmt in &stmts {
-        let Some(parsed) = parse_insert(stmt) else { continue };
+        let Some(parsed) = parse_insert(stmt) else {
+            continue;
+        };
         // Solo las filas ACOTADAS POR HUB entran al mapa: son las únicas cuyo `id` se remapea.
         // Meter aquí el id de una fila no hub-scoped (`hub_user`) haría que una FK que lo
         // referenciase se reescribiera hacia un id que nunca se insertó.
@@ -1242,7 +1313,9 @@ fn rewrite_insert(
         if !is_id_like {
             continue;
         }
-        let Some(raw) = unquote_string_literal(&vals[i]) else { continue };
+        let Some(raw) = unquote_string_literal(&vals[i]) else {
+            continue;
+        };
         let mapped = if col == "id" && !hub_scoped {
             // Identidad del core: conserva su id (idempotente para toda la organización).
             None
@@ -1250,7 +1323,11 @@ fn rewrite_insert(
             // El propio id: siempre el nuevo (del mapa si se captó en la 1ª pasada; si no, se
             // deriva ahora de forma determinista para no romper la idempotencia del re-import).
             id_map.get(&raw).cloned().or_else(|| {
-                if raw.is_empty() { None } else { Some(derive_id(target_hub_id, &raw)) }
+                if raw.is_empty() {
+                    None
+                } else {
+                    Some(derive_id(target_hub_id, &raw))
+                }
             })
         } else {
             // FK interna: solo si apunta a un id del bundle que hemos remapeado.
@@ -1296,7 +1373,12 @@ fn rewrite_insert(
     // …y, encadenada, una guarda por cada CLAVE NATURAL que el destino declara (hub#753).
     let guard = format!(
         "{guard}{}",
-        natural_key_guards(table, &cols, &new_vals, keys.get(table).map(Vec::as_slice).unwrap_or(&[]))
+        natural_key_guards(
+            table,
+            &cols,
+            &new_vals,
+            keys.get(table).map(Vec::as_slice).unwrap_or(&[])
+        )
     );
     format!("INSERT INTO {table} ({col_list}) SELECT {val_list}{guard};\n")
 }
@@ -1327,7 +1409,8 @@ fn natural_key_guards(
     vals: &[String],
     keys: &[crate::export::NaturalKey],
 ) -> String {
-    let value_of = |col: &str| -> Option<&String> { cols.iter().position(|c| c == col).map(|i| &vals[i]) };
+    let value_of =
+        |col: &str| -> Option<&String> { cols.iter().position(|c| c == col).map(|i| &vals[i]) };
     let mut out = String::new();
     for key in keys {
         // `None` en el valor de una condición = `columna IS NULL` (hub#576).
@@ -1405,7 +1488,9 @@ fn natural_key_guards(
             })
             .collect::<Vec<_>>()
             .join(" AND ");
-        out.push_str(&format!(" AND NOT EXISTS (SELECT 1 FROM {table} WHERE {where_clause})"));
+        out.push_str(&format!(
+            " AND NOT EXISTS (SELECT 1 FROM {table} WHERE {where_clause})"
+        ));
     }
     out
 }
@@ -1432,9 +1517,13 @@ async fn natural_keys_for_sql(
 ) -> std::collections::HashMap<String, Vec<crate::export::NaturalKey>> {
     let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
         std::collections::HashMap::new();
-    let Ok(stmts) = crate::import_sql::split_statements(sql) else { return out };
+    let Ok(stmts) = crate::import_sql::split_statements(sql) else {
+        return out;
+    };
     for stmt in &stmts {
-        let Some(parsed) = parse_insert(stmt) else { continue };
+        let Some(parsed) = parse_insert(stmt) else {
+            continue;
+        };
         if out.contains_key(parsed.table) {
             continue;
         }
@@ -1451,7 +1540,10 @@ async fn natural_keys_for_sql(
 /// `old` sea un id del bundle por `'new'`. Operación segura aquí: los ids son UUIDs v4 y solo
 /// aparecen como literales completos `'…'` (el export nunca los embebe dentro de otro dato), así
 /// que sustituir el par completo `'old'` no toca subcadenas ajenas.
-fn remap_literals_in_guard(guard: &str, id_map: &std::collections::HashMap<String, String>) -> String {
+fn remap_literals_in_guard(
+    guard: &str,
+    id_map: &std::collections::HashMap<String, String>,
+) -> String {
     let mut out = guard.to_string();
     for (old, new) in id_map {
         let from = quote_string_literal(old);
@@ -1483,7 +1575,9 @@ fn parse_value_list(s: &str) -> Option<Vec<String>> {
         return Some(split_top_level_commas(&inner[open + 1..close]));
     }
     let after_select = s.strip_prefix("SELECT")?;
-    Some(split_top_level_commas(after_select.trim_start().trim_end_matches(';')))
+    Some(split_top_level_commas(
+        after_select.trim_start().trim_end_matches(';'),
+    ))
 }
 
 /// Parte por comas que NO están dentro de `'…'` (un literal puede traer comas) ni de `"…"`.
@@ -1528,7 +1622,10 @@ fn split_top_level_commas(s: &str) -> Vec<String> {
         }
     }
     out.push(cur);
-    out.iter().map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect()
+    out.iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 /// Índice del `)` que cierra el `(` en `pos`, respetando literales e identificadores.
@@ -1578,9 +1675,7 @@ fn matching_paren(s: &str, open: usize) -> Option<usize> {
 
 /// Quita las comillas dobles de un identificador de columna (`"key"` → `key`).
 fn unquote_ident(s: &str) -> String {
-    s.trim()
-        .trim_matches('"')
-        .replace("\"\"", "\"")
+    s.trim().trim_matches('"').replace("\"\"", "\"")
 }
 
 /// Convierte un literal de cadena SQL (`'Café'`) en su contenido (`Café`). Solo si es tal literal.
@@ -1651,19 +1746,28 @@ mod tests {
         // `batch_id` NO viaja por el cable (hub#763): el contrato del shell son las `sections` (más
         // lo que el servidor añade encima), y un servidor que no conozca el campo tiene que poder
         // hacer round-trip igual. El cliente lo lee del informe PERSISTIDO, no de aquí.
-        assert!(!json.contains("batch_id"), "el batch_id no se serializa: {json}");
+        assert!(
+            !json.contains("batch_id"),
+            "el batch_id no se serializa: {json}"
+        );
     }
 
     /// Y el lote sí acompaña al informe DENTRO del proceso, que es como el motor se lo pasa al
     /// servidor para que haga el UPSERT del informe extendido sobre el mismo `batch_id`.
     #[test]
     fn the_batch_travels_in_memory_but_not_on_the_wire() {
-        let r = ImportReport { sections: Vec::new(), batch_id: Some("b-1".into()) };
+        let r = ImportReport {
+            sections: Vec::new(),
+            batch_id: Some("b-1".into()),
+        };
 
         let back: ImportReport = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
 
         assert_eq!(r.batch_id.as_deref(), Some("b-1"));
-        assert_eq!(back.batch_id, None, "al deserializar no se inventa un lote que no vino");
+        assert_eq!(
+            back.batch_id, None,
+            "al deserializar no se inventa un lote que no vino"
+        );
     }
 
     /// A manifest whose only interesting part is where it comes from (hub#331 gate).
@@ -1705,8 +1809,14 @@ mod tests {
             "another hub's identities must never be applied here"
         );
         // The gate is about identities: the rest of the bundle is not its business.
-        assert_eq!(identity_not_portable(&manifest_from("h1"), "modules/inventory", "h2"), None);
-        assert_eq!(identity_not_portable(&manifest_from("h1"), "hub_settings", "h2"), None);
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "modules/inventory", "h2"),
+            None
+        );
+        assert_eq!(
+            identity_not_portable(&manifest_from("h1"), "hub_settings", "h2"),
+            None
+        );
     }
 
     /// 🔴 An UNKNOWN origin is not «the same hub». Bundles older than `manifest.hub.hub_id`
@@ -1715,7 +1825,10 @@ mod tests {
     /// ever match, a bundle would only need to omit the field to get its accounts in.
     #[test]
     fn an_unknown_origin_is_never_the_same_hub() {
-        assert!(!is_same_hub(&manifest_from(""), ""), "unknown origin must not match anything");
+        assert!(
+            !is_same_hub(&manifest_from(""), ""),
+            "unknown origin must not match anything"
+        );
         assert_eq!(
             identity_not_portable(&manifest_from(""), "hub_users", "").as_deref(),
             Some(ignore_reason::IDENTITY_NOT_PORTABLE)
@@ -1754,14 +1867,24 @@ mod tests {
     fn installation_bound_data_is_declared_by_the_module_not_named_by_the_core() {
         let bound = registry_with("ticketbai", true);
         assert_eq!(
-            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h2")
-                .as_deref(),
+            installation_bound_not_portable(
+                &bound,
+                &manifest_from("h1"),
+                "modules/ticketbai",
+                "h2"
+            )
+            .as_deref(),
             Some(ignore_reason::INSTALLATION_BOUND_DATA),
             "another installation's bound records must not be applied here"
         );
         // The SAME installation restoring its own backup resumes its own chain (ADR-0113 §1).
         assert_eq!(
-            installation_bound_not_portable(&bound, &manifest_from("h1"), "modules/ticketbai", "h1"),
+            installation_bound_not_portable(
+                &bound,
+                &manifest_from("h1"),
+                "modules/ticketbai",
+                "h1"
+            ),
             None,
             "a hub restoring its own backup gets its own records back"
         );
@@ -1829,7 +1952,10 @@ mod tests {
         assert_eq!(rows_in_section("fiscal", &files), 0);
         assert_eq!(rows_in_section("modules/inventory", &files), 0);
         // An unparseable file must not turn the count into a second failure path.
-        files.insert("data/hub_users.sql".into(), b"INSERT INTO hub_user SELECT 'unclosed".to_vec());
+        files.insert(
+            "data/hub_users.sql".into(),
+            b"INSERT INTO hub_user SELECT 'unclosed".to_vec(),
+        );
         assert_eq!(rows_in_section("hub_users", &files), 0);
     }
 
@@ -1859,13 +1985,23 @@ mod tests {
             settings_row("language", "es"),
             settings_row("business_legal_name", "Bar Pepe SL"),
         );
-        let (kept, dropped) = keep_portable_settings(&sql, &settings_scope()).expect("valid section");
+        let (kept, dropped) =
+            keep_portable_settings(&sql, &settings_scope()).expect("valid section");
 
         assert_eq!(dropped, 2, "two identity rows had to be dropped:\n{kept}");
-        assert!(kept.contains("'country_code'") && kept.contains("'language'"), "the configuration must survive:\n{kept}");
-        assert!(!kept.contains("business_tax_id"), "the tax id of another business must not be written:\n{kept}");
+        assert!(
+            kept.contains("'country_code'") && kept.contains("'language'"),
+            "the configuration must survive:\n{kept}"
+        );
+        assert!(
+            !kept.contains("business_tax_id"),
+            "the tax id of another business must not be written:\n{kept}"
+        );
         assert!(!kept.contains("B12345674"), "…nor its value:\n{kept}");
-        assert!(!kept.contains("Bar Pepe SL"), "…nor the legal name:\n{kept}");
+        assert!(
+            !kept.contains("Bar Pepe SL"),
+            "…nor the legal name:\n{kept}"
+        );
         // What survives is still exactly what the import will validate and run (same grammar).
         assert!(
             crate::import_sql::validate(&kept, &settings_scope()).is_ok(),
@@ -1883,7 +2019,8 @@ mod tests {
             settings_row("printer_ip", "192.168.1.50"),
             "INSERT INTO hub_settings (\"hub_id\", \"value\") SELECT 'h2', 'x';\n",
         );
-        let (kept, dropped) = keep_portable_settings(&sql, &settings_scope()).expect("valid section");
+        let (kept, dropped) =
+            keep_portable_settings(&sql, &settings_scope()).expect("valid section");
         assert_eq!(dropped, 2, "both rows had to be dropped:\n{kept}");
         assert!(kept.trim().is_empty(), "nothing may survive:\n{kept}");
     }
@@ -1916,7 +2053,10 @@ mod tests {
         let a2 = derive_id("h2", "src-1");
         assert_eq!(a1, a2, "mismo (hub,id) → mismo id derivado (idempotencia)");
         let b = derive_id("h3", "src-1");
-        assert_ne!(a1, b, "distinto hub → distinto id (sin colisión de PK global)");
+        assert_ne!(
+            a1, b,
+            "distinto hub → distinto id (sin colisión de PK global)"
+        );
         let c = derive_id("h2", "src-2");
         assert_ne!(a1, c, "distinto id origen → distinto id");
         assert!(!a1.is_empty());
@@ -1933,16 +2073,26 @@ mod tests {
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product WHERE id = 'src-prod');";
         let out = remap_section_ids(sql, "h2", &Default::default());
         // El id de origen NO aparece (fue reescrito por el derivado).
-        assert!(!out.contains("'src-prod'"), "el id origen debe reescribirse: {out}");
+        assert!(
+            !out.contains("'src-prod'"),
+            "el id origen debe reescribirse: {out}"
+        );
         // Los datos del usuario se conservan.
-        assert!(out.contains("'Café'") && out.contains("'CAF'"), "se perdieron datos: {out}");
+        assert!(
+            out.contains("'Café'") && out.contains("'CAF'"),
+            "se perdieron datos: {out}"
+        );
         // La guarda va por (hub_id, id) destino — id ya NO va solo.
         assert!(
             out.contains("\"hub_id\" = 'h2' AND id = "),
             "la guarda debe acotarse por (hub_id, id): {out}"
         );
         // Idempotencia: misma entrada → misma salida (el id derivado es estable).
-        assert_eq!(out, remap_section_ids(sql, "h2", &Default::default()), "el remap debe ser determinista");
+        assert_eq!(
+            out,
+            remap_section_ids(sql, "h2", &Default::default()),
+            "el remap debe ser determinista"
+        );
     }
 
     /// 🔴 El SQL que rompía la sección **Usuarios** en producción (2026-08-03):
@@ -1963,7 +2113,11 @@ mod tests {
         let sql = "INSERT INTO hub_user (\"cloud_user_id\", \"created_at\", \"id\", \"name\", \"role\") \
                    SELECT NULL, '2026-01-01T00:00:00+00:00', 'bp-user-manager-000000000000000', 'Manager', 'manager' \
                    WHERE NOT EXISTS (SELECT 1 FROM hub_user WHERE id = 'bp-user-manager-000000000000000');";
-        let out = remap_section_ids(sql, "56f2bbe7-792e-44d3-adfe-c18891cfc925", &Default::default());
+        let out = remap_section_ids(
+            sql,
+            "56f2bbe7-792e-44d3-adfe-c18891cfc925",
+            &Default::default(),
+        );
 
         assert!(
             out.contains("\"hub_id\"") && out.contains("'56f2bbe7-792e-44d3-adfe-c18891cfc925'"),
@@ -2017,17 +2171,37 @@ mod tests {
                    WHERE NOT EXISTS (SELECT 1 FROM inventory_product_categories WHERE product_id = 'src-prod');";
         let out = remap_section_ids(sql, "h2", &Default::default());
 
-        assert!(!out.contains("'src-prod'"), "el producto (hub-scoped) debe remapearse:\n{out}");
-        let prod = out.lines().find(|l| l.contains("INSERT INTO inventory_product ")).unwrap();
+        assert!(
+            !out.contains("'src-prod'"),
+            "el producto (hub-scoped) debe remapearse:\n{out}"
+        );
+        let prod = out
+            .lines()
+            .find(|l| l.contains("INSERT INTO inventory_product "))
+            .unwrap();
         let nuevo = prod
-            .split("SELECT ").nth(1).unwrap().trim()
-            .strip_prefix('\'').unwrap().split('\'').next().unwrap().to_string();
-        let link = out.lines().find(|l| l.contains("inventory_product_categories")).unwrap();
+            .split("SELECT ")
+            .nth(1)
+            .unwrap()
+            .trim()
+            .strip_prefix('\'')
+            .unwrap()
+            .split('\'')
+            .next()
+            .unwrap()
+            .to_string();
+        let link = out
+            .lines()
+            .find(|l| l.contains("inventory_product_categories"))
+            .unwrap();
         assert!(
             link.contains(&format!("'{nuevo}'")),
             "la FK del vínculo debe apuntar al id NUEVO del producto ({nuevo}):\n{link}"
         );
-        assert!(!link.contains("hub_id"), "el vínculo no tiene columna hub_id:\n{link}");
+        assert!(
+            !link.contains("hub_id"),
+            "el vínculo no tiene columna hub_id:\n{link}"
+        );
     }
 
     /// Una FK interna (columna `*_id`) que apunta a otro id DEL BUNDLE se remapea al nuevo id;
@@ -2049,7 +2223,10 @@ mod tests {
         let out = remap_section_ids(sql, "h2", &Default::default());
 
         // `ext-rate` no es id de ninguna fila del bundle → se conserva (referencia externa).
-        assert!(out.contains("'ext-rate'"), "una FK ajena al bundle no debe tocarse: {out}");
+        assert!(
+            out.contains("'ext-rate'"),
+            "una FK ajena al bundle no debe tocarse: {out}"
+        );
 
         // Los ids del bundle ya no aparecen con su valor origen.
         assert!(
@@ -2060,14 +2237,20 @@ mod tests {
         // La FK interna `category_id` apunta ahora al MISMO id nuevo que la fila categoría: la
         // guarda de la categoría lleva su id nuevo, y ese mismo literal aparece como valor del
         // `category_id` del producto (la FK casa con el padre recién reescrito).
-        let cat_line = out.lines().find(|l| l.contains("INSERT INTO inventory_category")).unwrap();
+        let cat_line = out
+            .lines()
+            .find(|l| l.contains("INSERT INTO inventory_category"))
+            .unwrap();
         let new_cat_id = cat_line
             .split("SELECT ")
             .nth(1)
             .and_then(|s| s.trim().strip_prefix('\''))
             .and_then(|s| s.split('\'').next())
             .expect("id nuevo de la categoría");
-        let prod_line = out.lines().find(|l| l.contains("INSERT INTO inventory_product")).unwrap();
+        let prod_line = out
+            .lines()
+            .find(|l| l.contains("INSERT INTO inventory_product"))
+            .unwrap();
         assert!(
             prod_line.contains(&format!("'{}'", new_cat_id)),
             "category_id debe quedar remapeado al id nuevo de la categoría ({new_cat_id}):\n{prod_line}"
@@ -2088,7 +2271,8 @@ mod tests {
     /// Preguntar solo por la técnica es lo que dejaba salir el INSERT contra un `FAC` que ya estaba.
     #[test]
     fn la_guarda_pregunta_tambien_por_la_clave_natural() {
-        let sql = "INSERT INTO invoice_series_series (\"id\", \"hub_id\", \"code\", \"is_deleted\") \
+        let sql =
+            "INSERT INTO invoice_series_series (\"id\", \"hub_id\", \"code\", \"is_deleted\") \
                    SELECT 'src-fac', 'h2', 'FAC', 0 \
                    WHERE NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE id = 'src-fac');";
         let keys = keys_for(
@@ -2097,12 +2281,15 @@ mod tests {
                 cols: vec!["hub_id".into(), "code".into()],
                 predicate: vec![("is_deleted".into(), Some("0".into()))],
                 nulls_not_distinct: false,
-            seeded_only: false,
+                seeded_only: false,
             }],
         );
         let out = remap_section_ids(sql, "h2", &keys);
 
-        assert!(out.contains("\"hub_id\" = 'h2' AND id = "), "sigue la guarda técnica: {out}");
+        assert!(
+            out.contains("\"hub_id\" = 'h2' AND id = "),
+            "sigue la guarda técnica: {out}"
+        );
         assert!(
             out.contains("AND NOT EXISTS (SELECT 1 FROM invoice_series_series WHERE \"hub_id\" = 'h2' AND \"code\" = 'FAC' AND \"is_deleted\" = 0)"),
             "falta la guarda por clave natural (con el predicado del índice parcial): {out}"
@@ -2119,11 +2306,24 @@ mod tests {
     ///   · fila FUERA del predicado de un índice parcial (una serie borrada no reserva su código).
     #[test]
     fn una_clave_natural_que_no_aplica_a_la_fila_no_genera_guarda() {
-        let cols = vec!["id".to_string(), "hub_id".to_string(), "code".to_string(), "is_deleted".to_string()];
-        let vals = vec!["'x'".to_string(), "'h2'".to_string(), "NULL".to_string(), "1".to_string()];
+        let cols = vec![
+            "id".to_string(),
+            "hub_id".to_string(),
+            "code".to_string(),
+            "is_deleted".to_string(),
+        ];
+        let vals = vec![
+            "'x'".to_string(),
+            "'h2'".to_string(),
+            "NULL".to_string(),
+            "1".to_string(),
+        ];
         let nk = |c: Vec<&str>, p: Vec<(&str, &str)>| crate::export::NaturalKey {
             cols: c.into_iter().map(str::to_string).collect(),
-            predicate: p.into_iter().map(|(a, b)| (a.to_string(), Some(b.to_string()))).collect(),
+            predicate: p
+                .into_iter()
+                .map(|(a, b)| (a.to_string(), Some(b.to_string())))
+                .collect(),
             nulls_not_distinct: false,
             seeded_only: false,
         };
@@ -2131,10 +2331,16 @@ mod tests {
         for (caso, key) in [
             ("columna ausente", nk(vec!["hub_id", "sku"], vec![])),
             ("valor NULL", nk(vec!["hub_id", "code"], vec![])),
-            ("fuera del predicado parcial", nk(vec!["hub_id"], vec![("is_deleted", "0")])),
+            (
+                "fuera del predicado parcial",
+                nk(vec!["hub_id"], vec![("is_deleted", "0")]),
+            ),
         ] {
             let out = natural_key_guards("t", &cols, &vals, &[key]);
-            assert!(out.is_empty(), "{caso}: no debía generar guarda, salió `{out}`");
+            assert!(
+                out.is_empty(),
+                "{caso}: no debía generar guarda, salió `{out}`"
+            );
         }
     }
 
@@ -2147,14 +2353,47 @@ mod tests {
     /// the INSERT sails past the guard and dies against the index, taking the section with it.
     #[test]
     fn a_nulls_not_distinct_key_guards_null_values_with_is_null() {
-        let cols: Vec<String> = ["id", "hub_id", "country_code", "tax_category_key", "region_code", "valid_from", "parent_id", "is_deleted"]
-            .into_iter().map(str::to_string).collect();
-        let vals: Vec<String> = ["'r1'", "'h2'", "'ES'", "'product.generic'", "NULL", "'2012-09-01'", "NULL", "0"]
-            .into_iter().map(str::to_string).collect();
+        let cols: Vec<String> = [
+            "id",
+            "hub_id",
+            "country_code",
+            "tax_category_key",
+            "region_code",
+            "valid_from",
+            "parent_id",
+            "is_deleted",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+        let vals: Vec<String> = [
+            "'r1'",
+            "'h2'",
+            "'ES'",
+            "'product.generic'",
+            "NULL",
+            "'2012-09-01'",
+            "NULL",
+            "0",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
         let key = crate::export::NaturalKey {
-            cols: ["hub_id", "country_code", "tax_category_key", "region_code", "valid_from"]
-                .into_iter().map(str::to_string).collect(),
-            predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
+            cols: [
+                "hub_id",
+                "country_code",
+                "tax_category_key",
+                "region_code",
+                "valid_from",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+            predicate: vec![
+                ("parent_id".into(), None),
+                ("is_deleted".into(), Some("0".into())),
+            ],
             nulls_not_distinct: true,
             seeded_only: false,
         };
@@ -2173,27 +2412,69 @@ mod tests {
     /// legitimate components.
     #[test]
     fn a_row_outside_an_is_null_predicate_gets_no_guard() {
-        let cols: Vec<String> = ["id", "hub_id", "country_code", "tax_category_key", "region_code", "valid_from", "parent_id", "is_deleted"]
-            .into_iter().map(str::to_string).collect();
-        let vals: Vec<String> = ["'c1'", "'h2'", "'ES'", "'product.generic'", "'ES-CN'", "NULL", "'root-igic'", "0"]
-            .into_iter().map(str::to_string).collect();
+        let cols: Vec<String> = [
+            "id",
+            "hub_id",
+            "country_code",
+            "tax_category_key",
+            "region_code",
+            "valid_from",
+            "parent_id",
+            "is_deleted",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+        let vals: Vec<String> = [
+            "'c1'",
+            "'h2'",
+            "'ES'",
+            "'product.generic'",
+            "'ES-CN'",
+            "NULL",
+            "'root-igic'",
+            "0",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
         let key = crate::export::NaturalKey {
-            cols: ["hub_id", "country_code", "tax_category_key", "region_code", "valid_from"]
-                .into_iter().map(str::to_string).collect(),
-            predicate: vec![("parent_id".into(), None), ("is_deleted".into(), Some("0".into()))],
+            cols: [
+                "hub_id",
+                "country_code",
+                "tax_category_key",
+                "region_code",
+                "valid_from",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+            predicate: vec![
+                ("parent_id".into(), None),
+                ("is_deleted".into(), Some("0".into())),
+            ],
             nulls_not_distinct: true,
             seeded_only: false,
         };
         let out = natural_key_guards("taxes_rule", &cols, &vals, &[key]);
-        assert!(out.is_empty(), "a component row cannot collide on the roots-only index: `{out}`");
+        assert!(
+            out.is_empty(),
+            "a component row cannot collide on the roots-only index: `{out}`"
+        );
     }
 
     /// Under the DEFAULT (`NULLS DISTINCT`) nothing changes: a NULL key value still cannot
     /// collide, so the key is discarded for that row — hub#753 behavior, verbatim.
     #[test]
     fn a_nulls_distinct_key_still_discards_null_values() {
-        let cols: Vec<String> = ["id", "hub_id", "code"].into_iter().map(str::to_string).collect();
-        let vals: Vec<String> = ["'x'", "'h2'", "NULL"].into_iter().map(str::to_string).collect();
+        let cols: Vec<String> = ["id", "hub_id", "code"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let vals: Vec<String> = ["'x'", "'h2'", "NULL"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         let key = crate::export::NaturalKey {
             cols: vec!["hub_id".into(), "code".into()],
             predicate: vec![],
@@ -2201,7 +2482,10 @@ mod tests {
             seeded_only: false,
         };
         let out = natural_key_guards("t", &cols, &vals, &[key]);
-        assert!(out.is_empty(), "NULLS DISTINCT: a NULL value must keep discarding the key, got `{out}`");
+        assert!(
+            out.is_empty(),
+            "NULLS DISTINCT: a NULL value must keep discarding the key, got `{out}`"
+        );
     }
 
     // ── Claves declaradas por el SEED del módulo (hub#842) ──────────────────────────────────
@@ -2261,8 +2545,14 @@ mod tests {
     /// antes de hub#842.
     #[test]
     fn una_clave_de_seed_se_descarta_si_la_tabla_no_marca_quien_creo_la_fila() {
-        let cols: Vec<String> = ["id", "hub_id", "type"].into_iter().map(str::to_string).collect();
-        let vals: Vec<String> = ["'x'", "'h2'", "'cash'"].into_iter().map(str::to_string).collect();
+        let cols: Vec<String> = ["id", "hub_id", "type"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+        let vals: Vec<String> = ["'x'", "'h2'", "'cash'"]
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         let key = crate::export::NaturalKey {
             cols: vec!["hub_id".into(), "type".into()],
             predicate: vec![],

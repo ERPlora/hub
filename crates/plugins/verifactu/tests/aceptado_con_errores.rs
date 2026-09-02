@@ -18,8 +18,11 @@
 use erplora_verifactu::aeat;
 
 fn fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR")))
-        .unwrap_or_else(|e| panic!("no se pudo leer la captura {name}: {e}"))
+    std::fs::read_to_string(format!(
+        "{}/tests/fixtures/{name}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap_or_else(|e| panic!("no se pudo leer la captura {name}: {e}"))
 }
 
 // ── 1. El 2007 real ───────────────────────────────────────────────────────────────────────

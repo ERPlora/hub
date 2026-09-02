@@ -86,7 +86,11 @@ async fn a_partial_update_preserves_the_untouched_fields() {
 
     let row = order_row(&rt, &id).await;
     assert_eq!(row["notes"], json!("extra napkins"), "the sent key wins");
-    assert_eq!(row["customer"], json!("Ana García"), "an omitted key preserves");
+    assert_eq!(
+        row["customer"],
+        json!("Ana García"),
+        "an omitted key preserves"
+    );
     assert_eq!(row["status"], json!("open"), "an omitted key preserves");
 }
 
@@ -105,7 +109,11 @@ async fn an_explicit_null_clears_while_omitting_preserves() {
 
     let row = order_row(&rt, &id).await;
     assert_eq!(row["notes"], Json::Null, "explicit null clears the field");
-    assert_eq!(row["customer"], json!("Ana García"), "everything omitted preserves");
+    assert_eq!(
+        row["customer"],
+        json!("Ana García"),
+        "everything omitted preserves"
+    );
 }
 
 /// A FULL payload keeps working exactly as before: the merge under a complete object is the
@@ -155,7 +163,10 @@ async fn a_partial_update_of_a_missing_record_is_refused_not_invented() {
 fn the_records_block_parses() {
     let manifest =
         erplora_runtime::manifest::Manifest::load(&fixture()).expect("fixture manifest loads");
-    let receipt = manifest.records.get("receipt").expect("receipt is declared");
+    let receipt = manifest
+        .records
+        .get("receipt")
+        .expect("receipt is declared");
     assert!(!receipt.mutable);
     assert_eq!(receipt.reason.as_deref(), Some("fiscal"));
     assert_eq!(receipt.correct_with, vec!["rec.receipt.void".to_string()]);

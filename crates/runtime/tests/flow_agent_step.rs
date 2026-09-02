@@ -90,7 +90,10 @@ async fn notes(rt: &Runtime) -> Vec<String> {
 }
 
 async fn run_of(rt: &Runtime, flow_id: &str) -> store::FlowRun {
-    rt.list_flow_runs(flow_id, 10, None).await.unwrap().remove(0)
+    rt.list_flow_runs(flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0)
 }
 
 /// Starts the flow and ticks once, returning the `PendingIo` the tick handed back.
@@ -453,12 +456,7 @@ async fn an_approval_is_decided_once() {
 async fn a_flow_may_only_run_the_queries_it_was_granted() {
     let rt = runtime().await;
     let flow_id = flow_with(&rt, agent_definition("manual")).await;
-    grant(
-        &rt,
-        &flow_id,
-        &[(GrantKind::Query, "crm.note.list".into())],
-    )
-    .await;
+    grant(&rt, &flow_id, &[(GrantKind::Query, "crm.note.list".into())]).await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
     let run = run_of(&rt, &flow_id).await;
 
@@ -469,7 +467,9 @@ async fn a_flow_may_only_run_the_queries_it_was_granted() {
     let err = rt
         .execute_flow_query(&flow_id, &run.id, "crm.note.recent", &Params::new())
         .await
-        .expect_err("a sibling query of the same module is a different question with the same answer");
+        .expect_err(
+            "a sibling query of the same module is a different question with the same answer",
+        );
     assert!(format!("{err}").contains("crm.note.recent"), "{err}");
 }
 

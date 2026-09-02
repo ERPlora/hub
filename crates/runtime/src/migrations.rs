@@ -60,10 +60,12 @@ pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) ->
 
         // 🚪 La puerta que protege (hub#542): no se fía del paquete. Devuelve las sentencias ya
         // traducidas — en un `contract`, con los `DROP` convertidos en rename.
-        let plan = crate::migration_guard::check(&manifest.id, file, &sql, *kind)
-            .map_err(|error| crate::errors::RuntimeError::Domain {
-                code: "hub.module_migration_rejected".into(),
-                message: format!("módulo `{}`, {file}: {error}", manifest.id),
+        let plan =
+            crate::migration_guard::check(&manifest.id, file, &sql, *kind).map_err(|error| {
+                crate::errors::RuntimeError::Domain {
+                    code: "hub.module_migration_rejected".into(),
+                    message: format!("módulo `{}`, {file}: {error}", manifest.id),
+                }
             })?;
 
         // El SQL se ejecuta TAL CUAL salvo en un `contract`. Recomponer un batch que se ha partido
@@ -73,7 +75,8 @@ pub async fn apply(db: &dyn DatabaseAdapter, dir: &Path, manifest: &Manifest) ->
         match plan {
             crate::migration_guard::Plan::AsWritten => db.execute_batch(&sql).await?,
             crate::migration_guard::Plan::Rewritten(statements) => {
-                db.execute_batch(&format!("{};", statements.join(";\n"))).await?
+                db.execute_batch(&format!("{};", statements.join(";\n")))
+                    .await?
             }
         }
         record_applied(db, &manifest.id, file).await?;
@@ -101,6 +104,7 @@ async fn record_applied(db: &dyn DatabaseAdapter, module_id: &str, file: &str) -
         "INSERT INTO _hub_migrations (module_id, filename, applied_at) \
          VALUES (:module_id, :filename, :applied_at)",
         &p,
-    ).await?;
+    )
+    .await?;
     Ok(())
 }

@@ -116,6 +116,26 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
+    /// **Capability `fiscal_gateway`** (hub#1432, hub#985 §1): everything ONE transmission
+    /// through the fiscal cell needs — URL, short-lived Bearer, the hub's mTLS identity and the
+    /// CA root — obtained by the broker the server installs (`GatewayBrokerCell`). The engine
+    /// never sees the machine credential; same split as `certificate_identity`.
+    ///
+    /// Default: `Ok(None)` — no broker installed (a test host, an embedded runtime) or the route
+    /// simply not available for this hub (no identity enrolled yet). The engine leaves the
+    /// record queued with a visible reason; it never panics and never falls back to going
+    /// direct without a certificate.
+    async fn fiscal_gateway_access(
+        &self,
+        _hub_id: &str,
+    ) -> Result<Option<crate::fiscal_gateway::GatewayAccess>> {
+        Ok(None)
+    }
+
+    /// The cell refused the Bearer in flight (401): drop any cached token so the next
+    /// [`fiscal_gateway_access`](Self::fiscal_gateway_access) fetches a fresh one.
+    async fn fiscal_gateway_invalidate(&self) {}
+
     /// Escribe dentro de la carpeta `static_files` declarada por el módulo. La implementación real
     /// conoce el módulo que está ejecutándose y media el backend Local/Cloud; el plugin solo aporta
     /// una ruta relativa segura.
@@ -227,6 +247,22 @@ impl NativeHost for DbHost<'_> {
         Ok(crate::producer_facts::ProducerFactsCache::global()
             .current()
             .map(|facts| facts.to_json()))
+    }
+
+    async fn fiscal_gateway_access(
+        &self,
+        hub_id: &str,
+    ) -> Result<Option<crate::fiscal_gateway::GatewayAccess>> {
+        match crate::fiscal_gateway::GatewayBrokerCell::global().current() {
+            Some(broker) => broker.access(hub_id).await,
+            None => Ok(None),
+        }
+    }
+
+    async fn fiscal_gateway_invalidate(&self) {
+        if let Some(broker) = crate::fiscal_gateway::GatewayBrokerCell::global().current() {
+            broker.invalidate_token().await;
+        }
     }
 
     async fn write_static_file(

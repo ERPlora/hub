@@ -287,9 +287,7 @@ fn resolve_unqualified(
     name: &str,
     bodies: &BTreeMap<(String, String), String>,
 ) -> Option<(String, String)> {
-    let mut hits = bodies
-        .keys()
-        .filter(|(f, n)| n == name && is_split_file(f));
+    let mut hits = bodies.keys().filter(|(f, n)| n == name && is_split_file(f));
     let first = hits.next()?.clone();
     hits.next().is_none().then_some(first)
 }

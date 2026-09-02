@@ -100,7 +100,11 @@ fn banner(title: &str) {
 }
 
 /// Postea un alta y devuelve `(cuerpo_crudo, respuesta_parseada)`, imprimiendo ambos enteros.
-async fn send_alta(record: &Json, prev: Option<&Json>, label: &str) -> (String, aeat::AeatResponse) {
+async fn send_alta(
+    record: &Json,
+    prev: Option<&Json>,
+    label: &str,
+) -> (String, aeat::AeatResponse) {
     let xml = aeat::build_soap(record, &config(), prev, "hub-ensayo-2007").expect("declarable");
     banner(&format!("{label} — XML ENVIADO"));
     println!("{xml}");
@@ -111,9 +115,13 @@ async fn send_alta(record: &Json, prev: Option<&Json>, label: &str) -> (String, 
         Err(e) => panic!("[XSD] INVÁLIDO, no se envía a Hacienda: {e}"),
     }
 
-    let body = aeat::post_soap(aeat::endpoint("testing", CERTIFICATE_KIND), identity(), &xml)
-        .await
-        .expect("la AEAT debe responder 200");
+    let body = aeat::post_soap(
+        aeat::endpoint("testing", CERTIFICATE_KIND),
+        identity(),
+        &xml,
+    )
+    .await
+    .expect("la AEAT debe responder 200");
     banner(&format!("{label} — RESPUESTA CRUDA DE LA AEAT"));
     println!("{body}");
 
@@ -174,15 +182,27 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
     // Si lo está, reenviarlo re-anclado lo duplicaría, y el diseño de la recuperación cambia.
     let nif = env("ERPLORA_ISSUER_NIF");
     let name = env("ERPLORA_ISSUER_NAME");
-    let consult = aeat::build_consult_soap(&nif, &name, &now.format("%Y").to_string(), &now.format("%m").to_string())
-        .expect("envelope de consulta");
-    let body = aeat::post_soap(aeat::consult_endpoint("testing", CERTIFICATE_KIND), identity(), &consult)
-        .await
-        .expect("la consulta debe responder 200");
+    let consult = aeat::build_consult_soap(
+        &nif,
+        &name,
+        &now.format("%Y").to_string(),
+        &now.format("%m").to_string(),
+    )
+    .expect("envelope de consulta");
+    let body = aeat::post_soap(
+        aeat::consult_endpoint("testing", CERTIFICATE_KIND),
+        identity(),
+        &consult,
+    )
+    .await
+    .expect("la consulta debe responder 200");
     banner("PASO 2 · CONSULTA tras el 2007 — RESPUESTA CRUDA");
     println!("{body}");
     let records = aeat::parse_consult_response(&body).expect("la AEAT rechazó la consulta");
-    let hits: Vec<_> = records.iter().filter(|r| r.invoice_number == serial).collect();
+    let hits: Vec<_> = records
+        .iter()
+        .filter(|r| r.invoice_number == serial)
+        .collect();
     println!(
         "\n=> {serial} aparece {} vez/veces en la AEAT tras el 2007 => {}",
         hits.len(),
@@ -193,7 +213,10 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
         }
     );
     for h in &hits {
-        println!("   estado={:<20} huella={} gen={}", h.estado, h.record_hash, h.generated_at);
+        println!(
+            "   estado={:<20} huella={} gen={}",
+            h.estado, h.record_hash, h.generated_at
+        );
     }
 
     // ── PASO 3 — re-anclar ese MISMO registro y reenviarlo (lo que hace auto_rechain_and_retry) ──
@@ -219,7 +242,12 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
         "invoice_date": anchor_date_iso,
         "record_hash": chain::normalize_hash(&anchor.record_hash),
     });
-    let (_, resp2) = send_alta(&rechained, Some(&prev), "PASO 3 · MISMO registro RE-ANCLADO").await;
+    let (_, resp2) = send_alta(
+        &rechained,
+        Some(&prev),
+        "PASO 3 · MISMO registro RE-ANCLADO",
+    )
+    .await;
 
     banner("VEREDICTO §1 — ¿qué hace la AEAT con un re-anclado ya aceptado?");
     println!("EstadoRegistro ....... {:?}", resp2.estado_registro);
@@ -227,26 +255,43 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
     println!("Descripcion .......... {:?}", resp2.descripcion_error);
 
     // ── PASO 4 — consultar de nuevo: ¿duplicado, sustituido o rechazado? ───────────────────
-    let body = aeat::post_soap(aeat::consult_endpoint("testing", CERTIFICATE_KIND), identity(), &aeat::build_consult_soap(&nif, &name, &now.format("%Y").to_string(), &now.format("%m").to_string()).unwrap())
-        .await
-        .expect("la consulta debe responder 200");
+    let body = aeat::post_soap(
+        aeat::consult_endpoint("testing", CERTIFICATE_KIND),
+        identity(),
+        &aeat::build_consult_soap(
+            &nif,
+            &name,
+            &now.format("%Y").to_string(),
+            &now.format("%m").to_string(),
+        )
+        .unwrap(),
+    )
+    .await
+    .expect("la consulta debe responder 200");
     banner("PASO 4 · CONSULTA FINAL — RESPUESTA CRUDA");
     println!("{body}");
     let after = aeat::parse_consult_response(&body).expect("consulta final");
-    let hits2: Vec<_> = after.iter().filter(|r| r.invoice_number == serial).collect();
+    let hits2: Vec<_> = after
+        .iter()
+        .filter(|r| r.invoice_number == serial)
+        .collect();
     println!(
         "\n=> {serial} aparece ahora {} vez/veces (antes {})",
         hits2.len(),
         hits.len()
     );
     for h in &hits2 {
-        println!("   estado={:<20} huella={} gen={}", h.estado, h.record_hash, h.generated_at);
+        println!(
+            "   estado={:<20} huella={} gen={}",
+            h.estado, h.record_hash, h.generated_at
+        );
     }
     println!(
         "\n=> CONCLUSIÓN: la AEAT {}",
         match (hits.len(), hits2.len()) {
             (a, b) if b > a => "DUPLICA el registro re-anclado",
-            (a, b) if a == b && b > 0 => "NO duplica: sustituye/ignora el reenvío (misma IDFactura)",
+            (a, b) if a == b && b > 0 =>
+                "NO duplica: sustituye/ignora el reenvío (misma IDFactura)",
             _ => "hizo algo inesperado — mirar el XML crudo de arriba",
         }
     );

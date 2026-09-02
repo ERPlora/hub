@@ -297,7 +297,11 @@ fn clean_name(value: &str) -> Result<String> {
         return Err(invalid_field("name", "required", "the name is required"));
     }
     if name.chars().count() > 150 {
-        return Err(invalid_field("name", "too_long", "the name exceeds 150 characters"));
+        return Err(invalid_field(
+            "name",
+            "too_long",
+            "the name exceeds 150 characters",
+        ));
     }
     Ok(name.to_string())
 }
@@ -315,7 +319,11 @@ fn clean_role(value: &str) -> Result<String> {
         return Err(invalid_field("role", "required", "the role is required"));
     }
     if role.chars().count() > 50 {
-        return Err(invalid_field("role", "too_long", "the role exceeds 50 characters"));
+        return Err(invalid_field(
+            "role",
+            "too_long",
+            "the role exceeds 50 characters",
+        ));
     }
     Ok(role.to_string())
 }
@@ -335,7 +343,11 @@ pub(crate) fn clean_pin(value: &str, length: i64) -> Result<String> {
         return Ok(String::new());
     }
     if !pin.chars().all(|c| c.is_ascii_digit()) || pin.chars().count() as i64 != length {
-        return Err(invalid_field("pin", "format", format!("the PIN must be {length} digits")));
+        return Err(invalid_field(
+            "pin",
+            "format",
+            format!("the PIN must be {length} digits"),
+        ));
     }
     if is_guessable_pin(pin) {
         return Err(reject(
@@ -355,7 +367,11 @@ pub(crate) fn clean_pin(value: &str, length: i64) -> Result<String> {
 /// not a dictionary: a longer blacklist buys little and starts rejecting PINs people can remember,
 /// which pushes the shop back to sharing one.
 fn is_guessable_pin(pin: &str) -> bool {
-    let digits: Vec<i64> = pin.chars().filter_map(|c| c.to_digit(10)).map(i64::from).collect();
+    let digits: Vec<i64> = pin
+        .chars()
+        .filter_map(|c| c.to_digit(10))
+        .map(i64::from)
+        .collect();
     if digits.len() < 2 {
         return true;
     }
@@ -381,7 +397,11 @@ fn clean_badge(value: &str) -> Result<String> {
         return Ok(String::new());
     }
     if !BADGE_LEN.contains(&badge.chars().count()) {
-        return Err(invalid_field("badge", "length", "the badge must be between 4 and 64 characters"));
+        return Err(invalid_field(
+            "badge",
+            "length",
+            "the badge must be between 4 and 64 characters",
+        ));
     }
     if !badge
         .chars()
@@ -598,7 +618,9 @@ async fn ensure_local_identity(
 /// más: el SaaS no lo conoce, así que una invitación con él no llega a existir. Es lo que hace que
 /// los roles de módulo sean del personal LOCAL y el usuario de cuenta lleve uno de los tres.
 pub fn is_grantable_account_role(role: &str) -> bool {
-    BASE_ROLES.iter().any(|base| base.eq_ignore_ascii_case(role))
+    BASE_ROLES
+        .iter()
+        .any(|base| base.eq_ignore_ascii_case(role))
 }
 
 /// [`is_grantable_account_role`] como guarda: el rechazo estable que comparten las **dos** puertas
@@ -710,10 +732,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
         .map(|r| {
             let id = r["id"].as_str().unwrap_or_default().to_string();
             HubUserRow {
-                access_email_conflict: conflicts
-                    .iter()
-                    .find(|c| c.user_id == id)
-                    .map(|c| c.reason),
+                access_email_conflict: conflicts.iter().find(|c| c.user_id == id).map(|c| c.reason),
                 id,
                 name: r["name"].as_str().unwrap_or_default().to_string(),
                 email: r["email"].as_str().unwrap_or_default().to_string(),
@@ -730,12 +749,21 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
 
 /// SQLite devuelve enteros donde Postgres puede devolver booleanos: acepta ambos.
 fn truthy(value: &serde_json::Value) -> bool {
-    value.as_bool().unwrap_or_else(|| value.as_i64().unwrap_or(0) != 0)
+    value
+        .as_bool()
+        .unwrap_or_else(|| value.as_i64().unwrap_or(0) != 0)
 }
 
 /// Un usuario por id (cualquier estado). `None` si no existe en este hub.
-pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Result<Option<HubUserRow>> {
-    Ok(list(db, hub_id).await?.into_iter().find(|u| u.id == user_id))
+pub async fn get(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+) -> Result<Option<HubUserRow>> {
+    Ok(list(db, hub_id)
+        .await?
+        .into_iter()
+        .find(|u| u.id == user_id))
 }
 
 /// Alta de usuario: valida, crea la identidad (con PIN si lo trae) y guarda su email.
@@ -830,7 +858,10 @@ pub async fn update(
         None => None,
     };
     let pin = match &input.pin {
-        Some(value) => Some(clean_pin(value, crate::settings::pin_length_of(db, hub_id).await)?),
+        Some(value) => Some(clean_pin(
+            value,
+            crate::settings::pin_length_of(db, hub_id).await,
+        )?),
         None => None,
     };
     let badge = match &input.badge {
@@ -1000,7 +1031,12 @@ pub async fn core_query(
     // `approvals.list` is the exception — the audit grows forever, so it pages (hub#884).
     let whole = |rows: Vec<serde_json::Value>| {
         let total = rows.len() as u64;
-        crate::queries::QueryPage { rows, total, limit: total, offset: 0 }
+        crate::queries::QueryPage {
+            rows,
+            total,
+            limit: total,
+            offset: 0,
+        }
     };
     match rest {
         // Setup status of the hub (hub#369): ONE document joining the core's items with the ones
@@ -1219,7 +1255,9 @@ mod tests {
         identity::create_user(&db, HUB, "Marta", "1234", "cashier", None)
             .await
             .unwrap();
-        let err = ensure_name_is_free(&db, HUB, "Marta", None).await.unwrap_err();
+        let err = ensure_name_is_free(&db, HUB, "Marta", None)
+            .await
+            .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::InvalidField { field, reason, .. }
                      if field == "name" && reason == "duplicate"),
@@ -1292,14 +1330,27 @@ mod tests {
         assert!(clean_role("").is_err());
         assert_eq!(clean_pin("", 4).unwrap(), "");
         assert_eq!(clean_pin("4821", 4).unwrap(), "4821");
-        assert!(clean_pin("12", 4).is_err(), "menos dígitos de los que pide el hub");
-        assert!(clean_pin("48213", 4).is_err(), "más dígitos de los que pide el hub");
-        assert_eq!(clean_pin("482137", 6).unwrap(), "482137", "y en un hub de 6, seis");
+        assert!(
+            clean_pin("12", 4).is_err(),
+            "menos dígitos de los que pide el hub"
+        );
+        assert!(
+            clean_pin("48213", 4).is_err(),
+            "más dígitos de los que pide el hub"
+        );
+        assert_eq!(
+            clean_pin("482137", 6).unwrap(),
+            "482137",
+            "y en un hub de 6, seis"
+        );
         assert!(clean_pin("4821", 6).is_err(), "en un hub de 6, cuatro no");
         assert!(clean_pin("12ab", 4).is_err(), "solo dígitos");
         // hub#355: la forma ya no basta, el PIN tampoco puede ser de los que se adivinan a la
         // primera. `1234` era el ejemplo de este test justamente por ser el primero que se prueba.
-        assert!(clean_pin("1234", 4).is_err(), "una cuesta arriba no es un PIN");
+        assert!(
+            clean_pin("1234", 4).is_err(),
+            "una cuesta arriba no es un PIN"
+        );
         assert_eq!(clean_email("").unwrap(), "");
         assert!(clean_email("ana@example.com").is_ok());
         assert!(clean_email("ana.example.com").is_err());
@@ -1335,13 +1386,17 @@ mod tests {
         identity::create_user(&db, HUB, "Marta", "1234", "cashier", None)
             .await
             .unwrap();
-        let err = ensure_name_is_free(&db, HUB, "Marta", None).await.unwrap_err();
+        let err = ensure_name_is_free(&db, HUB, "Marta", None)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("Marta"), "{err}");
         // Editarse a uno mismo con el mismo nombre no choca consigo mismo.
         let id = identity::create_user(&db, HUB, "Luis", "2222", "cashier", None)
             .await
             .unwrap();
-        ensure_name_is_free(&db, HUB, "Luis", Some(&id)).await.unwrap();
+        ensure_name_is_free(&db, HUB, "Luis", Some(&id))
+            .await
+            .unwrap();
     }
 
     #[test]
@@ -1360,13 +1415,24 @@ mod tests {
     fn clean_pin_refuses_four_digits_when_the_hub_wants_six_hub1302() {
         let err = clean_pin("4821", 6).unwrap_err();
         match &err {
-            RuntimeError::InvalidField { field, reason, detail, .. } => {
+            RuntimeError::InvalidField {
+                field,
+                reason,
+                detail,
+                ..
+            } => {
                 assert_eq!(field, "pin");
                 assert_eq!(reason, "format");
                 // The refusal has to name what THIS hub expects (six), never what some other hub
                 // would have wanted (four) — the whole point of hub#1302.
-                assert!(detail.contains('6'), "refusal must name the hub's real length: {detail}");
-                assert!(!detail.contains('4'), "refusal must not claim four digits: {detail}");
+                assert!(
+                    detail.contains('6'),
+                    "refusal must name the hub's real length: {detail}"
+                );
+                assert!(
+                    !detail.contains('4'),
+                    "refusal must not claim four digits: {detail}"
+                );
             }
             other => panic!("expected InvalidField(pin, format), got {other:?}"),
         }

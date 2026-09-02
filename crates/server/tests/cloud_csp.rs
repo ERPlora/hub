@@ -23,7 +23,9 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{build_serving_router, default_csp, AppState, AuthMode, HubConfig, ServeConfig};
+use erplora_server::{
+    build_serving_router, default_csp, AppState, AuthMode, HubConfig, ServeConfig,
+};
 use std::collections::BTreeMap;
 use tower::ServiceExt; // oneshot
 

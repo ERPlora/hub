@@ -47,7 +47,10 @@ pub struct Available {
 /// Qué debe correr este hub tras resolver.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
-    Update { from: String, to: String },
+    Update {
+        from: String,
+        to: String,
+    },
     /// Se queda donde está — y eso incluye el caso en que el Cloud no dijo nada. **Nunca «sin
     /// módulo»**: un hub con la versión de ayer funciona; uno sin el módulo, no.
     StayPut(String),
@@ -89,7 +92,9 @@ pub fn resolve(installed: &str, pinned: Option<&str>, available: &[Available]) -
     let best = available
         .iter()
         .filter(|candidate| candidate.is_active)
-        .filter_map(|candidate| parse(&candidate.version).map(|parsed| (parsed, &candidate.version)))
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, &candidate.version))
+        })
         .filter(|(parsed, _)| *parsed > current)
         .max_by_key(|(parsed, _)| *parsed);
 
@@ -202,7 +207,9 @@ pub fn resolve_bundle_version(requested: &str, available: &[Available]) -> Optio
     available
         .iter()
         .filter(installable)
-        .filter_map(|candidate| parse(&candidate.version).map(|parsed| (parsed, &candidate.version)))
+        .filter_map(|candidate| {
+            parse(&candidate.version).map(|parsed| (parsed, &candidate.version))
+        })
         .filter(|(parsed, _)| *parsed > pinned && compatible(pinned, *parsed))
         .max_by_key(|(parsed, _)| *parsed)
         .map(|(_, version)| version.clone())
@@ -223,13 +230,22 @@ fn compatible(pinned: (u64, u64, u64), candidate: (u64, u64, u64)) -> bool {
 pub enum Outcome {
     /// Ya estaba en esa versión: no se descargó nada ni se migró nada.
     AlreadyThere(String),
-    Updated { from: String, to: String },
+    Updated {
+        from: String,
+        to: String,
+    },
     /// La nueva falló y **la vieja volvió a quedar instalada y funcionando**.
-    RolledBack { stayed_on: String, error: String },
+    RolledBack {
+        stayed_on: String,
+        error: String,
+    },
     /// La nueva falló **y la vuelta atrás también**. El hub se queda sin el módulo, y por eso este
     /// caso no puede pasar en silencio: con el readiness duro de hub#538 el arranque siguiente no
     /// dará `UP`, y Swarm revertirá el despliegue entero.
-    Lost { module: String, error: String },
+    Lost {
+        module: String,
+        error: String,
+    },
 }
 
 /// Actualiza, y si falla **deja la versión anterior puesta**.
@@ -289,7 +305,10 @@ mod tests {
     use super::*;
 
     fn v(version: &str, is_active: bool) -> Available {
-        Available { version: version.into(), is_active }
+        Available {
+            version: version.into(),
+            is_active,
+        }
     }
 
     // ── Se actualizan solos ──────────────────────────────────────────────────────────
@@ -298,14 +317,28 @@ mod tests {
     fn a_newer_version_is_picked_up_without_anyone_asking() {
         let target = resolve("1.0.0", None, &[v("1.0.0", true), v("1.1.0", true)]);
 
-        assert_eq!(target, Target::Update { from: "1.0.0".into(), to: "1.1.0".into() });
+        assert_eq!(
+            target,
+            Target::Update {
+                from: "1.0.0".into(),
+                to: "1.1.0".into()
+            }
+        );
     }
 
     #[test]
     fn the_highest_wins_not_the_last_in_the_list() {
-        let target = resolve("1.0.0", None, &[v("1.10.0", true), v("1.9.0", true), v("1.2.0", true)]);
+        let target = resolve(
+            "1.0.0",
+            None,
+            &[v("1.10.0", true), v("1.9.0", true), v("1.2.0", true)],
+        );
 
-        assert_eq!(target.version(), "1.10.0", "1.10 > 1.9: se compara por número, no por texto");
+        assert_eq!(
+            target.version(),
+            "1.10.0",
+            "1.10 > 1.9: se compara por número, no por texto"
+        );
     }
 
     #[test]
@@ -342,7 +375,11 @@ mod tests {
     /// los demás. Por eso gana sobre todo lo demás, incluida una versión más nueva.
     #[test]
     fn a_support_pin_beats_a_newer_version() {
-        let target = resolve("3.1.0", Some("3.1.0"), &[v("3.1.0", true), v("3.2.0", true)]);
+        let target = resolve(
+            "3.1.0",
+            Some("3.1.0"),
+            &[v("3.1.0", true), v("3.2.0", true)],
+        );
 
         assert_eq!(target, Target::StayPut("3.1.0".into()));
     }
@@ -350,7 +387,11 @@ mod tests {
     #[test]
     fn a_support_pin_also_beats_the_quarantine() {
         // Si lo hemos clavado ahí a propósito, es porque sabemos lo que hacemos.
-        let target = resolve("3.1.0", Some("3.1.0"), &[v("3.1.0", false), v("3.2.0", true)]);
+        let target = resolve(
+            "3.1.0",
+            Some("3.1.0"),
+            &[v("3.1.0", false), v("3.2.0", true)],
+        );
 
         assert_eq!(target.version(), "3.1.0");
     }
@@ -395,7 +436,11 @@ mod tests {
     /// todas las publicadas — y la primera de la lista es la última, que es la que se ofrece.
     #[test]
     fn a_first_install_can_choose_among_every_published_version_newest_first() {
-        let offered = offer(None, None, &[v("1.0.0", true), v("2.0.0", true), v("1.5.0", true)]);
+        let offered = offer(
+            None,
+            None,
+            &[v("1.0.0", true), v("2.0.0", true), v("1.5.0", true)],
+        );
 
         assert_eq!(offered, vec!["2.0.0", "1.5.0", "1.0.0"]);
     }
@@ -422,7 +467,11 @@ mod tests {
             &[v("1.0.0", true), v("2.0.0", true), v("2.1.0", true)],
         );
 
-        assert_eq!(offered, vec!["2.1.0"], "ni la instalada ni ninguna anterior");
+        assert_eq!(
+            offered,
+            vec!["2.1.0"],
+            "ni la instalada ni ninguna anterior"
+        );
     }
 
     #[test]
@@ -443,7 +492,11 @@ mod tests {
     fn a_version_that_cannot_be_ordered_is_not_offered() {
         let offered = offer(None, None, &[v("latest", true), v("1.0.0", true)]);
 
-        assert_eq!(offered, vec!["1.0.0"], "lo que no se puede colocar no se ofrece");
+        assert_eq!(
+            offered,
+            vec!["1.0.0"],
+            "lo que no se puede colocar no se ofrece"
+        );
     }
 
     /// Si la instalada no se puede comparar, no se sabe qué sería «hacia delante»: se ofrece nada
@@ -472,7 +525,10 @@ mod tests {
             &[v("3.1.0", true), v("3.2.0", true)],
         );
 
-        assert!(offered.is_empty(), "el pin no se salta desde la pantalla: {offered:?}");
+        assert!(
+            offered.is_empty(),
+            "el pin no se salta desde la pantalla: {offered:?}"
+        );
     }
 
     // ── Actualizar sin quedarse sin módulo ───────────────────────────────────────────
@@ -515,7 +571,11 @@ mod tests {
         let (outcome, intentos) = attempt(&["1.1.0"], "1.0.0", "1.1.0").await;
 
         assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
-        assert_eq!(intentos, vec!["1.1.0", "1.0.0"], "se intenta la nueva y se vuelve a la vieja");
+        assert_eq!(
+            intentos,
+            vec!["1.1.0", "1.0.0"],
+            "se intenta la nueva y se vuelve a la vieja"
+        );
     }
 
     /// Y si la vuelta atrás TAMBIÉN falla, se dice — no se finge que salió bien.
@@ -544,8 +604,7 @@ mod tests {
     /// El caso real: el marketplace podó `sales@2.12.8` y la plantilla se quedó sin ventas.
     #[test]
     fn a_pinned_version_the_marketplace_pruned_falls_back_to_the_newest_compatible() {
-        let resolved =
-            resolve_bundle_version("2.12.8", &[v("2.13.10", true), v("2.13.9", true)]);
+        let resolved = resolve_bundle_version("2.12.8", &[v("2.13.10", true), v("2.13.9", true)]);
 
         assert_eq!(resolved.as_deref(), Some("2.13.10"));
     }
@@ -610,7 +669,10 @@ mod tests {
             resolve_bundle_version("2026-07-31", &[v("2026-07-31", true)]).as_deref(),
             Some("2026-07-31"),
         );
-        assert_eq!(resolve_bundle_version("2026-07-31", &[v("2.13.10", true)]), None);
+        assert_eq!(
+            resolve_bundle_version("2026-07-31", &[v("2.13.10", true)]),
+            None
+        );
     }
 
     /// Un módulo que ya no publica NADA no tiene sustituta — y el llamante debe contarlo.

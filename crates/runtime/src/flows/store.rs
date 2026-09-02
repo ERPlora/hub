@@ -413,7 +413,11 @@ pub async fn seed_triggers(
         p.insert("next_run".into(), json!(next_run));
         p.insert(
             "tz".into(),
-            json!(if trigger.kind == TriggerKind::Cron { tz.name() } else { "" }),
+            json!(if trigger.kind == TriggerKind::Cron {
+                tz.name()
+            } else {
+                ""
+            }),
         );
         p.insert("now".into(), json!(now));
         // The upsert deliberately does NOT touch `next_run` (nor the `tz` it was computed under):
@@ -739,7 +743,11 @@ pub async fn get_run(
             &p,
         )
         .await?;
-    let run = res.rows.first().map(run_row).ok_or_else(|| not_found(run_id))?;
+    let run = res
+        .rows
+        .first()
+        .map(run_row)
+        .ok_or_else(|| not_found(run_id))?;
     let steps = db
         .query(
             "SELECT step_index, step_id, kind, status, input, output, error, started_at, finished_at \
@@ -1198,7 +1206,10 @@ mod tests {
             .await
             .unwrap()
             .rows;
-        assert!(live.is_empty(), "no trigger keeps creating runs for a deleted flow");
+        assert!(
+            live.is_empty(),
+            "no trigger keeps creating runs for a deleted flow"
+        );
     }
 
     /// **hub#771** — deleting a flow must cancel the runs it left behind that have not finished yet,
@@ -1234,9 +1245,19 @@ mod tests {
         )
         .await
         .unwrap();
-        let sleeping_run = start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
-            .await
-            .unwrap();
+        let sleeping_run = start_run(
+            &db,
+            HUB,
+            &flow.id,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
         // Run the tick that parks it on the delay.
         executor::tick(&db, &reg, HUB).await.unwrap();
         let parked = get_run(&db, HUB, &sleeping_run).await.unwrap().0;
@@ -1264,13 +1285,26 @@ mod tests {
         )
         .await
         .unwrap();
-        let neighbour_run =
-            start_run(&db, NEIGHBOUR, &neighbour_flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
-                .await
-                .unwrap();
+        let neighbour_run = start_run(
+            &db,
+            NEIGHBOUR,
+            &neighbour_flow.id,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
         executor::tick(&db, &reg, NEIGHBOUR).await.unwrap();
         assert_eq!(
-            get_run(&db, NEIGHBOUR, &neighbour_run).await.unwrap().0.status,
+            get_run(&db, NEIGHBOUR, &neighbour_run)
+                .await
+                .unwrap()
+                .0
+                .status,
             STATUS_SLEEPING,
             "precondition: the neighbour is also sleeping"
         );
@@ -1325,10 +1359,19 @@ mod tests {
         )
         .await
         .unwrap();
-        let pending_run =
-            start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
-                .await
-                .unwrap();
+        let pending_run = start_run(
+            &db,
+            HUB,
+            &flow.id,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
         assert_eq!(
             get_run(&db, HUB, &pending_run).await.unwrap().0.status,
             STATUS_PENDING,
@@ -1366,10 +1409,19 @@ mod tests {
         )
         .await
         .unwrap();
-        let done_run =
-            start_run(&db, HUB, &flow.id, "", "manual", "", &json!({}), 0, "hub_user:1")
-                .await
-                .unwrap();
+        let done_run = start_run(
+            &db,
+            HUB,
+            &flow.id,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
         // Mark it finished by hand — the run row is what the delete sees, not how it got there.
         let mut p = Params::new();
         p.insert("id".into(), json!(done_run));
@@ -1454,9 +1506,19 @@ mod tests {
         let mut ids = Vec::new();
         for _ in 0..n {
             ids.push(
-                start_run(db, HUB, flow_id, "", "manual", "", &json!({}), 0, "hub_user:1")
-                    .await
-                    .unwrap(),
+                start_run(
+                    db,
+                    HUB,
+                    flow_id,
+                    "",
+                    "manual",
+                    "",
+                    &json!({}),
+                    0,
+                    "hub_user:1",
+                )
+                .await
+                .unwrap(),
             );
         }
         ids
@@ -1489,7 +1551,9 @@ mod tests {
         let mut seen: Vec<String> = Vec::new();
         let mut before: Option<String> = None;
         for _ in 0..4 {
-            let page = list_runs(&db, HUB, &flow.id, 2, before.as_deref()).await.unwrap();
+            let page = list_runs(&db, HUB, &flow.id, 2, before.as_deref())
+                .await
+                .unwrap();
             if page.is_empty() {
                 break;
             }
@@ -1497,7 +1561,11 @@ mod tests {
             seen.extend(page.into_iter().map(|r| r.id));
         }
 
-        assert_eq!(seen.len(), 5, "every run appeared exactly once across the pages");
+        assert_eq!(
+            seen.len(),
+            5,
+            "every run appeared exactly once across the pages"
+        );
         let mut unique = seen.clone();
         unique.sort();
         unique.dedup();
@@ -1547,7 +1615,10 @@ mod tests {
             get_run(&db, HUB, &their_run).await.is_err(),
             "the detail of another tenant's run is not a 404 by luck: it must not be readable"
         );
-        assert!(list_runs(&db, HUB, &theirs.id, 50, None).await.unwrap().is_empty());
+        assert!(list_runs(&db, HUB, &theirs.id, 50, None)
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     /// **The history never shows a secret** (ADR-0283 §4).
@@ -1589,9 +1660,19 @@ mod tests {
         )
         .await
         .unwrap();
-        let run_id = start_run(db, HUB, flow_id, "", "manual", "", &json!({}), 0, "hub_user:1")
-            .await
-            .unwrap();
+        let run_id = start_run(
+            db,
+            HUB,
+            flow_id,
+            "",
+            "manual",
+            "",
+            &json!({}),
+            0,
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
 
         // What a resolved http step would have written: the header, templated, in the clear.
         let mut s = Params::new();

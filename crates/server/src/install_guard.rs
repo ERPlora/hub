@@ -244,7 +244,10 @@ mod tests {
     /// (g) del contrato: `HUB_MODULES_DIR` solo se escanea al arrancar en modo desarrollo.
     #[test]
     fn el_escaneo_de_arranque_es_solo_dev() {
-        assert_eq!(boot_scan_dir(true, Some("/tmp/modules")), Some("/tmp/modules"));
+        assert_eq!(
+            boot_scan_dir(true, Some("/tmp/modules")),
+            Some("/tmp/modules")
+        );
         assert_eq!(boot_scan_dir(false, Some("/tmp/modules")), None);
         assert_eq!(boot_scan_dir(true, None), None);
     }

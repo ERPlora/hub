@@ -44,7 +44,10 @@ struct Sink {
 }
 impl EventSink for Sink {
     fn emit(&self, _source: EventSource<'_>, name: &str, payload: &Value) {
-        self.events.lock().unwrap().push((name.into(), payload.clone()));
+        self.events
+            .lock()
+            .unwrap()
+            .push((name.into(), payload.clone()));
     }
 }
 impl Sink {
@@ -95,7 +98,10 @@ async fn notes(rt: &Runtime) -> Vec<String> {
 }
 
 async fn run_of(rt: &Runtime, flow_id: &str) -> store::FlowRun {
-    rt.list_flow_runs(flow_id, 10, None).await.unwrap().remove(0)
+    rt.list_flow_runs(flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0)
 }
 
 /// A run parked on an approval, exactly as a 3 AM turn leaves it.
@@ -166,7 +172,10 @@ async fn a_proposal_past_its_ttl_is_swept_the_run_ends_and_nothing_is_executed()
 
     let report = rt.sweep_expired_flow_approvals().await.unwrap();
 
-    assert_eq!(report.expired, 1, "the sweep counts what it decided: {report:?}");
+    assert_eq!(
+        report.expired, 1,
+        "the sweep counts what it decided: {report:?}"
+    );
     assert_eq!(report.runs_stopped, 1);
     let swept = rt.get_flow_approval(&approval.id).await.unwrap();
     assert_eq!(swept.status, approvals::STATUS_EXPIRED);
@@ -175,7 +184,10 @@ async fn a_proposal_past_its_ttl_is_swept_the_run_ends_and_nothing_is_executed()
         approvals::DECIDED_BY_EXPIRY,
         "nobody decided this; the hub closed it, and the record says so instead of naming a person"
     );
-    assert!(swept.decided_at.is_some(), "when it was closed is part of the record");
+    assert!(
+        swept.decided_at.is_some(),
+        "when it was closed is part of the record"
+    );
 
     assert!(
         notes(&rt).await.is_empty(),
@@ -190,7 +202,10 @@ async fn a_proposal_past_its_ttl_is_swept_the_run_ends_and_nothing_is_executed()
     // And the steps written after the agent's do not run either — the tick must not pick the run
     // back up now that it is out of `waiting_approval`.
     rt.process_flows().await.unwrap();
-    assert!(notes(&rt).await.is_empty(), "a cancelled run stays cancelled");
+    assert!(
+        notes(&rt).await.is_empty(),
+        "a cancelled run stays cancelled"
+    );
 
     let emitted = sink.named(approvals::EVENT_APPROVAL_EXPIRED);
     assert_eq!(emitted.len(), 1, "the tray hears about it without polling");

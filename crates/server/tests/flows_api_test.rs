@@ -58,12 +58,16 @@ async fn build_fixture(install_modules: bool) -> Fixture {
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
     if install_modules {
-        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda");
+        let dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda");
         rt.install_from_dir(&dir).await.unwrap();
     }
 
     let admin_id = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
-    let employee_id = rt.create_user("Marta", "2222", "cashier", None).await.unwrap();
+    let employee_id = rt
+        .create_user("Marta", "2222", "cashier", None)
+        .await
+        .unwrap();
     let admin = rt.create_session(&admin_id, 3600, None).await.unwrap();
     let employee = rt.create_session(&employee_id, 3600, None).await.unwrap();
     let api_key = rt.ensure_app_api_key().await.unwrap();
@@ -153,19 +157,23 @@ async fn the_crud_round_trips_and_the_definition_comes_back_as_json() {
 
     let id = create(&f, welcome_flow()).await;
 
-    let listed = body_json(send(
-        &f.router,
-        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request("GET", "/api/hub/flows", Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert_eq!(listed["data"].as_array().unwrap().len(), 1);
 
-    let got = body_json(send(
-        &f.router,
-        request("GET", &format!("/api/hub/flows/{id}"), Some(&f.admin), None),
+    let got = body_json(
+        send(
+            &f.router,
+            request("GET", &format!("/api/hub/flows/{id}"), Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert_eq!(got["data"]["name"], "Welcome");
     assert_eq!(got["data"]["enabled"], true, "a saved flow is meant to run");
@@ -197,7 +205,12 @@ async fn the_crud_round_trips_and_the_definition_comes_back_as_json() {
 
     let deleted = send(
         &f.router,
-        request("DELETE", &format!("/api/hub/flows/{id}"), Some(&f.admin), None),
+        request(
+            "DELETE",
+            &format!("/api/hub/flows/{id}"),
+            Some(&f.admin),
+            None,
+        ),
     )
     .await;
     assert_eq!(deleted.status(), StatusCode::OK);
@@ -383,11 +396,13 @@ async fn a_document_the_hub_does_not_understand_is_refused_with_its_stable_code(
     }
 
     // And nothing landed.
-    let listed = body_json(send(
-        &f.router,
-        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request("GET", "/api/hub/flows", Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert!(listed["data"].as_array().unwrap().is_empty());
 
@@ -490,15 +505,20 @@ async fn a_trigger_the_engine_cannot_read_is_refused_at_the_door_with_its_stable
         );
         // The message has to be actionable — it names what is wrong and what the grammar is.
         let message = json["error"]["message"].as_str().unwrap_or("");
-        assert!(!message.is_empty(), "the refusal must explain itself: {json}");
+        assert!(
+            !message.is_empty(),
+            "the refusal must explain itself: {json}"
+        );
     }
 
     // …and NOTHING landed: none of the unreadable triggers is armed.
-    let listed = body_json(send(
-        &f.router,
-        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request("GET", "/api/hub/flows", Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert!(
         listed["data"].as_array().unwrap().is_empty(),
@@ -536,11 +556,18 @@ async fn grants_are_replaced_whole_and_a_command_that_does_not_exist_refuses_the
     let id = create(&f, welcome_flow()).await;
 
     // Nothing granted is the default answer, and the API says so out loud.
-    let empty = body_json(send(
-        &f.router,
-        request("GET", &format!("/api/hub/flows/{id}/grants"), Some(&f.admin), None),
+    let empty = body_json(
+        send(
+            &f.router,
+            request(
+                "GET",
+                &format!("/api/hub/flows/{id}/grants"),
+                Some(&f.admin),
+                None,
+            ),
+        )
+        .await,
     )
-    .await)
     .await;
     assert!(empty["data"].as_array().unwrap().is_empty());
 
@@ -666,11 +693,13 @@ async fn a_query_step_is_refused_at_the_save_door_for_its_limit_and_for_a_read_t
     .await;
     assert_eq!(ok.status(), StatusCode::CREATED, "the good one saves");
 
-    let listed = body_json(send(
-        &f.router,
-        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request("GET", "/api/hub/flows", Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert_eq!(
         listed["data"].as_array().unwrap().len(),
@@ -720,11 +749,13 @@ async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door(
         body_json(saved).await["error"]["code"],
         "flow.internal_command"
     );
-    let listed = body_json(send(
-        &f.router,
-        request("GET", "/api/hub/flows", Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request("GET", "/api/hub/flows", Some(&f.admin), None),
+        )
+        .await,
     )
-    .await)
     .await;
     assert!(
         listed["data"].as_array().unwrap().is_empty(),
@@ -748,11 +779,18 @@ async fn an_internal_command_is_refused_at_the_grants_door_and_at_the_save_door(
         body_json(granted).await["error"]["code"],
         "flow.internal_command"
     );
-    let live = body_json(send(
-        &f.router,
-        request("GET", &format!("/api/hub/flows/{id}/grants"), Some(&f.admin), None),
+    let live = body_json(
+        send(
+            &f.router,
+            request(
+                "GET",
+                &format!("/api/hub/flows/{id}/grants"),
+                Some(&f.admin),
+                None,
+            ),
+        )
+        .await,
     )
-    .await)
     .await;
     assert!(
         live["data"].as_array().unwrap().is_empty(),
@@ -819,11 +857,18 @@ async fn the_run_routes_do_not_shadow_each_other() {
         .unwrap()
         .to_string();
 
-    let listed = body_json(send(
-        &f.router,
-        request("GET", &format!("/api/hub/flows/{id}/runs"), Some(&f.admin), None),
+    let listed = body_json(
+        send(
+            &f.router,
+            request(
+                "GET",
+                &format!("/api/hub/flows/{id}/runs"),
+                Some(&f.admin),
+                None,
+            ),
+        )
+        .await,
     )
-    .await)
     .await;
     assert_eq!(listed["data"].as_array().unwrap().len(), 1);
     assert_eq!(listed["data"][0]["id"], run_id);
@@ -898,7 +943,8 @@ async fn the_run_history_is_paged_by_cursor_and_never_serves_the_same_run_twice(
     let mut seen: Vec<String> = Vec::new();
     let mut uri = format!("/api/hub/flows/{id}/runs?limit=2");
     for _ in 0..4 {
-        let page = body_json(send(&f.router, request("GET", &uri, Some(&f.admin), None)).await).await;
+        let page =
+            body_json(send(&f.router, request("GET", &uri, Some(&f.admin), None)).await).await;
         let rows = page["data"].as_array().unwrap().clone();
         if rows.is_empty() {
             break;
@@ -948,11 +994,18 @@ async fn the_run_detail_carries_the_events_the_run_emitted() {
         .unwrap()
         .to_string();
 
-    let body = body_json(send(
-        &f.router,
-        request("GET", &format!("/api/hub/flows/runs/{run_id}"), Some(&f.admin), None),
+    let body = body_json(
+        send(
+            &f.router,
+            request(
+                "GET",
+                &format!("/api/hub/flows/runs/{run_id}"),
+                Some(&f.admin),
+                None,
+            ),
+        )
+        .await,
     )
-    .await)
     .await;
 
     assert_eq!(body["data"]["run"]["id"], run_id);
@@ -974,7 +1027,12 @@ async fn a_disabled_flow_refuses_to_be_run_by_hand() {
 
     let response = send(
         &f.router,
-        request("POST", &format!("/api/hub/flows/{id}/run"), Some(&f.admin), None),
+        request(
+            "POST",
+            &format!("/api/hub/flows/{id}/run"),
+            Some(&f.admin),
+            None,
+        ),
     )
     .await;
     // …and THIS one keeps its `409` (hub#734): the flow exists, the request is well formed and the
@@ -986,7 +1044,6 @@ async fn a_disabled_flow_refuses_to_be_run_by_hand() {
     std::fs::remove_dir_all(f.temp).ok();
 }
 
-
 /// hub#662 — the write-only credential store, through the real router.
 ///
 /// Two things only a router test can catch: that `secrets` is not swallowed by `/flows/{id}` (it is
@@ -996,7 +1053,12 @@ async fn a_disabled_flow_refuses_to_be_run_by_hand() {
 async fn a_secret_goes_in_and_only_its_name_comes_back() {
     // A secret is refused without a master key (hub#114, fail-closed), so the test provides one.
     // SAFETY: no other test in this binary reads or writes this variable.
-    unsafe { std::env::set_var("HUB_SECRETS_KEY", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=") };
+    unsafe {
+        std::env::set_var(
+            "HUB_SECRETS_KEY",
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        )
+    };
     let f = fixture().await;
 
     let created = send(
@@ -1024,7 +1086,11 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
         request("GET", "/api/hub/flows/secrets", Some(&f.admin), None),
     )
     .await;
-    assert_eq!(listed.status(), StatusCode::OK, "`secrets` is not read as a flow id");
+    assert_eq!(
+        listed.status(),
+        StatusCode::OK,
+        "`secrets` is not read as a flow id"
+    );
     let listing = body_json(listed).await;
     assert_eq!(listing["data"][0]["name"], "API_KEY");
     assert!(!listing.to_string().contains("sk-live-42"), "{listing}");
@@ -1048,7 +1114,12 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
 
     let removed = send(
         &f.router,
-        request("DELETE", "/api/hub/flows/secrets/API_KEY", Some(&f.admin), None),
+        request(
+            "DELETE",
+            "/api/hub/flows/secrets/API_KEY",
+            Some(&f.admin),
+            None,
+        ),
     )
     .await;
     assert_eq!(removed.status(), StatusCode::OK);
@@ -1064,7 +1135,12 @@ async fn a_secret_goes_in_and_only_its_name_comes_back() {
     // retry a delete of something that will never exist.
     let ghost = send(
         &f.router,
-        request("DELETE", "/api/hub/flows/secrets/NO_SUCH_SECRET", Some(&f.admin), None),
+        request(
+            "DELETE",
+            "/api/hub/flows/secrets/NO_SUCH_SECRET",
+            Some(&f.admin),
+            None,
+        ),
     )
     .await;
     assert_eq!(ghost.status(), StatusCode::NOT_FOUND);
@@ -1106,7 +1182,9 @@ async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
             "PUT",
             &format!("/api/hub/flows/{id}/grants"),
             Some(&f.admin),
-            Some(json!({ "grants": [{ "kind": "http", "value": "https://api.example.com/v1/*" }] })),
+            Some(
+                json!({ "grants": [{ "kind": "http", "value": "https://api.example.com/v1/*" }] }),
+            ),
         ),
     )
     .await;
@@ -1157,7 +1235,11 @@ async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
         ),
     )
     .await;
-    assert_eq!(notifying.status(), StatusCode::CREATED, "a `notify` step saves since hub#821");
+    assert_eq!(
+        notifying.status(),
+        StatusCode::CREATED,
+        "a `notify` step saves since hub#821"
+    );
 
     // …and the same step with a free address does NOT, which is the refusal that matters: there is
     // no syntax for one, so nothing an author writes can put an address from the event payload in
@@ -1210,7 +1292,11 @@ async fn every_step_kind_saves_now_and_what_is_refused_is_a_bad_value() {
         ),
     )
     .await;
-    assert_eq!(response.status(), StatusCode::CREATED, "an `ai` flow saves since hub#665");
+    assert_eq!(
+        response.status(),
+        StatusCode::CREATED,
+        "an `ai` flow saves since hub#665"
+    );
 
     std::fs::remove_dir_all(f.temp).ok();
 }

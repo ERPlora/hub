@@ -120,7 +120,10 @@ mod tests {
     /// este test estaría midiendo el recorte del techo en lugar de que el entorno se lea.
     #[test]
     fn it_can_be_tuned_from_the_environment() {
-        assert!(Duration::from_secs(25) < MAX_DRAIN, "25 s debe caber bajo el techo");
+        assert!(
+            Duration::from_secs(25) < MAX_DRAIN,
+            "25 s debe caber bajo el techo"
+        );
         assert_eq!(con(Some("25")), std::time::Duration::from_secs(25));
     }
 

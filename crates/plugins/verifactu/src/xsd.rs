@@ -297,7 +297,10 @@ type Element<'a> = (&'a str, &'a str, usize);
 
 /// Primer elemento con ese nombre, a cualquier profundidad.
 fn text_of<'a>(elements: &[Element<'a>], tag: &str) -> Option<&'a str> {
-    elements.iter().find(|(t, _, _)| *t == tag).map(|(_, v, _)| *v)
+    elements
+        .iter()
+        .find(|(t, _, _)| *t == tag)
+        .map(|(_, v, _)| *v)
 }
 
 /// Profundidad del primer elemento con ese nombre.
@@ -583,9 +586,7 @@ fn num(v: &str) -> Option<f64> {
 /// ¿Coincide con alguno de los valores permitidos? Compara en céntesimas para no depender de la
 /// representación binaria de `7.5` o `5.2`.
 fn en_lista(v: f64, permitidos: &[f64]) -> bool {
-    permitidos
-        .iter()
-        .any(|p| ((p - v) * 100.0).abs() < 0.5)
+    permitidos.iter().any(|p| ((p - v) * 100.0).abs() < 0.5)
 }
 
 /// Valida el bloque `Desglose` de un registro de alta.
@@ -1038,7 +1039,9 @@ mod tests {
     /// `RegistroAnterior`. Una autocerrada no abre nivel; un cierre lo baja.
     #[test]
     fn walk_anota_la_profundidad_de_cada_elemento() {
-        let els = walk("<R><IDFactura><Huella>propia</Huella></IDFactura><Vacio/><Huella>otra</Huella></R>");
+        let els = walk(
+            "<R><IDFactura><Huella>propia</Huella></IDFactura><Vacio/><Huella>otra</Huella></R>",
+        );
         assert_eq!(
             els,
             vec![

@@ -14,7 +14,6 @@ use crate::manifest::{FilterOp, ListSpec};
 use crate::permissions;
 use crate::registry::{Registry, RequestContext};
 
-
 /// Resultado de una query de lista: la página de filas + el total filtrado (para el pager).
 /// Es lo que viaja en `data` del envelope para queries paginadas (§7.6, §8.2).
 #[derive(Debug, Clone, serde::Serialize)]
@@ -115,10 +114,16 @@ pub async fn execute_page(
         // módulo activo es un CONTRATO ROTO y explota.
         let owner = name.split('.').next().unwrap_or("");
         if owner.is_empty() || !registry.installed.iter().any(|m| m.id == owner) {
-            return RuntimeError::ModuleNotInstalled { module: owner.to_string(), operation: name.to_string() };
+            return RuntimeError::ModuleNotInstalled {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
         }
         if !registry.is_active(owner) {
-            return RuntimeError::ModuleInactive { module: owner.to_string(), operation: name.to_string() };
+            return RuntimeError::ModuleInactive {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
         }
         RuntimeError::QueryNotFound(name.to_string())
     })?;
@@ -130,7 +135,10 @@ pub async fn execute_page(
     let params = if let Some(schema) = &q.schema {
         schema
             .validate(&Json::Object(params.clone()))
-            .map_err(|detail| RuntimeError::InvalidPayload { name: name.to_string(), detail })?;
+            .map_err(|detail| RuntimeError::InvalidPayload {
+                name: name.to_string(),
+                detail,
+            })?;
         // hub#1092: los números se bindean con la FORMA que el schema declara (`number`→f64,
         // `integer`→i64), no con la del valor accidental — un filtro numérico enviado como `3`
         // y luego como `3.5` no debe re-preparar (ni corromper) la misma sentencia.
@@ -150,7 +158,9 @@ pub async fn execute_page(
     // VIVO. Degrada a vacío si los settings fallan.
     let enriched_ctx;
     let ctx = if ctx.business_tax_id.is_empty() {
-        let f = crate::settings::get_all(db, &ctx.hub_id).await.unwrap_or(Json::Null);
+        let f = crate::settings::get_all(db, &ctx.hub_id)
+            .await
+            .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
         // Same reader as `commands::execute` and as the ⛔ arm of `setup_status`, on purpose: the
         // own certificate if there is one, otherwise ERPlora's delegated one (ADR-0202 §2.1,
@@ -193,7 +203,12 @@ pub async fn execute_page(
         None => {
             let rows = db.query(&q.sql, &bound).await?.rows;
             let total = rows.len() as u64;
-            Ok(QueryPage { rows, total, limit: total, offset: 0 })
+            Ok(QueryPage {
+                rows,
+                total,
+                limit: total,
+                offset: 0,
+            })
         }
         // Query de lista: compone el SQL paginado de forma genérica.
         // hub#1173: the vocabulary check runs on the params the CALLER sent, never on `bound` —
@@ -409,7 +424,10 @@ pub(crate) async fn run_list(
     // decía nada — el TPV se quedaba sin la mitad del catálogo en silencio. Quien sabe cuántas
     // filas necesita es quien llama (una tabla quiere una página; un TPV quiere TODO su catálogo).
     // Sin `limit`, manda el `page_size` que el módulo declara en su manifest.
-    let limit = p.get("limit").and_then(|v| v.as_u64()).unwrap_or(spec.page_size);
+    let limit = p
+        .get("limit")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(spec.page_size);
     let offset = p.get("offset").and_then(|v| v.as_u64()).unwrap_or(0);
     p.insert("limit".into(), json!(limit));
     p.insert("offset".into(), json!(offset));
@@ -502,9 +520,13 @@ pub(crate) async fn run_list(
         })
         .collect();
 
-    Ok(QueryPage { rows, total, limit, offset })
+    Ok(QueryPage {
+        rows,
+        total,
+        limit,
+        offset,
+    })
 }
-
 
 // ── binds obligatorios de un SQL de lista (hub#1086) ─────────────────────────────────────
 
@@ -638,8 +660,8 @@ fn coalesce_first_arg_spans(bytes: &[u8], code: &[(usize, usize)]) -> Vec<(usize
             if seg[i..].len() >= needle.len()
                 && seg[i..i + needle.len()].eq_ignore_ascii_case(needle)
             {
-                let prev_ident = i > 0
-                    && (seg[i - 1].is_ascii_alphanumeric() || seg[i - 1] == b'_');
+                let prev_ident =
+                    i > 0 && (seg[i - 1].is_ascii_alphanumeric() || seg[i - 1] == b'_');
                 let after = i + needle.len();
                 let next_ident = seg
                     .get(after)
@@ -701,7 +723,7 @@ fn is_ident(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{code_spans, coalesce_first_arg_spans, required_binds};
+    use super::{coalesce_first_arg_spans, code_spans, required_binds};
 
     // ── hub#1086: el escáner de binds obligatorios ───────────────────────────────────────────
     // La regla: un bind es obligatorio iff aparece AL MENOS UNA VEZ fuera del primer argumento
@@ -734,7 +756,8 @@ mod tests {
         // El idioma de appointments.list (simple, no list): el sentinel `(COALESCE(:p,'')='' OR
         // col = :p)`. La SEGUNDA aparición no está protegida — para el motor de listas manda
         // como requerido: es la lectura conservadora de un bind medio protegido.
-        let sql = "SELECT * FROM t WHERE (COALESCE(CAST(:status AS text), '') = '' OR status = :status)";
+        let sql =
+            "SELECT * FROM t WHERE (COALESCE(CAST(:status AS text), '') = '' OR status = :status)";
         assert_eq!(required_binds(sql), vec!["status"]);
     }
 

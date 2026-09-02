@@ -200,8 +200,8 @@ pub(crate) async fn set(
             secret_box::MASTER_KEY_ENV
         ))
     })?;
-    let pkcs12_b64_enc =
-        secret_box::encrypt(&key, pkcs12_b64).map_err(|e| certificate_error("cifrando el .p12", e))?;
+    let pkcs12_b64_enc = secret_box::encrypt(&key, pkcs12_b64)
+        .map_err(|e| certificate_error("cifrando el .p12", e))?;
     let password_enc = secret_box::encrypt(&key, password)
         .map_err(|e| certificate_error("cifrando la contraseña", e))?;
 
@@ -695,9 +695,11 @@ async fn load_pkcs12(
     let password = secret_box::decrypt_or_legacy(key.as_ref(), password_stored)
         .map_err(|e| certificate_error("descifrando la contraseña de _hub_certificate", e))?;
 
-    let der = base64::engine::general_purpose::STANDARD.decode(b64.trim()).map_err(|e| {
-        RuntimeError::Certificate(format!("PKCS#12 base64 inválido en _hub_certificate: {e}"))
-    })?;
+    let der = base64::engine::general_purpose::STANDARD
+        .decode(b64.trim())
+        .map_err(|e| {
+            RuntimeError::Certificate(format!("PKCS#12 base64 inválido en _hub_certificate: {e}"))
+        })?;
     Ok(Some((der, password)))
 }
 
@@ -713,7 +715,10 @@ async fn load_pkcs12(
 ///
 /// (Before ERPlora/hub#114 the export read `pkcs12_b64` raw from the database — it was the plaintext
 /// base64 back then; with encryption at rest it has to come through here.)
-pub async fn exportable_der_bytes(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<Vec<u8>>> {
+pub async fn exportable_der_bytes(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Option<Vec<u8>>> {
     for kind in SLOTS {
         if !kind.may_leave_the_hub() {
             continue;
@@ -730,7 +735,9 @@ pub async fn exportable_der_bytes(db: &dyn DatabaseAdapter, hub_id: &str) -> Res
 /// [`active_kind`] selects. Errors if the hub has none, or if it does not parse.
 pub async fn identity(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<reqwest::Identity> {
     let (der, password) = load_active_pkcs12(db, hub_id).await?.ok_or_else(|| {
-        RuntimeError::Certificate("no hay certificado del negocio cargado (Ajustes → Negocio)".into())
+        RuntimeError::Certificate(
+            "no hay certificado del negocio cargado (Ajustes → Negocio)".into(),
+        )
     })?;
     identity_from_der(&der, &password)
 }
@@ -807,9 +814,9 @@ pub fn identity_from_der(der: &[u8], password: &str) -> Result<reqwest::Identity
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
         .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
-    let parsed = pkcs12
-        .parse2(password)
-        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
     let key = parsed
         .pkey
         .ok_or_else(|| RuntimeError::Certificate("el PKCS#12 no contiene clave privada".into()))?;
@@ -820,7 +827,9 @@ pub fn identity_from_der(der: &[u8], password: &str) -> Result<reqwest::Identity
         .private_key_to_pem_pkcs8()
         .map_err(|e| RuntimeError::Certificate(format!("clave privada: {e}")))?;
     pem.extend_from_slice(
-        &cert.to_pem().map_err(|e| RuntimeError::Certificate(format!("certificado: {e}")))?,
+        &cert
+            .to_pem()
+            .map_err(|e| RuntimeError::Certificate(format!("certificado: {e}")))?,
     );
     // Cadena intermedia (si el `.p12` la incluye) — la AEAT valida hasta la raíz FNMT.
     if let Some(chain) = parsed.ca {
@@ -849,9 +858,9 @@ pub fn expiry_from_der(der: &[u8], password: &str) -> Result<Option<String>> {
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
         .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
-    let parsed = pkcs12
-        .parse2(password)
-        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
     match parsed.cert {
         // El Display de Asn1Time es "MMM DD HH:MM:SS YYYY GMT" (p.ej. "Jun 10 00:00:00 2028 GMT").
         Some(cert) => Ok(asn1_time_to_iso(&cert.not_after().to_string())),
@@ -876,9 +885,9 @@ pub fn certificate_type_from_der(der: &[u8], password: &str) -> Result<Option<Ce
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
         .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
-    let parsed = pkcs12
-        .parse2(password)
-        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
     let Some(cert) = parsed.cert else {
         return Ok(None);
     };
@@ -898,10 +907,7 @@ pub fn certificate_type_from_der(der: &[u8], password: &str) -> Result<Option<Ce
 /// transmisión fiscal todavía (mismo motivo por el que existe el stub). Sus gemelos
 /// `identity_from_der`, `expiry_from_der` y `expiry_instant_from_der` están exactamente igual.
 #[cfg(target_os = "android")]
-pub fn certificate_type_from_der(
-    _der: &[u8],
-    _password: &str,
-) -> Result<Option<CertificateType>> {
+pub fn certificate_type_from_der(_der: &[u8], _password: &str) -> Result<Option<CertificateType>> {
     Ok(None)
 }
 
@@ -957,7 +963,9 @@ fn certificate_type_of_x509(
         (false, true) => Some(CertificateType::Representative),
         // Declares both: the container contradicts itself and nothing is inferred from it.
         (true, true) => None,
-        (false, false) => subject_holds_a_natural_person(subject).then_some(CertificateType::Representative),
+        (false, false) => {
+            subject_holds_a_natural_person(subject).then_some(CertificateType::Representative)
+        }
     }
 }
 
@@ -992,9 +1000,9 @@ pub fn expiry_instant_from_der(der: &[u8], password: &str) -> Result<Option<Stri
     ensure_legacy_provider();
     let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
         .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
-    let parsed = pkcs12
-        .parse2(password)
-        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
     match parsed.cert {
         Some(cert) => Ok(asn1_time_to_rfc3339(&cert.not_after().to_string())),
         None => Ok(None),
@@ -1025,13 +1033,26 @@ fn asn1_time_to_iso(s: &str) -> Option<String> {
         return None;
     }
     let month = match parts[0] {
-        "Jan" => "01", "Feb" => "02", "Mar" => "03", "Apr" => "04",
-        "May" => "05", "Jun" => "06", "Jul" => "07", "Aug" => "08",
-        "Sep" => "09", "Oct" => "10", "Nov" => "11", "Dec" => "12",
+        "Jan" => "01",
+        "Feb" => "02",
+        "Mar" => "03",
+        "Apr" => "04",
+        "May" => "05",
+        "Jun" => "06",
+        "Jul" => "07",
+        "Aug" => "08",
+        "Sep" => "09",
+        "Oct" => "10",
+        "Nov" => "11",
+        "Dec" => "12",
         _ => return None,
     };
     let day = parts[1];
-    let day = if day.len() == 1 { format!("0{day}") } else { day.to_string() };
+    let day = if day.len() == 1 {
+        format!("0{day}")
+    } else {
+        day.to_string()
+    };
     Some(format!("{}-{}-{}", parts[3], month, day))
 }
 
@@ -1061,8 +1082,14 @@ mod asn1_tests {
     use super::{asn1_time_to_iso, asn1_time_to_rfc3339};
     #[test]
     fn parses_openssl_asn1_time() {
-        assert_eq!(asn1_time_to_iso("Jun 10 00:00:00 2028 GMT").as_deref(), Some("2028-06-10"));
-        assert_eq!(asn1_time_to_iso("Mar 3 23:59:59 2027 GMT").as_deref(), Some("2027-03-03"));
+        assert_eq!(
+            asn1_time_to_iso("Jun 10 00:00:00 2028 GMT").as_deref(),
+            Some("2028-06-10")
+        );
+        assert_eq!(
+            asn1_time_to_iso("Mar 3 23:59:59 2027 GMT").as_deref(),
+            Some("2027-03-03")
+        );
         assert_eq!(asn1_time_to_iso("garbage").as_deref(), None);
     }
 
@@ -1087,9 +1114,18 @@ mod asn1_tests {
     #[test]
     fn an_unrecognised_shape_is_not_guessed_into_an_instant() {
         assert_eq!(asn1_time_to_rfc3339("garbage").as_deref(), None);
-        assert_eq!(asn1_time_to_rfc3339("Jun 10 9:12:33 2028 GMT").as_deref(), None);
-        assert_eq!(asn1_time_to_rfc3339("Jun 10 091233 2028 GMT").as_deref(), None);
-        assert_eq!(asn1_time_to_rfc3339("Jun 10 09-12-33 2028 GMT").as_deref(), None);
+        assert_eq!(
+            asn1_time_to_rfc3339("Jun 10 9:12:33 2028 GMT").as_deref(),
+            None
+        );
+        assert_eq!(
+            asn1_time_to_rfc3339("Jun 10 091233 2028 GMT").as_deref(),
+            None
+        );
+        assert_eq!(
+            asn1_time_to_rfc3339("Jun 10 09-12-33 2028 GMT").as_deref(),
+            None
+        );
     }
 
     /// **Las dos lecturas no pueden separarse**: la fecha es exactamente el prefijo del instante.
@@ -1120,21 +1156,31 @@ mod tests {
 
     fn decoded(b64: &str) -> Vec<u8> {
         use base64::Engine as _;
-        base64::engine::general_purpose::STANDARD.decode(b64).unwrap()
+        base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap()
     }
 
     async fn db_ready() -> PgAdapter {
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         // hub_session baseline (v0): la migración v8 (device_id, ADR-0154) lo ALTERa.
         crate::identity::ensure_tables(&db).await.unwrap();
-        crate::system_migrations::apply(&db, "hub-test").await.unwrap();
+        crate::system_migrations::apply(&db, "hub-test")
+            .await
+            .unwrap();
         db
     }
 
     /// Reads the raw row of one slot as it sits in the database (without going through
     /// `load_pkcs12`/decryption) — what somebody with direct database access would see.
-    async fn raw_row(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKind) -> (String, String) {
+    async fn raw_row(
+        db: &dyn DatabaseAdapter,
+        hub_id: &str,
+        kind: CertificateKind,
+    ) -> (String, String) {
         let mut p = Params::new();
         p.insert("hub_id".into(), json!(hub_id));
         p.insert("kind".into(), json!(kind.as_str()));
@@ -1148,8 +1194,14 @@ mod tests {
             .unwrap();
         let row = res.rows.into_iter().next().expect("fila esperada");
         (
-            row.get("pkcs12_b64").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            row.get("password").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            row.get("pkcs12_b64")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            row.get("password")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
         )
     }
 
@@ -1161,22 +1213,51 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(1));
         let db = db_ready().await;
         // Ausente.
-        assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(false));
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(false)
+        );
         // Subir.
-        set(&db, "hub-test", CertificateKind::Own, "QkFTRTY0", "secret", "hub_user:admin", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            "QkFTRTY0",
+            "secret",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
         assert_eq!(st["present"], json!(true));
         assert_eq!(st["uploaded_by"], json!("hub_user:admin"));
         // status NO expone bytes ni password.
         assert!(st.get("pkcs12_b64").is_none() && st.get("password").is_none());
         // Reemplazar (upsert, no duplica).
-        set(&db, "hub-test", CertificateKind::Own, "TkVX", "p2", "hub_user:admin", None, None).await.unwrap();
-        assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(true));
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            "TkVX",
+            "p2",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(true)
+        );
         // Borrar.
         delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
-        assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(false));
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(false)
+        );
     }
 
     // ── ERPlora/hub#114: cifrado at-rest de `_hub_certificate` ─────────────────────────────────
@@ -1194,7 +1275,8 @@ mod tests {
             "TVVZLVNFQ1JFVE8tUEtDUzEy",
             "s3cr3t-p12-password",
             "hub_user:admin",
-            None, None,
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -1218,9 +1300,18 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(7));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "erplora-pw", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "erplora-pw",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let (pkcs12_raw, password_raw) = raw_row(&db, "hub-test", CertificateKind::Delegated).await;
         assert!(!pkcs12_raw.contains(DELEGATED_B64));
@@ -1235,9 +1326,18 @@ mod tests {
         let db = db_ready().await;
 
         let original_b64 = "TVVZLVNFQ1JFVE8tUEtDUzEy"; // base64("MUY-SECRETO-PKCS12")
-        set(&db, "hub-test", CertificateKind::Own, original_b64, "mi-contraseña-real", "hub_user:admin", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            original_b64,
+            "mi-contraseña-real",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let (der, password) = load_pkcs12(&db, "hub-test", CertificateKind::Own)
             .await
@@ -1256,11 +1356,23 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(6));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "no-debe-viajar", "hub_user:admin", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "no-debe-viajar",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
-        let der = exportable_der_bytes(&db, "hub-test").await.unwrap().expect("certificado presente");
+        let der = exportable_der_bytes(&db, "hub-test")
+            .await
+            .unwrap()
+            .expect("certificado presente");
         assert_eq!(der, decoded(OWN_B64));
     }
 
@@ -1302,13 +1414,28 @@ mod tests {
         let _guard = EnvVarGuard::unset();
         let db = db_ready().await;
 
-        let err = set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None, None)
-            .await
-            .unwrap_err();
+        let err = set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            "cGtjczEy",
+            "password",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("HUB_SECRETS_KEY"), "mensaje de error poco claro: {msg}");
+        assert!(
+            msg.contains("HUB_SECRETS_KEY"),
+            "mensaje de error poco claro: {msg}"
+        );
         // No debe haber guardado nada.
-        assert_eq!(status(&db, "hub-test").await.unwrap()["present"], json!(false));
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(false)
+        );
     }
 
     #[tokio::test]
@@ -1317,15 +1444,26 @@ mod tests {
         let db = {
             let _guard = EnvVarGuard::set(&test_key_b64(4));
             let db = db_ready().await;
-            set(&db, "hub-test", CertificateKind::Own, "cGtjczEy", "password", "hub_user:admin", None, None)
-                .await
-                .unwrap();
+            set(
+                &db,
+                "hub-test",
+                CertificateKind::Own,
+                "cGtjczEy",
+                "password",
+                "hub_user:admin",
+                None,
+                None,
+            )
+            .await
+            .unwrap();
             db
         };
 
         // Misma fila, master key DISTINTA: debe fallar con un error claro, no un pánico.
         let _guard = EnvVarGuard::set(&test_key_b64(5));
-        let err = load_pkcs12(&db, "hub-test", CertificateKind::Own).await.unwrap_err();
+        let err = load_pkcs12(&db, "hub-test", CertificateKind::Own)
+            .await
+            .unwrap_err();
         assert!(matches!(err, RuntimeError::Certificate(_)));
     }
 
@@ -1339,19 +1477,52 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(8));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
-        assert_eq!(slot_status(&db, "hub-test", CertificateKind::Own).await.unwrap()["present"], json!(true));
         assert_eq!(
-            slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap()["present"],
+            slot_status(&db, "hub-test", CertificateKind::Own)
+                .await
+                .unwrap()["present"],
+            json!(true)
+        );
+        assert_eq!(
+            slot_status(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap()["present"],
             json!(true)
         );
         // Y cada slot conserva SUS bytes (no se pisan).
-        let (own, _) = load_pkcs12(&db, "hub-test", CertificateKind::Own).await.unwrap().unwrap();
-        let (del, _) = load_pkcs12(&db, "hub-test", CertificateKind::Delegated).await.unwrap().unwrap();
+        let (own, _) = load_pkcs12(&db, "hub-test", CertificateKind::Own)
+            .await
+            .unwrap()
+            .unwrap();
+        let (del, _) = load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(own, decoded(OWN_B64));
         assert_eq!(del, decoded(DELEGATED_B64));
     }
@@ -1369,12 +1540,28 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(9));
         let db = db_ready().await;
 
-        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), None, "sin certificado no firma nada");
-        assert!(!can_sign(&db, "hub-test").await.unwrap(), "…y por tanto no puede facturar");
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            None,
+            "sin certificado no firma nada"
+        );
+        assert!(
+            !can_sign(&db, "hub-test").await.unwrap(),
+            "…y por tanto no puede facturar"
+        );
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             active_kind(&db, "hub-test").await.unwrap(),
             Some(CertificateKind::Delegated),
@@ -1385,7 +1572,18 @@ mod tests {
             "y con el delegado el hub SÍ factura: ERPlora firma en su nombre (hub#319)"
         );
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             active_kind(&db, "hub-test").await.unwrap(),
             Some(CertificateKind::Own),
@@ -1424,18 +1622,36 @@ mod tests {
             "sin certificado la vía que le espera es la de ERPlora, no la propia"
         );
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             transmission_route(&db, "hub-test").await.unwrap(),
             ROUTE_DELEGATED,
             "el Sello de ERPlora remite EN NOMBRE del obligado: vía delegada"
         );
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             transmission_route(&db, "hub-test").await.unwrap(),
             ROUTE_OWN,
@@ -1463,16 +1679,44 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(10));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
-        assert_eq!(st["present"], json!(false), "el negocio no ha subido el suyo");
-        assert_eq!(st["active"], json!("delegated"), "pero el hub firma con el de ERPlora");
+        assert_eq!(
+            st["present"],
+            json!(false),
+            "el negocio no ha subido el suyo"
+        );
+        assert_eq!(
+            st["active"],
+            json!("delegated"),
+            "pero el hub firma con el de ERPlora"
+        );
         assert_eq!(st["slots"]["delegated"]["present"], json!(true));
         assert_eq!(st["slots"]["own"]["present"], json!(false));
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
         assert_eq!(st["present"], json!(true));
         assert_eq!(st["active"], json!("own"));
@@ -1494,9 +1738,18 @@ mod tests {
         let db = db_ready().await;
 
         // Un hub que SOLO tiene el delegado no exporta certificado alguno.
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             None,
@@ -1504,8 +1757,22 @@ mod tests {
         );
 
         // Con los dos, sale el PROPIO — nunca el delegado.
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
-        let der = exportable_der_bytes(&db, "hub-test").await.unwrap().expect("el propio sí viaja");
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let der = exportable_der_bytes(&db, "hub-test")
+            .await
+            .unwrap()
+            .expect("el propio sí viaja");
         assert_eq!(der, decoded(OWN_B64));
         assert_ne!(der, decoded(DELEGATED_B64));
     }
@@ -1522,11 +1789,26 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(12));
         let db = db_ready().await;
 
-        set(&db, "hub-test", CertificateKind::Delegated, DELEGATED_B64, "pw-del", "cloud", None, None)
-            .await
-            .unwrap();
-        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Delegated));
-        assert!(can_sign(&db, "hub-test").await.unwrap(), "este hub SÍ puede facturar…");
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Delegated,
+            DELEGATED_B64,
+            "pw-del",
+            "cloud",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            Some(CertificateKind::Delegated)
+        );
+        assert!(
+            can_sign(&db, "hub-test").await.unwrap(),
+            "este hub SÍ puede facturar…"
+        );
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             None,
@@ -1555,9 +1837,12 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(13));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
 
-        let (stored_b64, stored_password) = raw_row(&db, "hub-test", CertificateKind::Delegated).await;
+        let (stored_b64, stored_password) =
+            raw_row(&db, "hub-test", CertificateKind::Delegated).await;
         assert!(
             secret_box::is_encrypted(&stored_b64),
             "el .p12 delegado está en claro en la BD: {stored_b64}"
@@ -1570,7 +1855,9 @@ mod tests {
         assert!(!stored_password.contains("pw-del"));
         // Y se lee de vuelta intacto: cifrar no puede significar corromper.
         assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap(),
             Some((decoded(DELEGATED_B64), "pw-del".to_string()))
         );
     }
@@ -1584,12 +1871,19 @@ mod tests {
         let _guard = EnvVarGuard::unset();
         let db = db_ready().await;
 
-        let err = set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap_err();
+        let err = set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap_err();
         assert!(
             err.to_string().contains(secret_box::MASTER_KEY_ENV),
             "el error debería nombrar la clave que falta: {err}"
         );
-        assert_eq!(slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap()["present"], json!(false));
+        assert_eq!(
+            slot_status(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap()["present"],
+            json!(false)
+        );
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), None);
     }
 
@@ -1605,15 +1899,21 @@ mod tests {
 
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), None);
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(4));
 
         // Una rotación reemplaza bytes Y número a la vez: nunca queda el número viejo sobre los
         // bytes nuevos (ni al revés), que es justo lo que rompería la convergencia.
-        set_delegated(&db, "hub-test", OWN_B64, "pw-rotated", 5, None).await.unwrap();
+        set_delegated(&db, "hub-test", OWN_B64, "pw-rotated", 5, None)
+            .await
+            .unwrap();
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(5));
         assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap(),
             Some((decoded(OWN_B64), "pw-rotated".to_string()))
         );
     }
@@ -1629,7 +1929,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(19));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
         let mut p = Params::new();
         p.insert("hub_id".into(), json!("hub-test"));
         db.execute(
@@ -1639,7 +1941,12 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap()["present"], json!(false));
+        assert_eq!(
+            slot_status(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap()["present"],
+            json!(false)
+        );
         assert_eq!(
             delegated_version(&db, "hub-test").await.unwrap(),
             None,
@@ -1656,14 +1963,32 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(15));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 7, None).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 7, None)
+            .await
+            .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(7));
         // Los dos slots siguen ahí y el propio manda (la regla de selección de hub#316, intacta).
-        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Own));
         assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            active_kind(&db, "hub-test").await.unwrap(),
+            Some(CertificateKind::Own)
+        );
+        assert_eq!(
+            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap(),
             Some((decoded(DELEGATED_B64), "pw-del".to_string()))
         );
     }
@@ -1680,14 +2005,27 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(16));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             None,
             "la clave privada de ERPlora no sale del hub ni llegando por el plano de control"
         );
 
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None).await.unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             exportable_der_bytes(&db, "hub-test").await.unwrap(),
             Some(decoded(OWN_B64))
@@ -1703,8 +2041,12 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(17));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
-        let st = slot_status(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
+        let st = slot_status(&db, "hub-test", CertificateKind::Delegated)
+            .await
+            .unwrap();
         assert_eq!(st["uploaded_by"], json!(CONTROL_PLANE));
         assert!(!st["uploaded_by"].as_str().unwrap().contains("hub_user"));
     }
@@ -1728,18 +2070,34 @@ mod tests {
         let db = db_ready().await;
 
         let (delegated_b64, delegated_pw, expected_date) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None).await.unwrap();
-        set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw-own", "hub_user:admin", None, None)
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None)
             .await
             .unwrap();
+        set(
+            &db,
+            "hub-test",
+            CertificateKind::Own,
+            OWN_B64,
+            "pw-own",
+            "hub_user:admin",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         // El propio MANDA para firmar (regla de hub#316) y no es un `.p12` legible, así que la
         // caducidad "activa" no se sabe (`.ok().flatten()` = lo que el llamador observa).
-        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Own));
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            Some(CertificateKind::Own)
+        );
         assert_eq!(expiry(&db, "hub-test").await.ok().flatten(), None);
         // ...pero la del slot delegado sí, y es la que se reporta.
         assert_eq!(
-            slot_expiry(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            slot_expiry(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap(),
             Some(expected_date)
         );
     }
@@ -1755,7 +2113,9 @@ mod tests {
         let db = db_ready().await;
 
         let (delegated_b64, delegated_pw, expected_day) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None)
+            .await
+            .unwrap();
 
         let instant = slot_expiry_instant(&db, "hub-test", CertificateKind::Delegated)
             .await
@@ -1765,13 +2125,21 @@ mod tests {
             instant.starts_with(&expected_day),
             "el instante {instant} no empieza por el día {expected_day}"
         );
-        assert!(instant.ends_with('Z'), "el instante tiene que ser UTC: {instant}");
+        assert!(
+            instant.ends_with('Z'),
+            "el instante tiene que ser UTC: {instant}"
+        );
         // Y lleva la HORA: si fuese la fecha truncada, el panel de flota lo leería como medianoche.
-        assert!(instant.len() > expected_day.len() + 1, "sin hora: {instant}");
+        assert!(
+            instant.len() > expected_day.len() + 1,
+            "sin hora: {instant}"
+        );
 
         // Un slot vacío no inventa fecha.
         assert_eq!(
-            slot_expiry_instant(&db, "hub-test", CertificateKind::Own).await.unwrap(),
+            slot_expiry_instant(&db, "hub-test", CertificateKind::Own)
+                .await
+                .unwrap(),
             None
         );
     }
@@ -1798,7 +2166,8 @@ mod tests {
         cert.set_subject_name(&name).unwrap();
         cert.set_issuer_name(&name).unwrap();
         cert.set_pubkey(&key).unwrap();
-        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
         cert.set_not_after(&not_after).unwrap();
         cert.sign(&key, MessageDigest::sha256()).unwrap();
         let cert = cert.build();
@@ -1844,13 +2213,18 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(18));
         let db = db_ready().await;
 
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
+            .await
+            .unwrap();
 
         assert!(
             can_sign(&db, "hub-test").await.unwrap(),
             "ERPlora's certificate signs on the hub's behalf: this hub can invoice"
         );
-        assert_eq!(active_kind(&db, "hub-test").await.unwrap(), Some(CertificateKind::Delegated));
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            Some(CertificateKind::Delegated)
+        );
 
         let st = status(&db, "hub-test").await.unwrap();
         assert_eq!(
@@ -1858,7 +2232,11 @@ mod tests {
             json!(false),
             "Ajustes → Negocio still has nothing of the customer's to show or delete"
         );
-        assert_eq!(st["active"], json!("delegated"), "…but the hub knows what it signs with");
+        assert_eq!(
+            st["active"],
+            json!("delegated"),
+            "…but the hub knows what it signs with"
+        );
     }
 
     /// **`can_sign` is `active_kind` and can never be anything else.** The two are one answer split
@@ -1878,14 +2256,27 @@ mod tests {
             (true, true, Some(CertificateKind::Own)),
         ] {
             delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
-            delete(&db, "hub-test", CertificateKind::Delegated).await.unwrap();
+            delete(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap();
             if own {
-                set(&db, "hub-test", CertificateKind::Own, OWN_B64, "pw", "hub_user:a", None, None)
-                    .await
-                    .unwrap();
+                set(
+                    &db,
+                    "hub-test",
+                    CertificateKind::Own,
+                    OWN_B64,
+                    "pw",
+                    "hub_user:a",
+                    None,
+                    None,
+                )
+                .await
+                .unwrap();
             }
             if delegated {
-                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4, None).await.unwrap();
+                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4, None)
+                    .await
+                    .unwrap();
             }
 
             let kind = active_kind(&db, "hub-test").await.unwrap();
@@ -1959,8 +2350,10 @@ mod tests {
         cert.set_subject_name(&name).unwrap();
         cert.set_issuer_name(&name).unwrap();
         cert.set_pubkey(&key).unwrap();
-        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-        cert.set_not_after(&Asn1Time::days_from_now(365).unwrap()).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        cert.set_not_after(&Asn1Time::days_from_now(365).unwrap())
+            .unwrap();
 
         // The `qcStatements` extension (RFC 3739 `1.3.6.1.5.5.7.1.3`), hand-encoded: a SEQUENCE of
         // QCStatement, each `{ statementId, statementInfo }`. Here one statement — ETSI's
@@ -2105,7 +2498,9 @@ mod tests {
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
 
-        set_delegated(&db, "hub-test", &b64, &pw, 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", &b64, &pw, 4, None)
+            .await
+            .unwrap();
 
         assert_eq!(
             active_kind(&db, "hub-test").await.unwrap(),
@@ -2126,7 +2521,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(21));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
+            .await
+            .unwrap();
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
@@ -2145,7 +2542,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(22));
         let db = db_ready().await;
         let (good_b64, good_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &good_b64, &good_pw, 4, Some("seal")).await.unwrap();
+        set_delegated(&db, "hub-test", &good_b64, &good_pw, 4, Some("seal"))
+            .await
+            .unwrap();
 
         let (bad_b64, bad_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
         let err = set_delegated(&db, "hub-test", &bad_b64, &bad_pw, 5, Some("seal"))
@@ -2179,7 +2578,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(23));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, None).await.unwrap();
+        set_delegated(&db, "hub-test", &b64, &pw, 4, None)
+            .await
+            .unwrap();
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
@@ -2195,7 +2596,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(24));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::Anonymous);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
+            .await
+            .unwrap();
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
@@ -2282,7 +2685,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(27));
         let db = db_ready().await;
         let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal")).await.unwrap();
+        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal"))
+            .await
+            .unwrap();
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
@@ -2323,7 +2728,9 @@ mod tests {
         let db = db_ready().await;
         assert_eq!(active_type(&db, "hub-test").await.unwrap(), None);
         assert_eq!(
-            slot_type(&db, "hub-test", CertificateKind::Delegated).await.unwrap(),
+            slot_type(&db, "hub-test", CertificateKind::Delegated)
+                .await
+                .unwrap(),
             None
         );
     }
@@ -2339,7 +2746,9 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(29));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal")).await.unwrap();
+        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
+            .await
+            .unwrap();
 
         // Exactly the state of a hub deployed before v21: bytes, no type.
         let mut p = Params::new();
@@ -2367,12 +2776,21 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(30));
         let db = db_ready().await;
         let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal")).await.unwrap();
-
-        let (rep_b64, rep_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
-        set_delegated(&db, "hub-test", &rep_b64, &rep_pw, 5, Some("representative"))
+        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal"))
             .await
             .unwrap();
+
+        let (rep_b64, rep_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
+        set_delegated(
+            &db,
+            "hub-test",
+            &rep_b64,
+            &rep_pw,
+            5,
+            Some("representative"),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
@@ -2390,7 +2808,16 @@ mod tests {
         for t in [CertificateType::Seal, CertificateType::Representative] {
             assert_eq!(CertificateType::parse(t.as_str()), Some(t));
         }
-        for unknown in ["", " ", "Seal", "seal ", "sello", "own", "delegated", "future"] {
+        for unknown in [
+            "",
+            " ",
+            "Seal",
+            "seal ",
+            "sello",
+            "own",
+            "delegated",
+            "future",
+        ] {
             assert_eq!(CertificateType::parse(unknown), None, "{unknown:?}");
         }
     }

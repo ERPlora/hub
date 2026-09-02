@@ -89,10 +89,20 @@ async fn ingest(host: &SpyHost, hub_id: &str) -> Result<Value> {
 
 #[tokio::test]
 async fn two_hubs_with_the_same_nif_get_distinct_installation_numbers_and_fresh_chains() {
-    let host_a = SpyHost { invoice: vec![invoice_row()], ..Default::default() };
-    let rec_a = ingest(&host_a, HUB_A).await.expect("hub A builds its record");
-    let host_b = SpyHost { invoice: vec![invoice_row()], ..Default::default() };
-    let rec_b = ingest(&host_b, HUB_B).await.expect("hub B builds its record");
+    let host_a = SpyHost {
+        invoice: vec![invoice_row()],
+        ..Default::default()
+    };
+    let rec_a = ingest(&host_a, HUB_A)
+        .await
+        .expect("hub A builds its record");
+    let host_b = SpyHost {
+        invoice: vec![invoice_row()],
+        ..Default::default()
+    };
+    let rec_b = ingest(&host_b, HUB_B)
+        .await
+        .expect("hub B builds its record");
 
     // No anchor on either hub → each one opens its OWN chain.
     assert_eq!(rec_a["is_first_record"], json!(1), "{rec_a}");
@@ -115,15 +125,25 @@ async fn two_hubs_with_the_same_nif_get_distinct_installation_numbers_and_fresh_
     let xml_a = aeat::build_soap(&rec_a, &config, None, HUB_A).expect("declarable");
     let xml_b = aeat::build_soap(&rec_b, &config, None, HUB_B).expect("declarable");
     assert!(
-        xml_a.contains(&format!("<sum1:NumeroInstalacion>{HUB_A}</sum1:NumeroInstalacion>")),
+        xml_a.contains(&format!(
+            "<sum1:NumeroInstalacion>{HUB_A}</sum1:NumeroInstalacion>"
+        )),
         "hub A must declare ITS hub_id as NumeroInstalacion: {xml_a}"
     );
     assert!(
-        xml_b.contains(&format!("<sum1:NumeroInstalacion>{HUB_B}</sum1:NumeroInstalacion>")),
+        xml_b.contains(&format!(
+            "<sum1:NumeroInstalacion>{HUB_B}</sum1:NumeroInstalacion>"
+        )),
         "hub B must declare ITS hub_id as NumeroInstalacion: {xml_b}"
     );
-    assert!(xml_a.contains("<sum1:PrimerRegistro>S</sum1:PrimerRegistro>"), "{xml_a}");
-    assert!(xml_b.contains("<sum1:PrimerRegistro>S</sum1:PrimerRegistro>"), "{xml_b}");
+    assert!(
+        xml_a.contains("<sum1:PrimerRegistro>S</sum1:PrimerRegistro>"),
+        "{xml_a}"
+    );
+    assert!(
+        xml_b.contains("<sum1:PrimerRegistro>S</sum1:PrimerRegistro>"),
+        "{xml_b}"
+    );
 
     // Contract: the anchor is scoped per hub — another hub's records can never be the anchor.
     let anchor_sql = host_a.anchor_query();
@@ -135,7 +155,10 @@ async fn two_hubs_with_the_same_nif_get_distinct_installation_numbers_and_fresh_
 #[tokio::test]
 async fn a_record_is_never_built_for_an_empty_or_non_uuid_hub_id() {
     for bad in ["", "bar-manolo", "h1", "B27593136"] {
-        let host = SpyHost { invoice: vec![invoice_row()], ..Default::default() };
+        let host = SpyHost {
+            invoice: vec![invoice_row()],
+            ..Default::default()
+        };
         let result = ingest(&host, bad).await;
         assert!(
             result.is_err(),
@@ -149,7 +172,12 @@ async fn a_record_is_never_built_for_an_empty_or_non_uuid_hub_id() {
 async fn a_valid_hub_uuid_is_accepted_verbatim() {
     // `hub_id` is not part of the INSERT params (the runtime row contract injects it);
     // what this pins is that a UUID hub passes the guard and the record gets built.
-    let host = SpyHost { invoice: vec![invoice_row()], ..Default::default() };
-    let rec = ingest(&host, HUB_A).await.expect("a UUID hub_id builds the record");
+    let host = SpyHost {
+        invoice: vec![invoice_row()],
+        ..Default::default()
+    };
+    let rec = ingest(&host, HUB_A)
+        .await
+        .expect("a UUID hub_id builds the record");
     assert_eq!(rec["record_type"], json!("alta"), "{rec}");
 }

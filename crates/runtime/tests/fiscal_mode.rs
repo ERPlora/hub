@@ -155,7 +155,12 @@ async fn a_sale_that_starts_the_fiscal_chain_in_production_seals_the_go_live() {
         .unwrap();
 
     assert!(
-        !rt.fiscal_profile().await.unwrap().unwrap().first_record_at.is_empty(),
+        !rt.fiscal_profile()
+            .await
+            .unwrap()
+            .unwrap()
+            .first_record_at
+            .is_empty(),
         "el sello lo pone el CORE, no un mensaje del módulo"
     );
 }

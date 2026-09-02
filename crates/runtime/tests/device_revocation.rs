@@ -32,13 +32,23 @@ use erplora_runtime::Runtime;
 async fn hub(hub_id: &str) -> (Runtime, String, String) {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
     rt.ensure_system_tables().await.unwrap();
-    let admin = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
-    rt.trust_device("till-1", "Counter till").await.unwrap();
-    rt.trust_device("laptop-1", "Office laptop").await.unwrap();
-    rt.set_device_mode("laptop-1", erplora_runtime::device_mode::DeviceMode::Personal, &admin)
+    let admin = rt
+        .create_user("Admin", "1111", "admin", None)
         .await
         .unwrap();
-    let at_till = rt.create_session(&admin, 3600, Some("till-1")).await.unwrap();
+    rt.trust_device("till-1", "Counter till").await.unwrap();
+    rt.trust_device("laptop-1", "Office laptop").await.unwrap();
+    rt.set_device_mode(
+        "laptop-1",
+        erplora_runtime::device_mode::DeviceMode::Personal,
+        &admin,
+    )
+    .await
+    .unwrap();
+    let at_till = rt
+        .create_session(&admin, 3600, Some("till-1"))
+        .await
+        .unwrap();
     let at_laptop = rt
         .create_session(&admin, 3600, Some("laptop-1"))
         .await
@@ -115,7 +125,10 @@ async fn the_other_till_of_the_same_business_keeps_everything() {
 #[tokio::test]
 async fn a_session_that_names_no_device_is_not_swept_along() {
     let (rt, _at_till, _at_laptop) = hub("hub-455").await;
-    let admin = rt.create_user("Owner", "2222", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user("Owner", "2222", "admin", None)
+        .await
+        .unwrap();
     // No `device_id`: a client that identifies none, or a session opened before hub#200 added the
     // column. In SQL `NULL != 'laptop-1'` is NULL, so a "delete everything that is not this one"
     // would miss it — and a "delete everything" would take it. Neither is what revoking one device
@@ -149,7 +162,11 @@ async fn another_hub_that_knows_a_device_by_the_same_id_is_untouched() {
         "the neighbour's mode is exactly as it was"
     );
     let there = neighbour.list_devices().await.unwrap();
-    assert_eq!(there.len(), 2, "the neighbour still knows both of its devices");
+    assert_eq!(
+        there.len(),
+        2,
+        "the neighbour still knows both of its devices"
+    );
 }
 
 #[tokio::test]
@@ -171,11 +188,17 @@ async fn revoking_twice_is_the_same_as_revoking_once() {
 #[tokio::test]
 async fn a_device_this_hub_never_trusted_still_gets_its_sessions_closed() {
     let (rt, _at_till, _at_laptop) = hub("hub-455").await;
-    let admin = rt.create_user("Owner", "2222", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user("Owner", "2222", "admin", None)
+        .await
+        .unwrap();
     // A session whose device carries no trust row (the trust expired, a boot sweep removed it,
     // hub#454). Cutting the device off must still reach the session: the row is the reason the
     // device is *listed*, never the reason it is *connected*.
-    let orphan = rt.create_session(&admin, 3600, Some("ghost-1")).await.unwrap();
+    let orphan = rt
+        .create_session(&admin, 3600, Some("ghost-1"))
+        .await
+        .unwrap();
 
     let revocation = rt.revoke_device("ghost-1").await.unwrap();
 
@@ -217,22 +240,35 @@ async fn the_list_carries_what_lets_a_person_recognise_the_device_they_lost() {
     assert!(!laptop.trusted_at.is_empty());
     assert_eq!(laptop.mode, "personal");
     assert_eq!(laptop.open_sessions, 1);
-    assert!(!laptop.last_sign_in.is_empty(), "when somebody last signed in on it");
-    assert!(!laptop.signed_in_until.is_empty(), "how long that session still has");
+    assert!(
+        !laptop.last_sign_in.is_empty(),
+        "when somebody last signed in on it"
+    );
+    assert!(
+        !laptop.signed_in_until.is_empty(),
+        "how long that session still has"
+    );
 }
 
 #[tokio::test]
 async fn the_device_used_most_recently_is_at_the_top() {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-455");
     rt.ensure_system_tables().await.unwrap();
-    let admin = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     for id in ["till-1", "till-2", "till-3"] {
         rt.trust_device(id, id).await.unwrap();
     }
     // `till-2` is the one somebody is on; `till-3` signed in earlier today; `till-1` not at all.
-    rt.create_session(&admin, 3600, Some("till-3")).await.unwrap();
+    rt.create_session(&admin, 3600, Some("till-3"))
+        .await
+        .unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-    rt.create_session(&admin, 3600, Some("till-2")).await.unwrap();
+    rt.create_session(&admin, 3600, Some("till-2"))
+        .await
+        .unwrap();
 
     let devices = rt.list_devices().await.unwrap();
 
@@ -246,11 +282,16 @@ async fn the_device_used_most_recently_is_at_the_top() {
 async fn an_expired_session_is_not_somebody_signed_in() {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), "hub-455");
     rt.ensure_system_tables().await.unwrap();
-    let admin = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     rt.trust_device("till-1", "Counter till").await.unwrap();
     // Already over when it was written. Counting it would tell the owner a till is in use in an
     // empty shop — and, the other way round, would make a genuinely idle device look busy.
-    rt.create_session(&admin, -60, Some("till-1")).await.unwrap();
+    rt.create_session(&admin, -60, Some("till-1"))
+        .await
+        .unwrap();
 
     let devices = rt.list_devices().await.unwrap();
 

@@ -23,7 +23,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{Runtime, RuntimeError};
 use serde_json::json;
 
@@ -230,7 +230,11 @@ async fn cash_sale_completes_and_records_a_movement_when_the_drawer_is_open() {
         )
         .await
         .unwrap();
-    assert_eq!(movs.len(), 1, "exactly one idempotent movement must be recorded");
+    assert_eq!(
+        movs.len(),
+        1,
+        "exactly one idempotent movement must be recorded"
+    );
     assert_eq!(movs[0]["movement_type"], json!("sale"));
     assert_eq!(movs[0]["amount"].as_i64().unwrap(), 3000);
 }

@@ -948,7 +948,9 @@ mod tests {
     /// "open" against one of "closed".
     #[test]
     fn a_typo_never_disarms_it() {
-        for raw in ["", " ", "0", "false", "no", "disabled", "of", "offf", "on", "enforced"] {
+        for raw in [
+            "", " ", "0", "false", "no", "disabled", "of", "offf", "on", "enforced",
+        ] {
             assert!(
                 parse_device_trust(Some(raw)),
                 "`{raw}` must not open the PIN door"
@@ -964,7 +966,10 @@ mod tests {
         // Dos variables, dos dueños, dos efectos OPUESTOS: `HUB_AUTH=dev` ABRE el hub (el
         // navegador dicta identidad y permisos), `HUB_DEMO=1` lo CIERRA (entorno fiscal clavado,
         // certificado e identidad congelados). Ni el valor de una activa la otra.
-        assert!(!parse_demo_flag(Some("dev")), "`HUB_DEMO=dev` no es una demo");
+        assert!(
+            !parse_demo_flag(Some("dev")),
+            "`HUB_DEMO=dev` no es una demo"
+        );
         assert_eq!(
             parse_auth_mode(Some("1")),
             AuthMode::Session,

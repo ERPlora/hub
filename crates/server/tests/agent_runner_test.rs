@@ -178,7 +178,12 @@ struct Hub {
 
 /// A hub with the `agenda` module installed, one flow whose only step is the agent turn, and the
 /// grants the story needs: read the diary, write a booking.
-async fn hub(cloud_base_url: String, tag: &str, step: Value, grants: &[(GrantKind, String)]) -> Hub {
+async fn hub(
+    cloud_base_url: String,
+    tag: &str,
+    step: Value,
+    grants: &[(GrantKind, String)],
+) -> Hub {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -365,7 +370,10 @@ async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person(
         bookings(&h).await.is_empty(),
         "an unattended model does not write to the business database (ADR-0283 D3)"
     );
-    assert_eq!(run_status(&h, &run_id).await, store::STATUS_WAITING_APPROVAL);
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL
+    );
 
     let rt = h.state.runtime.read().await;
     let pending = rt
@@ -795,7 +803,11 @@ async fn an_invalid_proposal_never_reaches_the_tray_and_the_model_corrects_it_in
 #[tokio::test]
 async fn a_model_that_never_gets_the_payload_right_ends_in_words_not_in_the_tray() {
     let cloud = FakeCloud::with(vec![
-        sse_call("agenda.booking.create", "c1", json!({ "customer": "Marta" })),
+        sse_call(
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta" }),
+        ),
         sse_text("I could not book that: I am missing the start time."),
     ]);
     let h = hub(
@@ -897,7 +909,10 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
         "a decision that could not be carried out is not a decision: the row must not read \
          `approved` about something that never happened"
     );
-    assert!(row.decided_by.is_empty(), "nobody is recorded as having approved it");
+    assert!(
+        row.decided_by.is_empty(),
+        "nobody is recorded as having approved it"
+    );
     assert_eq!(
         run_status(&h, &run_id).await,
         store::STATUS_WAITING_APPROVAL,

@@ -32,10 +32,12 @@ pub(crate) async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Resu
     let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
         RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
     })?;
-    // Gate: sin certificado (ni core ni legacy) no se puede transmitir.
-    if !has_certificate(&config) {
+    // Gate: sin NINGUNA vía (certificado del core o pasarela fiscal) no se puede transmitir.
+    if !can_transmit(host, &ctx.hub_id, &config).await? {
         return Err(VerifactuError::Certificate(
-            "certificado PKCS#12 no configurado (sube el .p12 en Ajustes → Negocio)".into(),
+            "sin vía de transmisión: ni certificado PKCS#12 (sube el .p12 en Ajustes → Negocio) \
+             ni pasarela fiscal disponible"
+                .into(),
         )
         .into());
     }
@@ -206,10 +208,32 @@ pub(crate) async fn transmit_one(
     // Archivo duradero ANTES de tocar la red. Si el backend Local/S3 no confirma la escritura, no
     // se envía: nunca aceptamos una transmisión fiscal sin conservar su XML para auditoría/reenvío.
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
-    // Identity mTLS: cert del core (opaca, bytes en el core) o legacy. Ver `build_identity`.
-    let identity = build_identity(host, &ctx.hub_id, config).await?;
+    // Las dos vías de ADR-0320, resueltas en UN sitio (`resolve_route`): certificado del core →
+    // directo a la AEAT, como siempre; sin certificado → la pasarela fiscal transmite LOS MISMOS
+    // bytes con el Sello como canal (hub#1432). Aguas abajo nadie distingue el camino: las dos
+    // devuelven el SOAP crudo de la AEAT y la cadena parse/classify/persistencia es una.
+    let route = resolve_route(host, &ctx.hub_id, config).await?;
+    let via_gateway = matches!(route, TransmitRoute::Gateway(_));
+    let transport = match &route {
+        TransmitRoute::Direct(identity) => {
+            aeat::post_soap(destination.endpoint, identity.clone(), &xml).await
+        }
+        TransmitRoute::Gateway(access) => crate::gateway::transmit_via_gateway(
+            host,
+            &ctx.hub_id,
+            access,
+            &crate::gateway::GatewayEnvelope {
+                hub_id: &ctx.hub_id,
+                obligado_nif: &str_field(record, "issuer_nif"),
+                environment: &destination.environment,
+                transmission_id: &record_id,
+                xml: &xml,
+            },
+        )
+        .await,
+    };
 
-    match aeat::post_soap(destination.endpoint, identity, &xml).await {
+    match transport {
         Ok(body) => {
             let resp = aeat::parse_response(&body);
 
@@ -231,7 +255,12 @@ pub(crate) async fn transmit_one(
             // **con aviso**: la cadena sigue desde él, que es lo que la AEAT tiene por último.
             // Re-anclar ANTES de emitir sigue siendo una acción explícita (`recover_from_aeat`).
             let verdict = aeat::classify(&resp);
-            if verdict.should_retransmit()
+            // El auto-rechain consulta a la AEAT DIRECTO con la identity del core; en la vía
+            // gateway no existe esa identity, así que se salta limpiamente y el rechazo original
+            // se registra tal cual (la recuperación explícita `recover_from_aeat` sigue siendo
+            // la puerta manual). Consultar vía la celda es issue aparte.
+            if !via_gateway
+                && verdict.should_retransmit()
                 && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
                 && !recovery_id.is_empty()
             {
@@ -288,7 +317,11 @@ pub(crate) async fn transmit_one(
             // credencial de máquina ni debe tenerla—: lo PIDE, y el servicio de refetch del server
             // decide. Va justo aquí, encolando la contingencia, porque el fallo ES el disparador:
             // así se converge sin polling.
-            request_certificate_refetch_on_tls(&err, &signing_kind(config), RefetchSignal::global());
+            request_certificate_refetch_on_tls(
+                &err,
+                &signing_kind(config),
+                RefetchSignal::global(),
+            );
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
             let reason = err.to_string();
             let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
@@ -812,15 +845,19 @@ pub(crate) fn apply_transmission(
 /// lee las entradas elegibles (`pending`/`retrying` con `next_attempt_at <= now`) por prioridad y
 /// antigüedad, y reintenta la transmisión de cada una vía [`transmit_one`]. Éxito → sale de la
 /// cola; fallo → backoff. Devuelve un evento resumen `{successful, failed}`.
-pub(crate) async fn process_contingency_queue(input: &Json, host: &dyn NativeHost) -> Result<Output> {
+pub(crate) async fn process_contingency_queue(
+    input: &Json,
+    host: &dyn NativeHost,
+) -> Result<Output> {
     let (payload, ctx) = split_input(input)?;
     let limit = int_field(&payload, "limit", 100).clamp(1, 500);
 
     let config = read_config(host, &ctx.hub_id).await?.ok_or_else(|| {
         RuntimeError::Native("VeriFactu sin configurar (verifactu.config.save)".into())
     })?;
-    // Gate: sin certificado no hay nada que transmitir; deja la cola como está.
-    if !has_certificate(&config) {
+    // Gate: sin NINGUNA vía (certificado o pasarela) no hay nada que transmitir; deja la cola
+    // como está — los hubs sin cert pero con la pasarela enrolada por fin drenan (hub#1432).
+    if !can_transmit(host, &ctx.hub_id, &config).await? {
         return Ok(Output::new());
     }
 
@@ -917,6 +954,137 @@ mod tests {
     use serde_json::Value as Json;
     use std::sync::Mutex;
 
+    // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
+
+    /// A throwaway mTLS identity so a fake host can answer the capability like the real broker.
+    fn throwaway_identity() -> reqwest::Identity {
+        use openssl::asn1::Asn1Time;
+        use openssl::hash::MessageDigest;
+        use openssl::nid::Nid;
+        let group = openssl::ec::EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+        let pkey = openssl::pkey::PKey::from_ec_key(openssl::ec::EcKey::generate(&group).unwrap())
+            .unwrap();
+        let mut name = openssl::x509::X509NameBuilder::new().unwrap();
+        name.append_entry_by_nid(Nid::COMMONNAME, "route-test")
+            .unwrap();
+        let name = name.build();
+        let mut cert = openssl::x509::X509::builder().unwrap();
+        cert.set_version(2).unwrap();
+        cert.set_subject_name(&name).unwrap();
+        cert.set_issuer_name(&name).unwrap();
+        cert.set_pubkey(&pkey).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        cert.set_not_after(&Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
+        cert.sign(&pkey, MessageDigest::sha256()).unwrap();
+        let bundle = format!(
+            "{}\n{}",
+            String::from_utf8(pkey.private_key_to_pem_pkcs8().unwrap()).unwrap(),
+            String::from_utf8(cert.build().to_pem().unwrap()).unwrap(),
+        );
+        reqwest::Identity::from_pem(bundle.as_bytes()).unwrap()
+    }
+
+    /// Default host: NO certificate capability, NO gateway broker — the state of every hub that
+    /// enrolled nothing.
+    struct NoRoadHost;
+    #[async_trait::async_trait]
+    impl NativeHost for NoRoadHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![])
+        }
+    }
+
+    /// A host whose broker answers with a gateway access — the enrolled, certless hub.
+    struct GatewayHost;
+    #[async_trait::async_trait]
+    impl NativeHost for GatewayHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![])
+        }
+        async fn fiscal_gateway_access(
+            &self,
+            _hub_id: &str,
+        ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
+            Ok(Some(erplora_runtime::fiscal_gateway::GatewayAccess {
+                url: "https://cell.internal.example".into(),
+                token: "bearer".into(),
+                identity: throwaway_identity(),
+                ca_pem: b"irrelevant-here".to_vec(),
+            }))
+        }
+    }
+
+    /// 🔒 REGRESIÓN (hub#1432, lo que la tarea exige): un hub sin certificado Y sin pasarela no
+    /// llega a ningún cable — ni a la AEAT directa (hoy lo garantizaba `build_identity`) ni a la
+    /// celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola deja los
+    /// registros `pending` en vez de quemar reintentos.
+    #[tokio::test]
+    async fn a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire() {
+        let host = NoRoadHost;
+        let config = serde_json::json!({ "environment": "testing" });
+
+        let err = crate::config::resolve_route(&host, "hub-1", &config)
+            .await
+            .err()
+            .expect("no road = a visible error, never a silent direct");
+        let message = err.to_string();
+        assert!(message.contains("vía de transmisión"), "{message}");
+        assert!(message.contains("pasarela"), "{message}");
+
+        assert!(
+            !crate::config::can_transmit(&host, "hub-1", &config)
+                .await
+                .unwrap(),
+            "the contingency gate must leave the queue untouched"
+        );
+    }
+
+    /// Sin certificado pero con la pasarela enrolada, la ruta es la celda — jamás la AEAT
+    /// directa sin identidad, que era el modelo que saas#1435 retiró.
+    #[tokio::test]
+    async fn a_certless_hub_with_a_gateway_resolves_the_gateway_route() {
+        let host = GatewayHost;
+        let config = serde_json::json!({ "environment": "testing" });
+
+        let route = crate::config::resolve_route(&host, "hub-1", &config)
+            .await
+            .unwrap();
+        assert!(matches!(route, crate::config::TransmitRoute::Gateway(_)));
+        assert!(crate::config::can_transmit(&host, "hub-1", &config)
+            .await
+            .unwrap());
+    }
+
+    /// El certificado del core GANA: un negocio con su propio `.p12` sigue firmando y
+    /// transmitiendo directo, exactamente como hoy — la pasarela ni se consulta.
+    #[tokio::test]
+    async fn a_certified_hub_still_resolves_direct_without_asking_the_broker() {
+        struct CertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for CertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+            async fn fiscal_gateway_access(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
+                panic!("the broker must not be consulted when the core certificate signs");
+            }
+        }
+
+        let config = serde_json::json!({ "certificate_source": "core" });
+        let route = crate::config::resolve_route(&CertHost, "hub-1", &config)
+            .await
+            .unwrap();
+        assert!(matches!(route, crate::config::TransmitRoute::Direct(_)));
+    }
+
     #[derive(Default)]
     struct ArchiveHost {
         writes: Mutex<Vec<(String, Vec<u8>, String)>>,
@@ -978,7 +1146,7 @@ mod tests {
     fn mixto_o_vacio_cae_al_tipo_efectivo() {
         // Mixed 21%+10% in the old map: the row is single-rate → effective. The XML does emit one
         // line per real rate (`aeat::desglose`), so nothing declared is lost.
-        let mixto =r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
+        let mixto = r#"{"21.00":{"base":10000,"tax":2100},"10.00":{"base":1000,"tax":100}}"#;
         let r = derive_tax_rate(mixto, 11000.0, 2200.0); // 2200/11000 = 20%
         assert_eq!(r, 20.0);
         // Desglose vacío (facturas antiguas '{}'): efectivo desde base/cuota.
@@ -1011,7 +1179,8 @@ mod tests {
     #[test]
     fn derive_tax_rate_reads_the_array_breakdown_hub1198() {
         // The exact ticket of the issue: one fiscal key at 21 %, quota rounded up per line.
-        let real_ticket = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#;
+        let real_ticket =
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#;
         assert_eq!(derive_tax_rate(real_ticket, 200.0, 44.0), 21.0);
 
         // Reduced rate, exact amounts: same reading, no rounding involved.
@@ -1045,7 +1214,8 @@ mod tests {
 
         // An array whose amounts cannot be read is not a breakdown: nothing is declared, so the
         // effective rate is all that is left (and `aeat::desglose` refuses the record anyway).
-        let unreadable = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"quota":2100}]"#;
+        let unreadable =
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"quota":2100}]"#;
         assert_eq!(derive_tax_rate(unreadable, 10000.0, 2100.0), 21.0);
 
         // An empty array declares nothing either.
@@ -1187,7 +1357,9 @@ mod environment_chain_tests {
         /// `signing_kind` defaults to `"own"`, because most of these tests are about the CHAIN
         /// and not about which certificate signs; the rotation test overrides it.
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
-            Ok(self.has_core_certificate.then(|| self.signing_kind.to_string()))
+            Ok(self
+                .has_core_certificate
+                .then(|| self.signing_kind.to_string()))
         }
 
         /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
@@ -1739,7 +1911,10 @@ mod environment_chain_tests {
              decides whether somebody goes to look at the invoice or at the config"
         );
         assert!(
-            details["error"].as_str().unwrap_or_default().contains("total_amount"),
+            details["error"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("total_amount"),
             "the operator has to be told WHICH amount: {details}"
         );
         assert_eq!(
@@ -1783,11 +1958,17 @@ mod environment_chain_tests {
             .iter()
             .find(|o| o.params.get("event_type") == Some(&json!("contingency_processed")))
             .expect("the batch must still report a summary");
-        let details: Json =
-            serde_json::from_str(summary.params.get("details").and_then(Json::as_str).unwrap())
-                .unwrap();
+        let details: Json = serde_json::from_str(
+            summary
+                .params
+                .get("details")
+                .and_then(Json::as_str)
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(
-            details["failed"], json!(1),
+            details["failed"],
+            json!(1),
             "a record that could not be placed counts as failed, never as sent"
         );
         assert_eq!(details["successful"], json!(0));
@@ -2073,10 +2254,10 @@ mod environment_chain_tests {
         let payload = emitted(&events, EVENT_RECORD_REJECTED).expect("it emits");
         let text = payload.to_string();
         for secret in [
-            "<xml>",              // the signed record itself
-            HASH_TESTING_2,       // the chain hash
-            NIF,                  // the issuer's tax id
-            "12100",              // any amount
+            "<xml>",        // the signed record itself
+            HASH_TESTING_2, // the chain hash
+            NIF,            // the issuer's tax id
+            "12100",        // any amount
             "CSV-SHOULD-NOT-TRAVEL",
         ] {
             assert!(
@@ -2119,7 +2300,10 @@ mod environment_chain_tests {
             None,
         );
 
-        assert!(success, "it is registered at the AEAT: it counts as accepted");
+        assert!(
+            success,
+            "it is registered at the AEAT: it counts as accepted"
+        );
         assert!(
             emitted(&events, EVENT_RECORD_REJECTED).is_none(),
             "never as a rejection: the invoice is filed"
@@ -2296,7 +2480,10 @@ mod environment_chain_tests {
             "context": { "hub_id": HUB, "now": "2026-08-06T11:00:00+02:00",
                          "current_user_id": "u1", "new_ids": ["id-evt"] }
         });
-        let valid_host = ChainHost::new(config_row("testing"), vec![record1.clone(), record2.clone()]);
+        let valid_host = ChainHost::new(
+            config_row("testing"),
+            vec![record1.clone(), record2.clone()],
+        );
         let out = validate_chain(&validate_input, &valid_host).await.unwrap();
         let event = find_op(&out, "verifactu._insert_event");
         assert_eq!(
