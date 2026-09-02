@@ -1661,6 +1661,8 @@ export default {
     textPlaceholder: 'Type here…',
     invalidFields: 'Check the fields marked below and save again.',
     fieldInvalid: 'This value is not accepted.',
+    preview: 'Test',
+    previewError: 'Could not run the test.',
   },
   modulePlan: {
     tab: 'Plan',

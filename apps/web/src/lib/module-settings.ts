@@ -18,7 +18,23 @@ export interface ModuleSettingsLocale {
   /** Heading of the settings screen, translated. Mirrors `settings.title` of the manifest. */
   title?: string;
   /** Per-property strings, keyed by the JSON Schema property name. */
-  fields?: Record<string, { label?: string; description?: string } | undefined>;
+  fields?: Record<
+    string,
+    {
+      label?: string;
+      description?: string;
+      /**
+       * The `enum` OPTIONS of this property, translated — keyed by the RAW value the schema
+       * declares (hub#1427). `{ "dine_in": "En sala" }`.
+       *
+       * The other half of hub#1094: the label of the field was translatable, its options were not,
+       * so a `select` painted `dine_in · takeaway · delivery` on a Spanish hub no matter what the
+       * module shipped. Keyed by the stored value on purpose — the schema stays canonical English
+       * (ADR-0055) and what gets saved never changes, only what is painted.
+       */
+      options?: Record<string, string | undefined>;
+    } | undefined
+  >;
 }
 
 /**
@@ -56,6 +72,26 @@ export function settingsFieldLabel(
   );
 }
 
+/**
+ * Label of ONE OPTION of an `enum` field — hub#1427.
+ *
+ * Order: **module locale → the raw value**. There is no schema fallback because JSON Schema has
+ * nowhere to name an option: `enum` is a list of stored values, and those values are the contract
+ * with the column. So the raw value is the last resort here for the same reason
+ * [`humanizeSettingKey`] is for a label — a nameless option is worse than an English one.
+ *
+ * Looked up by the value's TEXT (`String(value)`), which is also how a JSON object can key it: a
+ * numeric `enum` (`[1, 2]`) is written `{ "2": "Dos copias" }` in `locales/<lang>.json`.
+ */
+export function settingsOptionLabel(
+  locale: ModuleSettingsLocale | undefined,
+  key: string,
+  value: string | number,
+): string {
+  const raw = String(value);
+  return translated(locale?.fields?.[key]?.options?.[raw]) ?? raw;
+}
+
 /** Help text of one field, same order as [`settingsFieldLabel`]. `undefined` when nobody wrote one. */
 export function settingsFieldDescription(
   locale: ModuleSettingsLocale | undefined,
@@ -63,6 +99,28 @@ export function settingsFieldDescription(
   prop: SettingsSchemaProperty,
 ): string | undefined {
   return translated(locale?.fields?.[key]?.description) ?? translated(prop.description);
+}
+
+/**
+ * The custom element that runs the TEST action of one setting, or `undefined` when the module
+ * declares none for it — hub#1426.
+ *
+ * `x-erplora-preview` on the property names the module's Web Component. The shell paints the
+ * button and calls `preview({ key, value, settings })` on that element with the value that is IN
+ * THE FORM, unsaved; what "test" means is the module's business (playing a chime, flashing a
+ * screen), and the shell deliberately knows nothing about it.
+ *
+ * It is an `x-` keyword of the module's OWN settings JSON Schema and not a `module.json` field, so
+ * it needs no manifest surface at all: the annotation sits on the very property it describes, and
+ * a JSON Schema validator ignores keywords it does not know.
+ *
+ * A blank or non-dashed tag is treated as "not declared": `document.createElement` of a name that
+ * is not a valid custom element would silently give back an `HTMLUnknownElement` with no `preview`
+ * on it, and the button would then be a button that does nothing.
+ */
+export function settingsPreviewTag(prop: SettingsSchemaProperty): string | undefined {
+  const tag = prop['x-erplora-preview']?.trim();
+  return tag && /^[a-z][a-z0-9]*-[a-z0-9-]+$/.test(tag) ? tag : undefined;
 }
 
 /**

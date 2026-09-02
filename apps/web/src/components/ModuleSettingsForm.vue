@@ -1,4 +1,10 @@
 <template>
+  <!-- Anfitrión de las acciones de PRUEBA del módulo (hub#1426). Vive FUERA del `v-if` del estado
+       porque los custom elements se montan durante `boot()`, cuando el formulario todavía no se ha
+       pintado — y un elemento desconectado no ejecuta su `connectedCallback`. Oculto con `hidden`:
+       lo visible es el botón del shell, no el elemento del módulo. -->
+  <div ref="previewHost" hidden />
+
   <div v-if="status === 'loading'" class="flex items-center gap-2 py-8 opacity-70">
     <ion-spinner name="crescent" /> {{ t('moduleSettings.loading') }}
   </div>
@@ -50,8 +56,15 @@
               :value="model[field.key]"
               @ion-change="model[field.key] = $event.detail.value"
             >
-              <ion-select-option v-for="opt in field.options" :key="String(opt)" :value="opt">
-                {{ opt }}
+              <!-- El rótulo de la opción sale del `locales/<lang>.json` del módulo
+                   (`settings.fields.<key>.options.<valor>`, hub#1427); el `value` sigue siendo el
+                   del `enum`, que es lo que se guarda. -->
+              <ion-select-option
+                v-for="opt in field.options"
+                :key="String(opt.value)"
+                :value="opt.value"
+              >
+                {{ opt.label }}
               </ion-select-option>
             </ion-select>
 
@@ -81,6 +94,23 @@
               :value="(model[field.key] as string | null) ?? ''"
               @ion-input="model[field.key] = $event.detail.value ?? ''"
             />
+
+            <!-- Acción de PRUEBA que el módulo declara para ESTE campo (hub#1426). El botón lo
+                 pinta el shell (rótulo traducido, mismo sitio en todos los módulos); lo que hace
+                 —sonar, parpadear— lo ejecuta el Web Component del módulo, con el valor del
+                 formulario SIN guardar. `fill="clear"` porque es la acción secundaria del campo;
+                 en `ion-button` el `fill` sí pinta (ADR-0143 acota el no-op a los controles de
+                 formulario). -->
+            <ion-button
+              v-if="previewTags.has(field.key)"
+              slot="end"
+              fill="clear"
+              size="small"
+              :disabled="previewing === field.key"
+              @click="runPreview(field.key)"
+            >
+              {{ t('moduleSettings.preview') }}
+            </ion-button>
           </ion-item>
         </ion-list>
       </ion-card-content>
@@ -147,7 +177,7 @@ import { ErploraError, type ErploraClient } from '@erplora/module-sdk';
 import HubIcon from './HubIcon.vue';
 import { getClient } from '../lib/runtime';
 import { isAdmin } from '../lib/session';
-import { loadModuleLocale } from '../lib/module-loader';
+import { loadInstalledManifests, loadModuleComponent, loadModuleLocale } from '../lib/module-loader';
 import { moduleBase } from '../lib/module-url';
 import { toastSuccess, toastError } from '../lib/toast';
 import {
@@ -157,6 +187,8 @@ import {
   settingsFieldDescription,
   settingsFieldLabel,
   settingsHeading,
+  settingsOptionLabel,
+  settingsPreviewTag,
   type ModuleSettingControl,
   type ModuleSettingsLocale,
 } from '../lib/module-settings';
@@ -186,7 +218,8 @@ interface Field {
   label: string;
   description?: string;
   control: ModuleSettingControl;
-  options?: (string | number)[];
+  /** Opciones de un `enum`: el valor que se GUARDA y el rótulo que se PINTA (hub#1427). */
+  options?: { value: string | number; label: string }[];
   maxLength?: number;
 }
 
@@ -198,6 +231,32 @@ const moduleLocale = ref<ModuleSettingsLocale | undefined>(undefined);
 const saveRefusal = ref<string | null>(null);
 /** Claves que el runtime nombró en ese rechazo (`error.fields`, hub#1094). */
 const invalidFields = ref<Set<string>>(new Set());
+
+// ── Acciones de PRUEBA del módulo (hub#1426) ────────────────────────────────────────────────
+//
+// Un ajuste que solo se puede juzgar oyéndolo o viéndolo —el volumen del KDS— se regulaba a
+// ciegas: guardar, ir a la pantalla, esperar a que entre una comanda, volver. Todo TPV del
+// mercado (Square, Fresh KDS, Loyverse) pone un «Probar» al lado del volumen.
+//
+// El reparto: el shell pinta el botón (rótulo traducido, sitio fijo, un solo aspecto en todos los
+// módulos) y le pasa el valor que hay EN EL FORMULARIO; el módulo ejecuta la prueba, porque el
+// shell no sabe —ni debe saber— qué es un tono de aviso. La puerta es la MISMA por la que un
+// módulo aporta cualquier otra UI (`loadModuleComponent`, la de widgets y slots), no una nueva.
+
+/** Un Web Component de prueba: lo único que el shell le exige es el método `preview`. */
+interface PreviewElement extends HTMLElement {
+  client?: unknown;
+  preview?: (detail: { key: string; value: unknown; settings: Record<string, unknown> }) => unknown;
+}
+
+/** Contenedor oculto donde viven los elementos de prueba mientras la pantalla esté montada. */
+const previewHost = ref<HTMLElement | null>(null);
+/** Elemento resuelto por clave de ajuste. Vacío = ningún campo ofrece prueba. */
+const previewElements = new Map<string, PreviewElement>();
+/** Las claves con prueba disponible, para el `v-if` del botón (reactivo: se llena tras cargar). */
+const previewTags = ref<Set<string>>(new Set());
+/** La clave cuya prueba está corriendo ahora mismo, o `null`. Deshabilita SU botón, no los demás. */
+const previewing = ref<string | null>(null);
 
 /** `aria-invalid` solo cuando de verdad lo está: un `"false"` constante es ruido para el lector. */
 function ariaInvalid(key: string): 'true' | undefined {
@@ -219,7 +278,10 @@ const fields = computed<Field[]>(() =>
     label: settingsFieldLabel(moduleLocale.value, key, prop),
     description: settingsFieldDescription(moduleLocale.value, key, prop),
     control: settingControl(prop),
-    options: prop.enum,
+    options: prop.enum?.map((value) => ({
+      value,
+      label: settingsOptionLabel(moduleLocale.value, key, value),
+    })),
     maxLength: prop.maxLength,
   })),
 );
@@ -295,6 +357,86 @@ async function boot(): Promise<void> {
     status.value = 'ready';
   } catch {
     status.value = 'error';
+    return;
+  }
+  // FUERA del `try` de arriba, y a propósito: los ajustes ya se pueden ver y guardar. Si el
+  // bundle del módulo no carga, lo que se pierde es el botón de prueba — no la pantalla.
+  await loadPreviews();
+}
+
+/**
+ * El snapshot COMPLETO tal y como se persistiría (una clave por propiedad del schema, en la
+ * representación que declara el schema). Lo comparten `save` —que lo manda— y `runPreview`, que lo
+ * entrega SIN mandarlo: la prueba tiene que oírse con lo que hay en pantalla, no con lo guardado.
+ */
+function storageSnapshot(): Record<string, unknown> {
+  const snapshot: Record<string, unknown> = {};
+  for (const [key, prop] of Object.entries(properties.value)) {
+    snapshot[key] = settingValueForStorage(prop, model[key]);
+  }
+  return snapshot;
+}
+
+/**
+ * Monta los Web Components de prueba que el módulo anota en su JSON Schema de ajustes
+ * (`x-erplora-preview` en la propiedad). No hace nada —ni una petición— para un módulo que no
+ * declara ninguno: ese pinta EXACTAMENTE el formulario de antes. Un tag que no se pueda cargar se
+ * omite y su botón no se pinta: un botón que no puede hacer nada es peor que no tenerlo.
+ */
+async function loadPreviews(): Promise<void> {
+  previewElements.clear();
+  previewTags.value = new Set();
+  const declared = Object.entries(properties.value).flatMap(([key, prop]) => {
+    const tag = settingsPreviewTag(prop);
+    return tag ? [[key, tag] as const] : [];
+  });
+  if (declared.length === 0) return;
+
+  const manifests = await loadInstalledManifests().catch(() => []);
+  const mod = manifests.find((m) => m.moduleId === props.moduleId);
+  if (!mod) return;
+
+  const found = new Set<string>();
+  const byTag = new Map<string, PreviewElement>();
+  for (const [key, tag] of declared) {
+    let el = byTag.get(tag);
+    if (!el) {
+      try {
+        await loadModuleComponent(mod, tag);
+        el = document.createElement(tag) as PreviewElement;
+        // El mismo cliente acotado al módulo que recibe el escape-hatch `settings.component`: una
+        // prueba puede necesitar leer algo suyo, y nunca sale de su propio namespace.
+        el.client = client.forModule(props.moduleId);
+      } catch {
+        continue; // el bundle del módulo no cargó: ese campo simplemente no ofrece prueba
+      }
+      previewHost.value?.appendChild(el);
+      byTag.set(tag, el);
+    }
+    previewElements.set(key, el);
+    found.add(key);
+  }
+  previewTags.value = found;
+}
+
+/**
+ * Pide al módulo que pruebe ESTE ajuste con el valor de AHORA — el del formulario, sin guardar,
+ * que es justo lo que hace útil al botón. No persiste nada.
+ *
+ * Un fallo se dice en voz alta (toast): una prueba que no suena y no explica por qué es
+ * indistinguible de un ajuste roto, y la persona se queda mirando un botón mudo.
+ */
+async function runPreview(key: string): Promise<void> {
+  const el = previewElements.get(key);
+  previewing.value = key;
+  try {
+    if (typeof el?.preview !== 'function') throw new Error('preview() no implementado');
+    const snapshot = storageSnapshot();
+    await el.preview({ key, value: snapshot[key], settings: snapshot });
+  } catch {
+    await toastError(t('moduleSettings.previewError'));
+  } finally {
+    previewing.value = null;
   }
 }
 
@@ -306,11 +448,7 @@ async function save(): Promise<void> {
   invalidFields.value = new Set();
   try {
     // Snapshot completo: una clave por propiedad del schema (es un upsert, no un patch parcial).
-    const snapshot: Record<string, unknown> = {};
-    for (const [key, prop] of Object.entries(properties.value)) {
-      snapshot[key] = settingValueForStorage(prop, model[key]);
-    }
-    await client.command(props.settings.set, snapshot);
+    await client.command(props.settings.set, storageSnapshot());
     await toastSuccess(t('moduleSettings.saved'));
   } catch (e) {
     // Los campos viajan como CAMPO del sobre (`error.fields`), nunca sacados del mensaje a

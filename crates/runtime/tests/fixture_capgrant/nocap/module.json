@@ -1,0 +1,12 @@
+{
+  "id": "nocap",
+  "name": "No capabilities fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "queries": {
+    "nocap.config_get": {
+      "permission": "",
+      "sql": "sql/config_get.sql"
+    }
+  }
+}

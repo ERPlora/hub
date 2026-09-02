@@ -1,0 +1,17 @@
+{
+  "id": "capg",
+  "name": "Capability grant fixture",
+  "version": "1.0.0",
+  "permissions": [],
+  "capabilities": {
+    "certificate": { "purpose": "fiscal-sign" },
+    "network": { "allow": ["https://example.test"] }
+  },
+  "migrations": { "postgres": ["migrations/postgres/001_init.sql"] },
+  "queries": {
+    "capg.config_get": {
+      "permission": "",
+      "sql": "sql/config_get.sql"
+    }
+  }
+}

@@ -1514,6 +1514,8 @@ export default {
     textPlaceholder: 'Escribe aquí…',
     invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
     fieldInvalid: 'Este valor no se admite.',
+    preview: 'Probar',
+    previewError: 'No se pudo hacer la prueba.',
   },
   modulePlan: {
     tab: 'Plan',
