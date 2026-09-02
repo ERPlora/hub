@@ -35,6 +35,7 @@ pub mod xsd;
 mod config;
 mod diagnostics;
 mod engine;
+mod gateway;
 mod events;
 mod ingest;
 mod records;

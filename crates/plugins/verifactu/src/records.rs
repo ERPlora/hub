@@ -760,9 +760,10 @@ pub(crate) async fn build_record_output(host: &dyn NativeHost, ctx: &Ctx, r: Rec
     if let Some(cfg) = config.as_ref() {
         // Inline AEAT transmission on emit. Reuses `transmit_one`, which applies the result to
         // the record (accepted/rejected + CSV) and, on network failure, enqueues it in the
-        // contingency queue with backoff. Without a configured certificate → left `pending`
-        // (manual send later). Intentions apply AFTER the record INSERT (Output order).
-        if has_certificate(cfg) {
+        // contingency queue with backoff. With NO transmission road at all (neither a core
+        // certificate nor the fiscal gateway, hub#1432) → left `pending` (manual send later).
+        // Intentions apply AFTER the record INSERT (Output order).
+        if can_transmit(host, &ctx.hub_id, cfg).await? {
             let record_json = json!({
                 "id": record_id,
                 "record_type": r.record_type,

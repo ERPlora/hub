@@ -103,6 +103,50 @@ pub(crate) fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
 }
 
+/// The two roads of ADR-0320, resolved in ONE place (hub#1432 — the hub#319/#320 lesson: one
+/// question, one owner). The core's certificate WINS: a business that uploaded its own signs
+/// with its own, direct to the AEAT, exactly as today. Without one, the gateway — the host's
+/// broker answers with a [`GatewayAccess`] when the machine identity is enrolled and the control
+/// plane authorises. Without EITHER, the same visible error as always: the record stays pending,
+/// never a panic, never a silent skip.
+pub(crate) enum TransmitRoute {
+    Direct(reqwest::Identity),
+    Gateway(erplora_runtime::fiscal_gateway::GatewayAccess),
+}
+
+pub(crate) async fn resolve_route(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+) -> Result<TransmitRoute> {
+    if has_certificate(config) {
+        return Ok(TransmitRoute::Direct(host.certificate_identity(hub_id).await?));
+    }
+    match host.fiscal_gateway_access(hub_id).await? {
+        Some(access) => Ok(TransmitRoute::Gateway(access)),
+        None => Err(VerifactuError::Certificate(
+            "no hay vía de transmisión: ni certificado del negocio (súbelo en Ajustes → Negocio) \
+             ni pasarela fiscal disponible (identidad de máquina sin enrolar)"
+                .into(),
+        )
+        .into()),
+    }
+}
+
+/// ¿Hay ALGUNA vía — certificado del core O pasarela? El gate de la cola de contingencia: sin
+/// ninguna, los registros se quedan `pending` (comportamiento de siempre) en vez de quemar
+/// reintentos que no pueden salir.
+pub(crate) async fn can_transmit(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+) -> Result<bool> {
+    if has_certificate(config) {
+        return Ok(true);
+    }
+    Ok(host.fiscal_gateway_access(hub_id).await?.is_some())
+}
+
 /// **¿Puede este motor firmar por `hub_id` ahora mismo?** — exactamente el predicado con el que
 /// [`build_identity`] deja pasar o rechaza.
 ///
