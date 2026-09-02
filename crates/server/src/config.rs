@@ -50,6 +50,15 @@ pub struct ServeConfig {
 /// Y lo que NO lleva, también a propósito: **`form-action`**. No hereda de `default-src`, así que
 /// su ausencia es una decisión: fijarla rompe el login con Google, cuya cadena de redirección sale
 /// del hub, pasa por el SaaS y vuelve — sin error que el usuario pueda accionar.
+///
+/// Y lo que SÍ lleva desde hub#1447: **`report-uri`**, la única directiva que no autoriza nada.
+/// Sin ella la política es una pared que salta en silencio — el navegador escribe una línea en la
+/// consola del dispositivo donde pasó y ahí se acaba el registro. Eso es lo que costó
+/// `ERPlora/infra#73`: Cloudflare inyectando su beacon en el HTML desde el edge, `script-src
+/// 'self'` rechazándolo en **todas** las páginas de **todos** los hubs, y nosotros enterándonos
+/// porque alguien abrió la consola a mano. Apunta a este mismo hub —no al SaaS— para que un
+/// self-host sin Cloud detrás siga teniendo dónde reportar; el receptor es
+/// [`crate::csp_report`].
 pub(crate) const CSP_BASE: &str = "default-src 'self'; \
                         script-src 'self'; \
                         worker-src 'self'; \
@@ -58,7 +67,8 @@ pub(crate) const CSP_BASE: &str = "default-src 'self'; \
                         media-src 'self' blob:; \
                         frame-src 'none'; \
                         object-src 'none'; \
-                        base-uri 'self'";
+                        base-uri 'self'; \
+                        report-uri /csp-report/";
 
 /// El `connect-src` mínimo: el propio origen **y el canal IPC de Tauri**.
 ///

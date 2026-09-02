@@ -20,6 +20,16 @@ pub fn app(state: AppState) -> Router {
         // fallback SPA: sin esta ruta, `/robots.txt` devolvía `index.html` con un 200, que
         // un rastreador lee como «este sitio no tiene reglas».
         .route("/robots.txt", get(robots_txt))
+        // El otro extremo del `report-uri` de la política (hub#1447). Sin sesión a propósito: lo
+        // postea el NAVEGADOR cuando la CSP acaba de rechazar algo, y eso ocurre muy especialmente
+        // en la pantalla de login, antes de que exista sesión alguna. Va dentro del shed de
+        // negocio: si el hub está saturado, la caja cobra y el informe se cae, no al revés. El
+        // límite de cuerpo es de dos órdenes de magnitud menos que el general: un informe de CSP
+        // son cientos de bytes, y cuánto ocupa `script-sample` lo decide una página hostil.
+        .route(
+            "/csp-report/",
+            post(csp_report::receive).layer(axum::extract::DefaultBodyLimit::max(16 * 1024)),
+        )
         .route("/api/hub/context", get(hub_context))
         .route("/api/system", get(system::system_info))
         // Telemetría de recursos vs límites del plan (ADR-0154, hub#203). Sesión admin.
@@ -540,8 +550,14 @@ pub(crate) async fn require_machine_registration(
     // `/p/...` (hub#963) is in the allow-list for the same reason the three above are: the person
     // on the other side is a CUSTOMER holding a printed ticket. They cannot enrol a device, and a
     // hub that already put a locator on paper has to honour it whatever state its enrolment is in.
-    if matches!(path, "/healthz" | "/readyz" | "/api/hub/context")
-        || public_door::is_public_path(path)
+    // `/csp-report/` (hub#1447) está en la lista por lo mismo que `/healthz`: quien postea no es
+    // un usuario del negocio sino el NAVEGADOR, que no puede enrolar nada. Y un hub a medio
+    // enrolar es justo el estado donde una política rota es más probable: dejar que la barrera se
+    // coma esos informes sería un fallo mudo dentro del arreglo contra los fallos mudos.
+    if matches!(
+        path,
+        "/healthz" | "/readyz" | "/api/hub/context" | "/csp-report/"
+    ) || public_door::is_public_path(path)
         || st.is_dev_hub()
         || st.machine_registered()
     {

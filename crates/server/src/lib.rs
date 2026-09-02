@@ -44,6 +44,8 @@ pub mod assistant;
 pub mod assistant_report;
 pub mod auth;
 pub mod boot_announce;
+/// The other end of the hub's `report-uri`: what the browser refused, said out loud — hub#1447.
+pub mod csp_report;
 pub mod daily_usage;
 /// `shared` (counter till) vs `personal` (somebody's own device) — plan step 2b, hub#357.
 pub mod device_mode;
