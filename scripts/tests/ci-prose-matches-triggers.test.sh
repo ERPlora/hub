@@ -19,7 +19,7 @@
 #     before a merge — since 2026-08-29 the `local-gate/hub-tests` seal is the only proof
 #     `merge-pr.sh` accepts for a workspace PR. It already misled a human on 2026-09-02.
 #
-# WHAT IT CHECKS. Three rules, deliberately narrow. Precision over recall: a guard that cries
+# WHAT IT CHECKS. Four rules, deliberately narrow. Precision over recall: a guard that cries
 # wolf over ordinary prose is a guard the fleet learns to bypass, so each rule fires only on a
 # shape that is unambiguously a claim.
 #
@@ -30,6 +30,9 @@
 #   C · MERGE AUTHORITY — prose asserting that a workflow decides or blocks merges, when that
 #       workflow has no `pull_request` trigger. Scanned over the WHOLE file, not just comments:
 #       the false claim of hub#1438 lived in the alert-issue body the workflow writes.
+#   F · DEAD EVENT CONDITIONS — a workflow condition that filters by an event its own `on:`
+#       can never fire (hub#1443). Not prose: read off the PARSED workflow, so it sees what
+#       Actions evaluates and a comment can never trip it.
 #
 # The subject of a claim is not assumed to be the file it appears in: the prose that lied about
 # `test-hub.yml` lives in `.githooks/pre-push`. Each claim resolves to the last workflow file
@@ -401,6 +404,154 @@ for label, body, want in ENUM_FIXTURES:
         got == want,
         f"detector said {got}, expected {want} — rule A "
         f"{'stops covering' if want else 'starts firing on'} this block",
+    )
+
+# ── F · DEAD EVENT CONDITIONS — an expression that names an event the `on:` cannot fire ──
+# hub#1443: the prose rules above only read comments, so a CONDITION that filters by an
+# impossible event was invisible to them. `test-hub.yml`, `test-hub-modules.yml` and
+# `test-web.yml` all carried
+#
+#     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+#
+# after pm#197/hub#1352 took `pull_request` out of their `on:`. With no `pull_request` trigger
+# the first half is ALWAYS true, so the whole condition is constant and the draft optimisation
+# it documents never runs — while the file still reads as if the workflow gated PRs and skipped
+# drafts. Same family as hub#1438, but in behaviour instead of prose.
+#
+# Narrow on purpose, like every rule here. Only two shapes are unambiguous:
+#   · a comparison of `github.event_name` against a trigger name, and
+#   · a read of a payload root that a single family of events produces.
+# `github.event.inputs`, `head_commit` and friends are ambiguous and stay out: a guard that
+# cries wolf is a guard the fleet learns to bypass.
+EVENT_NAME_CMP = re.compile(r"github\.event_name\s*(?:==|!=)\s*'([a-z_]+)'")
+PAYLOAD_ROOT = {
+    "pull_request": {"pull_request", "pull_request_target"},
+    "client_payload": {"repository_dispatch"},
+}
+PAYLOAD_ACCESS = re.compile(r"github\.event\.(" + "|".join(PAYLOAD_ROOT) + r")\b")
+
+
+def yaml_strings(node):
+    """Every string scalar of a parsed workflow — `if:`, `${{ }}` interpolations, `run:` bodies.
+
+    Read off the PARSED document, never the raw text, so a comment discussing a trigger can
+    never trip this rule: only what Actions actually evaluates counts.
+    """
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for k, v in node.items():
+            yield from yaml_strings(k)
+            yield from yaml_strings(v)
+    elif isinstance(node, list):
+        for v in node:
+            yield from yaml_strings(v)
+
+
+def dead_event_conditions(triggers, doc):
+    """(needed event, offending text) for every condition this `on:` can never satisfy."""
+    if "workflow_call" in triggers:
+        # A reusable workflow evaluates under the CALLER's event, so its own `on:` proves
+        # nothing about which events reach it.
+        return []
+    dead = []
+    for expr in yaml_strings(doc):
+        for name in EVENT_NAME_CMP.findall(expr):
+            if name in TRIGGERS and name not in triggers:
+                dead.append((name, f"github.event_name compared with '{name}'"))
+        for root in PAYLOAD_ACCESS.findall(expr):
+            if not PAYLOAD_ROOT[root] & triggers:
+                dead.append((root, f"github.event.{root} read"))
+    return dead
+
+
+for name in sorted(real):
+    path = os.path.join(workflows_dir, name)
+    with open(path, encoding="utf-8") as fh:
+        raw_lines = fh.read().split("\n")
+    doc = yaml.safe_load("\n".join(raw_lines))
+    seen = set()
+    for needed, what in dead_event_conditions(real[name], doc):
+        if (needed, what) in seen:
+            continue
+        seen.add((needed, what))
+        # The line is looked up only to point at it; the finding itself came from the parsed
+        # document, so a comment mentioning the same text cannot be what is reported.
+        where = next(
+            (
+                str(i)
+                for i, line in enumerate(raw_lines, 1)
+                if not line.strip().startswith("#")
+                and (
+                    EVENT_NAME_CMP.search(line) and needed in line
+                    or PAYLOAD_ACCESS.search(line) and needed in line
+                )
+            ),
+            "?",
+        )
+        check(
+            f"{name}:{where} filters by `{needed}`, and its `on:` can fire it",
+            False,
+            f"{what} but the `on:` of {name} is {sorted(real[name])} — the condition is "
+            f"constant, so the branch it guards never runs while the file reads as if it "
+            f"did. Delete it, or bring the trigger back with it",
+        )
+    if not seen:
+        # One green line per clean workflow: the rule has to be visibly RUNNING over each
+        # file, not only visible when it fires.
+        check(f"{name} has no condition filtering by an event it never receives", True)
+
+# ── F fixtures · the rule fires on the shape it exists for, and only on it ───────────
+# Same reason as rule E: a detector nobody proves is a detector that can quietly stop
+# detecting. Each fixture is (label, `on:` triggers, workflow body, expected findings).
+DEAD_EVENT_FIXTURES = [
+    (
+        "the hub#1443 shape: a draft filter on a workflow without `pull_request`",
+        {"push"},
+        {"jobs": {"t": {"if": "github.event_name != 'pull_request' "
+                              "|| !github.event.pull_request.draft"}}},
+        2,
+    ),
+    (
+        "the same condition where `pull_request` IS a trigger",
+        {"push", "pull_request"},
+        {"jobs": {"t": {"if": "github.event_name != 'pull_request' "
+                              "|| !github.event.pull_request.draft"}}},
+        0,
+    ),
+    (
+        "a reusable workflow, which runs under the caller's event",
+        {"workflow_call"},
+        {"jobs": {"t": {"if": "github.event_name != 'pull_request'"}}},
+        0,
+    ),
+    (
+        "`client_payload` read by a workflow that declares `repository_dispatch`",
+        {"repository_dispatch", "push"},
+        {"jobs": {"t": {"steps": [{"run": "echo ${{ github.event.client_payload.module }}"}]}}},
+        0,
+    ),
+    (
+        "`client_payload` read by a workflow that does not",
+        {"push"},
+        {"jobs": {"t": {"steps": [{"run": "echo ${{ github.event.client_payload.module }}"}]}}},
+        1,
+    ),
+    (
+        "an ordinary condition on a trigger the file really has",
+        {"push", "schedule"},
+        {"jobs": {"t": {"steps": [{"with": {"ref": "${{ github.event_name == 'schedule' "
+                                                   "&& 'develop' || github.ref }}"}}]}}},
+        0,
+    ),
+]
+for label, triggers, body, want in DEAD_EVENT_FIXTURES:
+    got = len(dead_event_conditions(triggers, body))
+    check(
+        f"dead-event detector: {label} → {want} finding(s)",
+        got == want,
+        f"detector found {got}, expected {want} — rule F "
+        f"{'stops covering' if want else 'starts firing on'} this shape",
     )
 
 for f in failures:

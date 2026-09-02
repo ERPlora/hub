@@ -101,12 +101,10 @@ fn no_published_emit_list_is_refused_by_the_schema_hub1076() {
     let root = erplora_runtime::modules_root();
     let mut seen = 0;
     let mut failures = Vec::new();
-    for entry in std::fs::read_dir(&root).expect("modules-workspace/modules is readable") {
-        let dir = entry.unwrap().path();
+    // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
+    // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    for (_module, dir) in erplora_runtime::published_module_dirs() {
         let manifest = dir.join("module.json");
-        if !manifest.is_file() {
-            continue;
-        }
         seen += 1;
         let raw: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&manifest).unwrap()).unwrap();

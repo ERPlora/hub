@@ -85,6 +85,9 @@ on:
   # romper develop juntas, y eso solo se ve sobre el árbol resultante).
   # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
   # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
+  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
+  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
+  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -105,10 +108,6 @@ permissions:
 
 jobs:
   test:
-    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
-    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
-    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: cargo test --workspace
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo: el
     # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
