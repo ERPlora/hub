@@ -132,8 +132,10 @@ jobs:
     # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: pnpm verify (vue-tsc + vitest + module-sdk)
-    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Este es el
-    # único check que corre de verdad en las PRs del web, así que sin él una PR no se puede mergear.
+    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo con lo
+    # que este job NO es: desde hub#1352 este workflow no tiene `pull_request`, así que en una PR
+    # del web no corre nadie en la nube — lo que autoriza el merge es el sello `local-gate/hub-web`
+    # que publica el gate pre-push (pm#198). Aquí se verifica el árbol ya mergeado.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
 

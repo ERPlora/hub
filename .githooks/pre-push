@@ -4,26 +4,38 @@
 #
 # It runs the packages THIS PUSH CAN BREAK — not the whole workspace (hub#1207).
 #
-# History, because the header used to claim the opposite: this gate was born to
-# REPLACE the `pull_request` trigger of "Hub tests (Rust · Postgres)"
-# (.github/workflows/test-hub.yml), which was burning ~96% of the repo's Actions
-# minutes. That replacement ended with hub#873: since 2026-08-11 the jobs run on
-# the org's own runners, whose minutes are not billed, so `test-hub.yml` declares
-# `on: pull_request` again and the full suite runs there, for free, on every PR.
+# 🔴 THIS GATE IS THE ONLY PRE-MERGE PROOF THE HUB'S RUST HAS. Read that before
+# deciding it is redundant: since 2026-08-29 (pm#197, Ioan's call, with
+# `ci-runner-1` saturated) `test-hub.yml` declares `on: [push, workflow_dispatch]`
+# — no `pull_request`. The cloud suite therefore runs AFTER the merge, over
+# `develop`/`main`. Before the merge there is only what happens here, and
+# `merge-pr.sh` enforces exactly that: for a PR touching workspace Rust,
+# `require_workspace_suite` refuses to merge unless this hook published
+# `local-gate/hub-tests` green on the pushed sha. Its one alternative is a
+# `test-hub.yml` run dispatched BY HAND over the branch (`gh workflow run`), whose
+# `cargo test --workspace` check it also accepts — nothing runs on its own.
 #
-# What was left here was the same suite a second time — and the expensive copy,
-# because it holds a machine-wide lock for ~20-40 min. With the autonomous fleet
-# that lock IS the ceiling: ~8-10 issues/day regardless of how many workers push.
+# HISTORY, in the past because it is over. The gate was born to REPLACE that
+# `pull_request` trigger, which was burning ~96% of the repo's Actions minutes.
+# Between 2026-08-11 (hub#873, org runners, minutes not billed) and 2026-08-29
+# the trigger was back and the cloud did run the suite on every PR; during those
+# 18 days this hook really was a second, more expensive copy. pm#197 ended that.
+# The header kept describing those 18 days as the present until hub#1438, which
+# is how it came to argue for its own deletion — deleting it now would leave the
+# hub's Rust with nobody testing it before a merge.
 #
-# So the division of labour is now explicit:
-#   · HERE  — fast feedback on the branch: the touched packages and everything
-#             that depends on them, `--no-fail-fast` (without it cargo stops at
-#             the first failing binary and reports one failure out of twenty).
-#   · ACTIONS — `cargo test --workspace` on the PR, and that is the one that
-#             decides the merge (`merge-pr.sh` still refuses on CI silence).
-# What this trades away, said plainly: a branch can leave this machine broken
-# OUTSIDE its scope. Actions catches it on the PR, before the merge. That is one
-# wasted CI round now and then instead of 40 serialized minutes on every push.
+# So the division of labour, as it stands today:
+#   · HERE  — the pre-merge run, and the one `merge-pr.sh` requires: the touched
+#             packages and everything that depends on them, `--no-fail-fast`
+#             (without it cargo stops at the first failing binary and reports one
+#             failure out of twenty).
+#   · ACTIONS — the POST-MERGE net (hub#572): `cargo test --workspace` on the
+#             `push` to develop/main, over the tree the merge actually produced,
+#             which is the one thing a per-branch run cannot see.
+# What this trades away, said plainly: a scoped run can leave this machine broken
+# OUTSIDE its scope, and now nothing catches that until the post-merge push. That
+# is the accepted price of not serializing 40 minutes onto every push; the
+# `resolve_scope` fallbacks below are what keep the scope honest.
 #
 # The full workspace still runs here whenever the scope cannot be trusted —
 # Cargo.lock, the workspace manifest, the toolchain, `schemas/`, or any failure
@@ -332,19 +344,22 @@ mkdir -p "$STATE_DIR"
 
 # ── hub#1207: the SCOPE — run the packages this diff can break, not all of them ─
 #
-# `cargo test --workspace` here is a minute-for-minute DUPLICATE of the suite
-# `test-hub.yml` runs on every `pull_request` over the org's own runners, whose
-# minutes are not billed. The duplicate is the expensive copy — it holds a
-# machine-wide lock for ~40 min — so it, and only it, is the fleet's ceiling:
-# ~8-10 issues/day no matter how many workers push. What it buys over Actions
-# is speed of feedback on the branch, and that is exactly what a scoped run
-# still gives.
+# When hub#1207 was written, `cargo test --workspace` here was a minute-for-minute
+# DUPLICATE of the suite `test-hub.yml` then ran on every `pull_request` over the
+# org's own runners. That is no longer the shape: pm#197 removed that trigger on
+# 2026-08-29, so the workspace run in the cloud happens only AFTER the merge, on
+# the `push` to develop/main.
 #
-# So the local gate becomes a fast smoke over what CHANGED, and the full suite
-# stays where it is free: Actions, on the PR, before the merge. Note what is
-# NOT touched — the LOCK stays (hub#526: two suites at once melt the machine).
-# What shrinks is how long it is held, and a lock held for minutes drains a
-# queue that a lock held for forty minutes does not.
+# The reason to scope survives the change, and it is the lock: the full run holds
+# a machine-wide one for ~40 min, so it, and only it, is the fleet's ceiling —
+# ~8-10 issues/day no matter how many workers push. What scoping buys is a queue
+# that drains; what it costs is that a branch can break packages OUTSIDE its
+# scope with nothing catching it until the post-merge push. Note what is NOT
+# touched — the LOCK stays (hub#526: two suites at once melt the machine).
+#
+# ⚠️ Scoping is NOT a bypass: a scoped run publishes `local-gate/hub-tests-scoped`,
+# a context `merge-pr.sh` deliberately does not accept as workspace proof (see the
+# header). Only a real full run seals `local-gate/hub-tests`.
 #
 # Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
 # `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
