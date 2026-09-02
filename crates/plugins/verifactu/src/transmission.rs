@@ -233,6 +233,18 @@ pub(crate) async fn transmit_one(
         .await,
     };
 
+    // Un cuerpo entregado que NO es un veredicto (un SOAP Fault de la AEAT, o HTML de un
+    // intermediario) parseaba a un `AeatResponse` con todos los campos vacíos y se archivaba como
+    // «AEAT (testing): » — un fallo mudo (regla: un fallo que no se ve no existe). Se vio en vivo
+    // el 2026-09-02: el NIF demo inválido volvía como Fault 4116 y el registro moría sin motivo
+    // visible. Un no-veredicto lleva el motivo del otro lado a bordo (`faultstring`): se normaliza
+    // AQUÍ a la misma rama que un fallo de conexión — contingencia con backoff y el motivo en el
+    // evento — en vez de inventarle un veredicto.
+    let transport = transport.and_then(|body| match fault_reason(&body) {
+        Some(reason) => Err(VerifactuError::Transmission(reason)),
+        None => Ok(body),
+    });
+
     match transport {
         Ok(body) => {
             let resp = aeat::parse_response(&body);
@@ -388,6 +400,41 @@ pub(crate) struct Retry {
     operation: Operation,
     attempts: i64,
     backoff_minutes: i64,
+}
+
+/// The reason a delivered body is NOT an AEAT verdict — `None` when it is one.
+///
+/// The parser is namespace-driven and yields an all-empty [`aeat::AeatResponse`] for anything
+/// that is not a `RespuestaRegFactuSistemaFacturacion`: a SOAP `Fault` (the AEAT's own refusal —
+/// measured live on 2026-09-02: `4116` for a malformed obligado NIF, `4112` for a holder the
+/// Sello may not present for), or an intermediary's HTML. Filing that as a verdict buries the
+/// other side's message; this surfaces it, `faultstring` first.
+pub(crate) fn fault_reason(body: &str) -> Option<String> {
+    let resp = aeat::parse_response(body);
+    let is_verdict = !resp.estado_envio.is_empty()
+        || !resp.estado_registro.is_empty()
+        || !resp.csv.is_empty();
+    if is_verdict {
+        return None;
+    }
+    let fault = body
+        .split("<faultstring>")
+        .nth(1)
+        .and_then(|rest| rest.split("</faultstring>").next())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    Some(match fault {
+        Some(text) => {
+            let mut snippet: String = text.chars().take(300).collect();
+            if text.chars().count() > 300 {
+                snippet.push('…');
+            }
+            format!("la AEAT respondió un Fault, no un veredicto: {snippet}")
+        }
+        None => "la AEAT no devolvió un veredicto reconocible (cuerpo sin \
+                 RespuestaRegFactuSistemaFacturacion ni faultstring)"
+            .to_owned(),
+    })
 }
 
 pub(crate) async fn enqueue_retry(
@@ -950,9 +997,42 @@ pub(crate) async fn process_contingency_queue(
 
 #[cfg(test)]
 mod tests {
-    use super::{archive_transmission_xml, derive_tax_rate, NativeHost, Params, Result};
+    use super::{archive_transmission_xml, derive_tax_rate, fault_reason, NativeHost, Params, Result};
     use serde_json::Value as Json;
     use std::sync::Mutex;
+
+    // ── a delivered body that is not a verdict is a VISIBLE failure (2026-09-02) ──────────────
+
+    /// The live bug: a SOAP Fault filed as an all-empty verdict — «AEAT (testing): » with no
+    /// code, no message, no clue. The Fault below is the AEAT preproduction's real answer to
+    /// the old demo tax id (`B00000000`, Fault 4116), captured on 2026-09-02.
+    #[test]
+    fn a_soap_fault_is_a_failure_that_names_the_fault() {
+        let body = r#"<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/"><env:Body><env:Fault><faultcode>env:Client</faultcode><faultstring>Codigo[4116].Error en la cabecera: el campo NIF del bloque ObligadoEmision tiene un formato incorrecto.. NIF:B00000000. NOMBRE_RAZON:ERPlora Demo SL</faultstring></env:Fault></env:Body></env:Envelope>"#;
+
+        let reason = fault_reason(body).expect("a Fault is never a verdict");
+
+        assert!(reason.contains("4116"), "the fault code must survive: {reason}");
+        assert!(reason.contains("Fault"), "the reason says WHAT came back: {reason}");
+    }
+
+    /// The positive control: a REAL verdict (the AEAT's own `AceptadoConErrores` fixture) must
+    /// flow through untouched — `fault_reason` returning `Some` for it would send every
+    /// legitimate answer to the retry queue.
+    #[test]
+    fn a_real_verdict_is_not_a_fault() {
+        let body = include_str!("../tests/fixtures/alta_2007_aceptado_con_errores_2026-08-02.xml");
+        assert_eq!(fault_reason(body), None);
+    }
+
+    /// An intermediary's HTML (a proxy error page, a captive portal) is not a verdict either,
+    /// and it carries no faultstring — the reason still says something a human can act on.
+    #[test]
+    fn unrecognisable_bodies_fail_visibly_too() {
+        let reason = fault_reason("<html><body>502 Bad Gateway</body></html>")
+            .expect("HTML is not a verdict");
+        assert!(reason.contains("veredicto"), "{reason}");
+    }
 
     // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
 
