@@ -328,6 +328,9 @@ shipped_manifest="$repo_root/scripts/ci/module-hub-batteries.txt"
 [ -f "$shipped_manifest" ] || fail "no shipped manifest at $shipped_manifest"
 ok
 
+declared_shipped=$(sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+    "$shipped_manifest" | grep -v '^$')
+
 while IFS= read -r entry; do
     [ -n "$entry" ] || continue
     case "$entry" in
@@ -339,8 +342,29 @@ while IFS= read -r entry; do
         *) fail "shipped manifest entry is not a hub battery: $entry" ;;
     esac
 done <<EOF_ENTRIES
-$(sed -e 's/[[:space:]]*#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$shipped_manifest" | grep -v '^$')
+$declared_shipped
 EOF_ENTRIES
+ok
+
+# ── 10 · The incident of hub#1396 stays pinned ───────────────────────────────────────────
+# On 2026-09-01 `inventory` published `tests/combo_stock.hub.test.py` (inventory#77, v1.2.44) and
+# the half of the pair that lives HERE was never written. The guard did its job — but only where
+# the catalogue is, which is `test-hub-modules.yml`. So the red landed POST-MERGE, in somebody
+# else's push, and stayed for 14 runs and a full day; and because the guard runs BEFORE
+# `cargo test`, the crater — the 27 published modules against the runtime — did not run once in
+# all that time.
+#
+# This pin is the cheap half of the answer: it moves the detection of THAT line going missing from
+# "a day later, in CI" to "now, in the gate that runs this file". The expensive half — making the
+# module's own gate demand the pairing before it merges, so the author sees it in their PR — is
+# hub#1439.
+#
+# WHEN TO CHANGE THIS: when `combo_stock.hub.test.py` is legitimately retired from `inventory`,
+# this case goes with it in the SAME commit. It is a pin on one incident, not a rule about the
+# module — do not "fix" it by weakening it.
+combo_entry='inventory/tests/combo_stock.hub.test.py'
+printf '%s\n' "$declared_shipped" | grep -Fxq "$combo_entry" || fail \
+    "the shipped manifest no longer declares $combo_entry (hub#1396)"
 ok
 
 printf 'PASS: %d module-hub-batteries guard cases\n' "$passed"
