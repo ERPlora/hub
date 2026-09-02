@@ -885,6 +885,26 @@ pub struct RequestContext {
     /// read; a caller never writes it — `system_params` overwrites it with the value from `ctx`
     /// after cloning the payload, exactly like `hub_id` or `has_certificate`.
     pub is_demo_hub: bool,
+    /// **¿Están CONCEDIDAS todas las capabilities que declara el módulo que está llamando?**
+    /// (ADR-0079, hub#1425). Lo sella el dispatcher —`commands::execute_at` y `queries::execute`,
+    /// por módulo llamante— con [`crate::capabilities::all_granted`], que es [`enforce`] mismo;
+    /// `system_params` lo expone como `:capabilities_granted` (0/1).
+    ///
+    /// MISMO patrón que [`Self::has_certificate`]: una condición del hub que el módulo necesita
+    /// para PINTAR —verifactu#62: «estás activado y no puedes firmar»—, sonada por el runtime y
+    /// nunca adivinada por el módulo, que además no puede leer `_module_capability_grants` (tabla
+    /// de sistema, vedada por `migration_guard`).
+    ///
+    /// **Es 0/1 agregado, no la lista**: el módulo ya sabe qué declara (está en su manifest); lo
+    /// que no sabe es si se lo han concedido. Un booleano cierra el caso sin publicar el mapa de
+    /// permisos del hub a cualquier módulo instalado.
+    ///
+    /// El default es `false`, y es deliberado: sin sellar significa «no lo sé», y de las dos
+    /// lecturas equivocadas la cara es la otra —una pantalla que calla mientras el módulo no puede
+    /// firmar es exactamente el fallo que hub#1425 cierra; una que avisa de más se corrige mirando
+    /// Ajustes → Permisos—. Nunca lo escribe quien llama: `system_params` lo sobrescribe DESPUÉS
+    /// de clonar el payload, igual que `:hub_id`.
+    pub capabilities_granted: bool,
     /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
     /// inyecta el dispatcher junto a la identidad de negocio.
     ///
@@ -1044,6 +1064,7 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            capabilities_granted: false,
             is_demo_hub: false,
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
@@ -1191,6 +1212,14 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Copia con la respuesta de `capabilities::all_granted` para el módulo LLAMANTE (hub#1425).
+    /// Solo la sella el dispatcher, por módulo y en cada dispatch; nunca quien llama. Builder para
+    /// no romper los `new(...)`/tests.
+    pub fn with_capabilities_granted(mut self, granted: bool) -> Self {
+        self.capabilities_granted = granted;
         self
     }
 

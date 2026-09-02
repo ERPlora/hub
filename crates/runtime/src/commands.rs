@@ -259,6 +259,33 @@ pub(crate) async fn execute_at(
         .get_command(name)
         .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
 
+    // ¿Puede este módulo hacer lo que declara que necesita? (ADR-0079, hub#1425). Se sella por
+    // módulo LLAMANTE y en cada dispatch —no con la identidad del hub, que es una propiedad del
+    // hub y se resuelve una sola vez—: un `ctx` heredado (un listener que corre a `depth > 0`,
+    // otro módulo) traería la respuesta del módulo anterior. Aquí, justo detrás del lookup, lo
+    // ven TODAS las ramas de abajo: el SQL declarativo, las operaciones de un handler y el gate
+    // nativo `capabilities::enforce`, que es la misma función que contesta esto.
+    //
+    // Degrada a `false` —en voz alta— si la lectura falla: `:capabilities_granted` existe para
+    // AVISAR, y de las dos lecturas equivocadas la cara es callar mientras el módulo no firma.
+    let capability_ctx;
+    let ctx = match crate::capabilities::all_granted(db, registry, &cmd.module_id, &ctx.hub_id)
+        .await
+    {
+        Ok(granted) => {
+            capability_ctx = ctx.clone().with_capabilities_granted(granted);
+            &capability_ctx
+        }
+        Err(e) => {
+            eprintln!(
+                "⚠ capabilities: no se pudo leer el estado de `{}` ({e}) → `:capabilities_granted` = 0",
+                cmd.module_id
+            );
+            capability_ctx = ctx.clone().with_capabilities_granted(false);
+            &capability_ctx
+        }
+    };
+
     // Gate de ORIGEN (hub#131, hub#145): un command interno (prefijo `_` en su último segmento,
     // o `internal: true` en el manifest) es invisible para un caller EXTERNO — ni el permiso ni
     // el schema del command importan, se rechaza ANTES de comprobarlos. Solo el propio runtime

@@ -134,6 +134,21 @@ export interface SettingsSchemaProperty {
   default?: unknown;
   /** Longitud máxima (string) → `maxlength` del input. */
   maxLength?: number;
+  /**
+   * Acción de PRUEBA de ESTE ajuste (hub#1426): el tag del Web Component del módulo que sabe
+   * ejecutarla. `"erp-kitchen-sound-preview"`.
+   *
+   * El shell pinta un botón «Probar» junto al campo y, al pulsarlo, llama al método
+   * `preview({ key, value, settings })` de ese elemento con el valor que hay EN EL FORMULARIO,
+   * todavía sin guardar. Existe porque un ajuste que solo se puede juzgar oyéndolo o viéndolo —el
+   * volumen del KDS— se regula a ciegas: guardar, ir a la pantalla, esperar a que entre una
+   * comanda y volver. El shell no sabe nada de sonido; quien ejecuta la prueba es el módulo.
+   *
+   * Va aquí, en el JSON Schema del propio módulo, y no en `module.json`: es una anotación DE LA
+   * PROPIEDAD, y `x-` es la forma que JSON Schema tiene para eso (un validador ignora las palabras
+   * clave que no conoce). El valor declarado y lo que se guarda no cambian: solo aparece un botón.
+   */
+  'x-erplora-preview'?: string;
 }
 
 /** JSON Schema (subset) del formulario de ajustes de un módulo. */

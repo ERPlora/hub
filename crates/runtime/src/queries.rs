@@ -196,6 +196,32 @@ pub async fn execute_page(
         ctx
     };
 
+    // ¿Puede este módulo hacer lo que declara que necesita? (ADR-0079, hub#1425). Se sella AQUÍ,
+    // por módulo LLAMANTE y en cada dispatch, y no arriba con la identidad del hub: aquélla es una
+    // propiedad del hub (se resuelve una vez), ésta es del par (hub, módulo) — un `ctx` heredado
+    // de otra llamada traería la respuesta del módulo ANTERIOR.
+    //
+    // Degrada a `false` si la lectura falla, la misma dirección conservadora que `has_certificate`
+    // y por el mismo motivo: `:capabilities_granted` existe para AVISAR, y de las dos lecturas
+    // equivocadas la cara es callar mientras el módulo no puede firmar. Y se dice en voz alta: un
+    // fallo mudo aquí es una pantalla que miente sin que nadie se entere.
+    let capability_ctx;
+    let ctx = match crate::capabilities::all_granted(db, registry, &q.module_id, &ctx.hub_id).await
+    {
+        Ok(granted) => {
+            capability_ctx = ctx.clone().with_capabilities_granted(granted);
+            &capability_ctx
+        }
+        Err(e) => {
+            eprintln!(
+                "⚠ capabilities: no se pudo leer el estado de `{}` ({e}) → `:capabilities_granted` = 0",
+                q.module_id
+            );
+            capability_ctx = ctx.clone().with_capabilities_granted(false);
+            &capability_ctx
+        }
+    };
+
     let bound = crate::system_params(params, ctx);
 
     match &q.def.list {

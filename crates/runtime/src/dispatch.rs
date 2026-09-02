@@ -301,6 +301,17 @@ pub fn system_params(base: &Params, ctx: &RequestContext) -> Params {
         "is_demo_hub".into(),
         Json::from(if ctx.is_demo_hub { 1 } else { 0 }),
     );
+    // ¿Están CONCEDIDAS todas las capabilities que declara el módulo LLAMANTE? (ADR-0079,
+    // hub#1425), como 0/1 — MISMO patrón que `:has_certificate` y `:is_demo_hub`: una condición
+    // que el módulo necesita para PINTAR («estás activado y no puedes firmar», verifactu#62),
+    // sonada por el runtime y nunca leída por el módulo de `_module_capability_grants`, que es
+    // tabla de sistema. El valor lo sella el dispatcher llamando a `capabilities::all_granted`
+    // —que ES `capabilities::enforce`—, así que la pantalla y el gate no pueden discrepar. No es
+    // falsificable por payload: se escribe aquí, DESPUÉS de clonar `base`.
+    p.insert(
+        "capabilities_granted".into(),
+        Json::from(if ctx.capabilities_granted { 1 } else { 0 }),
+    );
     // LA ZONA HORARIA DEL NEGOCIO (hub#731, hub#1022), como nombre IANA ya RESUELTO
     // (`settings::timezone_of`: la declarada o la deducida del país/región). Disponible como
     // `:timezone` en TODO el SQL de queries y comandos — «mañana a las 09:00» son las 09:00 de la
@@ -486,6 +497,54 @@ mod tests {
             p["is_demo_hub"],
             json!(1),
             "a demo hub cannot be talked out of its own mark via payload"
+        );
+    }
+
+    /// hub#1425: a module cannot tell whether the owner GRANTED the capabilities it declares, so
+    /// it cannot say so on its own screen — which is where the owner is standing when they switch
+    /// on the feature that needs them. The core already does its half (`invoice.created` dies with
+    /// `module.capability_denied`, `setup_status` does not call it configured); what was missing
+    /// was the module's half, at the point of use.
+    ///
+    /// Same shape as `:has_certificate`/`:is_demo_hub` right above: a hub condition a module needs
+    /// in order to PAINT, sounded by the runtime as 0/1 so no module reads the system table
+    /// `_module_capability_grants` (which `migration_guard` forbids it anyway).
+    #[test]
+    fn hub1425_system_params_expose_whether_the_capabilities_are_granted() {
+        let ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(
+            p["capabilities_granted"],
+            json!(0),
+            "unresolved reads as «not granted»: a screen that over-warns is recoverable, one that \
+             stays silent while the module cannot sign is the bug this closes"
+        );
+
+        let ctx = ctx.with_capabilities_granted(true);
+        let p = system_params(&Params::new(), &ctx);
+        assert_eq!(p["capabilities_granted"], json!(1));
+    }
+
+    /// And it is not forgeable: written AFTER cloning `base`, exactly like `:hub_id`. Otherwise a
+    /// module could paint itself «all permissions granted» by stuffing the key into its own
+    /// payload — the shape of hole `hub1135_the_demo_mark_is_not_writable_by_payload` pins for the
+    /// demo mark.
+    #[test]
+    fn hub1425_capabilities_granted_is_not_writable_by_payload() {
+        let denied_ctx = RequestContext::new("h1", "u1", Vec::<String>::new());
+        let mut forged_true = Params::new();
+        forged_true.insert("capabilities_granted".into(), json!(1));
+        assert_eq!(
+            system_params(&forged_true, &denied_ctx)["capabilities_granted"],
+            json!(0)
+        );
+
+        let granted_ctx = denied_ctx.with_capabilities_granted(true);
+        let mut forged_false = Params::new();
+        forged_false.insert("capabilities_granted".into(), json!(0));
+        assert_eq!(
+            system_params(&forged_false, &granted_ctx)["capabilities_granted"],
+            json!(1)
         );
     }
 
