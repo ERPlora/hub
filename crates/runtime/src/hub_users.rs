@@ -70,6 +70,10 @@ pub const ADMINISTER_PERMISSION: &str = "hub.administer";
 /// la pantalla de la cola no podía existir fuera del shell. Gate: el del namespace (sesión local),
 /// **no admin** — es la audiencia que hub#987 ya decidió para los mismos hechos: una cola que nadie
 /// drena necesita a quien está en el mostrador, no a quien administra el hub.
+/// `fiscal.transmission` (hub#1416) es la VÍA por la que los registros de este hub llegan a la
+/// AEAT (ADR-0320 §1) más el estado del otorgamiento. Mismo gate que `fiscal.limits` y por el mismo
+/// motivo: quien lo consume es quien mira la pantalla, no quien administra el hub.
+///
 /// `pub` porque **es contrato del kernel** (hub#1235): el namespace reservado `hub.*` que el core
 /// contesta sin que ningún módulo lo declare, congelado en `contracts/kernel/engine.snapshot`.
 pub const CORE_QUERIES: &[&str] = &[
@@ -78,6 +82,7 @@ pub const CORE_QUERIES: &[&str] = &[
     "setup.status",
     "approvals.list",
     "fiscal.limits",
+    "fiscal.transmission",
     "print.coverage",
     "print.jobs",
 ];
@@ -1063,6 +1068,37 @@ pub async fn core_query(
             crate::fiscal_profile::limits(db, hub_id).await?,
         )
         .unwrap_or_else(|_| json!({}))])),
+        // WHICH of the two EXCLUSIVE routes of ADR-0320 §1 carries this hub's records to the tax
+        // authority, and where its representation grant stands (hub#1416). Same shape as
+        // `fiscal.limits` above — **the core answers, the module paints** — and it exists for the
+        // same reason: a fiscal module's screen has to show the active route without owning the
+        // form that changes it, and today it has nowhere to read it from.
+        //
+        // 🔴 The route comes from `certificate::route_of`, the SAME function `fiscal_profile::
+        // go_live` decides the Anexo I with. It is NOT re-derived from `:has_certificate`, which
+        // is `can_sign` and answers «own OR delegated»: a hub holding only ERPlora's certificate
+        // says `true` there and is on the DELEGATED route. That deduction would be a second rule,
+        // and two rules is how a screen and a production gate end up disagreeing about the route
+        // a business is on.
+        //
+        // The grant is served from the copy `_hub_fiscal_profile` MIRRORS (hub#836), never with a
+        // trip to the control plane: whoever wants it refreshed opens Ajustes → Negocio, which is
+        // where the `GET` lives. A network call behind a paint would make every screen open cost a
+        // round trip, and leave the module's screen broken whenever the Cloud is unreachable.
+        //
+        // A hub with no profile yet answers the empty string on both grant fields — «never asked»
+        // — and never a state it invented, the same tolerance `load` already owes early boot.
+        "fiscal.transmission" => {
+            let profile = crate::fiscal_profile::load(db, hub_id).await?;
+            let grant = |pick: fn(&crate::fiscal_profile::FiscalProfile) -> &str| {
+                profile.as_ref().map(pick).unwrap_or_default().to_string()
+            };
+            Ok(whole(vec![json!({
+                "transmission_route": crate::certificate::transmission_route(db, hub_id).await?,
+                "representation_status": grant(|p| &p.representation_status),
+                "representation_at": grant(|p| &p.representation_at),
+            })]))
+        }
         // The PIN approval record (hub#362 writes, hub#512 reads, hub#884 pages). Double
         // attribution: who asked for the elevation and who approved it. The ids resolve to names
         // against `hub_user`, or the screen shows UUIDs and nobody uses it.
