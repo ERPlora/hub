@@ -196,6 +196,21 @@ def paragraphs(block):
     return out
 
 
+def block_is_enumeration(block):
+    """Is this comment block a list of triggers, so rule A applies to its bullets?
+
+    By WORDING or by SHAPE, and the second half is what makes the detector survive an edit
+    (hub#1445). Keying only on the heading meant that rewording it — «Los CUATRO disparadores»
+    → «Las CUATRO vías de entrada» — switched rule A off for the whole block, without a word,
+    and hub#1442 rewrote exactly that heading. Two or more bullets each STARTING with a trigger
+    name is not something ordinary prose does; one is (`· \\`push\\` es lo que usamos para
+    desplegar`), which is why the threshold is two and not one.
+    """
+    if ENUM_HEADING.search(" ".join(t for _, t in block)):
+        return True
+    return sum(1 for _, t in block if BULLET.match(t)) >= 2
+
+
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -250,8 +265,7 @@ for path in files:
     lines = raw.split("\n")
 
     for block in comment_blocks(lines):
-        block_text = " ".join(t for _, t in block)
-        is_enum = bool(ENUM_HEADING.search(block_text))
+        is_enum = block_is_enumeration(block)
         named_before = None
 
         for para in paragraphs(block):
@@ -348,6 +362,46 @@ if os.path.exists(runner):
         )
 else:
     check("actionlint.yml exists to run this guard", False, f"missing {runner}")
+
+# ── E · the enumeration detector reads SHAPE, not wording (hub#1445) ─────────────────
+# Rule A used to apply only inside a block whose text contained "disparador"/"trigger", so
+# rewriting that heading turned it off — silently, and for the WHOLE block: measured on
+# `test-hub-modules.yml`, renaming «Los CUATRO disparadores» to «Las CUATRO vías de entrada»
+# took the run from 11 checks to 7 and let a false `pull_request` bullet through, still
+# printing "passed". A guard whose coverage depends on a word nobody knows is load-bearing is
+# a guard that switches itself off during an ordinary edit — hub#1442 rewrote exactly that
+# heading. The shape is the honest signal: two or more bullets that each START with a trigger
+# name is not ordinary prose, whatever the heading calls itself.
+ENUM_FIXTURES = [
+    (
+        "a heading that says «disparadores»",
+        ["── Los CUATRO disparadores ──", "· `push` a `main`", "· `schedule` diario"],
+        True,
+    ),
+    (
+        "the SAME list with the heading reworded (hub#1445)",
+        ["── Las CUATRO vías de entrada ──", "· `push` a `main`", "· `schedule` diario"],
+        True,
+    ),
+    (
+        "ordinary prose that merely mentions a trigger in a bullet",
+        ["Notas sueltas:", "· `push` es lo que usamos para desplegar."],
+        False,
+    ),
+    (
+        "a single bullet, which stays ordinary prose",
+        ["Detalle:", "· `push` a `main`/`develop`: la red POST-MERGE."],
+        False,
+    ),
+]
+for label, body, want in ENUM_FIXTURES:
+    got = block_is_enumeration(list(enumerate(body, 1)))
+    check(
+        f"enumeration detector: {label} → {'enumeration' if want else 'plain prose'}",
+        got == want,
+        f"detector said {got}, expected {want} — rule A "
+        f"{'stops covering' if want else 'starts firing on'} this block",
+    )
 
 for f in failures:
     print(f"  ✗ {f}")
