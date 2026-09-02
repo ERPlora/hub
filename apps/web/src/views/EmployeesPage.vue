@@ -204,6 +204,7 @@ import {
   accessOf,
   assignableRoles,
   canDeactivate,
+  canEditUser,
   accountUserIssue,
   createHubUser,
   deactivateHubUser,
@@ -527,8 +528,21 @@ const staffTable = ref<DataTableElement | null>(null);
 
 function handleUserRowAction(event: Event): void {
   const { actionId, row } = (event as CustomEvent<{ actionId: string; row: Row }>).detail;
-  if (actionId === 'edit' && row.id) void router.push(`/employees/${encodeURIComponent(String(row.id))}`);
+  if (actionId === 'edit' && row.id) void editUser(String(row.id));
   if (actionId === 'delete' && row.id) void deactivateUser(row);
+}
+
+/**
+ * hub#1429 — la ficha del dueño de la cuenta solo la abre él. Espejo del guard del runtime
+ * (`hub.users.owner_row`): quien no puede guardar tampoco entra a un formulario que va a rechazarle
+ * el servidor. La autoridad sigue siendo el runtime, que revalida.
+ */
+function editUser(id: string): void {
+  if (!canEditUser(users.value, user.value?.id ?? '', id)) {
+    void toast(t('employees.ownerRowBlocked'), 'warning');
+    return;
+  }
+  void router.push(`/employees/${encodeURIComponent(id)}`);
 }
 
 function bindTable(element: DataTableElement | null, rowHandler?: (event: Event) => void): void {

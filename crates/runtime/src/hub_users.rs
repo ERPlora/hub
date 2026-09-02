@@ -190,6 +190,14 @@ pub struct HubUserRow {
     /// para el personal **solo-local** (§2.9).
     pub cloud_user_id: Option<String>,
     pub is_active: bool,
+    /// **Esta fila es la del DUEÑO de la cuenta** (hub#1429). Marca **derivada**, no un rol: la
+    /// asienta `identity::seed_owner` en cada arranque desde `HUB_OWNER_EMAIL` (el env del
+    /// aprovisionamiento, ADR-0157) y ninguna puerta HTTP la escribe. No resucita el rol `owner`
+    /// que hub#349 retiró —lo que se PUEDE sigue siendo `is_admin_role`—: dice solo **quién es el
+    /// propietario**, que siempre fue del plano de la CUENTA. `false` en todas las filas de un hub
+    /// que aún no ha arrancado con el env: no hay dueño que nombrar, así que no hay fila que
+    /// proteger.
+    pub is_account_owner: bool,
     /// `true` si puede entrar con PIN local. El owner suele entrar por Cloud, así que es `false`.
     pub has_pin: bool,
     /// `true` si lleva una **placa** enrolada (hub#658). Hermana de `has_pin`: la pantalla enseña
@@ -716,6 +724,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
             // fila trae el email vacío, así que su BAJA nunca revocaba su membresía.
             "SELECT u.id AS id, u.name AS name, u.role AS role, u.cloud_user_id AS cloud_user_id, \
                     u.is_active AS is_active, u.created_at AS created_at, \
+                    u.is_account_owner AS is_account_owner, \
                     CASE WHEN u.pin_hash IS NULL OR u.pin_hash = '' THEN 0 ELSE 1 END AS has_pin, \
                     CASE WHEN u.badge_hash IS NULL OR u.badge_hash = '' THEN 0 ELSE 1 END \
                       AS has_badge, \
@@ -744,6 +753,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
                 role: r["role"].as_str().unwrap_or_default().to_string(),
                 cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
                 is_active: truthy(&r["is_active"]),
+                is_account_owner: truthy(&r["is_account_owner"]),
                 has_pin: truthy(&r["has_pin"]),
                 has_badge: truthy(&r["has_badge"]),
                 created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
