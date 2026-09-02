@@ -577,7 +577,11 @@ mod tests {
         let got = sink.0.lock().unwrap().clone();
         assert_eq!(
             got,
-            vec!["first".to_string(), "second".to_string(), "third".to_string()],
+            vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string()
+            ],
             "el buffer debe vaciarse en el mismo orden en que se reportó"
         );
     }
@@ -749,12 +753,19 @@ mod tests {
             DemoLock::FiscalIdentity.as_str(),
         ];
         for code in codes {
-            assert!(!code.trim().is_empty(), "un cierre sin código es un 409 mudo");
+            assert!(
+                !code.trim().is_empty(),
+                "un cierre sin código es un 409 mudo"
+            );
         }
         let mut unique = codes.to_vec();
         unique.sort_unstable();
         unique.dedup();
-        assert_eq!(unique.len(), 3, "dos cierres con la misma respuesta: {codes:?}");
+        assert_eq!(
+            unique.len(),
+            3,
+            "dos cierres con la misma respuesta: {codes:?}"
+        );
     }
 
     /// `error_code_of` publica el SUJETO del cierre, no un `demo_locked` plano: es lo que viaja al
@@ -799,19 +810,31 @@ mod tests {
         for (code, err) in [
             (
                 crate::settings::INVALID_TAX_ID_TYPE,
-                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_TYPE, message: String::new() },
+                RuntimeError::InvalidTaxId {
+                    code: crate::settings::INVALID_TAX_ID_TYPE,
+                    message: String::new(),
+                },
             ),
             (
                 crate::settings::TAX_ID_TOO_LONG,
-                RuntimeError::InvalidTaxId { code: crate::settings::TAX_ID_TOO_LONG, message: String::new() },
+                RuntimeError::InvalidTaxId {
+                    code: crate::settings::TAX_ID_TOO_LONG,
+                    message: String::new(),
+                },
             ),
             (
                 crate::settings::INVALID_TAX_ID_FORMAT,
-                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_FORMAT, message: String::new() },
+                RuntimeError::InvalidTaxId {
+                    code: crate::settings::INVALID_TAX_ID_FORMAT,
+                    message: String::new(),
+                },
             ),
             (
                 crate::settings::INVALID_TAX_ID_CONTROL,
-                RuntimeError::InvalidTaxId { code: crate::settings::INVALID_TAX_ID_CONTROL, message: String::new() },
+                RuntimeError::InvalidTaxId {
+                    code: crate::settings::INVALID_TAX_ID_CONTROL,
+                    message: String::new(),
+                },
             ),
         ] {
             assert_eq!(error_code_of(&err), code, "the code IS the subject");

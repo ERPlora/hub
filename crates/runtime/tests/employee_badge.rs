@@ -50,10 +50,17 @@ const SOFIA_BADGE: &str = "4A00B7C219E3";
 #[tokio::test]
 async fn a_badge_signs_in_its_owner_without_anybody_tapping_a_name() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
-    let matched = rt.verify_badge(ANA_BADGE).await.unwrap().expect("the badge opens Ana's identity");
+    let matched = rt
+        .verify_badge(ANA_BADGE)
+        .await
+        .unwrap()
+        .expect("the badge opens Ana's identity");
 
     assert_eq!(matched.user.id, ana);
     assert_eq!(matched.user.name, "Ana");
@@ -67,7 +74,10 @@ async fn a_badge_signs_in_its_owner_without_anybody_tapping_a_name() {
 #[tokio::test]
 async fn an_unknown_badge_opens_nothing() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     assert!(rt.verify_badge("999999999").await.unwrap().is_none());
@@ -80,7 +90,10 @@ async fn an_unknown_badge_opens_nothing() {
 #[tokio::test]
 async fn the_badge_of_a_deactivated_person_opens_nothing() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
     rt.update_hub_user(
         &ana,
@@ -107,14 +120,24 @@ async fn the_badge_of_a_deactivated_person_opens_nothing() {
 #[tokio::test]
 async fn a_badge_lookup_narrows_to_one_row_before_a_single_hash_is_verified() {
     let (db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
     for n in 0..12 {
         let other = rt
-            .create_user(&format!("Colleague {n}"), &format!("47{n:02}"), "employee", None)
+            .create_user(
+                &format!("Colleague {n}"),
+                &format!("47{n:02}"),
+                "employee",
+                None,
+            )
             .await
             .unwrap();
-        rt.set_user_badge(&other, &format!("0009171{n:03}")).await.unwrap();
+        rt.set_user_badge(&other, &format!("0009171{n:03}"))
+            .await
+            .unwrap();
     }
 
     let key = rt.badge_index_key().await.unwrap();
@@ -131,7 +154,11 @@ async fn a_badge_lookup_narrows_to_one_row_before_a_single_hash_is_verified() {
         .await
         .unwrap();
 
-    assert_eq!(res.rows.len(), 1, "the index must select exactly the badge's owner");
+    assert_eq!(
+        res.rows.len(),
+        1,
+        "the index must select exactly the badge's owner"
+    );
     assert_eq!(res.rows[0]["id"].as_str().unwrap(), ana);
 }
 
@@ -171,15 +198,27 @@ async fn a_badge_of_the_business_next_door_opens_nothing_here() {
     let test_db = TestDb::new().await;
     let mine = hub_on(&test_db, "hub-mine").await;
     let neighbour = hub_on(&test_db, "hub-neighbour").await;
-    let theirs = neighbour.create_user("Ana", "4729", "admin", None).await.unwrap();
+    let theirs = neighbour
+        .create_user("Ana", "4729", "admin", None)
+        .await
+        .unwrap();
     neighbour.set_user_badge(&theirs, ANA_BADGE).await.unwrap();
-    let mine_user = mine.create_user("Bruno", "5183", "employee", None).await.unwrap();
+    let mine_user = mine
+        .create_user("Bruno", "5183", "employee", None)
+        .await
+        .unwrap();
     mine.set_user_badge(&mine_user, SOFIA_BADGE).await.unwrap();
 
     assert!(mine.verify_badge(ANA_BADGE).await.unwrap().is_none());
     // …and the neighbour is untouched: their badge still opens their hub.
     assert_eq!(
-        neighbour.verify_badge(ANA_BADGE).await.unwrap().unwrap().user.id,
+        neighbour
+            .verify_badge(ANA_BADGE)
+            .await
+            .unwrap()
+            .unwrap()
+            .user
+            .id,
         theirs
     );
 }
@@ -191,7 +230,10 @@ async fn a_badge_of_the_business_next_door_opens_nothing_here() {
 #[tokio::test]
 async fn enrolling_a_badge_leaves_the_pin_working() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     assert_eq!(rt.verify_pin("Ana", "4729").await.unwrap().unwrap().id, ana);
@@ -202,12 +244,18 @@ async fn enrolling_a_badge_leaves_the_pin_working() {
 #[tokio::test]
 async fn revoking_the_badge_does_not_touch_the_pin() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     rt.set_user_badge(&ana, "").await.unwrap();
 
-    assert!(rt.verify_badge(ANA_BADGE).await.unwrap().is_none(), "the lost card is dead");
+    assert!(
+        rt.verify_badge(ANA_BADGE).await.unwrap().is_none(),
+        "the lost card is dead"
+    );
     assert_eq!(
         rt.verify_pin("Ana", "4729").await.unwrap().unwrap().id,
         ana,
@@ -215,7 +263,10 @@ async fn revoking_the_badge_does_not_touch_the_pin() {
     );
     // A new card can be issued straight away; the old one stays dead.
     rt.set_user_badge(&ana, SOFIA_BADGE).await.unwrap();
-    assert_eq!(rt.verify_badge(SOFIA_BADGE).await.unwrap().unwrap().user.id, ana);
+    assert_eq!(
+        rt.verify_badge(SOFIA_BADGE).await.unwrap().unwrap().user.id,
+        ana
+    );
     assert!(rt.verify_badge(ANA_BADGE).await.unwrap().is_none());
 }
 
@@ -225,12 +276,18 @@ async fn revoking_the_badge_does_not_touch_the_pin() {
 #[tokio::test]
 async fn changing_the_pin_does_not_touch_the_badge() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     rt.set_pin(&ana, "5183").await.unwrap();
 
-    assert_eq!(rt.verify_badge(ANA_BADGE).await.unwrap().unwrap().user.id, ana);
+    assert_eq!(
+        rt.verify_badge(ANA_BADGE).await.unwrap().unwrap().user.id,
+        ana
+    );
 }
 
 /// Two people behind one card is the badge twin of the PIN clash, and worse: a card is lent. The
@@ -238,8 +295,14 @@ async fn changing_the_pin_does_not_touch_the_badge() {
 #[tokio::test]
 async fn a_badge_that_already_belongs_to_somebody_is_refused() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
-    let bruno = rt.create_user("Bruno", "5183", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
+    let bruno = rt
+        .create_user("Bruno", "5183", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     assert!(rt.badge_is_taken(ANA_BADGE, Some(&bruno)).await.unwrap());
@@ -256,7 +319,10 @@ async fn a_badge_that_already_belongs_to_somebody_is_refused() {
 #[tokio::test]
 async fn every_session_records_the_credential_that_opened_it() {
     let (db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
     let matched = rt.verify_badge(ANA_BADGE).await.unwrap().unwrap();
 
@@ -288,13 +354,22 @@ async fn every_session_records_the_credential_that_opened_it() {
                 .await
                 .unwrap();
             (
-                res.rows[0]["credential_kind"].as_str().unwrap_or_default().to_string(),
-                res.rows[0]["credential_ref"].as_str().unwrap_or_default().to_string(),
+                res.rows[0]["credential_kind"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                res.rows[0]["credential_ref"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
             )
         }
     };
 
-    assert_eq!(read(by_badge).await, ("badge".to_string(), matched.badge_index.clone()));
+    assert_eq!(
+        read(by_badge).await,
+        ("badge".to_string(), matched.badge_index.clone())
+    );
     assert_eq!(read(by_pin).await, ("pin".to_string(), String::new()));
 }
 
@@ -310,7 +385,10 @@ async fn every_session_records_the_credential_that_opened_it() {
 #[tokio::test]
 async fn the_pin_cannot_be_removed_from_somebody_whose_only_other_way_in_is_a_badge() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     let refused = rt
@@ -339,7 +417,10 @@ async fn the_pin_cannot_be_removed_from_somebody_whose_only_other_way_in_is_a_ba
 #[tokio::test]
 async fn removing_the_badge_and_the_pin_together_is_allowed() {
     let (_db, rt) = a_hub().await;
-    let ana = rt.create_user("Ana", "4729", "employee", None).await.unwrap();
+    let ana = rt
+        .create_user("Ana", "4729", "employee", None)
+        .await
+        .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
     rt.update_hub_user(

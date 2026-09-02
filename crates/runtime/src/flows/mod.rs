@@ -111,7 +111,11 @@ pub(crate) mod test_support {
 
     /// A declarative query, the shape the installer produces. Its `ai` block is what makes it a
     /// tool the agent runner can be offered (hub#665).
-    pub(crate) fn query(module: &str, permission: &str, sql: &str) -> crate::registry::RegisteredQuery {
+    pub(crate) fn query(
+        module: &str,
+        permission: &str,
+        sql: &str,
+    ) -> crate::registry::RegisteredQuery {
         use crate::manifest::{AiTool, QueryDef};
         crate::registry::RegisteredQuery {
             module_id: module.to_string(),

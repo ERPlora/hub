@@ -215,7 +215,10 @@ pub(crate) fn insert_op(
     p.insert("id".into(), json!(dedup_id.clone().unwrap_or_else(new_id)));
     p.insert("hub_id".into(), json!(ctx.hub_id));
     p.insert("user_id".into(), json!(ctx.user_id));
-    p.insert("permissions".into(), json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())));
+    p.insert(
+        "permissions".into(),
+        json!(serde_json::to_string(&perms).unwrap_or_else(|_| "[]".into())),
+    );
     p.insert("event_name".into(), json!(event));
     p.insert("module_id".into(), json!(module_id));
     p.insert(
@@ -225,7 +228,10 @@ pub(crate) fn insert_op(
     p.insert("depth".into(), json!(depth));
     p.insert(
         "run_id".into(),
-        json!(ctx.automation().map(|a| a.run_id.as_str()).unwrap_or_default()),
+        json!(ctx
+            .automation()
+            .map(|a| a.run_id.as_str())
+            .unwrap_or_default()),
     );
     p.insert("parent_event_id".into(), json!(ctx.parent_event_id()));
     p.insert("now".into(), json!(now));
@@ -352,7 +358,10 @@ pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry) -> Resu
                 if let Err(e) = process_row(db, registry, &row).await {
                     // `process_row` ya intentó defer/dead; si hasta eso falla (p.ej. la BD se cayó),
                     // lo dejamos para el próximo ciclo del relay y seguimos con las filas sanas.
-                    eprintln!("relay outbox: fila {}: {e}", row["id"].as_str().unwrap_or("?"));
+                    eprintln!(
+                        "relay outbox: fila {}: {e}",
+                        row["id"].as_str().unwrap_or("?")
+                    );
                 }
                 ran += 1;
             }
@@ -495,8 +504,16 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     if event_name.ends_with(REMINDER_DUE_SUFFIX) {
         let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
         let run_id = row["run_id"].as_str().unwrap_or_default().to_string();
-        if let Err(f) =
-            deliver_host_notify(db, registry, &id, &module_id, &run_id, &ctx.hub_id, &payload).await
+        if let Err(f) = deliver_host_notify(
+            db,
+            registry,
+            &id,
+            &module_id,
+            &run_id,
+            &ctx.hub_id,
+            &payload,
+        )
+        .await
         {
             failures += 1;
             permanent = f.permanent;
@@ -522,7 +539,8 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // ninguno registrado el trabajo espera (`print_hosts.rs`), no falla.
     if event_name.ends_with(PRINT_DUE_SUFFIX) {
         let module_id = row["module_id"].as_str().unwrap_or_default().to_string();
-        if let Err(e) = deliver_host_print(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
+        if let Err(e) =
+            deliver_host_print(db, registry, &id, &module_id, &ctx.hub_id, &payload).await
         {
             failures += 1;
             // The twin of the gate above (hub#1192): `printer` is the same default-deny switch, so
@@ -568,15 +586,8 @@ async fn process_row(db: &dyn DatabaseAdapter, registry: &Registry, row: &Json) 
     // cambia cuándo corren los listeners de ese mismo evento. Y un fallo aquí NO impide marcar la
     // fila entregada por lo demás: se registra como los otros (backoff/dead-letter) y los flujos
     // que sí arrancaron ya tienen su marcador.
-    if let Err(e) = crate::flows::triggers::on_event(
-        db,
-        &ctx.hub_id,
-        &id,
-        &event_name,
-        &payload,
-        depth,
-    )
-    .await
+    if let Err(e) =
+        crate::flows::triggers::on_event(db, &ctx.hub_id, &id, &event_name, &payload, depth).await
     {
         failures += 1;
         if first_err.is_none() {
@@ -1040,7 +1051,8 @@ async fn defer_or_dead(db: &dyn DatabaseAdapter, id: &str, attempts: i64, err: &
     if next >= MAX_ATTEMPTS {
         return mark_dead(db, id, err).await;
     }
-    let next_at = (chrono::Utc::now() + chrono::Duration::seconds(backoff_seconds(next))).to_rfc3339();
+    let next_at =
+        (chrono::Utc::now() + chrono::Duration::seconds(backoff_seconds(next))).to_rfc3339();
     let mut p = Params::new();
     p.insert("id".into(), json!(id));
     p.insert("attempts".into(), json!(next));
@@ -1102,7 +1114,11 @@ pub struct DeadEvent {
 }
 
 /// Dead-letters of this hub, newest first. `limit` is clamped to [`MAX_DEAD_PAGE`].
-pub async fn list_dead(db: &dyn DatabaseAdapter, hub_id: &str, limit: i64) -> Result<Vec<DeadEvent>> {
+pub async fn list_dead(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    limit: i64,
+) -> Result<Vec<DeadEvent>> {
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("status".into(), json!(STATUS_DEAD));
@@ -1121,7 +1137,12 @@ pub async fn list_dead(db: &dyn DatabaseAdapter, hub_id: &str, limit: i64) -> Re
 
 fn dead_event(row: &Json) -> DeadEvent {
     let s = |k: &str| row[k].as_str().unwrap_or_default().to_string();
-    let n = |k: &str| row[k].as_i64().or_else(|| row[k].as_f64().map(|f| f as i64)).unwrap_or(0);
+    let n = |k: &str| {
+        row[k]
+            .as_i64()
+            .or_else(|| row[k].as_f64().map(|f| f as i64))
+            .unwrap_or(0)
+    };
     let raw = s("payload");
     let failure_kind = s("failure_kind");
     DeadEvent {
@@ -1524,8 +1545,14 @@ pub async fn count_dead(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<i64> {
             &p,
         )
         .await?;
-    Ok(res.rows.first()
-        .and_then(|r| r["c"].as_i64().or_else(|| r["c"].as_f64().map(|f| f as i64)))
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| {
+            r["c"]
+                .as_i64()
+                .or_else(|| r["c"].as_f64().map(|f| f as i64))
+        })
         .unwrap_or(0))
 }
 
@@ -1699,7 +1726,10 @@ mod tests {
 
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
-        r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
+        r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1)
     }
 
     /// El command emisor NO corre el listener inline (entrega asíncrona); el relay lo entrega
@@ -1707,24 +1737,41 @@ mod tests {
     #[tokio::test]
     async fn outbox_async_delivery_is_exactly_once() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         // Módulo "m" activo: "m.fire" emite "e"; "m.append" (listener de "e") inserta n=1.
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
-        reg.commands.insert("m.append".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
-        reg.commands
-            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.commands.insert(
+            "m.append".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.commands.insert(
+            "m.fire".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]),
+        );
         reg.listeners.insert("e".into(), vec!["m.append".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
 
         // Emisor: inserta su fila (99) + persiste el evento en el outbox, pero NO corre el listener.
-        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 0, "listener no inline");
+        crate::commands::execute(&db, &reg, "m.fire", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            0,
+            "listener no inline"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
             1,
             "evento pendiente en outbox"
         );
@@ -1733,13 +1780,21 @@ mod tests {
         drain(&db, &reg).await.unwrap();
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1
         );
 
         // Idempotencia: re-drenar no re-ejecuta el listener.
         drain(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1, "idempotente");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "idempotente"
+        );
     }
 
     /// hub#131/#145: un listener marcado INTERNO por convención (último segmento `_`, estilo real
@@ -1749,26 +1804,45 @@ mod tests {
     #[tokio::test]
     async fn relay_delivers_to_an_underscore_prefixed_internal_listener() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; "cash_register._reverse_sale" (interno, sin
         // `expose_api`) es su listener, como en el caso real (void_reversal_e2e.rs).
         let mut reg = Registry::new();
         reg.status.insert("sales".into(), ModuleStatus::Active);
-        reg.status.insert("cash_register".into(), ModuleStatus::Active);
+        reg.status
+            .insert("cash_register".into(), ModuleStatus::Active);
         reg.commands.insert(
             "cash_register._reverse_sale".into(),
             cmd("cash_register", "INSERT INTO t (n) VALUES (1);", vec![]),
         );
         reg.commands.insert(
             "sales.void".into(),
-            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+            cmd(
+                "sales",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["sale.voided".into()],
+            ),
         );
-        reg.listeners.insert("sale.voided".into(), vec!["cash_register._reverse_sale".into()]);
+        reg.listeners.insert(
+            "sale.voided".into(),
+            vec!["cash_register._reverse_sale".into()],
+        );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx, &Grants::new()).await.unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.void",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
 
         drain(&db, &reg).await.unwrap();
         assert_eq!(
@@ -1782,8 +1856,12 @@ mod tests {
     /// el outbox. Necesaria desde hub#240: `host.notify` consulta grants y ajustes del hub.
     async fn db_for_notify() -> PgAdapter {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
         ensure_tables(&db).await.unwrap();
@@ -1805,7 +1883,11 @@ mod tests {
             .push(serde_json::from_str(manifest_json).unwrap());
         reg.commands.insert(
             "appt.remind".into(),
-            cmd("appt", "INSERT INTO t (n) VALUES (1);", vec!["appt.reminder.due".into()]),
+            cmd(
+                "appt",
+                "INSERT INTO t (n) VALUES (1);",
+                vec!["appt.reminder.due".into()],
+            ),
         );
         reg
     }
@@ -1852,10 +1934,20 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
-        assert!(transport.sent().is_empty(), "no se envía inline; va por el relay");
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        assert!(
+            transport.sent().is_empty(),
+            "no se envía inline; va por el relay"
+        );
 
         // Relay: entrega el evento → el transporte recibe la intención una vez.
         drain(&db, &reg).await.unwrap();
@@ -1863,15 +1955,27 @@ mod tests {
         assert_eq!(sent.len(), 1, "una entrega por el listener-host");
         assert_eq!(sent[0].0.channel, Channel::Email);
         assert_eq!(sent[0].0.to, "cliente@x.com");
-        assert_eq!(sent[0].1, Routing::Tenant, "email = canal del tenant (secreto local)");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            sent[0].1,
+            Routing::Tenant,
+            "email = canal del tenant (secreto local)"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
             1
         );
 
         // Idempotencia: re-drenar no re-envía.
         drain(&db, &reg).await.unwrap();
-        assert_eq!(transport.sent().len(), 1, "idempotente (marcador host.notify)");
+        assert_eq!(
+            transport.sent().len(),
+            1,
+            "idempotente (marcador host.notify)"
+        );
     }
 
     /// **hub#240 — el agujero.** Un módulo SIN la capability `notify` concedida emite su
@@ -1888,9 +1992,16 @@ mod tests {
         reg.notify_transport = Some(transport.clone());
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
 
         assert!(
@@ -1898,7 +2009,11 @@ mod tests {
             "sin grant de `notify` no puede salir NADA del hub"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.notify'"
+            )
+            .await,
             0,
             "no hay entrega que marcar"
         );
@@ -1924,7 +2039,8 @@ mod tests {
             &reg,
             "appt.remind",
             &reminder_payload("atacante@evil.com"),
-            &ctx, &Grants::new(),
+            &ctx,
+            &Grants::new(),
         )
         .await
         .unwrap();
@@ -1950,14 +2066,32 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
 
         // Primer ciclo: el envío falla → la fila se difiere (sigue 'pending', attempts=1, no 'dead').
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await, 1);
-        assert_eq!(count(&db, "SELECT attempts AS c FROM _event_outbox").await, 1, "1 intento fallido");
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
+            1
+        );
+        assert_eq!(
+            count(&db, "SELECT attempts AS c FROM _event_outbox").await,
+            1,
+            "1 intento fallido"
+        );
 
         // Simula que ya agotó los reintentos (sin esperar el backoff real): attempts justo por
         // debajo del tope + vencido. El siguiente fallo lo manda a dead-letter.
@@ -1970,7 +2104,15 @@ mod tests {
         .await
         .unwrap();
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await, 1, "dead-letter");
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
+            1,
+            "dead-letter"
+        );
     }
 
     /// Queues a message the way `flows::notify` does: **no module, a run, and the release the grant
@@ -2049,17 +2191,29 @@ mod tests {
 
         assert!(transport.sent().is_empty(), "revoking has to stop the send");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             1,
             "a revoked release is terminal on the first pass, not after eight"
         );
         assert_eq!(
-            count(&db, "SELECT attempts AS c FROM _event_outbox WHERE id='ev-1'").await,
+            count(
+                &db,
+                "SELECT attempts AS c FROM _event_outbox WHERE id='ev-1'"
+            )
+            .await,
             0,
             "no retry ladder was climbed against an answer that is not coming back"
         );
         assert_eq!(
-            one_text(&db, "SELECT failure_kind AS c FROM _event_outbox WHERE id='ev-1'").await,
+            one_text(
+                &db,
+                "SELECT failure_kind AS c FROM _event_outbox WHERE id='ev-1'"
+            )
+            .await,
             FAILURE_RELEASE_REVOKED,
             "the queue records WHY, so the screen and the retry do not have to guess"
         );
@@ -2143,7 +2297,11 @@ mod tests {
             other => panic!("a retry that can never work must be refused, got {other:?}"),
         }
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             1,
             "and the row stays where it was, not back on the relay"
         );
@@ -2175,7 +2333,9 @@ mod tests {
     #[tokio::test]
     async fn one_failing_listener_does_not_block_sibling_listeners() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         // "sales.void" emite "sale.voided"; dos listeners: "bad" (revienta: columna inexistente)
@@ -2196,7 +2356,11 @@ mod tests {
         );
         reg.commands.insert(
             "sales.void".into(),
-            cmd("sales", "INSERT INTO t (n) VALUES (99);", vec!["sale.voided".into()]),
+            cmd(
+                "sales",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["sale.voided".into()],
+            ),
         );
         reg.listeners.insert(
             "sale.voided".into(),
@@ -2204,7 +2368,16 @@ mod tests {
         );
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "sales.void", &Params::new(), &ctx, &Grants::new()).await.unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "sales.void",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
 
         // Un solo ciclo del relay: "good.listener" se entrega AUNQUE "bad.listener" falla antes.
         process_once(&db, &reg).await.unwrap();
@@ -2215,18 +2388,30 @@ mod tests {
         );
         // La entrega del bueno queda marcada (idempotente); la del malo, no.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='good.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='good.listener'"
+            )
+            .await,
             1,
             "el listener bueno quedó marcado como entregado"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='bad.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='bad.listener'"
+            )
+            .await,
             0,
             "el listener malo NO se marcó (falló) → se reintenta"
         );
         // La fila NO se marca 'delivered' (un listener falló): queda diferida para reintento.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending'"
+            )
+            .await,
             1,
             "la fila se difiere (no delivered) porque un listener falló"
         );
@@ -2240,7 +2425,9 @@ mod tests {
         // (marcador de idempotencia). El contrato at-least-once + idempotencia por listener se mantiene.
         let mut p = Params::new();
         p.insert("a".into(), json!("2020-01-01T00:00:00+00:00"));
-        db.execute("UPDATE _event_outbox SET next_attempt_at = :a", &p).await.unwrap();
+        db.execute("UPDATE _event_outbox SET next_attempt_at = :a", &p)
+            .await
+            .unwrap();
         process_once(&db, &reg).await.unwrap();
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
@@ -2259,7 +2446,9 @@ mod tests {
     #[tokio::test]
     async fn one_failing_row_does_not_starve_later_rows_in_the_batch() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         // "poison.fire" emite "poison.e" cuyo ÚNICO listener revienta (columna inexistente).
@@ -2271,7 +2460,11 @@ mod tests {
         }
         reg.commands.insert(
             "poison.listener".into(),
-            cmd("poison", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
+            cmd(
+                "poison",
+                "INSERT INTO t (no_such_column) VALUES (1);",
+                vec![],
+            ),
         );
         reg.commands.insert(
             "ok.listener".into(),
@@ -2279,18 +2472,35 @@ mod tests {
         );
         reg.commands.insert(
             "poison.fire".into(),
-            cmd("poison", "INSERT INTO t (n) VALUES (99);", vec!["poison.e".into()]),
+            cmd(
+                "poison",
+                "INSERT INTO t (n) VALUES (99);",
+                vec!["poison.e".into()],
+            ),
         );
         reg.commands.insert(
             "ok.fire".into(),
             cmd("ok", "INSERT INTO t (n) VALUES (99);", vec!["ok.e".into()]),
         );
-        reg.listeners.insert("poison.e".into(), vec!["poison.listener".into()]);
-        reg.listeners.insert("ok.e".into(), vec!["ok.listener".into()]);
+        reg.listeners
+            .insert("poison.e".into(), vec!["poison.listener".into()]);
+        reg.listeners
+            .insert("ok.e".into(), vec!["ok.listener".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "poison.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
-        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx, &Grants::new()).await.unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "poison.fire",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        crate::commands::execute(&db, &reg, "ok.fire", &Params::new(), &ctx, &Grants::new())
+            .await
+            .unwrap();
 
         // Un solo ciclo del relay procesa AMBAS filas (BATCH=50). La venenosa falla y se difiere;
         // la sana se entrega igual. Sin el fix, "ok.listener" no correría (n=1 sería 0 aquí).
@@ -2301,7 +2511,11 @@ mod tests {
             "la fila sana se entrega aunque la venenosa (anterior en el lote) falle (hub#142)"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='ok.listener'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='ok.listener'"
+            )
+            .await,
             1,
             "la entrega de la fila sana queda marcada"
         );
@@ -2425,7 +2639,10 @@ mod tests {
         // `now` is past the lease: the row is reclaimable.
         let now = "2026-01-01T00:00:00+00:00";
         let claimed = claim_next_due(&db, now).await.unwrap();
-        assert!(claimed.is_some(), "an expired lease is reclaimed (orphan recovery)");
+        assert!(
+            claimed.is_some(),
+            "an expired lease is reclaimed (orphan recovery)"
+        );
         assert_eq!(claimed.as_ref().unwrap()["id"].as_str(), Some("evt-1"));
     }
 
@@ -2440,7 +2657,9 @@ mod tests {
     /// cashier's role). What is left is what will always be left: a listener that is simply broken.
     async fn hub_with_a_dead_letter() -> (PgAdapter, Registry) {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         let mut reg = Registry::new();
@@ -2451,8 +2670,10 @@ mod tests {
             "m.apply".into(),
             cmd("m", "INSERT INTO t (no_such_column) VALUES (1);", vec![]),
         );
-        reg.commands
-            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.commands.insert(
+            "m.fire".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]),
+        );
         reg.listeners.insert("e".into(), vec!["m.apply".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
@@ -2474,7 +2695,11 @@ mod tests {
         .unwrap();
         process_once(&db, &reg).await.unwrap();
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             1,
             "fixture precondition: the event is dead-lettered"
         );
@@ -2524,15 +2749,21 @@ mod tests {
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 0);
 
         // The operator fixes the cause (here: the listener now works) and replays the event.
-        reg.commands
-            .insert("m.apply".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
+        reg.commands.insert(
+            "m.apply".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
         assert_eq!(
             retry(&db, "h1", &dead_id(&db).await).await.unwrap(),
             RetryOutcome::Requeued,
             "the row was requeued"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=0").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=0"
+            )
+            .await,
             1,
             "back to pending with a fresh attempt budget"
         );
@@ -2544,13 +2775,19 @@ mod tests {
             "the listener finally runs: the retry is a real delivery, not a status change"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1
         );
 
         // Only a dead-letter is replayable: replaying a delivered row is not an operator gesture.
         assert_eq!(
-            retry(&db, "h1", &id_of(&db, "delivered").await).await.unwrap(),
+            retry(&db, "h1", &id_of(&db, "delivered").await)
+                .await
+                .unwrap(),
             RetryOutcome::NotFound
         );
     }
@@ -2563,7 +2800,9 @@ mod tests {
         let (db, mut reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
 
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "")
+            .await
+            .unwrap());
 
         // The row is conserved, with its audit stamp.
         let mut p = Params::new();
@@ -2580,9 +2819,13 @@ mod tests {
         assert_eq!(rows.len(), 1, "the row is CONSERVED, never deleted");
         assert_eq!(rows[0]["status"].as_str(), Some(STATUS_DISCARDED));
         assert_eq!(rows[0]["discarded_by"].as_str(), Some("hub_user:admin-1"));
-        assert!(rows[0]["discarded_at"].as_str().is_some_and(|s| !s.is_empty()));
+        assert!(rows[0]["discarded_at"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty()));
         assert!(
-            rows[0]["payload"].as_str().is_some_and(|s| s.contains("F2-1")),
+            rows[0]["payload"]
+                .as_str()
+                .is_some_and(|s| s.contains("F2-1")),
             "the payload survives for inspection"
         );
 
@@ -2595,11 +2838,16 @@ mod tests {
         .await
         .unwrap();
         assert!(
-            claim_next_due(&db, "2026-01-01T00:00:00+00:00").await.unwrap().is_none(),
+            claim_next_due(&db, "2026-01-01T00:00:00+00:00")
+                .await
+                .unwrap()
+                .is_none(),
             "the relay never claims a discarded row"
         );
-        reg.commands
-            .insert("m.apply".into(), cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]));
+        reg.commands.insert(
+            "m.apply".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
         drain(&db, &reg).await.unwrap();
         assert_eq!(
             count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
@@ -2616,11 +2864,17 @@ mod tests {
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
         let rows = db
-            .query("SELECT discard_reason FROM _event_outbox WHERE id = :id", &p)
+            .query(
+                "SELECT discard_reason FROM _event_outbox WHERE id = :id",
+                &p,
+            )
             .await
             .unwrap()
             .rows;
-        rows[0]["discard_reason"].as_str().unwrap_or_default().to_string()
+        rows[0]["discard_reason"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string()
     }
 
     /// **A decision that does not say WHY is half a record** (hub#955).
@@ -2662,7 +2916,9 @@ mod tests {
     async fn a_discard_reason_is_optional_and_bounded() {
         let (db, _reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "   ").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "   ")
+            .await
+            .unwrap());
         assert_eq!(
             reason_of(&db, &id).await,
             "",
@@ -2674,14 +2930,19 @@ mod tests {
         let (db2, _reg2) = hub_with_a_dead_letter().await;
         let id2 = dead_id(&db2).await;
         let essay = "é".repeat(MAX_DISCARD_REASON + 50);
-        assert!(discard(&db2, "h1", &id2, "hub_user:admin-1", &essay).await.unwrap());
+        assert!(discard(&db2, "h1", &id2, "hub_user:admin-1", &essay)
+            .await
+            .unwrap());
         let stored = reason_of(&db2, &id2).await;
         assert_eq!(
             stored.chars().count(),
             MAX_DISCARD_REASON,
             "the stored reason is capped at {MAX_DISCARD_REASON} characters"
         );
-        assert!(stored.chars().all(|c| c == 'é'), "and cut where a character ends");
+        assert!(
+            stored.chars().all(|c| c == 'é'),
+            "and cut where a character ends"
+        );
     }
 
     /// Neither gesture crosses hubs, and neither invents a row: an unknown id is simply `false`.
@@ -2695,11 +2956,22 @@ mod tests {
             RetryOutcome::NotFound,
             "another hub cannot replay it"
         );
-        assert!(!discard(&db, "other-hub", &id, "hub_user:x", "").await.unwrap());
-        assert_eq!(retry(&db, "h1", "no-such-event").await.unwrap(), RetryOutcome::NotFound);
-        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x", "").await.unwrap());
+        assert!(!discard(&db, "other-hub", &id, "hub_user:x", "")
+            .await
+            .unwrap());
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            retry(&db, "h1", "no-such-event").await.unwrap(),
+            RetryOutcome::NotFound
+        );
+        assert!(!discard(&db, "h1", "no-such-event", "hub_user:x", "")
+            .await
+            .unwrap());
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             1,
             "the dead-letter is untouched"
         );
@@ -2754,7 +3026,10 @@ mod tests {
         let (db, _reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
 
-        assert!(list_discarded(&db, "h1", 50).await.unwrap().is_empty(), "nothing closed yet");
+        assert!(
+            list_discarded(&db, "h1", 50).await.unwrap().is_empty(),
+            "nothing closed yet"
+        );
 
         assert!(discard(
             &db,
@@ -2798,7 +3073,9 @@ mod tests {
     async fn discarded_list_is_scoped_to_this_hub_hub1117() {
         let (db, _reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "nuestra").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "nuestra")
+            .await
+            .unwrap());
         seed_foreign_discarded(&db, "other-hub", "evt-neighbour", "la del vecino").await;
 
         let ours = list_discarded(&db, "h1", 50).await.unwrap();
@@ -2821,16 +3098,25 @@ mod tests {
     async fn the_discarded_listing_is_newest_first_and_capped_hub1117() {
         let (db, _reg) = hub_with_a_dead_letter().await;
         let id = dead_id(&db).await;
-        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "la reciente").await.unwrap());
+        assert!(discard(&db, "h1", &id, "hub_user:admin-1", "la reciente")
+            .await
+            .unwrap());
         // An older closure of THIS hub, stamped a month before the one above.
         seed_foreign_discarded(&db, "h1", "evt-older", "la antigua").await;
 
         let closed = list_discarded(&db, "h1", 50).await.unwrap();
         assert_eq!(closed.len(), 2);
-        assert_eq!(closed[0].discard_reason, "la reciente", "newest closure first");
+        assert_eq!(
+            closed[0].discard_reason, "la reciente",
+            "newest closure first"
+        );
         assert_eq!(closed[1].discard_reason, "la antigua");
 
-        assert_eq!(list_discarded(&db, "h1", 1).await.unwrap().len(), 1, "the limit is honoured");
+        assert_eq!(
+            list_discarded(&db, "h1", 1).await.unwrap().len(),
+            1,
+            "the limit is honoured"
+        );
         assert_eq!(
             list_discarded(&db, "h1", i64::MAX).await.unwrap().len(),
             2,
@@ -2897,8 +3183,10 @@ mod tests {
                 vec![],
             ),
         );
-        reg.listeners
-            .insert("sale.completed".into(), vec!["inventory.stock.decrease_on_sale".into()]);
+        reg.listeners.insert(
+            "sale.completed".into(),
+            vec!["inventory.stock.decrease_on_sale".into()],
+        );
 
         // The cashier: may sell, may look at the catalogue, may not edit it.
         let cashier = RequestContext::new(
@@ -2937,12 +3225,20 @@ mod tests {
             "the stock came down: reacting to the sale is the MODULE's decision, not the cashier's"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1,
             "the event is delivered, not deferred"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='dead'"
+            )
+            .await,
             0,
             "no dead-letter: this was the structural one that hid a fiscal breach"
         );
@@ -2968,7 +3264,11 @@ mod tests {
         drain(&db, &reg).await.unwrap();
 
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM stock_moves WHERE hub_id = 'h1'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM stock_moves WHERE hub_id = 'h1'"
+            )
+            .await,
             1,
             "the tenant of the emitter, never a system-wide or empty hub_id"
         );
@@ -3052,8 +3352,10 @@ mod tests {
                 vec![],
             ),
         );
-        reg.listeners
-            .insert("invoice.created".into(), vec!["verifactu.records.ingest_invoice".into()]);
+        reg.listeners.insert(
+            "invoice.created".into(),
+            vec!["verifactu.records.ingest_invoice".into()],
+        );
 
         // No business identity configured in this hub — the precondition the gate exists for.
         let cashier = RequestContext::new("h1", "hub_user:ana", ["sales.add_sale".to_string()]);
@@ -3131,9 +3433,15 @@ mod tests {
 
         let mut payload = Params::new();
         payload.insert("from".into(), json!("34600999888"));
-        let fresh = insert_core_event_once(&db, "wa-wamid.1", "hub-7", "hub.whatsapp.message_received", &payload)
-            .await
-            .unwrap();
+        let fresh = insert_core_event_once(
+            &db,
+            "wa-wamid.1",
+            "hub-7",
+            "hub.whatsapp.message_received",
+            &payload,
+        )
+        .await
+        .unwrap();
         assert!(fresh, "the first write of an id is a new event");
 
         let rows = db
@@ -3144,7 +3452,10 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["id"], json!("wa-wamid.1"));
         assert_eq!(rows[0]["hub_id"], json!("hub-7"));
-        assert_eq!(rows[0]["event_name"], json!("hub.whatsapp.message_received"));
+        assert_eq!(
+            rows[0]["event_name"],
+            json!("hub.whatsapp.message_received")
+        );
         assert_eq!(rows[0]["status"], json!("pending"));
         assert_eq!(
             rows[0]["payload"].as_str().unwrap(),
@@ -3162,7 +3473,9 @@ mod tests {
 
         let mut first = Params::new();
         first.insert("text".into(), json!("is the table free?"));
-        assert!(insert_core_event_once(&db, "wa-wamid.1", "h", "e", &first).await.unwrap());
+        assert!(insert_core_event_once(&db, "wa-wamid.1", "h", "e", &first)
+            .await
+            .unwrap());
 
         // A redelivery of the SAME message: different payload on purpose — the id decides, and the
         // row that is already there must not be overwritten either.
@@ -3178,8 +3491,15 @@ mod tests {
             .await
             .unwrap()
             .rows;
-        assert_eq!(rows.len(), 1, "exactly one event, however many times it arrives");
-        assert_eq!(rows[0]["payload"].as_str().unwrap(), r#"{"text":"is the table free?"}"#);
+        assert_eq!(
+            rows.len(),
+            1,
+            "exactly one event, however many times it arrives"
+        );
+        assert_eq!(
+            rows[0]["payload"].as_str().unwrap(),
+            r#"{"text":"is the table free?"}"#
+        );
     }
 
     /// A duplicate must not resurrect an event the relay already delivered: `ON CONFLICT DO
@@ -3189,17 +3509,25 @@ mod tests {
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
 
-        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new())
+            .await
+            .unwrap();
         mark_delivered(&db, "wa-1").await.unwrap();
 
-        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new()).await.unwrap();
+        insert_core_event_once(&db, "wa-1", "h", "e", &Params::new())
+            .await
+            .unwrap();
         let rows = db
             .query("SELECT status FROM _event_outbox", &Params::new())
             .await
             .unwrap()
             .rows;
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0]["status"], json!("delivered"), "still delivered, not pending again");
+        assert_eq!(
+            rows[0]["status"],
+            json!("delivered"),
+            "still delivered, not pending again"
+        );
     }
 
     /// Delivery contract of a host-emitted event (ADR-0288): it reaches the listening module's
@@ -3209,7 +3537,9 @@ mod tests {
     #[tokio::test]
     async fn a_core_event_is_delivered_to_its_listeners_with_no_emitting_user() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         // The WHOLE system schema, not just the outbox's two tables: this test DRAINS, and since
         // hub#661 the relay asks `_flow_triggers` whether the event it just delivered starts a
         // flow. With half a schema that question errors, the row is deferred instead of delivered,
@@ -3218,14 +3548,24 @@ mod tests {
 
         let mut reg = Registry::new();
         reg.status.insert("wa".into(), ModuleStatus::Active);
-        reg.commands
-            .insert("wa.on_message".into(), cmd("wa", "INSERT INTO t (n) VALUES (1);", vec![]));
-        reg.listeners
-            .insert("hub.whatsapp.message_received".into(), vec!["wa.on_message".into()]);
+        reg.commands.insert(
+            "wa.on_message".into(),
+            cmd("wa", "INSERT INTO t (n) VALUES (1);", vec![]),
+        );
+        reg.listeners.insert(
+            "hub.whatsapp.message_received".into(),
+            vec!["wa.on_message".into()],
+        );
 
-        insert_core_event_once(&db, "wa-1", "h", "hub.whatsapp.message_received", &Params::new())
-            .await
-            .unwrap();
+        insert_core_event_once(
+            &db,
+            "wa-1",
+            "h",
+            "hub.whatsapp.message_received",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
 
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
@@ -3234,7 +3574,11 @@ mod tests {
             .await
             .unwrap()
             .rows;
-        assert_eq!(rows[0]["user_id"], json!(""), "nobody in this hub caused it");
+        assert_eq!(
+            rows[0]["user_id"],
+            json!(""),
+            "nobody in this hub caused it"
+        );
         assert_eq!(rows[0]["status"], json!("delivered"));
     }
 
@@ -3248,7 +3592,9 @@ mod tests {
     #[tokio::test]
     async fn a_cascade_event_names_the_event_whose_delivery_caused_it() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         // "m.fire" emits "e"; its listener "m.append" emits "f" — a two-link chain.
@@ -3258,8 +3604,10 @@ mod tests {
             "m.append".into(),
             cmd("m", "INSERT INTO t (n) VALUES (1);", vec!["f".into()]),
         );
-        reg.commands
-            .insert("m.fire".into(), cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]));
+        reg.commands.insert(
+            "m.fire".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (99);", vec!["e".into()]),
+        );
         reg.listeners.insert("e".into(), vec!["m.append".into()]);
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
@@ -3345,9 +3693,15 @@ mod tests {
             sql_a.ends_with(" ON CONFLICT (id) DO NOTHING"),
             "a keyed emission is absorbed on conflict"
         );
-        assert_ne!(p_a["id"], p_b["id"], "the same key in two hubs is two events, never one");
+        assert_ne!(
+            p_a["id"], p_b["id"],
+            "the same key in two hubs is two events, never one"
+        );
         let (_, p_a2) = insert_op(&a, "m", "m.e", &payload, 0, Some("wa_message_id"));
-        assert_eq!(p_a["id"], p_a2["id"], "the same key in the same hub is the same row");
+        assert_eq!(
+            p_a["id"], p_a2["id"],
+            "the same key in the same hub is the same row"
+        );
         assert_eq!(p_a["id"], json!("dedup:hub-a:m:m.e:wamid.X"));
     }
 
@@ -3364,8 +3718,14 @@ mod tests {
         for field in ["absent", "nil", "list", "obj"] {
             let (sql_1, p_1) = insert_op(&ctx, "m", "m.e", &payload, 0, Some(field));
             let (_, p_2) = insert_op(&ctx, "m", "m.e", &payload, 0, Some(field));
-            assert!(!sql_1.contains("ON CONFLICT"), "`{field}`: no key, no conflict clause");
-            assert_ne!(p_1["id"], p_2["id"], "`{field}`: each emission keeps its own fresh id");
+            assert!(
+                !sql_1.contains("ON CONFLICT"),
+                "`{field}`: no key, no conflict clause"
+            );
+            assert_ne!(
+                p_1["id"], p_2["id"],
+                "`{field}`: each emission keeps its own fresh id"
+            );
             assert!(
                 !p_1["id"].as_str().unwrap_or_default().starts_with("dedup:"),
                 "`{field}`: an unresolvable key derives no dedup id at all"
@@ -3429,7 +3789,10 @@ mod tests {
         seed_row(&db, "dc", "h1", STATUS_DISCARDED).await;
 
         let moved = retry_all(&db, "h1").await.unwrap();
-        assert_eq!(moved, 3, "only this hub's dead rows move (not h2, not delivered/discarded)");
+        assert_eq!(
+            moved, 3,
+            "only this hub's dead rows move (not h2, not delivered/discarded)"
+        );
 
         // The three dead rows are now pending, fresh budget, lease cleared, error wiped.
         assert_eq!(
@@ -3439,25 +3802,40 @@ mod tests {
         );
         // The foreign hub's dead row is untouched (tenancy).
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='fx' AND status='dead'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='fx' AND status='dead'"
+            )
+            .await,
             1,
             "another hub's dead-letter is not revived"
         );
         // The delivered/discarded rows stayed where they were.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='ok' AND status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='ok' AND status='delivered'"
+            )
+            .await,
             1,
             "a delivered row is not an operator gesture — untouched"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='dc' AND status='discarded'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE id='dc' AND status='discarded'"
+            )
+            .await,
             1,
             "a discarded row is a closed decision — untouched"
         );
 
         // Idempotent: a second call moves nothing (no dead rows left).
         let moved_again = retry_all(&db, "h1").await.unwrap();
-        assert_eq!(moved_again, 0, "retry-all is idempotent — the queue is already clear");
+        assert_eq!(
+            moved_again, 0,
+            "retry-all is idempotent — the queue is already clear"
+        );
     }
 
     /// `count_dead` is the cheap number the topbar bell polls. It counts ONLY `dead` rows of this
@@ -3480,12 +3858,24 @@ mod tests {
             2,
             "only this hub's dead rows (not h2, not delivered/pending/discarded)"
         );
-        assert_eq!(count_dead(&db, "h2").await.unwrap(), 1, "the foreign hub sees its own");
-        assert_eq!(count_dead(&db, "lonely").await.unwrap(), 0, "an empty hub has zero");
+        assert_eq!(
+            count_dead(&db, "h2").await.unwrap(),
+            1,
+            "the foreign hub sees its own"
+        );
+        assert_eq!(
+            count_dead(&db, "lonely").await.unwrap(),
+            0,
+            "an empty hub has zero"
+        );
 
         // The bell drops to zero once the admin clears the queue.
         retry_all(&db, "h1").await.unwrap();
-        assert_eq!(count_dead(&db, "h1").await.unwrap(), 0, "the bell clears when nothing is dead");
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            0,
+            "the bell clears when nothing is dead"
+        );
     }
 
     // ── Listener-host de `host.print` (hub#957) ─────────────────────────────────────────────
@@ -3515,7 +3905,11 @@ mod tests {
         );
         reg.commands.insert(
             "labels.print".into(),
-            cmd("labels", "INSERT INTO t (n) VALUES (1);", vec!["labels.print.due".into()]),
+            cmd(
+                "labels",
+                "INSERT INTO t (n) VALUES (1);",
+                vec!["labels.print.due".into()],
+            ),
         );
         reg
     }
@@ -3538,7 +3932,9 @@ mod tests {
     }
 
     async fn queued_jobs(db: &PgAdapter) -> Vec<crate::print_queue::PrintJob> {
-        crate::print_queue::list(db, "h1", None, None, 50).await.unwrap()
+        crate::print_queue::list(db, "h1", None, None, 50)
+            .await
+            .unwrap()
     }
 
     /// **El hueco de hub#957 cerrado.** Un evento `*.print.due` de un módulo con la capability
@@ -3551,10 +3947,20 @@ mod tests {
         authorize_print(&db, &reg).await;
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
-            .await
-            .unwrap();
-        assert!(queued_jobs(&db).await.is_empty(), "no se encola inline; va por el relay");
+        crate::commands::execute(
+            &db,
+            &reg,
+            "labels.print",
+            &print_payload("job-1"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
+        assert!(
+            queued_jobs(&db).await.is_empty(),
+            "no se encola inline; va por el relay"
+        );
 
         drain(&db, &reg).await.unwrap();
         let jobs = queued_jobs(&db).await;
@@ -3563,16 +3969,28 @@ mod tests {
         assert_eq!(jobs[0].role, "receipt");
         assert_eq!(jobs[0].document_type, "barcode_label");
         assert_eq!(jobs[0].document["sku"], json!("A-1"));
-        assert_eq!(jobs[0].format, crate::print_queue::FORMAT_RECEIPT, "formato por defecto");
+        assert_eq!(
+            jobs[0].format,
+            crate::print_queue::FORMAT_RECEIPT,
+            "formato por defecto"
+        );
         assert_eq!(jobs[0].status, crate::print_queue::STATUS_PENDING);
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'"
+            )
+            .await,
             1
         );
 
         // Idempotencia del relay: re-drenar no encola un segundo tique.
         drain(&db, &reg).await.unwrap();
-        assert_eq!(queued_jobs(&db).await.len(), 1, "idempotente (marcador host.print)");
+        assert_eq!(
+            queued_jobs(&db).await.len(),
+            1,
+            "idempotente (marcador host.print)"
+        );
     }
 
     /// **Default-deny, como `notify`.** El módulo declara `printer` pero NADIE se la concede: el
@@ -3583,9 +4001,16 @@ mod tests {
         let reg = registry_for_print();
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "labels.print",
+            &print_payload("job-1"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
 
         assert!(
@@ -3593,7 +4018,11 @@ mod tests {
             "sin grant de `printer` no se encola nada"
         );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_delivery WHERE listener_command='host.print'"
+            )
+            .await,
             0,
             "no hay entrega que marcar"
         );
@@ -3610,7 +4039,10 @@ mod tests {
 
         let mut p = Params::new();
         p.insert("id".into(), json!("ev-1"));
-        p.insert("payload".into(), json!(Json::Object(print_payload("job-1")).to_string()));
+        p.insert(
+            "payload".into(),
+            json!(Json::Object(print_payload("job-1")).to_string()),
+        );
         p.insert("at".into(), json!("2020-01-01T00:00:00+00:00"));
         db.execute(
             "INSERT INTO _event_outbox \
@@ -3632,9 +4064,12 @@ mod tests {
         // igual con la puerta borrada (la de capability también rechaza un módulo vacío), y el
         // mensaje que un operador lee en el dead-letter diría otra cosa.
         assert!(
-            one_text(&db, "SELECT last_error AS c FROM _event_outbox WHERE id='ev-1'")
-                .await
-                .contains("sin módulo emisor atribuido"),
+            one_text(
+                &db,
+                "SELECT last_error AS c FROM _event_outbox WHERE id='ev-1'"
+            )
+            .await
+            .contains("sin módulo emisor atribuido"),
             "el error nombra la atribución que falta, no una capability de nadie"
         );
     }
@@ -3649,9 +4084,16 @@ mod tests {
         authorize_print(&db, &reg).await;
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "labels.print",
+            &print_payload("job-1"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         let mut second = print_payload("job-1");
         second.insert("document".into(), json!({ "sku": "OTRO" }));
         crate::commands::execute(&db, &reg, "labels.print", &second, &ctx, &Grants::new())
@@ -3661,10 +4103,18 @@ mod tests {
 
         let jobs = queued_jobs(&db).await;
         assert_eq!(jobs.len(), 1, "el mismo jobId es un solo trabajo");
-        assert_eq!(jobs[0].document["sku"], json!("A-1"), "el duplicado no reescribe el documento");
+        assert_eq!(
+            jobs[0].document["sku"],
+            json!("A-1"),
+            "el duplicado no reescribe el documento"
+        );
         // Las DOS filas de outbox quedan entregadas: la segunda no es un fallo, es un duplicado.
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             2
         );
     }
@@ -3680,16 +4130,31 @@ mod tests {
         authorize_print(&db, &reg).await;
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "labels.print",
+            &print_payload("job-1"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
 
         let jobs = queued_jobs(&db).await;
         assert_eq!(jobs.len(), 1);
-        assert_eq!(jobs[0].status, crate::print_queue::STATUS_PENDING, "espera, no muere");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            jobs[0].status,
+            crate::print_queue::STATUS_PENDING,
+            "espera, no muere"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1,
             "la fila del evento queda entregada: encolar ES la entrega, imprimir es del host"
         );
@@ -3698,7 +4163,10 @@ mod tests {
         assert_eq!(coverage.len(), 1);
         assert_eq!(coverage[0].role, "receipt");
         assert_eq!(coverage[0].waiting, 1);
-        assert_eq!(coverage[0].live_hosts, 0, "nadie imprime `receipt` y hay trabajo esperando");
+        assert_eq!(
+            coverage[0].live_hosts, 0,
+            "nadie imprime `receipt` y hay trabajo esperando"
+        );
     }
 
     /// Un documento que la cola rechaza (vocabulario cerrado de `document_type`) NO se encola en
@@ -3719,14 +4187,23 @@ mod tests {
             .unwrap();
 
         process_once(&db, &reg).await.unwrap();
-        assert!(queued_jobs(&db).await.is_empty(), "un tipo desconocido no se encola");
+        assert!(
+            queued_jobs(&db).await.is_empty(),
+            "un tipo desconocido no se encola"
+        );
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1"
+            )
+            .await,
             1,
             "la fila se difiere con su error, no se marca entregada"
         );
         assert!(
-            one_text(&db, "SELECT last_error AS c FROM _event_outbox").await.contains("host.print"),
+            one_text(&db, "SELECT last_error AS c FROM _event_outbox")
+                .await
+                .contains("host.print"),
             "el error dice qué puerta lo rechazó"
         );
     }
@@ -3760,7 +4237,9 @@ mod tests {
     /// `certificate` capability, which NOBODY has granted).
     async fn hub_with_an_ungranted_capability() -> (PgAdapter, Registry) {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE invoices (id TEXT);").await.unwrap();
+        db.execute_batch("CREATE TABLE invoices (id TEXT);")
+            .await
+            .unwrap();
         system_schema(&db).await;
 
         let mut reg = Registry::new();
@@ -3791,9 +4270,12 @@ mod tests {
             file: None,
             function: "ingest_invoice".into(),
         });
-        reg.commands.insert("sealer.records.ingest_invoice".into(), ingest);
-        reg.listeners
-            .insert("invoice.created".into(), vec!["sealer.records.ingest_invoice".into()]);
+        reg.commands
+            .insert("sealer.records.ingest_invoice".into(), ingest);
+        reg.listeners.insert(
+            "invoice.created".into(),
+            vec!["sealer.records.ingest_invoice".into()],
+        );
         (db, reg)
     }
 
@@ -3806,18 +4288,31 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .expect("invoicing does not depend on the sealer's capability");
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .expect("invoicing does not depend on the sealer's capability");
         process_once(&db, &reg).await.unwrap();
 
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             0,
             "a refused listener must never leave the event marked delivered"
         );
         assert!(
-            one_text(&db, "SELECT last_error AS c FROM _event_outbox").await.contains("certificate"),
+            one_text(&db, "SELECT last_error AS c FROM _event_outbox")
+                .await
+                .contains("certificate"),
             "the row records WHICH capability refused it"
         );
     }
@@ -3831,9 +4326,16 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
         let dead = list_dead(&db, "h1", 50).await.unwrap();
@@ -3862,13 +4364,23 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
         let dead = list_dead(&db, "h1", 50).await.unwrap();
         assert!(
-            matches!(retry(&db, "h1", &dead[0].id).await.unwrap(), RetryOutcome::Requeued),
+            matches!(
+                retry(&db, "h1", &dead[0].id).await.unwrap(),
+                RetryOutcome::Requeued
+            ),
             "the screen's retry button is not dead for this row"
         );
 
@@ -3887,12 +4399,23 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
-        assert_eq!(retry_all(&db, "h1").await.unwrap(), 1, "the row goes back to the relay");
+        assert_eq!(
+            retry_all(&db, "h1").await.unwrap(),
+            1,
+            "the row goes back to the relay"
+        );
     }
 
     /// **The other half of hub#1119.** Making the failure visible is not the same as making it
@@ -3905,15 +4428,34 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "dead while the switch is off");
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            1,
+            "dead while the switch is off"
+        );
 
-        crate::capabilities::set_grant(&db, &reg, "h1", "sealer", "certificate", true, "hub_user:admin")
-            .await
-            .unwrap();
+        crate::capabilities::set_grant(
+            &db,
+            &reg,
+            "h1",
+            "sealer",
+            "certificate",
+            true,
+            "hub_user:admin",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             count_dead(&db, "h1").await.unwrap(),
@@ -3922,7 +4464,11 @@ mod tests {
         );
         drain(&db, &reg).await.unwrap();
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1,
             "and the relay delivered them"
         );
@@ -3936,16 +4482,35 @@ mod tests {
         let (db, reg) = hub_with_an_ungranted_capability().await;
         let ctx = RequestContext::new("h1", "hub_user:ana", ["*".to_string()]);
 
-        crate::commands::execute(&db, &reg, "invoice.create_from_sale", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "invoice.create_from_sale",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
-        crate::capabilities::set_grant(&db, &reg, "h1", "sealer", "certificate", false, "hub_user:admin")
-            .await
-            .unwrap();
+        crate::capabilities::set_grant(
+            &db,
+            &reg,
+            "h1",
+            "sealer",
+            "certificate",
+            false,
+            "hub_user:admin",
+        )
+        .await
+        .unwrap();
 
-        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "still dead, still visible");
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            1,
+            "still dead, still visible"
+        );
     }
 
     // ── hub#1192: the SAME refusal, one gate further out — the host listener of `host.notify` ──
@@ -3979,14 +4544,28 @@ mod tests {
         // NO `authorize_notify`: the switch is off, which is how every hub starts.
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
-        assert!(transport.sent().is_empty(), "sin grant no sale nada del hub (hub#240)");
+        assert!(
+            transport.sent().is_empty(),
+            "sin grant no sale nada del hub (hub#240)"
+        );
         let dead = list_dead(&db, "h1", 50).await.unwrap();
-        assert_eq!(dead.len(), 1, "one pass, not eight: «Eventos caídos» has to SEE it: {dead:?}");
+        assert_eq!(
+            dead.len(),
+            1,
+            "one pass, not eight: «Eventos caídos» has to SEE it: {dead:?}"
+        );
         assert_eq!(dead[0].event_name, "appt.reminder.due");
         assert!(
             dead[0].last_error.contains("notify"),
@@ -4016,11 +4595,22 @@ mod tests {
         reg.notify_transport = Some(transport.clone());
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
-        assert_eq!(count_dead(&db, "h1").await.unwrap(), 1, "dead while the switch is off");
+        assert_eq!(
+            count_dead(&db, "h1").await.unwrap(),
+            1,
+            "dead while the switch is off"
+        );
 
         // The owner flips «Notificaciones» on in Ajustes → Permisos (and the recipient is a
         // customer of the hub, as the other three gates require).
@@ -4032,9 +4622,17 @@ mod tests {
             "granting `notify` put the refused reminder back in front of the relay"
         );
         drain(&db, &reg).await.unwrap();
-        assert_eq!(transport.sent().len(), 1, "…and the reminder finally reached the customer");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'").await,
+            transport.sent().len(),
+            1,
+            "…and the reminder finally reached the customer"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='delivered'"
+            )
+            .await,
             1,
             "the row is delivered, not sitting in a queue nobody looks at"
         );
@@ -4046,17 +4644,28 @@ mod tests {
     /// `replay_capability_denied` cannot sweep. Granting «Impresora» left the ticket dead. Leaving
     /// one of two identical doors open is how a fixed bug comes back through the other one.
     #[tokio::test]
-    async fn hub1192_a_print_due_without_granted_printer_dies_stamped_and_granting_it_requeues_the_ticket() {
+    async fn hub1192_a_print_due_without_granted_printer_dies_stamped_and_granting_it_requeues_the_ticket(
+    ) {
         let db = db_for_print().await;
         let reg = registry_for_print();
 
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "labels.print", &print_payload("job-1"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "labels.print",
+            &print_payload("job-1"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
-        assert!(queued_jobs(&db).await.is_empty(), "sin grant de `printer` no se encola nada");
+        assert!(
+            queued_jobs(&db).await.is_empty(),
+            "sin grant de `printer` no se encola nada"
+        );
         let dead = list_dead(&db, "h1", 50).await.unwrap();
         assert_eq!(dead.len(), 1, "one pass, not eight: {dead:?}");
         assert_eq!(
@@ -4073,7 +4682,11 @@ mod tests {
             "granting `printer` put the refused ticket back in front of the relay"
         );
         drain(&db, &reg).await.unwrap();
-        assert_eq!(queued_jobs(&db).await.len(), 1, "…and the document reached the print queue");
+        assert_eq!(
+            queued_jobs(&db).await.len(),
+            1,
+            "…and the document reached the print queue"
+        );
     }
 
     /// Regression test for ERPlora/hub#1192 (review) — **only the refusal is terminal-now.** The gate
@@ -4092,18 +4705,35 @@ mod tests {
         authorize_notify(&db, &reg, "cliente@x.com").await;
 
         let ctx = RequestContext::new("h1", "", ["*".to_string()]);
-        crate::commands::execute(&db, &reg, "appt.remind", &reminder_payload("cliente@x.com"), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        crate::commands::execute(
+            &db,
+            &reg,
+            "appt.remind",
+            &reminder_payload("cliente@x.com"),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         // The grants table goes away under the relay: `capabilities::require` fails on its query.
-        db.execute_batch("ALTER TABLE _module_capability_grants RENAME TO _module_capability_grants_gone;")
-            .await
-            .unwrap();
+        db.execute_batch(
+            "ALTER TABLE _module_capability_grants RENAME TO _module_capability_grants_gone;",
+        )
+        .await
+        .unwrap();
         process_once(&db, &reg).await.unwrap();
 
-        assert_eq!(count_dead(&db, "h1").await.unwrap(), 0, "a database error is not a refusal: no first-pass death");
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1").await,
+            count_dead(&db, "h1").await.unwrap(),
+            0,
+            "a database error is not a refusal: no first-pass death"
+        );
+        assert_eq!(
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _event_outbox WHERE status='pending' AND attempts=1"
+            )
+            .await,
             1,
             "the row is deferred on the ladder with its error"
         );
@@ -4114,13 +4744,22 @@ mod tests {
         );
 
         // The database comes back and the ladder does its job: the reminder goes out.
-        db.execute_batch("ALTER TABLE _module_capability_grants_gone RENAME TO _module_capability_grants;")
-            .await
-            .unwrap();
-        db.execute("UPDATE _event_outbox SET next_attempt_at = '2020-01-01T00:00:00+00:00'", &Params::new())
-            .await
-            .unwrap();
+        db.execute_batch(
+            "ALTER TABLE _module_capability_grants_gone RENAME TO _module_capability_grants;",
+        )
+        .await
+        .unwrap();
+        db.execute(
+            "UPDATE _event_outbox SET next_attempt_at = '2020-01-01T00:00:00+00:00'",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
         drain(&db, &reg).await.unwrap();
-        assert_eq!(transport.sent().len(), 1, "…and the reminder reached the customer after the blip");
+        assert_eq!(
+            transport.sent().len(),
+            1,
+            "…and the reminder reached the customer after the blip"
+        );
     }
 }

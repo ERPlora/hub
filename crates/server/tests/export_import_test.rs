@@ -13,7 +13,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::Runtime;
-use erplora_server::{app, AppState, AuthMode, DEV_HUB_ID, HubConfig};
+use erplora_server::{app, AppState, AuthMode, HubConfig, DEV_HUB_ID};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt; // oneshot
@@ -56,7 +56,10 @@ async fn make_app_with_db(auth_mode: AuthMode, tag: &str) -> (axum::Router, erpl
     let rt = Runtime::with_hub_id(Box::new(test_db.adapter().await), "hub-test");
     rt.ensure_system_tables().await.expect("esquema de sistema");
     let side = test_db.adapter().await;
-    (app(AppState::with_config(rt, test_config(auth_mode, tag))), side)
+    (
+        app(AppState::with_config(rt, test_config(auth_mode, tag))),
+        side,
+    )
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {
@@ -158,7 +161,10 @@ async fn export_with_traversal_name_is_422() {
 async fn export_with_empty_name_is_422() {
     let app = make_app(AuthMode::Dev, "export_emptyname").await;
     let resp = app
-        .oneshot(post_json("/api/hub/export", json!({ "name": "", "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/export",
+            json!({ "name": "", "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -193,7 +199,11 @@ async fn export_without_body_is_4xx() {
         )
         .await
         .unwrap();
-    assert!(resp.status().is_client_error(), "status = {}", resp.status());
+    assert!(
+        resp.status().is_client_error(),
+        "status = {}",
+        resp.status()
+    );
 }
 
 /// Flujo completo: export → zip con manifest.json. Atraviesa `export_hub` del runtime.
@@ -215,10 +225,25 @@ async fn export_returns_blueprint_zip() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let ct = resp.headers().get("content-type").unwrap().to_str().unwrap().to_string();
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     assert_eq!(ct, "application/zip");
-    let cd = resp.headers().get("content-disposition").unwrap().to_str().unwrap().to_string();
-    assert!(cd.contains("barberia_es.blueprint.zip"), "content-disposition = {cd}");
+    let cd = resp
+        .headers()
+        .get("content-disposition")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        cd.contains("barberia_es.blueprint.zip"),
+        "content-disposition = {cd}"
+    );
     // El body es un zip real con manifest.json en la raíz.
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
@@ -267,7 +292,9 @@ fn zip_entries(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
 /// incluido—, no sobre una lista de rutas conocidas: una fuga que estrenase un fichero nuevo pasaría
 /// por delante de una comprobación que solo mira `data/fiscal/certificate.p12`.
 fn zip_contains(entries: &[(String, Vec<u8>)], needle: &[u8]) -> bool {
-    entries.iter().any(|(_, bytes)| bytes.windows(needle.len()).any(|w| w == needle))
+    entries
+        .iter()
+        .any(|(_, bytes)| bytes.windows(needle.len()).any(|w| w == needle))
 }
 
 async fn export_with_fiscal(app: axum::Router, tag: &str) -> Vec<(String, Vec<u8>)> {
@@ -316,7 +343,9 @@ async fn the_export_never_carries_the_delegated_certificate() {
     seed_certificate_slot(&db, "delegated", DELEGATED_P12_B64).await;
     let entries = export_with_fiscal(app.clone(), "solodelegado").await;
     assert!(
-        !entries.iter().any(|(name, _)| name == "data/fiscal/certificate.p12"),
+        !entries
+            .iter()
+            .any(|(name, _)| name == "data/fiscal/certificate.p12"),
         "sin certificado propio no hay certificado que exportar"
     );
     assert!(
@@ -334,7 +363,10 @@ async fn the_export_never_carries_the_delegated_certificate() {
         .map(|(_, b)| b.clone())
         .expect("el certificado PROPIO del negocio sí viaja en su backup");
     assert_eq!(cert, OWN_P12, "viaja el del negocio, no otro");
-    assert!(!zip_contains(&entries, DELEGATED_P12), "el .p12 delegado se ha colado en el bundle");
+    assert!(
+        !zip_contains(&entries, DELEGATED_P12),
+        "el .p12 delegado se ha colado en el bundle"
+    );
 }
 
 // ─────────────────────── POST /api/hub/import/inspect ───────────────────────
@@ -344,7 +376,10 @@ async fn the_export_never_carries_the_delegated_certificate() {
 async fn inspect_without_session_is_401() {
     let app = make_app(AuthMode::Session, "inspect_401").await;
     let zip = build_zip(&[("manifest.json", manifest_json(1, json!({})).as_bytes())]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -353,7 +388,10 @@ async fn inspect_without_session_is_401() {
 async fn inspect_rejects_non_zip_payload() {
     let app = make_app(AuthMode::Dev, "inspect_garbage").await;
     let resp = app
-        .oneshot(post_zip("/api/hub/import/inspect", b"esto no es un zip".to_vec()))
+        .oneshot(post_zip(
+            "/api/hub/import/inspect",
+            b"esto no es un zip".to_vec(),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -363,7 +401,10 @@ async fn inspect_rejects_non_zip_payload() {
 #[tokio::test]
 async fn inspect_rejects_empty_body() {
     let app = make_app(AuthMode::Dev, "inspect_empty").await;
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", Vec::new())).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", Vec::new()))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -372,7 +413,10 @@ async fn inspect_rejects_empty_body() {
 async fn inspect_rejects_zip_without_manifest() {
     let app = make_app(AuthMode::Dev, "inspect_nomanifest").await;
     let zip = build_zip(&[("readme.txt", b"sin manifest")]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -384,7 +428,10 @@ async fn inspect_rejects_path_traversal_zip() {
         ("manifest.json", manifest_json(1, json!({})).as_bytes()),
         ("../evil", b"pwned"),
     ]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let j = body_json(resp).await;
     assert_eq!(j["ok"], json!(false));
@@ -400,12 +447,18 @@ async fn inspect_rejects_media_path_traversal_zip() {
         ("manifest.json", manifest_json(1, json!({})).as_bytes()),
         ("media/../../evil", b"pwned"),
     ]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let j = body_json(resp).await;
     assert_eq!(j["ok"], json!(false));
     assert!(
-        j["error"]["message"].as_str().unwrap_or_default().contains("zip inseguro"),
+        j["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("zip inseguro"),
         "el motivo nombra la ruta insegura: {j}"
     );
 }
@@ -418,7 +471,10 @@ async fn inspect_rejects_absolute_path_zip() {
         ("manifest.json", manifest_json(1, json!({})).as_bytes()),
         ("/etc/evil", b"pwned"),
     ]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -427,7 +483,10 @@ async fn inspect_rejects_absolute_path_zip() {
 async fn inspect_rejects_unknown_schema_version() {
     let app = make_app(AuthMode::Dev, "inspect_schema").await;
     let zip = build_zip(&[("manifest.json", manifest_json(99, json!({})).as_bytes())]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -436,7 +495,10 @@ async fn inspect_rejects_unknown_schema_version() {
 async fn inspect_rejects_invalid_manifest_shape() {
     let app = make_app(AuthMode::Dev, "inspect_shape").await;
     let zip = build_zip(&[("manifest.json", br#"{ "schema_version": 1 }"#.as_slice())]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -445,14 +507,20 @@ async fn inspect_rejects_invalid_manifest_shape() {
 async fn inspect_ok_returns_upload_id_and_manifest() {
     let app = make_app(AuthMode::Dev, "inspect_ok").await;
     let zip = build_zip(&[("manifest.json", manifest_json(1, json!({})).as_bytes())]);
-    let resp = app.oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let j = body_json(resp).await;
     assert_eq!(j["ok"], json!(true));
     let upload_id = j["upload_id"].as_str().unwrap();
     assert!(!upload_id.is_empty());
     // El upload_id es un identificador simple (sin separadores: se usa como componente de ruta).
-    assert!(upload_id.chars().all(|c| c.is_ascii_alphanumeric()), "upload_id = {upload_id}");
+    assert!(
+        upload_id.chars().all(|c| c.is_ascii_alphanumeric()),
+        "upload_id = {upload_id}"
+    );
     assert_eq!(j["manifest"]["name"], json!("barberia"));
     assert_eq!(j["manifest"]["locale"], json!("es"));
 }
@@ -464,7 +532,10 @@ async fn inspect_ok_returns_upload_id_and_manifest() {
 async fn import_without_session_is_401() {
     let app = make_app(AuthMode::Session, "import_401").await;
     let resp = app
-        .oneshot(post_json("/api/hub/import", json!({ "upload_id": "abc", "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": "abc", "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
@@ -503,8 +574,15 @@ async fn import_traversal_upload_id_is_rejected() {
 #[tokio::test]
 async fn import_without_upload_id_is_4xx() {
     let app = make_app(AuthMode::Dev, "import_nopayload").await;
-    let resp = app.oneshot(post_json("/api/hub/import", json!({ "selection": {} }))).await.unwrap();
-    assert!(resp.status().is_client_error(), "status = {}", resp.status());
+    let resp = app
+        .oneshot(post_json("/api/hub/import", json!({ "selection": {} })))
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_client_error(),
+        "status = {}",
+        resp.status()
+    );
 }
 
 /// sha256 que no casa → 422 SIN efectos, y el temporal se borra IGUALMENTE (también en error):
@@ -514,22 +592,38 @@ async fn import_sha256_mismatch_is_422_and_cleans_tmp() {
     let app = make_app(AuthMode::Dev, "import_sha").await;
     // manifest declara data/x.sql con un hash que NO corresponde al contenido real.
     let manifest = manifest_json(1, json!({ "data/x.sql": "00".repeat(32) }));
-    let zip = build_zip(&[("manifest.json", manifest.as_bytes()), ("data/x.sql", b"hola")]);
-    let resp = app.clone().oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let zip = build_zip(&[
+        ("manifest.json", manifest.as_bytes()),
+        ("data/x.sql", b"hola"),
+    ]);
+    let resp = app
+        .clone()
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // (1) integridad dura: 422 sin efectos.
     let resp = app
         .clone()
-        .oneshot(post_json("/api/hub/import", json!({ "upload_id": upload_id, "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
     // (2) el temporal se borró también en el error → repetir da 404.
     let resp = app
-        .oneshot(post_json("/api/hub/import", json!({ "upload_id": upload_id, "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -541,13 +635,26 @@ async fn import_sha256_mismatch_is_422_and_cleans_tmp() {
 async fn import_unlisted_file_is_422() {
     let app = make_app(AuthMode::Dev, "import_unlisted").await;
     let manifest = manifest_json(1, json!({}));
-    let zip = build_zip(&[("manifest.json", manifest.as_bytes()), ("data/extra.sql", b"sorpresa")]);
-    let resp = app.clone().oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let zip = build_zip(&[
+        ("manifest.json", manifest.as_bytes()),
+        ("data/extra.sql", b"sorpresa"),
+    ]);
+    let resp = app
+        .clone()
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let resp = app
-        .oneshot(post_json("/api/hub/import", json!({ "upload_id": upload_id, "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
@@ -582,9 +689,16 @@ async fn una_plantilla_no_ofrece_el_certificado_fiscal_que_traiga() {
         ("manifest.json", manifest.as_bytes()),
         ("data/fiscal/certificate.p12", p12),
     ]);
-    let resp = app.clone().oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Se PIDE fiscal explícitamente: el propósito tiene que ganar a la casilla.
     let resp = app
@@ -623,10 +737,20 @@ async fn import_valid_bundle_returns_extended_report() {
     let app = make_app(AuthMode::Dev, "import_full").await;
     let sql = b"-- vacio".as_slice();
     let manifest = manifest_json(1, json!({ "data/hub_settings.sql": sha256_hex(sql) }));
-    let zip = build_zip(&[("manifest.json", manifest.as_bytes()), ("data/hub_settings.sql", sql)]);
-    let resp = app.clone().oneshot(post_zip("/api/hub/import/inspect", zip)).await.unwrap();
+    let zip = build_zip(&[
+        ("manifest.json", manifest.as_bytes()),
+        ("data/hub_settings.sql", sql),
+    ]);
+    let resp = app
+        .clone()
+        .oneshot(post_zip("/api/hub/import/inspect", zip))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let upload_id = body_json(resp).await["upload_id"].as_str().unwrap().to_string();
+    let upload_id = body_json(resp).await["upload_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let resp = app
         .clone()
@@ -646,7 +770,10 @@ async fn import_valid_bundle_returns_extended_report() {
 
     // El temporal se consume: repetir el mismo upload_id da 404.
     let resp = app
-        .oneshot(post_json("/api/hub/import", json!({ "upload_id": upload_id, "selection": {} })))
+        .oneshot(post_json(
+            "/api/hub/import",
+            json!({ "upload_id": upload_id, "selection": {} }),
+        ))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -671,7 +798,10 @@ fn demo_dev_config(tag: &str) -> HubConfig {
 async fn demo_hub_export_is_forced_to_template_even_when_backup_is_asked() {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), DEV_HUB_ID);
-    let app = app(AppState::with_config(rt, demo_dev_config("export_demo_template")));
+    let app = app(AppState::with_config(
+        rt,
+        demo_dev_config("export_demo_template"),
+    ));
     // Pedimos explícitamente backup (el que incluye identidades/fiscal) — el override lo ignora.
     let resp = app
         .oneshot(post_json(
@@ -688,7 +818,11 @@ async fn demo_hub_export_is_forced_to_template_even_when_backup_is_asked() {
         ))
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "el export de demo responde 200");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "el export de demo responde 200"
+    );
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let mut ar = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
     let manifest: Value = {
@@ -699,9 +833,16 @@ async fn demo_hub_export_is_forced_to_template_even_when_backup_is_asked() {
         serde_json::from_str(&s).unwrap()
     };
     // El override fuerza template aunque el body pidiera backup.
-    assert_eq!(manifest["purpose"], json!("template"), "un hub de demo exporta como plantilla");
+    assert_eq!(
+        manifest["purpose"],
+        json!("template"),
+        "un hub de demo exporta como plantilla"
+    );
     // Consecuencia directa: una plantilla no lleva identidades. No existe `data/hub_users.sql`.
-    assert!(ar.by_name("data/hub_users.sql").is_err(), "una plantilla no lleva hub_user (pin_hash)");
+    assert!(
+        ar.by_name("data/hub_users.sql").is_err(),
+        "una plantilla no lleva hub_user (pin_hash)"
+    );
 }
 
 /// Un hub REAL (no demo) respeta el `purpose` que pide el formulario: el override NO se dispara.
@@ -735,7 +876,11 @@ async fn real_hub_export_respects_the_requested_purpose() {
         f.read_to_string(&mut s).unwrap();
         serde_json::from_str(&s).unwrap()
     };
-    assert_eq!(manifest["purpose"], json!("backup"), "un hub real respeta el purpose pedido");
+    assert_eq!(
+        manifest["purpose"],
+        json!("backup"),
+        "un hub real respeta el purpose pedido"
+    );
 }
 
 // ── hub#1249: los USUARIOS sobreviven al round-trip export → inspect ────────────────────────────
@@ -754,7 +899,10 @@ async fn real_hub_with_admin(tag: &str) -> (axum::Router, String, String) {
         .create_user("Marta Ruiz", "1234", "admin", None)
         .await
         .expect("crear administradora");
-    let session = rt.create_session(&user_id, 3600, None).await.expect("sesión");
+    let session = rt
+        .create_session(&user_id, 3600, None)
+        .await
+        .expect("sesión");
     let mut cfg = test_config(AuthMode::Session, tag);
     cfg.hub_id = hub_id;
     (app(AppState::with_config(rt, cfg)), session, user_id)
@@ -775,7 +923,9 @@ fn post_json_as(uri: &str, session: &str, body: Value) -> Request<Body> {
 fn manifest_of(zip_bytes: &[u8]) -> Value {
     use std::io::Read as _;
     let mut ar = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes.to_vec())).unwrap();
-    let mut f = ar.by_name("manifest.json").expect("manifest.json en el zip");
+    let mut f = ar
+        .by_name("manifest.json")
+        .expect("manifest.json en el zip");
     let mut s = String::new();
     f.read_to_string(&mut s).unwrap();
     serde_json::from_str(&s).unwrap()
@@ -799,8 +949,17 @@ async fn export_backup_with_users(app: axum::Router, session: &str) -> Vec<u8> {
         ))
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "el export de un hub real responde 200");
-    resp.into_body().collect().await.unwrap().to_bytes().to_vec()
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "el export de un hub real responde 200"
+    );
+    resp.into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec()
 }
 
 /// 🔴 Regression test for ERPlora/hub#1249 — el round-trip export→import PERDÍA los usuarios.
@@ -824,15 +983,23 @@ async fn el_export_con_users_lista_hub_users_en_sections_hub_1249() {
     let mut ar = zip::ZipArchive::new(std::io::Cursor::new(zip.clone())).unwrap();
     let sql = {
         use std::io::Read as _;
-        let mut f = ar.by_name("data/hub_users.sql").expect("data/hub_users.sql en el zip");
+        let mut f = ar
+            .by_name("data/hub_users.sql")
+            .expect("data/hub_users.sql en el zip");
         let mut s = String::new();
         f.read_to_string(&mut s).unwrap();
         s
     };
     // La FILA, no solo el fichero: un volcado vacío pasaría igual de bien una comprobación de ruta
     // y es exactamente el modo de fallo que hub#1249 describe (la copia parece hecha y no lo está).
-    assert!(sql.contains(&user_id), "el volcado no trae la administradora: {sql}");
-    assert!(sql.contains("admin"), "el volcado no trae el ROL de la administradora: {sql}");
+    assert!(
+        sql.contains(&user_id),
+        "el volcado no trae la administradora: {sql}"
+    );
+    assert!(
+        sql.contains("admin"),
+        "el volcado no trae el ROL de la administradora: {sql}"
+    );
 }
 
 /// 🔴 Regression test for ERPlora/hub#1249 — el otro lado del round-trip.
@@ -859,7 +1026,10 @@ async fn el_inspect_detecta_hub_users_hub_1249() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp).await;
-    let sections = body["manifest"]["sections"].as_array().cloned().unwrap_or_default();
+    let sections = body["manifest"]["sections"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
     assert!(
         sections.iter().any(|s| s == "hub_users"),
         "el inspect no detecta `hub_users`: {sections:?}"
@@ -899,7 +1069,10 @@ async fn el_formulario_sabe_que_un_hub_demo_solo_exporta_plantillas_hub_1249() {
     // (2) Hub de dev sin enrolar: `is_dev_hub()` — el mismo estado que el banco e2e.
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), DEV_HUB_ID);
-    let demo = app(AppState::with_config(rt, demo_dev_config("tables1249_demo")));
+    let demo = app(AppState::with_config(
+        rt,
+        demo_dev_config("tables1249_demo"),
+    ));
     let resp = demo
         .oneshot(
             Request::builder()

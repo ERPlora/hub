@@ -120,7 +120,11 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
         assistant::build_instructions(
             rt.registry(),
             &[automation_briefing(&request)],
-            &format!("{} ({})", now.format("%Y-%m-%dT%H:%M:%SZ"), now.format("%A")),
+            &format!(
+                "{} ({})",
+                now.format("%Y-%m-%dT%H:%M:%SZ"),
+                now.format("%A")
+            ),
         )
     };
 
@@ -187,7 +191,11 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
          this step declared. Every turn is a real call through the SaaS proxy, so the loop is cut \
          here rather than left to the model. Last text: {}",
         request.max_iters,
-        if answered.is_empty() { "(none)" } else { &answered }
+        if answered.is_empty() {
+            "(none)"
+        } else {
+            &answered
+        }
     ))
 }
 
@@ -204,20 +212,18 @@ struct Tools {
 /// Reads the parked request and assembles the tool catalogue, under ONE lock: the registry the
 /// tools come from and the grants they are filtered by must be the same snapshot, or a revocation
 /// landing between the two reads would produce a catalogue that never existed.
-async fn prepare(
-    st: &AppState,
-    run_id: &str,
-    step_id: &str,
-) -> Result<(AiRequest, Tools), String> {
+async fn prepare(st: &AppState, run_id: &str, step_id: &str) -> Result<(AiRequest, Tools), String> {
     let rt = st.runtime.read().await;
     let request = rt
         .load_flow_ai_request(run_id, step_id)
         .await
         .map_err(|e| format!("agent: run {run_id} is not ready for a turn: {e}"))?;
-    let authority = rt
-        .flow_authority(&request.flow_id)
-        .await
-        .map_err(|e| format!("agent: could not read the grants of flow {}: {e}", request.flow_id))?;
+    let authority = rt.flow_authority(&request.flow_id).await.map_err(|e| {
+        format!(
+            "agent: could not read the grants of flow {}: {e}",
+            request.flow_id
+        )
+    })?;
 
     // (1) Assembled from the registry under the FLOW's own permissions. This is the same catalogue
     // the drawer builds for a user — only the authority differs, and it is the flow's.
@@ -604,7 +610,9 @@ mod tests {
                 "arguments": "{\"customer\":\"Marta\",\"starts_at\":\"2026-08-10T10:00:00Z\"}"
             })
         );
-        let cut = whole.find("starts_at").expect("the cut lands mid-arguments");
+        let cut = whole
+            .find("starts_at")
+            .expect("the cut lands mid-arguments");
 
         let mut split = Aggregator::default();
         assert!(split.push(&whole[..cut]).is_none());
@@ -665,7 +673,9 @@ mod tests {
     fn an_error_event_fails_the_turn_instead_of_answering_nothing() {
         let mut agg = Aggregator::default();
         agg.push("data: {\"type\":\"error\",\"error\":\"quota exceeded\"}\n\n");
-        let err = agg.finish().expect_err("an error must not read as a silent answer");
+        let err = agg
+            .finish()
+            .expect_err("an error must not read as a silent answer");
         assert!(err.contains("quota exceeded"), "{err}");
     }
 

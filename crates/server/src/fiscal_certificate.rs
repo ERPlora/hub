@@ -255,7 +255,10 @@ impl RefetchBudget {
             // case of continuing is one extra request.
             Err(poisoned) => poisoned.into_inner(),
         };
-        while spent.front().is_some_and(|t| now.duration_since(*t) >= self.window) {
+        while spent
+            .front()
+            .is_some_and(|t| now.duration_since(*t) >= self.window)
+        {
             spent.pop_front();
         }
         if spent.len() >= self.max {
@@ -380,7 +383,10 @@ pub async fn refetch_once(
         RefetchTrigger::Heartbeat { announced } => {
             let local = {
                 let rt = runtime.read().await;
-                certificate::delegated_version(rt.db(), hub_id).await.ok().flatten()
+                certificate::delegated_version(rt.db(), hub_id)
+                    .await
+                    .ok()
+                    .flatten()
             };
             heartbeat_requires_refetch(local, announced)
         }
@@ -410,7 +416,10 @@ pub async fn refetch_once(
         }
     };
     let Some(cert) = fetched else {
-        tracing::debug!(?trigger, "el plano de control no tiene certificado delegado para este hub");
+        tracing::debug!(
+            ?trigger,
+            "el plano de control no tiene certificado delegado para este hub"
+        );
         return RefetchOutcome::Done(DelegatedCertificateOutcome::NotProvisioned);
     };
     let stored = {
@@ -524,12 +533,12 @@ pub fn spawn_refetch_service(st: &AppState, budget: Arc<RefetchBudget>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_runtime::Runtime;
     use axum::http::{HeaderMap, StatusCode};
     use axum::routing::get;
     use axum::Router;
     use erplora_db::testutil::fresh_db;
     use erplora_db::PgAdapter;
+    use erplora_runtime::Runtime;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
@@ -550,7 +559,11 @@ mod tests {
     async fn cloud_stub(
         status: StatusCode,
         body: impl Into<String>,
-    ) -> (String, Arc<Mutex<Option<HeaderMap>>>, tokio::task::JoinHandle<()>) {
+    ) -> (
+        String,
+        Arc<Mutex<Option<HeaderMap>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
         type Seen = Arc<Mutex<Option<HeaderMap>>>;
         let seen: Seen = Arc::new(Mutex::new(None));
         let body = body.into();
@@ -580,9 +593,13 @@ mod tests {
 
     async fn db_ready() -> PgAdapter {
         let db = fresh_db().await;
-        erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+        erplora_runtime::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         erplora_runtime::identity::ensure_tables(&db).await.unwrap();
-        erplora_runtime::system_migrations::apply(&db, "hub-test").await.unwrap();
+        erplora_runtime::system_migrations::apply(&db, "hub-test")
+            .await
+            .unwrap();
         db
     }
 
@@ -646,7 +663,10 @@ mod tests {
         assert!(!error.contains(DELEGATED_B64), "{error}");
         assert!(!error.contains(DELEGATED_PASSWORD), "{error}");
         // Y sigue siendo diagnosticable: el status es lo que dice si reintentar.
-        assert!(error.contains("500"), "el error debería nombrar el status: {error}");
+        assert!(
+            error.contains("500"),
+            "el error debería nombrar el status: {error}"
+        );
         server.abort();
     }
 
@@ -694,7 +714,10 @@ mod tests {
         );
         // Ni un fragmento: una traza que imprimiese el principio de la clave seguiría siendo una fuga.
         for fragment in ["REVMRUdB", "erplora-delegated", "delegated-passphrase"] {
-            assert!(!logs.contains(fragment), "fuga del fragmento {fragment:?}: {logs}");
+            assert!(
+                !logs.contains(fragment),
+                "fuga del fragmento {fragment:?}: {logs}"
+            );
         }
         server.abort();
     }
@@ -848,7 +871,9 @@ mod tests {
             DelegatedCertificateOutcome::Installed { version: 4, .. }
         ));
         assert_eq!(
-            certificate::delegated_version(&db, "hub-test").await.unwrap(),
+            certificate::delegated_version(&db, "hub-test")
+                .await
+                .unwrap(),
             Some(4)
         );
         assert_eq!(
@@ -857,8 +882,14 @@ mod tests {
         );
         // En la BD, cifrado: un `pg_dump` no lleva la clave de ERPlora.
         let (stored_b64, stored_password) = raw_delegated_row(&db).await;
-        assert!(stored_b64.starts_with("v1:"), "no está cifrado: {stored_b64}");
-        assert!(stored_password.starts_with("v1:"), "no está cifrada: {stored_password}");
+        assert!(
+            stored_b64.starts_with("v1:"),
+            "no está cifrado: {stored_b64}"
+        );
+        assert!(
+            stored_password.starts_with("v1:"),
+            "no está cifrada: {stored_password}"
+        );
         assert!(!stored_b64.contains(DELEGATED_B64));
         assert!(!stored_password.contains(DELEGATED_PASSWORD));
         // Descifrado, es EXACTAMENTE lo servido y en su columna: el contenedor en `pkcs12_b64` y la
@@ -868,7 +899,9 @@ mod tests {
         assert_eq!(decrypt(&stored_password), DELEGATED_PASSWORD);
         // Y la guarda de hub#316 sigue en pie por esta vía nueva.
         assert_eq!(
-            certificate::exportable_der_bytes(&db, "hub-test").await.unwrap(),
+            certificate::exportable_der_bytes(&db, "hub-test")
+                .await
+                .unwrap(),
             None,
             "la clave privada de ERPlora no sale del hub"
         );
@@ -955,7 +988,10 @@ mod tests {
             certificate::active_kind(&db, "hub-test").await.unwrap(),
             Some(certificate::CertificateKind::Own)
         );
-        assert_eq!(certificate::expiry(&db, "hub-test").await.ok().flatten(), None);
+        assert_eq!(
+            certificate::expiry(&db, "hub-test").await.ok().flatten(),
+            None
+        );
         server.abort();
     }
 
@@ -997,7 +1033,9 @@ mod tests {
 
     async fn local_version(runtime: &crate::state::SharedRuntime) -> Option<i64> {
         let rt = runtime.read().await;
-        certificate::delegated_version(rt.db(), "hub-test").await.unwrap()
+        certificate::delegated_version(rt.db(), "hub-test")
+            .await
+            .unwrap()
     }
 
     async fn refetch(
@@ -1028,7 +1066,9 @@ mod tests {
     async fn a_new_version_in_the_heartbeat_refetches_exactly_once() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None)
+            .await
+            .unwrap();
         let runtime = runtime_of(db);
         let (base, hits, server) = counting_stub(StatusCode::OK, served_body(5)).await;
         let budget = RefetchBudget::hourly();
@@ -1119,7 +1159,13 @@ mod tests {
         let runtime = runtime_of(db);
         let (base, hits, server) = counting_stub(StatusCode::OK, served_body(4)).await;
 
-        let outcome = refetch(RefetchTrigger::Boot, &RefetchBudget::hourly(), &base, &runtime).await;
+        let outcome = refetch(
+            RefetchTrigger::Boot,
+            &RefetchBudget::hourly(),
+            &base,
+            &runtime,
+        )
+        .await;
 
         assert!(matches!(
             outcome,
@@ -1138,11 +1184,19 @@ mod tests {
     async fn a_hub_that_already_holds_a_certificate_does_not_ask_at_boot() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None)
+            .await
+            .unwrap();
         let runtime = runtime_of(db);
         let (base, hits, server) = counting_stub(StatusCode::OK, served_body(4)).await;
 
-        let outcome = refetch(RefetchTrigger::Boot, &RefetchBudget::hourly(), &base, &runtime).await;
+        let outcome = refetch(
+            RefetchTrigger::Boot,
+            &RefetchBudget::hourly(),
+            &base,
+            &runtime,
+        )
+        .await;
 
         assert_eq!(outcome, RefetchOutcome::NotNeeded);
         assert_eq!(hits.load(Ordering::SeqCst), 0);
@@ -1224,7 +1278,9 @@ mod tests {
     async fn a_server_error_leaves_the_hub_with_the_certificate_it_had() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None)
+            .await
+            .unwrap();
         let runtime = runtime_of(db);
         let (base, _hits, server) = counting_stub(StatusCode::INTERNAL_SERVER_ERROR, "boom").await;
 
@@ -1255,7 +1311,9 @@ mod tests {
     async fn an_unreachable_control_plane_leaves_the_hub_with_the_certificate_it_had() {
         ensure_master_key();
         let db = db_ready().await;
-        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None).await.unwrap();
+        certificate::set_delegated(&db, "hub-test", DELEGATED_B64, "pw-4", 4, None)
+            .await
+            .unwrap();
         let runtime = runtime_of(db);
         // Puerto cerrado: nada escucha ahí.
         let outcome = refetch(
@@ -1283,7 +1341,13 @@ mod tests {
         )
         .await;
 
-        let outcome = refetch(RefetchTrigger::Boot, &RefetchBudget::hourly(), &base, &runtime).await;
+        let outcome = refetch(
+            RefetchTrigger::Boot,
+            &RefetchBudget::hourly(),
+            &base,
+            &runtime,
+        )
+        .await;
 
         assert_eq!(
             outcome,
@@ -1312,18 +1376,36 @@ mod tests {
         .await;
 
         let logs = capture_logs(|| async {
-            refetch(RefetchTrigger::Boot, &RefetchBudget::hourly(), &base, &runtime).await
+            refetch(
+                RefetchTrigger::Boot,
+                &RefetchBudget::hourly(),
+                &base,
+                &runtime,
+            )
+            .await
         })
         .await;
 
         assert!(!logs.contains(DELEGATED_B64), "fuga del contenedor: {logs}");
-        assert!(!logs.contains(DELEGATED_PASSWORD), "fuga de la contraseña: {logs}");
+        assert!(
+            !logs.contains(DELEGATED_PASSWORD),
+            "fuga de la contraseña: {logs}"
+        );
         for fragment in ["REVMRUdB", "erplora-delegated", "delegated-passphrase"] {
-            assert!(!logs.contains(fragment), "fuga del fragmento {fragment:?}: {logs}");
+            assert!(
+                !logs.contains(fragment),
+                "fuga del fragmento {fragment:?}: {logs}"
+            );
         }
         // Y sigue siendo diagnosticable: se ve QUÉ disparador y que hubo un 500.
-        assert!(logs.contains("Boot"), "el log debería nombrar el disparador: {logs}");
-        assert!(logs.contains("500"), "el log debería nombrar el status: {logs}");
+        assert!(
+            logs.contains("Boot"),
+            "el log debería nombrar el disparador: {logs}"
+        );
+        assert!(
+            logs.contains("500"),
+            "el log debería nombrar el status: {logs}"
+        );
         server.abort();
     }
 
@@ -1337,14 +1419,26 @@ mod tests {
         let (base, _hits, server) = counting_stub(StatusCode::OK, served_body(7)).await;
 
         let logs = capture_logs(|| async {
-            refetch(RefetchTrigger::Boot, &RefetchBudget::hourly(), &base, &runtime).await
+            refetch(
+                RefetchTrigger::Boot,
+                &RefetchBudget::hourly(),
+                &base,
+                &runtime,
+            )
+            .await
         })
         .await;
 
         assert!(!logs.contains(DELEGATED_B64), "fuga del contenedor: {logs}");
-        assert!(!logs.contains(DELEGATED_PASSWORD), "fuga de la contraseña: {logs}");
+        assert!(
+            !logs.contains(DELEGATED_PASSWORD),
+            "fuga de la contraseña: {logs}"
+        );
         // La versión sí: no es secreta (el heartbeat la anuncia en claro) y es lo que se diagnostica.
-        assert!(logs.contains('7'), "el log debería decir la versión: {logs}");
+        assert!(
+            logs.contains('7'),
+            "el log debería decir la versión: {logs}"
+        );
         server.abort();
     }
 
@@ -1408,9 +1502,16 @@ mod tests {
         ensure_master_key();
         let db = db_ready().await;
         seed_own_certificate(&db).await; // manda para firmar, y no es un `.p12` legible
-        certificate::set_delegated(&db, "hub-test", REAL_P12_B64.trim(), REAL_P12_PASSWORD, 9, None)
-            .await
-            .unwrap();
+        certificate::set_delegated(
+            &db,
+            "hub-test",
+            REAL_P12_B64.trim(),
+            REAL_P12_PASSWORD,
+            9,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(
             certificate::active_kind(&db, "hub-test").await.unwrap(),
             Some(certificate::CertificateKind::Own)
@@ -1439,7 +1540,9 @@ mod tests {
     async fn a_hub_that_cannot_read_its_certificate_table_reports_nothing() {
         ensure_master_key();
         let db = db_ready().await;
-        db.execute_batch("DROP TABLE _hub_certificate;").await.unwrap();
+        db.execute_batch("DROP TABLE _hub_certificate;")
+            .await
+            .unwrap();
         assert_eq!(delegated_certificate_report(&db, "hub-test").await, None);
         // Y por el mismo motivo tampoco sale a pedir una clave privada al arrancar.
         assert!(!boot_requires_refetch(&db, "hub-test").await);
@@ -1454,18 +1557,40 @@ mod tests {
 
         let first = served_body(4);
         let (base, _seen, server) = cloud_stub(StatusCode::OK, first).await;
-        install_delegated_certificate(&reqwest::Client::new(), &base, &machine_auth(), &db, "hub-test")
-            .await
-            .unwrap();
-        assert_eq!(certificate::delegated_version(&db, "hub-test").await.unwrap(), Some(4));
+        install_delegated_certificate(
+            &reqwest::Client::new(),
+            &base,
+            &machine_auth(),
+            &db,
+            "hub-test",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            certificate::delegated_version(&db, "hub-test")
+                .await
+                .unwrap(),
+            Some(4)
+        );
         server.abort();
 
         let rotated = r#"{"version": 5, "pkcs12_b64": "Uk9UQVRFRC1QS0NTMTI=", "password": "pw-5"}"#;
         let (base, _seen, server) = cloud_stub(StatusCode::OK, rotated).await;
-        install_delegated_certificate(&reqwest::Client::new(), &base, &machine_auth(), &db, "hub-test")
-            .await
-            .unwrap();
-        assert_eq!(certificate::delegated_version(&db, "hub-test").await.unwrap(), Some(5));
+        install_delegated_certificate(
+            &reqwest::Client::new(),
+            &base,
+            &machine_auth(),
+            &db,
+            "hub-test",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            certificate::delegated_version(&db, "hub-test")
+                .await
+                .unwrap(),
+            Some(5)
+        );
         server.abort();
     }
 }

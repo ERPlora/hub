@@ -66,7 +66,10 @@ pub enum GuardError {
     /// seguro retirarlo: la ventana N/N-1 no se puede revisar si nadie la declara (hub#1163).
     ContractWithoutVersion { verb: String },
     /// Un `DROP` que nombra varias cosas en una sentencia. La traducción es 1:1 o no es (hub#1145).
-    DropsMoreThanOne { what: &'static str, statement: String },
+    DropsMoreThanOne {
+        what: &'static str,
+        statement: String,
+    },
     /// Un cuerpo procedimental (`DO`, `CREATE FUNCTION`/`PROCEDURE`). El guard es un lint sobre el
     /// TEXTO y ahí dentro no hay texto que leer: no se inspecciona, no entra (hub#1149).
     NotInspectable { construct: &'static str },
@@ -169,18 +172,36 @@ pub const RESHAPE_VERBS: &[&str] = &["ALTER COLUMN ... TYPE", "RENAME COLUMN", "
 /// keeps the list honest in both directions. The pass is for the RESHAPE and per FILE: the same
 /// module's next migration inherits nothing, and a `DROP` in a listed file is still refused.
 pub const RESHAPE_GRANDFATHERED: &[(&str, &str)] = &[
-    ("cart_checkout", "migrations/postgres/003_quantity_fixed_point.sql"),
+    (
+        "cart_checkout",
+        "migrations/postgres/003_quantity_fixed_point.sql",
+    ),
     ("inventory", "migrations/postgres/002_tax_rate_id.sql"),
     ("inventory", "migrations/postgres/004_tax_category_key.sql"),
     ("inventory", "migrations/postgres/005_stock_ledger.sql"),
-    ("inventory", "migrations/postgres/006_quantity_fixed_point.sql"),
-    ("invoice", "migrations/postgres/004_quantity_fixed_point.sql"),
+    (
+        "inventory",
+        "migrations/postgres/006_quantity_fixed_point.sql",
+    ),
+    (
+        "invoice",
+        "migrations/postgres/004_quantity_fixed_point.sql",
+    ),
     ("kitchen", "migrations/postgres/004_dispatch_snapshot.sql"),
-    ("kitchen", "migrations/postgres/005_quantity_fixed_point.sql"),
-    ("pricing", "migrations/postgres/005_quantity_fixed_point.sql"),
+    (
+        "kitchen",
+        "migrations/postgres/005_quantity_fixed_point.sql",
+    ),
+    (
+        "pricing",
+        "migrations/postgres/005_quantity_fixed_point.sql",
+    ),
     ("sales", "migrations/postgres/014_quantity_fixed_point.sql"),
     ("services", "migrations/postgres/005_tax_category_key.sql"),
-    ("services", "migrations/postgres/006_quantity_fixed_point.sql"),
+    (
+        "services",
+        "migrations/postgres/006_quantity_fixed_point.sql",
+    ),
 ];
 
 fn is_reshape_grandfathered(module_id: &str, filename: &str) -> bool {
@@ -204,10 +225,19 @@ pub const GRANDFATHERED: &[(&str, &str)] = &[
     ("tables", "migrations/postgres/007_session_history_fk.sql"), // DROP CONSTRAINT
     ("sales", "migrations/postgres/011_sale_forgets_table.sql"),  // DROP COLUMN
     ("sales", "migrations/postgres/013_drop_legacy_cart.sql"),    // DROP TABLE
-    ("taxes", "migrations/postgres/003_backfill_es_vat_baseline.sql"), // toca `_taxes_backfill_hubs`
+    (
+        "taxes",
+        "migrations/postgres/003_backfill_es_vat_baseline.sql",
+    ), // toca `_taxes_backfill_hubs`
     ("verifactu", "migrations/postgres/006_drop_cert_columns.sql"), // DROP COLUMN
-    ("verifactu", "migrations/postgres/009_drop_auto_transmit.sql"), // DROP COLUMN
-    ("pricing", "migrations/postgres/004_price_list_item_tenant_fk.sql"), // DROP CONSTRAINT
+    (
+        "verifactu",
+        "migrations/postgres/009_drop_auto_transmit.sql",
+    ), // DROP COLUMN
+    (
+        "pricing",
+        "migrations/postgres/004_price_list_item_tenant_fk.sql",
+    ), // DROP CONSTRAINT
     ("services", "migrations/postgres/002_tax_rate_id.sql"),      // DROP COLUMN
     ("services", "migrations/postgres/004_discount_split.sql"),   // DROP COLUMN
 ];
@@ -271,12 +301,7 @@ pub fn kind_matches(sql: &str, kind: Kind) -> Result<(), GuardError> {
 }
 
 /// Revisa la migración y dice cómo aplicarla.
-pub fn check(
-    module_id: &str,
-    filename: &str,
-    sql: &str,
-    kind: Kind,
-) -> Result<Plan, GuardError> {
+pub fn check(module_id: &str, filename: &str, sql: &str, kind: Kind) -> Result<Plan, GuardError> {
     // Un fichero abuelado se aplica tal cual: ya está en las bases de la flota, y el contrato no
     // puede aplicarse retroactivamente sin romper justo lo que protege.
     if is_grandfathered(module_id, filename) {
@@ -344,7 +369,9 @@ pub fn check(
                 // `_deprecated_*` y las 4 publicadas son exactamente eso.
                 if let Some(verb) = reshape_verb(&strip_comments(&statement).to_uppercase()) {
                     if !contract_version_declared {
-                        return Err(GuardError::ContractWithoutVersion { verb: verb.to_string() });
+                        return Err(GuardError::ContractWithoutVersion {
+                            verb: verb.to_string(),
+                        });
                     }
                 }
                 out.push(set_aside_instead_of_dropping(&statement)?);
@@ -408,8 +435,14 @@ fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> 
         let head = sql[..at].trim_end(); // "ALTER TABLE sales_sale"
         let rest = sql[at + " DROP COLUMN ".len()..].trim();
         let (guard, column) = strip_if_exists(rest);
-        let column = column.split_whitespace().next().unwrap_or(column).trim_end_matches(';');
-        return Ok(format!("{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}"));
+        let column = column
+            .split_whitespace()
+            .next()
+            .unwrap_or(column)
+            .trim_end_matches(';');
+        return Ok(format!(
+            "{prose}{head} RENAME COLUMN {guard}{column} TO _deprecated_{column}"
+        ));
     }
 
     if upper.starts_with("DROP TABLE ") {
@@ -423,8 +456,14 @@ fn set_aside_instead_of_dropping(statement: &str) -> Result<String, GuardError> 
                 statement: sql.to_string(),
             });
         }
-        let table = table.split_whitespace().next().unwrap_or(table).trim_end_matches(';');
-        return Ok(format!("{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}"));
+        let table = table
+            .split_whitespace()
+            .next()
+            .unwrap_or(table)
+            .trim_end_matches(';');
+        return Ok(format!(
+            "{prose}ALTER TABLE {guard}{table} RENAME TO _deprecated_{table}"
+        ));
     }
 
     Ok(statement.to_string())
@@ -536,7 +575,13 @@ fn strip_if_exists(rest: &str) -> (&'static str, &str) {
 
 fn destructive_verb(statement: &str) -> Option<String> {
     let upper = strip_comments(statement).to_uppercase();
-    for verb in ["DROP COLUMN", "DROP TABLE", "DROP CONSTRAINT", "TRUNCATE", "DELETE FROM"] {
+    for verb in [
+        "DROP COLUMN",
+        "DROP TABLE",
+        "DROP CONSTRAINT",
+        "TRUNCATE",
+        "DELETE FROM",
+    ] {
         if upper.contains(verb) {
             return Some(verb.to_string());
         }
@@ -876,7 +921,12 @@ mod tests {
     }
 
     fn contract(sql: &str) -> Result<Plan, GuardError> {
-        check("sales", "migrations/postgres/013_x.sql", sql, Kind::Contract)
+        check(
+            "sales",
+            "migrations/postgres/013_x.sql",
+            sql,
+            Kind::Contract,
+        )
     }
 
     // ── La tabla pertenece al módulo ─────────────────────────────────────────────────
@@ -884,7 +934,10 @@ mod tests {
     /// Un `expand` **no se reescribe nunca**: su SQL sale tal cual.
     #[test]
     fn an_expand_is_applied_exactly_as_written() {
-        assert_eq!(expand("CREATE TABLE sales_sale (id BIGINT)").unwrap(), Plan::AsWritten);
+        assert_eq!(
+            expand("CREATE TABLE sales_sale (id BIGINT)").unwrap(),
+            Plan::AsWritten
+        );
     }
 
     #[test]
@@ -899,7 +952,10 @@ mod tests {
     fn a_module_may_not_touch_another_modules_tables() {
         let refused = expand("ALTER TABLE inventory_item ADD COLUMN x TEXT");
 
-        assert!(matches!(refused, Err(GuardError::ForeignTable { .. })), "{refused:?}");
+        assert!(
+            matches!(refused, Err(GuardError::ForeignTable { .. })),
+            "{refused:?}"
+        );
     }
 
     /// **Ni las del sistema.** Ya se cruzó una vez: `taxes/003` crea y dropea
@@ -926,7 +982,10 @@ mod tests {
     fn an_index_on_another_modules_table_is_caught() {
         let refused = expand("CREATE INDEX idx_x ON inventory_item (hub_id)");
 
-        assert!(matches!(refused, Err(GuardError::ForeignTable { .. })), "{refused:?}");
+        assert!(
+            matches!(refused, Err(GuardError::ForeignTable { .. })),
+            "{refused:?}"
+        );
     }
 
     #[test]
@@ -942,7 +1001,10 @@ mod tests {
     fn an_expand_may_not_destroy() {
         let refused = expand("ALTER TABLE sales_sale DROP COLUMN total");
 
-        assert!(matches!(refused, Err(GuardError::KindMismatch { .. })), "{refused:?}");
+        assert!(
+            matches!(refused, Err(GuardError::KindMismatch { .. })),
+            "{refused:?}"
+        );
     }
 
     #[test]
@@ -954,13 +1016,21 @@ mod tests {
             Kind::Backfill,
         );
 
-        assert!(matches!(refused, Err(GuardError::KindMismatch { .. })), "{refused:?}");
+        assert!(
+            matches!(refused, Err(GuardError::KindMismatch { .. })),
+            "{refused:?}"
+        );
     }
 
     #[test]
     fn a_backfill_may_update_its_own_rows() {
-        check("sales", "m.sql", "UPDATE sales_sale SET total = 0 WHERE total IS NULL", Kind::Backfill)
-            .expect("es exactamente para lo que existe");
+        check(
+            "sales",
+            "m.sql",
+            "UPDATE sales_sale SET total = 0 WHERE total IS NULL",
+            Kind::Backfill,
+        )
+        .expect("es exactamente para lo que existe");
     }
 
     // ── 🔑 `DROP` se traduce a rename ────────────────────────────────────────────────
@@ -1053,9 +1123,8 @@ mod tests {
         };
 
         assert!(
-            rewritten[0].ends_with(
-                "ALTER TABLE sales_old_line RENAME TO _deprecated_sales_old_line"
-            ),
+            rewritten[0]
+                .ends_with("ALTER TABLE sales_old_line RENAME TO _deprecated_sales_old_line"),
             "un comentario de bloque tampoco anula la traducción: {rewritten:?}"
         );
     }
@@ -1077,18 +1146,26 @@ mod tests {
             panic!("un contract se reescribe");
         };
 
-        let escaped: Vec<&String> =
-            rewritten.iter().filter(|s| s.to_uppercase().contains("DROP ")).collect();
+        let escaped: Vec<&String> = rewritten
+            .iter()
+            .filter(|s| s.to_uppercase().contains("DROP "))
+            .collect();
         assert!(
             escaped.is_empty(),
             "🔴 estos `DROP` se escaparon sin traducir: {escaped:?}"
         );
-        assert!(rewritten[1].ends_with("RENAME TO _deprecated_sales_old_line"), "{rewritten:?}");
+        assert!(
+            rewritten[1].ends_with("RENAME TO _deprecated_sales_old_line"),
+            "{rewritten:?}"
+        );
         assert!(
             rewritten[2].ends_with("RENAME COLUMN legacy_total TO _deprecated_legacy_total"),
             "{rewritten:?}"
         );
-        assert!(rewritten[3].ends_with("RENAME TO _deprecated_sales_old_cart"), "{rewritten:?}");
+        assert!(
+            rewritten[3].ends_with("RENAME TO _deprecated_sales_old_cart"),
+            "{rewritten:?}"
+        );
     }
 
     /// La red de seguridad: **ningún** `contract` puede dejar salir un `DROP TABLE`/`DROP COLUMN`
@@ -1160,7 +1237,10 @@ mod tests {
         let refused = contract("TRUNCATE sales_line").expect_err("un `contract` no vacía tablas");
         let message = refused.to_string();
         assert!(message.contains("TRUNCATE"), "{message}");
-        assert!(message.contains("backfill"), "y dice por dónde SÍ se limpian filas: {message}");
+        assert!(
+            message.contains("backfill"),
+            "y dice por dónde SÍ se limpian filas: {message}"
+        );
     }
 
     /// La otra mitad, y la que más se parece a un cambio inocente.
@@ -1195,8 +1275,9 @@ mod tests {
         )
         .expect("limpiar filas propias es DML, y el DML vive en un `backfill`");
 
-        check("sales", "m.sql", "TRUNCATE sales_line", Kind::Backfill)
-            .expect_err("un `TRUNCATE` no admite `WHERE` ni vuelta atrás: no cabe en ningún `kind`");
+        check("sales", "m.sql", "TRUNCATE sales_line", Kind::Backfill).expect_err(
+            "un `TRUNCATE` no admite `WHERE` ni vuelta atrás: no cabe en ningún `kind`",
+        );
     }
 
     /// 🔴 **Control de falsos positivos.** Un falso positivo aquí deja un módulo sin instalar, que
@@ -1232,8 +1313,9 @@ mod tests {
             ),
         ];
         for (module, sql) in published {
-            check(module, "migrations/postgres/099_x.sql", sql, Kind::Contract)
-                .unwrap_or_else(|e| panic!("`{module}` está publicado y tiene que seguir pasando: {e}"));
+            check(module, "migrations/postgres/099_x.sql", sql, Kind::Contract).unwrap_or_else(
+                |e| panic!("`{module}` está publicado y tiene que seguir pasando: {e}"),
+            );
         }
     }
 
@@ -1251,7 +1333,10 @@ mod tests {
             message.contains("una tabla por sentencia"),
             "el error tiene que decir qué escribir en su lugar: {message}"
         );
-        assert!(message.contains("sales_a"), "y enseñar la sentencia que lo provoca: {message}");
+        assert!(
+            message.contains("sales_a"),
+            "y enseñar la sentencia que lo provoca: {message}"
+        );
     }
 
     /// La misma grieta por el lado de la columna, que la issue no nombraba: un `ALTER` con más de
@@ -1277,7 +1362,10 @@ mod tests {
         let Plan::Rewritten(rewritten) = contract("DROP TABLE sales_old CASCADE").unwrap() else {
             panic!("un contract se reescribe");
         };
-        assert_eq!(rewritten, vec!["ALTER TABLE sales_old RENAME TO _deprecated_sales_old"]);
+        assert_eq!(
+            rewritten,
+            vec!["ALTER TABLE sales_old RENAME TO _deprecated_sales_old"]
+        );
     }
 
     /// **Un comentario no es SQL.** Comprobado contra los 24 módulos publicados: las palabras de
@@ -1299,8 +1387,13 @@ mod tests {
     #[test]
     fn apostrophes_inside_comments_do_not_open_a_string() {
         let sql = include_str!("../tests/fixtures/migration_guard/printing_002_jobs.sql");
-        check("printing", "migrations/postgres/002_jobs.sql", sql, Kind::Expand)
-            .unwrap_or_else(|e| panic!("a published, well-formed migration must pass: {e}"));
+        check(
+            "printing",
+            "migrations/postgres/002_jobs.sql",
+            sql,
+            Kind::Expand,
+        )
+        .unwrap_or_else(|e| panic!("a published, well-formed migration must pass: {e}"));
     }
 
     // ── Lo ya publicado: la lista de abuelados ───────────────────────────────────────
@@ -1314,8 +1407,13 @@ mod tests {
     fn what_was_already_published_still_applies() {
         let sql = "DROP TABLE sales_legacy_cart";
 
-        check("sales", "migrations/postgres/013_drop_legacy_cart.sql", sql, Kind::Expand)
-            .expect("un fichero abuelado pasa aunque su SQL ya no sea legal");
+        check(
+            "sales",
+            "migrations/postgres/013_drop_legacy_cart.sql",
+            sql,
+            Kind::Expand,
+        )
+        .expect("un fichero abuelado pasa aunque su SQL ya no sea legal");
     }
 
     /// **La lista solo puede encoger.** Es lo único que impide que «abuelar» se convierta en la vía
@@ -1332,7 +1430,12 @@ mod tests {
 
     #[test]
     fn a_new_file_in_a_grandfathered_module_gets_no_pass() {
-        let refused = check("sales", "migrations/postgres/099_nuevo.sql", "DROP TABLE sales_x", Kind::Expand);
+        let refused = check(
+            "sales",
+            "migrations/postgres/099_nuevo.sql",
+            "DROP TABLE sales_x",
+            Kind::Expand,
+        );
 
         assert!(
             matches!(refused, Err(GuardError::KindMismatch { .. })),
@@ -1359,8 +1462,15 @@ mod tests {
                    SET label = EXCLUDED.label, description = EXCLUDED.description";
 
         for kind in [Kind::Expand, Kind::Backfill] {
-            let plan = check("taxes", "migrations/postgres/005_category_labels.sql", sql, kind)
-                .unwrap_or_else(|e| panic!("un upsert sobre la tabla del propio módulo instala ({kind:?}): {e}"));
+            let plan = check(
+                "taxes",
+                "migrations/postgres/005_category_labels.sql",
+                sql,
+                kind,
+            )
+            .unwrap_or_else(|e| {
+                panic!("un upsert sobre la tabla del propio módulo instala ({kind:?}): {e}")
+            });
             assert_eq!(plan, Plan::AsWritten, "y se aplica tal cual ({kind:?})");
         }
     }
@@ -1369,8 +1479,13 @@ mod tests {
     /// puerta: un `UPDATE` de verdad sobre la tabla de otro módulo se rechaza igual.
     #[test]
     fn an_update_on_another_modules_table_is_still_refused() {
-        let refused = check("taxes", "migrations/postgres/006_x.sql", "UPDATE sales_sale SET total = 0", Kind::Backfill)
-            .expect_err("la tabla de otro modulo no se toca");
+        let refused = check(
+            "taxes",
+            "migrations/postgres/006_x.sql",
+            "UPDATE sales_sale SET total = 0",
+            Kind::Backfill,
+        )
+        .expect_err("la tabla de otro modulo no se toca");
 
         assert!(
             matches!(&refused, GuardError::ForeignTable { table, .. } if table == "sales_sale"),
@@ -1429,12 +1544,20 @@ mod tests {
     /// de un muro: un módulo sin instalar y sin explicación es el fallo caro.
     #[test]
     fn the_refusal_names_the_construct_and_the_way_out() {
-        let refused = check("sales", "migrations/postgres/020_x.sql", "DO $$ BEGIN PERFORM 1; END $$", Kind::Expand)
-            .expect_err("no inspeccionable");
+        let refused = check(
+            "sales",
+            "migrations/postgres/020_x.sql",
+            "DO $$ BEGIN PERFORM 1; END $$",
+            Kind::Expand,
+        )
+        .expect_err("no inspeccionable");
         let message = refused.to_string();
 
         assert!(message.contains("DO"), "nombra la construccion: {message}");
-        assert!(message.to_lowercase().contains("sql"), "y dice por donde SI se pasa: {message}");
+        assert!(
+            message.to_lowercase().contains("sql"),
+            "y dice por donde SI se pasa: {message}"
+        );
     }
 
     /// 🔴 **Control de falsos positivos**, que aquí valen un módulo sin instalar. Un `$$` dentro

@@ -21,7 +21,7 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -29,7 +29,11 @@ use serde_json::json;
 /// dinero, `pg_cell`), mientras que `COUNT(*)` es `INT8` → número. Lee un i64 en ambos casos.
 fn i64_of(v: &serde_json::Value) -> i64 {
     v.as_i64()
-        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .or_else(|| {
+            v.as_str()
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|f| f.round() as i64)
+        })
         .unwrap_or_else(|| panic!("valor entero/NUMERIC esperado, got {v}"))
 }
 
@@ -41,7 +45,11 @@ fn params(v: serde_json::Value) -> Params {
 /// JSON **string** (`"352"`), no número. Acepta ambas representaciones.
 fn cents(v: &serde_json::Value) -> i64 {
     v.as_i64()
-        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .or_else(|| {
+            v.as_str()
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|f| f.round() as i64)
+        })
         .unwrap_or_else(|| panic!("no es un importe numérico: {v:?}"))
 }
 
@@ -64,26 +72,43 @@ async fn kpi_row(rt: &Runtime, query: &str, ctx: &RequestContext) -> serde_json:
         .execute_query(query, &Params::new(), ctx)
         .await
         .unwrap_or_else(|e| panic!("query `{query}` del widget falló: {e:?}"));
-    assert!(!rows.is_empty(), "la query `{query}` del widget no devolvió filas");
+    assert!(
+        !rows.is_empty(),
+        "la query `{query}` del widget no devolvió filas"
+    );
     rows[0].clone()
 }
 
 // ── sales: `sales.today` → total del día + nº de tickets ─────────────────────────────────────────
 #[tokio::test]
 async fn sales_today_kpi_shows_real_total_and_tickets() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut rt = rt().await;
     // sales depende de taxes (ADR-0066) + inventory + customers.
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
-    rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
-    rt.install_from_dir(&mdir("customers")).await.expect("customers");
+    rt.install_from_dir(&mdir("inventory"))
+        .await
+        .expect("inventory");
+    rt.install_from_dir(&mdir("customers"))
+        .await
+        .expect("customers");
     rt.install_from_dir(&mdir("sales")).await.expect("sales");
     let ctx = admin();
 
     // KPI en un hub sin ventas: 0 € / 0 tickets (estado real, no placeholder).
     let empty = kpi_row(&rt, "sales.today", &ctx).await;
-    assert_eq!(empty["total"].as_i64().unwrap_or(0), 0, "sin ventas el total es 0");
-    assert_eq!(empty["tickets"].as_i64().unwrap_or(0), 0, "sin ventas los tickets son 0");
+    assert_eq!(
+        empty["total"].as_i64().unwrap_or(0),
+        0,
+        "sin ventas el total es 0"
+    );
+    assert_eq!(
+        empty["tickets"].as_i64().unwrap_or(0),
+        0,
+        "sin ventas los tickets son 0"
+    );
 
     // A REAL sale: Café 1.21€×2 + Agua 1.10€×1, tax included → total 352 cents (proven by `tests/checkout.hub.test.py` in the sales repo, hub#1264).
     // With runtime and ctx sharing "h1" (hub#594) the seeded catalog is visible, so complete_sale
@@ -115,17 +140,29 @@ async fn sales_today_kpi_shows_real_total_and_tickets() {
 
     // El KPI refleja la venta real: 352 céntimos (3,52 €) y 1 ticket.
     let after = kpi_row(&rt, "sales.today", &ctx).await;
-    assert_eq!(cents(&after["total"]), 352, "el KPI de ventas de hoy debe ser el total real");
-    assert_eq!(i64_of(&after["tickets"]), 1, "el KPI de tickets debe contar la venta real");
+    assert_eq!(
+        cents(&after["total"]),
+        352,
+        "el KPI de ventas de hoy debe ser el total real"
+    );
+    assert_eq!(
+        i64_of(&after["tickets"]),
+        1,
+        "el KPI de tickets debe contar la venta real"
+    );
 }
 
 // ── inventory: `inventory.products.stats` → stock bajo, valor, en stock ───────────────────────────
 #[tokio::test]
 async fn inventory_stats_kpis_show_real_numbers() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
-    rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
+    rt.install_from_dir(&mdir("inventory"))
+        .await
+        .expect("inventory");
     let ctx = admin();
 
     // Un producto REAL con stock 3 y umbral 5 (escala 10⁶) → en stock bajo; valoración A COSTE
@@ -143,15 +180,29 @@ async fn inventory_stats_kpis_show_real_numbers() {
     .expect("products.create");
 
     let stats = kpi_row(&rt, "inventory.products.stats", &ctx).await;
-    assert_eq!(i64_of(&stats["products_low_stock"]), 1, "1 producto en stock bajo (real)");
-    assert_eq!(i64_of(&stats["products_in_stock"]), 1, "1 producto con existencias (real)");
-    assert_eq!(i64_of(&stats["total_inventory_value"]), 600, "valoración a COSTE: 200 × 3");
+    assert_eq!(
+        i64_of(&stats["products_low_stock"]),
+        1,
+        "1 producto en stock bajo (real)"
+    );
+    assert_eq!(
+        i64_of(&stats["products_in_stock"]),
+        1,
+        "1 producto con existencias (real)"
+    );
+    assert_eq!(
+        i64_of(&stats["total_inventory_value"]),
+        600,
+        "valoración a COSTE: 200 × 3"
+    );
 }
 
 // ── staff: `staff.members.stats` → empleados activos ─────────────────────────────────────────────
 #[tokio::test]
 async fn staff_headcount_kpi_counts_active_members() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut rt = rt().await;
     rt.install_from_dir(&mdir("staff")).await.expect("staff");
     let ctx = admin();
@@ -168,9 +219,15 @@ async fn staff_headcount_kpi_counts_active_members() {
     // El alta ya NO puede nacer `terminated` (staff 36c0bd2): el enum de `member_create` es
     // `active|inactive|on_leave` y la baja es una PUERTA propia — `staff.members.delete`, con su
     // fecha y su motivo. Se termina por ahí, que además es lo que ejerce el camino real.
-    rt.execute_command("staff.members.create", &create("Ana", "active"), &ctx).await.unwrap();
-    rt.execute_command("staff.members.create", &create("Beto", "active"), &ctx).await.unwrap();
-    rt.execute_command("staff.members.create", &create("Caro", "active"), &ctx).await.unwrap();
+    rt.execute_command("staff.members.create", &create("Ana", "active"), &ctx)
+        .await
+        .unwrap();
+    rt.execute_command("staff.members.create", &create("Beto", "active"), &ctx)
+        .await
+        .unwrap();
+    rt.execute_command("staff.members.create", &create("Caro", "active"), &ctx)
+        .await
+        .unwrap();
     let caro = rt
         .execute_query("staff.members.list", &Params::new(), &ctx)
         .await
@@ -190,15 +247,23 @@ async fn staff_headcount_kpi_counts_active_members() {
     .unwrap();
 
     let stats = kpi_row(&rt, "staff.members.stats", &ctx).await;
-    assert_eq!(i64_of(&stats["active_members"]), 2, "el KPI cuenta SOLO los activos reales");
+    assert_eq!(
+        i64_of(&stats["active_members"]),
+        2,
+        "el KPI cuenta SOLO los activos reales"
+    );
 }
 
 // ── cash_register: `cash_register.current_session` → efectivo esperado en caja ─────────────────────
 #[tokio::test]
 async fn cash_register_current_session_kpi_shows_expected_total() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut rt = rt().await;
-    rt.install_from_dir(&mdir("cash_register")).await.expect("cash_register");
+    rt.install_from_dir(&mdir("cash_register"))
+        .await
+        .expect("cash_register");
     let ctx = admin();
 
     // Sesión con apertura 100,00 € (10000 céntimos) + una venta en efectivo de 50,00 €.
@@ -244,21 +309,35 @@ async fn cash_register_current_session_kpi_shows_expected_total() {
 // ── verifactu: `verifactu.stats.compliance_summary` → registros pendientes de la AEAT ──────────────
 #[tokio::test]
 async fn verifactu_pending_kpi_counts_real_records() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let mut rt = rt().await;
     // verifactu depends_on invoice → sales → inventory + taxes (manifests actuales; customers lo
     // pide el propio flujo de facturación).
     rt.install_from_dir(&mdir("taxes")).await.expect("taxes");
-    rt.install_from_dir(&mdir("inventory")).await.expect("inventory");
-    rt.install_from_dir(&mdir("customers")).await.expect("customers");
+    rt.install_from_dir(&mdir("inventory"))
+        .await
+        .expect("inventory");
+    rt.install_from_dir(&mdir("customers"))
+        .await
+        .expect("customers");
     rt.install_from_dir(&mdir("sales")).await.expect("sales");
-    rt.install_from_dir(&mdir("invoice")).await.expect("invoice");
-    rt.install_from_dir(&mdir("verifactu")).await.expect("verifactu");
+    rt.install_from_dir(&mdir("invoice"))
+        .await
+        .expect("invoice");
+    rt.install_from_dir(&mdir("verifactu"))
+        .await
+        .expect("verifactu");
     let ctx = admin();
 
     // Sin registros: 0 pendientes (estado real, no placeholder).
     let empty = kpi_row(&rt, "verifactu.stats.compliance_summary", &ctx).await;
-    assert_eq!(empty["pending_count"].as_i64().unwrap_or(0), 0, "sin registros, 0 pendientes");
+    assert_eq!(
+        empty["pending_count"].as_i64().unwrap_or(0),
+        0,
+        "sin registros, 0 pendientes"
+    );
 
     // Un registro VeriFactu REAL en estado `pending`. `records.create` calcula el hash-chain en el
     // PLUGIN NATIVO first-party (ADR-0009, compliance-critical), que no se enlaza en este runtime

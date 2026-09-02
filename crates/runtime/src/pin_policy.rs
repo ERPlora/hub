@@ -311,7 +311,10 @@ mod tests {
         }
         // The three spellings that ARE the contract still read back.
         assert_eq!(PinPolicy::from_stored(Some("always")), PinPolicy::Always);
-        assert_eq!(PinPolicy::from_stored(Some("per_shift")), PinPolicy::PerShift);
+        assert_eq!(
+            PinPolicy::from_stored(Some("per_shift")),
+            PinPolicy::PerShift
+        );
         assert_eq!(PinPolicy::from_stored(Some("never")), PinPolicy::Never);
     }
 

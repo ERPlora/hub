@@ -30,7 +30,11 @@ type Beats = Arc<Mutex<Vec<(HeaderMap, Value)>>>;
 
 /// Un Cloud que solo sabe hacer una cosa: apuntar quién le ha latido.
 async fn spawn_cloud() -> (String, Beats) {
-    async fn capture(State(beats): State<Beats>, headers: HeaderMap, Json(body): Json<Value>) -> StatusCode {
+    async fn capture(
+        State(beats): State<Beats>,
+        headers: HeaderMap,
+        Json(body): Json<Value>,
+    ) -> StatusCode {
         beats.lock().unwrap().push((headers, body));
         StatusCode::OK
     }
@@ -48,10 +52,16 @@ async fn spawn_cloud() -> (String, Beats) {
 /// Un hub arrancado del todo, hablando con `cloud_base_url`. `token` a `None` = sin enrolar.
 async fn booted_hub(cloud_base_url: &str, token: Option<&str>) -> AppState {
     let db = fresh_db().await;
-    erplora_runtime::migrations::ensure_table(&db).await.unwrap();
-    erplora_runtime::installer::ensure_hub_module_table(&db).await.unwrap();
+    erplora_runtime::migrations::ensure_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db)
+        .await
+        .unwrap();
     erplora_runtime::identity::ensure_tables(&db).await.unwrap();
-    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID).await.unwrap();
+    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID)
+        .await
+        .unwrap();
 
     let mut config = HubConfig::from_env_with_auth(AuthMode::Dev);
     config.cloud_base_url = cloud_base_url.to_string();
@@ -90,7 +100,11 @@ async fn a_hub_that_is_ready_tells_the_cloud_with_its_machine_credential() {
     boot_announce::announce_when_ready(state, IMPATIENT, POLL).await;
 
     let beats = beats.lock().unwrap();
-    assert_eq!(beats.len(), 1, "el hub tenía que latir exactamente una vez al arrancar");
+    assert_eq!(
+        beats.len(),
+        1,
+        "el hub tenía que latir exactamente una vez al arrancar"
+    );
     let (headers, body) = &beats[0];
     assert_eq!(headers["x-hub-id"], DEV_HUB_ID);
     assert_eq!(headers["x-hub-token"], "machine-token");
@@ -110,7 +124,10 @@ async fn a_hub_missing_a_module_never_announces_itself() {
 
     boot_announce::announce_when_ready(state, IMPATIENT, POLL).await;
 
-    assert!(beats.lock().unwrap().is_empty(), "un hub incompleto no puede declararse listo");
+    assert!(
+        beats.lock().unwrap().is_empty(),
+        "un hub incompleto no puede declararse listo"
+    );
 }
 
 /// Un `pnpm dev` local no está enrolado: no hay credencial de máquina, no hay a quién avisar.

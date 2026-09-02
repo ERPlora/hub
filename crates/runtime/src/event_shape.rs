@@ -471,9 +471,8 @@ fn event_is_about_a_person(event_name: &str) -> bool {
 /// Any segment of the path naming something that is a person's ONLY once the record is known to be
 /// about one ([`PERSONAL_WHEN_ABOUT_A_PERSON`]).
 fn path_names_a_person(path: &str) -> bool {
-    path.split('.').any(|segment| {
-        terms(segment).any(|t| PERSONAL_WHEN_ABOUT_A_PERSON.contains(&t.as_str()))
-    })
+    path.split('.')
+        .any(|segment| terms(segment).any(|t| PERSONAL_WHEN_ABOUT_A_PERSON.contains(&t.as_str())))
 }
 
 /// Any segment of the path — the leaf or any ancestor — naming a person, a credential or a
@@ -517,7 +516,10 @@ fn terms(segment: &str) -> impl Iterator<Item = String> {
     if !current.is_empty() {
         words.push(current);
     }
-    let pairs: Vec<String> = words.windows(2).map(|w| format!("{}{}", w[0], w[1])).collect();
+    let pairs: Vec<String> = words
+        .windows(2)
+        .map(|w| format!("{}{}", w[0], w[1]))
+        .collect();
     words.into_iter().chain(pairs)
 }
 
@@ -643,7 +645,10 @@ mod tests {
     fn the_entity_is_recognised_in_plural_and_in_a_longer_name() {
         for name in ["customers.imported", "customer.contact.updated"] {
             let fields = shape_of(name, &[json!({ "name": "Berta Segunda" })]);
-            assert!(fields["name"].redacted, "{name} handed over a person's name");
+            assert!(
+                fields["name"].redacted,
+                "{name} handed over a person's name"
+            );
         }
         // No entity, no promotion: the path and the value rules are all there is, exactly as before.
         let fields = shape_of("reminder.due", &[json!({ "name": "Corte de pelo" })]);
@@ -763,7 +768,11 @@ mod tests {
 
         assert!(fields["label"].truncated);
         let sample = fields["label"].sample.as_ref().unwrap().as_str().unwrap();
-        assert_eq!(sample.chars().count(), MAX_SAMPLE_CHARS + 1, "cut plus the ellipsis");
+        assert_eq!(
+            sample.chars().count(),
+            MAX_SAMPLE_CHARS + 1,
+            "cut plus the ellipsis"
+        );
         assert!(sample.ends_with('…'));
     }
 
@@ -782,7 +791,10 @@ mod tests {
             Some(json!("20.00")),
             "the newest event supplies the example"
         );
-        assert_eq!(fields["coupon"].seen_in, 1, "present in one of two = optional");
+        assert_eq!(
+            fields["coupon"].seen_in, 1,
+            "present in one of two = optional"
+        );
         assert_eq!(
             fields["discount"].sample,
             Some(json!("2.00")),
@@ -795,7 +807,10 @@ mod tests {
     #[test]
     fn a_payload_that_is_not_an_object_has_no_fields() {
         assert_eq!(
-            infer("sale.completed", &[json!("just a string"), json!(7), json!(null)]),
+            infer(
+                "sale.completed",
+                &[json!("just a string"), json!(7), json!(null)]
+            ),
             Vec::new()
         );
     }

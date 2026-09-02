@@ -25,7 +25,10 @@ const INDEX_HTML: &str = "<!doctype html><title>ERPlora SPA</title><div id=app><
 /// `remove_dir_all` final de un test borraba el dist mientras otro aún servía de él (404 flaky,
 /// cazada en la review del 2026-07-12).
 fn temp_dist(suffix: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("erplora_adr0050_spa_{}_{suffix}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "erplora_adr0050_spa_{}_{suffix}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("crear dist temporal");
     std::fs::write(dir.join("index.html"), INDEX_HTML).expect("escribir index.html");
@@ -54,7 +57,11 @@ async fn api_routes_are_not_shadowed_by_the_static_frontend() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(body_string(resp).await, "pong", "la API gana sobre el estático");
+    assert_eq!(
+        body_string(resp).await,
+        "pong",
+        "la API gana sobre el estático"
+    );
 
     let resp = router_with_front(&dist)
         .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
@@ -87,7 +94,11 @@ async fn unknown_client_route_falls_back_to_spa_index() {
     // Una ruta del router de cliente (sin fichero en disco) debe servir el index.html, no 404 — así
     // un refresco en `/dashboard` o `/modules/...` carga la SPA en lugar de romper.
     let resp = router_with_front(&dist)
-        .oneshot(Request::get("/dashboard/inventory").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/dashboard/inventory")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);

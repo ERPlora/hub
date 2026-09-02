@@ -24,7 +24,8 @@ pub(crate) async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> R
         consult_endpoint_of(&config),
         &issuer_nif,
         &ctx.now,
-    ).await?;
+    )
+    .await?;
     let (ops, limit) = aeat_snapshot_ops(&ctx, &issuer_nif, &records);
     let mut out = Output::new();
     for o in ops {
@@ -69,7 +70,8 @@ pub(crate) async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Re
         consult_endpoint_of(&config),
         &issuer_nif,
         &ctx.now,
-    ).await?;
+    )
+    .await?;
     if records.is_empty() {
         return Err(RuntimeError::Native(
             "la AEAT no devolvió registros para este emisor/periodo; nada que recuperar".into(),

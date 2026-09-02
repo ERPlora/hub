@@ -62,9 +62,7 @@ pub(crate) fn envelope_json(envelope: &GatewayEnvelope<'_>) -> serde_json::Value
 /// everything lands in the contingency backoff except a 401, which gets ONE in-line retry with a
 /// fresh token first — the Bearer lives 300 s and a queue drain can outlive it legitimately.
 fn refusal_error(status: u16, code: &str, message: &str) -> VerifactuError {
-    VerifactuError::Transmission(format!(
-        "pasarela fiscal: {status} {code}: {message}"
-    ))
+    VerifactuError::Transmission(format!("pasarela fiscal: {status} {code}: {message}"))
 }
 
 /// POSTs the envelope to the cell and hands back the AEAT's raw SOAP body — the SAME string
@@ -112,10 +110,9 @@ async fn post_transmission(
     let client = reqwest::Client::builder()
         .use_rustls_tls()
         .identity(access.identity.clone())
-        .add_root_certificate(
-            reqwest::Certificate::from_pem(&access.ca_pem)
-                .map_err(|e| VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}")))?,
-        )
+        .add_root_certificate(reqwest::Certificate::from_pem(&access.ca_pem).map_err(|e| {
+            VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}"))
+        })?)
         .timeout(GATEWAY_TIMEOUT)
         .build()
         .map_err(|e| VerifactuError::Transmission(format!("cliente mTLS de la pasarela: {e}")))?;
@@ -151,16 +148,26 @@ async fn post_transmission(
             .map_err(|e| {
                 VerifactuError::Transmission(format!("aeat_response_b64 no es base64: {e}"))
             })?;
-        return String::from_utf8(bytes).map(PostOutcome::AeatBody).map_err(|e| {
-            VerifactuError::Transmission(format!("respuesta AEAT no UTF-8 vía pasarela: {e}"))
-        });
+        return String::from_utf8(bytes)
+            .map(PostOutcome::AeatBody)
+            .map_err(|e| {
+                VerifactuError::Transmission(format!("respuesta AEAT no UTF-8 vía pasarela: {e}"))
+            });
     }
 
     // The error contract is `{code, message}` — public material, safe to surface on the record.
     let (code, message) = match serde_json::from_str::<serde_json::Value>(&body) {
         Ok(value) => (
-            value.get("code").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
-            value.get("message").and_then(|v| v.as_str()).unwrap_or("").to_owned(),
+            value
+                .get("code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
+            value
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned(),
         ),
         Err(_) => (String::new(), String::new()),
     };
@@ -205,7 +212,11 @@ mod tests {
         assert_eq!(decoded, xml.as_bytes(), "the EXACT bytes travel");
         let sha = value["xml_sha256"].as_str().unwrap();
         assert_eq!(sha.len(), 64);
-        assert_eq!(sha, sha.to_lowercase(), "lowercase hex, as the cell demands");
+        assert_eq!(
+            sha,
+            sha.to_lowercase(),
+            "lowercase hex, as the cell demands"
+        );
         let recomputed: String = sha2::Sha256::digest(xml.as_bytes())
             .iter()
             .map(|byte| format!("{byte:02x}"))
@@ -226,6 +237,193 @@ mod tests {
         );
     }
 
+    /// One canned HTTP answer per accepted connection, in order. Plain HTTP on purpose: the
+    /// mTLS handshake belongs to the REAL cell (and to the PRE end-to-end); what this pins is
+    /// the transport glue — receipt decoding and the 401 semantics.
+    async fn canned_cell(answers: Vec<String>) -> String {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            for answer in answers {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut buffer = [0u8; 65536];
+                let _ = socket.read(&mut buffer).await;
+                let _ = socket.write_all(answer.as_bytes()).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+        format!("http://{address}")
+    }
+
+    fn http_json(status: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn receipt_with(aeat_body: &str) -> String {
+        serde_json::json!({
+            "schema_version": 1,
+            "transmission_id": "record-42",
+            "request_sha256": "00".repeat(32),
+            "certificate_generation": "seal-test",
+            "aeat_http_status": 200,
+            "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(aeat_body),
+            "aeat_response_sha256": "00".repeat(32),
+            "received_at": "2026-09-02T10:00:00Z",
+        })
+        .to_string()
+    }
+
+    fn test_access(url: &str) -> GatewayAccess {
+        // The CA is required by the client builder; over plain HTTP it is simply unused.
+        let group =
+            openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::X9_62_PRIME256V1).unwrap();
+        let pkey = openssl::pkey::PKey::from_ec_key(openssl::ec::EcKey::generate(&group).unwrap())
+            .unwrap();
+        let mut name = openssl::x509::X509NameBuilder::new().unwrap();
+        name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, "canned")
+            .unwrap();
+        let name = name.build();
+        let mut cert = openssl::x509::X509::builder().unwrap();
+        cert.set_version(2).unwrap();
+        cert.set_subject_name(&name).unwrap();
+        cert.set_issuer_name(&name).unwrap();
+        cert.set_pubkey(&pkey).unwrap();
+        cert.set_not_before(&openssl::asn1::Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        cert.set_not_after(&openssl::asn1::Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
+        cert.sign(&pkey, openssl::hash::MessageDigest::sha256())
+            .unwrap();
+        let ca_pem = cert.build().to_pem().unwrap();
+        let bundle = format!(
+            "{}\n{}",
+            String::from_utf8(pkey.private_key_to_pem_pkcs8().unwrap()).unwrap(),
+            String::from_utf8(ca_pem.clone()).unwrap(),
+        );
+        GatewayAccess {
+            url: url.to_owned(),
+            token: "bearer-token".to_owned(),
+            identity: reqwest::Identity::from_pem(bundle.as_bytes()).unwrap(),
+            ca_pem,
+        }
+    }
+
+    struct InvalidateCountingHost {
+        invalidations: std::sync::Mutex<u32>,
+        fresh_access_url: String,
+    }
+    #[async_trait::async_trait]
+    impl NativeHost for InvalidateCountingHost {
+        async fn read(
+            &self,
+            _sql: &str,
+            _params: &erplora_db::Params,
+        ) -> erplora_runtime::Result<Vec<serde_json::Value>> {
+            Ok(vec![])
+        }
+        async fn fiscal_gateway_access(
+            &self,
+            _hub_id: &str,
+        ) -> erplora_runtime::Result<Option<GatewayAccess>> {
+            Ok(Some(test_access(&self.fresh_access_url)))
+        }
+        async fn fiscal_gateway_invalidate(&self) {
+            *self.invalidations.lock().unwrap() += 1;
+        }
+    }
+
+    fn envelope<'a>(xml: &'a str) -> GatewayEnvelope<'a> {
+        GatewayEnvelope {
+            hub_id: "hub-1",
+            obligado_nif: "B12345678",
+            environment: "testing",
+            transmission_id: "record-42",
+            xml,
+        }
+    }
+
+    /// The glue that matters: a 200 receipt comes back as the DECODED AEAT SOAP — the same
+    /// string `post_soap` would have returned, so the downstream chain is road-blind.
+    #[tokio::test]
+    async fn a_200_receipt_hands_back_the_decoded_aeat_body() {
+        let soap = "<soapenv:Envelope>respuesta AEAT</soapenv:Envelope>";
+        let url = canned_cell(vec![http_json("200 OK", &receipt_with(soap))]).await;
+        let host = InvalidateCountingHost {
+            invalidations: std::sync::Mutex::new(0),
+            fresh_access_url: url.clone(),
+        };
+
+        let body = transmit_via_gateway(&host, "hub-1", &test_access(&url), &envelope("<x/>"))
+            .await
+            .unwrap();
+
+        assert_eq!(body, soap);
+        assert_eq!(
+            *host.invalidations.lock().unwrap(),
+            0,
+            "no 401, no invalidation"
+        );
+    }
+
+    /// A 401 invalidates the cached Bearer and retries EXACTLY once with a fresh access; the
+    /// second answer is the one that counts.
+    #[tokio::test]
+    async fn a_401_invalidates_the_token_and_retries_exactly_once() {
+        let soap = "<soapenv:Envelope>tras renovar</soapenv:Envelope>";
+        let url = canned_cell(vec![
+            http_json(
+                "401 Unauthorized",
+                r#"{"code":"invalid_hub_token","message":"token is expired"}"#,
+            ),
+            http_json("200 OK", &receipt_with(soap)),
+        ])
+        .await;
+        let host = InvalidateCountingHost {
+            invalidations: std::sync::Mutex::new(0),
+            fresh_access_url: url.clone(),
+        };
+
+        let body = transmit_via_gateway(&host, "hub-1", &test_access(&url), &envelope("<x/>"))
+            .await
+            .unwrap();
+
+        assert_eq!(body, soap);
+        assert_eq!(
+            *host.invalidations.lock().unwrap(),
+            1,
+            "exactly one invalidation"
+        );
+    }
+
+    /// And a second 401 is a real refusal — no loop, the record goes to the backoff queue.
+    #[tokio::test]
+    async fn a_second_401_is_a_refusal_not_a_loop() {
+        let refusal = http_json(
+            "401 Unauthorized",
+            r#"{"code":"invalid_hub_token","message":"still refused"}"#,
+        );
+        let url = canned_cell(vec![refusal.clone(), refusal]).await;
+        let host = InvalidateCountingHost {
+            invalidations: std::sync::Mutex::new(0),
+            fresh_access_url: url.clone(),
+        };
+
+        let err = transmit_via_gateway(&host, "hub-1", &test_access(&url), &envelope("<x/>"))
+            .await
+            .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("401"), "{message}");
+        assert!(message.contains("invalid_hub_token"), "{message}");
+        assert_eq!(*host.invalidations.lock().unwrap(), 1);
+    }
+
     /// The refusal keeps the cell's `{code, message}` — public material — and stays a
     /// `Transmission` error: `::Tls` would fire the delegated-certificate refetch signal, which
     /// has no business on the gateway road.
@@ -239,6 +437,9 @@ mod tests {
             }
             other => panic!("expected Transmission, got {other:?}"),
         }
-        assert!(!crate::aeat::is_tls_failure(&err), "must not trip the refetch trigger");
+        assert!(
+            !crate::aeat::is_tls_failure(&err),
+            "must not trip the refetch trigger"
+        );
     }
 }

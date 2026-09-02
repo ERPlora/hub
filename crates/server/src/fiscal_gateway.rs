@@ -56,7 +56,10 @@ impl GatewayToken {
         };
         Ok(Self {
             token: text("token")?,
-            expires_in: value.get("expires_in").and_then(|v| v.as_i64()).unwrap_or(300),
+            expires_in: value
+                .get("expires_in")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(300),
             gateway_url: text("gateway_url")?,
             obligado_nif: text("obligado_nif")?,
             grant_version: value.get("grant_version").and_then(|v| v.as_i64()),
@@ -198,9 +201,7 @@ impl GatewayBroker for HubGatewayBroker {
         };
 
         let token = self.token().await.map_err(|error| {
-            erplora_runtime::errors::RuntimeError::Certificate(format!(
-                "gateway token: {error}"
-            ))
+            erplora_runtime::errors::RuntimeError::Certificate(format!("gateway token: {error}"))
         })?;
         let Some(token) = token else {
             return Ok(None);
@@ -293,8 +294,11 @@ mod tests {
     /// quoted — on a proxy mishap it could carry the bearer itself.
     #[tokio::test]
     async fn a_bad_token_response_never_quotes_the_body() {
-        let (base, _hits, server) =
-            cloud_stub(StatusCode::OK, "SECRET-BEARER-IN-BROKEN-BODY not json".into()).await;
+        let (base, _hits, server) = cloud_stub(
+            StatusCode::OK,
+            "SECRET-BEARER-IN-BROKEN-BODY not json".into(),
+        )
+        .await;
 
         let error = fetch_gateway_token(&reqwest::Client::new(), &base, &machine())
             .await

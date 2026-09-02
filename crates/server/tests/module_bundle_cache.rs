@@ -89,8 +89,15 @@ async fn get(router: axum::Router, uri: &str) -> Res {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    let body =
-        String::from_utf8(resp.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
+    let body = String::from_utf8(
+        resp.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
     Res {
         status,
         cache_control,
@@ -100,7 +107,10 @@ async fn get(router: axum::Router, uri: &str) -> Res {
 
 /// Un temp dir propio por test (los tests del crate corren en paralelo sobre el mismo tmp).
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("erplora-bundle-cache-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "erplora-bundle-cache-{name}-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }
@@ -214,7 +224,8 @@ async fn versioned_assets_are_immutable_and_unversioned_ones_always_revalidate()
 /// el runtime tiene AHORA. Es la fuente honesta para la url del bundle.
 #[tokio::test]
 async fn navigation_tells_the_shell_which_version_each_module_is_at() {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_inventory");
+    let fixture =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixture_inventory");
     let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&fixture).await.unwrap();
     let installed = rt

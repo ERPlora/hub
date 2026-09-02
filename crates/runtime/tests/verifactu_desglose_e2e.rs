@@ -77,7 +77,9 @@ fn handlers_built() -> bool {
 async fn fiscal_chain() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.ensure_system_tables().await.expect("ensure_system_tables");
+    rt.ensure_system_tables()
+        .await
+        .expect("ensure_system_tables");
     for m in ["taxes", "inventory", "customers", "sales", "invoice"] {
         rt.install_from_dir(&mdir(m))
             .await
@@ -90,7 +92,9 @@ async fn fiscal_chain() -> Runtime {
     up.insert("business_tax_id".into(), json!("B12345674"));
     up.insert("business_legal_name".into(), json!("Bar Paco SL"));
     up.insert("country_code".into(), json!("ES"));
-    rt.set_settings(&up, "u1").await.expect("set business identity");
+    rt.set_settings(&up, "u1")
+        .await
+        .expect("set business identity");
     rt
 }
 
@@ -177,20 +181,25 @@ struct Entry {
 }
 
 fn field(v: &Value, k: &str) -> String {
-    v.get(k).and_then(Value::as_str).unwrap_or_default().to_string()
+    v.get(k)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// Parses `invoice_invoice.tax_breakdown`. **Array only**: the object generation is history that
 /// only `aeat::desglose` still has to read (already-chained invoices), never something the module
 /// may produce today.
 fn breakdown_of(inv: &Value) -> Vec<Entry> {
-    let raw = inv["tax_breakdown"].as_str().expect("tax_breakdown is a string column");
+    let raw = inv["tax_breakdown"]
+        .as_str()
+        .expect("tax_breakdown is a string column");
     let parsed: Value = serde_json::from_str(raw).expect("tax_breakdown is JSON");
     let entries = match &parsed {
         Value::Array(a) => a.clone(),
-        other => panic!(
-            "`tax_breakdown` must be the ARRAY of full fiscal keys (ADR-0186); got {other}"
-        ),
+        other => {
+            panic!("`tax_breakdown` must be the ARRAY of full fiscal keys (ADR-0186); got {other}")
+        }
     };
     entries
         .iter()
@@ -199,9 +208,15 @@ fn breakdown_of(inv: &Value) -> Vec<Entry> {
             regime: field(e, "regime"),
             class: field(e, "class"),
             exempt_reason: field(e, "exempt_reason"),
-            rate: e["rate"].as_f64().unwrap_or_else(|| panic!("entry without rate: {e}")),
-            base: e["base"].as_i64().unwrap_or_else(|| panic!("base must be integer cents: {e}")),
-            quota: e["quota"].as_i64().unwrap_or_else(|| panic!("quota must be integer cents: {e}")),
+            rate: e["rate"]
+                .as_f64()
+                .unwrap_or_else(|| panic!("entry without rate: {e}")),
+            base: e["base"]
+                .as_i64()
+                .unwrap_or_else(|| panic!("base must be integer cents: {e}")),
+            quota: e["quota"]
+                .as_i64()
+                .unwrap_or_else(|| panic!("quota must be integer cents: {e}")),
         })
         .collect()
 }
@@ -238,8 +253,11 @@ fn tag(chunk: &str, name: &str) -> Option<String> {
 
 /// AEAT amounts travel as euros with 2 decimals; the whole system reasons in cents (ADR-0123).
 fn cents(euros: &str) -> i64 {
-    (euros.parse::<f64>().unwrap_or_else(|_| panic!("not an AEAT amount: {euros}")) * 100.0).round()
-        as i64
+    (euros
+        .parse::<f64>()
+        .unwrap_or_else(|_| panic!("not an AEAT amount: {euros}"))
+        * 100.0)
+        .round() as i64
 }
 
 /// The cross-check the AEAT itself runs over a `RegistroAlta`: `CuotaTotal` is the sum of the
@@ -296,7 +314,10 @@ async fn issue_ticket(rt: &Runtime, items: &[(&str, i64, i64, f64, &str)]) -> Va
     .await
     .expect("invoice.create");
 
-    let list = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    let list = rt
+        .execute_query("invoice.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     let id = list.last().expect("one invoice")["id"].clone();
     let got = rt
         .execute_query("invoice.get", &params(json!({ "invoice_id": id })), &ctx)
@@ -329,7 +350,11 @@ async fn a_mixed_ticket_declares_one_breakdown_line_per_real_rate() {
     .await;
 
     let entries = breakdown_of(&inv);
-    assert_eq!(entries.len(), 2, "one entry per REAL rate, not one aggregate: {entries:#?}");
+    assert_eq!(
+        entries.len(),
+        2,
+        "one entry per REAL rate, not one aggregate: {entries:#?}"
+    );
     assert!(
         !entries.iter().any(|e| (e.rate - 17.33).abs() < 0.01),
         "the effective rate is not a Spanish rate and must never be declared: {entries:#?}"
@@ -340,32 +365,69 @@ async fn a_mixed_ticket_declares_one_breakdown_line_per_real_rate() {
         assert_eq!(e.regime, "01", "general regime: {e:?}");
         assert_eq!(e.class, "subject", "subject and not exempt: {e:?}");
     }
-    assert_eq!((at_rate(&entries, 21.0).base, at_rate(&entries, 21.0).quota), (1000, 210));
-    assert_eq!((at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota), (500, 50));
+    assert_eq!(
+        (at_rate(&entries, 21.0).base, at_rate(&entries, 21.0).quota),
+        (1000, 210)
+    );
+    assert_eq!(
+        (at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota),
+        (500, 50)
+    );
     assert_eq!(inv["base_amount"].as_i64().unwrap(), 1500);
     assert_eq!(inv["tax_amount"].as_i64().unwrap(), 260);
 
     let xml = aeat_xml(&rt, inv["id"].as_str().unwrap()).await;
     let blocks = detalles(&xml);
     assert_eq!(blocks.len(), 2, "two DetalleDesglose: {xml}");
-    assert!(!xml.contains("17.33"), "the effective rate must not reach the AEAT: {xml}");
+    assert!(
+        !xml.contains("17.33"),
+        "the effective rate must not reach the AEAT: {xml}"
+    );
     // Stable order: rate descending inside the same fiscal key. The XML cannot depend on the order
     // in which the producer built the array (the object generation had no order at all).
-    assert_eq!(tag(&blocks[0], "TipoImpositivo").as_deref(), Some("21.00"), "{xml}");
-    assert_eq!(tag(&blocks[1], "TipoImpositivo").as_deref(), Some("10.00"), "{xml}");
+    assert_eq!(
+        tag(&blocks[0], "TipoImpositivo").as_deref(),
+        Some("21.00"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(&blocks[1], "TipoImpositivo").as_deref(),
+        Some("10.00"),
+        "{xml}"
+    );
     // Rate, base and quota belong to the SAME detail — a breakdown that pairs them wrong balances
     // just as well in total, and declares two rates that were never charged.
-    assert_eq!(tag(&blocks[0], "BaseImponibleOimporteNoSujeto").as_deref(), Some("10.00"), "{xml}");
-    assert_eq!(tag(&blocks[0], "CuotaRepercutida").as_deref(), Some("2.10"), "{xml}");
-    assert_eq!(tag(&blocks[1], "BaseImponibleOimporteNoSujeto").as_deref(), Some("5.00"), "{xml}");
-    assert_eq!(tag(&blocks[1], "CuotaRepercutida").as_deref(), Some("0.50"), "{xml}");
+    assert_eq!(
+        tag(&blocks[0], "BaseImponibleOimporteNoSujeto").as_deref(),
+        Some("10.00"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(&blocks[0], "CuotaRepercutida").as_deref(),
+        Some("2.10"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(&blocks[1], "BaseImponibleOimporteNoSujeto").as_deref(),
+        Some("5.00"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(&blocks[1], "CuotaRepercutida").as_deref(),
+        Some("0.50"),
+        "{xml}"
+    );
     for b in &blocks {
         // Domestic VAT under the general regime — the OTHER axis of the breakdown (ADR-0186).
         // `Impuesto 03`/`02` would declare IGIC/IPSI, and `ClaveRegimen 08` means the exact
         // opposite of what it looks like: "this operation does NOT carry my tax".
         assert_eq!(tag(b, "Impuesto").as_deref(), Some("01"), "{xml}");
         assert_eq!(tag(b, "ClaveRegimen").as_deref(), Some("01"), "{xml}");
-        assert_eq!(tag(b, "CalificacionOperacion").as_deref(), Some("S1"), "{xml}");
+        assert_eq!(
+            tag(b, "CalificacionOperacion").as_deref(),
+            Some("S1"),
+            "{xml}"
+        );
         // A bar under the ordinary regime charges NO equivalence surcharge, and the two surcharge
         // elements are optional — an empty pair is not harmless: §15.3 accepts a 0 % surcharge, so
         // the pre-network validator lets it through and the AEAT is told this business is on the
@@ -410,11 +472,22 @@ async fn two_lines_under_the_same_fiscal_key_collapse_into_one_breakdown_line() 
         "two rates → two entries, however many lines feed them: {entries:#?}"
     );
     let general = at_rate(&entries, 21.0);
-    assert_eq!((general.base, general.quota), (500, 105), "the 21 % lines add up: {entries:#?}");
-    assert_eq!((at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota), (500, 50));
+    assert_eq!(
+        (general.base, general.quota),
+        (500, 105),
+        "the 21 % lines add up: {entries:#?}"
+    );
+    assert_eq!(
+        (at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota),
+        (500, 50)
+    );
 
     let xml = aeat_xml(&rt, inv["id"].as_str().unwrap()).await;
-    assert_eq!(detalles(&xml).len(), 2, "one detail per fiscal key, not per line: {xml}");
+    assert_eq!(
+        detalles(&xml).len(),
+        2,
+        "one detail per fiscal key, not per line: {xml}"
+    );
     assert_xml_reconciles(&xml);
 }
 
@@ -443,13 +516,24 @@ async fn an_exempt_service_reaches_the_xml_as_operacion_exenta_not_as_subject_at
     .await;
 
     let entries = breakdown_of(&inv);
-    assert_eq!(entries.len(), 2, "exempt and subject never share an entry: {entries:#?}");
+    assert_eq!(
+        entries.len(),
+        2,
+        "exempt and subject never share an entry: {entries:#?}"
+    );
     let exempt = entries
         .iter()
         .find(|e| e.class == "exempt")
         .unwrap_or_else(|| panic!("the healthcare line must be EXEMPT, not subject: {entries:#?}"));
-    assert_eq!(exempt.exempt_reason, "E1", "cause in the AEAT vocabulary: {exempt:?}");
-    assert_eq!((exempt.base, exempt.quota), (4000, 0), "an exempt line charges nothing");
+    assert_eq!(
+        exempt.exempt_reason, "E1",
+        "cause in the AEAT vocabulary: {exempt:?}"
+    );
+    assert_eq!(
+        (exempt.base, exempt.quota),
+        (4000, 0),
+        "an exempt line charges nothing"
+    );
     let subject = at_rate(&entries, 21.0);
     assert_eq!(subject.class, "subject");
     assert_eq!((subject.base, subject.quota), (2000, 420));
@@ -464,7 +548,11 @@ async fn an_exempt_service_reaches_the_xml_as_operacion_exenta_not_as_subject_at
         .iter()
         .find(|b| b.contains("<sum1:OperacionExenta>"))
         .unwrap_or_else(|| panic!("no OperacionExenta in the breakdown: {xml}"));
-    assert_eq!(tag(exempt_block, "OperacionExenta").as_deref(), Some("E1"), "{xml}");
+    assert_eq!(
+        tag(exempt_block, "OperacionExenta").as_deref(),
+        Some("E1"),
+        "{xml}"
+    );
     assert_eq!(
         tag(exempt_block, "CalificacionOperacion"),
         None,
@@ -475,7 +563,11 @@ async fn an_exempt_service_reaches_the_xml_as_operacion_exenta_not_as_subject_at
         None,
         "§15.5: an exempt line informs no rate — 'subject at 0 %' is a different declaration — {xml}"
     );
-    assert_eq!(tag(exempt_block, "CuotaRepercutida"), None, "§15.5: nor a quota — {xml}");
+    assert_eq!(
+        tag(exempt_block, "CuotaRepercutida"),
+        None,
+        "§15.5: nor a quota — {xml}"
+    );
     assert_eq!(
         tag(exempt_block, "BaseImponibleOimporteNoSujeto").as_deref(),
         Some("40.00"),
@@ -485,8 +577,16 @@ async fn an_exempt_service_reaches_the_xml_as_operacion_exenta_not_as_subject_at
         .iter()
         .find(|b| b.contains("<sum1:CalificacionOperacion>"))
         .unwrap_or_else(|| panic!("no subject line: {xml}"));
-    assert_eq!(tag(subject_block, "CalificacionOperacion").as_deref(), Some("S1"), "{xml}");
-    assert_eq!(tag(subject_block, "TipoImpositivo").as_deref(), Some("21.00"), "{xml}");
+    assert_eq!(
+        tag(subject_block, "CalificacionOperacion").as_deref(),
+        Some("S1"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(subject_block, "TipoImpositivo").as_deref(),
+        Some("21.00"),
+        "{xml}"
+    );
     assert_xml_reconciles(&xml);
 }
 
@@ -542,25 +642,62 @@ async fn an_exempt_service_and_a_zero_rated_sale_never_share_a_breakdown_line() 
         2,
         "exempt and subject-at-0 % are two declarations, not one line: {entries:#?}"
     );
-    let exempt = entries.iter().find(|e| e.class == "exempt").expect("the exempt entry");
-    let zero = entries.iter().find(|e| e.class == "subject").expect("the subject-at-0 entry");
+    let exempt = entries
+        .iter()
+        .find(|e| e.class == "exempt")
+        .expect("the exempt entry");
+    let zero = entries
+        .iter()
+        .find(|e| e.class == "subject")
+        .expect("the subject-at-0 entry");
     assert_eq!((exempt.base, exempt.quota), (3000, 0));
     assert_eq!((zero.base, zero.quota, zero.rate), (1000, 0, 0.0));
 
     let xml = aeat_xml(&rt, inv["id"].as_str().unwrap()).await;
     let blocks = detalles(&xml);
-    assert_eq!(blocks.len(), 2, "the two must not collapse into one detail: {xml}");
-    let exempt_block = blocks.iter().find(|b| b.contains("<sum1:OperacionExenta>")).expect("exempt");
-    let zero_block =
-        blocks.iter().find(|b| b.contains("<sum1:CalificacionOperacion>")).expect("subject");
-    assert_eq!(tag(exempt_block, "OperacionExenta").as_deref(), Some("E1"), "{xml}");
-    assert_eq!(tag(exempt_block, "BaseImponibleOimporteNoSujeto").as_deref(), Some("30.00"));
+    assert_eq!(
+        blocks.len(),
+        2,
+        "the two must not collapse into one detail: {xml}"
+    );
+    let exempt_block = blocks
+        .iter()
+        .find(|b| b.contains("<sum1:OperacionExenta>"))
+        .expect("exempt");
+    let zero_block = blocks
+        .iter()
+        .find(|b| b.contains("<sum1:CalificacionOperacion>"))
+        .expect("subject");
+    assert_eq!(
+        tag(exempt_block, "OperacionExenta").as_deref(),
+        Some("E1"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(exempt_block, "BaseImponibleOimporteNoSujeto").as_deref(),
+        Some("30.00")
+    );
     // §15.4: S1 at 0 % DOES inform rate and quota, explicitly zero. That is precisely the
     // difference with the exempt line above, and the reason they cannot share a detail.
-    assert_eq!(tag(zero_block, "CalificacionOperacion").as_deref(), Some("S1"), "{xml}");
-    assert_eq!(tag(zero_block, "TipoImpositivo").as_deref(), Some("0.00"), "{xml}");
-    assert_eq!(tag(zero_block, "CuotaRepercutida").as_deref(), Some("0.00"), "{xml}");
-    assert_eq!(tag(zero_block, "BaseImponibleOimporteNoSujeto").as_deref(), Some("10.00"));
+    assert_eq!(
+        tag(zero_block, "CalificacionOperacion").as_deref(),
+        Some("S1"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(zero_block, "TipoImpositivo").as_deref(),
+        Some("0.00"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(zero_block, "CuotaRepercutida").as_deref(),
+        Some("0.00"),
+        "{xml}"
+    );
+    assert_eq!(
+        tag(zero_block, "BaseImponibleOimporteNoSujeto").as_deref(),
+        Some("10.00")
+    );
     assert_xml_reconciles(&xml);
 }
 
@@ -608,7 +745,11 @@ async fn the_quota_closes_once_per_fiscal_key_not_per_line() {
     .await;
 
     let entries = breakdown_of(&inv);
-    assert_eq!(entries.len(), 1, "same fiscal key → one entry: {entries:#?}");
+    assert_eq!(
+        entries.len(),
+        1,
+        "same fiscal key → one entry: {entries:#?}"
+    );
     assert_eq!(
         (entries[0].base, entries[0].quota),
         (500, 105),
@@ -618,7 +759,11 @@ async fn the_quota_closes_once_per_fiscal_key_not_per_line() {
 
     let xml = aeat_xml(&rt, inv["id"].as_str().unwrap()).await;
     let block = &detalles(&xml)[0];
-    assert_eq!(tag(block, "CuotaRepercutida").as_deref(), Some("1.05"), "{xml}");
+    assert_eq!(
+        tag(block, "CuotaRepercutida").as_deref(),
+        Some("1.05"),
+        "{xml}"
+    );
     assert_eq!(tag(&xml, "CuotaTotal").as_deref(), Some("1.05"), "{xml}");
     assert_eq!(tag(&xml, "ImporteTotal").as_deref(), Some("6.05"), "{xml}");
     assert_xml_reconciles(&xml);
@@ -675,20 +820,37 @@ async fn a_sale_wide_discount_is_spread_across_rates_and_the_breakdown_still_rec
     // Asynchronous delivery: the relay turns sale.completed into invoice.create_from_sale.
     rt.drain_outbox().await.expect("drain_outbox");
 
-    let list = rt.execute_query("invoice.list", &Params::new(), &ctx).await.unwrap();
+    let list = rt
+        .execute_query("invoice.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(list.len(), 1, "the sale must auto-issue exactly one F2");
     let inv = rt
-        .execute_query("invoice.get", &params(json!({ "invoice_id": list[0]["id"] })), &ctx)
+        .execute_query(
+            "invoice.get",
+            &params(json!({ "invoice_id": list[0]["id"] })),
+            &ctx,
+        )
         .await
         .expect("invoice.get")
         .remove(0);
 
     let entries = breakdown_of(&inv);
-    assert_eq!(entries.len(), 2, "the discount must not invent or merge rates: {entries:#?}");
+    assert_eq!(
+        entries.len(),
+        2,
+        "the discount must not invent or merge rates: {entries:#?}"
+    );
     // 11,00 € − 10 % = 9,90 € VAT-included at 10 % → base 9,00 € + quota 0,90 €.
-    assert_eq!((at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota), (900, 90));
+    assert_eq!(
+        (at_rate(&entries, 10.0).base, at_rate(&entries, 10.0).quota),
+        (900, 90)
+    );
     // 5,00 € − 10 % = 4,50 € VAT-included at 21 % → base 3,72 € + quota 0,78 €.
-    assert_eq!((at_rate(&entries, 21.0).base, at_rate(&entries, 21.0).quota), (372, 78));
+    assert_eq!(
+        (at_rate(&entries, 21.0).base, at_rate(&entries, 21.0).quota),
+        (372, 78)
+    );
     assert_eq!(inv["base_amount"].as_i64().unwrap(), 1272);
     assert_eq!(inv["tax_amount"].as_i64().unwrap(), 168);
     assert_eq!(

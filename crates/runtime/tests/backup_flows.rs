@@ -96,8 +96,7 @@ async fn create_flow(rt: &Runtime, name: &str, definition: Value, enabled: bool)
 }
 
 async fn grant(rt: &Runtime, flow_id: &str, pairs: &[(GrantKind, &str)]) {
-    let wanted: Vec<(GrantKind, String)> =
-        pairs.iter().map(|(k, v)| (*k, v.to_string())).collect();
+    let wanted: Vec<(GrantKind, String)> = pairs.iter().map(|(k, v)| (*k, v.to_string())).collect();
     rt.replace_flow_grants(flow_id, &wanted, OWNER)
         .await
         .expect("the owner grants the flow what it may do");
@@ -119,7 +118,11 @@ async fn count(rt: &Runtime, sql: &str) -> i64 {
         .unwrap()
         .rows
         .first()
-        .and_then(|r| r["c"].as_i64().or_else(|| r["c"].as_f64().map(|f| f as i64)))
+        .and_then(|r| {
+            r["c"]
+                .as_i64()
+                .or_else(|| r["c"].as_f64().map(|f| f as i64))
+        })
         .unwrap_or(-1)
 }
 
@@ -130,9 +133,9 @@ fn flows_row(report: &ImportReport) -> Option<&erplora_runtime::import::SectionR
 
 fn reason(status: &SectionStatus) -> String {
     match status {
-        SectionStatus::Ignored(r) | SectionStatus::PartiallyApplied(r) | SectionStatus::Failed(r) => {
-            r.clone()
-        }
+        SectionStatus::Ignored(r)
+        | SectionStatus::PartiallyApplied(r)
+        | SectionStatus::Failed(r) => r.clone(),
         other => panic!("expected a status with a reason, got {other:?}"),
     }
 }
@@ -165,12 +168,19 @@ async fn a_backup_restores_the_flows_and_they_run_again() {
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
 
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
         .await
         .expect("export");
 
-    assert_eq!(bundle.manifest.flows.len(), 1, "the backup carries the flow the owner wrote");
+    assert_eq!(
+        bundle.manifest.flows.len(),
+        1,
+        "the backup carries the flow the owner wrote"
+    );
     let spec = &bundle.manifest.flows[0];
     assert_eq!(spec.name, "Welcome");
     assert!(spec.enabled, "it was armed, and it comes back armed");
@@ -188,7 +198,10 @@ async fn a_backup_restores_the_flows_and_they_run_again() {
         "what the flow may do travels as KEYS, next to its document"
     );
     assert!(
-        bundle.manifest.sections.contains(&FLOWS_SECTION.to_string()),
+        bundle
+            .manifest
+            .sections
+            .contains(&FLOWS_SECTION.to_string()),
         "the inventory the user confirms before importing has to show the bundle brings flows"
     );
     assert!(
@@ -216,7 +229,10 @@ async fn a_backup_restores_the_flows_and_they_run_again() {
 
     let flows = restored.list_flows().await.unwrap();
     assert_eq!(flows.len(), 1, "the flow is back");
-    assert!(flows[0].enabled, "and it is ARMED, or it is not back at all");
+    assert!(
+        flows[0].enabled,
+        "and it is ARMED, or it is not back at all"
+    );
     assert_eq!(
         restored
             .list_flow_grants(&flows[0].id)
@@ -229,7 +245,10 @@ async fn a_backup_restores_the_flows_and_they_run_again() {
         "its authority came back through the granting door"
     );
     assert!(
-        matches!(flows_row(&report).map(|r| &r.status), Some(SectionStatus::Applied)),
+        matches!(
+            flows_row(&report).map(|r| &r.status),
+            Some(SectionStatus::Applied)
+        ),
         "the report says what it did with the flows: {:?}",
         report.sections
     );
@@ -262,9 +281,16 @@ async fn the_triggers_are_rematerialised_by_the_same_door_that_saves_a_flow() {
     });
     create_flow(&origin, "Nightly", nightly.clone(), true).await;
 
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
     import_sections(
         &mut restored,
@@ -286,7 +312,11 @@ async fn the_triggers_are_rematerialised_by_the_same_door_that_saves_a_flow() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(rows.len(), 1, "the cron trigger of the document was materialised");
+    assert_eq!(
+        rows.len(),
+        1,
+        "the cron trigger of the document was materialised"
+    );
     assert_eq!(rows[0]["cron"], json!("0 9 * * *"));
     assert!(
         rows[0]["next_run"].as_str().is_some_and(|s| !s.is_empty()),
@@ -315,7 +345,10 @@ async fn a_flow_secret_never_leaves_the_hub_in_any_form() {
     let flow_id = create_flow(&origin, "Reorder", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
 
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "b", "es", CREATED_AT)
         .await
         .expect("export");
@@ -346,12 +379,19 @@ async fn the_execution_history_does_not_travel() {
     origin.drain_outbox().await.unwrap();
     origin.process_flows().await.unwrap();
     assert_eq!(
-        origin.list_flow_runs(&flow_id, 10, None).await.unwrap().len(),
+        origin
+            .list_flow_runs(&flow_id, 10, None)
+            .await
+            .unwrap()
+            .len(),
         1,
         "precondition: the origin has a run in its history"
     );
 
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "b", "es", CREATED_AT)
         .await
         .expect("export");
@@ -368,7 +408,11 @@ async fn the_execution_history_does_not_travel() {
 
     let new_flow = restored.list_flows().await.unwrap().remove(0);
     assert!(
-        restored.list_flow_runs(&new_flow.id, 10, None).await.unwrap().is_empty(),
+        restored
+            .list_flow_runs(&new_flow.id, 10, None)
+            .await
+            .unwrap()
+            .is_empty(),
         "the restored hub starts its own history: a run of the origin is not something that \
          happened here"
     );
@@ -394,7 +438,10 @@ async fn a_template_carries_no_flows() {
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
 
-    let selection = ExportSelection { purpose: BundlePurpose::Template, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Template,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "restaurante", "es", CREATED_AT)
         .await
         .expect("export");
@@ -403,7 +450,10 @@ async fn a_template_carries_no_flows() {
         bundle.manifest.flows.is_empty(),
         "a published template does not carry the automations of the hub that produced it"
     );
-    assert!(!bundle.manifest.sections.contains(&FLOWS_SECTION.to_string()));
+    assert!(!bundle
+        .manifest
+        .sections
+        .contains(&FLOWS_SECTION.to_string()));
 }
 
 /// 🔴 Tenant isolation — the #1 risk of this engine, with a LIVE neighbour: the database is shared
@@ -429,13 +479,21 @@ async fn the_export_carries_only_the_flows_of_its_own_hub() {
     .await
     .expect("the hub next door writes its own flow");
 
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "b", "es", CREATED_AT)
         .await
         .expect("export");
 
     assert_eq!(
-        bundle.manifest.flows.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+        bundle
+            .manifest
+            .flows
+            .iter()
+            .map(|f| f.name.as_str())
+            .collect::<Vec<_>>(),
         vec!["Mine"],
         "only the automations of THIS hub travel in its backup"
     );
@@ -455,7 +513,10 @@ async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused(
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "b", "es", CREATED_AT)
         .await
         .expect("export");
@@ -473,14 +534,22 @@ async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused(
     .expect("a bundle from elsewhere is not a reason to refuse the whole restore");
 
     let flows = other.list_flows().await.unwrap();
-    assert_eq!(flows.len(), 1, "the document is of the business, so it lands");
+    assert_eq!(
+        flows.len(),
+        1,
+        "the document is of the business, so it lands"
+    );
     assert!(
         !flows[0].enabled,
         "…but PAUSED: a flow with no authority fails at every step, and arming it here was nobody's \
          decision"
     );
     assert_eq!(
-        count(&other, "SELECT COUNT(*) AS c FROM _flow_grants WHERE deleted_at IS NULL").await,
+        count(
+            &other,
+            "SELECT COUNT(*) AS c FROM _flow_grants WHERE deleted_at IS NULL"
+        )
+        .await,
         0,
         "not one grant row: a downloaded file may not decide what an automation is allowed to do"
     );
@@ -511,9 +580,16 @@ async fn a_bundle_of_unknown_origin_regrants_nothing() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
-    let mut bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let mut bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     bundle.manifest.hub.hub_id = String::new();
 
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
@@ -528,11 +604,18 @@ async fn a_bundle_of_unknown_origin_regrants_nothing() {
     .expect("import");
 
     assert_eq!(
-        count(&restored, "SELECT COUNT(*) AS c FROM _flow_grants WHERE deleted_at IS NULL").await,
+        count(
+            &restored,
+            "SELECT COUNT(*) AS c FROM _flow_grants WHERE deleted_at IS NULL"
+        )
+        .await,
         0
     );
     assert!(!restored.list_flows().await.unwrap()[0].enabled);
-    assert_eq!(reason(&flows_row(&report).unwrap().status), "flow_grants_not_portable");
+    assert_eq!(
+        reason(&flows_row(&report).unwrap().status),
+        "flow_grants_not_portable"
+    );
 }
 
 /// 🟡 A flow whose grant **cannot be re-granted here** arrives DISABLED, and the report says why.
@@ -546,7 +629,10 @@ async fn a_flow_whose_grant_cannot_be_regranted_arrives_disabled() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
-    let selection = ExportSelection { purpose: BundlePurpose::Backup, ..Default::default() };
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
     let bundle = export_hub(&origin, "h1", &selection, "b", "es", CREATED_AT)
         .await
         .expect("export");
@@ -570,7 +656,11 @@ async fn a_flow_whose_grant_cannot_be_regranted_arrives_disabled() {
         "but it is PAUSED: an armed flow with no permission dies in every run"
     );
     assert!(
-        restored.list_flow_grants(&flows[0].id).await.unwrap().is_empty(),
+        restored
+            .list_flow_grants(&flows[0].id)
+            .await
+            .unwrap()
+            .is_empty(),
         "the grant naming a command this hub does not have was refused at the door"
     );
     let row = flows_row(&report).expect("the report has a row for the flows");
@@ -603,16 +693,25 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         ],
     )
     .await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
     // The bundle also names a command nobody has: a hand-edited zip, or a module renamed since.
     let mut manifest = bundle.manifest.clone();
-    manifest.flows[0].grants.push(erplora_runtime::export::FlowGrantSpec {
-        kind: "command".into(),
-        value: "ghost.module.act".into(),
-    });
+    manifest.flows[0]
+        .grants
+        .push(erplora_runtime::export::FlowGrantSpec {
+            kind: "command".into(),
+            value: "ghost.module.act".into(),
+        });
 
     let report = import_sections(
         &mut restored,
@@ -642,8 +741,14 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         ],
         "the three real permissions came back; only the one naming nothing was refused"
     );
-    assert!(!flow.enabled, "and the flow waits, because part of its authority is missing");
-    assert_eq!(reason(&flows_row(&report).unwrap().status), "flows_paused_without_grants");
+    assert!(
+        !flow.enabled,
+        "and the flow waits, because part of its authority is missing"
+    );
+    assert_eq!(
+        reason(&flows_row(&report).unwrap().status),
+        "flows_paused_without_grants"
+    );
 }
 
 // ── The same door as `POST /flows` ───────────────────────────────────────────────────────
@@ -656,9 +761,16 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
 async fn a_document_the_save_door_refuses_does_not_get_in_through_a_backup() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     create_flow(&origin, "Good", welcome_definition(), true).await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     // A hand-edited manifest with a second flow whose `query` step names a read that does not
     // exist. `store::create` refuses exactly this (hub#954) — a step naming nothing is not a read.
@@ -698,7 +810,10 @@ async fn a_document_the_save_door_refuses_does_not_get_in_through_a_backup() {
     );
     let row = flows_row(&report).expect("the report has a row for the flows");
     assert_eq!(reason(&row.status), "flows_not_restorable");
-    assert_eq!(row.discarded_rows, 1, "and the refused document is counted, not swallowed");
+    assert_eq!(
+        row.discarded_rows, 1,
+        "and the refused document is counted, not swallowed"
+    );
 }
 
 /// 🟡 Restoring the same backup **twice** does not duplicate the automations. A flow already live
@@ -709,9 +824,16 @@ async fn restoring_the_same_backup_twice_does_not_duplicate_the_flows() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
     grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
     for _ in 0..2 {
@@ -727,7 +849,11 @@ async fn restoring_the_same_backup_twice_does_not_duplicate_the_flows() {
     }
 
     let flows = restored.list_flows().await.unwrap();
-    assert_eq!(flows.len(), 1, "the same document by the same name is one automation, not two");
+    assert_eq!(
+        flows.len(),
+        1,
+        "the same document by the same name is one automation, not two"
+    );
     assert_eq!(
         restored.list_flow_grants(&flows[0].id).await.unwrap().len(),
         1,
@@ -742,9 +868,16 @@ async fn restoring_the_same_backup_twice_does_not_duplicate_the_flows() {
 async fn restoring_never_removes_a_flow_the_bundle_does_not_carry() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
 
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
     create_flow(&restored, "Written afterwards", welcome_definition(), true).await;
@@ -766,7 +899,10 @@ async fn restoring_never_removes_a_flow_the_bundle_does_not_carry() {
         .map(|f| f.name.clone())
         .collect();
     names.sort();
-    assert_eq!(names, vec!["Welcome".to_string(), "Written afterwards".to_string()]);
+    assert_eq!(
+        names,
+        vec!["Welcome".to_string(), "Written afterwards".to_string()]
+    );
 }
 
 /// 🔴 A bundle with no flows says nothing about them: no hollow row in the report, no section in
@@ -774,11 +910,21 @@ async fn restoring_never_removes_a_flow_the_bundle_does_not_carry() {
 #[tokio::test]
 async fn a_hub_without_flows_reports_nothing_about_them() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
-    let bundle = export_hub(&origin, "h1", &ExportSelection::default(), "b", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &origin,
+        "h1",
+        &ExportSelection::default(),
+        "b",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     assert!(bundle.manifest.flows.is_empty());
-    assert!(!bundle.manifest.sections.contains(&FLOWS_SECTION.to_string()));
+    assert!(!bundle
+        .manifest
+        .sections
+        .contains(&FLOWS_SECTION.to_string()));
 
     let mut restored = hub_with("h1", &["sales", "crm"]).await;
     let report = import_sections(

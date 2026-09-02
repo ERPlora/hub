@@ -19,7 +19,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::export::{foreign_keys, has_column, list_tables, safe_ident, table_owner, ROLES_SECTION};
+use crate::export::{
+    foreign_keys, has_column, list_tables, safe_ident, table_owner, ROLES_SECTION,
+};
 use crate::Runtime;
 
 /// Table behind the `roles` section (system migration v13). Named once, next to the section it
@@ -364,8 +366,10 @@ pub async fn execute_reset(
 
     let mut p = hub_params(hub_id);
     p.insert("actor".into(), serde_json::json!(actor_user_id));
-    let tx: Vec<(String, erplora_db::Params)> =
-        ops.iter().map(|(_, _, sql)| (sql.clone(), p.clone())).collect();
+    let tx: Vec<(String, erplora_db::Params)> = ops
+        .iter()
+        .map(|(_, _, sql)| (sql.clone(), p.clone()))
+        .collect();
     db.execute_tx(&tx).await.map_err(|e| {
         crate::RuntimeError::Other(format!("reset: la transacción falló, nada se borró: {e}"))
     })?;
@@ -373,7 +377,10 @@ pub async fn execute_reset(
     Ok(ResetReport {
         sections: planned
             .into_iter()
-            .map(|(section, rows_deleted)| SectionOutcome { section, rows_deleted })
+            .map(|(section, rows_deleted)| SectionOutcome {
+                section,
+                rows_deleted,
+            })
             .collect(),
     })
 }
@@ -391,15 +398,25 @@ struct ResetTable {
 
 impl ResetTable {
     fn delete_sql(&self) -> String {
-        format!("DELETE FROM {} WHERE {} AND {}", self.name, self.scope, self.user_rows)
+        format!(
+            "DELETE FROM {} WHERE {} AND {}",
+            self.name, self.scope, self.user_rows
+        )
     }
     fn count_sql(&self) -> String {
-        format!("SELECT count(*) AS n FROM {} WHERE {} AND {}", self.name, self.scope, self.user_rows)
+        format!(
+            "SELECT count(*) AS n FROM {} WHERE {} AND {}",
+            self.name, self.scope, self.user_rows
+        )
     }
 }
 
 fn module_ids(rt: &Runtime) -> Vec<String> {
-    rt.registry().installed.iter().map(|m| m.id.clone()).collect()
+    rt.registry()
+        .installed
+        .iter()
+        .map(|m| m.id.clone())
+        .collect()
 }
 
 /// Tablas propiedad de `module_id` (prefijo más largo, igual que el export), cada una con su
@@ -423,7 +440,11 @@ async fn module_tables(
             // NO se toca (borrarla entera se llevaría filas de otros hubs de la org).
             None => continue,
         };
-        out.push(ResetTable { name, user_rows, scope });
+        out.push(ResetTable {
+            name,
+            user_rows,
+            scope,
+        });
     }
     out
 }
@@ -462,13 +483,19 @@ async fn user_rows_predicate(
 ) -> String {
     let mut conds: Vec<String> = Vec::new();
     if has_column(db, table, "is_system").await {
-        conds.push(format!("({prefix}is_system IS NULL OR {prefix}is_system = 0)"));
+        conds.push(format!(
+            "({prefix}is_system IS NULL OR {prefix}is_system = 0)"
+        ));
     }
     if has_column(db, table, "source").await {
-        conds.push(format!("({prefix}source IS NULL OR {prefix}source <> 'shipped')"));
+        conds.push(format!(
+            "({prefix}source IS NULL OR {prefix}source <> 'shipped')"
+        ));
     }
     if has_column(db, table, "created_by").await {
-        conds.push(format!("({prefix}created_by IS NULL OR {prefix}created_by <> 'system')"));
+        conds.push(format!(
+            "({prefix}created_by IS NULL OR {prefix}created_by <> 'system')"
+        ));
     }
     if conds.is_empty() {
         "TRUE".into()
@@ -554,8 +581,15 @@ async fn count_where(rt: &Runtime, table: &str, extra: &str, hub_id: &str) -> i6
     if !safe_ident(table) {
         return 0;
     }
-    let Some(scope) = tenant_scope(rt.db(), table).await else { return 0 };
-    count_raw(rt, &format!("SELECT count(*) AS n FROM {table} WHERE {scope} AND {extra}"), hub_id).await
+    let Some(scope) = tenant_scope(rt.db(), table).await else {
+        return 0;
+    };
+    count_raw(
+        rt,
+        &format!("SELECT count(*) AS n FROM {table} WHERE {scope} AND {extra}"),
+        hub_id,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -576,7 +610,10 @@ mod tests {
         assert_eq!(plan, back);
 
         let report = ResetReport {
-            sections: vec![SectionOutcome { section: "hub_settings".into(), rows_deleted: 7 }],
+            sections: vec![SectionOutcome {
+                section: "hub_settings".into(),
+                rows_deleted: 7,
+            }],
         };
         let back: ResetReport =
             serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
@@ -599,7 +636,10 @@ mod tests {
     fn default_selection_is_empty() {
         let sel = ResetSelection::default();
         assert!(!sel.settings && !sel.users && !sel.media && !sel.fiscal);
-        assert!(!sel.print_queue, "la cola de impresión tampoco se borra por defecto");
+        assert!(
+            !sel.print_queue,
+            "la cola de impresión tampoco se borra por defecto"
+        );
         assert!(sel.modules.is_empty());
     }
 
@@ -613,9 +653,15 @@ mod tests {
     /// bloqueado aunque el módulo que sabía contarlo no esté (otro régimen, o desinstalado).
     #[test]
     fn el_sello_del_core_bloquea_sin_que_ningun_modulo_cuente_nada() {
-        let hold = FiscalHold { emitted: true, remitted: 0 };
+        let hold = FiscalHold {
+            emitted: true,
+            remitted: 0,
+        };
         let motivo = fiscal_block("sales", hold).expect("un hub que emitió bloquea sus ventas");
-        assert!(!motivo.is_empty(), "el bloqueo llega siempre con motivo escrito");
+        assert!(
+            !motivo.is_empty(),
+            "el bloqueo llega siempre con motivo escrito"
+        );
         // País-agnóstico: sin cifra que dar, el texto NO puede nombrar a la AEAT — sería meter
         // España en un core que ya no la nombra.
         assert!(
@@ -629,10 +675,16 @@ mod tests {
     /// módulo es lo ÚNICO que bloquea. Si este test cae, el límite duro se apagó para ese hub.
     #[test]
     fn el_conteo_del_modulo_sigue_bloqueando_con_el_sello_aun_vacio() {
-        let hold = FiscalHold { emitted: false, remitted: 2 };
+        let hold = FiscalHold {
+            emitted: false,
+            remitted: 2,
+        };
         let motivo = fiscal_block("verifactu", hold).expect("2 facturas remitidas bloquean");
         assert!(motivo.contains('2'), "el motivo dice CUÁNTAS: {motivo}");
-        assert!(motivo.to_lowercase().contains("aeat"), "y nombra a la AEAT: {motivo}");
+        assert!(
+            motivo.to_lowercase().contains("aeat"),
+            "y nombra a la AEAT: {motivo}"
+        );
     }
 
     /// Nada sellado y nada contado ⇒ nada bloqueado. El caso ADR-0170: probar la demo y borrarla.
@@ -645,9 +697,15 @@ mod tests {
     /// El alcance no se toca: el límite congela las secciones fiscal/ventas, no el reset entero.
     #[test]
     fn el_bloqueo_solo_alcanza_a_las_secciones_fiscales() {
-        let hold = FiscalHold { emitted: true, remitted: 3 };
+        let hold = FiscalHold {
+            emitted: true,
+            remitted: 3,
+        };
         for fiscal in FISCAL_SECTIONS {
-            assert!(fiscal_block(fiscal, hold).is_some(), "{fiscal} sostiene lo emitido");
+            assert!(
+                fiscal_block(fiscal, hold).is_some(),
+                "{fiscal} sostiene lo emitido"
+            );
         }
         assert_eq!(
             fiscal_block("inventory", hold),
@@ -718,7 +776,10 @@ pub async fn begin_batch(rt: &Runtime, hub_id: &str, name: &str) -> crate::Resul
     p.insert("id".into(), serde_json::json!(batch_id));
     p.insert("hub_id".into(), serde_json::json!(hub_id));
     p.insert("name".into(), serde_json::json!(name));
-    p.insert("now".into(), serde_json::json!(crate::registry::now_rfc3339()));
+    p.insert(
+        "now".into(),
+        serde_json::json!(crate::registry::now_rfc3339()),
+    );
     db.execute(
         "INSERT INTO _hub_import_batch (id, hub_id, name, created_at) \
          VALUES (:id, :hub_id, :name, :now)",
@@ -769,7 +830,9 @@ pub async fn apply_tracked_into(
             }
         };
         for row in &res.rows {
-            let Some(row_id) = row.get("id").and_then(|v| v.as_str()) else { continue };
+            let Some(row_id) = row.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
             let mut rp = erplora_db::Params::new();
             rp.insert("batch_id".into(), serde_json::json!(batch_id));
             rp.insert("table_name".into(), serde_json::json!(table));
@@ -780,7 +843,9 @@ pub async fn apply_tracked_into(
                 &rp,
             )
             .await
-            .map_err(|e| crate::RuntimeError::Other(format!("reset: registrar fila del lote: {e}")))?;
+            .map_err(|e| {
+                crate::RuntimeError::Other(format!("reset: registrar fila del lote: {e}"))
+            })?;
         }
         applied += 1;
     }
@@ -860,7 +925,10 @@ pub async fn store_import_report(
     p.insert("hub_id".into(), serde_json::json!(hub_id));
     p.insert("name".into(), serde_json::json!(name));
     p.insert("report".into(), serde_json::json!(report_json));
-    p.insert("now".into(), serde_json::json!(crate::registry::now_rfc3339()));
+    p.insert(
+        "now".into(),
+        serde_json::json!(crate::registry::now_rfc3339()),
+    );
     // UPSERT: a `batch_id` is unique per import, so this only replaces on a replay over the exact
     // same batch (the server's «extend the runtime report with modules/media/fiscal» step).
     db.execute(
@@ -870,7 +938,9 @@ pub async fn store_import_report(
         &p,
     )
     .await
-    .map_err(|e| crate::RuntimeError::Other(format!("reset: persistir el informe de import: {e}")))?;
+    .map_err(|e| {
+        crate::RuntimeError::Other(format!("reset: persistir el informe de import: {e}"))
+    })?;
     Ok(())
 }
 
@@ -890,7 +960,10 @@ pub struct StoredImportReport {
 /// This is what the Data tab reads on mount to recover what the Dashboard pointed at: the most
 /// recent import run, whatever it was. `None` when no import has run (or its batch was undone and
 /// the report with it — see [`undo_import`]).
-pub async fn last_import_report_for_hub(rt: &Runtime, hub_id: &str) -> crate::Result<Option<StoredImportReport>> {
+pub async fn last_import_report_for_hub(
+    rt: &Runtime,
+    hub_id: &str,
+) -> crate::Result<Option<StoredImportReport>> {
     let db = rt.db();
     ensure_report_table(db).await?;
     let res = db
@@ -977,7 +1050,9 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
     // Agrupado por tabla, y las tablas en orden inverso de FK (igual que el reset por secciones).
     let mut by_table: Vec<(String, Vec<String>)> = Vec::new();
     for r in &rows.rows {
-        let (Some(t), Some(id)) = (r["table_name"].as_str(), r["row_id"].as_str()) else { continue };
+        let (Some(t), Some(id)) = (r["table_name"].as_str(), r["row_id"].as_str()) else {
+            continue;
+        };
         if !safe_ident(t) {
             continue;
         }
@@ -1002,7 +1077,10 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
             format!("DELETE FROM {table} WHERE id IN ({list})"),
             erplora_db::Params::new(),
         ));
-        outcomes.push(SectionOutcome { section: table.clone(), rows_deleted: ids.len() as i64 });
+        outcomes.push(SectionOutcome {
+            section: table.clone(),
+            rows_deleted: ids.len() as i64,
+        });
     }
     // El registro del lote se consume en la MISMA transacción: si el borrado revierte, el lote
     // sigue ahí y se puede reintentar (y si no, deshacer otra vez es un no-op limpio).
@@ -1023,7 +1101,9 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
     ));
 
     db.execute_tx(&ops).await.map_err(|e| {
-        crate::RuntimeError::Other(format!("reset: deshacer el import falló, nada se borró: {e}"))
+        crate::RuntimeError::Other(format!(
+            "reset: deshacer el import falló, nada se borró: {e}"
+        ))
     })?;
     Ok(ResetReport { sections: outcomes })
 }

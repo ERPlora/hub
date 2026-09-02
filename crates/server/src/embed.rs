@@ -346,7 +346,11 @@ mod tests {
             reg.installed.push(serde_json::from_value(m).unwrap());
             reg.status.insert(
                 id.to_string(),
-                if active { ModuleStatus::Active } else { ModuleStatus::Inactive },
+                if active {
+                    ModuleStatus::Active
+                } else {
+                    ModuleStatus::Inactive
+                },
             );
         }
         reg
@@ -364,8 +368,11 @@ mod tests {
         assert_eq!(chunks, 2, "one agent chunk each");
         let mut refs = s.indexed_refs("h1").await.unwrap();
         refs.sort();
-        assert_eq!(refs, vec!["inventory".to_string(), "sales".to_string()],
-            "the inactive module must NOT be embedded");
+        assert_eq!(
+            refs,
+            vec!["inventory".to_string(), "sales".to_string()],
+            "the inactive module must NOT be embedded"
+        );
     }
 
     /// Only the DIFFERENCE is embedded: embeddings are metered Cloud calls, and re-embedding the
@@ -379,8 +386,15 @@ mod tests {
         let calls_after_first = emb.seen.lock().unwrap().len();
 
         let (modules, chunks) = backfill_index(&emb, &s, &reg, "h1").await;
-        assert_eq!((modules, chunks), (0, 0), "second boot: nothing new to index");
-        assert_eq!(emb.seen.lock().unwrap().len(), calls_after_first,
-            "and crucially, ZERO further calls to the embeddings endpoint");
+        assert_eq!(
+            (modules, chunks),
+            (0, 0),
+            "second boot: nothing new to index"
+        );
+        assert_eq!(
+            emb.seen.lock().unwrap().len(),
+            calls_after_first,
+            "and crucially, ZERO further calls to the embeddings endpoint"
+        );
     }
 }

@@ -188,7 +188,9 @@ mod tests {
 
     async fn db() -> PgAdapter {
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, HUB).await.unwrap();
         db

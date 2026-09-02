@@ -145,7 +145,9 @@ async fn a_declared_role_lands_inactive_until_the_administrator_switches_it_on()
     );
 
     // …and switching it back off is just as explicit.
-    rt.set_role_active("kitchen", false, "user-1").await.unwrap();
+    rt.set_role_active("kitchen", false, "user-1")
+        .await
+        .unwrap();
     assert!(!entry(&rt, "kitchen").await.unwrap().active);
 }
 
@@ -405,7 +407,10 @@ async fn an_inactive_declared_role_cannot_be_handed_to_a_person() {
         .await
         .expect_err("a role nobody switched on is not live in this hub")
         .to_string();
-    assert!(error.contains("kitchen"), "the refusal names the role: {error}");
+    assert!(
+        error.contains("kitchen"),
+        "the refusal names the role: {error}"
+    );
 
     rt.set_role_active("kitchen", true, "user-1").await.unwrap();
     rt.create_hub_user(&NewHubUser {

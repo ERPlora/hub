@@ -17,7 +17,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
-use erplora_runtime::{ModuleStatus, RuntimeError, Runtime};
+use erplora_runtime::{ModuleStatus, Runtime, RuntimeError};
 use erplora_wasm_host::Output;
 
 fn fixture(name: &str) -> PathBuf {
@@ -63,7 +63,9 @@ async fn hub_owing(count: u64) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture("rbase")).await.expect("rbase");
-    rt.install_from_dir(&fixture("rowing")).await.expect("rowing");
+    rt.install_from_dir(&fixture("rowing"))
+        .await
+        .expect("rowing");
     rt.register_native("rowing", Arc::new(OwingEngine { count }));
     rt
 }
@@ -157,7 +159,10 @@ async fn a_module_that_is_not_installed_still_reports_that_and_not_the_retention
     let mut rt = Runtime::new(Box::new(db));
     rt.register_native("rowing", Arc::new(OwingEngine { count: 5 }));
 
-    let err = rt.uninstall("rowing").await.expect_err("nothing to uninstall");
+    let err = rt
+        .uninstall("rowing")
+        .await
+        .expect_err("nothing to uninstall");
     assert!(
         matches!(err, RuntimeError::CommandNotFound(_)),
         "expected the usual not-installed error, got {err:?}"

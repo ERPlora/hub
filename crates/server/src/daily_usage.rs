@@ -159,7 +159,11 @@ impl PendingObligationFields {
             report
                 .iter()
                 .map(|(module_id, answer)| match answer {
-                    Some(owed) => (module_id.clone(), owed.count, owed.oldest_pending_at.clone()),
+                    Some(owed) => (
+                        module_id.clone(),
+                        owed.count,
+                        owed.oldest_pending_at.clone(),
+                    ),
                     None => (module_id.clone(), 0, None),
                 })
                 .collect(),
@@ -497,17 +501,17 @@ mod tests {
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
             cert_version: Some(4),
             cert_not_after: Some("2028-06-10".into()),
-        hub_version: crate::version::HUB_VERSION.to_string(),
-        pending: PendingObligationFields(vec![(
-            "verifactu".into(),
-            2,
-            Some("2026-07-25T08:00:00Z".into()),
-        )]),
-        cpu_pct: Some(50.0),
-        memory_used_mb: Some(10.0),
-        memory_limit_mb: Some(96.0),
-        memory_peak_mb: Some(192.0),
-    };
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            pending: PendingObligationFields(vec![(
+                "verifactu".into(),
+                2,
+                Some("2026-07-25T08:00:00Z".into()),
+            )]),
+            cpu_pct: Some(50.0),
+            memory_used_mb: Some(10.0),
+            memory_limit_mb: Some(96.0),
+            memory_peak_mb: Some(192.0),
+        };
         send_heartbeat(
             &reqwest::Client::new(),
             &format!("http://{address}"),
@@ -556,16 +560,19 @@ mod tests {
             last_user_activity_at: None,
             cert_version: None,
             cert_not_after: None,
-        hub_version: crate::version::HUB_VERSION.to_string(),
-        pending: PendingObligationFields::default(),
-        cpu_pct: None,
-        memory_used_mb: None,
-        memory_limit_mb: None,
-        memory_peak_mb: None,
-    };
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            pending: PendingObligationFields::default(),
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+            memory_peak_mb: None,
+        };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("last_user_activity_at").is_none());
-        assert_eq!(body, json!({"orders_today": 0, "terminals": 0, "hub_version": crate::version::HUB_VERSION}));
+        assert_eq!(
+            body,
+            json!({"orders_today": 0, "terminals": 0, "hub_version": crate::version::HUB_VERSION})
+        );
     }
 
     // ── The certificate the hub REPORTS (ADR-0202 §2.5 — hub#318) ─────────────────────────────
@@ -582,15 +589,18 @@ mod tests {
             last_user_activity_at: None,
             cert_version: Some(0),
             cert_not_after: None,
-        hub_version: crate::version::HUB_VERSION.to_string(),
-        pending: PendingObligationFields::default(),
-        cpu_pct: None,
-        memory_used_mb: None,
-        memory_limit_mb: None,
-        memory_peak_mb: None,
-    };
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            pending: PendingObligationFields::default(),
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+            memory_peak_mb: None,
+        };
         let body = serde_json::to_value(&usage).unwrap();
-        assert_eq!(body, json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION}));
+        assert_eq!(
+            body,
+            json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION})
+        );
         // Y la caducidad NO viaja: es justo lo que borra en el Cloud la fecha vieja de un hub
         // reprovisionado (§2.5, «el par se escribe entero»).
         assert!(body.get("cert_not_after").is_none());
@@ -636,14 +646,30 @@ mod tests {
             },
         );
         let body = serde_json::to_value(&usage).unwrap();
-        assert_eq!(body["cpu_pct"], json!(50.0), "fracción 0..1 → porcentaje del Cloud");
-        assert_eq!(body["memory_used_mb"], json!(10.0), "bytes → MB (10 MiB exactos)");
-        assert_eq!(body["memory_limit_mb"], json!(96.0), "bytes → MB (96 MiB del plan free)");
+        assert_eq!(
+            body["cpu_pct"],
+            json!(50.0),
+            "fracción 0..1 → porcentaje del Cloud"
+        );
+        assert_eq!(
+            body["memory_used_mb"],
+            json!(10.0),
+            "bytes → MB (10 MiB exactos)"
+        );
+        assert_eq!(
+            body["memory_limit_mb"],
+            json!(96.0),
+            "bytes → MB (96 MiB del plan free)"
+        );
         // El PICO es lo que decide el techo de un plan: el régimen cabe de sobra en 256 MiB, y lo
         // que no se ve desde fuera es el arranque (reinstalación stateless de los módulos), que
         // dura segundos y cae entre scrapes. `memory.peak` es un high-water mark, así que el
         // latido lo lleva aunque el pico ocurriera hace horas (hub#981).
-        assert_eq!(body["memory_peak_mb"], json!(192.0), "bytes → MB (192 MiB de pico)");
+        assert_eq!(
+            body["memory_peak_mb"],
+            json!(192.0),
+            "bytes → MB (192 MiB de pico)"
+        );
     }
 
     /// 🔴 [hub#975] Outside a container (Tauri/desktop/dev) the cgroup does not exist: the
@@ -679,8 +705,14 @@ mod tests {
             },
         );
         let body = serde_json::to_value(&usage).unwrap();
-        assert!(body.get("cpu_pct").is_none(), "sin cgroup no hay porcentaje");
-        assert!(body.get("memory_used_mb").is_none(), "sin cgroup no hay MB usados");
+        assert!(
+            body.get("cpu_pct").is_none(),
+            "sin cgroup no hay porcentaje"
+        );
+        assert!(
+            body.get("memory_used_mb").is_none(),
+            "sin cgroup no hay MB usados"
+        );
         assert!(body.get("memory_limit_mb").is_none());
     }
 
@@ -709,7 +741,7 @@ mod tests {
                 used_bytes: Some(10_485_760),
                 limit_bytes: None, // `memory.max = "max"`: sin techo
                 fraction: None,
-                peak_bytes: None,  // kernel sin `memory.peak`
+                peak_bytes: None, // kernel sin `memory.peak`
             },
             crate::system_metrics::CpuMetric {
                 used_cores: Some(0.7),
@@ -719,7 +751,11 @@ mod tests {
         );
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cpu_pct").is_none(), "0,7 cores NO es un 0,7 %");
-        assert_eq!(body["memory_used_mb"], json!(10.0), "el uso medido sí viaja");
+        assert_eq!(
+            body["memory_used_mb"],
+            json!(10.0),
+            "el uso medido sí viaja"
+        );
         assert!(body.get("memory_limit_mb").is_none());
     }
 
@@ -735,16 +771,19 @@ mod tests {
             last_user_activity_at: None,
             cert_version: None,
             cert_not_after: None,
-        hub_version: crate::version::HUB_VERSION.to_string(),
-        pending: PendingObligationFields::default(),
-        cpu_pct: None,
-        memory_used_mb: None,
-        memory_limit_mb: None,
-        memory_peak_mb: None,
-    };
+            hub_version: crate::version::HUB_VERSION.to_string(),
+            pending: PendingObligationFields::default(),
+            cpu_pct: None,
+            memory_used_mb: None,
+            memory_limit_mb: None,
+            memory_peak_mb: None,
+        };
         let body = serde_json::to_value(&usage).unwrap();
         assert!(body.get("cert_version").is_none());
-        assert_eq!(body, json!({"orders_today": 3, "terminals": 1, "hub_version": crate::version::HUB_VERSION}));
+        assert_eq!(
+            body,
+            json!({"orders_today": 3, "terminals": 1, "hub_version": crate::version::HUB_VERSION})
+        );
     }
 
     // ── What the control plane announces back (ADR-0202 §2.5) ─────────────────────────────────
@@ -769,7 +808,10 @@ mod tests {
     /// as «the control plane has no certificate» would be inventing news out of an old deployment.
     #[test]
     fn an_older_control_plane_that_announces_nothing_is_not_read_as_zero() {
-        assert_eq!(HeartbeatResponse::parse(r#"{"ok": true}"#).cert_version, None);
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"ok": true}"#).cert_version,
+            None
+        );
         assert_eq!(
             HeartbeatResponse::parse(r#"{"cert_version": null}"#).cert_version,
             None
@@ -782,7 +824,10 @@ mod tests {
     /// idle — and eventually switch a hub off that people are using every day.
     #[test]
     fn a_body_that_is_not_json_degrades_to_no_news() {
-        assert_eq!(HeartbeatResponse::parse("<html>502</html>").cert_version, None);
+        assert_eq!(
+            HeartbeatResponse::parse("<html>502</html>").cert_version,
+            None
+        );
         assert_eq!(HeartbeatResponse::parse("").cert_version, None);
         assert_eq!(HeartbeatResponse::parse("[]").cert_version, None);
     }
@@ -823,8 +868,12 @@ mod tests {
     /// the hub keeps whatever it already had rather than inventing a legal declaration.
     #[test]
     fn a_beat_without_the_block_announces_no_facts() {
-        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#).producer.is_none());
-        assert!(HeartbeatResponse::parse("<html>502</html>").producer.is_none());
+        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#)
+            .producer
+            .is_none());
+        assert!(HeartbeatResponse::parse("<html>502</html>")
+            .producer
+            .is_none());
     }
 
     /// A block that would be rejected by the AEAT is not installed. These facts are identical for
@@ -832,7 +881,10 @@ mod tests {
     /// previous ones beats adopting a broken identity.
     #[test]
     fn a_block_the_aeat_would_reject_is_not_adopted() {
-        let broken = served_producer_body().replace(r#""IdSistemaInformatico": "EC""#, r#""IdSistemaInformatico": "ERPLORA-001""#);
+        let broken = served_producer_body().replace(
+            r#""IdSistemaInformatico": "EC""#,
+            r#""IdSistemaInformatico": "ERPLORA-001""#,
+        );
 
         assert!(HeartbeatResponse::parse(&broken).producer.is_none());
     }
@@ -875,13 +927,13 @@ mod tests {
                 last_user_activity_at: None,
                 cert_version: Some(0),
                 cert_not_after: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
-            pending: PendingObligationFields::default(),
-            cpu_pct: None,
-            memory_used_mb: None,
-            memory_limit_mb: None,
-            memory_peak_mb: None,
-        },
+                hub_version: crate::version::HUB_VERSION.to_string(),
+                pending: PendingObligationFields::default(),
+                cpu_pct: None,
+                memory_used_mb: None,
+                memory_limit_mb: None,
+                memory_peak_mb: None,
+            },
         )
         .await
         .expect("un 2xx es un latido entregado, lo que traiga el cuerpo o no");
@@ -930,17 +982,20 @@ mod tests {
                 last_user_activity_at: None,
                 cert_version: Some(4),
                 cert_not_after: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
-            pending: PendingObligationFields::default(),
-            cpu_pct: None,
-            memory_used_mb: None,
-            memory_limit_mb: None,
-            memory_peak_mb: None,
-        },
+                hub_version: crate::version::HUB_VERSION.to_string(),
+                pending: PendingObligationFields::default(),
+                cpu_pct: None,
+                memory_used_mb: None,
+                memory_limit_mb: None,
+                memory_peak_mb: None,
+            },
         )
         .await
         .expect("un 2xx entregado no puede deshacerse porque el cuerpo se corte");
-        assert_eq!(response.cert_version, None, "sin cuerpo legible, sin noticias");
+        assert_eq!(
+            response.cert_version, None,
+            "sin cuerpo legible, sin noticias"
+        );
         server.abort();
     }
 
@@ -1005,5 +1060,4 @@ mod tests {
 
         assert_eq!(usage.hub_version, crate::version::HUB_VERSION);
     }
-
 }

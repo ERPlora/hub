@@ -281,7 +281,9 @@ async fn boot_error_of_a_mixed_hub_reaches_the_sink_once_installed_hub1274() {
 
     let events = sink.0.lock().unwrap();
     assert!(
-        events.iter().any(|e| e.error_code == "money_unit_ambiguous"),
+        events
+            .iter()
+            .any(|e| e.error_code == "money_unit_ambiguous"),
         "the boot-time mixed-hub error must reach the sink once it is installed, not be lost: \
          got {events:?}"
     );
@@ -420,7 +422,10 @@ async fn rows_do_not_vote_empty_or_null_only_tables_cannot_flip_the_verdict_hub1
     let err = money_backfill::run(&db)
         .await
         .expect_err("an empty cents table still counts: the hub is mixed by schema");
-    assert!(matches!(err, RuntimeError::MoneyUnitAmbiguous { .. }), "{err:?}");
+    assert!(
+        matches!(err, RuntimeError::MoneyUnitAmbiguous { .. }),
+        "{err:?}"
+    );
     assert_eq!(
         read_one(&db, "SELECT amount FROM payments_payment WHERE id = 'p1'").await,
         10,
@@ -505,7 +510,9 @@ async fn a_conversion_that_dies_halfway_leaves_nothing_behind_to_convert_twice_h
     assert!(!money_backfill::is_marked_cents(&db).await.unwrap());
 
     // The obstacle goes away; the re-run converts exactly once (1 payments row + 6 sales columns).
-    db.execute_batch("DROP TRIGGER refuse ON sales_sale;").await.unwrap();
+    db.execute_batch("DROP TRIGGER refuse ON sales_sale;")
+        .await
+        .unwrap();
     let report = money_backfill::run(&db).await.unwrap();
     assert_eq!(report.rows_updated, 7);
     assert_eq!(

@@ -15,11 +15,17 @@ async fn install_all_from_missing_dir_is_ok_empty() {
 
     // Ruta que garantizadamente NO existe (nunca se crea). No debe ser un error.
     let missing = std::env::temp_dir().join("erplora-616-modules-dir-inexistente-jamas-creado");
-    assert!(!missing.exists(), "precondición: el dir de módulos no debe existir");
+    assert!(
+        !missing.exists(),
+        "precondición: el dir de módulos no debe existir"
+    );
 
     let installed = rt
         .install_all_from_dir(&missing)
         .await
         .expect("un dir de módulos ausente no debe abortar el arranque del hub");
-    assert!(installed.is_empty(), "sin dir de módulos → cero módulos instalados");
+    assert!(
+        installed.is_empty(),
+        "sin dir de módulos → cero módulos instalados"
+    );
 }

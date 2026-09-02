@@ -23,8 +23,8 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::{EventSink, EventSource, RequestContext, RuntimeError, Runtime};
+use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::{EventSink, EventSource, RequestContext, Runtime, RuntimeError};
 use serde_json::{json, Value as Json};
 
 fn fixture(name: &str) -> PathBuf {
@@ -48,7 +48,9 @@ impl EventSink for Sink {
 async fn hub() -> (Runtime, Arc<Sink>) {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture("gate")).await.expect("install gate");
+    rt.install_from_dir(&fixture("gate"))
+        .await
+        .expect("install gate");
     let sink = Arc::new(Sink::default());
     rt.set_event_sink(sink.clone());
     (rt, sink)
@@ -66,12 +68,18 @@ fn booking(window_ok: i64) -> Params {
 }
 
 async fn bookings(rt: &Runtime) -> i64 {
-    let rows = rt.execute_query("gate.bookings.count", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("gate.bookings.count", &Params::new(), &ctx())
+        .await
+        .unwrap();
     rows.first().and_then(|r| r["n"].as_i64()).unwrap_or(0)
 }
 
 async fn counter(rt: &Runtime) -> i64 {
-    let rows = rt.execute_query("gate.counter", &Params::new(), &ctx()).await.unwrap();
+    let rows = rt
+        .execute_query("gate.counter", &Params::new(), &ctx())
+        .await
+        .unwrap();
     rows.first().and_then(|r| r["seq"].as_i64()).unwrap_or(0)
 }
 
@@ -89,8 +97,14 @@ async fn anchored_gate_rolls_back_when_the_guarded_statement_misses() {
         .expect_err("the anchored statement affected 0 rows: the command must refuse");
     match err {
         RuntimeError::Domain { code, message } => {
-            assert_eq!(code, "gate.outside_booking_window", "the declared stable code");
-            assert!(message.contains("booking window"), "the declared message: {message}");
+            assert_eq!(
+                code, "gate.outside_booking_window",
+                "the declared stable code"
+            );
+            assert!(
+                message.contains("booking window"),
+                "the declared message: {message}"
+            );
         }
         other => panic!("expected the module-declared domain rejection, got {other:?}"),
     }
@@ -119,8 +133,16 @@ async fn unanchored_gate_keeps_the_documented_batch_sum() {
         .execute_command("gate.bookings.create_unanchored", &booking(0), &ctx())
         .await
         .expect("without the anchor, the batch sum (0 + 1 >= 1) is the contract, as today");
-    assert_eq!(out["ok"], json!(true), "compat: the sum gate passes: {out:?}");
-    assert_eq!(bookings(&rt).await, 0, "still nothing written by the guarded statement");
+    assert_eq!(
+        out["ok"],
+        json!(true),
+        "compat: the sum gate passes: {out:?}"
+    );
+    assert_eq!(
+        bookings(&rt).await,
+        0,
+        "still nothing written by the guarded statement"
+    );
     assert_eq!(
         sink.events.lock().unwrap().len(),
         1,
@@ -140,8 +162,15 @@ async fn anchored_gate_passes_when_the_guarded_statement_hits() {
         .expect("the guarded statement affected 1 row: the command must commit");
     assert_eq!(out["ok"], json!(true), "{out:?}");
     assert_eq!(bookings(&rt).await, 1);
-    assert_eq!(counter(&rt).await, 1, "the sibling statement committed with it");
-    assert_eq!(sink.events.lock().unwrap().as_slice(), ["gate.booking.created"]);
+    assert_eq!(
+        counter(&rt).await,
+        1,
+        "the sibling statement committed with it"
+    );
+    assert_eq!(
+        sink.events.lock().unwrap().as_slice(),
+        ["gate.booking.created"]
+    );
 }
 
 /// An anchor that names no statement of its command is refused AT INSTALL: it would read as

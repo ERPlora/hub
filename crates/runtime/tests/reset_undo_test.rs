@@ -38,8 +38,12 @@ fn ctx(hub: &str) -> RequestContext {
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("instalar inventory");
     rt
 }
 
@@ -48,7 +52,10 @@ async fn count(rt: &Runtime, table: &str, hub: &str) -> i64 {
     p.insert("hub_id".into(), json!(hub));
     let res = rt
         .db()
-        .query(&format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"), &p)
+        .query(
+            &format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"),
+            &p,
+        )
         .await
         .unwrap_or_else(|e| panic!("contar {table}: {e}"));
     res.rows[0]["n"].as_i64().expect("count(*)")
@@ -85,10 +92,16 @@ async fn import_demo(rt: &Runtime, hub: &str, name: &str) -> String {
 
 #[tokio::test]
 async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     let batch = import_demo(&rt, "h1", "restaurante_es").await;
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 2, "precondición: la demo entró");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        2,
+        "precondición: la demo entró"
+    );
 
     // El usuario prueba la demo y AÑADE lo suyo.
     rt.execute_command(
@@ -100,7 +113,9 @@ async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
     .expect("producto del usuario");
     assert_eq!(count(&rt, "inventory_product", "h1").await, 3);
 
-    undo_import(&rt, "h1", &batch).await.expect("deshacer la importación");
+    undo_import(&rt, "h1", &batch)
+        .await
+        .expect("deshacer la importación");
 
     // Se va la demo; sobrevive lo del usuario. ESTA es la diferencia con el reset por secciones.
     assert_eq!(
@@ -114,19 +129,29 @@ async fn deshacer_una_importacion_borra_solo_lo_que_trajo() {
         .await
         .unwrap();
     let skus: Vec<&str> = res.rows.iter().filter_map(|r| r["sku"].as_str()).collect();
-    assert_eq!(skus, vec!["MIO"], "lo que queda debe ser exactamente lo del usuario: {skus:?}");
+    assert_eq!(
+        skus,
+        vec!["MIO"],
+        "lo que queda debe ser exactamente lo del usuario: {skus:?}"
+    );
 }
 
 /// Deshacer dos veces no puede reventar ni llevarse nada de más: el usuario puede pulsar dos
 /// veces, o reintentar tras un error de red.
 #[tokio::test]
 async fn deshacer_dos_veces_es_idempotente() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     let batch = import_demo(&rt, "h1", "restaurante_es").await;
 
-    undo_import(&rt, "h1", &batch).await.expect("primer deshacer");
-    undo_import(&rt, "h1", &batch).await.expect("segundo deshacer: no puede fallar");
+    undo_import(&rt, "h1", &batch)
+        .await
+        .expect("primer deshacer");
+    undo_import(&rt, "h1", &batch)
+        .await
+        .expect("segundo deshacer: no puede fallar");
 
     assert_eq!(count(&rt, "inventory_product", "h1").await, 0);
 }
@@ -134,7 +159,9 @@ async fn deshacer_dos_veces_es_idempotente() {
 /// El lote pertenece a un hub: deshacer el de h1 no puede tocar las filas de h2 (misma BD).
 #[tokio::test]
 async fn deshacer_un_lote_no_toca_otro_hub() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     let batch_h1 = import_demo(&rt, "h1", "restaurante_es").await;
     rt.execute_command(
@@ -145,16 +172,28 @@ async fn deshacer_un_lote_no_toca_otro_hub() {
     .await
     .expect("producto del vecino");
 
-    undo_import(&rt, "h1", &batch_h1).await.expect("deshacer h1");
+    undo_import(&rt, "h1", &batch_h1)
+        .await
+        .expect("deshacer h1");
 
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 0, "h1 deshecho");
-    assert_eq!(count(&rt, "inventory_product", "h2").await, 1, "🔴 el vecino perdió datos");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        0,
+        "h1 deshecho"
+    );
+    assert_eq!(
+        count(&rt, "inventory_product", "h2").await,
+        1,
+        "🔴 el vecino perdió datos"
+    );
 }
 
 /// El panel lista las importaciones para que el usuario elija cuál deshacer.
 #[tokio::test]
 async fn las_importaciones_se_listan_por_hub() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     import_demo(&rt, "h1", "restaurante_es").await;
     import_demo(&rt, "h2", "barberia_es").await;
@@ -170,20 +209,36 @@ async fn las_importaciones_se_listan_por_hub() {
 /// puede apuntarse filas que no insertó — si lo hiciera, deshacerlo borraría las del primero.
 #[tokio::test]
 async fn un_lote_solo_registra_las_filas_que_realmente_inserto() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     let primero = import_demo(&rt, "h1", "restaurante_es").await;
     let segundo = import_demo(&rt, "h1", "restaurante_es_otra_vez").await;
 
     let batches = list_import_batches(&rt, "h1").await.expect("listar");
-    let segundo_lote = batches.iter().find(|b| b.id == segundo).expect("el segundo lote existe");
-    assert_eq!(segundo_lote.rows, 0, "el re-import no insertó nada: no puede apuntarse filas");
+    let segundo_lote = batches
+        .iter()
+        .find(|b| b.id == segundo)
+        .expect("el segundo lote existe");
+    assert_eq!(
+        segundo_lote.rows, 0,
+        "el re-import no insertó nada: no puede apuntarse filas"
+    );
 
     // Y deshacer el segundo no puede llevarse lo que trajo el primero.
-    undo_import(&rt, "h1", &segundo).await.expect("deshacer el segundo");
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 2, "la demo del primer lote sigue");
+    undo_import(&rt, "h1", &segundo)
+        .await
+        .expect("deshacer el segundo");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        2,
+        "la demo del primer lote sigue"
+    );
 
-    undo_import(&rt, "h1", &primero).await.expect("deshacer el primero");
+    undo_import(&rt, "h1", &primero)
+        .await
+        .expect("deshacer el primero");
     assert_eq!(count(&rt, "inventory_product", "h1").await, 0);
 }
 
@@ -194,7 +249,9 @@ async fn un_lote_solo_registra_las_filas_que_realmente_inserto() {
 /// es la diferencia entre «implementado» y «disponible».
 #[tokio::test]
 async fn el_import_real_registra_un_lote_deshacible() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // Hub A con datos → bundle.
     let a = fresh().await;
     for (name, sku) in [("Café", "CAF"), ("Té verde", "TEV")] {
@@ -247,13 +304,29 @@ async fn el_import_real_registra_un_lote_deshacible() {
     .await
     .expect("import en B");
 
-    assert_eq!(count(&b, "inventory_product", "h2").await, 2, "precondición: la demo entró en B");
+    assert_eq!(
+        count(&b, "inventory_product", "h2").await,
+        2,
+        "precondición: la demo entró en B"
+    );
 
     // El import dejó UN lote, con el nombre del blueprint y sus filas.
-    let batches = list_import_batches(&b, "h2").await.expect("listar lotes tras el import real");
-    assert_eq!(batches.len(), 1, "el import real debe registrar un lote: {batches:?}");
-    assert_eq!(batches[0].name, "restaurante", "el lote toma el nombre del manifest");
-    assert_eq!(batches[0].rows, 2, "el lote debe apuntar las 2 filas insertadas");
+    let batches = list_import_batches(&b, "h2")
+        .await
+        .expect("listar lotes tras el import real");
+    assert_eq!(
+        batches.len(),
+        1,
+        "el import real debe registrar un lote: {batches:?}"
+    );
+    assert_eq!(
+        batches[0].name, "restaurante",
+        "el lote toma el nombre del manifest"
+    );
+    assert_eq!(
+        batches[0].rows, 2,
+        "el lote debe apuntar las 2 filas insertadas"
+    );
 
     // Y el usuario añade lo suyo DESPUÉS.
     b.execute_command(
@@ -264,7 +337,9 @@ async fn el_import_real_registra_un_lote_deshacible() {
     .await
     .expect("producto del usuario en B");
 
-    undo_import(&b, "h2", &batches[0].id).await.expect("deshacer el import real");
+    undo_import(&b, "h2", &batches[0].id)
+        .await
+        .expect("deshacer el import real");
 
     assert_eq!(
         count(&b, "inventory_product", "h2").await,

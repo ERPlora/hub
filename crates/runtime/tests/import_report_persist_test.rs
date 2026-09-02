@@ -63,8 +63,16 @@ fn full_selection() -> ExportSelection {
         fiscal: false,
         media: false,
         modules: vec![
-            ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
-            ModuleDataSelection { module_id: "inventory".into(), with_data: true, tables: None },
+            ModuleDataSelection {
+                module_id: "taxes".into(),
+                with_data: true,
+                tables: None,
+            },
+            ModuleDataSelection {
+                module_id: "inventory".into(),
+                with_data: true,
+                tables: None,
+            },
         ],
         purpose: Default::default(),
     }
@@ -120,7 +128,10 @@ async fn import_report_survives_loss_of_in_memory_value() {
     let recovered: erplora_runtime::import::ImportReport =
         serde_json::from_str(&stored.report).expect("el JSON persistido es un ImportReport");
     assert!(
-        recovered.sections.iter().any(|s| s.section == "modules/inventory"),
+        recovered
+            .sections
+            .iter()
+            .any(|s| s.section == "modules/inventory"),
         "el informe recuperado conserva sus secciones: {:?}",
         recovered.sections
     );

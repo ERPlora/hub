@@ -301,7 +301,6 @@ async fn re_applying_the_system_migrations_does_not_re_run_the_flow_tables() {
     assert_eq!(rows.len(), 1, "the flow survives a re-apply");
 }
 
-
 #[tokio::test]
 async fn a_hub_holds_one_live_secret_per_name_and_forgetting_one_is_not_a_reservation() {
     // Same partial-unique shape as `_flow_grants`, for the same reason: a credential is removed by

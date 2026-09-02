@@ -52,7 +52,10 @@ async fn two_hubs_sharing_a_database() -> (TestDb, Runtime, Runtime) {
 /// A business with its counter till and a floor tablet, both trusted as an online login leaves
 /// them, the tablet marked `personal` — the lax mode, the one worth stealing. Returns the admin.
 async fn a_business_with_a_till_and_a_tablet(rt: &Runtime, admin_name: &str) -> String {
-    let admin = rt.create_user(admin_name, "1111", "admin", None).await.unwrap();
+    let admin = rt
+        .create_user(admin_name, "1111", "admin", None)
+        .await
+        .unwrap();
     rt.trust_device("till-1", "Counter till").await.unwrap();
     rt.trust_device("tablet-1", "Floor tablet").await.unwrap();
     rt.set_device_mode("tablet-1", DeviceMode::Personal, &admin)
@@ -133,7 +136,10 @@ async fn the_same_tablet_can_be_trusted_by_two_businesses_at_once() {
     let db = test_db.adapter().await;
 
     mine.trust_device("tablet-1", "Ana Soto").await.unwrap();
-    neighbour.trust_device("tablet-1", "Bruno Díaz").await.unwrap();
+    neighbour
+        .trust_device("tablet-1", "Bruno Díaz")
+        .await
+        .unwrap();
 
     assert!(mine.is_device_trusted("tablet-1").await.unwrap());
     assert!(neighbour.is_device_trusted("tablet-1").await.unwrap());
@@ -186,7 +192,9 @@ async fn revoking_here_leaves_the_neighbours_device_of_the_same_id_trusted() {
     let (test_db, mine, neighbour) = two_hubs_sharing_a_database().await;
     let db = test_db.adapter().await;
     a_business_with_a_till_and_a_tablet(&neighbour, "Ana").await;
-    mine.trust_device("tablet-1", "My own tablet").await.unwrap();
+    mine.trust_device("tablet-1", "My own tablet")
+        .await
+        .unwrap();
 
     mine.revoke_device("tablet-1").await.unwrap();
 
@@ -225,8 +233,13 @@ async fn revoking_here_leaves_the_neighbours_device_of_the_same_id_trusted() {
 async fn marking_a_device_personal_here_does_not_take_the_pinpad_off_next_door() {
     let (_test_db, mine, neighbour) = two_hubs_sharing_a_database().await;
     a_business_with_a_till_and_a_tablet(&neighbour, "Ana").await;
-    let my_admin = mine.create_user("Bruno", "2222", "admin", None).await.unwrap();
-    mine.trust_device("till-1", "My counter till").await.unwrap();
+    let my_admin = mine
+        .create_user("Bruno", "2222", "admin", None)
+        .await
+        .unwrap();
+    mine.trust_device("till-1", "My counter till")
+        .await
+        .unwrap();
 
     mine.set_device_mode("till-1", DeviceMode::Personal, &my_admin)
         .await
@@ -249,7 +262,10 @@ async fn an_administrator_cannot_name_a_device_only_the_neighbour_knows() {
     let (test_db, mine, neighbour) = two_hubs_sharing_a_database().await;
     let db = test_db.adapter().await;
     a_business_with_a_till_and_a_tablet(&neighbour, "Ana").await;
-    let my_admin = mine.create_user("Bruno", "2222", "admin", None).await.unwrap();
+    let my_admin = mine
+        .create_user("Bruno", "2222", "admin", None)
+        .await
+        .unwrap();
     let before = every_row(&db).await;
 
     let refused = mine
@@ -278,7 +294,10 @@ async fn a_deployment_that_does_not_say_which_hub_it_is_trusts_no_device() {
     let nameless = hub_on(&test_db, "").await;
     let db = test_db.adapter().await;
 
-    nameless.trust_device("till-1", "Counter till").await.unwrap();
+    nameless
+        .trust_device("till-1", "Counter till")
+        .await
+        .unwrap();
 
     assert!(
         !nameless.is_device_trusted("till-1").await.unwrap(),

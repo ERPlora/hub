@@ -192,10 +192,14 @@ pub(crate) async fn execute_at(
                 Ok(p) => (
                     crate::fiscal_profile::determine_fiscal_mode(&p, registry, &ctx.hub_id),
                     p.fiscal_trigger_events.clone(),
-                    crate::fiscal_profile::providers_of(registry, &p.country_code, &p.fiscal_system)
-                        .iter()
-                        .map(|m| m.id.clone())
-                        .collect(),
+                    crate::fiscal_profile::providers_of(
+                        registry,
+                        &p.country_code,
+                        &p.fiscal_system,
+                    )
+                    .iter()
+                    .map(|m| m.id.clone())
+                    .collect(),
                     p.environment.clone(),
                 ),
                 Err(_) => (
@@ -502,7 +506,9 @@ pub(crate) async fn execute_at(
     // longer satisfy a guard the guarded statement failed, which answered `200 ok` with an
     // event for something that never happened (online_booking#25).
     let expected = cmd.def.expect_rows.as_ref();
-    let min = expected.map(|expect| expect.n).or(cmd.def.min_affected_rows);
+    let min = expected
+        .map(|expect| expect.n)
+        .or(cmd.def.min_affected_rows);
     let gates: Vec<RowGate> = match (min, expected.and_then(|e| e.statement.as_deref())) {
         (Some(min), Some(anchor)) => vec![RowGate {
             first: anchored_statement_index(cmd, name, anchor)?,
@@ -512,7 +518,11 @@ pub(crate) async fn execute_at(
         (Some(min), None) => {
             // Un command declarativo ES un solo grupo: sus sentencias de mutación, sin el
             // outbox. La forma de lista la trajo hub#1025 para el camino del handler.
-            vec![RowGate { first: 0, count: sql_op_count, min }]
+            vec![RowGate {
+                first: 0,
+                count: sql_op_count,
+                min,
+            }]
         }
         (None, _) => Vec::new(),
     };
@@ -744,7 +754,15 @@ pub(crate) async fn enforce_protects(
             let sys = RequestContext::new(&ctx.hub_id, &ctx.user_id, ["*".to_string()]);
 
             // (1) the settings row. Degrade open on any failure — see "Why it degrades OPEN".
-            let settings = match crate::queries::execute(db, registry, &guard.settings_query, &Params::new(), &sys).await {
+            let settings = match crate::queries::execute(
+                db,
+                registry,
+                &guard.settings_query,
+                &Params::new(),
+                &sys,
+            )
+            .await
+            {
                 Ok(rows) => rows.into_iter().next().unwrap_or(Json::Null),
                 Err(e) => {
                     eprintln!(
@@ -784,7 +802,15 @@ pub(crate) async fn enforce_protects(
 
             // (4) is the precondition met? Degrade open on a query failure — the alternative is a
             // till that refuses every sale because a read broke.
-            let rows = match crate::queries::execute(db, registry, &guard.guard_query, &Params::new(), &sys).await {
+            let rows = match crate::queries::execute(
+                db,
+                registry,
+                &guard.guard_query,
+                &Params::new(),
+                &sys,
+            )
+            .await
+            {
                 Ok(rows) => rows,
                 Err(e) => {
                     eprintln!(
@@ -1004,7 +1030,9 @@ async fn call_wasm_off_thread(
     let mut host = tokio::task::spawn_blocking(move || compiled.instantiate())
         .await
         .map_err(|join_err| {
-            RuntimeError::Wasm(format!("el handler `{function}` abortó al cargar: {join_err}"))
+            RuntimeError::Wasm(format!(
+                "el handler `{function}` abortó al cargar: {join_err}"
+            ))
         })?
         .map_err(|e| RuntimeError::Wasm(e.to_string()))?;
 
@@ -1012,7 +1040,8 @@ async fn call_wasm_off_thread(
     let func = function.to_string();
     let join = tokio::task::spawn_blocking(move || host.call(&func, &input));
 
-    let wait = std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
+    let wait =
+        std::time::Duration::from_millis(limits.timeout_ms.saturating_add(WASM_CALL_GRACE_MS));
     match tokio::time::timeout(wait, join).await {
         Ok(Ok(Ok(output))) => Ok(output),
         Ok(Ok(Err(e))) => Err(RuntimeError::Wasm(e.to_string())),
@@ -1201,7 +1230,9 @@ async fn persist_handler_output(
         // `validate_operation` ya garantizó que el command existe y es del mismo módulo.
         if let Some(target) = target {
             let expected = target.def.expect_rows.as_ref();
-            let min = expected.map(|expect| expect.n).or(target.def.min_affected_rows);
+            let min = expected
+                .map(|expect| expect.n)
+                .or(target.def.min_affected_rows);
             if let Some(min) = min {
                 // hub#1091: an anchored gate counts ONLY the anchored statement of this op —
                 // same rule as the declarative path, so a handler cannot reach a sub-command
@@ -1209,7 +1240,11 @@ async fn persist_handler_output(
                 let gate = match expected.and_then(|e| e.statement.as_deref()) {
                     Some(anchor) => {
                         let idx = anchored_statement_index(target, &op.command, anchor)?;
-                        RowGate { first: first + idx, count: 1, min }
+                        RowGate {
+                            first: first + idx,
+                            count: 1,
+                            min,
+                        }
                     }
                     None => RowGate { first, count, min },
                 };
@@ -1459,7 +1494,9 @@ pub(crate) fn validate_handler_event(
         if !declares_printer {
             return Err(RuntimeError::CapabilityDenied {
                 module: handler_module_id.to_string(),
-                capability: crate::manifest::CapabilityKind::Printer.as_str().to_string(),
+                capability: crate::manifest::CapabilityKind::Printer
+                    .as_str()
+                    .to_string(),
             });
         }
     }
@@ -1488,7 +1525,9 @@ pub(crate) fn validate_handler_event(
     }
 
     // Regla 4 — modo estricto si el módulo declaró sus eventos; si no, compat + aviso.
-    let strict = manifest.map(|m| !m.events.emits.is_empty()).unwrap_or(false);
+    let strict = manifest
+        .map(|m| !m.events.emits.is_empty())
+        .unwrap_or(false);
     if strict {
         return Err(denied());
     }
@@ -1572,17 +1611,17 @@ fn spend_approval(
 /// refuses an anchor naming no statement of its command; this is the runtime's own defense in
 /// depth — silently degrading to the batch-sum gate would re-create exactly the "guard its
 /// author believes armed" hole this anchor exists to close.
-fn anchored_statement_index(
-    cmd: &RegisteredCommand,
-    name: &str,
-    anchor: &str,
-) -> Result<usize> {
-    cmd.def.sql.iter().position(|path| path == anchor).ok_or_else(|| {
-        RuntimeError::Other(format!(
-            "command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
+fn anchored_statement_index(cmd: &RegisteredCommand, name: &str, anchor: &str) -> Result<usize> {
+    cmd.def
+        .sql
+        .iter()
+        .position(|path| path == anchor)
+        .ok_or_else(|| {
+            RuntimeError::Other(format!(
+                "command `{name}` anchors `expect_rows.statement` to `{anchor}`, \
              which is not one of its sql statements"
-        ))
-    })
+            ))
+        })
 }
 
 pub(crate) fn validate_operation(
@@ -1630,7 +1669,8 @@ pub(crate) fn validate_operation(
         Ok(()) => {}
         // Sin persona a la que pedir el PIN, «hace falta elevación» y «denegado» son lo mismo para
         // esta transacción — pero se dice cuál era el permiso, que es lo que arregla el manifest.
-        Err(RuntimeError::RequiresElevation { permission }) | Err(RuntimeError::PermissionDenied(permission)) => {
+        Err(RuntimeError::RequiresElevation { permission })
+        | Err(RuntimeError::PermissionDenied(permission)) => {
             return Err(RuntimeError::PermissionDenied(format!(
                 "la operación `{}` exige `{permission}`, que quien invocó `{}` no tiene: un handler \
                  no puede alcanzar SQL por encima del permiso de su propio command (§5.3, hub#459)",
@@ -1703,8 +1743,11 @@ fn enforce_fiscal_precondition<'a>(
     ctx: &RequestContext,
     mut sqls: impl Iterator<Item = &'a str>,
 ) -> Result<()> {
-    let stamps_identity =
-        sqls.any(|sql| FISCAL_IDENTITY_PARAMS.iter().any(|p| references_param(sql, p)));
+    let stamps_identity = sqls.any(|sql| {
+        FISCAL_IDENTITY_PARAMS
+            .iter()
+            .any(|p| references_param(sql, p))
+    });
     if !stamps_identity {
         return Ok(());
     }
@@ -1838,14 +1881,18 @@ fn enforce_fiscal_capacity(
             Err(RuntimeError::Domain {
                 code: reason.code().to_string(),
                 message: match reason {
-                    crate::fiscal_profile::BlockedReason::ProviderMissing =>
+                    crate::fiscal_profile::BlockedReason::ProviderMissing => {
                         "this hub files for real and no installed module fulfils its fiscal \
                          regime: nobody would generate the record for this sale. Reinstall the \
-                         fiscal module to carry on".to_string(),
-                    crate::fiscal_profile::BlockedReason::InstallationMismatch =>
+                         fiscal module to carry on"
+                            .to_string()
+                    }
+                    crate::fiscal_profile::BlockedReason::InstallationMismatch => {
                         "these records were filed by a DIFFERENT installation of this hub: \
                          carrying on would mix two chains. Adopt the installation explicitly \
-                         before issuing again".to_string(),
+                         before issuing again"
+                            .to_string()
+                    }
                 },
             })
         }
@@ -1984,7 +2031,8 @@ mod tests {
     #[test]
     fn validate_operation_rejects_other_module_command() {
         let reg = registry_with_command("inventory", "inventory.products.create");
-        let err = validate_operation(&reg, &sys_ctx(), "notes", &op("inventory.products.create")).unwrap_err();
+        let err = validate_operation(&reg, &sys_ctx(), "notes", &op("inventory.products.create"))
+            .unwrap_err();
         assert!(
             matches!(err, RuntimeError::PermissionDenied(_)),
             "got {err:?}"
@@ -2021,7 +2069,11 @@ mod tests {
     // diferencia deliberada: aquí no se ofrece elevación. Estamos a mitad de una transacción,
     // sin nadie a quien preguntar, y un `RequiresElevation` que nadie puede atender es una
     // denegación disfrazada de diálogo.
-    fn registry_with_two(module_id: &str, public: (&str, &str), internal: (&str, &str)) -> Registry {
+    fn registry_with_two(
+        module_id: &str,
+        public: (&str, &str),
+        internal: (&str, &str),
+    ) -> Registry {
         let mut reg = registry_with_command(module_id, public.0);
         for (name, permission) in [public, internal] {
             let mut def = cmd_def();
@@ -2044,15 +2096,29 @@ mod tests {
     fn an_operation_may_not_demand_a_permission_the_caller_lacks() {
         let reg = registry_with_two(
             "appointments",
-            ("appointments.appointments.create", "appointments.add_appointment"),
-            ("appointments._insert_history", "appointments.change_appointment"),
+            (
+                "appointments.appointments.create",
+                "appointments.add_appointment",
+            ),
+            (
+                "appointments._insert_history",
+                "appointments.change_appointment",
+            ),
         );
         let cashier = RequestContext::new("h1", "u1", ["appointments.add_appointment".to_string()]);
-        let err = validate_operation(&reg, &cashier, "appointments", &op("appointments._insert_history"))
-            .unwrap_err();
+        let err = validate_operation(
+            &reg,
+            &cashier,
+            "appointments",
+            &op("appointments._insert_history"),
+        )
+        .unwrap_err();
         match err {
             RuntimeError::PermissionDenied(p) => {
-                assert!(p.contains("change_appointment"), "names the missing permission: {p}")
+                assert!(
+                    p.contains("change_appointment"),
+                    "names the missing permission: {p}"
+                )
             }
             other => panic!("a ceiling leak is a denial, got {other:?}"),
         }
@@ -2062,12 +2128,23 @@ mod tests {
     fn an_operation_the_caller_is_entitled_to_still_resolves() {
         let reg = registry_with_two(
             "appointments",
-            ("appointments.appointments.create", "appointments.add_appointment"),
-            ("appointments._insert_history", "appointments.add_appointment"),
+            (
+                "appointments.appointments.create",
+                "appointments.add_appointment",
+            ),
+            (
+                "appointments._insert_history",
+                "appointments.add_appointment",
+            ),
         );
         let cashier = RequestContext::new("h1", "u1", ["appointments.add_appointment".to_string()]);
-        let sql = validate_operation(&reg, &cashier, "appointments", &op("appointments._insert_history"))
-            .expect("same permission as the command that pushes it");
+        let sql = validate_operation(
+            &reg,
+            &cashier,
+            "appointments",
+            &op("appointments._insert_history"),
+        )
+        .expect("same permission as the command that pushes it");
         assert_eq!(sql.len(), 1);
     }
 
@@ -2077,12 +2154,23 @@ mod tests {
         // to check, and a ceiling that stopped the outbox would break every listener.
         let reg = registry_with_two(
             "appointments",
-            ("appointments.appointments.create", "appointments.add_appointment"),
-            ("appointments._insert_history", "appointments.change_appointment"),
+            (
+                "appointments.appointments.create",
+                "appointments.add_appointment",
+            ),
+            (
+                "appointments._insert_history",
+                "appointments.change_appointment",
+            ),
         );
         let system = RequestContext::new("h1", "u1", ["*".to_string()]);
-        validate_operation(&reg, &system, "appointments", &op("appointments._insert_history"))
-            .expect("the system context resolves every op of the module");
+        validate_operation(
+            &reg,
+            &system,
+            "appointments",
+            &op("appointments._insert_history"),
+        )
+        .expect("the system context resolves every op of the module");
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -2134,8 +2222,13 @@ mod tests {
             &["invoice.created"],
             &[],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
-            .expect_err("sin proveedor no se abre una cadena fiscal");
+        let err = enforce_fiscal_capacity(
+            &ctx,
+            "sales",
+            false,
+            &[crate::manifest::EmitDef::from("invoice.created")],
+        )
+        .expect_err("sin proveedor no se abre una cadena fiscal");
         assert_eq!(code_of(&err), "fiscal.provider_missing");
     }
 
@@ -2150,8 +2243,13 @@ mod tests {
             &[],
         );
         assert!(
-            enforce_fiscal_capacity(&ctx, "inventory", false, &[crate::manifest::EmitDef::from("inventory.stock.moved")])
-                .is_ok(),
+            enforce_fiscal_capacity(
+                &ctx,
+                "inventory",
+                false,
+                &[crate::manifest::EmitDef::from("inventory.stock.moved")]
+            )
+            .is_ok(),
             "mover stock no abre ninguna cadena fiscal"
         );
         assert!(enforce_fiscal_capacity(&ctx, "inventory", false, &[]).is_ok());
@@ -2165,8 +2263,13 @@ mod tests {
             &["invoice.created"],
             &["verifactu"],
         );
-        let err = enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")])
-            .expect_err("una cadena ajena no se continúa");
+        let err = enforce_fiscal_capacity(
+            &ctx,
+            "sales",
+            false,
+            &[crate::manifest::EmitDef::from("invoice.created")],
+        )
+        .expect_err("una cadena ajena no se continúa");
         assert_eq!(code_of(&err), "fiscal.installation_mismatch");
     }
 
@@ -2174,9 +2277,13 @@ mod tests {
     #[test]
     fn an_active_hub_with_its_provider_mounted_is_not_gated() {
         let ctx = fiscal_ctx(FiscalMode::Active, &["invoice.created"], &["verifactu"]);
-        assert!(
-            enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok()
-        );
+        assert!(enforce_fiscal_capacity(
+            &ctx,
+            "sales",
+            false,
+            &[crate::manifest::EmitDef::from("invoice.created")]
+        )
+        .is_ok());
     }
 
     /// `CLOSED` es **default-deny de escrituras**: cesó la actividad, no se emite más.
@@ -2211,7 +2318,13 @@ mod tests {
     fn an_unresolved_mode_is_not_read_as_permission_to_emit() {
         let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
         assert_eq!(ctx.fiscal_mode, None);
-        assert!(enforce_fiscal_capacity(&ctx, "sales", false, &[crate::manifest::EmitDef::from("invoice.created")]).is_ok());
+        assert!(enforce_fiscal_capacity(
+            &ctx,
+            "sales",
+            false,
+            &[crate::manifest::EmitDef::from("invoice.created")]
+        )
+        .is_ok());
     }
 
     /// Un evento declarado en el `emit` de un command del módulo se acepta (comportamiento
@@ -2364,15 +2477,27 @@ mod tests {
     fn a_graceful_read_declares_itself_and_needs_no_depends_on() {
         // An OPTIONAL capability (ADR-0127): naming the query in the manifest IS the contract. It
         // forces no install and does not join the ADR-0128 cascade, so declaring it drags nothing.
-        assert!(read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", false));
-        assert!(read_in_scope(&["sales", "taxes"], "modifiers.options.all", false));
+        assert!(read_in_scope(
+            &["sales", "taxes"],
+            "inventory.products.for_sale",
+            false
+        ));
+        assert!(read_in_scope(
+            &["sales", "taxes"],
+            "modifiers.options.all",
+            false
+        ));
     }
 
     #[test]
     fn a_required_read_still_needs_its_owner_declared_as_a_dependency() {
         // Saying "this command cannot run without that module's answer" IS declaring a hard
         // dependency: without `depends_on` nobody guarantees the module is installed.
-        assert!(!read_in_scope(&["sales", "taxes"], "inventory.products.for_sale", true));
+        assert!(!read_in_scope(
+            &["sales", "taxes"],
+            "inventory.products.for_sale",
+            true
+        ));
         assert!(read_in_scope(&["sales", "taxes"], "taxes.rules.list", true));
     }
 
@@ -2451,8 +2576,10 @@ mod tests {
                 schema: None,
             },
         );
-        reg.native
-            .insert("sales".into(), std::sync::Arc::new(EmittingHandler(emitted)));
+        reg.native.insert(
+            "sales".into(),
+            std::sync::Arc::new(EmittingHandler(emitted)),
+        );
         reg
     }
 
@@ -2570,7 +2697,9 @@ mod tests {
 
     async fn db_with_capability_tables() -> erplora_db::PgAdapter {
         let db = erplora_db::testutil::fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "h1").await.unwrap();
@@ -2586,9 +2715,16 @@ mod tests {
         let reg = registry_with_printing_handler(false);
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let err = execute(&db, &reg, "labels.print", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap_err();
+        let err = execute(
+            &db,
+            &reg,
+            "labels.print",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::CapabilityDenied { capability, .. } if capability == "printer"),
             "got {err:?}"
@@ -2598,7 +2734,11 @@ mod tests {
             .query("SELECT COUNT(*) AS c FROM _event_outbox", &Params::new())
             .await
             .unwrap();
-        assert_eq!(rows.rows[0]["c"].as_i64().unwrap_or(-1), 0, "no se encola nada");
+        assert_eq!(
+            rows.rows[0]["c"].as_i64().unwrap_or(-1),
+            0,
+            "no se encola nada"
+        );
     }
 
     /// El camino feliz: con la capability declarada **y concedida**, el evento llega al outbox con
@@ -2607,17 +2747,35 @@ mod tests {
     async fn handler_emitting_print_due_with_printer_granted_reaches_the_outbox() {
         let db = db_with_capability_tables().await;
         let reg = registry_with_printing_handler(true);
-        crate::capabilities::set_grant(&db, &reg, "h1", "labels", "printer", true, "hub_user:admin")
-            .await
-            .unwrap();
+        crate::capabilities::set_grant(
+            &db,
+            &reg,
+            "h1",
+            "labels",
+            "printer",
+            true,
+            "hub_user:admin",
+        )
+        .await
+        .unwrap();
 
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        execute(&db, &reg, "labels.print", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        execute(
+            &db,
+            &reg,
+            "labels.print",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
 
         let rows = db
-            .query("SELECT event_name, module_id FROM _event_outbox", &Params::new())
+            .query(
+                "SELECT event_name, module_id FROM _event_outbox",
+                &Params::new(),
+            )
             .await
             .unwrap();
         assert_eq!(rows.rows.len(), 1);
@@ -2933,12 +3091,12 @@ mod tests {
             _input: &Json,
             _host: &dyn crate::native::NativeHost,
         ) -> Result<Output> {
-            Ok(Output::new()
-                .with_result(json!({"open": true}))
-                .with_error(erplora_wasm_host::guest_sdk::DomainError::new(
+            Ok(Output::new().with_result(json!({"open": true})).with_error(
+                erplora_wasm_host::guest_sdk::DomainError::new(
                     "sales.rejected",
                     "Rejected by a business rule",
-                )))
+                ),
+            ))
         }
     }
 
@@ -2996,8 +3154,13 @@ mod tests {
                 schema: None,
             },
         );
-        let err =
-            validate_operation(&reg, &sys_ctx(), "inventory", &op("inventory.stock.decrease")).unwrap_err();
+        let err = validate_operation(
+            &reg,
+            &sys_ctx(),
+            "inventory",
+            &op("inventory.stock.decrease"),
+        )
+        .unwrap_err();
         assert!(
             matches!(err, RuntimeError::Wasm(_)),
             "debe rechazar, no aplicar 0 sentencias: {err:?}"
@@ -3064,7 +3227,9 @@ mod tests {
             _ops: &[(String, Params)],
             _gates: &[erplora_db::RowGate],
         ) -> std::result::Result<erplora_db::TxGatedOutcome, erplora_db::DbError> {
-            panic!("DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes");
+            panic!(
+                "DenyDb::execute_tx_gated no debía llamarse — el gate de origen debe cortar antes"
+            );
         }
         async fn query(
             &self,
@@ -3375,9 +3540,16 @@ mod tests {
         let reg = registry_with_fiscal_command();
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
 
-        let out = execute(&db, &reg, "invoice.create", &fiscal_payload(), &ctx, &Grants::new())
-            .await
-            .expect("with the business identity set, the fiscal document must be emitted");
+        let out = execute(
+            &db,
+            &reg,
+            "invoice.create",
+            &fiscal_payload(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .expect("with the business identity set, the fiscal document must be emitted");
         assert_eq!(out["ok"], json!(true));
 
         let rows = db
@@ -3473,7 +3645,8 @@ mod tests {
             .unwrap();
         assert_eq!(rows.rows.len(), 1);
         assert_eq!(
-            rows.rows[0]["issuer_nif"], json!("B12345674"),
+            rows.rows[0]["issuer_nif"],
+            json!("B12345674"),
             "a document stamped by a RELAYED command (depth > 0) must carry the hub's real \
              issuer, never a blank one"
         );
@@ -3569,9 +3742,16 @@ mod tests {
         let reg = registry_with_command("notes", "notes.create");
         // Empty business identity (FakeDb returns no settings rows).
         let ctx = crate::registry::RequestContext::new("h1", "u1", ["*".to_string()]);
-        let out = execute(&FakeDb, &reg, "notes.create", &Params::new(), &ctx, &Grants::new())
-            .await
-            .unwrap();
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "notes.create",
+            &Params::new(),
+            &ctx,
+            &Grants::new(),
+        )
+        .await
+        .unwrap();
         assert_eq!(out["ok"], json!(true));
     }
 
@@ -3645,9 +3825,7 @@ mod tests {
         enforce_fiscal_precondition(
             &reg,
             &ctx,
-            std::iter::once::<&str>(
-                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
-            ),
+            std::iter::once::<&str>("INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);"),
         )
         .expect("in testing there is nothing to authorize (ADR-0360): the gate must pass");
     }
@@ -3661,9 +3839,7 @@ mod tests {
         let err = enforce_fiscal_precondition(
             &reg,
             &ctx,
-            std::iter::once::<&str>(
-                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
-            ),
+            std::iter::once::<&str>("INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);"),
         )
         .unwrap_err();
         assert!(
@@ -3683,9 +3859,7 @@ mod tests {
         let err = enforce_fiscal_precondition(
             &reg,
             &ctx,
-            std::iter::once::<&str>(
-                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
-            ),
+            std::iter::once::<&str>("INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);"),
         )
         .unwrap_err();
         assert!(
@@ -3706,9 +3880,7 @@ mod tests {
         let err = enforce_fiscal_precondition(
             &reg,
             &ctx,
-            std::iter::once::<&str>(
-                "INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);",
-            ),
+            std::iter::once::<&str>("INSERT INTO fiscal_doc (issuer) VALUES (:business_tax_id);"),
         )
         .unwrap_err();
         assert!(
@@ -3737,11 +3909,9 @@ mod tests {
             RegisteredCommand {
                 module_id: "verifactu".into(),
                 def: cmd_def(),
-                sql: vec![
-                    "INSERT INTO verifactu_config (hub_id, environment) \
+                sql: vec!["INSERT INTO verifactu_config (hub_id, environment) \
                      VALUES (:hub_id, :environment);"
-                        .to_string(),
-                ],
+                    .to_string()],
                 wasm: None,
                 schema: None,
             },
@@ -3901,9 +4071,16 @@ mod tests {
         );
         let mut payload = Params::new();
         payload.insert("environment_label".into(), json!("production"));
-        let out = execute(&FakeDb, &reg, "crm.tag", &payload, &ctx_admin(), &Grants::new())
-            .await
-            .expect("an unrelated param must not be read as the fiscal environment");
+        let out = execute(
+            &FakeDb,
+            &reg,
+            "crm.tag",
+            &payload,
+            &ctx_admin(),
+            &Grants::new(),
+        )
+        .await
+        .expect("an unrelated param must not be read as the fiscal environment");
         assert_eq!(out["ok"], json!(true));
     }
 
@@ -3937,11 +4114,9 @@ mod tests {
         )];
         let mut reg = Registry::new();
         reg.demo_hub = true;
-        let err = enforce_fiscal_environment_pin(
-            &reg,
-            pairs.iter().map(|(sql, p)| (sql.as_str(), p)),
-        )
-        .unwrap_err();
+        let err =
+            enforce_fiscal_environment_pin(&reg, pairs.iter().map(|(sql, p)| (sql.as_str(), p)))
+                .unwrap_err();
         assert!(
             matches!(
                 err,
@@ -4039,7 +4214,8 @@ mod tests {
     /// id into a REJECTION instead of a silent no-op.
     fn registry_with_gated_subcommand() -> Registry {
         let mut reg = Registry::new();
-        reg.status.insert("customers".to_string(), ModuleStatus::Active);
+        reg.status
+            .insert("customers".to_string(), ModuleStatus::Active);
 
         let mut clear = cmd_def();
         clear.sql = vec![CLEAR_SQL.to_string()];

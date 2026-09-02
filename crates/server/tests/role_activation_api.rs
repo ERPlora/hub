@@ -55,7 +55,10 @@ async fn fixture() -> (axum::Router, String, String, std::path::PathBuf) {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
 
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let employee_id = rt
         .create_user("Employee", "2222", "employee", None)
         .await
@@ -113,7 +116,10 @@ async fn roles(router: &axum::Router, session: &str) -> Vec<Value> {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
-    body_json(response).await["data"].as_array().unwrap().clone()
+    body_json(response).await["data"]
+        .as_array()
+        .unwrap()
+        .clone()
 }
 
 type Response = axum::response::Response;
@@ -130,7 +136,10 @@ async fn the_catalogue_travels_with_its_label_source_and_activation() {
         .expect("the role the installed module declares is in the catalogue");
     assert_eq!(kitchen["label"], "Kitchen");
     assert_eq!(kitchen["extends"], "employee");
-    assert_eq!(kitchen["source"], json!({"kind": "module", "module_id": "kitchen"}));
+    assert_eq!(
+        kitchen["source"],
+        json!({"kind": "module", "module_id": "kitchen"})
+    );
     assert_eq!(kitchen["active"], false, "opt-in until somebody says so");
 
     let admin_role = listed.iter().find(|r| r["name"] == "admin").unwrap();

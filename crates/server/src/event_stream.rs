@@ -208,7 +208,11 @@ pub struct StreamLimiter {
 
 impl std::fmt::Debug for StreamLimiter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let open = self.inner.lock().map(|m| m.values().sum::<usize>()).unwrap_or(0);
+        let open = self
+            .inner
+            .lock()
+            .map(|m| m.values().sum::<usize>())
+            .unwrap_or(0);
         write!(f, "StreamLimiter({open} open)")
     }
 }
@@ -227,13 +231,19 @@ impl StreamLimiter {
             return None;
         }
         *count += 1;
-        Some(StreamSlot { limiter: Arc::clone(self), key_id: key_id.to_string() })
+        Some(StreamSlot {
+            limiter: Arc::clone(self),
+            key_id: key_id.to_string(),
+        })
     }
 
     /// How many live connections `key_id` holds. Only tests need this: the limiter is correct when
     /// its observable effect (a 17th socket is refused) is correct, not when a number is.
     pub fn held_by(&self, key_id: &str) -> usize {
-        self.inner.lock().map(|m| *m.get(key_id).unwrap_or(&0)).unwrap_or(0)
+        self.inner
+            .lock()
+            .map(|m| *m.get(key_id).unwrap_or(&0))
+            .unwrap_or(0)
     }
 }
 
@@ -466,23 +476,27 @@ pub async fn sse(
     // hub#529: the same filter the socket applies, from the same function. The scope travels with
     // the stream so a later frame is judged by the key that opened it, not by a re-read.
     let scope = principal.scope.clone();
-    let stream = futures_util::stream::unfold((rx, slot, scope), |(mut rx, slot, scope)| async move {
-        loop {
-            match rx.recv().await {
-                Ok(ev) => {
-                    if !may_receive(&scope, &ev) {
-                        continue;
+    let stream =
+        futures_util::stream::unfold((rx, slot, scope), |(mut rx, slot, scope)| async move {
+            loop {
+                match rx.recv().await {
+                    Ok(ev) => {
+                        if !may_receive(&scope, &ev) {
+                            continue;
+                        }
+                        let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
+                        return Some((
+                            Ok::<Event, std::convert::Infallible>(Event::default().data(data)),
+                            (rx, slot, scope),
+                        ));
                     }
-                    let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
-                    return Some((Ok::<Event, std::convert::Infallible>(Event::default().data(data)), (rx, slot, scope)));
+                    // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    // Canal cerrado: termina el stream. `slot` drops here, releasing the limiter count.
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
                 }
-                // Suscriptor lento: saltamos lo perdido y seguimos (igual que el WS).
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                // Canal cerrado: termina el stream. `slot` drops here, releasing the limiter count.
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
             }
-        }
-    });
+        });
     Sse::new(stream)
         .keep_alive(KeepAlive::default())
         .into_response()
@@ -493,7 +507,11 @@ pub async fn sse(
 ///
 /// There is deliberately **no** `?ticket=` here: the WebSocket has a first frame, so nothing has
 /// to go in the URL, and a credential in a URL is a credential in the access log.
-pub async fn upgrade(State(st): State<AppState>, headers: HeaderMap, ws: WebSocketUpgrade) -> Response {
+pub async fn upgrade(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    ws: WebSocketUpgrade,
+) -> Response {
     let credential = auth::api_key_token(&headers);
     ws.on_upgrade(move |socket| stream_loop(socket, st, credential))
 }
@@ -545,7 +563,10 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
         Ok(v) => v,
         Err(_) => Value::Null,
     };
-    let frame_type = parsed.get("type").and_then(Value::as_str).unwrap_or_default();
+    let frame_type = parsed
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if frame_type != "auth" {
         // This channel speaks ONE client frame. Before `auth` that is an unauthenticated peer
         // trying its luck and the socket goes; after it, a client talking nonsense on a channel
@@ -566,7 +587,10 @@ pub async fn handle_frame(st: &AppState, conn: &mut StreamConnection, raw: &str)
             keep_open: conn.is_ready(),
         };
     }
-    let token = parsed.get("token").and_then(Value::as_str).unwrap_or_default();
+    let token = parsed
+        .get("token")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     match authenticate(st, Some(token)).await {
         StreamAuth::Granted(principal) => {
             conn.key_id = principal.key_id.clone();
@@ -708,7 +732,8 @@ mod tests {
     const NEIGHBOUR_ID: &str = "hub-next-door";
 
     fn config(hub_id: &str) -> crate::HubConfig {
-        let temp = std::env::temp_dir().join(format!("erplora-event-stream-{}", std::process::id()));
+        let temp =
+            std::env::temp_dir().join(format!("erplora-event-stream-{}", std::process::id()));
         crate::HubConfig {
             hub_id: hub_id.into(),
             cloud_base_url: "https://example.invalid".into(),
@@ -892,7 +917,10 @@ mod tests {
         );
         let without = none.frame["message"].as_str().unwrap_or_default();
         let invalid = bogus.frame["message"].as_str().unwrap_or_default();
-        assert!(!without.is_empty() && !invalid.is_empty(), "a refusal says why");
+        assert!(
+            !without.is_empty() && !invalid.is_empty(),
+            "a refusal says why"
+        );
         assert_ne!(without, invalid, "…and these two are not the same why");
 
         // And the third refusal is a third message: a key that may not read is neither of those.
@@ -982,7 +1010,10 @@ mod tests {
         let tickets = StreamTickets::default();
         let t = tickets.mint_at(HUB_ID, "key-1", 1_000);
         assert!(t.starts_with(TICKET_PREFIX));
-        assert_eq!(tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(), Some("key-1"));
+        assert_eq!(
+            tickets.redeem_at(&t, HUB_ID, 1_000).as_deref(),
+            Some("key-1")
+        );
         assert_eq!(
             tickets.redeem_at(&t, HUB_ID, 1_000),
             None,
@@ -1085,9 +1116,9 @@ mod tests {
             a.len() >= TICKET_PREFIX.len() + 32,
             "a ticket that short is not carrying real entropy: {a}"
         );
-        assert!(a.strip_prefix(TICKET_PREFIX).is_some_and(|s| s
-            .chars()
-            .all(|c| c.is_ascii_hexdigit())));
+        assert!(a
+            .strip_prefix(TICKET_PREFIX)
+            .is_some_and(|s| s.chars().all(|c| c.is_ascii_hexdigit())));
     }
 
     #[test]
@@ -1143,7 +1174,10 @@ mod tests {
         // Dropping one frees exactly one slot.
         drop(slots);
         assert_eq!(lim.held_by(k), 0, "all slots released on drop");
-        assert!(lim.acquire(k).is_some(), "a slot is available again after release");
+        assert!(
+            lim.acquire(k).is_some(),
+            "a slot is available again after release"
+        );
     }
 
     /// The cap is per key: a second key is not penalised for the first one's connections.
@@ -1151,12 +1185,17 @@ mod tests {
     fn limiter_caps_per_key_not_globally() {
         let lim = Arc::new(StreamLimiter::default());
         let _a = lim.acquire("key-A").unwrap();
-        let _many_a: Vec<_> = (0..MAX_STREAMS_PER_KEY - 1).map(|_| lim.acquire("key-A").unwrap()).collect();
+        let _many_a: Vec<_> = (0..MAX_STREAMS_PER_KEY - 1)
+            .map(|_| lim.acquire("key-A").unwrap())
+            .collect();
         assert!(lim.acquire("key-A").is_none(), "key-A is at the cap");
 
         // key-B is untouched.
         assert_eq!(lim.held_by("key-B"), 0);
-        assert!(lim.acquire("key-B").is_some(), "a different key is not blocked by key-A");
+        assert!(
+            lim.acquire("key-B").is_some(),
+            "a different key is not blocked by key-A"
+        );
     }
 
     /// A socket that authenticates and then disconnects (the common case: a tab closed) leaves the
@@ -1169,7 +1208,11 @@ mod tests {
             let _slot = lim.acquire("key-A").unwrap();
             assert_eq!(lim.held_by("key-A"), 1);
         } // slot drops here
-        assert_eq!(lim.held_by("key-A"), 0, "the slot was released when the scope ended");
+        assert_eq!(
+            lim.held_by("key-A"),
+            0,
+            "the slot was released when the scope ended"
+        );
     }
 
     // ── hub#529: what a listener may be sent ────────────────────────────────
@@ -1231,8 +1274,16 @@ mod tests {
     #[test]
     fn write_on_a_module_is_not_permission_to_listen_to_it() {
         let feed = ApiKeyScope::custom(vec![
-            ScopeEntry { module: "invoice".into(), read: false, write: true },
-            ScopeEntry { module: "sales".into(), read: true, write: false },
+            ScopeEntry {
+                module: "invoice".into(),
+                read: false,
+                write: true,
+            },
+            ScopeEntry {
+                module: "sales".into(),
+                read: true,
+                write: false,
+            },
         ]);
         assert!(!may_receive(
             &feed,
@@ -1260,7 +1311,10 @@ mod tests {
                 &frame_of(EventSource::Core, "flow.approval.created")
             ));
             assert!(
-                may_receive(&scope, &json!({ "type": "module.installed", "module_id": "sales" })),
+                may_receive(
+                    &scope,
+                    &json!({ "type": "module.installed", "module_id": "sales" })
+                ),
                 "including the raw system frames the installer publishes"
             );
         }
@@ -1299,7 +1353,10 @@ mod tests {
             &nothing,
             &frame_of(EventSource::Module("invoice"), "invoice.issued")
         ));
-        assert!(!may_receive(&nothing, &frame_of(EventSource::Core, "anything")));
+        assert!(!may_receive(
+            &nothing,
+            &frame_of(EventSource::Core, "anything")
+        ));
         assert!(!StreamConnection::default()
             .may_receive(&frame_of(EventSource::Module("invoice"), "invoice.issued")));
     }
@@ -1314,7 +1371,10 @@ mod tests {
             &feed,
             &frame_of(EventSource::Module("sales"), "sale.completed")
         ));
-        assert!(!may_receive(&feed, &frame_of(EventSource::Core, "anything")));
+        assert!(!may_receive(
+            &feed,
+            &frame_of(EventSource::Core, "anything")
+        ));
     }
 
     /// The frame really does carry the emitter, in the field the filter reads. If the builder

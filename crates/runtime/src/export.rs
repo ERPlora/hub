@@ -406,7 +406,9 @@ pub async fn export_hub(
         // la tabla entera, así que en una BD compartida el backup de un negocio se llevaba dentro
         // al personal del de al lado —con su rol y su `pin_hash`— y restaurarlo en cualquier sitio
         // los daba de alta ahí.
-        let mut rows = fetch_rows(db, "hub_user", Some(hub_id)).await.unwrap_or_default();
+        let mut rows = fetch_rows(db, "hub_user", Some(hub_id))
+            .await
+            .unwrap_or_default();
         // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
         // PERSONA del SaaS: el usuario que dispara el export acaba dentro del bundle y, si se
         // publica como blueprint, cada hub que lo importe se lo lleva como usuario suyo —con su
@@ -423,7 +425,10 @@ pub async fn export_hub(
                 *v = serde_json::Value::Null;
             }
         }
-        files.insert("data/hub_users.sql".into(), rows_to_sql("hub_user", &rows, hub_id).into_bytes());
+        files.insert(
+            "data/hub_users.sql".into(),
+            rows_to_sql("hub_user", &rows, hub_id).into_bytes(),
+        );
         // hub#464: the profile and preferences are half of «the person comes back whole». `hub_user`
         // carries name/role/PIN/access-email, but the display name, avatar, profile email
         // (`hub_user_profile`) and the language/theme/palette choices (`hub_user_pref`) live in their
@@ -433,7 +438,9 @@ pub async fn export_hub(
         // never travel in a template (`carries_identity`), so a published blueprint still carries no
         // personal data.
         for table in ["hub_user_profile", "hub_user_pref"] {
-            let rows = fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default();
+            let rows = fetch_rows(db, table, Some(hub_id))
+                .await
+                .unwrap_or_default();
             if !rows.is_empty() {
                 files.insert(
                     format!("data/{table}.sql"),
@@ -444,10 +451,17 @@ pub async fn export_hub(
         sections.push("hub_users".into());
     }
     if selection.settings {
-        let mut rows = fetch_rows(db, "hub_settings", Some(hub_id)).await.unwrap_or_default();
+        let mut rows = fetch_rows(db, "hub_settings", Some(hub_id))
+            .await
+            .unwrap_or_default();
         if let Some(keys) = &selection.settings_items {
             // Paso de ajustes ítem a ítem: solo las claves marcadas.
-            rows.retain(|r| r.get("key").and_then(|k| k.as_str()).map(|k| keys.iter().any(|w| w == k)).unwrap_or(false));
+            rows.retain(|r| {
+                r.get("key")
+                    .and_then(|k| k.as_str())
+                    .map(|k| keys.iter().any(|w| w == k))
+                    .unwrap_or(false)
+            });
         }
         // ADR-0195 §4 (hub#405): a TEMPLATE only carries CONFIGURATION. `hub_settings` holds, in
         // the same table, what a sector template is for (country, currency, language, palette) and
@@ -462,10 +476,16 @@ pub async fn export_hub(
         // lesson as the identity sections above: a checkbox is not a control.
         if !carries_identity {
             rows.retain(|r| {
-                r.get("key").and_then(|k| k.as_str()).map(is_portable_setting).unwrap_or(false)
+                r.get("key")
+                    .and_then(|k| k.as_str())
+                    .map(is_portable_setting)
+                    .unwrap_or(false)
             });
         }
-        files.insert("data/hub_settings.sql".into(), rows_to_sql("hub_settings", &rows, hub_id).into_bytes());
+        files.insert(
+            "data/hub_settings.sql".into(),
+            rows_to_sql("hub_settings", &rows, hub_id).into_bytes(),
+        );
         sections.push("hub_settings".into());
     }
     // fiscal/media: el runtime solo REGISTRA la sección; los bytes (certificado, imágenes)
@@ -482,7 +502,12 @@ pub async fn export_hub(
     // `kitchen_orders_x` al módulo `kitchen` existiendo `kitchen_orders`, cada tabla se asigna
     // al id INSTALADO con el prefijo coincidente MÁS LARGO.
     let all_tables = list_tables(db).await?;
-    let installed_ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+    let installed_ids: Vec<String> = rt
+        .registry()
+        .installed
+        .iter()
+        .map(|m| m.id.clone())
+        .collect();
     let mut manifest_modules: Vec<ManifestModule> = Vec::new();
 
     for m in &selection.modules {
@@ -490,7 +515,11 @@ pub async fn export_hub(
             continue; // no instalado → no se puede volcar ni referenciar con versión real
         }
         let version = rt.registry().module_version(&m.module_id);
-        manifest_modules.push(ManifestModule { id: m.module_id.clone(), version, with_data: m.with_data });
+        manifest_modules.push(ManifestModule {
+            id: m.module_id.clone(),
+            version,
+            with_data: m.with_data,
+        });
         if !m.with_data {
             continue; // checkbox «módulo» sin «datos»: solo va al manifest (se instalará, vacío)
         }
@@ -526,7 +555,8 @@ pub async fn export_hub(
             // (hub#533): la serie de facturación y su libro de números entregados. Ver
             // `TEMPLATE_EXCLUDED_TABLES` — es el suelo del core, por debajo de lo que el operador
             // elige tabla a tabla al exportar.
-            if selection.purpose.is_template() && TEMPLATE_EXCLUDED_TABLES.contains(&table.as_str()) {
+            if selection.purpose.is_template() && TEMPLATE_EXCLUDED_TABLES.contains(&table.as_str())
+            {
                 continue;
             }
             // La mayoría de tablas llevan `hub_id` (contrato de fila §2.5) → se acotan por él.
@@ -535,7 +565,9 @@ pub async fn export_hub(
             // el bundle perdía la categoría de cada producto. Se vuelcan acotadas por su tabla
             // PADRE a través de la FK DECLARADA (metadato de la BD, no adivinar nombres).
             let rows = if has_column(db, table, "hub_id").await {
-                fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default()
+                fetch_rows(db, table, Some(hub_id))
+                    .await
+                    .unwrap_or_default()
             } else {
                 match fetch_join_rows(db, table, hub_id).await {
                     Some(rows) => rows,
@@ -593,7 +625,9 @@ pub async fn export_hub(
     // Hoy restaurar un backup dejaba TODOS los módulos denegados (default-deny) y nadie lo decía:
     // el restore parecía completo y el hub no podía firmar.
     let capability_grants = if carries_identity {
-        crate::capabilities::granted_by_module(db, hub_id).await.unwrap_or_default()
+        crate::capabilities::granted_by_module(db, hub_id)
+            .await
+            .unwrap_or_default()
     } else {
         BTreeMap::new()
     };
@@ -638,9 +672,15 @@ pub async fn export_hub(
         name: name.to_string(),
         locale: locale.to_string(),
         hub: HubMeta {
-            name: setting(db, hub_id, "business_name").await.unwrap_or_default(),
-            country: setting(db, hub_id, "country").await.unwrap_or_else(|| "ES".into()),
-            currency: setting(db, hub_id, "currency").await.unwrap_or_else(|| "EUR".into()),
+            name: setting(db, hub_id, "business_name")
+                .await
+                .unwrap_or_default(),
+            country: setting(db, hub_id, "country")
+                .await
+                .unwrap_or_else(|| "ES".into()),
+            currency: setting(db, hub_id, "currency")
+                .await
+                .unwrap_or_else(|| "EUR".into()),
             hub_id: hub_id.to_string(),
         },
         created_at: created_at.to_string(),
@@ -662,12 +702,18 @@ pub async fn export_hub(
 /// that is not there yet) yields no flows instead of losing the whole backup.
 async fn collect_flows(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Vec<FlowSpec> {
     let mut out = Vec::new();
-    for flow in crate::flows::store::list(db, hub_id).await.unwrap_or_default() {
+    for flow in crate::flows::store::list(db, hub_id)
+        .await
+        .unwrap_or_default()
+    {
         let grants = crate::flows::grants::list(db, hub_id, &flow.id)
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|g| FlowGrantSpec { kind: g.kind, value: g.value })
+            .map(|g| FlowGrantSpec {
+                kind: g.kind,
+                value: g.value,
+            })
             .collect();
         out.push(FlowSpec {
             name: flow.name,
@@ -713,7 +759,12 @@ pub async fn module_table_counts(
 ) -> crate::Result<Vec<ModuleTables>> {
     let db = rt.db();
     let all_tables = list_tables(db).await?;
-    let installed_ids: Vec<String> = rt.registry().installed.iter().map(|m| m.id.clone()).collect();
+    let installed_ids: Vec<String> = rt
+        .registry()
+        .installed
+        .iter()
+        .map(|m| m.id.clone())
+        .collect();
 
     let mut out = Vec::with_capacity(module_ids.len());
     for module_id in module_ids {
@@ -726,16 +777,28 @@ pub async fn module_table_counts(
             .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(module_id.as_str()))
         {
             let rows = if has_column(db, table, "hub_id").await {
-                fetch_rows(db, table, Some(hub_id)).await.unwrap_or_default().len()
+                fetch_rows(db, table, Some(hub_id))
+                    .await
+                    .unwrap_or_default()
+                    .len()
             } else {
-                fetch_join_rows(db, table, hub_id).await.unwrap_or_default().len()
+                fetch_join_rows(db, table, hub_id)
+                    .await
+                    .unwrap_or_default()
+                    .len()
             };
-            tables.push(TableCount { table: table.clone(), rows: rows as i64 });
+            tables.push(TableCount {
+                table: table.clone(),
+                rows: rows as i64,
+            });
         }
         // Por volumen descendente: lo gordo es lo que hay que ver primero. Empate → por nombre, para
         // que dos cargas de la misma pantalla den la misma lista.
         tables.sort_by(|a, b| b.rows.cmp(&a.rows).then_with(|| a.table.cmp(&b.table)));
-        out.push(ModuleTables { module_id: module_id.clone(), tables });
+        out.push(ModuleTables {
+            module_id: module_id.clone(),
+            tables,
+        });
     }
     Ok(out)
 }
@@ -749,13 +812,22 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Lista las tablas de usuario del backend activo (catálogo por dialecto).
-pub(crate) async fn list_tables(db: &dyn erplora_db::DatabaseAdapter) -> crate::Result<Vec<String>> {
+pub(crate) async fn list_tables(
+    db: &dyn erplora_db::DatabaseAdapter,
+) -> crate::Result<Vec<String>> {
     // Postgres-only (ADR-0154). `current_schema()` acota al esquema activo del hub (en prod
     // `public`; en los tests, el esquema efímero por test).
     let sql = "SELECT table_name AS name FROM information_schema.tables \
                WHERE table_schema = current_schema()";
-    let res = db.query(sql, &erplora_db::Params::new()).await.map_err(|e| crate::RuntimeError::Other(format!("export: catálogo de tablas: {e}")))?;
-    Ok(res.rows.iter().filter_map(|r| r.get("name").and_then(|n| n.as_str()).map(str::to_string)).collect())
+    let res = db
+        .query(sql, &erplora_db::Params::new())
+        .await
+        .map_err(|e| crate::RuntimeError::Other(format!("export: catálogo de tablas: {e}")))?;
+    Ok(res
+        .rows
+        .iter()
+        .filter_map(|r| r.get("name").and_then(|n| n.as_str()).map(str::to_string))
+        .collect())
 }
 
 /// Ordena `tables` para que una tabla vaya SIEMPRE detrás de aquellas a las que referencia.
@@ -786,8 +858,9 @@ async fn order_by_dependency(db: &dyn erplora_db::DatabaseAdapter, tables: &mut 
     let mut salida: Vec<String> = Vec::with_capacity(tables.len());
     let mut colocadas: std::collections::HashSet<String> = std::collections::HashSet::new();
     while salida.len() < tables.len() {
-        let siguiente = (0..tables.len())
-            .find(|&i| !colocadas.contains(&tables[i]) && deps[i].iter().all(|p| colocadas.contains(p)));
+        let siguiente = (0..tables.len()).find(|&i| {
+            !colocadas.contains(&tables[i]) && deps[i].iter().all(|p| colocadas.contains(p))
+        });
         match siguiente {
             Some(i) => {
                 colocadas.insert(tables[i].clone());
@@ -850,12 +923,11 @@ async fn order_rows_parent_first(
         // apunta a una fila filtrada —soft-deleted, sembrada— y el guard NOT EXISTS lo cubre).
         let ids_restantes: std::collections::HashSet<String> =
             restantes.iter().filter_map(id_de).collect();
-        let (listas, esperando): (Vec<_>, Vec<_>) = restantes.into_iter().partition(|r| {
-            match pendiente_de(r) {
+        let (listas, esperando): (Vec<_>, Vec<_>) =
+            restantes.into_iter().partition(|r| match pendiente_de(r) {
                 None => true,
                 Some(p) => colocados.contains(&p) || !ids_restantes.contains(&p),
-            }
-        });
+            });
         if listas.is_empty() {
             // Ciclo entre filas: se emiten tal cual (ningún orden lo resuelve) y no se pierde nada.
             salida.extend(esperando);
@@ -896,7 +968,11 @@ pub(crate) fn safe_ident(s: &str) -> bool {
 }
 
 /// ¿`table` tiene la columna `col`? (catálogo por dialecto).
-pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str, col: &str) -> bool {
+pub(crate) async fn has_column(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+    col: &str,
+) -> bool {
     if !safe_ident(table) {
         return false;
     }
@@ -905,7 +981,9 @@ pub(crate) async fn has_column(db: &dyn erplora_db::DatabaseAdapter, table: &str
         "SELECT column_name AS name FROM information_schema.columns \
          WHERE table_schema = current_schema() AND table_name = '{table}'"
     );
-    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return false };
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else {
+        return false;
+    };
     res.rows
         .iter()
         .filter_map(|r| r.get("name").and_then(|n| n.as_str()))
@@ -959,7 +1037,10 @@ pub(crate) struct NaturalKey {
 /// `columna = literal`— se DESCARTA en vez de traducirse a medias. Una guarda construida a partir
 /// de un índice mal entendido saltaría filas legítimas en silencio, que es peor que el fallo ruidoso
 /// que ya teníamos. Lo que se descarta aquí se comporta como antes de hub#753.
-pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<NaturalKey> {
+pub(crate) async fn natural_keys(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+) -> Vec<NaturalKey> {
     if !safe_ident(table) {
         return Vec::new();
     }
@@ -975,7 +1056,9 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
          WHERE c.relname = '{table}' AND n.nspname = current_schema() \
            AND i.indisunique AND NOT i.indisprimary AND i.indisvalid"
     );
-    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return Vec::new() };
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else {
+        return Vec::new();
+    };
     res.rows
         .iter()
         .filter_map(|r| {
@@ -1002,7 +1085,12 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
                 Some(expr) => parse_index_predicate(expr)?,
             };
             let nulls_not_distinct = truthy(r.get("nnd"));
-            Some(NaturalKey { cols, predicate, nulls_not_distinct, seeded_only: false })
+            Some(NaturalKey {
+                cols,
+                predicate,
+                nulls_not_distinct,
+                seeded_only: false,
+            })
         })
         .collect()
 }
@@ -1016,7 +1104,11 @@ pub(crate) async fn natural_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
 fn parse_index_predicate(expr: &str) -> Option<Vec<(String, Option<String>)>> {
     let mut out = Vec::new();
     for part in expr.split(" AND ") {
-        let part = part.trim().trim_start_matches('(').trim_end_matches(')').trim();
+        let part = part
+            .trim()
+            .trim_start_matches('(')
+            .trim_end_matches(')')
+            .trim();
         // `columna IS NULL` (hub#576): identidad «regla raíz» del índice parcial de `taxes_rule`.
         // `IS NOT NULL` no acaba en ` IS NULL`, así que cae al `split_once('=')` y descarta el
         // índice entero — el fail-open de siempre.
@@ -1034,8 +1126,14 @@ fn parse_index_predicate(expr: &str) -> Option<Vec<(String, Option<String>)>> {
             return None;
         }
         // Literal escalar: número o cadena entrecomillada. Nada de casts (`'x'::text`) ni funciones.
-        let numeric = !lit.is_empty() && lit.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-');
-        let quoted = lit.len() >= 2 && lit.starts_with('\'') && lit.ends_with('\'') && !lit[1..lit.len() - 1].contains('\'');
+        let numeric = !lit.is_empty()
+            && lit
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == '.' || c == '-');
+        let quoted = lit.len() >= 2
+            && lit.starts_with('\'')
+            && lit.ends_with('\'')
+            && !lit[1..lit.len() - 1].contains('\'');
         if !numeric && !quoted {
             return None;
         }
@@ -1052,7 +1150,10 @@ pub(crate) struct ForeignKey {
 }
 
 /// FKs declaradas de `table`, leídas del catálogo de la BD (no se infieren por nombre).
-pub(crate) async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &str) -> Vec<ForeignKey> {
+pub(crate) async fn foreign_keys(
+    db: &dyn erplora_db::DatabaseAdapter,
+    table: &str,
+) -> Vec<ForeignKey> {
     if !safe_ident(table) {
         return Vec::new();
     }
@@ -1073,16 +1174,25 @@ pub(crate) async fn foreign_keys(db: &dyn erplora_db::DatabaseAdapter, table: &s
          WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = current_schema() \
            AND tc.table_name = '{table}'"
     );
-    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else { return Vec::new() };
+    let Ok(res) = db.query(&sql, &erplora_db::Params::new()).await else {
+        return Vec::new();
+    };
     res.rows
         .iter()
         .filter_map(|r| {
             let from = r.get("col_from")?.as_str()?.to_string();
             let parent = r.get("parent")?.as_str()?.to_string();
             // En SQLite `to` puede venir NULL → referencia implícita a la PK del padre (`id`).
-            let to = r.get("col_to").and_then(|v| v.as_str()).unwrap_or("id").to_string();
-            (safe_ident(&from) && safe_ident(&parent) && safe_ident(&to))
-                .then_some(ForeignKey { from, parent, to })
+            let to = r
+                .get("col_to")
+                .and_then(|v| v.as_str())
+                .unwrap_or("id")
+                .to_string();
+            (safe_ident(&from) && safe_ident(&parent) && safe_ident(&to)).then_some(ForeignKey {
+                from,
+                parent,
+                to,
+            })
         })
         .collect()
 }
@@ -1104,7 +1214,10 @@ async fn fetch_join_rows(
              (SELECT 1 FROM {parent} p WHERE p.{to} = t.{from} AND p.hub_id = :hub_id)"
         );
         let mut p = erplora_db::Params::new();
-        p.insert("hub_id".into(), serde_json::Value::String(hub_id.to_string()));
+        p.insert(
+            "hub_id".into(),
+            serde_json::Value::String(hub_id.to_string()),
+        );
         if let Ok(res) = db.query(&sql, &p).await {
             return Some(res.rows);
         }
@@ -1218,7 +1331,11 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
         // importar: `inventory_category`/`staff_role` tienen una columna `order` y el bundle
         // aterrizaba con «near "order": syntax error» — perdiendo la sección ENTERA (el módulo se
         // aplica en bloque), así que 19 categorías + 280 productos se quedaban en nada.
-        let col_list = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
+        let col_list = cols
+            .iter()
+            .map(|c| quote_ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
         let val_list = vals.join(", ");
         // Guard NOT EXISTS por `id` SOLO cuando hay `id` (contrato de fila): re-importar el mismo
         // bundle no duplica. Sin `id` (p.ej. hub_settings, PK compuesta) → guard por PK real.
@@ -1252,9 +1369,14 @@ fn rows_to_sql(table: &str, rows: &[serde_json::Value], hub_id: &str) -> String 
                     }
                 })
                 .collect();
-            format!(" WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE {})", conds.join(" AND "))
+            format!(
+                " WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE {})",
+                conds.join(" AND ")
+            )
         };
-        out.push_str(&format!("INSERT INTO {table} ({col_list}) SELECT {val_list}{guard};\n"));
+        out.push_str(&format!(
+            "INSERT INTO {table} ({col_list}) SELECT {val_list}{guard};\n"
+        ));
     }
     // El barrido anti-fuga del hub_id de ORIGEN va ya POR COLUMNA arriba (respetando id y
     // auditoría), no con un replace ciego sobre todo el SQL.
@@ -1273,7 +1395,13 @@ fn quote_ident(name: &str) -> String {
 fn sql_literal(v: &serde_json::Value) -> String {
     match v {
         serde_json::Value::Null => "NULL".into(),
-        serde_json::Value::Bool(b) => if *b { "TRUE".into() } else { "FALSE".into() },
+        serde_json::Value::Bool(b) => {
+            if *b {
+                "TRUE".into()
+            } else {
+                "FALSE".into()
+            }
+        }
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
         other => format!("'{}'", other.to_string().replace('\'', "''")),
@@ -1283,16 +1411,29 @@ fn sql_literal(v: &serde_json::Value) -> String {
 /// Lee un setting del hub (best-effort; para los metadatos informativos del manifest).
 async fn setting(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str, key: &str) -> Option<String> {
     let mut p = erplora_db::Params::new();
-    p.insert("hub_id".into(), serde_json::Value::String(hub_id.to_string()));
+    p.insert(
+        "hub_id".into(),
+        serde_json::Value::String(hub_id.to_string()),
+    );
     p.insert("key".into(), serde_json::Value::String(key.to_string()));
-    let res = db.query("SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key", &p).await.ok()?;
-    res.rows.first().and_then(|r| r.get("value")).and_then(|v| v.as_str()).map(str::to_string)
+    let res = db
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
+        .await
+        .ok()?;
+    res.rows
+        .first()
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use erplora_db::{DatabaseAdapter, testutil::fresh_db};
+    use erplora_db::{testutil::fresh_db, DatabaseAdapter};
 
     /// The predicate of `taxes_rule`'s roots-only unique index (hub#576):
     /// `WHERE parent_id IS NULL AND is_deleted = 0`, as `pg_get_expr` renders it. An `IS NULL`
@@ -1302,7 +1443,10 @@ mod tests {
     fn parse_index_predicate_understands_is_null_conjuncts() {
         assert_eq!(
             parse_index_predicate("((parent_id IS NULL) AND (is_deleted = 0))"),
-            Some(vec![("parent_id".to_string(), None), ("is_deleted".to_string(), Some("0".to_string()))]),
+            Some(vec![
+                ("parent_id".to_string(), None),
+                ("is_deleted".to_string(), Some("0".to_string()))
+            ]),
         );
     }
 
@@ -1330,7 +1474,11 @@ mod tests {
                 hub_id: "6c9e7a52-0f1b-4b2e-9c1d-2f8a5e3d7b10".into(),
             },
             created_at: "2026-07-11T18:00:00Z".into(),
-            modules: vec![ManifestModule { id: "taxes".into(), version: "2.1.1".into(), with_data: true }],
+            modules: vec![ManifestModule {
+                id: "taxes".into(),
+                version: "2.1.1".into(),
+                with_data: true,
+            }],
             sections: vec!["hub_settings".into(), "modules/taxes".into()],
             active_roles: Vec::new(),
             capability_grants: BTreeMap::from([(
@@ -1369,7 +1517,10 @@ mod tests {
         })];
         let sql = rows_to_sql("inventory_product", &rows, "local");
         // La columna hub_id (valor + guard NOT EXISTS) va como placeholder: 2 apariciones.
-        assert!(sql.contains("'__HUB_ID__'"), "el hub_id debe viajar como placeholder");
+        assert!(
+            sql.contains("'__HUB_ID__'"),
+            "el hub_id debe viajar como placeholder"
+        );
         // created_by y updated_by conservan 'local' (identidad): exactamente 2 apariciones.
         assert_eq!(
             sql.matches("'local'").count(),
@@ -1385,7 +1536,10 @@ mod tests {
     #[test]
     fn only_configuration_settings_are_portable() {
         for key in PORTABLE_SETTING_KEYS {
-            assert!(is_portable_setting(key), "`{key}` is plain configuration and must travel");
+            assert!(
+                is_portable_setting(key),
+                "`{key}` is plain configuration and must travel"
+            );
         }
         for key in [
             "business_tax_id",
@@ -1400,8 +1554,14 @@ mod tests {
             );
         }
         // A key nobody classified — a printer address, a module's API key, tomorrow's setting.
-        assert!(!is_portable_setting("printer_ip"), "an unknown key is not portable by default");
-        assert!(!is_portable_setting(""), "an empty key is not portable either");
+        assert!(
+            !is_portable_setting("printer_ip"),
+            "an unknown key is not portable by default"
+        );
+        assert!(
+            !is_portable_setting(""),
+            "an empty key is not portable either"
+        );
     }
 
     /// **The hub's OWN system tables belong to no module** — ADR-0273 D8 (hub#560).
@@ -1420,15 +1580,28 @@ mod tests {
             "_hub_certificate",
             "_hub_import_row",
         ] {
-            assert!(is_system_table(table), "`{table}` is a system table of the hub");
-            assert_eq!(table_owner(table, &installed), None, "`{table}` is nobody's to export");
+            assert!(
+                is_system_table(table),
+                "`{table}` is a system table of the hub"
+            );
+            assert_eq!(
+                table_owner(table, &installed),
+                None,
+                "`{table}` is nobody's to export"
+            );
         }
         // The rule is about the `_hub_*` namespace, not about everything that says «hub»: the
         // shared tables of the hub travel by their own sections and must keep doing so.
         for table in ["hub_settings", "hub_user", "hub_role_activation"] {
-            assert!(!is_system_table(table), "`{table}` has its own section, it is not a system table");
+            assert!(
+                !is_system_table(table),
+                "`{table}` has its own section, it is not a system table"
+            );
         }
-        assert_eq!(table_owner("inventory_product", &installed).as_deref(), Some("inventory"));
+        assert_eq!(
+            table_owner("inventory_product", &installed).as_deref(),
+            Some("inventory")
+        );
     }
 
     /// Constraint names are only unique PER SCHEMA: two schemas holding the same tables carry

@@ -72,11 +72,18 @@ async fn seed_settings(rt: &Runtime, hub: &str) {
 }
 
 fn selection(purpose: BundlePurpose) -> ExportSelection {
-    ExportSelection { settings: true, purpose, ..Default::default() }
+    ExportSelection {
+        settings: true,
+        purpose,
+        ..Default::default()
+    }
 }
 
 fn import_settings() -> ImportSelection {
-    ImportSelection { settings: true, ..Default::default() }
+    ImportSelection {
+        settings: true,
+        ..Default::default()
+    }
 }
 
 fn settings_sql(bundle: &ExportBundle) -> String {
@@ -89,7 +96,10 @@ async fn setting_value(rt: &Runtime, hub: &str, key: &str) -> Option<String> {
     p.insert("key".into(), json!(key));
     let res = rt
         .db()
-        .query("SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key", &p)
+        .query(
+            "SELECT value FROM hub_settings WHERE hub_id = :hub_id AND key = :key",
+            &p,
+        )
         .await
         .ok()?;
     res.rows.first()?.get("value")?.as_str().map(str::to_string)
@@ -103,26 +113,53 @@ async fn a_template_carries_configuration_but_never_the_business_identity() {
     let rt = fresh("h1").await;
     seed_settings(&rt, "h1").await;
 
-    let bundle = export_hub(&rt, "h1", &selection(BundlePurpose::Template), "restaurante", "es", CREATED_AT)
-        .await
-        .expect("template export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &selection(BundlePurpose::Template),
+        "restaurante",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("template export");
     let sql = settings_sql(&bundle);
 
-    for leaked in [ORIGIN_TAX_ID, ORIGIN_LEGAL_NAME, ORIGIN_ADDRESS, ORIGIN_RECIPIENT] {
+    for leaked in [
+        ORIGIN_TAX_ID,
+        ORIGIN_LEGAL_NAME,
+        ORIGIN_ADDRESS,
+        ORIGIN_RECIPIENT,
+    ] {
         assert!(
             !sql.contains(leaked),
             "a published template must not carry `{leaked}` of the origin business:\n{sql}"
         );
     }
-    for key in ["business_tax_id", "business_legal_name", "business_address", "notify_allowed_recipients", "api_docs_enabled"] {
-        assert!(!sql.contains(key), "the key `{key}` must not be in a template:\n{sql}");
+    for key in [
+        "business_tax_id",
+        "business_legal_name",
+        "business_address",
+        "notify_allowed_recipients",
+        "api_docs_enabled",
+    ] {
+        assert!(
+            !sql.contains(key),
+            "the key `{key}` must not be in a template:\n{sql}"
+        );
     }
 
     // …and what a template IS for does travel: the configuration of the sector.
     for key in ["country_code", "currency", "language", "theme_palette"] {
-        assert!(sql.contains(key), "a template must still carry `{key}`:\n{sql}");
+        assert!(
+            sql.contains(key),
+            "a template must still carry `{key}`:\n{sql}"
+        );
     }
-    assert!(sql.contains(HUB_ID_PLACEHOLDER), "the dump must stay portable (placeholder tenant)");
+    assert!(
+        sql.contains(HUB_ID_PLACEHOLDER),
+        "the dump must stay portable (placeholder tenant)"
+    );
 }
 
 /// The mirror, and the half that keeps backups alive (ADR-0113 §1): a BACKUP of this hub takes its
@@ -133,13 +170,26 @@ async fn a_backup_still_carries_the_identity_of_its_own_hub() {
     let rt = fresh("h1").await;
     seed_settings(&rt, "h1").await;
 
-    let bundle = export_hub(&rt, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("backup export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("backup export");
     let sql = settings_sql(&bundle);
 
-    assert!(sql.contains(ORIGIN_TAX_ID), "a backup must keep the hub's own tax id:\n{sql}");
-    assert!(sql.contains(ORIGIN_LEGAL_NAME), "a backup must keep the hub's own legal name:\n{sql}");
+    assert!(
+        sql.contains(ORIGIN_TAX_ID),
+        "a backup must keep the hub's own tax id:\n{sql}"
+    );
+    assert!(
+        sql.contains(ORIGIN_LEGAL_NAME),
+        "a backup must keep the hub's own legal name:\n{sql}"
+    );
 }
 
 /// 🔴 CONSUMER — the defence that holds for a file nobody vetted (same plane as hub#331).
@@ -152,21 +202,47 @@ async fn a_backup_still_carries_the_identity_of_its_own_hub() {
 async fn a_foreign_bundle_never_writes_the_business_identity() {
     let a = fresh("h1").await;
     seed_settings(&a, "h1").await;
-    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
-    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "the bundle must claim to be a backup");
-    assert!(settings_sql(&bundle).contains(ORIGIN_TAX_ID), "the bundle must carry the identity");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
+    assert_eq!(
+        bundle.manifest.purpose,
+        BundlePurpose::Backup,
+        "the bundle must claim to be a backup"
+    );
+    assert!(
+        settings_sql(&bundle).contains(ORIGIN_TAX_ID),
+        "the bundle must carry the identity"
+    );
 
     // Destination: ANOTHER hub, brand new — the case that matters, because the idempotence guard
     // only skips a key the destination already has. A hub that never typed its tax id has no row.
     let mut b = fresh("h2").await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_settings(), "h2")
-        .await
-        .expect("import of the foreign bundle");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_settings(),
+        "h2",
+    )
+    .await
+    .expect("import of the foreign bundle");
 
     // 1. Not one identity key landed.
-    for key in ["business_tax_id", "business_legal_name", "business_address", "notify_allowed_recipients", "api_docs_enabled"] {
+    for key in [
+        "business_tax_id",
+        "business_legal_name",
+        "business_address",
+        "notify_allowed_recipients",
+        "api_docs_enabled",
+    ] {
         assert_eq!(
             setting_value(&b, "h2", key).await,
             None,
@@ -175,9 +251,18 @@ async fn a_foreign_bundle_never_writes_the_business_identity() {
     }
 
     // 2. The configuration DID land: this is a filter, not a rejection.
-    assert_eq!(setting_value(&b, "h2", "country_code").await.as_deref(), Some("ES"));
-    assert_eq!(setting_value(&b, "h2", "currency").await.as_deref(), Some("EUR"));
-    assert_eq!(setting_value(&b, "h2", "language").await.as_deref(), Some("es"));
+    assert_eq!(
+        setting_value(&b, "h2", "country_code").await.as_deref(),
+        Some("ES")
+    );
+    assert_eq!(
+        setting_value(&b, "h2", "currency").await.as_deref(),
+        Some("EUR")
+    );
+    assert_eq!(
+        setting_value(&b, "h2", "language").await.as_deref(),
+        Some("es")
+    );
 
     // 3. And the report SAYS it, with a stable code and the number of rows kept out (hub#331):
     //    a silent drop is indistinguishable from «I did not tick that box».
@@ -187,9 +272,15 @@ async fn a_foreign_bundle_never_writes_the_business_identity() {
         .find(|s| s.section == "hub_settings")
         .expect("hub_settings in the report");
     let SectionStatus::PartiallyApplied(reason) = &section.status else {
-        panic!("hub_settings had to be reported as partially applied, and came out as {:?}", section.status);
+        panic!(
+            "hub_settings had to be reported as partially applied, and came out as {:?}",
+            section.status
+        );
     };
-    assert_eq!(reason, erplora_runtime::import::ignore_reason::SETTINGS_NOT_PORTABLE);
+    assert_eq!(
+        reason,
+        erplora_runtime::import::ignore_reason::SETTINGS_NOT_PORTABLE
+    );
     assert_eq!(
         section.discarded_rows, 5,
         "the report must say HOW MANY settings were kept out: {section:?}"
@@ -202,16 +293,32 @@ async fn a_foreign_bundle_never_writes_the_business_identity() {
 async fn a_hub_restoring_its_own_backup_gets_its_identity_back() {
     let a = fresh("h1").await;
     seed_settings(&a, "h1").await;
-    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
-    assert_eq!(bundle.manifest.hub.hub_id, "h1", "the bundle must record its origin hub");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
+    assert_eq!(
+        bundle.manifest.hub.hub_id, "h1",
+        "the bundle must record its origin hub"
+    );
 
     // The same installation, rebuilt from scratch (a redeploy over its own backup).
     let mut b = fresh("h1").await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_settings(), "h1")
-        .await
-        .expect("restore of its own backup");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_settings(),
+        "h1",
+    )
+    .await
+    .expect("restore of its own backup");
 
     let section = report
         .sections
@@ -223,9 +330,20 @@ async fn a_hub_restoring_its_own_backup_gets_its_identity_back() {
         "a hub restoring its own backup must get its settings back whole: {:?}",
         section.status
     );
-    assert_eq!(setting_value(&b, "h1", "business_tax_id").await.as_deref(), Some(ORIGIN_TAX_ID));
-    assert_eq!(setting_value(&b, "h1", "business_legal_name").await.as_deref(), Some(ORIGIN_LEGAL_NAME));
-    assert_eq!(setting_value(&b, "h1", "api_docs_enabled").await.as_deref(), Some("true"));
+    assert_eq!(
+        setting_value(&b, "h1", "business_tax_id").await.as_deref(),
+        Some(ORIGIN_TAX_ID)
+    );
+    assert_eq!(
+        setting_value(&b, "h1", "business_legal_name")
+            .await
+            .as_deref(),
+        Some(ORIGIN_LEGAL_NAME)
+    );
+    assert_eq!(
+        setting_value(&b, "h1", "api_docs_enabled").await.as_deref(),
+        Some("true")
+    );
 }
 
 /// A bundle whose settings section is identity and nothing else has nothing left to apply: the
@@ -246,14 +364,27 @@ async fn a_settings_section_that_is_all_identity_is_discarded_whole() {
     .await
     .expect("seed identity-only settings");
 
-    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
 
     let mut b = fresh("h2").await;
-    let report = import_sections(&mut b, &bundle.manifest, &bundle.files, &import_settings(), "h2")
-        .await
-        .expect("import of the foreign bundle");
+    let report = import_sections(
+        &mut b,
+        &bundle.manifest,
+        &bundle.files,
+        &import_settings(),
+        "h2",
+    )
+    .await
+    .expect("import of the foreign bundle");
 
     let section = report
         .sections
@@ -261,10 +392,19 @@ async fn a_settings_section_that_is_all_identity_is_discarded_whole() {
         .find(|s| s.section == "hub_settings")
         .expect("hub_settings in the report");
     let SectionStatus::Ignored(reason) = &section.status else {
-        panic!("an all-identity section had to be discarded whole, and came out as {:?}", section.status);
+        panic!(
+            "an all-identity section had to be discarded whole, and came out as {:?}",
+            section.status
+        );
     };
-    assert_eq!(reason, erplora_runtime::import::ignore_reason::SETTINGS_NOT_PORTABLE);
-    assert_eq!(section.discarded_rows, 2, "the discard must count what it dropped: {section:?}");
+    assert_eq!(
+        reason,
+        erplora_runtime::import::ignore_reason::SETTINGS_NOT_PORTABLE
+    );
+    assert_eq!(
+        section.discarded_rows, 2,
+        "the discard must count what it dropped: {section:?}"
+    );
     assert_eq!(setting_value(&b, "h2", "business_tax_id").await, None);
 }
 
@@ -329,27 +469,52 @@ async fn an_unknown_settings_key_from_a_foreign_bundle_is_not_written() {
 async fn a_demo_hub_does_not_get_its_identity_back_even_from_its_own_backup() {
     let a = fresh("h1").await;
     seed_settings(&a, "h1").await;
-    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
-    assert_eq!(bundle.manifest.hub.hub_id, "h1", "the bundle claims to be this same hub");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
+    assert_eq!(
+        bundle.manifest.hub.hub_id, "h1",
+        "the bundle claims to be this same hub"
+    );
 
     // El MISMO hub_id, pero este despliegue es una demo efímera.
     let mut demo = fresh("h1").await;
     demo.set_demo_hub(true);
-    let report = import_sections(&mut demo, &bundle.manifest, &bundle.files, &import_settings(), "h1")
-        .await
-        .expect("the import runs: this is a filter, not a rejection");
+    let report = import_sections(
+        &mut demo,
+        &bundle.manifest,
+        &bundle.files,
+        &import_settings(),
+        "h1",
+    )
+    .await
+    .expect("the import runs: this is a filter, not a rejection");
 
     assert_eq!(
         setting_value(&demo, "h1", "business_tax_id").await,
         None,
         "a demo must not end up holding a tax id, not even one that claims to be its own"
     );
-    assert_eq!(setting_value(&demo, "h1", "business_legal_name").await, None);
+    assert_eq!(
+        setting_value(&demo, "h1", "business_legal_name").await,
+        None
+    );
     // Y sigue siendo un hub usable: la configuración del sector SÍ entra.
-    assert_eq!(setting_value(&demo, "h1", "country_code").await.as_deref(), Some("ES"));
-    assert_eq!(setting_value(&demo, "h1", "currency").await.as_deref(), Some("EUR"));
+    assert_eq!(
+        setting_value(&demo, "h1", "country_code").await.as_deref(),
+        Some("ES")
+    );
+    assert_eq!(
+        setting_value(&demo, "h1", "currency").await.as_deref(),
+        Some("EUR")
+    );
 
     let section = report
         .sections
@@ -370,17 +535,32 @@ async fn a_demo_hub_does_not_get_its_identity_back_even_from_its_own_backup() {
 async fn a_real_hub_restoring_its_own_backup_is_untouched_by_the_demo_lock() {
     let a = fresh("h1").await;
     seed_settings(&a, "h1").await;
-    let bundle = export_hub(&a, "h1", &selection(BundlePurpose::Backup), "copia", "es", CREATED_AT)
-        .await
-        .expect("export A");
+    let bundle = export_hub(
+        &a,
+        "h1",
+        &selection(BundlePurpose::Backup),
+        "copia",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export A");
 
     let mut real = fresh("h1").await;
     assert!(!real.is_demo_hub());
-    import_sections(&mut real, &bundle.manifest, &bundle.files, &import_settings(), "h1")
-        .await
-        .expect("restore of its own backup");
+    import_sections(
+        &mut real,
+        &bundle.manifest,
+        &bundle.files,
+        &import_settings(),
+        "h1",
+    )
+    .await
+    .expect("restore of its own backup");
     assert_eq!(
-        setting_value(&real, "h1", "business_tax_id").await.as_deref(),
+        setting_value(&real, "h1", "business_tax_id")
+            .await
+            .as_deref(),
         Some(ORIGIN_TAX_ID),
         "a real hub must get its own tax id back after a redeploy"
     );

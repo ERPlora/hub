@@ -2189,7 +2189,11 @@ mod tests {
                    "commands":{{"x.op":{{"permission":"p","ai":{{"description":"d","risk":"{raw}"}}}}}}}}"#
             );
             let m: Manifest = serde_json::from_str(&json).expect("parsea");
-            assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, Some(expected), "{raw}");
+            assert_eq!(
+                m.commands["x.op"].ai.as_ref().unwrap().risk,
+                Some(expected),
+                "{raw}"
+            );
         }
     }
 
@@ -2262,7 +2266,10 @@ mod tests {
 
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
         let storage = manifest.static_files.expect("static_files present");
-        assert!(storage.user_actions.is_empty(), "el default es solo-lectura");
+        assert!(
+            storage.user_actions.is_empty(),
+            "el default es solo-lectura"
+        );
         assert!(!storage.allows(UserFileAction::Delete));
         assert!(!storage.allows(UserFileAction::Rename));
         assert!(!storage.allows(UserFileAction::Upload));
@@ -2518,7 +2525,10 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(json).expect("manifest parses");
 
         let internal_cmd = &manifest.commands["cash_register._reverse_sale"];
-        assert!(!internal_cmd.internal, "el campo `internal` no se declaró: default false");
+        assert!(
+            !internal_cmd.internal,
+            "el campo `internal` no se declaró: default false"
+        );
         assert!(
             internal_cmd.is_internal("cash_register._reverse_sale"),
             "el último segmento empieza por `_` → interno por convención, sin migrar el manifest"

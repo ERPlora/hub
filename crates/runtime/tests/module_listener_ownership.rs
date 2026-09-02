@@ -177,7 +177,10 @@ async fn a_refused_listener_leaves_the_relay_nothing_to_run() {
     runtime.install_from_dir(&dir).await.unwrap_err();
 
     assert!(
-        runtime.registry().listeners_for("sale.completed").is_empty(),
+        runtime
+            .registry()
+            .listeners_for("sale.completed")
+            .is_empty(),
         "a refused install registers no listener: the relay never sees a foreign command to run"
     );
     std::fs::remove_dir_all(dir).unwrap();

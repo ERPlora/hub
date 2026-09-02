@@ -22,15 +22,19 @@
 //! takes the `inventory` slice, with the precedent already written in `cash_register`.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
-fn params(v: serde_json::Value) -> Params { v.as_object().cloned().unwrap_or_default() }
+fn params(v: serde_json::Value) -> Params {
+    v.as_object().cloned().unwrap_or_default()
+}
 fn mdir(n: &str) -> PathBuf {
     erplora_runtime::e2e_support::modules_root().join(n)
 }
-fn admin() -> RequestContext { RequestContext::new("h1", "u1", ["*".to_string()]) }
+fn admin() -> RequestContext {
+    RequestContext::new("h1", "u1", ["*".to_string()])
+}
 
 async fn full_stack() -> Runtime {
     let db = fresh_db().await;
@@ -44,14 +48,26 @@ async fn full_stack() -> Runtime {
 }
 
 async fn open_cash_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> String {
-    rt.execute_command("cash_register.session.open", &params(json!({
-        // Sin `session_number`: está DEPRECADO e ignorado desde cash_register#49 (lo acuña el
-        // servidor, `S-YYMMDD-NNNN`). Mandarlo hacía creer que la sesión se llamaba así.
-        "register_id": null,
-        "opening_balance": opening, "opening_notes": ""
-    })), ctx).await.unwrap();
-    rt.execute_query("cash_register.sessions.list", &Params::new(), ctx).await.unwrap()
-        .last().unwrap()["id"].as_str().unwrap().to_string()
+    rt.execute_command(
+        "cash_register.session.open",
+        &params(json!({
+            // Sin `session_number`: está DEPRECADO e ignorado desde cash_register#49 (lo acuña el
+            // servidor, `S-YYMMDD-NNNN`). Mandarlo hacía creer que la sesión se llamaba así.
+            "register_id": null,
+            "opening_balance": opening, "opening_notes": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap();
+    rt.execute_query("cash_register.sessions.list", &Params::new(), ctx)
+        .await
+        .unwrap()
+        .last()
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 /// Efectivo esperado de la sesión ABIERTA (KPI en vivo) = opening + Σ(sale,in) − Σ(refund,out).
@@ -61,10 +77,17 @@ async fn open_cash_session(rt: &Runtime, ctx: &RequestContext, opening: i64) -> 
 async fn expected_cash(rt: &Runtime, ctx: &RequestContext) -> i64 {
     // Postgres devuelve `opening_balance + SUM(amount)` como NUMERIC → JSON string (`"13000"`),
     // no número: aceptamos ambas representaciones.
-    let v = rt.execute_query("cash_register.current_session", &Params::new(), ctx).await.unwrap()[0]
-        ["expected_total"].clone();
+    let v = rt
+        .execute_query("cash_register.current_session", &Params::new(), ctx)
+        .await
+        .unwrap()[0]["expected_total"]
+        .clone();
     v.as_i64()
-        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .or_else(|| {
+            v.as_str()
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|f| f.round() as i64)
+        })
         .unwrap_or_else(|| panic!("expected_total no numérico: {v:?}"))
 }
 
@@ -73,9 +96,15 @@ async fn expected_cash(rt: &Runtime, ctx: &RequestContext) -> i64 {
 /// ("el arqueo queda inflado por cada anulación"). Refund/out se almacenan NEGATIVOS, así que
 /// una venta cash revertida deja Σ amount = 0 y el arqueo vuelve al neto de apertura.
 async fn arqueo(rt: &Runtime, ctx: &RequestContext, sid: &str) -> i64 {
-    rt.execute_command("cash_register.session.close", &params(json!({
-        "session_id": sid, "closing_balance": 0, "closing_notes": ""
-    })), ctx).await.unwrap();
+    rt.execute_command(
+        "cash_register.session.close",
+        &params(json!({
+            "session_id": sid, "closing_balance": 0, "closing_notes": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap();
     // hub#1173: aquí iba un `{"session_number": "VR-260625-1000"}` que NO filtraba nada — dos veces
     // muerto. El motor de listas lo descartaba en silencio (el filtro declarado se lee del cable
     // como `f_session_number`) y, aunque hubiera llegado, no habría casado: desde cash_register#49
@@ -85,34 +114,74 @@ async fn arqueo(rt: &Runtime, ctx: &RequestContext, sid: &str) -> i64 {
     // Same dual representation as `expected_cash` above: the live-KPI CASE of cash_register#65
     // unifies the column type to NUMERIC on Postgres, so even a closed session's stored INTEGER
     // arrives as a JSON string ("13000").
-    let v = rt.execute_query("cash_register.sessions.list", &Params::new(), ctx)
-        .await.unwrap().iter().find(|s| s["id"] == json!(sid)).unwrap()
-        ["expected_balance"].clone();
+    let v = rt
+        .execute_query("cash_register.sessions.list", &Params::new(), ctx)
+        .await
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == json!(sid))
+        .unwrap()["expected_balance"]
+        .clone();
     v.as_i64()
-        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+        .or_else(|| {
+            v.as_str()
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|f| f.round() as i64)
+        })
         .unwrap_or_else(|| panic!("expected_balance no numérico: {v:?}"))
 }
 
-async fn create_product(rt: &Runtime, ctx: &RequestContext, name: &str, sku: &str, stock: i64) -> String {
-    rt.execute_command("inventory.products.create", &params(json!({
-        "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": stock,
-        "low_stock_threshold": 5, "product_type": "physical",
-        "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
-    })), ctx).await.unwrap();
-    rt.execute_query("inventory.products.list", &params(json!({"search": sku})), ctx).await.unwrap()[0]
-        ["id"].as_str().unwrap().to_string()
+async fn create_product(
+    rt: &Runtime,
+    ctx: &RequestContext,
+    name: &str,
+    sku: &str,
+    stock: i64,
+) -> String {
+    rt.execute_command(
+        "inventory.products.create",
+        &params(json!({
+            "name": name, "sku": sku, "price": 1000, "cost": 500, "stock": stock,
+            "low_stock_threshold": 5, "product_type": "physical",
+            "ean13": null, "description": "", "tax_category_key": "product.generic", "image": ""
+        })),
+        ctx,
+    )
+    .await
+    .unwrap();
+    rt.execute_query(
+        "inventory.products.list",
+        &params(json!({"search": sku})),
+        ctx,
+    )
+    .await
+    .unwrap()[0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 async fn stock_of(rt: &Runtime, ctx: &RequestContext, pid: &str) -> f64 {
-    rt.execute_query("inventory.products.get", &params(json!({"product_id": pid})), ctx).await.unwrap()[0]
-        ["stock"].as_f64().unwrap()
+    rt.execute_query(
+        "inventory.products.get",
+        &params(json!({"product_id": pid})),
+        ctx,
+    )
+    .await
+    .unwrap()[0]["stock"]
+        .as_f64()
+        .unwrap()
 }
 
 /// Siembra una venta COMPLETADA (cabecera `sales_sale` + líneas `sales_sale_item`), como si
 /// `complete_sale` ya hubiera corrido. `lines`: (product_id|"", is_service 0/1, quantity).
 /// Solo usa columnas del esquema base committeado de sales (sin tocar trabajo en vuelo ajeno).
 async fn seed_sale(
-    rt: &Runtime, sale_id: &str, sale_number: &str, total: i64, payment_method: &str,
+    rt: &Runtime,
+    sale_id: &str,
+    sale_number: &str,
+    total: i64,
+    payment_method: &str,
     lines: &[(&str, i64, f64)],
 ) {
     let db = rt.db_for_test();
@@ -125,29 +194,51 @@ async fn seed_sale(
          :total, 0, '', '', 'pos', 'pos', 0, :now, :now)",
         &params(json!({ "id": sale_id, "num": sale_number, "total": total,
             "pm": payment_method, "now": "2026-06-25T10:00:00+00:00" })),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     for (i, (product_id, is_service, qty)) in lines.iter().enumerate() {
-        let pid = if product_id.is_empty() { json!(null) } else { json!(product_id) };
+        let pid = if product_id.is_empty() {
+            json!(null)
+        } else {
+            json!(product_id)
+        };
         db.execute(
             "INSERT INTO sales_sale_item (id, hub_id, sale_id, product_id, product_name, \
              product_sku, is_service, quantity, unit_price, discount_percent, tax_rate, \
              tax_class_name, net_amount, tax_amount, line_total, created_at) \
              VALUES (:id, 'h1', :sale_id, :product_id, :name, '', :is_service, :qty, 1000, 0, 0, \
              '', 1000, 0, 1000, :now)",
-            &params(json!({ "id": format!("{sale_id}-L{i}"), "sale_id": sale_id, "product_id": pid,
+            &params(
+                json!({ "id": format!("{sale_id}-L{i}"), "sale_id": sale_id, "product_id": pid,
                 "name": format!("L{i}"), "is_service": is_service, "qty": qty,
-                "now": "2026-06-25T10:00:00+00:00" })),
-        ).await.unwrap();
+                "now": "2026-06-25T10:00:00+00:00" }),
+            ),
+        )
+        .await
+        .unwrap();
     }
 }
 
 /// El movimiento de caja `sale` que `record_sale` habría creado al cobrar (lo escribe el
 /// command PÚBLICO real de cash_register; `sale_reference` = sale_id, como hace record_sale).
-async fn seed_cash_sale_movement(rt: &Runtime, ctx: &RequestContext, sid: &str, sale_id: &str, amount: i64) {
-    rt.execute_command("cash_register.movement.add", &params(json!({
-        "session_id": sid, "movement_type": "sale", "amount": amount, "payment_method": "cash",
-        "sale_reference": sale_id, "description": format!("Sale {sale_id}")
-    })), ctx).await.unwrap();
+async fn seed_cash_sale_movement(
+    rt: &Runtime,
+    ctx: &RequestContext,
+    sid: &str,
+    sale_id: &str,
+    amount: i64,
+) {
+    rt.execute_command(
+        "cash_register.movement.add",
+        &params(json!({
+            "session_id": sid, "movement_type": "sale", "amount": amount, "payment_method": "cash",
+            "sale_reference": sale_id, "description": format!("Sale {sale_id}")
+        })),
+        ctx,
+    )
+    .await
+    .unwrap();
 }
 
 /// Aplica el descuento de stock que `decrease_on_sale` habría hecho al cobrar (command real).
@@ -159,31 +250,48 @@ async fn seed_cash_sale_movement(rt: &Runtime, ctx: &RequestContext, sid: &str, 
 /// LEDGER, porque los componentes de un combo no están en filas de la venta y porque la fuente
 /// vieja devolvía hasta descuentos RECHAZADOS por falta de stock. Con la referencia puesta, esta
 /// siembra vuelve a ser equivalente al camino real y el test comprueba la misma promesa.
-async fn seed_stock_decrease(rt: &Runtime, ctx: &RequestContext, sale_id: &str, pid: &str, qty: i64) {
+async fn seed_stock_decrease(
+    rt: &Runtime,
+    ctx: &RequestContext,
+    sale_id: &str,
+    pid: &str,
+    qty: i64,
+) {
     rt.execute_command(
         "inventory.stock.decrease",
         &params(json!({ "product_id": pid, "qty": qty, "sale_id": sale_id })),
         ctx,
     )
-    .await.unwrap();
+    .await
+    .unwrap();
 }
 
 /// Listeners de sale.voided registrados por ambos módulos.
 #[tokio::test]
 async fn install_registers_void_listeners() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = full_stack().await;
     let reg = rt.registry();
     let listeners = reg.listeners_for("sale.voided");
-    assert!(listeners.contains(&"cash_register._reverse_sale".to_string()), "{listeners:?}");
-    assert!(listeners.contains(&"inventory._restock_on_void".to_string()), "{listeners:?}");
+    assert!(
+        listeners.contains(&"cash_register._reverse_sale".to_string()),
+        "{listeners:?}"
+    );
+    assert!(
+        listeners.contains(&"inventory._restock_on_void".to_string()),
+        "{listeners:?}"
+    );
 }
 
 /// Escenario completo: venta cash que subió caja + bajó stock → void → caja al neto previo y
 /// stock restituido. Reentrega del evento no duplica.
 #[tokio::test]
 async fn cash_sale_void_reverts_cash_and_stock() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = full_stack().await;
     let ctx = admin();
 
@@ -196,45 +304,109 @@ async fn cash_sale_void_reverts_cash_and_stock() {
     let pid = create_product(&rt, &ctx, "Café", "CAF", 10_000_000).await;
 
     // Precondición: venta cash de 30,00 € de 2 uds → caja +3000, stock 10→8.
-    seed_sale(&rt, "sale-1", "S-1", 3000, "cash", &[(&pid, 0, 2_000_000.0)]).await;
+    seed_sale(
+        &rt,
+        "sale-1",
+        "S-1",
+        3000,
+        "cash",
+        &[(&pid, 0, 2_000_000.0)],
+    )
+    .await;
     seed_cash_sale_movement(&rt, &ctx, &sid, "sale-1", 3000).await;
     seed_stock_decrease(&rt, &ctx, "sale-1", &pid, 2_000_000).await;
-    assert_eq!(expected_cash(&rt, &ctx).await, opening + 3000, "la venta cash subió la caja");
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 8_000_000.0, "la venta bajó el stock");
+    assert_eq!(
+        expected_cash(&rt, &ctx).await,
+        opening + 3000,
+        "la venta cash subió la caja"
+    );
+    assert_eq!(
+        stock_of(&rt, &ctx, &pid).await,
+        8_000_000.0,
+        "la venta bajó el stock"
+    );
 
     // ── ANULAR la venta (sales.void: UPDATE de estado + emit sale.voided) ───────────────
-    rt.execute_command("sales.void", &params(json!({ "sale_id": "sale-1", "reason": "test" })), &ctx)
-        .await.unwrap();
+    rt.execute_command(
+        "sales.void",
+        &params(json!({ "sale_id": "sale-1", "reason": "test" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
     rt.drain_outbox().await.unwrap(); // sale.voided → _reverse_sale + _restock_on_void
 
     // Stock restored to 10 after the void.
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0, "la anulación restituye el stock");
+    assert_eq!(
+        stock_of(&rt, &ctx, &pid).await,
+        10_000_000.0,
+        "la anulación restituye el stock"
+    );
 
     // El movimiento `sale` original SIGUE existiendo (no se muta): hay sale + refund.
-    let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
-        .await.unwrap();
-    let types: Vec<&str> = movs.iter().map(|m| m["movement_type"].as_str().unwrap()).collect();
-    assert!(types.contains(&"sale") && types.contains(&"refund"), "{types:?}");
-    let refund = movs.iter().find(|m| m["movement_type"] == json!("refund")).unwrap();
-    assert_eq!(refund["amount"].as_i64().unwrap(), -3000, "refund compensa el importe exacto (negativo, canónico)");
+    let movs = rt
+        .execute_query(
+            "cash_register.movements.list",
+            &params(json!({"session_id": sid})),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    let types: Vec<&str> = movs
+        .iter()
+        .map(|m| m["movement_type"].as_str().unwrap())
+        .collect();
+    assert!(
+        types.contains(&"sale") && types.contains(&"refund"),
+        "{types:?}"
+    );
+    let refund = movs
+        .iter()
+        .find(|m| m["movement_type"] == json!("refund"))
+        .unwrap();
+    assert_eq!(
+        refund["amount"].as_i64().unwrap(),
+        -3000,
+        "refund compensa el importe exacto (negativo, canónico)"
+    );
 
     // ── REENTREGA del evento: idempotencia (no duplica refund ni stock) ─────────────────
     rt.drain_outbox().await.unwrap();
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 10_000_000.0, "re-drenar no duplica la restitución");
-    let movs2 = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
-        .await.unwrap();
-    assert_eq!(movs2.len(), movs.len(), "no se añaden movimientos al reentregar el evento");
+    assert_eq!(
+        stock_of(&rt, &ctx, &pid).await,
+        10_000_000.0,
+        "re-drenar no duplica la restitución"
+    );
+    let movs2 = rt
+        .execute_query(
+            "cash_register.movements.list",
+            &params(json!({"session_id": sid})),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        movs2.len(),
+        movs.len(),
+        "no se añaden movimientos al reentregar el evento"
+    );
 
     // ARQUEO canónico: la venta cash anulada deja Σ amount = sale(+3000) + refund(−3000) = 0,
     // así que el arqueo vuelve al neto de apertura (el bug "arqueo inflado" queda resuelto).
-    assert_eq!(arqueo(&rt, &ctx, &sid).await, opening, "el arqueo vuelve al neto previo tras la anulación");
+    assert_eq!(
+        arqueo(&rt, &ctx, &sid).await,
+        opening,
+        "el arqueo vuelve al neto previo tras la anulación"
+    );
 }
 
 /// Una venta con TARJETA no toca la caja al venderse (no hay movimiento `sale` en efectivo),
 /// así que su anulación es no-op en caja (no se postea refund), pero el stock SÍ se restituye.
 #[tokio::test]
 async fn card_sale_void_restocks_but_no_cash_refund() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = full_stack().await;
     let ctx = admin();
     let opening = 5_000;
@@ -242,28 +414,64 @@ async fn card_sale_void_restocks_but_no_cash_refund() {
     let pid = create_product(&rt, &ctx, "Té", "TE", 7_000_000).await;
 
     // Card sale: does NOT create a cash movement; only lowers stock 7→4 (10^6 fixed point).
-    seed_sale(&rt, "sale-2", "S-2", 3000, "card", &[(&pid, 0, 3_000_000.0)]).await;
+    seed_sale(
+        &rt,
+        "sale-2",
+        "S-2",
+        3000,
+        "card",
+        &[(&pid, 0, 3_000_000.0)],
+    )
+    .await;
     seed_stock_decrease(&rt, &ctx, "sale-2", &pid, 3_000_000).await;
-    assert_eq!(expected_cash(&rt, &ctx).await, opening, "tarjeta no toca la caja");
+    assert_eq!(
+        expected_cash(&rt, &ctx).await,
+        opening,
+        "tarjeta no toca la caja"
+    );
     assert_eq!(stock_of(&rt, &ctx, &pid).await, 4_000_000.0);
 
-    rt.execute_command("sales.void", &params(json!({ "sale_id": "sale-2", "reason": "x" })), &ctx)
-        .await.unwrap();
+    rt.execute_command(
+        "sales.void",
+        &params(json!({ "sale_id": "sale-2", "reason": "x" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
     rt.drain_outbox().await.unwrap();
 
     // Caja intacta (no había movimiento cash que revertir); stock restituido.
-    assert_eq!(expected_cash(&rt, &ctx).await, opening, "sin refund: la venta no fue en efectivo");
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 7_000_000.0, "el stock se restituye igual en tarjeta");
-    let movs = rt.execute_query("cash_register.movements.list", &params(json!({"session_id": sid})), &ctx)
-        .await.unwrap();
-    assert!(movs.iter().all(|m| m["movement_type"] != json!("refund")), "no debe haber refund de caja");
+    assert_eq!(
+        expected_cash(&rt, &ctx).await,
+        opening,
+        "sin refund: la venta no fue en efectivo"
+    );
+    assert_eq!(
+        stock_of(&rt, &ctx, &pid).await,
+        7_000_000.0,
+        "el stock se restituye igual en tarjeta"
+    );
+    let movs = rt
+        .execute_query(
+            "cash_register.movements.list",
+            &params(json!({"session_id": sid})),
+            &ctx,
+        )
+        .await
+        .unwrap();
+    assert!(
+        movs.iter().all(|m| m["movement_type"] != json!("refund")),
+        "no debe haber refund de caja"
+    );
 }
 
 /// Servicios (sin stock físico) no se restituyen: una venta cash de solo servicio se anula
 /// revirtiendo la caja, sin tocar ningún stock de producto.
 #[tokio::test]
 async fn service_line_void_reverts_cash_without_touching_stock() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = full_stack().await;
     let ctx = admin();
     let sid = open_cash_session(&rt, &ctx, 0).await;
@@ -272,13 +480,30 @@ async fn service_line_void_reverts_cash_without_touching_stock() {
 
     seed_sale(&rt, "sale-3", "S-3", 2000, "cash", &[("", 1, 1.0)]).await; // línea servicio, sin product_id
     seed_cash_sale_movement(&rt, &ctx, &sid, "sale-3", 2000).await;
-    assert_eq!(expected_cash(&rt, &ctx).await, 2000, "el servicio cobrado en cash subió la caja");
+    assert_eq!(
+        expected_cash(&rt, &ctx).await,
+        2000,
+        "el servicio cobrado en cash subió la caja"
+    );
 
-    rt.execute_command("sales.void", &params(json!({ "sale_id": "sale-3", "reason": "x" })), &ctx)
-        .await.unwrap();
+    rt.execute_command(
+        "sales.void",
+        &params(json!({ "sale_id": "sale-3", "reason": "x" })),
+        &ctx,
+    )
+    .await
+    .unwrap();
     rt.drain_outbox().await.unwrap();
 
-    assert_eq!(stock_of(&rt, &ctx, &pid).await, 5.0, "ningún stock cambia al anular un servicio");
+    assert_eq!(
+        stock_of(&rt, &ctx, &pid).await,
+        5.0,
+        "ningún stock cambia al anular un servicio"
+    );
     // El servicio cash anulado: sale(+2000) + refund(−2000) = 0 → arqueo de vuelta al neto.
-    assert_eq!(arqueo(&rt, &ctx, &sid).await, 0, "la anulación del servicio revierte la caja");
+    assert_eq!(
+        arqueo(&rt, &ctx, &sid).await,
+        0,
+        "la anulación del servicio revierte la caja"
+    );
 }

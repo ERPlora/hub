@@ -98,7 +98,12 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // cash_register
     (
         "cash_register_session",
-        &["opening_balance", "closing_balance", "expected_balance", "difference"],
+        &[
+            "opening_balance",
+            "closing_balance",
+            "expected_balance",
+            "difference",
+        ],
     ),
     ("cash_register_movement", &["amount"]),
     ("cash_register_count", &["total"]),
@@ -108,8 +113,14 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     ("inventory_product", &["price", "cost"]),
     ("inventory_product_variant", &["price"]),
     // invoice
-    ("invoice_invoice", &["base_amount", "tax_amount", "total_amount"]),
-    ("invoice_invoiceitem", &["unit_price", "base_amount", "tax_amount", "total_amount"]),
+    (
+        "invoice_invoice",
+        &["base_amount", "tax_amount", "total_amount"],
+    ),
+    (
+        "invoice_invoiceitem",
+        &["unit_price", "base_amount", "tax_amount", "total_amount"],
+    ),
     // kitchen
     ("kitchen_order", &["subtotal", "tax", "discount", "total"]),
     ("kitchen_order_item", &["unit_price", "total"]),
@@ -136,11 +147,24 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     // sales
     (
         "sales_sale",
-        &["subtotal", "tax_amount", "discount_amount", "total", "amount_tendered", "change_due"],
+        &[
+            "subtotal",
+            "tax_amount",
+            "discount_amount",
+            "total",
+            "amount_tendered",
+            "change_due",
+        ],
     ),
-    ("sales_sale_item", &["unit_price", "net_amount", "tax_amount", "line_total"]),
+    (
+        "sales_sale_item",
+        &["unit_price", "net_amount", "tax_amount", "line_total"],
+    ),
     // services
-    ("services_service", &["price", "min_price", "max_price", "cost"]),
+    (
+        "services_service",
+        &["price", "min_price", "max_price", "cost"],
+    ),
     // `services_variant` estuvo aquí y se ha ido: `services/migrations/postgres/010` la retira
     // (services#69) y el guard la aparta a `_deprecated_services_variant`. Como con `services_addon`,
     // no había nada que convertir: la tabla nunca tuvo puerta — ningún command escribía una fila.
@@ -154,7 +178,10 @@ pub const MONEY_COLUMNS: &[(&str, &[&str])] = &[
     ("staff_member", &["hourly_rate"]),
     ("staff_service", &["custom_price"]),
     // verifactu
-    ("verifactu_record", &["base_amount", "tax_amount", "total_amount"]),
+    (
+        "verifactu_record",
+        &["base_amount", "tax_amount", "total_amount"],
+    ),
 ];
 
 /// The unit a hub database's money is declared in, decided over **every** column of
@@ -175,7 +202,10 @@ pub enum MoneyUnit {
     /// Columns of BOTH kinds. Nothing is converted, nothing is marked, and it is reported: both
     /// possible readings corrupt real money in opposite directions. Carries the `table.column`
     /// names of each side so ops can act on them.
-    Mixed { cents: Vec<String>, euros: Vec<String> },
+    Mixed {
+        cents: Vec<String>,
+        euros: Vec<String>,
+    },
 }
 
 impl MoneyUnit {
@@ -259,8 +289,13 @@ pub async fn is_marked_cents(db: &dyn DatabaseAdapter) -> Result<bool> {
     ensure_meta_table(db).await?;
     let mut p = Params::new();
     p.insert("key".into(), json!(MONEY_UNIT_KEY));
-    let res = db.query("SELECT value FROM _hub_meta WHERE key = :key", &p).await?;
-    Ok(res.rows.iter().any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
+    let res = db
+        .query("SELECT value FROM _hub_meta WHERE key = :key", &p)
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
 }
 
 /// Same as [`is_marked_cents`] but **creating nothing**: if `_hub_meta` does not exist yet it
@@ -279,8 +314,13 @@ async fn is_marked_cents_readonly(db: &dyn DatabaseAdapter) -> Result<bool> {
     }
     let mut p = Params::new();
     p.insert("key".into(), json!(MONEY_UNIT_KEY));
-    let res = db.query("SELECT value FROM _hub_meta WHERE key = :key", &p).await?;
-    Ok(res.rows.iter().any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
+    let res = db
+        .query("SELECT value FROM _hub_meta WHERE key = :key", &p)
+        .await?;
+    Ok(res
+        .rows
+        .iter()
+        .any(|r| r["value"].as_str() == Some(MONEY_UNIT_CENTS)))
 }
 
 /// The statement that seeds the `money_unit=cents` marker (idempotent: UPSERT, `key` is the PK —
@@ -324,7 +364,10 @@ async fn declared_type(
             &p,
         )
         .await?;
-    Ok(res.rows.first().and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["data_type"].as_str().map(|s| s.to_string())))
 }
 
 /// `true` si el tipo declarado ya es **entero** (esquema en céntimos: el `001` nuevo declara
@@ -487,8 +530,16 @@ pub async fn check_logged(db: &dyn DatabaseAdapter) -> Result<MoneyUnit> {
                 euros: euros.join(", "),
             };
             report_mixed(&err, "money_backfill::check_logged");
-            eprintln!("[check-money-unit]   · in cents ({}): {}", cents.len(), cents.join(", "));
-            eprintln!("[check-money-unit]   · in euros ({}): {}", euros.len(), euros.join(", "));
+            eprintln!(
+                "[check-money-unit]   · in cents ({}): {}",
+                cents.len(),
+                cents.join(", ")
+            );
+            eprintln!(
+                "[check-money-unit]   · in euros ({}): {}",
+                euros.len(),
+                euros.join(", ")
+            );
             // The marker alone does not say whether this is serious: it changes WHICH of the two
             // readings is the true one, and both really happen. It is printed next to the verdict
             // so whoever sweeps does not have to go and look it up (and does not mistake it for a
@@ -550,7 +601,11 @@ mod tests {
     fn num_i64(v: &serde_json::Value) -> i64 {
         v.as_i64()
             .or_else(|| v.as_f64().map(|f| f.round() as i64))
-            .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()).map(|f| f.round() as i64))
+            .or_else(|| {
+                v.as_str()
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .map(|f| f.round() as i64)
+            })
             .expect("valor numérico (int, real o NUMERIC-string)")
     }
 
@@ -606,14 +661,20 @@ mod tests {
 
     async fn read_total(db: &PgAdapter) -> i64 {
         let res = db
-            .query("SELECT total FROM sales_sale WHERE id = 's1'", &Params::new())
+            .query(
+                "SELECT total FROM sales_sale WHERE id = 's1'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         num_i64(&res.rows[0]["total"])
     }
     async fn read_subtotal(db: &PgAdapter) -> i64 {
         let res = db
-            .query("SELECT subtotal FROM sales_sale WHERE id = 's1'", &Params::new())
+            .query(
+                "SELECT subtotal FROM sales_sale WHERE id = 's1'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         num_i64(&res.rows[0]["subtotal"])
@@ -626,25 +687,38 @@ mod tests {
 
         let r = super::run(&db).await.unwrap();
         assert!(!r.already_marked);
-        assert!(!r.schema_already_cents, "hub viejo NUMERIC debe detectarse como euros");
+        assert!(
+            !r.schema_already_cents,
+            "hub viejo NUMERIC debe detectarse como euros"
+        );
         assert!(r.converted_tables.contains(&"sales_sale".to_string()));
 
         // 12.34 € → 1234 ¢, 14.93 € → 1493 ¢, 5.07 € → 507 ¢.
         assert_eq!(read_subtotal(&db).await, 1234);
         assert_eq!(read_total(&db).await, 1493);
         let change = db
-            .query("SELECT change_due FROM sales_sale WHERE id = 's1'", &Params::new())
+            .query(
+                "SELECT change_due FROM sales_sale WHERE id = 's1'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         assert_eq!(num_i64(&change.rows[0]["change_due"]), 507);
 
         // discount_percent (NUMERIC, NO es dinero) NO debe convertirse → sigue 10, no 1000.
         let pct = db
-            .query("SELECT discount_percent FROM sales_sale WHERE id = 's1'", &Params::new())
+            .query(
+                "SELECT discount_percent FROM sales_sale WHERE id = 's1'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         // Tras la conversión el valor sigue siendo 10 (no se tocó). NUMERIC → string en Postgres.
-        assert_eq!(num_i64(&pct.rows[0]["discount_percent"]), 10, "discount_percent NO es dinero, no se convierte");
+        assert_eq!(
+            num_i64(&pct.rows[0]["discount_percent"]),
+            10,
+            "discount_percent NO es dinero, no se convierte"
+        );
 
         // El marcador quedó puesto.
         assert!(super::is_marked_cents(&db).await.unwrap());
@@ -660,7 +734,10 @@ mod tests {
 
         // Re-ejecutar NO debe re-convertir (marcador presente) → sigue 1493, no 149300.
         let r2 = super::run(&db).await.unwrap();
-        assert!(r2.already_marked, "segunda corrida debe ser no-op por marcador");
+        assert!(
+            r2.already_marked,
+            "segunda corrida debe ser no-op por marcador"
+        );
         assert_eq!(r2.rows_updated, 0);
         assert_eq!(read_total(&db).await, total_after_first);
         assert_eq!(read_total(&db).await, 1493);
@@ -673,7 +750,10 @@ mod tests {
 
         // Instalación nueva (esquema INTEGER): el backfill NO toca datos, solo marca.
         let r = super::run(&db).await.unwrap();
-        assert!(r.schema_already_cents, "esquema INTEGER = nuevo → no convertir");
+        assert!(
+            r.schema_already_cents,
+            "esquema INTEGER = nuevo → no convertir"
+        );
         assert!(r.converted_tables.is_empty());
         assert_eq!(r.rows_updated, 0);
         // Los datos siguen en céntimos sin tocar.
@@ -715,10 +795,15 @@ mod tests {
         assert!(r.converted_tables.contains(&"sales_sale".to_string()));
         assert!(r.converted_tables.contains(&"payments_payment".to_string()));
         // inventory NO instalado → no aparece.
-        assert!(!r.converted_tables.contains(&"inventory_product".to_string()));
+        assert!(!r
+            .converted_tables
+            .contains(&"inventory_product".to_string()));
 
         let pay = db
-            .query("SELECT amount FROM payments_payment WHERE id = 'p1'", &Params::new())
+            .query(
+                "SELECT amount FROM payments_payment WHERE id = 'p1'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         assert_eq!(num_i64(&pay.rows[0]["amount"]), 999); // 9.99 € → 999 ¢

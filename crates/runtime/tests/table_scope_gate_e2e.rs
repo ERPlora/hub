@@ -51,7 +51,10 @@ async fn a_command_writing_a_foreign_table_is_refused() {
         .expect_err("`UPDATE inventory_product` in a `foreign_write` manifest must not install")
         .to_string();
     for fact in ["foreign_write", "inventory_product", "raid.sql"] {
-        assert!(err.contains(fact), "the refusal must name `{fact}`, got: {err}");
+        assert!(
+            err.contains(fact),
+            "the refusal must name `{fact}`, got: {err}"
+        );
     }
 }
 

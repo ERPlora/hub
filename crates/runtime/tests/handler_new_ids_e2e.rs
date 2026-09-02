@@ -66,7 +66,10 @@ impl NativeHandler for ConsumingHandler {
             if nested {
                 // The id travels inside a structured param, the way order lines carry theirs.
                 params.insert("id".into(), ids[i].clone());
-                params.insert("name".into(), json!({ "lines": [{ "ref": ids[i].clone() }] }));
+                params.insert(
+                    "name".into(),
+                    json!({ "lines": [{ "ref": ids[i].clone() }] }),
+                );
             } else {
                 params.insert("id".into(), ids[i].clone());
                 params.insert("name".into(), json!(format!("item {i}")));
@@ -172,7 +175,11 @@ async fn n_consumed_ids_answer_in_batch_order() {
 async fn a_repeated_id_is_reported_once() {
     let rt = runtime().await;
     let ids = create(&rt, json!({ "use": 1, "repeat": true })).await;
-    assert_eq!(ids.len(), 1, "one distinct id consumed → one id reported, got {ids:?}");
+    assert_eq!(
+        ids.len(),
+        1,
+        "one distinct id consumed → one id reported, got {ids:?}"
+    );
 }
 
 /// Ids nested inside structured params (order lines) are found too: the whole point is that the
@@ -181,5 +188,9 @@ async fn a_repeated_id_is_reported_once() {
 async fn a_nested_id_is_still_reported() {
     let rt = runtime().await;
     let ids = create(&rt, json!({ "use": 2, "nested": true })).await;
-    assert_eq!(ids.len(), 2, "both ids consumed (one nested) must be reported, got {ids:?}");
+    assert_eq!(
+        ids.len(),
+        2,
+        "both ids consumed (one nested) must be reported, got {ids:?}"
+    );
 }

@@ -101,11 +101,10 @@ fn s(v: &Json, k: &str) -> String {
 /// failure, never `0.00`.
 fn amount(v: &Json, k: &str) -> Result<f64, VerifactuError> {
     match v.get(k) {
-        Some(Json::Number(n)) => n.as_f64().ok_or_else(|| unreadable_amount(k, &n.to_string())),
-        Some(Json::String(t)) => t
-            .trim()
-            .parse()
-            .map_err(|_| unreadable_amount(k, t.trim())),
+        Some(Json::Number(n)) => n
+            .as_f64()
+            .ok_or_else(|| unreadable_amount(k, &n.to_string())),
+        Some(Json::String(t)) => t.trim().parse().map_err(|_| unreadable_amount(k, t.trim())),
         // Absent, `null`, a bool, an object: all of them are «nobody wrote an amount here». The
         // old reading answered `0.0` to every one of them and the answer went to Hacienda as a
         // fiscal fact — with a fingerprint on it and a chain number spent.
@@ -717,7 +716,11 @@ fn desglose(record: &Json) -> Result<String, VerifactuError> {
             .then_with(|| a.regimen.cmp(&b.regimen))
             .then_with(|| a.exenta.cmp(&b.exenta))
             .then_with(|| a.calificacion.cmp(b.calificacion))
-            .then_with(|| b.rate.partial_cmp(&a.rate).unwrap_or(std::cmp::Ordering::Equal))
+            .then_with(|| {
+                b.rate
+                    .partial_cmp(&a.rate)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     });
     lines.truncate(MAX_DETALLES);
 
@@ -1396,7 +1399,9 @@ mod tls_classification_tests {
 
     impl std::error::Error for Chained {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            self.source.as_deref().map(|e| e as &(dyn std::error::Error + 'static))
+            self.source
+                .as_deref()
+                .map(|e| e as &(dyn std::error::Error + 'static))
         }
     }
 
@@ -1421,15 +1426,19 @@ mod tls_classification_tests {
     #[test]
     fn a_refused_client_certificate_is_a_tls_failure() {
         for cause in [
-            "invalid peer certificate: Expired",   // «certificate»
+            "invalid peer certificate: Expired", // «certificate»
             "invalid peer certificate: UnknownIssuer",
-            "received fatal alert: AccessDenied",  // «alert»
-            "unexpected eof during handshake",     // «handshake»
-            "tls connection init failed",          // «tls»
+            "received fatal alert: AccessDenied", // «alert»
+            "unexpected eof during handshake",    // «handshake»
+            "tls connection init failed",         // «tls»
             "received fatal alert: CertificateRevoked",
             "tls handshake eof",
         ] {
-            let error = chain(&["error sending request for url (…)", "client error (Connect)", cause]);
+            let error = chain(&[
+                "error sending request for url (…)",
+                "client error (Connect)",
+                cause,
+            ]);
             assert!(is_tls_failure(&error), "no clasificado como TLS: {cause}");
         }
     }
@@ -1463,8 +1472,15 @@ mod tls_classification_tests {
             "operation timed out",
             "connection closed before message completed",
         ] {
-            let error = chain(&["error sending request for url (…)", "client error (Connect)", cause]);
-            assert!(!is_tls_failure(&error), "clasificado como TLS sin serlo: {cause}");
+            let error = chain(&[
+                "error sending request for url (…)",
+                "client error (Connect)",
+                cause,
+            ]);
+            assert!(
+                !is_tls_failure(&error),
+                "clasificado como TLS sin serlo: {cause}"
+            );
         }
     }
 
@@ -1514,13 +1530,8 @@ mod desglose_tests {
     }
 
     fn xml_de(record: &Json) -> String {
-        build_soap(
-            record,
-            &test_config_with_producer_facts(),
-            None,
-            "hub-1",
-        )
-        .expect("el registro se puede declarar")
+        build_soap(record, &test_config_with_producer_facts(), None, "hub-1")
+            .expect("el registro se puede declarar")
     }
 
     /// EL caso del negocio: una caña (21%) y una tapa (10%) en el mismo ticket. Antes se declaraba
@@ -1650,10 +1661,25 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1",
                       "rate":0.00,"base":5000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 5000.0, 0.0, 0.0));
-        assert!(xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"), "{xml}");
-        assert_eq!(count(&xml, "CalificacionOperacion"), 0, "el XSD es un <choice>: uno u otro");
-        assert_eq!(count(&xml, "TipoImpositivo"), 0, "§15.5: exenta no lleva tipo");
-        assert_eq!(count(&xml, "CuotaRepercutida"), 0, "§15.5: exenta no lleva cuota");
+        assert!(
+            xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"),
+            "{xml}"
+        );
+        assert_eq!(
+            count(&xml, "CalificacionOperacion"),
+            0,
+            "el XSD es un <choice>: uno u otro"
+        );
+        assert_eq!(
+            count(&xml, "TipoImpositivo"),
+            0,
+            "§15.5: exenta no lleva tipo"
+        );
+        assert_eq!(
+            count(&xml, "CuotaRepercutida"),
+            0,
+            "§15.5: exenta no lleva cuota"
+        );
         // El importe de la operación sigue viajando: es el único obligatorio del detalle.
         assert!(xml.contains(
             "<sum1:BaseImponibleOimporteNoSujeto>50.00</sum1:BaseImponibleOimporteNoSujeto>"
@@ -1671,7 +1697,10 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"01","class":"not_subject_location",
                       "rate":0.00,"base":100000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 100000.0, 0.0, 0.0));
-        assert!(xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"),
+            "{xml}"
+        );
         assert_eq!(count(&xml, "TipoImpositivo"), 0, "error 1237");
         assert_eq!(count(&xml, "CuotaRepercutida"), 0, "error 1237");
     }
@@ -1688,9 +1717,20 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"17","class":"not_subject_location",
                       "rate":19.00,"base":10000,"quota":1900}]"#;
         let xml = xml_de(&alta(tb, 10000.0, 1900.0, 19.0));
-        assert!(xml.contains("<sum1:ClaveRegimen>17</sum1:ClaveRegimen>"), "{xml}");
-        assert_eq!(count(&xml, "TipoImpositivo"), 0, "1237 sin excepción de régimen 17");
-        assert_eq!(count(&xml, "CuotaRepercutida"), 0, "1237 sin excepción de régimen 17");
+        assert!(
+            xml.contains("<sum1:ClaveRegimen>17</sum1:ClaveRegimen>"),
+            "{xml}"
+        );
+        assert_eq!(
+            count(&xml, "TipoImpositivo"),
+            0,
+            "1237 sin excepción de régimen 17"
+        );
+        assert_eq!(
+            count(&xml, "CuotaRepercutida"),
+            0,
+            "1237 sin excepción de régimen 17"
+        );
     }
 
     /// `ClaveRegimen 08` (operación localizada en Canarias/Ceuta/Melilla, declarada por un emisor
@@ -1700,7 +1740,10 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"08","class":"subject","rate":21.00,
                       "base":10000,"quota":2100}]"#;
         let xml = xml_de(&alta(tb, 10000.0, 2100.0, 21.0));
-        assert!(xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:CalificacionOperacion>N2</sum1:CalificacionOperacion>"),
+            "{xml}"
+        );
         assert_eq!(count(&xml, "TipoImpositivo"), 0);
     }
 
@@ -1713,7 +1756,11 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
                       "base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
         let xml = xml_de(&alta(tb, 10000.0, 2620.0, 21.0));
-        assert_eq!(count(&xml, "DetalleDesglose"), 1, "una sola línea, no dos: {xml}");
+        assert_eq!(
+            count(&xml, "DetalleDesglose"),
+            1,
+            "una sola línea, no dos: {xml}"
+        );
         assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"));
         assert!(xml.contains("<sum1:TipoRecargoEquivalencia>5.20</sum1:TipoRecargoEquivalencia>"));
         assert!(xml.contains("<sum1:CuotaRecargoEquivalencia>5.20</sum1:CuotaRecargoEquivalencia>"));
@@ -1731,9 +1778,18 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"01","class":"subject_reverse",
                       "rate":0.00,"base":50000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 50000.0, 0.0, 0.0));
-        assert!(xml.contains("<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>"), "{xml}");
-        assert!(xml.contains("<sum1:TipoImpositivo>0.00</sum1:TipoImpositivo>"), "§15.4: 0 explícito");
-        assert!(xml.contains("<sum1:CuotaRepercutida>0.00</sum1:CuotaRepercutida>"), "§15.4: 0 explícito");
+        assert!(
+            xml.contains("<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>"),
+            "{xml}"
+        );
+        assert!(
+            xml.contains("<sum1:TipoImpositivo>0.00</sum1:TipoImpositivo>"),
+            "§15.4: 0 explícito"
+        );
+        assert!(
+            xml.contains("<sum1:CuotaRepercutida>0.00</sum1:CuotaRepercutida>"),
+            "§15.4: 0 explícito"
+        );
     }
 
     /// El caso que junta los dos ejes: la peluquería que en el mismo ticket vende un corte (21 %) y
@@ -1746,7 +1802,11 @@ mod desglose_tests {
                       "rate":0.00,"base":4000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 6000.0, 420.0, 7.0));
         assert_eq!(count(&xml, "DetalleDesglose"), 2, "{xml}");
-        assert_eq!(count(&xml, "CalificacionOperacion"), 1, "solo la sujeta lleva calificación");
+        assert_eq!(
+            count(&xml, "CalificacionOperacion"),
+            1,
+            "solo la sujeta lleva calificación"
+        );
         assert_eq!(count(&xml, "OperacionExenta"), 1);
         assert_eq!(count(&xml, "TipoImpositivo"), 1, "la exenta no lleva tipo");
     }
@@ -1760,7 +1820,10 @@ mod desglose_tests {
         let tb = r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.00,
                       "base":10000,"quota":2100,"surcharge_rate":5.20,"surcharge_quota":520}]"#;
         let xml = xml_de(&alta(tb, 10000.0, 2620.0, 21.0));
-        let at = |t: &str| xml.find(&format!("<sum1:{t}>")).unwrap_or_else(|| panic!("falta {t}"));
+        let at = |t: &str| {
+            xml.find(&format!("<sum1:{t}>"))
+                .unwrap_or_else(|| panic!("falta {t}"))
+        };
         assert!(at("Impuesto") < at("ClaveRegimen"));
         assert!(at("ClaveRegimen") < at("CalificacionOperacion"));
         assert!(at("CalificacionOperacion") < at("TipoImpositivo"));
@@ -1811,7 +1874,10 @@ mod desglose_tests {
         let xml = xml_de(&alta(tb, 1500.0, 260.0, 17.33));
         let pos21 = xml.find("<sum1:TipoImpositivo>21.00").expect("21%");
         let pos10 = xml.find("<sum1:TipoImpositivo>10.00").expect("10%");
-        assert!(pos21 < pos10, "tipo descendente dentro de la misma clave fiscal");
+        assert!(
+            pos21 < pos10,
+            "tipo descendente dentro de la misma clave fiscal"
+        );
     }
 
     /// Un array vacío o basura no puede dejar el `Desglose` sin ninguna línea: el elemento es
@@ -1841,7 +1907,10 @@ mod desglose_tests {
     fn una_exenta_sin_causa_cae_a_e6() {
         let tb = r#"[{"tax":"vat","class":"exempt","rate":0.00,"base":1000,"quota":0}]"#;
         let xml = xml_de(&alta(tb, 1000.0, 0.0, 0.0));
-        assert!(xml.contains("<sum1:OperacionExenta>E6</sum1:OperacionExenta>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:OperacionExenta>E6</sum1:OperacionExenta>"),
+            "{xml}"
+        );
     }
 }
 
@@ -1901,7 +1970,10 @@ mod amount_tests {
 
         let error = build(&record).expect_err("a total that is not there cannot be declared");
         let message = error.to_string();
-        assert!(message.contains("total_amount"), "says WHICH amount: {message}");
+        assert!(
+            message.contains("total_amount"),
+            "says WHICH amount: {message}"
+        );
         assert!(
             !message.contains("0.00"),
             "the point is that no zero was produced: {message}"
@@ -1927,7 +1999,10 @@ mod amount_tests {
         let error = build(&record).expect_err("that string is not an amount");
         let message = error.to_string();
         assert!(message.contains("total_amount"), "{message}");
-        assert!(message.contains("1.210,00"), "quotes what it could not read: {message}");
+        assert!(
+            message.contains("1.210,00"),
+            "quotes what it could not read: {message}"
+        );
     }
 
     /// The breakdown line's only mandatory element (`BaseImponibleOimporteNoSujeto`). A line
@@ -1987,11 +2062,15 @@ mod amount_tests {
     #[test]
     fn an_exempt_line_needs_no_rate_or_quota() {
         let mut record = declarable_record();
-        record["tax_breakdown"] =
-            json!(r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1","base":5000}]"#);
+        record["tax_breakdown"] = json!(
+            r#"[{"tax":"vat","regime":"01","class":"exempt","exempt_reason":"E1","base":5000}]"#
+        );
 
         let xml = build(&record).expect("an exempt line declares neither rate nor quota");
-        assert!(xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:OperacionExenta>E1</sum1:OperacionExenta>"),
+            "{xml}"
+        );
         assert!(!xml.contains("TipoImpositivo"), "{xml}");
     }
 
@@ -1999,9 +2078,8 @@ mod amount_tests {
     #[test]
     fn a_not_subject_line_needs_no_rate_or_quota() {
         let mut record = declarable_record();
-        record["tax_breakdown"] = json!(
-            r#"[{"tax":"vat","regime":"01","class":"not_subject_location","base":100000}]"#
-        );
+        record["tax_breakdown"] =
+            json!(r#"[{"tax":"vat","regime":"01","class":"not_subject_location","base":100000}]"#);
 
         let xml = build(&record).expect("N2 declares neither rate nor quota");
         assert!(
@@ -2022,7 +2100,10 @@ mod amount_tests {
         );
 
         let xml = build(&record).expect("zero written down is a declarable amount");
-        assert!(xml.contains("<sum1:ImporteTotal>0.00</sum1:ImporteTotal>"), "{xml}");
+        assert!(
+            xml.contains("<sum1:ImporteTotal>0.00</sum1:ImporteTotal>"),
+            "{xml}"
+        );
     }
 
     /// A `RegistroAnulacion` carries no amounts at all: the strictness must not reach it.
@@ -2081,8 +2162,7 @@ mod contingency_incidence_tests {
             "record_hash": "ABC123",
             "generation_timestamp": "2026-07-09T10:00:00+02:00",
         });
-        build_soap(&record, &test_config_with_producer_facts(), None, "hub-1")
-            .expect("declarable")
+        build_soap(&record, &test_config_with_producer_facts(), None, "hub-1").expect("declarable")
     }
 
     /// A punctual remission declares no incidence at all — the element is `minOccurs="0"` and
@@ -2115,11 +2195,18 @@ mod contingency_incidence_tests {
     fn the_incidence_goes_after_obligado_emision_inside_the_header() {
         let xml = stamp_contingency_incidence(&envelope());
 
-        let obligado = xml.find("</sum1:ObligadoEmision>").expect("ObligadoEmision");
-        let remision = xml.find("<sum1:RemisionVoluntaria>").expect("RemisionVoluntaria");
+        let obligado = xml
+            .find("</sum1:ObligadoEmision>")
+            .expect("ObligadoEmision");
+        let remision = xml
+            .find("<sum1:RemisionVoluntaria>")
+            .expect("RemisionVoluntaria");
         let cabecera_end = xml.find("</sum:Cabecera>").expect("Cabecera");
         assert!(obligado < remision, "{xml}");
-        assert!(remision < cabecera_end, "inside the header, not after it: {xml}");
+        assert!(
+            remision < cabecera_end,
+            "inside the header, not after it: {xml}"
+        );
     }
 
     /// **The record is untouched, byte for byte.** The fingerprint was computed over the record's
@@ -2132,7 +2219,9 @@ mod contingency_incidence_tests {
 
         let registro = |xml: &str| {
             let start = xml.find("<sum:RegistroFactura>").expect("RegistroFactura");
-            let end = xml.find("</sum:RegistroFactura>").expect("RegistroFactura end");
+            let end = xml
+                .find("</sum:RegistroFactura>")
+                .expect("RegistroFactura end");
             xml[start..end].to_string()
         };
         assert_eq!(registro(&plain), registro(&stamped));
@@ -2273,9 +2362,14 @@ mod producer_facts_tests {
     fn the_manufacturer_and_the_product_are_declared_separately() {
         let xml = xml_with(&config_with(producer()));
 
-        assert!(xml.contains("<sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>"), "{xml}");
         assert!(
-            xml.contains("<sum1:NombreSistemaInformatico>ERPlora Hub</sum1:NombreSistemaInformatico>"),
+            xml.contains("<sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>"),
+            "{xml}"
+        );
+        assert!(
+            xml.contains(
+                "<sum1:NombreSistemaInformatico>ERPlora Hub</sum1:NombreSistemaInformatico>"
+            ),
             "{xml}"
         );
     }

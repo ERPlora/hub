@@ -84,7 +84,8 @@ impl Runtime {
         limit: i64,
     ) -> Result<Option<event_shape::EventShape>> {
         let declared_by = self.registry.modules_emitting(event_name);
-        let samples = outbox::sample_payloads(self.db.as_ref(), &self.hub_id, event_name, limit).await?;
+        let samples =
+            outbox::sample_payloads(self.db.as_ref(), &self.hub_id, event_name, limit).await?;
         if declared_by.is_empty() && samples.is_empty() {
             return Ok(None);
         }

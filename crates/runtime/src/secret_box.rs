@@ -155,7 +155,10 @@ pub fn encrypt(key: &SecretsKey, plaintext: &str) -> Result<String, SecretBoxErr
     let mut blob = Vec::with_capacity(NONCE_LEN + in_out.len());
     blob.extend_from_slice(&nonce_bytes);
     blob.extend_from_slice(&in_out);
-    Ok(format!("{PREFIX}{}", base64::engine::general_purpose::STANDARD.encode(blob)))
+    Ok(format!(
+        "{PREFIX}{}",
+        base64::engine::general_purpose::STANDARD.encode(blob)
+    ))
 }
 
 /// Descifra un envelope ya parseado por [`parse_envelope`] (`nonce || ciphertext || tag`).
@@ -166,7 +169,8 @@ pub fn encrypt(key: &SecretsKey, plaintext: &str) -> Result<String, SecretBoxErr
 fn decrypt_raw(key: &SecretsKey, raw: &[u8]) -> Result<String, SecretBoxError> {
     debug_assert!(raw.len() >= NONCE_LEN + AES_256_GCM.tag_len());
     let (nonce_bytes, ciphertext) = raw.split_at(NONCE_LEN);
-    let nonce = Nonce::try_assume_unique_for_key(nonce_bytes).map_err(|_| SecretBoxError::Decrypt)?;
+    let nonce =
+        Nonce::try_assume_unique_for_key(nonce_bytes).map_err(|_| SecretBoxError::Decrypt)?;
 
     let mut in_out = ciphertext.to_vec();
     let plain = key
@@ -201,7 +205,9 @@ pub(crate) mod test_support {
     /// paralelo se pisarían de forma no determinista sin esto.
     pub(crate) fn env_lock() -> MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap_or_else(|e| e.into_inner())
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     /// Base64-estándar de 32 bytes rellenos con `fill` — valor válido para `HUB_SECRETS_KEY` en
@@ -261,7 +267,10 @@ mod tests {
         let key = SecretsKey::for_test(7);
         let encrypted = encrypt(&key, "s3cr3t-p12-password").unwrap();
         assert!(is_encrypted(&encrypted));
-        assert_eq!(decrypt_or_legacy(Some(&key), &encrypted).unwrap(), "s3cr3t-p12-password");
+        assert_eq!(
+            decrypt_or_legacy(Some(&key), &encrypted).unwrap(),
+            "s3cr3t-p12-password"
+        );
     }
 
     #[test]
@@ -299,10 +308,15 @@ mod tests {
         // diferencia de tocar el último carácter base64 (podría coincidir por azar con el nonce
         // aleatorio y no cambiar nada), un XOR con 0xFF garantiza un byte distinto siempre.
         let b64 = encrypted.strip_prefix("v1:").unwrap();
-        let mut raw = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        let mut raw = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
         let last = raw.len() - 1;
         raw[last] ^= 0xFF;
-        let tampered = format!("v1:{}", base64::engine::general_purpose::STANDARD.encode(raw));
+        let tampered = format!(
+            "v1:{}",
+            base64::engine::general_purpose::STANDARD.encode(raw)
+        );
 
         let err = decrypt_or_legacy(Some(&key), &tampered).unwrap_err();
         assert!(matches!(err, SecretBoxError::Decrypt));
@@ -323,7 +337,10 @@ mod tests {
         // menos nonce+tag bytes) se trata como cifrado; el resto pasa como legacy, con o sin clave.
         let key = SecretsKey::for_test(11);
         for legacy in ["v1:mi-contraseña", "v1:", "v1:no base64!", "v1:QQ=="] {
-            assert!(!is_encrypted(legacy), "malinterpretado como cifrado: {legacy:?}");
+            assert!(
+                !is_encrypted(legacy),
+                "malinterpretado como cifrado: {legacy:?}"
+            );
             assert_eq!(decrypt_or_legacy(Some(&key), legacy).unwrap(), legacy);
             assert_eq!(decrypt_or_legacy(None, legacy).unwrap(), legacy);
         }

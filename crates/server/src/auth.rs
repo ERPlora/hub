@@ -305,7 +305,11 @@ pub fn machine_auth(st: &AppState) -> Option<cloud_client::Auth> {
 /// estas llamadas las hace el runtime (server-side).
 pub fn hub_scoped_auth(headers: &HeaderMap, st: &AppState) -> Option<cloud_client::Auth> {
     let hub_id = st.hub_id();
-    machine_auth(st).or_else(|| st.is_dev_hub().then(|| user_auth(headers, &hub_id)).flatten())
+    machine_auth(st).or_else(|| {
+        st.is_dev_hub()
+            .then(|| user_auth(headers, &hub_id))
+            .flatten()
+    })
 }
 
 /// LOCAL role somebody is provisioned with the first time they come in from the Cloud.
@@ -420,7 +424,10 @@ mod local_role_tests {
     #[test]
     fn without_a_role_in_the_token_the_default_wins() {
         // Token from an older SaaS, or a hub whose `org` is not listed: nothing is granted.
-        assert_eq!(super::local_role_for_cloud_login(&[], "employee"), "employee");
+        assert_eq!(
+            super::local_role_for_cloud_login(&[], "employee"),
+            "employee"
+        );
         assert_eq!(
             super::local_role_for_cloud_login(&[], "cashier"),
             "cashier",
@@ -499,7 +506,11 @@ mod role_floor_tests {
         assert_eq!(floor_of(&["member", "owner"]), None);
         assert_eq!(floor_of(&["owner", "member"]), None);
         assert_eq!(floor_of(&["admin", "employee"]), None);
-        assert_eq!(floor_of(&["", "admin"]), None, "an empty key is not administrative");
+        assert_eq!(
+            floor_of(&["", "admin"]),
+            None,
+            "an empty key is not administrative"
+        );
     }
 
     #[test]

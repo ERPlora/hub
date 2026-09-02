@@ -569,7 +569,9 @@ pub async fn verify_and_resolve(
     if !verify_secret_argon2(stored, &secret) {
         return Ok(None);
     }
-    Ok(Some(principal_from_row(db, registry, hub_id, &id, &row).await))
+    Ok(Some(
+        principal_from_row(db, registry, hub_id, &id, &row).await,
+    ))
 }
 
 /// Resolves a key **by id, without its secret** (hub#504). The one caller is the redemption of a
@@ -999,10 +1001,12 @@ mod tests {
             after_restore, first,
             "a re-issued key is a NEW credential, not the old one resurrected"
         );
-        assert!(resolve_key_id(&db, &registry_with_inventory(), hub, &after_restore)
-            .await
-            .unwrap()
-            .is_some());
+        assert!(
+            resolve_key_id(&db, &registry_with_inventory(), hub, &after_restore)
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[tokio::test]

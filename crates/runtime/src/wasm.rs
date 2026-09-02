@@ -7,5 +7,7 @@ use crate::errors::Result;
 
 /// Marcador: ejecutar un handler WASM aún no está soportado.
 pub fn execute_handler(_function: &str) -> Result<()> {
-    Err(crate::errors::RuntimeError::NotImplemented("handler WASM (Extism) — Tier 2"))
+    Err(crate::errors::RuntimeError::NotImplemented(
+        "handler WASM (Extism) — Tier 2",
+    ))
 }

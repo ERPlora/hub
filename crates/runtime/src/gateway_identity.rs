@@ -18,10 +18,10 @@
 
 use serde_json::json;
 
-use erplora_db::{DatabaseAdapter, Params};
 use crate::errors::{Result, RuntimeError};
 use crate::registry::now_rfc3339;
 use crate::secret_box::{self, SecretsKey};
+use erplora_db::{DatabaseAdapter, Params};
 
 /// The CN the ingress expects, derived exactly like the Cloud derives it
 /// (`HubFiscalClientIdentity.common_name_for`) and like the cell checks it
@@ -223,7 +223,8 @@ pub async fn ensure_key_and_csr(db: &dyn DatabaseAdapter, hub_id: &str) -> Resul
 
     let group = openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::X9_62_PRIME256V1)
         .map_err(|e| identity_error("curva P-256", e))?;
-    let ec = openssl::ec::EcKey::generate(&group).map_err(|e| identity_error("generando la clave", e))?;
+    let ec = openssl::ec::EcKey::generate(&group)
+        .map_err(|e| identity_error("generando la clave", e))?;
     let pkey = PKey::from_ec_key(ec).map_err(|e| identity_error("envolviendo la clave", e))?;
     let key_pem = String::from_utf8(
         pkey.private_key_to_pem_pkcs8()
@@ -254,14 +255,14 @@ pub async fn ensure_key_and_csr(db: &dyn DatabaseAdapter, hub_id: &str) -> Resul
 
 #[cfg(not(target_os = "android"))]
 fn build_csr(pkey: &openssl::pkey::PKey<openssl::pkey::Private>, cn: &str) -> Result<String> {
-    let mut name = openssl::x509::X509NameBuilder::new()
-        .map_err(|e| identity_error("nombre del CSR", e))?;
+    let mut name =
+        openssl::x509::X509NameBuilder::new().map_err(|e| identity_error("nombre del CSR", e))?;
     name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, cn)
         .map_err(|e| identity_error("CN del CSR", e))?;
     let name = name.build();
 
-    let mut req = openssl::x509::X509ReqBuilder::new()
-        .map_err(|e| identity_error("builder del CSR", e))?;
+    let mut req =
+        openssl::x509::X509ReqBuilder::new().map_err(|e| identity_error("builder del CSR", e))?;
     req.set_subject_name(&name)
         .map_err(|e| identity_error("sujeto del CSR", e))?;
     req.set_pubkey(pkey)
@@ -325,8 +326,8 @@ pub async fn install_certificate(
         ));
     }
 
-    let now = openssl::asn1::Asn1Time::days_from_now(0)
-        .map_err(|e| identity_error("reloj ASN.1", e))?;
+    let now =
+        openssl::asn1::Asn1Time::days_from_now(0).map_err(|e| identity_error("reloj ASN.1", e))?;
     if cert
         .not_after()
         .compare(&now)
@@ -388,9 +389,13 @@ mod tests {
 
     async fn db_ready() -> PgAdapter {
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
-        crate::system_migrations::apply(&db, "hub-test").await.unwrap();
+        crate::system_migrations::apply(&db, "hub-test")
+            .await
+            .unwrap();
         db
     }
 
@@ -401,7 +406,7 @@ mod tests {
         use openssl::hash::MessageDigest;
         use openssl::nid::Nid;
         use openssl::pkey::PKey;
-        use openssl::x509::{X509, X509NameBuilder, X509Req};
+        use openssl::x509::{X509NameBuilder, X509Req, X509};
 
         let ca_key = PKey::from_ec_key(
             openssl::ec::EcKey::generate(
@@ -411,15 +416,19 @@ mod tests {
         )
         .unwrap();
         let mut ca_name = X509NameBuilder::new().unwrap();
-        ca_name.append_entry_by_nid(Nid::COMMONNAME, "ERPlora Fiscal Internal CA TEST").unwrap();
+        ca_name
+            .append_entry_by_nid(Nid::COMMONNAME, "ERPlora Fiscal Internal CA TEST")
+            .unwrap();
         let ca_name = ca_name.build();
         let mut ca = X509::builder().unwrap();
         ca.set_version(2).unwrap();
         ca.set_subject_name(&ca_name).unwrap();
         ca.set_issuer_name(&ca_name).unwrap();
         ca.set_pubkey(&ca_key).unwrap();
-        ca.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-        ca.set_not_after(&Asn1Time::days_from_now(3650).unwrap()).unwrap();
+        ca.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        ca.set_not_after(&Asn1Time::days_from_now(3650).unwrap())
+            .unwrap();
         ca.sign(&ca_key, MessageDigest::sha256()).unwrap();
         let ca = ca.build();
 
@@ -437,8 +446,10 @@ mod tests {
         cert.set_subject_name(&subject).unwrap();
         cert.set_issuer_name(&ca_name).unwrap();
         cert.set_pubkey(&req.public_key().unwrap()).unwrap();
-        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-        cert.set_not_after(&Asn1Time::days_from_now(days.try_into().unwrap()).unwrap()).unwrap();
+        cert.set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        cert.set_not_after(&Asn1Time::days_from_now(days.try_into().unwrap()).unwrap())
+            .unwrap();
         cert.sign(&ca_key, MessageDigest::sha256()).unwrap();
         let cert = cert.build();
 
@@ -467,18 +478,29 @@ mod tests {
             .unwrap()
             .to_string();
         assert_eq!(cn, common_name(HUB));
-        assert!(req.verify(&req.public_key().unwrap()).unwrap(), "self-signature");
+        assert!(
+            req.verify(&req.public_key().unwrap()).unwrap(),
+            "self-signature"
+        );
 
         // At rest the key is CIPHERTEXT — what a database dump shows is not a key.
         let row = load_row(&db, HUB).await.unwrap().unwrap();
-        assert!(secret_box::is_encrypted(&row.0), "private key stored encrypted");
-        assert!(!row.0.contains("PRIVATE KEY"), "no PEM marker in the stored row");
+        assert!(
+            secret_box::is_encrypted(&row.0),
+            "private key stored encrypted"
+        );
+        assert!(
+            !row.0.contains("PRIVATE KEY"),
+            "no PEM marker in the stored row"
+        );
 
         // Idempotent: the second CSR re-derives from the SAME key.
         let second = ensure_key_and_csr(&db, HUB).await.unwrap();
         let req2 = openssl::x509::X509Req::from_pem(second.as_bytes()).unwrap();
         assert!(
-            req2.public_key().unwrap().public_eq(&req.public_key().unwrap()),
+            req2.public_key()
+                .unwrap()
+                .public_eq(&req.public_key().unwrap()),
             "same key, twice"
         );
     }
@@ -490,8 +512,14 @@ mod tests {
         let db = db_ready().await;
 
         let err = ensure_key_and_csr(&db, HUB).await.unwrap_err();
-        assert!(err.to_string().contains(secret_box::MASTER_KEY_ENV), "{err}");
-        assert!(load_row(&db, HUB).await.unwrap().is_none(), "nothing stored");
+        assert!(
+            err.to_string().contains(secret_box::MASTER_KEY_ENV),
+            "{err}"
+        );
+        assert!(
+            load_row(&db, HUB).await.unwrap().is_none(),
+            "nothing stored"
+        );
     }
 
     #[tokio::test]
@@ -507,12 +535,17 @@ mod tests {
             .await
             .unwrap();
         let (foreign_cert, ca) = sign_with_test_ca(&foreign_csr, Some(&common_name(HUB)), 365);
-        let err = install_certificate(&db, HUB, &foreign_cert, &ca).await.unwrap_err();
+        let err = install_certificate(&db, HUB, &foreign_cert, &ca)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("clave"), "{err}");
 
         // The right key but the WRONG name.
-        let (wrong_cn, ca2) = sign_with_test_ca(&csr, Some("hub-otro.fiscal.erplora.internal"), 365);
-        let err = install_certificate(&db, HUB, &wrong_cn, &ca2).await.unwrap_err();
+        let (wrong_cn, ca2) =
+            sign_with_test_ca(&csr, Some("hub-otro.fiscal.erplora.internal"), 365);
+        let err = install_certificate(&db, HUB, &wrong_cn, &ca2)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("CN"), "{err}");
 
         // Nothing half-installed after the refusals.
@@ -526,7 +559,10 @@ mod tests {
         let _key = EnvVarGuard::set(&test_key_b64(43));
         let db = db_ready().await;
 
-        assert!(client_identity(&db, HUB).await.unwrap().is_none(), "nothing yet");
+        assert!(
+            client_identity(&db, HUB).await.unwrap().is_none(),
+            "nothing yet"
+        );
 
         let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
         let (cert, ca) = sign_with_test_ca(&csr, None, 365);

@@ -28,8 +28,8 @@
 //! Real Postgres, ephemeral schema per test.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::{RequestContext, RuntimeError, Runtime};
+use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::{RequestContext, Runtime, RuntimeError};
 use serde_json::json;
 
 fn fixture() -> PathBuf {
@@ -42,7 +42,9 @@ fn fixture() -> PathBuf {
 async fn hub() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture()).await.expect("install lbind");
+    rt.install_from_dir(&fixture())
+        .await
+        .expect("install lbind");
     rt
 }
 
@@ -75,9 +77,16 @@ async fn an_undeclared_param_is_refused_instead_of_ignored() {
         .expect_err("an undeclared filter must not answer the whole list");
 
     match err {
-        RuntimeError::UnknownFilter { query, param, accepted } => {
+        RuntimeError::UnknownFilter {
+            query,
+            param,
+            accepted,
+        } => {
             assert_eq!(query, "lbind.items.list");
-            assert_eq!(param, "category_id", "the refusal names the offending param");
+            assert_eq!(
+                param, "category_id",
+                "the refusal names the offending param"
+            );
             assert!(
                 accepted.iter().any(|a| a == "f_name"),
                 "and lists what IS accepted, so the caller can fix it: {accepted:?}"
@@ -156,7 +165,10 @@ async fn the_engine_vocabulary_and_the_sql_binds_still_pass() {
         )
         .await
         .expect("limit/offset/search/sort/dir + the SQL's own bind are the vocabulary");
-    assert_eq!(page.limit, 2, "the `limit` the caller asked for is the one it gets");
+    assert_eq!(
+        page.limit, 2,
+        "the `limit` the caller asked for is the one it gets"
+    );
     assert_eq!(page.rows.len(), 2, "one page of it: {:?}", page.rows);
     assert_eq!(
         page.total, 3,
@@ -180,7 +192,9 @@ async fn a_coalesce_guarded_optional_bind_is_still_accepted() {
             &ctx(),
         )
         .await
-        .expect("`:include_archived` is referenced by the base SQL: it is vocabulary, not a filter");
+        .expect(
+            "`:include_archived` is referenced by the base SQL: it is vocabulary, not a filter",
+        );
     assert_eq!(page.total, 3, "archived cart included: {:?}", page.rows);
 }
 
@@ -198,7 +212,10 @@ async fn a_param_the_query_schema_declares_is_vocabulary() {
     let page = rt
         .execute_query_page(
             "lbind.items.scoped",
-            &params(&[("cart_id", json!("cart-a")), ("audit_tag", json!("who-asked"))]),
+            &params(&[
+                ("cart_id", json!("cart-a")),
+                ("audit_tag", json!("who-asked")),
+            ]),
             &ctx(),
         )
         .await

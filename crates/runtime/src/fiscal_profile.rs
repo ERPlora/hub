@@ -64,8 +64,8 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 
 use crate::errors::{Result, RuntimeError};
-use crate::registry::Registry;
 use crate::registry::now_rfc3339;
+use crate::registry::Registry;
 
 /// The state machine of the fiscal profile (ADR-0273 D2).
 ///
@@ -387,7 +387,9 @@ pub async fn refresh(
 
     // The go-live froze the answer; settings do not move it any more.
     if !profile.status.is_frozen() && profile.status != FiscalStatus::NotRequired {
-        let settings = crate::settings::get_all(db, hub_id).await.unwrap_or(json!({}));
+        let settings = crate::settings::get_all(db, hub_id)
+            .await
+            .unwrap_or(json!({}));
         let filled = |key: &str| {
             settings
                 .get(key)
@@ -399,7 +401,9 @@ pub async fn refresh(
         };
         // Degrading to `false` on error keeps this failing CLOSED: a hub whose certificate cannot
         // be read is not ready to emit.
-        let has_certificate = crate::certificate::can_sign(db, hub_id).await.unwrap_or(false);
+        let has_certificate = crate::certificate::can_sign(db, hub_id)
+            .await
+            .unwrap_or(false);
         let ready = filled("business_tax_id")
             && filled("business_legal_name")
             && has_certificate
@@ -916,7 +920,10 @@ pub async fn limits(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<FiscalLimi
     }
     .to_uppercase();
 
-    let mut limits = FiscalLimits { country_code: country.clone(), ..Default::default() };
+    let mut limits = FiscalLimits {
+        country_code: country.clone(),
+        ..Default::default()
+    };
     if country.is_empty() {
         return Ok(limits);
     }
@@ -1404,10 +1411,15 @@ mod tests {
             if let Some(f) = fiscal {
                 manifest["fiscal_regime"] = f.clone();
             }
-            reg.installed.push(serde_json::from_value(manifest).expect("manifest parses"));
+            reg.installed
+                .push(serde_json::from_value(manifest).expect("manifest parses"));
             reg.status.insert(
                 (*id).to_string(),
-                if *active { ModuleStatus::Active } else { ModuleStatus::Inactive },
+                if *active {
+                    ModuleStatus::Active
+                } else {
+                    ModuleStatus::Inactive
+                },
             );
         }
         reg
@@ -1444,7 +1456,11 @@ mod tests {
     fn active_with_no_provider_mounted_is_blocked() {
         let empty = registry_with(&[]);
         assert_eq!(
-            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-es"), &empty, "hub-es"),
+            determine_fiscal_mode(
+                &profile_in(FiscalStatus::Active, "hub-es"),
+                &empty,
+                "hub-es"
+            ),
             FiscalMode::Blocked(BlockedReason::ProviderMissing)
         );
     }
@@ -1502,8 +1518,18 @@ mod tests {
     #[test]
     fn two_providers_of_the_same_regime_both_count() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
-            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
+            (
+                "otro",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
         ]);
         assert_eq!(providers_of(&reg, "ES", "verifactu").len(), 2);
         assert_eq!(
@@ -1523,7 +1549,11 @@ mod tests {
             true,
         )]);
         assert_eq!(
-            determine_fiscal_mode(&profile_in(FiscalStatus::Active, "hub-otro"), &reg, "hub-es"),
+            determine_fiscal_mode(
+                &profile_in(FiscalStatus::Active, "hub-otro"),
+                &reg,
+                "hub-es"
+            ),
             FiscalMode::Blocked(BlockedReason::InstallationMismatch)
         );
     }
@@ -1533,7 +1563,11 @@ mod tests {
     #[test]
     fn a_hub_that_never_went_live_is_never_blocked() {
         let empty = registry_with(&[]);
-        for status in [FiscalStatus::NotRequired, FiscalStatus::Unconfigured, FiscalStatus::Ready] {
+        for status in [
+            FiscalStatus::NotRequired,
+            FiscalStatus::Unconfigured,
+            FiscalStatus::Ready,
+        ] {
             let mode = determine_fiscal_mode(&profile_in(status, "hub-es"), &empty, "hub-es");
             assert!(
                 !matches!(mode, FiscalMode::Blocked(_)),
@@ -1548,7 +1582,12 @@ mod tests {
     #[test]
     fn only_a_declared_provider_teaches_the_trigger_events() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
             ("inventory", None, &["sale.completed"], true),
         ]);
         assert_eq!(
@@ -1561,8 +1600,18 @@ mod tests {
     #[test]
     fn the_learnt_set_is_the_union_and_it_is_stable() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
-            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["sale.completed", "invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
+            (
+                "otro",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["sale.completed", "invoice.created"],
+                true,
+            ),
         ]);
         assert_eq!(
             learned_trigger_events(&reg, "ES", "verifactu"),
@@ -1585,14 +1634,22 @@ mod tests {
         )]);
         refresh(&db, &with_provider, "hub-es").await.unwrap();
         assert_eq!(
-            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            load(&db, "hub-es")
+                .await
+                .unwrap()
+                .unwrap()
+                .fiscal_trigger_events,
             vec!["invoice.created".to_string()]
         );
 
         // The provider is gone. The core still knows what starts a fiscal chain here.
         refresh(&db, &registry_with(&[]), "hub-es").await.unwrap();
         assert_eq!(
-            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            load(&db, "hub-es")
+                .await
+                .unwrap()
+                .unwrap()
+                .fiscal_trigger_events,
             vec!["invoice.created".to_string()],
             "this memory is what lets hub#556 refuse when there is nobody to ask"
         );
@@ -1621,7 +1678,11 @@ mod tests {
         refresh(&db, &replacement, "hub-es").await.unwrap();
 
         assert_eq!(
-            load(&db, "hub-es").await.unwrap().unwrap().fiscal_trigger_events,
+            load(&db, "hub-es")
+                .await
+                .unwrap()
+                .unwrap()
+                .fiscal_trigger_events,
             vec!["invoice.created".to_string(), "sale.completed".to_string()]
         );
     }
@@ -1642,7 +1703,10 @@ mod tests {
             true,
         )]);
 
-        assert_eq!(refresh(&db, &reg, "hub-es").await.unwrap(), FiscalMode::Unconfigured);
+        assert_eq!(
+            refresh(&db, &reg, "hub-es").await.unwrap(),
+            FiscalMode::Unconfigured
+        );
     }
 
     /// And `READY` goes back to `UNCONFIGURED` when a condition stops holding — before the go-live
@@ -1652,7 +1716,7 @@ mod tests {
         let db = fresh_db().await;
         booted_hub(&db, "hub-es", Some("ES")).await;
         ensure(&db, "hub-es").await.unwrap(); // the row has to exist before it can be moved
-        // A hub sitting at READY (however it got there) with nothing mounted is not ready.
+                                              // A hub sitting at READY (however it got there) with nothing mounted is not ready.
         let mut p = Params::new();
         p.insert("hub_id".into(), json!("hub-es"));
         db.execute(
@@ -1745,7 +1809,9 @@ mod tests {
         reg.demo_hub = true;
         refresh(&db, &reg, "hub-demo").await.unwrap();
 
-        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        let err = go_live(&db, "hub-demo")
+            .await
+            .expect_err("una demo no factura de verdad");
         assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
     }
 
@@ -1844,9 +1910,14 @@ mod tests {
     async fn a_grant_awaiting_review_does_not_open_the_go_live() {
         let db = fresh_db().await;
         hub_ready_without_grant(&db, "hub-es").await;
-        record_representation(&db, "hub-es", REPRESENTATION_PENDING, "2026-08-28T09:00:00Z")
-            .await
-            .unwrap();
+        record_representation(
+            &db,
+            "hub-es",
+            REPRESENTATION_PENDING,
+            "2026-08-28T09:00:00Z",
+        )
+        .await
+        .unwrap();
 
         let err = go_live(&db, "hub-es")
             .await
@@ -1861,9 +1932,14 @@ mod tests {
     async fn a_rejected_grant_does_not_open_the_go_live() {
         let db = fresh_db().await;
         hub_ready_without_grant(&db, "hub-es").await;
-        record_representation(&db, "hub-es", REPRESENTATION_REJECTED, "2026-08-28T10:00:00Z")
-            .await
-            .unwrap();
+        record_representation(
+            &db,
+            "hub-es",
+            REPRESENTATION_REJECTED,
+            "2026-08-28T10:00:00Z",
+        )
+        .await
+        .unwrap();
 
         let err = go_live(&db, "hub-es")
             .await
@@ -1879,11 +1955,18 @@ mod tests {
     async fn a_revoked_grant_does_not_open_the_go_live() {
         let db = fresh_db().await;
         hub_ready_without_grant(&db, "hub-es").await;
-        record_representation(&db, "hub-es", REPRESENTATION_REVOKED, "2026-08-11T10:00:00Z")
-            .await
-            .unwrap();
+        record_representation(
+            &db,
+            "hub-es",
+            REPRESENTATION_REVOKED,
+            "2026-08-11T10:00:00Z",
+        )
+        .await
+        .unwrap();
 
-        let err = go_live(&db, "hub-es").await.expect_err("revocado no es firmado");
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("revocado no es firmado");
 
         assert_eq!(code_of(&err), NO_REPRESENTATION);
     }
@@ -1936,7 +2019,9 @@ mod tests {
         let db = fresh_db().await;
         hub_ready(&db, "hub-es").await;
 
-        let after = go_live(&db, "hub-es").await.expect("firmado ⇒ puede facturar");
+        let after = go_live(&db, "hub-es")
+            .await
+            .expect("firmado ⇒ puede facturar");
 
         assert_eq!(after.status, FiscalStatus::Active);
     }
@@ -1950,9 +2035,14 @@ mod tests {
         booted_hub(&db, "hub-es", Some("ES")).await;
         ensure(&db, "hub-es").await.unwrap();
 
-        record_representation(&db, "hub-es", REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
-            .await
-            .unwrap();
+        record_representation(
+            &db,
+            "hub-es",
+            REPRESENTATION_VIGENTE,
+            "2026-08-11T09:00:00Z",
+        )
+        .await
+        .unwrap();
 
         let profile = load(&db, "hub-es").await.unwrap().unwrap();
         assert_eq!(profile.representation_status, REPRESENTATION_VIGENTE);
@@ -1969,7 +2059,9 @@ mod tests {
         reg.demo_hub = true;
         refresh(&db, &reg, "hub-demo").await.unwrap();
 
-        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        let err = go_live(&db, "hub-demo")
+            .await
+            .expect_err("una demo no factura de verdad");
 
         assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
     }
@@ -2003,11 +2095,18 @@ mod tests {
         let db = fresh_db().await;
         booted_hub(&db, "hub-es", Some("ES")).await;
         ensure(&db, "hub-es").await.unwrap();
-        record_representation(&db, "hub-es", REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
-            .await
-            .unwrap();
+        record_representation(
+            &db,
+            "hub-es",
+            REPRESENTATION_VIGENTE,
+            "2026-08-11T09:00:00Z",
+        )
+        .await
+        .unwrap();
 
-        let err = go_live(&db, "hub-es").await.expect_err("sin configurar no se enciende");
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("sin configurar no se enciende");
         assert_eq!(code_of(&err), NOT_READY);
     }
 
@@ -2026,7 +2125,9 @@ mod tests {
         .await
         .unwrap();
 
-        let err = go_live(&db, "hub-demo").await.expect_err("una demo no factura de verdad");
+        let err = go_live(&db, "hub-demo")
+            .await
+            .expect_err("una demo no factura de verdad");
         assert_eq!(code_of(&err), GO_LIVE_FORBIDDEN);
     }
 
@@ -2054,7 +2155,9 @@ mod tests {
         go_live(&db, "hub-es").await.unwrap();
         stamp_first_record(&db, "hub-es").await.unwrap();
 
-        let err = stand_down(&db, "hub-es").await.expect_err("ya salió un registro real");
+        let err = stand_down(&db, "hub-es")
+            .await
+            .expect_err("ya salió un registro real");
         assert_eq!(code_of(&err), ALREADY_EMITTED);
         assert!(
             err.to_string().contains("another hub"),
@@ -2140,7 +2243,9 @@ mod tests {
         go_live(&db, "hub-es").await.unwrap();
         close(&db, "hub-es", "hub_user:1").await.unwrap();
 
-        let err = go_live(&db, "hub-es").await.expect_err("a ceased hub does not issue again");
+        let err = go_live(&db, "hub-es")
+            .await
+            .expect_err("a ceased hub does not issue again");
 
         assert_eq!(code_of(&err), HUB_CLOSED);
         assert_eq!(
@@ -2160,7 +2265,10 @@ mod tests {
         let first = close(&db, "hub-es", "hub_user:1").await.unwrap();
         let second = close(&db, "hub-es", "hub_user:2").await.unwrap();
 
-        assert_eq!(first, second, "the second pass moves neither the date nor the author");
+        assert_eq!(
+            first, second,
+            "the second pass moves neither the date nor the author"
+        );
     }
 
     /// **Nobody to attribute it to, no cessation.** Same reasoning as the elevation receipt: if
@@ -2172,7 +2280,9 @@ mod tests {
         hub_ready(&db, "hub-es").await;
         go_live(&db, "hub-es").await.unwrap();
 
-        let err = close(&db, "hub-es", "   ").await.expect_err("somebody has to own this");
+        let err = close(&db, "hub-es", "   ")
+            .await
+            .expect_err("somebody has to own this");
 
         assert_eq!(code_of(&err), CLOSE_NEEDS_ACTOR);
         assert_eq!(
@@ -2248,7 +2358,10 @@ mod tests {
 
         let mode = refresh(&db, &reg, "hub-es").await.unwrap();
 
-        assert_eq!(mode, FiscalMode::Blocked(BlockedReason::InstallationMismatch));
+        assert_eq!(
+            mode,
+            FiscalMode::Blocked(BlockedReason::InstallationMismatch)
+        );
         assert!(
             load(&db, "hub-es").await.unwrap().unwrap().needs_review,
             "somebody has to look at this: the core will not guess"
@@ -2283,13 +2396,18 @@ mod tests {
         let db = fresh_db().await;
         let reg = hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
 
-        let after = adopt_installation(&db, "hub-es", "hub_user:1").await.unwrap();
+        let after = adopt_installation(&db, "hub-es", "hub_user:1")
+            .await
+            .unwrap();
 
         assert_eq!(after.system_id, "hub-es", "this installation is ours now");
         assert_eq!(after.adopted_from, "hub-somewhere-else");
         assert_eq!(after.adopted_by, "hub_user:1");
         assert!(!after.adopted_at.is_empty());
-        assert!(!after.needs_review, "the thing that needed reviewing is settled");
+        assert!(
+            !after.needs_review,
+            "the thing that needed reviewing is settled"
+        );
         assert_eq!(
             determine_fiscal_mode(&after, &reg, "hub-es"),
             FiscalMode::Active,
@@ -2340,10 +2458,17 @@ mod tests {
         hub_restored_from(&db, "hub-es", "hub-somewhere-else").await;
         stamp_first_record(&db, "hub-es").await.unwrap();
 
-        let after = adopt_installation(&db, "hub-es", "hub_user:1").await.unwrap();
+        let after = adopt_installation(&db, "hub-es", "hub_user:1")
+            .await
+            .unwrap();
 
-        assert!(!after.first_record_at.is_empty(), "what was filed stays filed");
-        let err = stand_down(&db, "hub-es").await.expect_err("no way back to the sandbox");
+        assert!(
+            !after.first_record_at.is_empty(),
+            "what was filed stays filed"
+        );
+        let err = stand_down(&db, "hub-es")
+            .await
+            .expect_err("no way back to the sandbox");
         assert_eq!(code_of(&err), ALREADY_EMITTED);
     }
 
@@ -2383,8 +2508,18 @@ mod tests {
     #[test]
     fn with_two_providers_removing_one_is_allowed() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
-            ("otro", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
+            (
+                "otro",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
         ]);
         assert!(ensure_provider_remains(
             &profile_in(FiscalStatus::Active, "hub-es"),
@@ -2401,7 +2536,12 @@ mod tests {
     #[test]
     fn the_cascade_that_would_drag_the_last_provider_is_refused_too() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
             ("invoice", None, &[], true),
         ]);
         let err = ensure_provider_remains(
@@ -2418,7 +2558,12 @@ mod tests {
     #[test]
     fn removing_a_module_that_is_not_a_provider_is_never_blocked() {
         let reg = registry_with(&[
-            ("verifactu", Some(json!({ "country": "ES", "regime": "verifactu" })), &["invoice.created"], true),
+            (
+                "verifactu",
+                Some(json!({ "country": "ES", "regime": "verifactu" })),
+                &["invoice.created"],
+                true,
+            ),
             ("inventory", None, &["sale.completed"], true),
         ]);
         assert!(ensure_provider_remains(
@@ -2442,8 +2587,12 @@ mod tests {
         )]);
         for status in [FiscalStatus::Unconfigured, FiscalStatus::Ready] {
             assert!(
-                ensure_provider_remains(&profile_in(status, "hub-es"), &reg, &["verifactu".to_string()])
-                    .is_ok(),
+                ensure_provider_remains(
+                    &profile_in(status, "hub-es"),
+                    &reg,
+                    &["verifactu".to_string()]
+                )
+                .is_ok(),
                 "{status:?} no ancla nada todavía"
             );
         }

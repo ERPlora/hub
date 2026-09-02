@@ -29,8 +29,14 @@ pub const GRANDFATHERED_MANIFEST_WARNINGS: &[(&str, &str)] = &[
     //
     // hub#610 — `validates` is RETIRED (`manifest::RETIRED_FIELDS`): the guard it describes has
     // never run, so the command executes unguarded. Four commands of `inventory` still ship it.
-    ("inventory", "commands.inventory.categories.create.validates"),
-    ("inventory", "commands.inventory.categories.update.validates"),
+    (
+        "inventory",
+        "commands.inventory.categories.create.validates",
+    ),
+    (
+        "inventory",
+        "commands.inventory.categories.update.validates",
+    ),
     ("inventory", "commands.inventory.products.create.validates"),
     ("inventory", "commands.inventory.products.update.validates"),
     // modifiers#6 — the only published manifest with a root `author`, which is in neither

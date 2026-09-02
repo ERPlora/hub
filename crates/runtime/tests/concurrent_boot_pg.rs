@@ -19,7 +19,10 @@ use erplora_runtime::Runtime;
 const HUB: &str = "hub-concurrent";
 
 async fn count(db: &dyn DatabaseAdapter, sql: &str) -> i64 {
-    let result = db.query(sql, &Params::new()).await.expect("consulta de control");
+    let result = db
+        .query(sql, &Params::new())
+        .await
+        .expect("consulta de control");
     let row = &result.rows[0];
     row["n"]
         .as_i64()
@@ -49,7 +52,10 @@ async fn two_boots_at_once_leave_a_sane_schema_and_apply_each_migration_once() {
          ) d",
     )
     .await;
-    assert_eq!(duplicated, 0, "hay migraciones de sistema registradas más de una vez");
+    assert_eq!(
+        duplicated, 0,
+        "hay migraciones de sistema registradas más de una vez"
+    );
 
     // Y el esquema quedó completo: las tablas del baseline existen de verdad.
     for table in ["hub_module", "_hub_system_migrations", "_event_outbox"] {
@@ -61,7 +67,10 @@ async fn two_boots_at_once_leave_a_sane_schema_and_apply_each_migration_once() {
             ),
         )
         .await;
-        assert_eq!(exists, 1, "falta la tabla `{table}` tras dos arranques simultáneos");
+        assert_eq!(
+            exists, 1,
+            "falta la tabla `{table}` tras dos arranques simultáneos"
+        );
     }
 }
 

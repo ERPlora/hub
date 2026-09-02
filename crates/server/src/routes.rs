@@ -29,10 +29,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/system/usage-series", get(usage_series::usage_series))
         // Qué le hemos cambiado a este hub y desde qué versión (hub#564). Solo lectura: la
         // contrapartida de actualizar sin preguntar (ADR-0269) es que se pueda SABER, no decidir.
-        .route(
-            "/api/system/update-history",
-            get(system::update_history),
-        )
+        .route("/api/system/update-history", get(system::update_history))
         // The responsible declaration of THIS version, inside the product (art. 13.2 RRSIF —
         // hub#528). Projects the same `SistemaInformatico` block that travels in every record:
         // the producer facts the control plane serves + this binary's `Version` + the `hub_id`
@@ -57,8 +54,7 @@ pub fn app(state: AppState) -> Router {
         )
         .route(
             "/api/hub/users/:id",
-            axum::routing::put(hub_users::update_user)
-                .delete(hub_users::deactivate_user),
+            axum::routing::put(hub_users::update_user).delete(hub_users::deactivate_user),
         )
         .route("/api/hub/roles", get(hub_users::list_roles))
         .route(
@@ -210,7 +206,10 @@ pub fn app(state: AppState) -> Router {
         // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
         // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
         // marketplace ha retirado — que es justo el que «Mis apps» tiene que poder marcar.
-        .route("/api/marketplace/modules/:id", get(proxy_marketplace_module))
+        .route(
+            "/api/marketplace/modules/:id",
+            get(proxy_marketplace_module),
+        )
         // Which build of the installable app the Cloud publishes (hub#400). The page cannot ask
         // erplora.com itself: `connect-src 'self' ipc:` kills it, and silently.
         .route("/api/app/release", get(proxy_app_release))
@@ -285,10 +284,7 @@ pub fn app(state: AppState) -> Router {
         )
         // Lo que NO se está drenando, para la campana. Sesión de usuario, no admin: quien está en
         // el mostrador es quien puede encender la caja y quien se va a quedar sin darle el tique.
-        .route(
-            "/api/print/undrained",
-            get(print::undrained_stations),
-        )
+        .route("/api/print/undrained", get(print::undrained_stations))
         // ── API pública por módulo (ADR-0057, public-api.md) ────────────────────────────────
         // Gestión de keys (auth = sesión admin owner/admin; NO una api key).
         .route(
@@ -303,8 +299,14 @@ pub fn app(state: AppState) -> Router {
         // cierra un registro para siempre, así que NO se abren a una API key ni al token de máquina.
         .route("/api/hub/events/dead", get(outbox_admin::list_dead))
         .route("/api/hub/events/dead/count", get(outbox_admin::count_dead))
-        .route("/api/hub/events/discarded", get(outbox_admin::list_discarded))
-        .route("/api/hub/events/retry-all", post(outbox_admin::retry_all_dead))
+        .route(
+            "/api/hub/events/discarded",
+            get(outbox_admin::list_discarded),
+        )
+        .route(
+            "/api/hub/events/retry-all",
+            post(outbox_admin::retry_all_dead),
+        )
         .route("/api/hub/events/:id/retry", post(outbox_admin::retry_dead))
         .route(
             "/api/hub/events/:id/discard",
@@ -709,7 +711,10 @@ pub(crate) async fn hub_context(State(st): State<AppState>) -> Response {
         // (`null` = «dedúcela del país») porque tiene que poder volver por un `PUT`; aquí se
         // expone el nombre IANA real, que es lo que la UI necesita para enseñar a qué hora local
         // se va a disparar un flujo. Si la lectura falla, UTC — que es lo que el reloj hará.
-        let timezone = rt.timezone_name().await.unwrap_or_else(|_| "UTC".to_string());
+        let timezone = rt
+            .timezone_name()
+            .await
+            .unwrap_or_else(|_| "UTC".to_string());
         (pin_users, currency, currency_decimals, language, timezone)
     };
     // Sector del hub: el frontend lee `sector ?? business_type` (alias), así que emitimos ambas

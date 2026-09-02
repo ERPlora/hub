@@ -7,12 +7,14 @@
 //! módulos reales sobre un Postgres real vive en `postgres_install_e2e.rs`.
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::Runtime;
 use serde_json::json;
 
 fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join(name)
 }
 
 async fn applied(rt: &Runtime, module_id: &str) -> Vec<String> {
@@ -37,7 +39,9 @@ async fn applied(rt: &Runtime, module_id: &str) -> Vec<String> {
 async fn empty_manifest_list_applies_package_migrations() {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture("fixture_migunion_empty")).await.expect("instalar");
+    rt.install_from_dir(&fixture("fixture_migunion_empty"))
+        .await
+        .expect("instalar");
 
     assert_eq!(
         applied(&rt, "migunion_empty").await,
@@ -66,7 +70,10 @@ async fn partial_manifest_list_applies_union_in_name_order() {
 
     assert_eq!(
         applied(&rt, "migunion_partial").await,
-        ["migrations/postgres/001_init.sql", "migrations/postgres/002_add_note.sql"],
+        [
+            "migrations/postgres/001_init.sql",
+            "migrations/postgres/002_add_note.sql"
+        ],
         "unión manifest∪disco en orden de nombre; README.txt ignorado"
     );
     rt.db_for_test()
@@ -83,8 +90,12 @@ async fn partial_manifest_list_applies_union_in_name_order() {
 async fn reinstall_does_not_reapply_union_migrations() {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
-    rt.install_from_dir(&fixture("fixture_migunion_partial")).await.unwrap();
-    rt.install_from_dir(&fixture("fixture_migunion_partial")).await.expect("reinstalar");
+    rt.install_from_dir(&fixture("fixture_migunion_partial"))
+        .await
+        .unwrap();
+    rt.install_from_dir(&fixture("fixture_migunion_partial"))
+        .await
+        .expect("reinstalar");
 
     assert_eq!(
         applied(&rt, "migunion_partial").await.len(),

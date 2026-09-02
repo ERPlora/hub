@@ -127,7 +127,11 @@ fn both_grants() -> Vec<(GrantKind, String)> {
 /// Starts the flow by hand and advances the tick until the step is over.
 async fn run_flow(rt: &Runtime, flow_id: &str) -> String {
     let run_id = rt
-        .start_flow_run(flow_id, &json!({ "customer_id": "c-1", "when": "martes" }), "hub_user:owner")
+        .start_flow_run(
+            flow_id,
+            &json!({ "customer_id": "c-1", "when": "martes" }),
+            "hub_user:owner",
+        )
         .await
         .unwrap();
     rt.process_flows().await.unwrap();
@@ -135,7 +139,11 @@ async fn run_flow(rt: &Runtime, flow_id: &str) -> String {
 }
 
 async fn rows(rt: &Runtime, sql: &str) -> Vec<Value> {
-    rt.db_for_test().query(sql, &Params::new()).await.unwrap().rows
+    rt.db_for_test()
+        .query(sql, &Params::new())
+        .await
+        .unwrap()
+        .rows
 }
 
 /// The queued host-notify events of this hub, whatever their state.
@@ -179,12 +187,19 @@ async fn without_the_recipient_grant_nothing_is_sent_and_with_it_exactly_one_mes
     // The same flow, the same input, one grant more.
     set_grants(&rt, &flow_id, &both_grants()).await;
     run_flow(&rt, &flow_id).await;
-    assert_eq!(queued_notifications(&rt).await.len(), 1, "one step, one message");
+    assert_eq!(
+        queued_notifications(&rt).await.len(),
+        1,
+        "one step, one message"
+    );
     rt.drain_outbox().await.unwrap();
 
     let sent = transport.sent();
     assert_eq!(sent.len(), 1, "exactly one message came out of the hub");
-    assert_eq!(sent[0].0.to, PHONE, "the recipient came from the customer's row");
+    assert_eq!(
+        sent[0].0.to, PHONE,
+        "the recipient came from the customer's row"
+    );
     assert_eq!(sent[0].0.template, "appointment_reminder");
     assert_eq!(
         sent[0].0.vars["text"],
@@ -214,7 +229,11 @@ async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
     let run_id = run_flow(&rt, &by_email).await;
     let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(run.status, store::STATUS_FAILED);
-    assert!(run.last_error.contains("flow.grant_denied"), "{}", run.last_error);
+    assert!(
+        run.last_error.contains("flow.grant_denied"),
+        "{}",
+        run.last_error
+    );
 
     // Another QUERY, same field name: a grant over the notes does not open the customers.
     let other_query = create_flow(&rt, reminder("whatsapp", "crm.customer.list", "phone")).await;
@@ -233,7 +252,11 @@ async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
     let run_id = run_flow(&rt, &other_query).await;
     let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(run.status, store::STATUS_FAILED);
-    assert!(run.last_error.contains("flow.grant_denied"), "{}", run.last_error);
+    assert!(
+        run.last_error.contains("flow.grant_denied"),
+        "{}",
+        run.last_error
+    );
 
     rt.drain_outbox().await.unwrap();
     assert!(transport.sent().is_empty(), "neither run reached anybody");
@@ -325,7 +348,10 @@ async fn deleting_the_flow_cuts_the_messages_it_had_already_queued() {
     rt.delete_flow(&flow_id, "hub_user:owner").await.unwrap();
     rt.drain_outbox().await.unwrap();
 
-    assert!(transport.sent().is_empty(), "the flow is gone; so is its message");
+    assert!(
+        transport.sent().is_empty(),
+        "the flow is gone; so is its message"
+    );
 }
 
 // ── what a module cannot borrow ───────────────────────────────────────────────────────────────
@@ -428,7 +454,11 @@ async fn a_flow_document_cannot_name_a_recipient_by_hand() {
             }]
         });
         rt.create_flow(
-            &NewFlow { name: "N".into(), enabled: true, definition },
+            &NewFlow {
+                name: "N".into(),
+                enabled: true,
+                definition,
+            },
             "hub_user:owner",
         )
         .await
@@ -449,7 +479,11 @@ async fn no_recipient_and_several_recipients_both_stop_the_step_instead_of_guess
     let flow_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
     set_grants(&rt, &flow_id, &both_grants()).await;
     let run_id = rt
-        .start_flow_run(&flow_id, &json!({ "customer_id": "ghost" }), "hub_user:owner")
+        .start_flow_run(
+            &flow_id,
+            &json!({ "customer_id": "ghost" }),
+            "hub_user:owner",
+        )
         .await
         .unwrap();
     rt.process_flows().await.unwrap();
@@ -496,7 +530,10 @@ async fn no_recipient_and_several_recipients_both_stop_the_step_instead_of_guess
 
     rt.drain_outbox().await.unwrap();
     assert!(transport.sent().is_empty());
-    assert!(queued_notifications(&rt).await.is_empty(), "nothing was queued either");
+    assert!(
+        queued_notifications(&rt).await.is_empty(),
+        "nothing was queued either"
+    );
 }
 
 /// A value that cannot be a recipient for the channel is refused with the same conservative rules
@@ -524,7 +561,11 @@ async fn a_field_that_does_not_look_like_a_phone_is_refused_before_anything_is_q
     let run_id = run_flow(&rt, &flow_id).await;
     let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
     assert_eq!(run.status, store::STATUS_FAILED);
-    assert!(run.last_error.contains("flow.recipient_invalid"), "{}", run.last_error);
+    assert!(
+        run.last_error.contains("flow.recipient_invalid"),
+        "{}",
+        run.last_error
+    );
     rt.drain_outbox().await.unwrap();
     assert!(transport.sent().is_empty());
     assert!(queued_notifications(&rt).await.is_empty());
@@ -587,15 +628,30 @@ async fn quota_exceeded_dies_on_the_first_pass_but_stays_retryable_by_hand() {
     )
     .await;
     assert_eq!(queued.len(), 1);
-    assert_eq!(queued[0]["status"], json!("dead"), "no ladder: {:?}", queued[0]);
-    assert_eq!(queued[0]["failure_kind"], json!(""), "an operator may retry after a top-up");
+    assert_eq!(
+        queued[0]["status"],
+        json!("dead"),
+        "no ladder: {:?}",
+        queued[0]
+    );
+    assert_eq!(
+        queued[0]["failure_kind"],
+        json!(""),
+        "an operator may retry after a top-up"
+    );
     assert!(
-        queued[0]["last_error"].as_str().unwrap_or_default().contains("quota"),
+        queued[0]["last_error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("quota"),
         "the queue says why: {}",
         queued[0]["last_error"]
     );
     assert!(
-        queued[0]["payload"].as_str().unwrap_or_default().contains(PHONE),
+        queued[0]["payload"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(PHONE),
         "the recipient is kept: a manual retry has to have someone to dial"
     );
 }

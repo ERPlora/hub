@@ -948,11 +948,15 @@ mod tests {
     #[tokio::test]
     async fn a_job_whose_route_broke_comes_out_at_the_counter_not_nowhere() {
         let db = queue_db().await;
-        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        let bar = crate::print_stations::resolve(&db, "h1", "bar")
+            .await
+            .unwrap();
         crate::print_routes::set(&db, "h1", "kitchen_order", "bar", "u1")
             .await
             .unwrap();
-        crate::print_stations::delete(&db, "h1", &bar.id).await.unwrap();
+        crate::print_stations::delete(&db, "h1", &bar.id)
+            .await
+            .unwrap();
 
         let outcome = enqueue(&db, "h1", &routed_job("j1", "kitchen_order"))
             .await
@@ -1125,13 +1129,18 @@ mod tests {
     #[tokio::test]
     async fn confirming_an_already_terminal_job_is_also_a_no() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j1", "receipt", "T-1")).await.unwrap();
+        enqueue(&db, "h1", &job("j1", "receipt", "T-1"))
+            .await
+            .unwrap();
         claim_next_role(&db, "h1", "receipt", "host-a", DEFAULT_LEASE_SECONDS)
             .await
             .unwrap()
             .unwrap();
 
-        assert!(mark_done(&db, "h1", "j1").await.unwrap(), "the first one counts");
+        assert!(
+            mark_done(&db, "h1", "j1").await.unwrap(),
+            "the first one counts"
+        );
         assert!(
             !mark_done(&db, "h1", "j1").await.unwrap(),
             "the second one changed nothing, and says so"
@@ -1563,7 +1572,11 @@ mod tests {
         )
         .await
         .expect("the bill is a document of this queue");
-        assert_eq!(all(&db, "h1").await.len(), 1, "and it is waiting for a print host");
+        assert_eq!(
+            all(&db, "h1").await.len(),
+            1,
+            "and it is waiting for a print host"
+        );
     }
 
     /// The queue's vocabulary is **the renderer's**, spelled the way the wire spells it. The
@@ -1775,7 +1788,9 @@ mod tests {
     #[tokio::test]
     async fn claiming_is_scoped_to_the_station_and_never_to_a_spelling() {
         let db = queue_db().await;
-        enqueue(&db, "h1", &job("j-bar", "bar", "B-1")).await.unwrap();
+        enqueue(&db, "h1", &job("j-bar", "bar", "B-1"))
+            .await
+            .unwrap();
         let kitchen = crate::print_stations::resolve(&db, "h1", "kitchen")
             .await
             .unwrap();
@@ -1787,7 +1802,9 @@ mod tests {
                 .is_none(),
             "the kitchen does not take the bar's ticket"
         );
-        let bar = crate::print_stations::resolve(&db, "h1", "bar").await.unwrap();
+        let bar = crate::print_stations::resolve(&db, "h1", "bar")
+            .await
+            .unwrap();
         assert_eq!(
             claim_next(&db, "h1", &bar.id, "host-b", DEFAULT_LEASE_SECONDS)
                 .await

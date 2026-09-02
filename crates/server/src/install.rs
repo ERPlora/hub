@@ -644,10 +644,9 @@ async fn restore_one(
     module_id: &str,
     signature_policy: &cloud_client::SignaturePolicy,
 ) -> Result<bool, InstallError> {
-    let stored =
-        erplora_runtime::module_package::load(runtime.db(), runtime.hub_id(), module_id)
-            .await
-            .map_err(|e| InstallError::Runtime(e.to_string()))?;
+    let stored = erplora_runtime::module_package::load(runtime.db(), runtime.hub_id(), module_id)
+        .await
+        .map_err(|e| InstallError::Runtime(e.to_string()))?;
     let Some(stored) = stored else {
         return Ok(false);
     };
@@ -982,12 +981,15 @@ async fn fetch_install_plan(
             .iter()
             .filter(|n| n.requires_purchase)
             .map(|n| {
-                let p = n.purchase.clone().unwrap_or(cloud_client::InstallPlanPurchase {
-                    module_type: n.tier.clone(),
-                    price: String::new(),
-                    currency: String::new(),
-                    purchase_url: String::new(),
-                });
+                let p = n
+                    .purchase
+                    .clone()
+                    .unwrap_or(cloud_client::InstallPlanPurchase {
+                        module_type: n.tier.clone(),
+                        price: String::new(),
+                        currency: String::new(),
+                        purchase_url: String::new(),
+                    });
                 BlockedPurchase {
                     module_id: n.module_id.clone(),
                     module_type: p.module_type,
@@ -1065,7 +1067,8 @@ async fn execute_plan(
         //
         // La excepción es el módulo que se está ACTUALIZANDO (hub#516): saltarlo por «ya
         // instalado» era exactamente lo que dejaba un bug de módulo sin arreglo posible.
-        if runtime.registry().is_installed(&node.module_id) && Some(node.module_id.as_str()) != updating
+        if runtime.registry().is_installed(&node.module_id)
+            && Some(node.module_id.as_str()) != updating
         {
             continue;
         }
@@ -1356,8 +1359,7 @@ async fn register(
     module_id: &str,
     updating: Option<&str>,
 ) -> Result<String, InstallError> {
-    let is_update =
-        updating == Some(module_id) && runtime.registry().is_installed(module_id);
+    let is_update = updating == Some(module_id) && runtime.registry().is_installed(module_id);
     let result = if is_update {
         runtime.update_from_dir(dir).await.map(|u| u.module_id)
     } else {

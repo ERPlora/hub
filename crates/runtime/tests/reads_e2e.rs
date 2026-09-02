@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use erplora_db::{Params, testutil::fresh_db};
+use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::{EventSink, EventSource, RequestContext, Runtime};
 use serde_json::json;
 
@@ -50,7 +50,10 @@ struct Sink {
 }
 impl EventSink for Sink {
     fn emit(&self, _source: EventSource<'_>, name: &str, payload: &serde_json::Value) {
-        self.events.lock().unwrap().push((name.to_string(), payload.clone()));
+        self.events
+            .lock()
+            .unwrap()
+            .push((name.to_string(), payload.clone()));
     }
 }
 
@@ -75,7 +78,9 @@ async fn rt_pos() -> Runtime {
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.set_event_sink(Arc::new(Sink::default()));
     for m in ["taxes", "inventory", "customers", "sales"] {
-        rt.install_from_dir(&mdir(m)).await.unwrap_or_else(|e| panic!("instalar {m}: {e}"));
+        rt.install_from_dir(&mdir(m))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {m}: {e}"));
     }
     rt
 }
@@ -88,7 +93,9 @@ async fn rt_pos() -> Runtime {
 /// El servidor debe declarar **el 10 % del catálogo**, no el 0 % del cliente.
 #[tokio::test]
 async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_cliente() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = rt_pos().await;
     let ctx = admin();
 
@@ -117,8 +124,14 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     .expect("crear la regla fiscal (ES · test.menu · 10 %)");
 
     // Guardarraíl del propio test: si la regla no llegó al catálogo, no estaría probando nada.
-    let reglas = rt.execute_query("taxes.rules.list", &Params::new(), &ctx).await.unwrap();
-    assert!(!reglas.is_empty(), "la regla fiscal no se sembró: el test no probaría nada");
+    let reglas = rt
+        .execute_query("taxes.rules.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
+    assert!(
+        !reglas.is_empty(),
+        "la regla fiscal no se sembró: el test no probaría nada"
+    );
 
     // El POS cobra un menú de 11,00 € (IVA incluido) diciendo que su IVA es 0 %.
     rt.execute_command(
@@ -143,13 +156,20 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
     .await
     .expect("completar la venta");
 
-    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let ventas = rt
+        .execute_query("sales.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     let v = &ventas[0];
 
     // Si el runtime NO pre-cargara las reads, el handler caería al fallback (la pista del cliente)
     // y declararía 0 € de IVA sobre una base de 11,00 €. Con el catálogo de confianza declara el
     // 10 %: base 10,00 € + cuota 1,00 €.
-    assert_eq!(v["total"].as_i64().unwrap(), 1100, "lo que paga el cliente no cambia");
+    assert_eq!(
+        v["total"].as_i64().unwrap(),
+        1100,
+        "lo que paga el cliente no cambia"
+    );
     assert_ne!(
         v["tax_amount"].as_i64().unwrap(),
         0,
@@ -176,7 +196,9 @@ async fn el_servidor_resuelve_el_iva_del_catalogo_e_ignora_lo_que_diga_el_client
 /// venta se completa igual (con la pista del cliente como último recurso) — pero se completa.
 #[tokio::test]
 async fn una_read_que_falla_no_impide_cobrar() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // The full stack is installed. Since hub#594 the seeded fiscal catalog IS visible (runtime
     // and ctx share "h1"), so the empty-catalog scenario is built per-line: the item carries NO
     // `tax_category_key`, so the trusted catalog cannot resolve it and the handler must degrade
@@ -201,7 +223,10 @@ async fn una_read_que_falla_no_impide_cobrar() {
     .await
     .expect("la venta DEBE completarse aunque no haya catálogo fiscal");
 
-    let ventas = rt.execute_query("sales.list", &Params::new(), &ctx).await.unwrap();
+    let ventas = rt
+        .execute_query("sales.list", &Params::new(), &ctx)
+        .await
+        .unwrap();
     assert_eq!(ventas.len(), 1, "el TPV cobró");
     assert_eq!(ventas[0]["total"].as_i64().unwrap(), 1000);
 }
@@ -229,7 +254,10 @@ fn una_read_sin_parametros_sigue_siendo_un_string() {
     let def: erplora_runtime::manifest::ReadDef =
         serde_json::from_str(r#""taxes.rules.list""#).expect("string suelto");
     assert_eq!(def.query(), "taxes.rules.list");
-    assert!(def.resolve_params_from_map(&Params::new()).is_empty(), "sin parámetros");
+    assert!(
+        def.resolve_params_from_map(&Params::new()).is_empty(),
+        "sin parámetros"
+    );
 }
 
 #[test]
@@ -243,8 +271,15 @@ fn una_read_parametrizada_toma_el_valor_del_payload() {
 
     let payload = params(serde_json::json!({ "product_id": "prod-1", "qty": 500 }));
     let resueltos = def.resolve_params_from_map(&payload);
-    assert_eq!(resueltos.get("product_id"), Some(&serde_json::json!("prod-1")));
-    assert_eq!(resueltos.len(), 1, "solo lo declarado, no el payload entero");
+    assert_eq!(
+        resueltos.get("product_id"),
+        Some(&serde_json::json!("prod-1"))
+    );
+    assert_eq!(
+        resueltos.len(),
+        1,
+        "solo lo declarado, no el payload entero"
+    );
 }
 
 #[test]
@@ -298,11 +333,13 @@ fn una_read_normal_que_falla_sigue_siendo_graceful() {
     // El defecto no cambia: la forma string y la forma objeto sin `required` ambas responden
     // `false` a `is_required()`, y eso es lo que `preload_reads` consulta para decidir si aborta
     // o si omite y deja al handler degradar.
-    let def_str: erplora_runtime::manifest::ReadDef =
-        serde_json::from_str(r#""x.y.z""#).unwrap();
+    let def_str: erplora_runtime::manifest::ReadDef = serde_json::from_str(r#""x.y.z""#).unwrap();
     assert!(!def_str.is_required(), "la forma string nunca es required");
 
     let def_obj: erplora_runtime::manifest::ReadDef =
         serde_json::from_str(r#"{ "query": "x.y.z" }"#).unwrap();
-    assert!(!def_obj.is_required(), "sin el flag, una read objeto no es required");
+    assert!(
+        !def_obj.is_required(),
+        "sin el flag, una read objeto no es required"
+    );
 }

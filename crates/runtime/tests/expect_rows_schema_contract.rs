@@ -88,7 +88,10 @@ fn the_gate_without_an_anchor_stays_valid() {
         "every published gate is unanchored: the batch-sum contract stays first-class"
     );
     let parsed: ExpectRows = serde_json::from_value(published).unwrap();
-    assert_eq!(parsed.statement, None, "no anchor = the batch sum, as documented");
+    assert_eq!(
+        parsed.statement, None,
+        "no anchor = the batch sum, as documented"
+    );
 }
 
 #[test]
@@ -106,7 +109,11 @@ fn an_empty_anchor_is_refused_by_the_schema_before_the_runtime_sees_it() {
     // refuse at the same moment, only in the same direction — and they do not need a third
     // vocabulary here: an anchor is a `sql` path, written exactly as `sql` writes it.
     let parsed: ExpectRows = serde_json::from_value(gate).unwrap();
-    assert_eq!(parsed.statement.as_deref(), Some(""), "serde is tolerant by design (hub#521); the refusal is positional");
+    assert_eq!(
+        parsed.statement.as_deref(),
+        Some(""),
+        "serde is tolerant by design (hub#521); the refusal is positional"
+    );
 }
 
 // ── PARIDAD del gate legado `min_affected_rows` (hub#1091, revisión) ─────────────────────────

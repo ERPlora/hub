@@ -40,7 +40,9 @@ pub fn parse(raw: &str) -> Result<Url, String> {
     // about credentials in the authority is one that can be fooled
     // (`https://api.example.com@evil.test` reads as the first host and is fetched from the second).
     if !url.username().is_empty() || url.password().is_some() {
-        return Err("carries credentials in its authority, which no allow-list can read".to_string());
+        return Err(
+            "carries credentials in its authority, which no allow-list can read".to_string(),
+        );
     }
     Ok(url)
 }
@@ -142,22 +144,22 @@ mod tests {
             "192.168.1.1",
             // The one that matters most: every cloud's metadata service.
             "169.254.169.254",
-            "100.64.0.1",     // carrier-grade NAT
-            "192.0.0.1",      // IETF protocol assignments
-            "198.18.0.1",     // benchmarking
-            "240.0.0.1",      // reserved
+            "100.64.0.1", // carrier-grade NAT
+            "192.0.0.1",  // IETF protocol assignments
+            "198.18.0.1", // benchmarking
+            "240.0.0.1",  // reserved
             "255.255.255.255",
-            "224.0.0.1",      // multicast
+            "224.0.0.1", // multicast
             "::1",
             "::",
-            "fe80::1",        // link-local
-            "fc00::1",        // unique-local
+            "fe80::1", // link-local
+            "fc00::1", // unique-local
             "fd12:3456::1",
-            "::ffff:127.0.0.1",   // v4 wearing a v6 hat
+            "::ffff:127.0.0.1", // v4 wearing a v6 hat
             "::ffff:169.254.169.254",
-            "::169.254.169.254",  // the deprecated compat form
-            "64:ff9b::7f00:1",    // NAT64 of 127.0.0.1
-            "ff02::1",            // multicast
+            "::169.254.169.254", // the deprecated compat form
+            "64:ff9b::7f00:1",   // NAT64 of 127.0.0.1
+            "ff02::1",           // multicast
         ] {
             assert!(
                 is_internal(&blocked.parse().unwrap()),
@@ -198,7 +200,10 @@ mod tests {
             ("http://0xa9fea9fe/latest/", "169.254.169.254"),
             ("http://3232235777/x", "192.168.1.1"),
             ("http://167772161/x", "10.0.0.1"),
-            ("http://[::ffff:169.254.169.254]/x", "::ffff:169.254.169.254"),
+            (
+                "http://[::ffff:169.254.169.254]/x",
+                "::ffff:169.254.169.254",
+            ),
             ("http://[::ffff:a9fe:a9fe]/x", "::ffff:169.254.169.254"),
             ("http://[64:ff9b::a9fe:a9fe]/x", "64:ff9b::a9fe:a9fe"),
             ("http://[0:0:0:0:0:0:0:1]/x", "::1"),
@@ -211,7 +216,11 @@ mod tests {
 
         // A NAME is not a literal: it is the resolver's question, and it is asked there so that the
         // addresses approved are the addresses dialled (the DNS-rebinding half of hub#662).
-        for name in ["http://localhost/x", "https://api.example.com/v1", "http://localtest.me/x"] {
+        for name in [
+            "http://localhost/x",
+            "https://api.example.com/v1",
+            "http://localtest.me/x",
+        ] {
             assert!(literal_address(&parse(name).unwrap()).is_none(), "{name}");
         }
     }

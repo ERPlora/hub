@@ -43,13 +43,7 @@ fn profile_json(profile: UserProfile, permissions: impl IntoIterator<Item = Stri
 async fn current_user_id(
     st: &AppState,
     headers: &HeaderMap,
-) -> Result<
-    (
-        crate::state::SharedRuntime,
-        String,
-    ),
-    Response,
-> {
+) -> Result<(crate::state::SharedRuntime, String), Response> {
     let arc = st
         .runtime_for(&st.hub_id())
         .await

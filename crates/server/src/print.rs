@@ -356,9 +356,7 @@ pub async fn discard_job(
     };
     // The audit half comes from the SESSION, never from the body: `DiscardReq` has no
     // `discardedBy` field, so a payload carrying one changes nothing.
-    let reason = body
-        .and_then(|Json(b)| b.reason)
-        .unwrap_or_default();
+    let reason = body.and_then(|Json(b)| b.reason).unwrap_or_default();
     match rt.discard_print_job(&job_id, &who, &reason).await {
         Ok(DiscardOutcome::Discarded(stamp)) => {
             Json(json!({ "ok": true, "data": stamp })).into_response()
@@ -730,7 +728,9 @@ pub async fn create_station(
         .create_print_station(input.key.as_deref().unwrap_or_default(), &input.label)
         .await
     {
-        Ok(station) => Json(json!({ "ok": true, "station": station_json(&station) })).into_response(),
+        Ok(station) => {
+            Json(json!({ "ok": true, "station": station_json(&station) })).into_response()
+        }
         Err(e) => crate::err_response(e),
     }
 }

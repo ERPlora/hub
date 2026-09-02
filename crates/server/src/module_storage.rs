@@ -110,9 +110,16 @@ impl ModuleMediaStorage {
 impl ModuleStorage for ModuleMediaStorage {
     async fn ensure_module_folder(&self, _hub_id: &str, folder: &str) -> Result<()> {
         let token = Self::cloud_token(&self.machine_token)?;
-        Self::ensure_cloud_path(&self.http, &self.base_url, &self.hub_id, &token, folder, None)
-            .await
-            .map(|_| ())
+        Self::ensure_cloud_path(
+            &self.http,
+            &self.base_url,
+            &self.hub_id,
+            &token,
+            folder,
+            None,
+        )
+        .await
+        .map(|_| ())
     }
 
     async fn write_module_file(
@@ -209,7 +216,13 @@ mod tests {
         let token = Arc::new(RwLock::new(Some("machine-secret".to_string())));
         let storage = ModuleMediaStorage::cloud("http://cloud.invalid", "hub-1", token);
         let error = storage
-            .write_module_file("hub-1", "verifactu", "../escape.xml", b"x", "application/xml")
+            .write_module_file(
+                "hub-1",
+                "verifactu",
+                "../escape.xml",
+                b"x",
+                "application/xml",
+            )
             .await
             .unwrap_err();
         assert!(matches!(error, RuntimeError::Storage(_)));

@@ -124,12 +124,19 @@ pub async fn seed_module_tasks(
 /// Borra del registro las tareas de `module_id` cuyo `name` no está en `keep` (las del manifest
 /// actual). Si `keep` está vacío, borra todas las del módulo. Se ejecuta al reinstalar y al
 /// desinstalar (con `keep = []`).
-pub async fn delete_obsolete(db: &dyn DatabaseAdapter, module_id: &str, keep: &[String]) -> Result<()> {
+pub async fn delete_obsolete(
+    db: &dyn DatabaseAdapter,
+    module_id: &str,
+    keep: &[String],
+) -> Result<()> {
     // Trae los nombres actuales y borra los que no se conservan (sin construir IN dinámico).
     let mut q = Params::new();
     q.insert("module_id".into(), json!(module_id));
     let rows = db
-        .query("SELECT name FROM _scheduled_tasks WHERE module_id = :module_id", &q)
+        .query(
+            "SELECT name FROM _scheduled_tasks WHERE module_id = :module_id",
+            &q,
+        )
         .await?;
     for row in &rows.rows {
         let name = row["name"].as_str().unwrap_or_default().to_string();
@@ -156,13 +163,21 @@ pub async fn remove_module_tasks(db: &dyn DatabaseAdapter, module_id: &str) -> R
 /// Un ciclo del barrido: ejecuta hasta [`BATCH`] tareas vencidas. Devuelve cuántas corrió.
 /// Lo llama el loop del relay en `crates/server` (junto al `process_outbox`). `hub_id` es el del
 /// despliegue (un ECS container por hub, §2.5): se inyecta en el contexto de sistema de la tarea.
-pub async fn process_once(db: &dyn DatabaseAdapter, registry: &Registry, hub_id: &str) -> Result<usize> {
+pub async fn process_once(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+) -> Result<usize> {
     sweep(db, registry, hub_id, false).await
 }
 
 /// Barrido de arranque (Tauri/local): catch-up **collapse**. Ejecuta una sola vez cada tarea
 /// con backlog vencido (las `catch_up=skip` solo se reprograman). Lo llama el host al arrancar.
-pub async fn catch_up_on_boot(db: &dyn DatabaseAdapter, registry: &Registry, hub_id: &str) -> Result<usize> {
+pub async fn catch_up_on_boot(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+) -> Result<usize> {
     sweep(db, registry, hub_id, true).await
 }
 
@@ -181,7 +196,12 @@ pub async fn catch_up_on_boot(db: &dyn DatabaseAdapter, registry: &Registry, hub
 /// nunca la misma dos veces. El `next_run` real (calculado en Rust, pues el cron se parsea aquí) se
 /// escribe al **resolver** la tarea, junto a los efectos del command, en la MISMA transacción; si el
 /// proceso muere a media tarea, el lease expira y otra instancia la reclama.
-async fn sweep(db: &dyn DatabaseAdapter, registry: &Registry, hub_id: &str, on_boot: bool) -> Result<usize> {
+async fn sweep(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    hub_id: &str,
+    on_boot: bool,
+) -> Result<usize> {
     let now = now_rfc3339();
     let mut ran = 0usize;
     for _ in 0..BATCH {
@@ -257,7 +277,11 @@ async fn run_task(
     let should_run = !(on_boot && catch_up == "skip");
 
     // El command pertenece al propio módulo; solo se ejecuta si su módulo está activo.
-    let runnable = should_run && registry.get_command(&command).map(|c| c.module_id == module_id).unwrap_or(false);
+    let runnable = should_run
+        && registry
+            .get_command(&command)
+            .map(|c| c.module_id == module_id)
+            .unwrap_or(false);
 
     if runnable {
         let payload = parse_payload(row);
@@ -355,7 +379,9 @@ fn parse_payload(row: &Json) -> Params {
 /// instant in UTC, because `next_run` is a TEXT column compared with `<=` in SQL and a `+02:00` in
 /// the string would sort as a different instant.
 pub mod cron {
-    use chrono::{DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc};
+    use chrono::{
+        DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc,
+    };
     pub use chrono_tz::Tz;
 
     /// What a person is allowed to write, in one line. It is appended to every refusal: the whole
@@ -371,11 +397,27 @@ pub mod cron {
     const SEARCH_DAYS: i32 = 8 * 366;
 
     const MONTH_NAMES: &[(&str, u32)] = &[
-        ("JAN", 1), ("FEB", 2), ("MAR", 3), ("APR", 4), ("MAY", 5), ("JUN", 6),
-        ("JUL", 7), ("AUG", 8), ("SEP", 9), ("OCT", 10), ("NOV", 11), ("DEC", 12),
+        ("JAN", 1),
+        ("FEB", 2),
+        ("MAR", 3),
+        ("APR", 4),
+        ("MAY", 5),
+        ("JUN", 6),
+        ("JUL", 7),
+        ("AUG", 8),
+        ("SEP", 9),
+        ("OCT", 10),
+        ("NOV", 11),
+        ("DEC", 12),
     ];
     const DAY_NAMES: &[(&str, u32)] = &[
-        ("SUN", 0), ("MON", 1), ("TUE", 2), ("WED", 3), ("THU", 4), ("FRI", 5), ("SAT", 6),
+        ("SUN", 0),
+        ("MON", 1),
+        ("TUE", 2),
+        ("WED", 3),
+        ("THU", 4),
+        ("FRI", 5),
+        ("SAT", 6),
     ];
 
     /// Next instant (RFC-3339, UTC) matching `expr` **strictly after** `after`, resolved on the
@@ -401,7 +443,9 @@ pub mod cron {
     ///   an interval tick is recoverable, booking a day twice is not.
     pub fn next_after_in_tz(expr: &str, after: &str, tz: Tz) -> Option<String> {
         let cron = parse(expr).ok()?;
-        let from: DateTime<Utc> = DateTime::parse_from_rfc3339(after).ok()?.with_timezone(&Utc);
+        let from: DateTime<Utc> = DateTime::parse_from_rfc3339(after)
+            .ok()?
+            .with_timezone(&Utc);
 
         let hours = values(cron.hour);
         let minutes = values(cron.minute);
@@ -507,8 +551,7 @@ pub mod cron {
                 return self.month != 0 && self.dow != 0;
             }
             (1..=12).any(|m| {
-                self.month & bit(m) != 0
-                    && (1..=days_in_month(m)).any(|d| self.dom & bit(d) != 0)
+                self.month & bit(m) != 0 && (1..=days_in_month(m)).any(|d| self.dom & bit(d) != 0)
             })
         }
     }
@@ -544,7 +587,9 @@ pub mod cron {
         if expanded.starts_with('@') {
             // `@reboot` is the usual one, and it is not a schedule — it is an event this hub does
             // not have. Saying so beats parsing it into a trigger that never fires.
-            return Err(format!("`{raw}` is not a shortcut this hub knows. {SYNTAX_HELP}"));
+            return Err(format!(
+                "`{raw}` is not a shortcut this hub knows. {SYNTAX_HELP}"
+            ));
         }
         let parts: Vec<&str> = expanded.split_whitespace().collect();
         if parts.len() != 5 {
@@ -569,7 +614,11 @@ pub mod cron {
             dom,
             month,
             // Both 0 and 7 mean Sunday in crontab, and somebody will write each of them.
-            dow: if dow_raw & bit(7) != 0 { (dow_raw | 1) & !bit(7) } else { dow_raw },
+            dow: if dow_raw & bit(7) != 0 {
+                (dow_raw | 1) & !bit(7)
+            } else {
+                dow_raw
+            },
             dom_restricted: parts[2] != "*",
             dow_restricted: parts[4] != "*",
         };
@@ -617,7 +666,10 @@ pub mod cron {
             let (lo, hi) = if range == "*" {
                 (min, max)
             } else if let Some((from, to)) = range.split_once('-') {
-                let (from, to) = (value(from, min, max, name, names)?, value(to, min, max, name, names)?);
+                let (from, to) = (
+                    value(from, min, max, name, names)?,
+                    value(to, min, max, name, names)?,
+                );
                 if from > to {
                     return Err(format!(
                         "{name} `{item}`: the range runs backwards ({from} is after {to}). {SYNTAX_HELP}"
@@ -627,7 +679,11 @@ pub mod cron {
             } else {
                 let v = value(range, min, max, name, names)?;
                 // `a/N` is `a` through the end of the field, every N — the crontab reading.
-                if step == 1 { (v, v) } else { (v, max) }
+                if step == 1 {
+                    (v, v)
+                } else {
+                    (v, max)
+                }
             };
             let mut v = lo;
             while v <= hi {
@@ -819,7 +875,10 @@ pub mod cron {
                     err.contains(needle),
                     "`{expr}`: the message has to say WHAT is wrong; expected `{needle}` in `{err}`"
                 );
-                assert!(next_after(expr, "2026-06-13T10:00:00+00:00").is_none(), "{expr}");
+                assert!(
+                    next_after(expr, "2026-06-13T10:00:00+00:00").is_none(),
+                    "{expr}"
+                );
             }
         }
 
@@ -827,7 +886,10 @@ pub mod cron {
         fn the_help_text_lists_what_is_accepted() {
             // The message a person reads is the whole fix for hub#730: it has to be actionable.
             for shape in ["*/N", "a-b", "a,b", "@daily", "MON"] {
-                assert!(SYNTAX_HELP.contains(shape), "`{shape}` missing from {SYNTAX_HELP}");
+                assert!(
+                    SYNTAX_HELP.contains(shape),
+                    "`{shape}` missing from {SYNTAX_HELP}"
+                );
             }
         }
 
@@ -895,7 +957,10 @@ mod tests {
     use super::*;
     use crate::manifest::CommandDef;
     use crate::registry::{ModuleStatus, RegisteredCommand};
-    use erplora_db::{testutil::{fresh_db, TestDb}, PgAdapter};
+    use erplora_db::{
+        testutil::{fresh_db, TestDb},
+        PgAdapter,
+    };
 
     fn cmd(module: &str, sql: &str) -> RegisteredCommand {
         RegisteredCommand {
@@ -932,7 +997,10 @@ mod tests {
 
     async fn count(db: &PgAdapter, sql: &str) -> i64 {
         let r = db.query(sql, &Params::new()).await.unwrap();
-        r.rows[0]["c"].as_i64().or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64)).unwrap_or(-1)
+        r.rows[0]["c"]
+            .as_i64()
+            .or_else(|| r.rows[0]["c"].as_f64().map(|f| f as i64))
+            .unwrap_or(-1)
     }
 
     /// hub#131/#145: el `command` de una scheduled task puede ser interno (prefijo `_`, como
@@ -941,7 +1009,9 @@ mod tests {
     #[tokio::test]
     async fn due_task_with_internal_command_runs_via_origin_internal() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         ensure_tables(&db).await.unwrap();
 
@@ -955,7 +1025,10 @@ mod tests {
         let mut p = Params::new();
         p.insert("module_id".into(), json!("verifactu"));
         p.insert("name".into(), json!("check_cert"));
-        p.insert("command".into(), json!("verifactu._check_certificate_expiry"));
+        p.insert(
+            "command".into(),
+            json!("verifactu._check_certificate_expiry"),
+        );
         p.insert("cron".into(), json!("*/5 * * * *"));
         p.insert("next_run".into(), json!("2020-01-01T00:00:00+00:00"));
         db.execute(
@@ -967,7 +1040,10 @@ mod tests {
         .unwrap();
 
         let ran = process_once(&db, &reg, "h1").await.unwrap();
-        assert_eq!(ran, 1, "el gate de origen NO bloquea una scheduled task interna");
+        assert_eq!(
+            ran, 1,
+            "el gate de origen NO bloquea una scheduled task interna"
+        );
         assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1);
     }
 
@@ -976,13 +1052,16 @@ mod tests {
     #[tokio::test]
     async fn due_task_runs_once_and_reschedules() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         ensure_tables(&db).await.unwrap();
 
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
-        reg.commands.insert("m.tick".into(), cmd("m", "INSERT INTO t (n) VALUES (1);"));
+        reg.commands
+            .insert("m.tick".into(), cmd("m", "INSERT INTO t (n) VALUES (1);"));
 
         // Tarea ya vencida: next_run en el pasado.
         let mut p = Params::new();
@@ -1018,7 +1097,10 @@ mod tests {
 
         seed_module_tasks(&db, "m", &tasks).await.unwrap();
         let r = db
-            .query("SELECT next_run FROM _scheduled_tasks WHERE module_id='m' AND name='tick'", &Params::new())
+            .query(
+                "SELECT next_run FROM _scheduled_tasks WHERE module_id='m' AND name='tick'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         let first = r.rows[0]["next_run"].as_str().unwrap().to_string();
@@ -1026,20 +1108,34 @@ mod tests {
         // Forzamos un next_run "antiguo" como si la tarea llevara tiempo corriendo.
         let mut p = Params::new();
         p.insert("nr".into(), json!("2099-01-01T00:00:00+00:00"));
-        db.execute("UPDATE _scheduled_tasks SET next_run = :nr WHERE name='tick'", &p).await.unwrap();
+        db.execute(
+            "UPDATE _scheduled_tasks SET next_run = :nr WHERE name='tick'",
+            &p,
+        )
+        .await
+        .unwrap();
 
         // Re-sembrar (reinstalación) NO debe pisar next_run.
         seed_module_tasks(&db, "m", &tasks).await.unwrap();
         let r = db
-            .query("SELECT next_run FROM _scheduled_tasks WHERE name='tick'", &Params::new())
+            .query(
+                "SELECT next_run FROM _scheduled_tasks WHERE name='tick'",
+                &Params::new(),
+            )
             .await
             .unwrap();
-        assert_eq!(r.rows[0]["next_run"].as_str().unwrap(), "2099-01-01T00:00:00+00:00");
+        assert_eq!(
+            r.rows[0]["next_run"].as_str().unwrap(),
+            "2099-01-01T00:00:00+00:00"
+        );
         assert_ne!(first, "2099-01-01T00:00:00+00:00");
 
         // Una tarea retirada del manifest se borra.
         seed_module_tasks(&db, "m", &[]).await.unwrap();
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM _scheduled_tasks").await, 0);
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM _scheduled_tasks").await,
+            0
+        );
     }
 
     /// hub#731: **the module contract does NOT move.** A flow's cron is the business clock because
@@ -1065,15 +1161,25 @@ mod tests {
             .await
             .unwrap();
 
-        seed_module_tasks(&db, "m", &[task("nine", "m.nine", "0 9 * * *", CatchUp::Collapse)])
-            .await
-            .unwrap();
+        seed_module_tasks(
+            &db,
+            "m",
+            &[task("nine", "m.nine", "0 9 * * *", CatchUp::Collapse)],
+        )
+        .await
+        .unwrap();
         let r = db
-            .query("SELECT next_run FROM _scheduled_tasks WHERE name='nine'", &Params::new())
+            .query(
+                "SELECT next_run FROM _scheduled_tasks WHERE name='nine'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         let next = r.rows[0]["next_run"].as_str().unwrap();
-        assert!(next.ends_with("T09:00:00+00:00"), "09:00 UTC, not 03:30: {next}");
+        assert!(
+            next.ends_with("T09:00:00+00:00"),
+            "09:00 UTC, not 03:30: {next}"
+        );
     }
 
     /// The opposite fallback of the flows one, and the more dangerous: `unwrap_or_else(|| now)`
@@ -1083,11 +1189,18 @@ mod tests {
     async fn a_task_whose_cron_cannot_run_is_not_scheduled_for_right_now() {
         let db = fresh_db().await;
         ensure_tables(&db).await.unwrap();
-        seed_module_tasks(&db, "m", &[task("bad", "m.bad", "1-5 9 * * FUNDAY", CatchUp::Collapse)])
-            .await
-            .unwrap();
+        seed_module_tasks(
+            &db,
+            "m",
+            &[task("bad", "m.bad", "1-5 9 * * FUNDAY", CatchUp::Collapse)],
+        )
+        .await
+        .unwrap();
         let r = db
-            .query("SELECT next_run FROM _scheduled_tasks WHERE name='bad'", &Params::new())
+            .query(
+                "SELECT next_run FROM _scheduled_tasks WHERE name='bad'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         assert!(
@@ -1102,14 +1215,20 @@ mod tests {
     #[tokio::test]
     async fn boot_catch_up_collapse_vs_skip() {
         let db = fresh_db().await;
-        db.execute_batch("CREATE TABLE t (n INTEGER);").await.unwrap();
+        db.execute_batch("CREATE TABLE t (n INTEGER);")
+            .await
+            .unwrap();
         crate::outbox::ensure_tables(&db).await.unwrap();
         ensure_tables(&db).await.unwrap();
 
         let mut reg = Registry::new();
         reg.status.insert("m".into(), ModuleStatus::Active);
-        reg.commands.insert("m.collapse".into(), cmd("m", "INSERT INTO t (n) VALUES (1);"));
-        reg.commands.insert("m.skip".into(), cmd("m", "INSERT INTO t (n) VALUES (2);"));
+        reg.commands.insert(
+            "m.collapse".into(),
+            cmd("m", "INSERT INTO t (n) VALUES (1);"),
+        );
+        reg.commands
+            .insert("m.skip".into(), cmd("m", "INSERT INTO t (n) VALUES (2);"));
 
         for (name, command, cu) in [("c", "m.collapse", "collapse"), ("s", "m.skip", "skip")] {
             let mut p = Params::new();
@@ -1130,11 +1249,23 @@ mod tests {
 
         let ran = catch_up_on_boot(&db, &reg, "h1").await.unwrap();
         assert_eq!(ran, 1, "solo la collapse corre en arranque");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await, 1, "collapse corrió una vez");
-        assert_eq!(count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=2").await, 0, "skip no corrió");
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=1").await,
+            1,
+            "collapse corrió una vez"
+        );
+        assert_eq!(
+            count(&db, "SELECT COUNT(*) AS c FROM t WHERE n=2").await,
+            0,
+            "skip no corrió"
+        );
         // Ambas quedan reprogramadas al futuro (no se vuelven a tomar).
         assert_eq!(
-            count(&db, "SELECT COUNT(*) AS c FROM _scheduled_tasks WHERE next_run <= '2025-01-01'").await,
+            count(
+                &db,
+                "SELECT COUNT(*) AS c FROM _scheduled_tasks WHERE next_run <= '2025-01-01'"
+            )
+            .await,
             0
         );
     }
@@ -1187,12 +1318,18 @@ mod tests {
         // B reclama la misma tarea mientras A la tiene leased → no la ve (None). Sin lease, B la
         // vería vencida y la reclamaría de nuevo → doble ejecución al correr ambas su command.
         let claimed_b = claim_next_due(&db_b, now).await.unwrap();
-        assert!(claimed_b.is_none(), "B no puede reclamar una tarea que A tiene leased");
+        assert!(
+            claimed_b.is_none(),
+            "B no puede reclamar una tarea que A tiene leased"
+        );
 
         // Mientras tanto, la fila sigue vencida (next_run no avanzó): A aún no ha resuelto. Esto
         // confirma que la invisibilidad para B viene del LEASE, no de un next_run ya adelantado.
         let still_due = db_b
-            .query("SELECT next_run FROM _scheduled_tasks WHERE module_id='m' AND name='tick'", &Params::new())
+            .query(
+                "SELECT next_run FROM _scheduled_tasks WHERE module_id='m' AND name='tick'",
+                &Params::new(),
+            )
             .await
             .unwrap();
         assert_eq!(

@@ -34,7 +34,12 @@ async fn make_state() -> AppState {
 }
 
 async fn body(resp: axum::response::Response) -> Vec<u8> {
-    resp.into_body().collect().await.unwrap().to_bytes().to_vec()
+    resp.into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec()
 }
 
 #[tokio::test]
@@ -59,11 +64,19 @@ async fn embedded_router_serves_index_and_api_same_origin() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(body(resp).await, b"ok", "la API gana sobre el estático en el mismo router");
+    assert_eq!(
+        body(resp).await,
+        b"ok",
+        "la API gana sobre el estático en el mismo router"
+    );
 
     // Una ruta del router de cliente (sin fichero) cae al index.html (fallback SPA).
     let resp = build_router(make_state().await, Some(&web_dir))
-        .oneshot(Request::get("/dashboard/inventory").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/dashboard/inventory")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
@@ -85,7 +98,9 @@ async fn with_csp_emite_el_header_content_security_policy() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     assert_eq!(
-        resp.headers().get("content-security-policy").map(|v| v.to_str().unwrap()),
+        resp.headers()
+            .get("content-security-policy")
+            .map(|v| v.to_str().unwrap()),
         Some(policy),
         "el runtime emite la CSP como header de respuesta"
     );
@@ -105,5 +120,9 @@ async fn embedded_router_without_web_dir_is_api_only() {
         .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "sin web_dir la API sigue funcionando");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "sin web_dir la API sigue funcionando"
+    );
 }

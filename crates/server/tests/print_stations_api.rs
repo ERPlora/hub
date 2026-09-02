@@ -88,7 +88,10 @@ async fn call(
         .unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 fn keys(list: &Value) -> Vec<String> {
@@ -227,7 +230,11 @@ async fn renaming_a_station_keeps_the_key_the_wire_uses() {
         })),
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "a rename must not strand the tickets");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a rename must not strand the tickets"
+    );
 }
 
 /// **Deleting cannot drop a ticket on the floor.** A station with work still queued refuses with a

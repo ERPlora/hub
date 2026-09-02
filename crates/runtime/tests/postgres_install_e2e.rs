@@ -39,7 +39,9 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
     let db = fresh_db().await;
 
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&module_dir("customers")).await.expect("instalar customers");
+    rt.install_from_dir(&module_dir("customers"))
+        .await
+        .expect("instalar customers");
 
     // Síntoma del bug: el módulo queda `active` en `hub_module`…
     // The runtime is built with `with_hub_id("h1")` (hub#594), so module state lives under "h1".
@@ -54,7 +56,11 @@ async fn install_on_postgres_applies_migrations_and_queries_work() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(status[0]["status"], json!("active"), "install deja el módulo activo");
+    assert_eq!(
+        status[0]["status"],
+        json!("active"),
+        "install deja el módulo activo"
+    );
 
     // …pero el contrato exige que sus migraciones se hayan aplicado de verdad:
     let applied = rt
@@ -103,9 +109,13 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
     // instalador exige la cadena completa antes que el dependiente. Lo que este test mide sigue
     // siendo SOLO lo de `invoice` (sus `_hub_migrations`), que no cambian por instalar sus deps.
     for dep in ["taxes", "inventory", "sales"] {
-        rt.install_from_dir(&module_dir(dep)).await.unwrap_or_else(|e| panic!("instalar {dep}: {e}"));
+        rt.install_from_dir(&module_dir(dep))
+            .await
+            .unwrap_or_else(|e| panic!("instalar {dep}: {e}"));
     }
-    rt.install_from_dir(&module_dir("invoice")).await.expect("instalar invoice");
+    rt.install_from_dir(&module_dir("invoice"))
+        .await
+        .expect("instalar invoice");
 
     let applied = rt
         .db_for_test()
@@ -116,7 +126,10 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
         .await
         .unwrap()
         .rows;
-    let names: Vec<&str> = applied.iter().map(|r| r["filename"].as_str().unwrap()).collect();
+    let names: Vec<&str> = applied
+        .iter()
+        .map(|r| r["filename"].as_str().unwrap())
+        .collect();
     // The expected list is READ from the module on disk, not written here: `invoice` publishes a
     // migration every few days and a literal list turned this test red on every one of them
     // (hub#959's gate broke on `005_substitution_unique.sql`). What the test measures is the
@@ -143,8 +156,7 @@ async fn install_invoice_on_postgres_applies_partial_manifest_union() {
         "the control: invoice ships at least the four migrations this test was born with: {expected:?}"
     );
     assert_eq!(
-        names,
-        expected,
+        names, expected,
         "unión manifest∪paquete: todas las migraciones Postgres del módulo, en orden"
     );
 

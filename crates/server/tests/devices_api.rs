@@ -52,7 +52,10 @@ async fn fixture(hub_id: &str) -> (axum::Router, Sessions) {
 async fn fixture_with_state(hub_id: &str) -> (axum::Router, Sessions, AppState) {
     let rt = Runtime::with_hub_id(Box::new(fresh_db().await), hub_id);
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let employee_id = rt
         .create_user("Employee", "2222", "employee", None)
         .await
@@ -74,7 +77,8 @@ async fn fixture_with_state(hub_id: &str) -> (axum::Router, Sessions, AppState) 
             .unwrap(),
     };
 
-    let temp = std::env::temp_dir().join(format!("erplora-devices-{}-{}", hub_id, std::process::id()));
+    let temp =
+        std::env::temp_dir().join(format!("erplora-devices-{}-{}", hub_id, std::process::id()));
     let cfg = HubConfig {
         demo: false,
         hub_id: hub_id.into(),
@@ -154,14 +158,23 @@ async fn without_a_session_nothing_can_be_disconnected() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     // And it did not happen anyway: an endpoint that disconnects devices is an endpoint that takes
     // tills down, so "refused" has to mean the till is still working.
-    assert!(listed_ids(&router, &sessions.admin).await.contains(&"till-1".to_string()));
+    assert!(listed_ids(&router, &sessions.admin)
+        .await
+        .contains(&"till-1".to_string()));
 }
 
 #[tokio::test]
 async fn an_employee_can_neither_see_the_devices_nor_disconnect_one() {
     let (router, sessions) = fixture("hub-455").await;
 
-    let read = call(&router, "GET", "/api/devices", Some(&sessions.employee), &[]).await;
+    let read = call(
+        &router,
+        "GET",
+        "/api/devices",
+        Some(&sessions.employee),
+        &[],
+    )
+    .await;
     let write = call(
         &router,
         "DELETE",
@@ -194,7 +207,14 @@ async fn a_caller_that_declares_itself_an_administrator_is_still_not_one() {
         ("x-hub-id", "hub-455"),
     ];
 
-    let no_session = call(&router, "DELETE", "/api/devices/laptop-1", None, &self_proclaimed).await;
+    let no_session = call(
+        &router,
+        "DELETE",
+        "/api/devices/laptop-1",
+        None,
+        &self_proclaimed,
+    )
+    .await;
     let as_employee = call(
         &router,
         "DELETE",
@@ -231,7 +251,10 @@ async fn a_device_of_another_business_is_not_reachable_from_here() {
     .await;
 
     assert_eq!(response.status(), StatusCode::OK, "it revoked MY laptop-1");
-    assert_eq!(listed_ids(&mine, &my_sessions.admin).await, vec!["till-1".to_string()]);
+    assert_eq!(
+        listed_ids(&mine, &my_sessions.admin).await,
+        vec!["till-1".to_string()]
+    );
     // The neighbour came out untouched: both devices listed and their sessions still open.
     let mut theirs = listed_ids(&neighbours, &their_sessions.admin).await;
     theirs.sort();
@@ -256,9 +279,23 @@ async fn a_request_that_names_no_device_deletes_nothing() {
     let (router, sessions) = fixture("hub-455").await;
 
     // `%20` is a path segment of blanks: a mis-built URL, never an instruction.
-    let blank = call(&router, "DELETE", "/api/devices/%20", Some(&sessions.admin), &[]).await;
+    let blank = call(
+        &router,
+        "DELETE",
+        "/api/devices/%20",
+        Some(&sessions.admin),
+        &[],
+    )
+    .await;
     // And with no segment at all there is simply no such door.
-    let nothing = call(&router, "DELETE", "/api/devices/", Some(&sessions.admin), &[]).await;
+    let nothing = call(
+        &router,
+        "DELETE",
+        "/api/devices/",
+        Some(&sessions.admin),
+        &[],
+    )
+    .await;
 
     assert_eq!(blank.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_ne!(nothing.status(), StatusCode::OK);
@@ -284,7 +321,10 @@ async fn the_list_says_what_lets_an_owner_point_at_the_device_they_lost() {
     assert_eq!(laptop["mode"], "personal");
     assert_eq!(laptop["open_sessions"], 1);
     assert!(!laptop["trusted_at"].as_str().unwrap_or_default().is_empty());
-    assert!(!laptop["signed_in_until"].as_str().unwrap_or_default().is_empty());
+    assert!(!laptop["signed_in_until"]
+        .as_str()
+        .unwrap_or_default()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -331,13 +371,23 @@ async fn a_row_with_no_id_is_never_the_device_you_are_holding() {
     // A trust row keyed on the empty string is writable, and a caller that names no device also
     // presents `""`. Comparing the two would flag a row the owner is NOT holding as "the one you
     // are using" — right next to the button that signs them out.
-    state.runtime.read().await.trust_device("", "ghost").await.unwrap();
+    state
+        .runtime
+        .read()
+        .await
+        .trust_device("", "ghost")
+        .await
+        .unwrap();
 
     let response = call(&router, "GET", "/api/devices", Some(&sessions.admin), &[]).await;
 
     let body = body_json(response).await;
     let devices = body["data"]["devices"].as_array().unwrap();
-    assert_eq!(devices.len(), 3, "the nameless row is listed, it is just never current");
+    assert_eq!(
+        devices.len(),
+        3,
+        "the nameless row is listed, it is just never current"
+    );
     for device in devices {
         assert_eq!(device["current"], Value::Bool(false), "{device}");
     }
@@ -362,7 +412,10 @@ async fn a_path_segment_with_blanks_around_a_real_id_still_names_that_device() {
     // "was it the one I am holding" answer all have to be about the same device.
     assert_eq!(body["data"]["device_id"], "laptop-1");
     assert_eq!(body["data"]["was_current"], Value::Bool(true));
-    assert_eq!(listed_ids(&router, &sessions.admin).await, vec!["till-1".to_string()]);
+    assert_eq!(
+        listed_ids(&router, &sessions.admin).await,
+        vec!["till-1".to_string()]
+    );
 }
 
 #[tokio::test]
@@ -371,9 +424,15 @@ async fn disconnecting_a_device_closes_the_session_it_had_open_right_away() {
     // The token was minted BEFORE the revocation and is nowhere near expiring: this is the thirty
     // days a `personal` device is worth, and the reason the screen can promise "right away".
     assert_eq!(
-        call(&router, "GET", "/api/devices", Some(&sessions.admin_on_laptop), &[])
-            .await
-            .status(),
+        call(
+            &router,
+            "GET",
+            "/api/devices",
+            Some(&sessions.admin_on_laptop),
+            &[]
+        )
+        .await
+        .status(),
         StatusCode::OK
     );
 
@@ -392,9 +451,15 @@ async fn disconnecting_a_device_closes_the_session_it_had_open_right_away() {
     assert_eq!(body["data"]["sessions_closed"], 1);
     assert_eq!(body["data"]["was_current"], Value::Bool(false));
     assert_eq!(
-        call(&router, "GET", "/api/devices", Some(&sessions.admin_on_laptop), &[])
-            .await
-            .status(),
+        call(
+            &router,
+            "GET",
+            "/api/devices",
+            Some(&sessions.admin_on_laptop),
+            &[]
+        )
+        .await
+        .status(),
         StatusCode::UNAUTHORIZED,
         "the very next request from the revoked device is already out"
     );
@@ -406,7 +471,10 @@ async fn disconnecting_a_device_closes_the_session_it_had_open_right_away() {
         StatusCode::UNAUTHORIZED,
         "(the employee still cannot read the list — but for the role, not because they were cut off)"
     );
-    assert_eq!(listed_ids(&router, &sessions.admin).await, vec!["till-1".to_string()]);
+    assert_eq!(
+        listed_ids(&router, &sessions.admin).await,
+        vec!["till-1".to_string()]
+    );
 }
 
 #[tokio::test]
@@ -430,9 +498,15 @@ async fn an_administrator_can_disconnect_the_device_they_are_holding_and_is_told
     let body = body_json(response).await;
     assert_eq!(body["data"]["was_current"], Value::Bool(true));
     assert_eq!(
-        call(&router, "GET", "/api/devices", Some(&sessions.admin_on_laptop), &[])
-            .await
-            .status(),
+        call(
+            &router,
+            "GET",
+            "/api/devices",
+            Some(&sessions.admin_on_laptop),
+            &[]
+        )
+        .await
+        .status(),
         StatusCode::UNAUTHORIZED,
         "it signed itself out, which is exactly what it asked for"
     );
@@ -442,8 +516,22 @@ async fn an_administrator_can_disconnect_the_device_they_are_holding_and_is_told
 async fn disconnecting_the_same_device_twice_is_not_an_error() {
     let (router, sessions) = fixture("hub-455").await;
 
-    let first = call(&router, "DELETE", "/api/devices/laptop-1", Some(&sessions.admin), &[]).await;
-    let second = call(&router, "DELETE", "/api/devices/laptop-1", Some(&sessions.admin), &[]).await;
+    let first = call(
+        &router,
+        "DELETE",
+        "/api/devices/laptop-1",
+        Some(&sessions.admin),
+        &[],
+    )
+    .await;
+    let second = call(
+        &router,
+        "DELETE",
+        "/api/devices/laptop-1",
+        Some(&sessions.admin),
+        &[],
+    )
+    .await;
 
     assert_eq!(first.status(), StatusCode::OK);
     // Two administrators reacting to the same lost tablet is the normal case; the second one must
@@ -520,7 +608,10 @@ async fn an_administrator_can_name_a_device_and_the_list_says_so() {
     // Trimmed in one place and used everywhere, like the id on the revocation door.
     assert_eq!(body["data"]["name"], "Barra");
     assert_eq!(body["data"]["device_id"], "till-1");
-    assert_eq!(listed_name(&router, &sessions.admin, "till-1").await, "Barra");
+    assert_eq!(
+        listed_name(&router, &sessions.admin, "till-1").await,
+        "Barra"
+    );
 }
 
 #[tokio::test]
@@ -555,7 +646,10 @@ async fn the_next_online_login_does_not_touch_the_name_the_business_chose() {
         .find(|d| d["device_id"] == "till-1")
         .expect("the till is listed");
     assert_eq!(till["name"], "Barra", "the name the business chose stayed");
-    assert_eq!(till["label"], "Luis Prats", "and the hint about who signed in moved on");
+    assert_eq!(
+        till["label"], "Luis Prats",
+        "and the hint about who signed in moved on"
+    );
 }
 
 #[tokio::test]
@@ -627,7 +721,14 @@ async fn naming_a_device_this_business_does_not_know_creates_nothing() {
 async fn only_an_administrator_can_name_a_device() {
     let (router, sessions) = fixture("hub-494").await;
 
-    let no_session = call_with_body(&router, "PUT", "/api/devices/till-1", None, json!({ "name": "Barra" })).await;
+    let no_session = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        None,
+        json!({ "name": "Barra" }),
+    )
+    .await;
     let as_employee = call_with_body(
         &router,
         "PUT",
@@ -661,9 +762,15 @@ async fn naming_a_device_is_not_disconnecting_it() {
     // A rename that closed sessions would sign the office out for a typo.
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
-        call(&router, "GET", "/api/devices", Some(&sessions.admin_on_laptop), &[])
-            .await
-            .status(),
+        call(
+            &router,
+            "GET",
+            "/api/devices",
+            Some(&sessions.admin_on_laptop),
+            &[]
+        )
+        .await
+        .status(),
         StatusCode::OK,
         "the session open on the renamed laptop is exactly as it was"
     );
@@ -694,7 +801,10 @@ async fn a_device_of_another_business_cannot_be_renamed_from_here() {
     )
     .await;
 
-    assert_eq!(listed_name(&mine, &my_sessions.admin, "till-1").await, "Mi barra");
+    assert_eq!(
+        listed_name(&mine, &my_sessions.admin, "till-1").await,
+        "Mi barra"
+    );
     assert_eq!(
         listed_name(&neighbours, &their_sessions.admin, "till-1").await,
         "Su barra",
@@ -726,5 +836,8 @@ async fn the_first_login_names_a_device_after_the_platform_it_announced() {
         .await
         .unwrap();
 
-    assert_eq!(listed_name(&router, &sessions.admin, "tablet-9").await, "Chrome · Android");
+    assert_eq!(
+        listed_name(&router, &sessions.admin, "tablet-9").await,
+        "Chrome · Android"
+    );
 }

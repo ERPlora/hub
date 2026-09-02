@@ -145,7 +145,14 @@ pub(crate) async fn prepare(
     // `module_id` is empty because no module emitted this — the kernel did. That emptiness is half
     // of what tells the relay this row may carry a flow's release, and it is not something a module
     // can produce (see `outbox::deliver_host_notify`).
-    let queue_op = outbox::insert_op(&ctx, "", outbox::FLOW_NOTIFY_EVENT, &payload, depth.max(0) as u32, None);
+    let queue_op = outbox::insert_op(
+        &ctx,
+        "",
+        outbox::FLOW_NOTIFY_EVENT,
+        &payload,
+        depth.max(0) as u32,
+        None,
+    );
     let event_id = queue_op
         .1
         .get("id")
@@ -361,16 +368,27 @@ mod tests {
         customer(&db, "c-1", "marta@example.com", "+34600111222").await;
         let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
 
-        let prepared = prepare_step(&db, &step("whatsapp", "crm.customer.get", "phone"), &authority)
-            .await
-            .unwrap();
+        let prepared = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap();
 
         let queued = &prepared.queue_op.1;
-        let payload: Json =
-            serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
-        assert_eq!(payload["to"], json!("+34600111222"), "the address the row carries");
+        let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            payload["to"],
+            json!("+34600111222"),
+            "the address the row carries"
+        );
         assert_eq!(payload["channel"], json!("whatsapp"));
-        assert_eq!(payload["vars"]["text"], json!("Hola Marta"), "the copy is rendered");
+        assert_eq!(
+            payload["vars"]["text"],
+            json!("Hola Marta"),
+            "the copy is rendered"
+        );
         let release = payload[host_notify::RESOLVED_VIA_KEY].as_str().unwrap();
         let live = grants::list(&db, HUB, FLOW).await.unwrap();
         let grant = live.iter().find(|g| g.kind == "recipient_query").unwrap();
@@ -393,17 +411,27 @@ mod tests {
         customer(&db, "c-1", "marta@example.com", "+34600111222").await;
         let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
 
-        let prepared = prepare_step(&db, &step("whatsapp", "crm.customer.get", "phone"), &authority)
-            .await
-            .unwrap();
+        let prepared = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap();
 
         let written = format!("{}{}", prepared.recorded_input, prepared.output);
         assert!(
             !written.contains("+34600111222"),
             "a customer's phone is not part of a run's history: {written}"
         );
-        assert!(written.contains(REDACTED), "and its place is marked: {written}");
-        assert_eq!(prepared.recorded_input["to"]["query"], json!("crm.customer.get"));
+        assert!(
+            written.contains(REDACTED),
+            "and its place is marked: {written}"
+        );
+        assert_eq!(
+            prepared.recorded_input["to"]["query"],
+            json!("crm.customer.get")
+        );
         assert_eq!(prepared.recorded_input["to"]["field"], json!("phone"));
         assert_eq!(prepared.output["recipient_redacted"], json!(true));
         assert_eq!(prepared.output["queued"], json!(true));
@@ -452,10 +480,17 @@ mod tests {
         assert!(format!("{err}").contains("crm.customer.get#email"), "{err}");
 
         // And the same field of another read is not covered either.
-        let err = prepare_step(&db, &step("email", "crm.customer.list", "phone"), &authority)
-            .await
-            .unwrap_err();
-        assert!(format!("{err}").contains("crm.customer.list#phone"), "{err}");
+        let err = prepare_step(
+            &db,
+            &step("email", "crm.customer.list", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            format!("{err}").contains("crm.customer.list#phone"),
+            "{err}"
+        );
     }
 
     #[tokio::test]
@@ -464,23 +499,36 @@ mod tests {
         let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
 
         // Nobody: the customer this run is about is not in the table.
-        let err = prepare_step(&db, &step("whatsapp", "crm.customer.get", "phone"), &authority)
-            .await
-            .unwrap_err();
-        assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_NOT_FOUND));
+        let err = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_NOT_FOUND)
+        );
 
         // Several.
         customer(&db, "c-1", "marta@example.com", "+34600111222").await;
         customer(&db, "c-2", "otro@example.com", "+34600333444").await;
         let authority = allow(&db, &both("crm.customer.list", "phone", "whatsapp")).await;
-        let err = prepare_step(&db, &step("whatsapp", "crm.customer.list", "phone"), &authority)
-            .await
-            .unwrap_err();
+        let err = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.list", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_AMBIGUOUS),
             "{err}"
         );
-        assert!(format!("{err}").contains("2 rows"), "the refusal says how many: {err}");
+        assert!(
+            format!("{err}").contains("2 rows"),
+            "the refusal says how many: {err}"
+        );
     }
 
     /// A value that is there and cannot be a recipient. The read is granted; that is not the same
@@ -491,23 +539,37 @@ mod tests {
         customer(&db, "c-1", "marta@example.com", "").await;
         // An email in the WhatsApp channel.
         let authority = allow(&db, &both("crm.customer.get", "email", "whatsapp")).await;
-        let err = prepare_step(&db, &step("whatsapp", "crm.customer.get", "email"), &authority)
-            .await
-            .unwrap_err();
+        let err = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "email"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_INVALID));
 
         // An empty column: nobody to write to, said as such.
         let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
-        let err = prepare_step(&db, &step("whatsapp", "crm.customer.get", "phone"), &authority)
-            .await
-            .unwrap_err();
-        assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_NOT_FOUND));
+        let err = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_NOT_FOUND)
+        );
 
         // A column that is not text at all.
         let authority = allow(&db, &both("crm.customer.get", "age", "whatsapp")).await;
-        let err = prepare_step(&db, &step("whatsapp", "crm.customer.get", "age"), &authority)
-            .await
-            .unwrap_err();
+        let err = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "age"),
+            &authority,
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_INVALID));
     }
 }

@@ -21,11 +21,10 @@ async fn fixture() -> (axum::Router, AppState, std::path::PathBuf) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-sess");
     rt.ensure_system_tables().await.unwrap();
-    rt.create_user("Admin", "1111", "admin", None).await.unwrap();
-    let temp = std::env::temp_dir().join(format!(
-        "erplora-single-session-{}",
-        std::process::id()
-    ));
+    rt.create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
+    let temp = std::env::temp_dir().join(format!("erplora-single-session-{}", std::process::id()));
     let cfg = HubConfig {
         demo: false,
         hub_id: "hub-sess".into(),
@@ -89,7 +88,10 @@ async fn session_token(resp: axum::response::Response) -> String {
     assert_eq!(resp.status(), StatusCode::OK, "login debe devolver 200");
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let v: Value = serde_json::from_slice(&bytes).unwrap();
-    v["token"].as_str().expect("token en la respuesta").to_string()
+    v["token"]
+        .as_str()
+        .expect("token en la respuesta")
+        .to_string()
 }
 
 #[tokio::test]

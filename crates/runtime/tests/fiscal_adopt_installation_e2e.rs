@@ -69,8 +69,12 @@ async fn hub_restored_elsewhere() -> Runtime {
     set_setting(&rt, "country_code", "ES").await;
     set_setting(&rt, "business_tax_id", "B12345674").await;
     set_setting(&rt, "business_legal_name", "Bar Pepe SL").await;
-    rt.install_from_dir(&fixture("fsale")).await.expect("install fsale");
-    rt.install_from_dir(&fixture("fprov")).await.expect("install fprov");
+    rt.install_from_dir(&fixture("fsale"))
+        .await
+        .expect("install fsale");
+    rt.install_from_dir(&fixture("fprov"))
+        .await
+        .expect("install fprov");
     // The trigger events are LEARNT from the healthy provider, so this has to run while it is
     // mounted — same order as a real boot.
     rt.refresh_fiscal_profile().await.unwrap();

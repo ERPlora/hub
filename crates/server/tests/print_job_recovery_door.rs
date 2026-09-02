@@ -235,7 +235,11 @@ async fn a_cashier_reads_the_queue_but_does_not_bin_a_ticket() {
 
     for uri in every_gesture() {
         let refused = send(&f.router, post(&uri, Some(&f.cashier), None)).await;
-        assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{uri} let a cashier write");
+        assert_eq!(
+            refused.status(),
+            StatusCode::FORBIDDEN,
+            "{uri} let a cashier write"
+        );
         let body = body_json(refused).await;
         assert_eq!(body["error"]["code"], json!("forbidden"));
     }
@@ -276,7 +280,11 @@ async fn declaring_the_capability_is_not_granting_it() {
 
     for uri in every_gesture() {
         let refused = send(&f.router, post(&uri, Some(&f.admin), Some(PRINTING))).await;
-        assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{uri} passed ungranted");
+        assert_eq!(
+            refused.status(),
+            StatusCode::FORBIDDEN,
+            "{uri} passed ungranted"
+        );
     }
     assert_eq!(status_of(&f, JOB_RETRY).await, "dead");
     let _ = std::fs::remove_dir_all(&f.temp);
@@ -320,7 +328,8 @@ async fn the_granted_module_re_fires_and_retires_a_ticket() {
     let body = body_json(discarded).await;
     assert_eq!(status_of(&f, JOB_DISCARD).await, "discarded");
     assert_eq!(
-        body["data"]["discardReason"], json!("de una sesión de QA"),
+        body["data"]["discardReason"],
+        json!("de una sesión de QA"),
         "what comes back is what was STORED, trimmed: {body}"
     );
     assert!(
@@ -389,7 +398,8 @@ async fn a_refusal_says_which_one_it_is() {
     let body = body_json(again).await;
     assert_eq!(body["error"]["code"], json!("print.job_not_requeueable"));
     assert_eq!(
-        body["error"]["status"], json!("pending"),
+        body["error"]["status"],
+        json!("pending"),
         "the refusal names the state the job is really in: {body}"
     );
     let _ = std::fs::remove_dir_all(&f.temp);

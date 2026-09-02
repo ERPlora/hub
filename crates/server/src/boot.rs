@@ -104,9 +104,11 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // (`postgresql+asyncpg://…`); sqlx quiere `postgresql://…` → se normaliza (`normalize_pg_dsn`).
     let dsn = normalize_pg_dsn(cfg.database_url.trim());
     if dsn.is_empty() {
-        return Err("HUB_DATABASE_URL es obligatoria (Hub Cloud es Postgres-only, ADR-0154): \
+        return Err(
+            "HUB_DATABASE_URL es obligatoria (Hub Cloud es Postgres-only, ADR-0154): \
                     define el DSN Postgres del hub"
-            .into());
+                .into(),
+        );
     }
     eprintln!("db: backend Postgres vía HUB_DATABASE_URL");
     let db: Box<dyn erplora_db::DatabaseAdapter> =
@@ -230,7 +232,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             }
         }
         Err(e) => {
-            eprintln!("asistente: sin índice vectorial (pool: {e}); se ofrecen todos los tools (§9.5)");
+            eprintln!(
+                "asistente: sin índice vectorial (pool: {e}); se ofrecen todos los tools (§9.5)"
+            );
             None
         }
     };
@@ -539,7 +543,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // `own`, ni salir de `testing`. Lo que se arregla es que la checklist le pedía justo el dato
     // que el producto le prohibía escribir, y que su venta se cobraba sin llegar a emitir factura
     // (`invoice.create_from_sale` estampa `:business_tax_id` y el gate de ADR-0203 la rechazaba).
-    match state.runtime.read().await.ensure_demo_fiscal_identity().await {
+    match state
+        .runtime
+        .read()
+        .await
+        .ensure_demo_fiscal_identity()
+        .await
+    {
         Ok(true) => eprintln!("demo: identidad fiscal de la demo sembrada (hub#684)"),
         Ok(false) => {}
         // No aborta el arranque: un hub que no abre es peor que una demo con la checklist a medias.
@@ -765,9 +775,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
             state.hub_id.clone(),
             state.machine_token.clone(),
         );
-        let secs = inbound_poll::interval_secs(
-            std::env::var(inbound_poll::INTERVAL_ENV).ok().as_deref(),
-        );
+        let secs =
+            inbound_poll::interval_secs(std::env::var(inbound_poll::INTERVAL_ENV).ok().as_deref());
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(std::time::Duration::from_secs(secs));
             tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -870,12 +879,8 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     &auth,
                     now,
                 );
-                let heartbeat_request = daily_usage::send_heartbeat(
-                    &st.http,
-                    &st.config.cloud_base_url,
-                    &auth,
-                    &usage,
-                );
+                let heartbeat_request =
+                    daily_usage::send_heartbeat(&st.http, &st.config.cloud_base_url, &auth, &usage);
                 let (outcome, heartbeat_result) =
                     tokio::join!(entitlement_request, heartbeat_request);
                 entitlement::record_outcome(&st.entitlement, outcome, now);
@@ -956,8 +961,9 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // capability `fiscal_gateway_access` y ESTE broker es quien de verdad lo consigue — token
     // corto del plano de control (cacheado; la cuota es 60/h) + identidad mTLS de la BD. El
     // motor nunca ve el token de máquina, igual que con el refetch del certificado.
-    erplora_runtime::fiscal_gateway::GatewayBrokerCell::global()
-        .install(std::sync::Arc::new(fiscal_gateway::HubGatewayBroker::new(&state)));
+    erplora_runtime::fiscal_gateway::GatewayBrokerCell::global().install(std::sync::Arc::new(
+        fiscal_gateway::HubGatewayBroker::new(&state),
+    ));
 
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la
@@ -1178,7 +1184,9 @@ pub(crate) fn report_failed_module_update(
 ///
 /// Es un fallo **del hub**, no de un módulo: lo que se cayó es el arranque, y colgárselo al primero
 /// de la lista mandaría a mirar donde no es.
-pub(crate) fn incomplete_boot_event(orphans: &[(String, String)]) -> erplora_runtime::error_registry::ErrorEvent {
+pub(crate) fn incomplete_boot_event(
+    orphans: &[(String, String)],
+) -> erplora_runtime::error_registry::ErrorEvent {
     use erplora_runtime::error_registry::{severity, source, ErrorEvent};
 
     let names: Vec<String> = orphans
@@ -1237,7 +1245,10 @@ mod incomplete_boot_report_tests {
         ]);
 
         assert_eq!(event.error_code, "module_boot_incomplete");
-        assert_eq!(event.severity, erplora_runtime::error_registry::severity::UNEXPECTED);
+        assert_eq!(
+            event.severity,
+            erplora_runtime::error_registry::severity::UNEXPECTED
+        );
         // Los módulos, con su versión, para que quien lo lea sepa QUÉ falta sin abrir el hub.
         assert_eq!(event.context["modules"][0]["module_id"], "sales");
         assert_eq!(event.context["modules"][0]["version"], "3.2.0");

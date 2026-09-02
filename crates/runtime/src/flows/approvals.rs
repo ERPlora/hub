@@ -455,11 +455,7 @@ pub async fn list(
 /// The two refusals are different questions with different remedies, so they are different codes:
 /// `already_decided` is the second press of a button (and must never book twice), `expired` is a
 /// question about a Tuesday that has passed.
-pub async fn claim_pending(
-    db: &dyn DatabaseAdapter,
-    hub_id: &str,
-    id: &str,
-) -> Result<Approval> {
+pub async fn claim_pending(db: &dyn DatabaseAdapter, hub_id: &str, id: &str) -> Result<Approval> {
     let approval = get(db, hub_id, id).await?;
     // A row the SWEEP closed (hub#972) is refused by the name it was closed under. Falling through
     // to `already_decided` would name a decider that does not exist and send the tray to the wrong
@@ -939,7 +935,10 @@ mod tests {
         assert_eq!(first.len(), 2, "one pass never exceeds the limit");
         assert_eq!(rest.len(), 3);
         assert_eq!(
-            list(&db, HUB, Some(STATUS_PENDING), 50).await.unwrap().len(),
+            list(&db, HUB, Some(STATUS_PENDING), 50)
+                .await
+                .unwrap()
+                .len(),
             0
         );
     }
@@ -1077,8 +1076,14 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(created.kind, KIND_COMMAND);
-        assert_eq!(created.title, "", "a model's proposal has no question, it has a payload");
-        assert_eq!(created.on_reject, ON_REJECT_CANCEL, "which is what it does today");
+        assert_eq!(
+            created.title, "",
+            "a model's proposal has no question, it has a payload"
+        );
+        assert_eq!(
+            created.on_reject, ON_REJECT_CANCEL,
+            "which is what it does today"
+        );
     }
 
     /// **The idempotency key is the run and the step** (the issue's criterion). A tick that died
@@ -1090,15 +1095,28 @@ mod tests {
         let db = db().await;
         let first = create_decision(&db, HUB, &question()).await.unwrap();
 
-        let found = pending_for_step(&db, HUB, "run-1", "approve").await.unwrap();
+        let found = pending_for_step(&db, HUB, "run-1", "approve")
+            .await
+            .unwrap();
         assert_eq!(found.map(|a| a.id), Some(first.id.clone()));
 
         // Another step of the same run, and the same step of another run, are other questions.
-        assert!(pending_for_step(&db, HUB, "run-1", "other").await.unwrap().is_none());
-        assert!(pending_for_step(&db, HUB, "run-2", "approve").await.unwrap().is_none());
+        assert!(pending_for_step(&db, HUB, "run-1", "other")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(pending_for_step(&db, HUB, "run-2", "approve")
+            .await
+            .unwrap()
+            .is_none());
         // And once it is decided it is no longer pending, so a later run is free to ask again.
-        mark_decided(&db, HUB, &first.id, STATUS_APPROVED, "hub_user:1", "").await.unwrap();
-        assert!(pending_for_step(&db, HUB, "run-1", "approve").await.unwrap().is_none());
+        mark_decided(&db, HUB, &first.id, STATUS_APPROVED, "hub_user:1", "")
+            .await
+            .unwrap();
+        assert!(pending_for_step(&db, HUB, "run-1", "approve")
+            .await
+            .unwrap()
+            .is_none());
         // The tenant is never negotiable, not even for a lookup.
         test_support::ensure_schema(&db, "hub-next-door").await;
         assert!(pending_for_step(&db, "hub-next-door", "run-1", "approve")
@@ -1147,7 +1165,11 @@ mod tests {
 
         assert_eq!(swept.len(), 1);
         assert_eq!(swept[0].kind, KIND_DECISION);
-        assert_eq!(swept[0].on_expire, ExpiryPolicy::Cancel, "read from the row");
+        assert_eq!(
+            swept[0].on_expire,
+            ExpiryPolicy::Cancel,
+            "read from the row"
+        );
         assert_eq!(swept[0].step_id, "approve");
         assert_eq!(
             swept[0].title, "Aprobar compra a Frutas Paco",
@@ -1160,7 +1182,10 @@ mod tests {
     /// must not be able to talk this hub into carrying a run past a refusal.
     #[test]
     fn an_unrecognised_reject_policy_degrades_to_ending_the_run() {
-        assert_eq!(RejectPolicy::parse(ON_REJECT_CONTINUE), RejectPolicy::Continue);
+        assert_eq!(
+            RejectPolicy::parse(ON_REJECT_CONTINUE),
+            RejectPolicy::Continue
+        );
         assert_eq!(RejectPolicy::parse(ON_REJECT_CANCEL), RejectPolicy::Cancel);
         for nonsense in ["", "reject", "nonsense-from-v2", "CONTINUE"] {
             assert_eq!(
@@ -1208,7 +1233,10 @@ mod tests {
         assert_eq!(pending[0].command, "agenda.booking.cancel");
         assert_eq!(list(&db, HUB, None, 50).await.unwrap().len(), 2);
         assert!(
-            list(&db, "hub-next-door", None, 50).await.unwrap().is_empty(),
+            list(&db, "hub-next-door", None, 50)
+                .await
+                .unwrap()
+                .is_empty(),
             "the tenant is never negotiable"
         );
         assert!(get(&db, "hub-next-door", &one.id).await.is_err());

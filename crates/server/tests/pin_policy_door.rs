@@ -46,7 +46,10 @@ async fn fixture() -> (axum::Router, String, String) {
     let db = fresh_db().await;
     let rt = Runtime::with_hub_id(Box::new(db), "hub-pp");
     rt.ensure_system_tables().await.unwrap();
-    let admin_id = rt.create_user("Admin", "1111", "admin", None).await.unwrap();
+    let admin_id = rt
+        .create_user("Admin", "1111", "admin", None)
+        .await
+        .unwrap();
     let employee_id = rt
         .create_user("Employee", "2222", "employee", None)
         .await
@@ -158,7 +161,16 @@ async fn a_policy_the_hub_cannot_read_is_refused_and_never_lands_on_never() {
     // Every one of these is a value that is *nearly* right. None of them may be guessed, and above
     // all none of them may fall through to the lax end: `never` has to be typed exactly, by an
     // administrator, on purpose.
-    for candidate in ["", " ", "Never", "never ", "nunca", "sometimes", "0", "false"] {
+    for candidate in [
+        "",
+        " ",
+        "Never",
+        "never ",
+        "nunca",
+        "sometimes",
+        "0",
+        "false",
+    ] {
         let refused = put_settings(&router, Some(&admin), json!({ "pin_policy": candidate })).await;
         assert_eq!(
             refused.status(),
@@ -202,12 +214,16 @@ async fn a_client_cannot_declare_itself_exempt() {
     .await;
     assert_eq!(smuggled.0, StatusCode::OK, "{}", smuggled.1);
     assert_ne!(
-        smuggled.1["data"]["pin_policy"], json!("never"),
+        smuggled.1["data"]["pin_policy"],
+        json!("never"),
         "a header is not a decision: the hub reads its own setting"
     );
 
     // And an id the hub never met buys nothing either.
-    assert_ne!(policy_of(&router, "a-device-nobody-enrolled").await, "never");
+    assert_ne!(
+        policy_of(&router, "a-device-nobody-enrolled").await,
+        "never"
+    );
 }
 
 // ── The behaviour: the dial exists, and the login screen can see where it points ────────────────

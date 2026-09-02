@@ -22,8 +22,8 @@ pub use entitlement::{
 };
 pub use integrity::{verify_sha256, IntegrityError};
 pub use signature::{
-    ModuleSignature, SignatureError, SignaturePolicy, Signer, TrustedKeyRing,
-    PUBLIC_KEY_LEN, SIGNATURE_LEN,
+    ModuleSignature, SignatureError, SignaturePolicy, Signer, TrustedKeyRing, PUBLIC_KEY_LEN,
+    SIGNATURE_LEN,
 };
 pub use user_jwt::{verify_user_jwt, HubMembership, UserClaims, UserJwtError};
 
@@ -729,10 +729,7 @@ impl CloudClient {
             Some(cursor) => format!("?after={}", encode_path_segment(cursor)),
             None => String::new(),
         };
-        self.get(
-            &format!("/api/v1/hub/device/whatsapp/inbox/{query}"),
-            auth,
-        )
+        self.get(&format!("/api/v1/hub/device/whatsapp/inbox/{query}"), auth)
     }
 
     /// **Acknowledge the inbound messages this hub has already ingested** (ADR-0283 K1c).
@@ -744,10 +741,7 @@ impl CloudClient {
     pub fn whatsapp_inbox_ack(&self, auth: &Auth) -> PreparedRequest {
         PreparedRequest {
             method: "POST",
-            url: format!(
-                "{}/api/v1/hub/device/whatsapp/inbox/ack/",
-                self.base_url
-            ),
+            url: format!("{}/api/v1/hub/device/whatsapp/inbox/ack/", self.base_url),
             headers: auth.headers(),
         }
     }
@@ -1110,7 +1104,10 @@ mod tests {
     #[test]
     fn assistant_config_and_checkout_are_hub_scoped_endpoints() {
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "t".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "t".into(),
+        };
 
         let cfg = c.assistant_config(&auth);
         assert_eq!(cfg.method, "GET", "leer el plan no muta nada");
@@ -1123,7 +1120,9 @@ mod tests {
         let checkout = c.assistant_checkout(&auth);
         assert_eq!(checkout.method, "POST");
         assert!(
-            checkout.url.ends_with("/api/v1/hub/device/assistant/subscription/checkout/"),
+            checkout
+                .url
+                .ends_with("/api/v1/hub/device/assistant/subscription/checkout/"),
             "la ruta real del SaaS: {}",
             checkout.url
         );
@@ -1135,7 +1134,10 @@ mod tests {
     #[test]
     fn the_fiscal_gateway_token_request_is_a_machine_post() {
         let c = CloudClient::new("https://erplora.com");
-        let auth = Auth::HubToken { hub_id: "h1".into(), token: "t".into() };
+        let auth = Auth::HubToken {
+            hub_id: "h1".into(),
+            token: "t".into(),
+        };
 
         let r = c.fiscal_gateway_token(&auth);
 
@@ -1228,8 +1230,7 @@ mod tests {
         let r = c.members_remove(&auth, "ana+x@bar.com");
         assert_eq!(r.method, "DELETE");
         assert_eq!(
-            r.url,
-            "https://erplora.com/api/v1/hub/device/members/ana%2Bx%40bar.com/",
+            r.url, "https://erplora.com/api/v1/hub/device/members/ana%2Bx%40bar.com/",
             "el email va percent-encoded en el path (@→%40, +→%2B); el punto se preserva"
         );
         assert!(r.headers.contains(&("X-Hub-Token", "tok".to_string())));
@@ -1290,8 +1291,7 @@ mod tests {
         let r =
             c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", "PV"), ""));
         assert_eq!(
-            r.url,
-            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV",
+            r.url, "https://erplora.com/api/v1/marketplace/catalog/?countries=ES&region=PV",
             "a bare subdivision is already in the wire format and passes through"
         );
     }
@@ -1344,11 +1344,9 @@ mod tests {
     #[test]
     fn a_hub_that_names_no_language_asks_exactly_as_before() {
         let c = CloudClient::new("https://erplora.com");
-        let r =
-            c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", ""), ""));
+        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new("ES", ""), ""));
         assert_eq!(
-            r.url,
-            "https://erplora.com/api/v1/marketplace/catalog/?countries=ES",
+            r.url, "https://erplora.com/api/v1/marketplace/catalog/?countries=ES",
             "no language = the Cloud serves its source language, which is today's behaviour"
         );
     }
@@ -1360,8 +1358,10 @@ mod tests {
             hub_id: "h1".into(),
             token: "tok".into(),
         };
-        let r =
-            c.marketplace_modules(&auth, &CatalogQuery::new(CountryFilter::new("ES", ""), "es"));
+        let r = c.marketplace_modules(
+            &auth,
+            &CatalogQuery::new(CountryFilter::new("ES", ""), "es"),
+        );
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/modules/?countries=ES&lang=es"
@@ -1408,7 +1408,8 @@ mod tests {
     #[test]
     fn the_country_is_normalised_before_it_travels() {
         let c = CloudClient::new("https://erplora.com");
-        let r = c.public_marketplace_modules(&CatalogQuery::new(CountryFilter::new(" fr ", " oc "), ""));
+        let r = c
+            .public_marketplace_modules(&CatalogQuery::new(CountryFilter::new(" fr ", " oc "), ""));
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/marketplace/catalog/?countries=FR&region=OC"
@@ -1567,7 +1568,10 @@ mod tests {
         };
         let r = c.fiscal_identity(&auth);
         assert_eq!(r.method, "POST");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/fiscal-identity/");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/fiscal-identity/"
+        );
         assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
         assert!(r
             .headers
@@ -1909,7 +1913,10 @@ mod tests {
         };
         let r = c.whatsapp_inbox(&auth, None);
         assert_eq!(r.method, "GET");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/whatsapp/inbox/");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/"
+        );
         assert!(r
             .headers
             .contains(&("X-Hub-Token", "machine-secret".to_string())));
@@ -1948,7 +1955,10 @@ mod tests {
         };
         let r = c.whatsapp_plan(&auth);
         assert_eq!(r.method, "GET");
-        assert_eq!(r.url, "https://erplora.com/api/v1/hub/device/whatsapp/plan/");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/plan/"
+        );
         assert!(r
             .headers
             .contains(&("X-Hub-Token", "machine-secret".to_string())));

@@ -98,8 +98,13 @@ async fn a_session_token_of_the_business_next_door_opens_nothing_here() {
 #[tokio::test]
 async fn a_pin_of_an_employee_next_door_is_not_a_login_here() {
     let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
-    neighbour.create_user("Marta", "4321", "cashier", None).await.unwrap();
-    mine.create_user("Bruno", "2222", "admin", None).await.unwrap();
+    neighbour
+        .create_user("Marta", "4321", "cashier", None)
+        .await
+        .unwrap();
+    mine.create_user("Bruno", "2222", "admin", None)
+        .await
+        .unwrap();
 
     assert!(
         mine.verify_pin("Marta", "4321").await.unwrap().is_none(),
@@ -124,8 +129,13 @@ async fn a_pin_of_an_employee_next_door_is_not_a_login_here() {
 #[tokio::test]
 async fn the_pin_screen_only_offers_the_people_of_this_business() {
     let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
-    neighbour.create_user("Marta", "4321", "cashier", None).await.unwrap();
-    mine.create_user("Bruno", "2222", "admin", None).await.unwrap();
+    neighbour
+        .create_user("Marta", "4321", "cashier", None)
+        .await
+        .unwrap();
+    mine.create_user("Bruno", "2222", "admin", None)
+        .await
+        .unwrap();
 
     let mut here: Vec<String> = mine
         .list_pin_users()
@@ -226,8 +236,13 @@ async fn signing_in_here_does_not_sign_the_neighbours_staff_out() {
 
     // Bruno signs in on a different device: his previous session goes, and only his.
     mine.trust_device("new-till", "Bruno").await.unwrap();
-    let my_new_token = mine.create_session(&me, 3600, Some("new-till")).await.unwrap();
-    mine.enforce_device_limit(1, Some("new-till")).await.unwrap();
+    let my_new_token = mine
+        .create_session(&me, 3600, Some("new-till"))
+        .await
+        .unwrap();
+    mine.enforce_device_limit(1, Some("new-till"))
+        .await
+        .unwrap();
 
     assert!(
         mine.resolve_session(&my_new_token).await.unwrap().is_some(),
@@ -283,11 +298,20 @@ async fn the_devices_screen_does_not_count_the_neighbours_open_sessions() {
 #[tokio::test]
 async fn two_businesses_can_employ_the_same_name_with_the_same_pin() {
     let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
-    neighbour.create_user("Marta", "1234", "cashier", None).await.unwrap();
-    mine.create_user("Marta", "1234", "cashier", None).await.unwrap();
+    neighbour
+        .create_user("Marta", "1234", "cashier", None)
+        .await
+        .unwrap();
+    mine.create_user("Marta", "1234", "cashier", None)
+        .await
+        .unwrap();
 
     let here = mine.verify_pin("Marta", "1234").await.unwrap().unwrap();
-    let there = neighbour.verify_pin("Marta", "1234").await.unwrap().unwrap();
+    let there = neighbour
+        .verify_pin("Marta", "1234")
+        .await
+        .unwrap()
+        .unwrap();
     assert_ne!(
         here.id, there.id,
         "two people, two rows — not one row two businesses share"

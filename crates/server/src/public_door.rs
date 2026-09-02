@@ -341,10 +341,7 @@ pub async fn redeem(
 
 // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 
-type Resolved = (
-    String,
-    crate::state::SharedRuntime,
-);
+type Resolved = (String, crate::state::SharedRuntime);
 
 async fn resolve(st: &AppState) -> Result<Resolved, Response> {
     let hub_id = st.hub_id();

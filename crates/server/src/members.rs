@@ -270,10 +270,7 @@ pub async fn remove_member(
 }
 
 /// `GET /api/members` — lista los usuarios-login del hub para el panel admin. Gate **owner/admin**.
-pub async fn list_members(
-    State(st): State<AppState>,
-    headers: axum::http::HeaderMap,
-) -> Response {
+pub async fn list_members(State(st): State<AppState>, headers: axum::http::HeaderMap) -> Response {
     let rt = st.runtime.read().await;
     if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
         return crate::unauthorized(e);

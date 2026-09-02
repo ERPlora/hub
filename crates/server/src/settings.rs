@@ -769,7 +769,9 @@ mod fiscal_identity_tests {
     /// «you left the field empty» is a worse error than the one the form can give right away.
     #[test]
     fn without_a_tax_id_there_is_nothing_to_publish() {
-        assert!(fiscal_identity_payload(&json!({ "business_legal_name": "Bar Manolo SL" })).is_none());
+        assert!(
+            fiscal_identity_payload(&json!({ "business_legal_name": "Bar Manolo SL" })).is_none()
+        );
         assert!(fiscal_identity_payload(&json!({ "business_tax_id": "   " })).is_none());
     }
 }

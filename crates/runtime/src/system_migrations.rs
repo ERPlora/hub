@@ -2214,10 +2214,7 @@ mod tests {
         apply(&db, "hub-test").await.unwrap();
 
         let row = db
-            .query(
-                "SELECT email FROM hub_user WHERE id = 'u1'",
-                &Params::new(),
-            )
+            .query("SELECT email FROM hub_user WHERE id = 'u1'", &Params::new())
             .await
             .unwrap();
         assert_eq!(
@@ -2488,7 +2485,9 @@ mod tests {
     async fn the_elevation_audit_can_be_applied_twice() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2595,7 +2594,9 @@ mod tests {
     async fn the_device_tenancy_migration_can_be_applied_twice() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2633,7 +2634,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(rows.rows.len(), 1, "re-aplicar no se lleva la confianza viva");
+        assert_eq!(
+            rows.rows.len(),
+            1,
+            "re-aplicar no se lleva la confianza viva"
+        );
         assert_eq!(rows.rows[0]["hub_id"], json!("hub-test"));
         assert_eq!(
             rows.rows[0]["mode"],
@@ -2645,7 +2650,10 @@ mod tests {
     #[test]
     fn split_statements_keeps_each_terminated() {
         let stmts = split_statements("CREATE TABLE IF NOT EXISTS a (x);  DROP TABLE b; ");
-        assert_eq!(stmts, vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]);
+        assert_eq!(
+            stmts,
+            vec!["CREATE TABLE IF NOT EXISTS a (x);", "DROP TABLE b;"]
+        );
     }
 
     /// The user-activity mark needs a table of its own (hub#670): kept only in memory it died with
@@ -2658,7 +2666,9 @@ mod tests {
     async fn apply_creates_the_activity_table_and_can_run_twice_without_losing_the_mark() {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
 
@@ -2699,7 +2709,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rows.rows.len(), 1, "re-applying must not drop the mark");
-        assert_eq!(rows.rows[0]["last_activity_at"], json!("2026-08-10T09:00:00Z"));
+        assert_eq!(
+            rows.rows[0]["last_activity_at"],
+            json!("2026-08-10T09:00:00Z")
+        );
     }
 
     #[tokio::test]
@@ -3180,10 +3193,7 @@ mod tests {
         // `the_trust_a_shared_database_cannot_attribute_is_not_handed_to_whoever_boots_first`.
         apply(&db, "hub-test").await.unwrap();
         let after = db
-            .query(
-                "SELECT device_id FROM hub_trusted_device",
-                &Params::new(),
-            )
+            .query("SELECT device_id FROM hub_trusted_device", &Params::new())
             .await
             .unwrap();
         assert_eq!(
@@ -3286,7 +3296,9 @@ mod tests {
         use erplora_db::testutil::fresh_db;
         let db = fresh_db().await;
         // Full baseline + the whole catalogue, genuinely applied once.
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         ensure_control_table(&db).await.unwrap();
         apply(&db, "hub-test").await.unwrap();
@@ -3297,7 +3309,9 @@ mod tests {
 
         // Wipe ALL control rows → `apply` sees a max of 0 and re-runs every migration. With the
         // objects already in the schema, a `CREATE TABLE` without `IF NOT EXISTS` dies on 42P07.
-        db.execute_batch("DELETE FROM _hub_system_migrations;").await.unwrap();
+        db.execute_batch("DELETE FROM _hub_system_migrations;")
+            .await
+            .unwrap();
         assert_eq!(
             max_applied_version(&db).await.unwrap(),
             0,
@@ -3308,7 +3322,7 @@ mod tests {
         // first `CREATE TABLE` without `IF NOT EXISTS`.
         apply(&db, "hub-test").await.expect(
             "re-aplicar el catálogo sobre un esquema ya creado no debe fallar: cada CREATE/ALTER \
-             necesita IF NOT EXISTS (hub#483)"
+             necesita IF NOT EXISTS (hub#483)",
         );
         // And it leaves the control table populated again — a re-run is a real apply, not a no-op
         // that silently skipped everything.
@@ -3499,7 +3513,9 @@ mod kind_contract_tests {
     #[test]
     fn every_system_migration_does_what_its_kind_says() {
         for migration in MIGRATIONS {
-            if let Err(error) = crate::migration_guard::kind_matches(migration.postgres, migration.kind) {
+            if let Err(error) =
+                crate::migration_guard::kind_matches(migration.postgres, migration.kind)
+            {
                 panic!(
                     "v{} `{}`: {error}\n\
                      Si de verdad no admite vuelta atrás, márcala `Kind::Contract` y añádela al \

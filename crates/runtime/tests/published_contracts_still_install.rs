@@ -9,7 +9,7 @@
 //!
 //! Es el control positivo de la regla: sin él, «rechazar cualquier `contract`» pasaría los tests
 //! que dicen que un `TRUNCATE` se rechaza.
-use erplora_runtime::migration_guard::{Kind, Plan, check};
+use erplora_runtime::migration_guard::{check, Kind, Plan};
 
 /// Cada fichero, con el `module_id` y el nombre con los que el hub lo aplica de verdad.
 const PUBLISHED: &[(&str, &str, &str)] = &[

@@ -45,8 +45,12 @@ fn ctx(hub: &str) -> RequestContext {
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("instalar inventory");
     rt
 }
 
@@ -67,7 +71,10 @@ async fn count(rt: &Runtime, table: &str, hub: &str) -> i64 {
     p.insert("hub_id".into(), json!(hub));
     let res = rt
         .db()
-        .query(&format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"), &p)
+        .query(
+            &format!("SELECT count(*) AS n FROM {table} WHERE hub_id = :hub_id"),
+            &p,
+        )
         .await
         .unwrap_or_else(|e| panic!("contar {table}: {e}"));
     res.rows[0]["n"].as_i64().expect("count(*) numérico")
@@ -77,7 +84,10 @@ async fn count(rt: &Runtime, table: &str, hub: &str) -> i64 {
 async fn count_all(rt: &Runtime, table: &str) -> i64 {
     let res = rt
         .db()
-        .query(&format!("SELECT count(*) AS n FROM {table}"), &Params::new())
+        .query(
+            &format!("SELECT count(*) AS n FROM {table}"),
+            &Params::new(),
+        )
         .await
         .unwrap_or_else(|e| panic!("contar {table}: {e}"));
     res.rows[0]["n"].as_i64().expect("count(*) numérico")
@@ -97,13 +107,21 @@ const ACTOR: &str = "u1";
 
 #[tokio::test]
 async fn reset_borra_los_datos_de_usuario_del_hub() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té verde", "TEV").await;
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 2, "precondición: 2 productos");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        2,
+        "precondición: 2 productos"
+    );
 
-    let report = execute_reset(&rt, "h1", &wipe_modules(), ACTOR).await.expect("reset");
+    let report = execute_reset(&rt, "h1", &wipe_modules(), ACTOR)
+        .await
+        .expect("reset");
 
     assert_eq!(
         count(&rt, "inventory_product", "h1").await,
@@ -116,18 +134,26 @@ async fn reset_borra_los_datos_de_usuario_del_hub() {
         .iter()
         .find(|s| s.section == "modules/inventory")
         .expect("el informe debe traer la sección modules/inventory");
-    assert!(inv.rows_deleted >= 2, "el informe debe contar las filas borradas, trae {}", inv.rows_deleted);
+    assert!(
+        inv.rows_deleted >= 2,
+        "el informe debe contar las filas borradas, trae {}",
+        inv.rows_deleted
+    );
 }
 
 /// Borrado DURO, no `is_deleted=1`: un soft-delete masivo dejaría el hub «vacío» en la UI pero
 /// rompería los índices únicos `(hub_id, sku)` al reimportar el catálogo.
 #[tokio::test]
 async fn reset_borra_de_verdad_no_marca_is_deleted() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
-    execute_reset(&rt, "h1", &wipe_modules(), ACTOR).await.expect("reset");
+    execute_reset(&rt, "h1", &wipe_modules(), ACTOR)
+        .await
+        .expect("reset");
 
     // Re-crear el MISMO sku debe funcionar: si el reset hubiera hecho soft-delete, la fila
     // seguiría ahí y el índice único (hub_id, sku) rechazaría este alta.
@@ -142,7 +168,9 @@ async fn reset_borra_de_verdad_no_marca_is_deleted() {
 /// datos de los hubs hermanos. Este test es el que impide que eso llegue a producción.
 #[tokio::test]
 async fn reset_no_toca_ni_una_fila_de_otro_hub_de_la_misma_org() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h2", "Secreto Ajeno", "SEC").await;
@@ -157,11 +185,20 @@ async fn reset_no_toca_ni_una_fila_de_otro_hub_de_la_misma_org() {
 
     let antes_h2_prod = count(&rt, "inventory_product", "h2").await;
     let antes_h2_cat = count(&rt, "taxes_category", "h2").await;
-    assert_eq!(antes_h2_prod, 2, "precondición: el vecino tiene 2 productos");
+    assert_eq!(
+        antes_h2_prod, 2,
+        "precondición: el vecino tiene 2 productos"
+    );
 
-    execute_reset(&rt, "h1", &wipe_modules(), ACTOR).await.expect("reset de h1");
+    execute_reset(&rt, "h1", &wipe_modules(), ACTOR)
+        .await
+        .expect("reset de h1");
 
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 0, "h1 sí se resetea");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        0,
+        "h1 sí se resetea"
+    );
     assert_eq!(
         count(&rt, "inventory_product", "h2").await,
         antes_h2_prod,
@@ -181,7 +218,9 @@ async fn reset_no_toca_ni_una_fila_de_otro_hub_de_la_misma_org() {
 /// IVA y sin forma de recuperarlo salvo reinstalando el módulo. El reset borra datos de USUARIO.
 #[tokio::test]
 async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     rt.execute_command(
         "taxes.categories.create",
@@ -192,9 +231,14 @@ async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
     .expect("categoría de usuario");
 
     let sembradas_antes = count(&rt, "taxes_category", "h1").await - 1; // menos la de usuario
-    assert!(sembradas_antes > 0, "precondición: instalar taxes siembra categorías is_system");
+    assert!(
+        sembradas_antes > 0,
+        "precondición: instalar taxes siembra categorías is_system"
+    );
 
-    execute_reset(&rt, "h1", &wipe_modules(), ACTOR).await.expect("reset");
+    execute_reset(&rt, "h1", &wipe_modules(), ACTOR)
+        .await
+        .expect("reset");
 
     assert_eq!(
         count(&rt, "taxes_category", "h1").await,
@@ -206,10 +250,16 @@ async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
     p.insert("hub_id".into(), json!("h1"));
     let res = rt
         .db()
-        .query("SELECT key FROM taxes_category WHERE hub_id = :hub_id AND key = 'user.custom'", &p)
+        .query(
+            "SELECT key FROM taxes_category WHERE hub_id = :hub_id AND key = 'user.custom'",
+            &p,
+        )
         .await
         .unwrap();
-    assert!(res.rows.is_empty(), "la categoría creada por el usuario debe borrarse");
+    assert!(
+        res.rows.is_empty(),
+        "la categoría creada por el usuario debe borrarse"
+    );
 }
 
 // ── 4. Orden inverso de FK ──────────────────────────────────────────────────────────────
@@ -219,19 +269,29 @@ async fn reset_conserva_las_filas_sembradas_por_el_modulo() {
 /// FK y el reset entero falla. Debe recorrerse en orden topológico inverso (hijos primero).
 #[tokio::test]
 async fn reset_borra_los_vinculos_m2m_antes_que_sus_padres() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     rt.execute_command(
         "inventory.categories.create",
-        &params(json!({ "name": "Cafés", "slug": "cafes", "icon": "cube-outline",
-                        "color": "#3880ff", "description": "", "order": 0 })),
+        &params(
+            json!({ "name": "Cafés", "slug": "cafes", "icon": "cube-outline",
+                        "color": "#3880ff", "description": "", "order": 0 }),
+        ),
         &ctx("h1"),
     )
     .await
     .expect("categoría");
-    let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx("h1")).await.unwrap();
-    let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx("h1")).await.unwrap();
+    let prods = rt
+        .execute_query("inventory.products.list", &Params::new(), &ctx("h1"))
+        .await
+        .unwrap();
+    let cats = rt
+        .execute_query("inventory.categories.list", &Params::new(), &ctx("h1"))
+        .await
+        .unwrap();
     rt.execute_command(
         "inventory.products.add_category",
         &params(json!({
@@ -242,12 +302,22 @@ async fn reset_borra_los_vinculos_m2m_antes_que_sus_padres() {
     )
     .await
     .expect("vincular producto↔categoría");
-    assert_eq!(count_all(&rt, "inventory_product_categories").await, 1, "precondición: 1 vínculo");
+    assert_eq!(
+        count_all(&rt, "inventory_product_categories").await,
+        1,
+        "precondición: 1 vínculo"
+    );
 
     // Si el orden de borrado fuese el ingenuo, esto devolvería Err por violación de FK.
-    execute_reset(&rt, "h1", &wipe_modules(), ACTOR).await.expect("el reset no puede romperse por una FK");
+    execute_reset(&rt, "h1", &wipe_modules(), ACTOR)
+        .await
+        .expect("el reset no puede romperse por una FK");
 
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 0, "productos borrados");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        0,
+        "productos borrados"
+    );
     assert_eq!(
         count_all(&rt, "inventory_product_categories").await,
         0,
@@ -261,7 +331,9 @@ async fn reset_borra_los_vinculos_m2m_antes_que_sus_padres() {
 /// reales. Y por ser dry-run, no puede borrar nada — se ejecuta solo con abrir el panel.
 #[tokio::test]
 async fn plan_reset_cuenta_filas_reales_y_no_borra_nada() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té", "TEV").await;
@@ -279,15 +351,24 @@ async fn plan_reset_cuenta_filas_reales_y_no_borra_nada() {
         "el plan debe contar las filas reales del hub (3 productos), trae {}",
         inv.rows
     );
-    assert!(inv.blocked_by.is_none(), "sin facturas remitidas nada bloquea inventory");
+    assert!(
+        inv.blocked_by.is_none(),
+        "sin facturas remitidas nada bloquea inventory"
+    );
     // Dry-run: nada se ha tocado.
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 3, "plan_reset NO puede borrar");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        3,
+        "plan_reset NO puede borrar"
+    );
 }
 
 /// El plan cuenta lo del hub que pregunta, no lo del vecino (misma BD, distinto tenant).
 #[tokio::test]
 async fn plan_reset_no_cuenta_filas_de_otro_hub() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     for (i, sku) in ["A", "B", "C", "D"].iter().enumerate() {
@@ -295,9 +376,17 @@ async fn plan_reset_no_cuenta_filas_de_otro_hub() {
     }
 
     let plan = plan_reset(&rt, "h1").await.expect("plan");
-    let inv = plan.sections.iter().find(|s| s.section == "modules/inventory").unwrap();
+    let inv = plan
+        .sections
+        .iter()
+        .find(|s| s.section == "modules/inventory")
+        .unwrap();
 
-    assert_eq!(inv.rows, 1, "el plan de h1 cuenta 1 producto, no los 4 del vecino (trae {})", inv.rows);
+    assert_eq!(
+        inv.rows, 1,
+        "el plan de h1 cuenta 1 producto, no los 4 del vecino (trae {})",
+        inv.rows
+    );
 }
 
 // ── 6. Selectividad ─────────────────────────────────────────────────────────────────────
@@ -306,7 +395,9 @@ async fn plan_reset_no_cuenta_filas_de_otro_hub() {
 /// no puede perder, de paso, su configuración fiscal.
 #[tokio::test]
 async fn reset_solo_toca_las_secciones_seleccionadas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     rt.execute_command(
@@ -319,10 +410,19 @@ async fn reset_solo_toca_las_secciones_seleccionadas() {
     let taxes_antes = count(&rt, "taxes_category", "h1").await;
 
     // Solo inventory.
-    let sel = ResetSelection { modules: vec!["inventory".into()], ..Default::default() };
-    execute_reset(&rt, "h1", &sel, ACTOR).await.expect("reset parcial");
+    let sel = ResetSelection {
+        modules: vec!["inventory".into()],
+        ..Default::default()
+    };
+    execute_reset(&rt, "h1", &sel, ACTOR)
+        .await
+        .expect("reset parcial");
 
-    assert_eq!(count(&rt, "inventory_product", "h1").await, 0, "inventory sí se borra");
+    assert_eq!(
+        count(&rt, "inventory_product", "h1").await,
+        0,
+        "inventory sí se borra"
+    );
     assert_eq!(
         count(&rt, "taxes_category", "h1").await,
         taxes_antes,
@@ -336,24 +436,52 @@ async fn reset_solo_toca_las_secciones_seleccionadas() {
 /// owner podría quedarse fuera de su propio hub con un clic y sin vuelta atrás.
 #[tokio::test]
 async fn reset_de_usuarios_conserva_a_quien_lo_ejecuta() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     let db = rt.db();
-    let owner = erplora_runtime::identity::create_user(db, &rt.hub_id(), "Dueño", "1234", "owner", None)
-        .await
-        .expect("crear owner");
-    let empleado = erplora_runtime::identity::create_user(db, &rt.hub_id(), "Empleado", "5678", "cashier", None)
-        .await
-        .expect("crear empleado");
+    let owner =
+        erplora_runtime::identity::create_user(db, &rt.hub_id(), "Dueño", "1234", "owner", None)
+            .await
+            .expect("crear owner");
+    let empleado = erplora_runtime::identity::create_user(
+        db,
+        &rt.hub_id(),
+        "Empleado",
+        "5678",
+        "cashier",
+        None,
+    )
+    .await
+    .expect("crear empleado");
 
-    let sel = ResetSelection { users: true, ..Default::default() };
-    execute_reset(&rt, "h1", &sel, &owner).await.expect("reset de usuarios");
+    let sel = ResetSelection {
+        users: true,
+        ..Default::default()
+    };
+    execute_reset(&rt, "h1", &sel, &owner)
+        .await
+        .expect("reset de usuarios");
 
-    let res = rt.db().query("SELECT id FROM hub_user", &Params::new()).await.unwrap();
-    let ids: Vec<String> =
-        res.rows.iter().filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
-    assert!(ids.contains(&owner), "🔴 el reset expulsó al usuario que lo ejecutaba");
-    assert!(!ids.contains(&empleado), "el resto de empleados sí se borran cuando se marca la sección");
+    let res = rt
+        .db()
+        .query("SELECT id FROM hub_user", &Params::new())
+        .await
+        .unwrap();
+    let ids: Vec<String> = res
+        .rows
+        .iter()
+        .filter_map(|r| r["id"].as_str().map(str::to_string))
+        .collect();
+    assert!(
+        ids.contains(&owner),
+        "🔴 el reset expulsó al usuario que lo ejecutaba"
+    );
+    assert!(
+        !ids.contains(&empleado),
+        "el resto de empleados sí se borran cuando se marca la sección"
+    );
 }
 
 // ── 8. La cola de impresión: dato que se borra, host que sobrevive (hub#502) ────────────
@@ -382,7 +510,9 @@ async fn ensure_print_host(rt: &Runtime) {
 /// have to re-pair printers after every reset — exactly what hub#342 avoided on purpose.
 #[tokio::test]
 async fn reset_empties_the_print_queue_but_keeps_the_host_registry() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     ensure_print_host(&rt).await;
 
@@ -437,16 +567,30 @@ async fn reset_empties_the_print_queue_but_keeps_the_host_registry() {
         .iter()
         .find(|s| s.section == "print_queue")
         .expect("el plan lista la sección print_queue");
-    assert_eq!(pq.rows, 2, "el plan cuenta los 2 tiques pendientes de h1 (no el del vecino)");
+    assert_eq!(
+        pq.rows, 2,
+        "el plan cuenta los 2 tiques pendientes de h1 (no el del vecino)"
+    );
 
     // Reset WITH the print_queue section marked.
-    let sel = ResetSelection { print_queue: true, ..Default::default() };
+    let sel = ResetSelection {
+        print_queue: true,
+        ..Default::default()
+    };
     execute_reset(&rt, "h1", &sel, "u1").await.expect("reset");
 
     // The queue is empty for h1…
-    assert_eq!(count(&rt, "_print_queue", "h1").await, 0, "la cola de h1 queda vacía");
+    assert_eq!(
+        count(&rt, "_print_queue", "h1").await,
+        0,
+        "la cola de h1 queda vacía"
+    );
     // …but h2's ticket is untouched (tenant isolation, same rule as every other table).
-    assert_eq!(count(&rt, "_print_queue", "h2").await, 1, "el tique del vecino no se toca");
+    assert_eq!(
+        count(&rt, "_print_queue", "h2").await,
+        1,
+        "el tique del vecino no se toca"
+    );
     // …and the host registry survives: re-pairing printers after every reset is the papercut
     // hub#342 killed, and this reset must not bring it back.
     let hosts = rt
@@ -470,7 +614,9 @@ async fn reset_empties_the_print_queue_but_keeps_the_host_registry() {
 /// field clears no queue.
 #[tokio::test]
 async fn reset_without_the_print_queue_section_leaves_the_queue_intact() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     ensure_print_host(&rt).await;
 

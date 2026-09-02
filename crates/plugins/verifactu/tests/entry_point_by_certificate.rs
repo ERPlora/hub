@@ -66,8 +66,14 @@ fn an_entity_seal_transmits_through_the_seal_entry_point() {
 /// whole deployed fleet at once.
 #[test]
 fn a_representative_certificate_keeps_the_holder_entry_point() {
-    assert_eq!(aeat::endpoint("testing", REPRESENTATIVE), PREPRODUCTION_HOLDER);
-    assert_eq!(aeat::endpoint("production", REPRESENTATIVE), PRODUCTION_HOLDER);
+    assert_eq!(
+        aeat::endpoint("testing", REPRESENTATIVE),
+        PREPRODUCTION_HOLDER
+    );
+    assert_eq!(
+        aeat::endpoint("production", REPRESENTATIVE),
+        PRODUCTION_HOLDER
+    );
 }
 
 /// 🔴 **The bug hub#470 closes.** `delegated` describes the PROVENANCE of the certificate, and
@@ -183,7 +189,14 @@ fn an_unknown_certificate_type_falls_back_to_the_holder_entry_point() {
 /// was misspelled cannot be taken back (ADR-0189: a remitted record is never re-sent).
 #[test]
 fn an_unknown_environment_stays_in_preproduction_for_both_certificates() {
-    for environment in ["", "testing", "Production", "production ", "prod", "sandbox"] {
+    for environment in [
+        "",
+        "testing",
+        "Production",
+        "production ",
+        "prod",
+        "sandbox",
+    ] {
         assert_eq!(
             aeat::endpoint(environment, REPRESENTATIVE),
             PREPRODUCTION_HOLDER,

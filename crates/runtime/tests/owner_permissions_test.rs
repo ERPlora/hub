@@ -51,7 +51,10 @@ fn owner_inherits_admin_module_permissions() {
     let admin = permissions_for_role(&reg, "admin");
     let owner = permissions_for_role(&reg, "owner");
 
-    assert!(!admin.is_empty(), "the fixture must grant permissions to admin");
+    assert!(
+        !admin.is_empty(),
+        "the fixture must grant permissions to admin"
+    );
     assert_eq!(
         owner, admin,
         "an owner must see the same set of module permissions as an admin"

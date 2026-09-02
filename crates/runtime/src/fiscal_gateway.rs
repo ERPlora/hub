@@ -122,16 +122,20 @@ mod tests {
             let ec = openssl::ec::EcKey::generate(&group).unwrap();
             let pkey = openssl::pkey::PKey::from_ec_key(ec).unwrap();
             let mut name = openssl::x509::X509NameBuilder::new().unwrap();
-            name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, "debug-test").unwrap();
+            name.append_entry_by_nid(openssl::nid::Nid::COMMONNAME, "debug-test")
+                .unwrap();
             let name = name.build();
             let mut cert = openssl::x509::X509::builder().unwrap();
             cert.set_version(2).unwrap();
             cert.set_subject_name(&name).unwrap();
             cert.set_issuer_name(&name).unwrap();
             cert.set_pubkey(&pkey).unwrap();
-            cert.set_not_before(&openssl::asn1::Asn1Time::days_from_now(0).unwrap()).unwrap();
-            cert.set_not_after(&openssl::asn1::Asn1Time::days_from_now(1).unwrap()).unwrap();
-            cert.sign(&pkey, openssl::hash::MessageDigest::sha256()).unwrap();
+            cert.set_not_before(&openssl::asn1::Asn1Time::days_from_now(0).unwrap())
+                .unwrap();
+            cert.set_not_after(&openssl::asn1::Asn1Time::days_from_now(1).unwrap())
+                .unwrap();
+            cert.sign(&pkey, openssl::hash::MessageDigest::sha256())
+                .unwrap();
             let bundle = format!(
                 "{}\n{}",
                 String::from_utf8(pkey.private_key_to_pem_pkcs8().unwrap()).unwrap(),

@@ -123,8 +123,14 @@ mod load_shed_config_tests {
     #[test]
     fn absent_or_blank_uses_the_default() {
         assert_eq!(resolve_max_inflight(None), DEFAULT_MAX_INFLIGHT_REQUESTS);
-        assert_eq!(resolve_max_inflight(Some("")), DEFAULT_MAX_INFLIGHT_REQUESTS);
-        assert_eq!(resolve_max_inflight(Some("   ")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(
+            resolve_max_inflight(Some("")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
+        assert_eq!(
+            resolve_max_inflight(Some("   ")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
     }
 
     #[test]
@@ -137,9 +143,21 @@ mod load_shed_config_tests {
     #[test]
     fn zero_and_garbage_fall_back_to_the_default_never_choke_the_hub() {
         // A ceiling of 0 would shed every request forever — clamp it to the default.
-        assert_eq!(resolve_max_inflight(Some("0")), DEFAULT_MAX_INFLIGHT_REQUESTS);
-        assert_eq!(resolve_max_inflight(Some("-5")), DEFAULT_MAX_INFLIGHT_REQUESTS);
-        assert_eq!(resolve_max_inflight(Some("abc")), DEFAULT_MAX_INFLIGHT_REQUESTS);
-        assert_eq!(resolve_max_inflight(Some("1.5")), DEFAULT_MAX_INFLIGHT_REQUESTS);
+        assert_eq!(
+            resolve_max_inflight(Some("0")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
+        assert_eq!(
+            resolve_max_inflight(Some("-5")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
+        assert_eq!(
+            resolve_max_inflight(Some("abc")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
+        assert_eq!(
+            resolve_max_inflight(Some("1.5")),
+            DEFAULT_MAX_INFLIGHT_REQUESTS
+        );
     }
 }

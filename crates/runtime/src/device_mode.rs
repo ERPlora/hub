@@ -249,7 +249,10 @@ mod tests {
             DeviceMode::from_stored(Some("trusted-forever")),
             DeviceMode::Shared
         );
-        assert_eq!(DeviceMode::from_stored(Some("Personal")), DeviceMode::Shared);
+        assert_eq!(
+            DeviceMode::from_stored(Some("Personal")),
+            DeviceMode::Shared
+        );
         assert_eq!(DeviceMode::from_stored(Some("shared")), DeviceMode::Shared);
         assert_eq!(
             DeviceMode::from_stored(Some("personal")),

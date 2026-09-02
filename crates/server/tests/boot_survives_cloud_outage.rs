@@ -198,7 +198,15 @@ async fn a_hub_recreated_with_the_cloud_down_still_boots_with_its_modules() {
     // La vía del marketplace está muerta: si el hub dependiera de ella, aquí se quedaría sin módulo.
     assert!(
         install_from_cloud(
-            &http, &down, &cache_2, &auth(), &mut rt2, "notes", "1.0.0", &|_, _| {}, &policy,
+            &http,
+            &down,
+            &cache_2,
+            &auth(),
+            &mut rt2,
+            "notes",
+            "1.0.0",
+            &|_, _| {},
+            &policy,
         )
         .await
         .is_err(),
@@ -248,7 +256,15 @@ async fn a_module_is_restored_even_when_its_dependency_comes_later_in_the_list()
     rt.ensure_system_tables().await.unwrap();
     // Instalar `invoicing` arrastra `ledger` (instalación anidada): quedan los dos, con sus copias.
     install_from_cloud(
-        &http, &cloud, &cache_1, &auth(), &mut rt, "invoicing", "1.0.0", &|_, _| {}, &policy,
+        &http,
+        &cloud,
+        &cache_1,
+        &auth(),
+        &mut rt,
+        "invoicing",
+        "1.0.0",
+        &|_, _| {},
+        &policy,
     )
     .await
     .unwrap();
@@ -295,7 +311,15 @@ async fn a_tampered_local_copy_is_refused_exactly_like_a_tampered_download() {
     let mut rt = Runtime::with_hub_id(Box::new(db.adapter().await), HUB);
     rt.ensure_system_tables().await.unwrap();
     install_from_cloud(
-        &http, &cloud, &cache_1, &auth(), &mut rt, "notes", "1.0.0", &|_, _| {}, &policy,
+        &http,
+        &cloud,
+        &cache_1,
+        &auth(),
+        &mut rt,
+        "notes",
+        "1.0.0",
+        &|_, _| {},
+        &policy,
     )
     .await
     .unwrap();
@@ -355,7 +379,15 @@ async fn uninstalling_forgets_the_local_copy_so_it_cannot_come_back() {
     let mut rt = Runtime::with_hub_id(Box::new(db.adapter().await), HUB);
     rt.ensure_system_tables().await.unwrap();
     install_from_cloud(
-        &http, &cloud, &cache_1, &auth(), &mut rt, "notes", "1.0.0", &|_, _| {}, &policy,
+        &http,
+        &cloud,
+        &cache_1,
+        &auth(),
+        &mut rt,
+        "notes",
+        "1.0.0",
+        &|_, _| {},
+        &policy,
     )
     .await
     .unwrap();

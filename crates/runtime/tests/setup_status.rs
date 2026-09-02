@@ -534,7 +534,11 @@ async fn an_installed_module_setup_block_joins_the_core_items() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
     let pricing = must(&doc, "pricing.setup");
 
     assert_eq!(
@@ -559,7 +563,11 @@ async fn the_module_item_is_done_when_its_own_query_says_so() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "done");
 }
 
@@ -574,7 +582,11 @@ async fn an_optional_module_item_is_listed_too_and_says_it_is_optional() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "printing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "printing.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "printing.setup")["required"], false);
 }
 
@@ -605,7 +617,11 @@ async fn a_module_that_is_installed_but_inactive_does_not_contribute_its_item() 
     std::fs::remove_dir_all(&dir).ok();
     rt.deactivate("pricing").await.unwrap();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
     assert!(
         item(&doc, "pricing.setup").is_none(),
         "an inactive module has no pending configuration: {:?}",
@@ -631,7 +647,10 @@ async fn a_module_blocked_by_entitlement_leaves_no_checklist_item_hub1175() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let mut blocked = ctx("hub-setup", &[SESSION, ADMINISTER, "invoice_series.configure"]);
+    let mut blocked = ctx(
+        "hub-setup",
+        &[SESSION, ADMINISTER, "invoice_series.configure"],
+    );
     blocked.blocked_modules = std::collections::HashSet::from(["invoice_series".to_string()]);
 
     let doc = status(&rt, &blocked).await;
@@ -654,7 +673,11 @@ async fn a_module_the_entitlement_does_not_name_keeps_its_checklist_item_hub1175
     std::fs::remove_dir_all(&dir).ok();
 
     // `blocked_modules` defaults empty — nobody stamped it, same as every context before hub#1175.
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "invoice.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "invoice.configure"]),
+    )
+    .await;
     assert!(
         item(&doc, "invoice.setup").is_some(),
         "a module the entitlement did not name must keep its item: {:?}",
@@ -705,7 +728,11 @@ async fn an_item_without_a_declared_country_applies_everywhere() {
     updates.insert("country_code".into(), json!("FR"));
     rt.set_settings(&updates, "u1").await.unwrap();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"]),
+    )
+    .await;
     assert!(item(&doc, "inventory.setup").is_some(), "{:?}", keys(&doc));
 }
 
@@ -776,7 +803,10 @@ async fn reading_the_check_is_not_the_same_as_being_able_to_fix_it() {
     );
 
     // And whoever can configure it does get it.
-    let admin = ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.view", "pricing.configure"]);
+    let admin = ctx(
+        "hub-setup",
+        &[SESSION, ADMINISTER, "pricing.view", "pricing.configure"],
+    );
     assert!(item(&status(&rt, &admin).await, "pricing.setup").is_some());
 }
 
@@ -816,7 +846,11 @@ async fn a_module_whose_setup_query_fails_is_omitted_instead_of_reported_as_pend
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "broken.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "broken.configure"]),
+    )
+    .await;
     assert!(
         item(&doc, "broken.setup").is_none(),
         "a failing check omits its item, it never invents a pending one: {:?}",
@@ -879,15 +913,16 @@ async fn a_check_with_no_row_at_all_is_pending_not_omitted() {
                 "permission": "empty.configure"
             }
         }),
-        &[(
-            "queries/config_get.sql",
-            "SELECT 1 AS ready WHERE 1 = 0",
-        )],
+        &[("queries/config_get.sql", "SELECT 1 AS ready WHERE 1 = 0")],
     );
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "empty.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "empty.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "empty.setup")["state"], "pending");
 }
 
@@ -927,12 +962,12 @@ async fn the_list_comes_back_already_ordered_by_the_core() {
     assert_eq!(
         keys(&doc),
         vec![
-            "apps",                  // 10 · core
-            "pricing.setup",           // 20 · module
-            "business_identity",     // 40 · core
-            "team",                  // 80 · core
-            "cash_register.setup",   // 90 · module
-            "unknown_module.setup",  // undeclared → last
+            "apps",                 // 10 · core
+            "pricing.setup",        // 20 · module
+            "business_identity",    // 40 · core
+            "team",                 // 80 · core
+            "cash_register.setup",  // 90 · module
+            "unknown_module.setup", // undeclared → last
         ]
     );
 }
@@ -949,13 +984,28 @@ async fn the_document_and_the_item_carry_exactly_the_contracted_keys() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
 
-    let mut doc_keys: Vec<&str> = doc.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut doc_keys: Vec<&str> = doc
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     doc_keys.sort_unstable();
     assert_eq!(
         doc_keys,
-        ["blocking_pending", "items", "pending", "total", "unavailable"],
+        [
+            "blocking_pending",
+            "items",
+            "pending",
+            "total",
+            "unavailable"
+        ],
         "three states need three counters: with only `pending`, `total - pending` reads as done"
     );
 
@@ -999,7 +1049,11 @@ async fn every_item_travels_with_the_ways_of_getting_it_done() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
 
     assert_eq!(
         must(&doc, "apps")["actions"],
@@ -1179,7 +1233,11 @@ async fn the_certificate_arm_of_the_gate_blocks_through_whoever_carries_the_capa
     std::fs::remove_dir_all(&dir).ok();
     set_business_identity(&rt).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "verifactu.setup")["level"], "legal");
     assert_eq!(
         doc["blocking_pending"], 1,
@@ -1200,7 +1258,11 @@ async fn the_certificate_item_drops_to_functional_the_moment_the_certificate_is_
     set_business_identity(&rt).await;
     load_certificate(&rt, "hub-setup").await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
     assert_eq!(
         must(&doc, "verifactu.setup")["state"],
         "pending",
@@ -1251,7 +1313,11 @@ async fn in_the_testing_environment_there_is_no_certificate_wall_and_the_documen
         .unwrap();
 
     // The checklist: no ⛔ on the certificate module — the gate behind it does not reject.
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
     assert_eq!(
         must(&doc, "verifactu.setup")["level"],
         "functional",
@@ -1292,7 +1358,12 @@ async fn the_blocking_level_follows_the_capability_and_never_a_module_name() {
         &rt,
         &ctx(
             "hub-setup",
-            &[SESSION, ADMINISTER, "fattura.configure", "verifactu.configure"],
+            &[
+                SESSION,
+                ADMINISTER,
+                "fattura.configure",
+                "verifactu.configure",
+            ],
         ),
     )
     .await;
@@ -1483,7 +1554,10 @@ async fn the_third_state_leaves_blocking_pending_exactly_where_it_was() {
     catalogue_offered(&rt, 0).await;
     let doc = status(&rt, &c).await;
     assert_eq!(doc["blocking_pending"], before);
-    assert_eq!(doc["blocking_pending"], 1, "the business identity, as always");
+    assert_eq!(
+        doc["blocking_pending"], 1,
+        "the business identity, as always"
+    );
 
     // And it still clears when the gate clears: the third state is on another axis entirely.
     set_business_identity(&rt).await;
@@ -1503,7 +1577,11 @@ async fn an_installed_app_beats_whatever_the_catalogue_last_said() {
     std::fs::remove_dir_all(&dir).ok();
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "inventory.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "apps")["state"], "done");
     assert_eq!(doc["unavailable"], 0);
 }
@@ -1520,7 +1598,11 @@ async fn only_the_apps_item_can_be_unavailable_a_module_item_never_is() {
     std::fs::remove_dir_all(&dir).ok();
     catalogue_offered(&rt, 0).await;
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "pending");
     for it in items(&doc) {
         assert!(
@@ -1826,7 +1908,11 @@ async fn un_item_hecho_por_una_plantilla_lo_dice() {
     rt.install_from_dir(&dir).await.unwrap();
     imported_row(&rt, "hub-origen", "tables_table", "t1").await;
 
-    let doc = status(&rt, &ctx("hub-origen", &[SESSION, ADMINISTER, "tables.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-origen", &[SESSION, ADMINISTER, "tables.configure"]),
+    )
+    .await;
 
     assert_eq!(must(&doc, "tables.setup")["origin"], "blueprint");
 }
@@ -1839,7 +1925,11 @@ async fn lo_que_configuro_el_dueno_no_se_marca_como_heredado() {
     let dir = setup_module("tables", true, json!({}));
     rt.install_from_dir(&dir).await.unwrap();
 
-    let doc = status(&rt, &ctx("hub-propio", &[SESSION, ADMINISTER, "tables.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-propio", &[SESSION, ADMINISTER, "tables.configure"]),
+    )
+    .await;
 
     assert_eq!(must(&doc, "tables.setup")["origin"], "user");
 }
@@ -1849,10 +1939,16 @@ async fn lo_que_configuro_el_dueno_no_se_marca_como_heredado() {
 #[tokio::test]
 async fn el_origen_es_por_modulo_no_por_hub() {
     let mut rt = runtime("hub-mixto").await;
-    rt.install_from_dir(&setup_module("tables", true, json!({}))).await.unwrap();
+    rt.install_from_dir(&setup_module("tables", true, json!({})))
+        .await
+        .unwrap();
     imported_row(&rt, "hub-mixto", "inventory_product", "p1").await;
 
-    let doc = status(&rt, &ctx("hub-mixto", &[SESSION, ADMINISTER, "tables.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-mixto", &[SESSION, ADMINISTER, "tables.configure"]),
+    )
+    .await;
 
     assert_eq!(must(&doc, "tables.setup")["origin"], "user");
 }
@@ -1877,15 +1973,20 @@ async fn los_items_del_core_son_siempre_del_dueno() {
 #[tokio::test]
 async fn todo_item_lleva_origen_aunque_este_pendiente() {
     let mut rt = runtime("hub-pendiente").await;
-    rt.install_from_dir(&setup_module("tables", false, json!({}))).await.unwrap();
+    rt.install_from_dir(&setup_module("tables", false, json!({})))
+        .await
+        .unwrap();
 
-    let doc = status(&rt, &ctx("hub-pendiente", &[SESSION, ADMINISTER, "tables.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-pendiente", &[SESSION, ADMINISTER, "tables.configure"]),
+    )
+    .await;
 
     for it in items(&doc) {
         assert!(it["origin"].is_string(), "sin origen: {it}");
     }
 }
-
 
 // ── hub#1119 · a module the dispatcher will refuse is NOT «configured» ──────────────────────────
 //
@@ -1902,7 +2003,11 @@ async fn a_module_whose_capability_is_not_granted_is_still_pending() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
     assert_eq!(
         must(&doc, "verifactu.setup")["state"],
         "pending",
@@ -1921,7 +2026,11 @@ async fn granting_the_capability_is_what_finishes_the_item() {
         .await
         .expect("the owner grants it in Ajustes → Permisos");
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "verifactu.configure"]),
+    )
+    .await;
     assert_eq!(
         must(&doc, "verifactu.setup")["state"],
         "done",
@@ -1937,6 +2046,10 @@ async fn a_module_that_asks_for_nothing_is_unaffected() {
     rt.install_from_dir(&dir).await.unwrap();
     std::fs::remove_dir_all(&dir).ok();
 
-    let doc = status(&rt, &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"])).await;
+    let doc = status(
+        &rt,
+        &ctx("hub-setup", &[SESSION, ADMINISTER, "pricing.configure"]),
+    )
+    .await;
     assert_eq!(must(&doc, "pricing.setup")["state"], "done");
 }

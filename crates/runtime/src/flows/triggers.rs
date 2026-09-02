@@ -222,7 +222,10 @@ async fn retime_to_current_zone(
         p.insert("hub_id".into(), json!(hub_id));
         p.insert("tz".into(), json!(tz.name()));
         p.insert("now".into(), json!(now));
-        p.insert("next_run".into(), json!(cron::next_after_in_tz(expr, now, tz)));
+        p.insert(
+            "next_run".into(),
+            json!(cron::next_after_in_tz(expr, now, tz)),
+        );
         db.execute(
             "UPDATE _flow_triggers SET next_run = :next_run, tz = :tz, updated_at = :now \
              WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
@@ -315,11 +318,7 @@ async fn advance_schedule(
 }
 
 /// How many runs this flow started in the last minute — the rate guard's only question.
-async fn runs_in_last_minute(
-    db: &dyn DatabaseAdapter,
-    hub_id: &str,
-    flow_id: &str,
-) -> Result<i64> {
+async fn runs_in_last_minute(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) -> Result<i64> {
     let since = (chrono::Utc::now() - chrono::Duration::seconds(60)).to_rfc3339();
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
@@ -336,7 +335,11 @@ async fn runs_in_last_minute(
     Ok(res
         .rows
         .first()
-        .and_then(|r| r["c"].as_i64().or_else(|| r["c"].as_f64().map(|f| f as i64)))
+        .and_then(|r| {
+            r["c"]
+                .as_i64()
+                .or_else(|| r["c"].as_f64().map(|f| f as i64))
+        })
         .unwrap_or(0))
 }
 
@@ -448,10 +451,13 @@ mod tests {
     async fn run_count(db: &dyn DatabaseAdapter, flow_id: &str) -> i64 {
         let mut p = Params::new();
         p.insert("f".into(), json!(flow_id));
-        db.query("SELECT COUNT(*) AS c FROM _flow_runs WHERE flow_id = :f", &p)
-            .await
-            .unwrap()
-            .rows[0]["c"]
+        db.query(
+            "SELECT COUNT(*) AS c FROM _flow_runs WHERE flow_id = :f",
+            &p,
+        )
+        .await
+        .unwrap()
+        .rows[0]["c"]
             .as_i64()
             .unwrap_or(-1)
     }
@@ -463,13 +469,17 @@ mod tests {
 
         let p = payload(&[("total", json!("120.50"))]);
         assert_eq!(
-            on_event(&db, HUB, "evt-1", "sale.completed", &p, 0).await.unwrap(),
+            on_event(&db, HUB, "evt-1", "sale.completed", &p, 0)
+                .await
+                .unwrap(),
             1
         );
         // The relay is at-least-once: the same event WILL come back after a failed sibling
         // listener, and it must not start a second run.
         assert_eq!(
-            on_event(&db, HUB, "evt-1", "sale.completed", &p, 0).await.unwrap(),
+            on_event(&db, HUB, "evt-1", "sale.completed", &p, 0)
+                .await
+                .unwrap(),
             0
         );
         assert_eq!(run_count(&db, &flow).await, 1);
@@ -480,14 +490,32 @@ mod tests {
         let db = db().await;
         let flow = flow_with(&db, on_sale(json!({ "event.total": { "gte": "100" } }))).await;
 
-        on_event(&db, HUB, "evt-small", "sale.completed", &payload(&[("total", json!("9.90"))]), 0)
-            .await
-            .unwrap();
-        assert_eq!(run_count(&db, &flow).await, 0, "below the threshold: no run");
+        on_event(
+            &db,
+            HUB,
+            "evt-small",
+            "sale.completed",
+            &payload(&[("total", json!("9.90"))]),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            run_count(&db, &flow).await,
+            0,
+            "below the threshold: no run"
+        );
 
-        on_event(&db, HUB, "evt-big", "sale.completed", &payload(&[("total", json!("120.50"))]), 0)
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            HUB,
+            "evt-big",
+            "sale.completed",
+            &payload(&[("total", json!("120.50"))]),
+            0,
+        )
+        .await
+        .unwrap();
         assert_eq!(run_count(&db, &flow).await, 1);
     }
 
@@ -509,7 +537,9 @@ mod tests {
         let plain = flow_with(&db, on_sale(json!({}))).await;
 
         let p = payload(&[("customer_id", json!("c-1")), ("id", json!("s-9"))]);
-        on_event(&db, HUB, "evt-1", "sale.completed", &p, 0).await.unwrap();
+        on_event(&db, HUB, "evt-1", "sale.completed", &p, 0)
+            .await
+            .unwrap();
 
         let runs = store::list_runs(&db, HUB, &mapped, 10, None).await.unwrap();
         assert_eq!(runs[0].input, json!({ "who": "c-1", "note": "sale s-9" }));
@@ -541,12 +571,16 @@ mod tests {
         .await
         .unwrap();
 
-        on_event(&db, HUB, "evt-1", "sale.completed", &payload(&[]), 0).await.unwrap();
+        on_event(&db, HUB, "evt-1", "sale.completed", &payload(&[]), 0)
+            .await
+            .unwrap();
         assert_eq!(run_count(&db, &flow).await, 0);
 
         let other = flow_with(&db, on_sale(json!({}))).await;
         store::delete(&db, HUB, &other, "hub_user:1").await.unwrap();
-        on_event(&db, HUB, "evt-2", "sale.completed", &payload(&[]), 0).await.unwrap();
+        on_event(&db, HUB, "evt-2", "sale.completed", &payload(&[]), 0)
+            .await
+            .unwrap();
         assert_eq!(run_count(&db, &other).await, 0);
     }
 
@@ -554,9 +588,16 @@ mod tests {
     async fn an_event_from_another_hub_never_starts_a_run_here() {
         let db = db().await;
         let flow = flow_with(&db, on_sale(json!({}))).await;
-        on_event(&db, "hub-other", "evt-1", "sale.completed", &payload(&[]), 0)
-            .await
-            .unwrap();
+        on_event(
+            &db,
+            "hub-other",
+            "evt-1",
+            "sale.completed",
+            &payload(&[]),
+            0,
+        )
+        .await
+        .unwrap();
         assert_eq!(run_count(&db, &flow).await, 0);
     }
 
@@ -585,9 +626,16 @@ mod tests {
         // Every event is a different id, so idempotence does not save us here — only the rate
         // guard does. This is the shape of a flow whose own command emits its own trigger.
         for i in 0..(MAX_RUNS_PER_MINUTE + 10) {
-            on_event(&db, HUB, &format!("evt-{i}"), "sale.completed", &payload(&[]), 0)
-                .await
-                .unwrap();
+            on_event(
+                &db,
+                HUB,
+                &format!("evt-{i}"),
+                "sale.completed",
+                &payload(&[]),
+                0,
+            )
+            .await
+            .unwrap();
         }
         assert_eq!(
             run_count(&db, &flow).await,
@@ -637,7 +685,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(sweep_schedules(&db, HUB).await.unwrap(), 1);
-        assert_eq!(sweep_schedules(&db, HUB).await.unwrap(), 0, "no double fire");
+        assert_eq!(
+            sweep_schedules(&db, HUB).await.unwrap(),
+            0,
+            "no double fire"
+        );
 
         let next = db
             .query("SELECT next_run FROM _flow_triggers WHERE flow_id = :f", &p)
@@ -758,7 +810,10 @@ mod tests {
 
         assert_eq!(sweep_schedules(&db, HUB).await.unwrap(), 1);
         let next = trigger_row(&db, &flow, "next_run").await;
-        assert!(next.ends_with("T03:30:00+00:00"), "advancing keeps the zone: {next}");
+        assert!(
+            next.ends_with("T03:30:00+00:00"),
+            "advancing keeps the zone: {next}"
+        );
     }
 
     // ── hub#735: the writes of this file name the hub, and the guards only count what exists ──
@@ -834,16 +889,28 @@ mod tests {
         let (id, _) = (trigger_row(&db, &mine, "id").await, ());
 
         // The neighbour asks for OUR trigger to be moved on.
-        advance_schedule(&db, OTHER, &id, "cron", "*/5 * * * *", &now_rfc3339(), cron::Tz::UTC)
-            .await
-            .unwrap();
+        advance_schedule(
+            &db,
+            OTHER,
+            &id,
+            "cron",
+            "*/5 * * * *",
+            &now_rfc3339(),
+            cron::Tz::UTC,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             trigger_row(&db, &mine, "next_run").await,
             before_mine,
             "our clock did not move"
         );
-        assert_eq!(trigger_row(&db, &mine, "last_run").await, "", "nor did it fire");
+        assert_eq!(
+            trigger_row(&db, &mine, "last_run").await,
+            "",
+            "nor did it fire"
+        );
         assert_eq!(
             trigger_row(&db, &theirs, "next_run").await,
             before_theirs,
@@ -857,7 +924,9 @@ mod tests {
     async fn an_idempotence_marker_belongs_to_the_hub_that_booked_it() {
         let db = db().await;
         let flow = flow_with(&db, on_sale(json!({}))).await;
-        on_event(&db, HUB, "evt-1", "sale.completed", &payload(&[]), 0).await.unwrap();
+        on_event(&db, HUB, "evt-1", "sale.completed", &payload(&[]), 0)
+            .await
+            .unwrap();
         assert_eq!(run_count(&db, &flow).await, 1);
 
         let listener = db

@@ -19,7 +19,10 @@ async fn make_app() -> axum::Router {
     let db = fresh_db().await;
     let mut rt = Runtime::new(Box::new(db));
     rt.install_from_dir(&fixture()).await.unwrap();
-    app(AppState::with_config(rt, HubConfig::from_env_with_auth(AuthMode::Dev)))
+    app(AppState::with_config(
+        rt,
+        HubConfig::from_env_with_auth(AuthMode::Dev),
+    ))
 }
 
 async fn body_json(resp: axum::response::Response) -> Value {

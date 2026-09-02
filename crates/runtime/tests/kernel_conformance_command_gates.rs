@@ -47,7 +47,11 @@ async fn a_declarative_command_answers_with_the_id_it_minted_hub1264() {
         .await
         .expect("read the row by the id the kernel answered")
         .rows;
-    assert_eq!(rows.len(), 1, "new_ids[0] names the row that was written: {out}");
+    assert_eq!(
+        rows.len(),
+        1,
+        "new_ids[0] names the row that was written: {out}"
+    );
     assert_eq!(rows[0]["name"], json!("minted"));
 }
 

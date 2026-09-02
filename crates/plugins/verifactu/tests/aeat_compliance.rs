@@ -114,12 +114,16 @@ fn alta_hash_coincide_con_formula_aeat() {
     );
     let esperado = sha256_upper(&esperado_input);
     // Valor fijado (anclaje contra regresiones silenciosas del oráculo): SHA-256 mayúsculas.
-    assert_eq!(esperado, "A84E25C35B6BA9FDABE7CF8DD744AA23A4BA8E3E2FE6535C71A9572B418D9122");
-
-    let obtenido = chain::alta_hash(
-        NIF, NUM1, FECHA_ISO, TIPO, cuota_eur, total_eur, "", TS1,
+    assert_eq!(
+        esperado,
+        "A84E25C35B6BA9FDABE7CF8DD744AA23A4BA8E3E2FE6535C71A9572B418D9122"
     );
-    assert_eq!(obtenido, esperado, "la huella de alta debe seguir la fórmula AEAT exacta");
+
+    let obtenido = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, cuota_eur, total_eur, "", TS1);
+    assert_eq!(
+        obtenido, esperado,
+        "la huella de alta debe seguir la fórmula AEAT exacta"
+    );
 }
 
 #[test]
@@ -127,7 +131,8 @@ fn alta_hash_es_hex_mayusculas_64() {
     let h = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     assert_eq!(h.len(), 64, "SHA-256 hex = 64 caracteres");
     assert!(
-        h.chars().all(|c| c.is_ascii_digit() || ('A'..='F').contains(&c)),
+        h.chars()
+            .all(|c| c.is_ascii_digit() || ('A'..='F').contains(&c)),
         "la huella debe ir en HEX MAYÚSCULAS (sin minúsculas): {h}"
     );
 }
@@ -230,7 +235,10 @@ fn alta_hash_matches_the_official_case_1_and_case_2_vectors_hub1330() {
 fn encadenamiento_la_huella_n_usa_la_huella_n_menos_1() {
     // Registro 1 (primero de la cadena → previous_hash vacío).
     let h1 = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
-    assert_eq!(h1, "A84E25C35B6BA9FDABE7CF8DD744AA23A4BA8E3E2FE6535C71A9572B418D9122");
+    assert_eq!(
+        h1,
+        "A84E25C35B6BA9FDABE7CF8DD744AA23A4BA8E3E2FE6535C71A9572B418D9122"
+    );
 
     // Registro 2: su campo Huella = huella del registro 1.
     let h2 = chain::alta_hash(NIF, NUM2, FECHA_ISO, TIPO, 42.0, 242.0, &h1, TS2);
@@ -242,10 +250,14 @@ fn encadenamiento_la_huella_n_usa_la_huella_n_menos_1() {
          &FechaHoraHusoGenRegistro={TS2}"
     );
     assert_eq!(h2, sha256_upper(&input2));
-    assert_eq!(h2, "718F7F017C633C8471F8DB1B4413EF8B1A3B38231E97320AEFC9B9E26CE13033");
+    assert_eq!(
+        h2,
+        "718F7F017C633C8471F8DB1B4413EF8B1A3B38231E97320AEFC9B9E26CE13033"
+    );
 
     // Cambiar la huella anterior cambia la huella siguiente (propiedad de encadenamiento).
-    let h2_otra_cadena = chain::alta_hash(NIF, NUM2, FECHA_ISO, TIPO, 42.0, 242.0, "HASH_FALSO", TS2);
+    let h2_otra_cadena =
+        chain::alta_hash(NIF, NUM2, FECHA_ISO, TIPO, 42.0, 242.0, "HASH_FALSO", TS2);
     assert_ne!(h2, h2_otra_cadena);
 }
 
@@ -263,10 +275,16 @@ fn anulacion_hash_coincide_con_formula_aeat() {
          &Huella=&FechaHoraHusoGenRegistro={TS1}"
     );
     let esperado = sha256_upper(&input);
-    assert_eq!(esperado, "BF697C1BE3F2A38B8A008037F9B745B40BC852D0579F6D932AB83AD0E29E1B3B");
+    assert_eq!(
+        esperado,
+        "BF697C1BE3F2A38B8A008037F9B745B40BC852D0579F6D932AB83AD0E29E1B3B"
+    );
 
     let obtenido = chain::anulacion_hash(NIF, NUM1, FECHA_ISO, "", TS1);
-    assert_eq!(obtenido, esperado, "la huella de anulación omite tipo/cuota/importe");
+    assert_eq!(
+        obtenido, esperado,
+        "la huella de anulación omite tipo/cuota/importe"
+    );
     // Y es distinta de la de alta (lleva menos campos Y nombres de campo distintos).
     let alta = chain::alta_hash(NIF, NUM1, FECHA_ISO, TIPO, 231.0, 1331.0, "", TS1);
     assert_ne!(obtenido, alta);
@@ -324,9 +342,7 @@ fn anulacion_hash_matches_the_official_case_3_vector_hub1330() {
 fn qr_url_lleva_parametros_aeat_correctos() {
     // En producción el host es www2.agenciatributaria.gob.es.
     let url = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "production");
-    assert!(url.starts_with(
-        "https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?"
-    ));
+    assert!(url.starts_with("https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?"));
     // nif sin caracteres especiales → tal cual.
     assert!(url.contains("nif=B12345678"), "{url}");
     // numserie: la '/' se url-encodea a %2F.
@@ -341,9 +357,15 @@ fn qr_url_lleva_parametros_aeat_correctos() {
 fn qr_url_host_segun_entorno() {
     // testing → prewww2.aeat.es (un QR de pruebas con el host de producción no validaría).
     let test = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "testing");
-    assert!(test.starts_with("https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?"), "{test}");
+    assert!(
+        test.starts_with("https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?"),
+        "{test}"
+    );
     let prod = chain::qr_url(NIF, NUM1, FECHA_ISO, 1331.0, "production");
-    assert!(prod.starts_with("https://www2.agenciatributaria.gob.es/"), "{prod}");
+    assert!(
+        prod.starts_with("https://www2.agenciatributaria.gob.es/"),
+        "{prod}"
+    );
 }
 
 #[test]
@@ -407,18 +429,34 @@ fn xml_alta_importes_en_euros_y_estructura() {
         .expect("el registro se puede declarar");
 
     // Importes formateados en EUROS (la conversión céntimos→euros la hace build_soap /100).
-    assert!(xml.contains("<sum1:CuotaTotal>231.00</sum1:CuotaTotal>"), "{xml}");
-    assert!(xml.contains("<sum1:ImporteTotal>1331.00</sum1:ImporteTotal>"), "{xml}");
     assert!(
-        xml.contains("<sum1:BaseImponibleOimporteNoSujeto>1100.00</sum1:BaseImponibleOimporteNoSujeto>"),
+        xml.contains("<sum1:CuotaTotal>231.00</sum1:CuotaTotal>"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("<sum1:ImporteTotal>1331.00</sum1:ImporteTotal>"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains(
+            "<sum1:BaseImponibleOimporteNoSujeto>1100.00</sum1:BaseImponibleOimporteNoSujeto>"
+        ),
         "base imponible en euros: {xml}"
     );
-    assert!(xml.contains("<sum1:CuotaRepercutida>231.00</sum1:CuotaRepercutida>"), "{xml}");
-    assert!(xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"), "{xml}");
+    assert!(
+        xml.contains("<sum1:CuotaRepercutida>231.00</sum1:CuotaRepercutida>"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>"),
+        "{xml}"
+    );
 
     // Estructura: tipo de registro, identificación de factura, fecha AEAT, huella, encadenamiento.
     assert!(xml.contains("<sum1:RegistroAlta>"));
-    assert!(xml.contains(&format!("<sum1:NumSerieFactura>{NUM1}</sum1:NumSerieFactura>")));
+    assert!(xml.contains(&format!(
+        "<sum1:NumSerieFactura>{NUM1}</sum1:NumSerieFactura>"
+    )));
     assert!(xml.contains(&format!(
         "<sum1:FechaExpedicionFactura>{FECHA_AEAT}</sum1:FechaExpedicionFactura>"
     )));
@@ -488,13 +526,24 @@ fn xml_alta_con_destinatario_emite_bloque_destinatarios() {
     let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
         .expect("el registro se puede declarar");
 
-    assert!(xml.contains("<sum1:Destinatarios><sum1:IDDestinatario>"), "{xml}");
-    assert!(xml.contains("<sum1:NombreRazon>Cliente S.L.</sum1:NombreRazon>"), "{xml}");
+    assert!(
+        xml.contains("<sum1:Destinatarios><sum1:IDDestinatario>"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("<sum1:NombreRazon>Cliente S.L.</sum1:NombreRazon>"),
+        "{xml}"
+    );
     assert!(xml.contains("<sum1:NIF>B87654321</sum1:NIF>"), "{xml}");
     // Posición XSD: Destinatarios va ANTES de Desglose.
-    let pos_dest = xml.find("<sum1:Destinatarios>").expect("Destinatarios presente");
+    let pos_dest = xml
+        .find("<sum1:Destinatarios>")
+        .expect("Destinatarios presente");
     let pos_desglose = xml.find("<sum1:Desglose>").expect("Desglose presente");
-    assert!(pos_dest < pos_desglose, "Destinatarios debe ir antes de Desglose: {xml}");
+    assert!(
+        pos_dest < pos_desglose,
+        "Destinatarios debe ir antes de Desglose: {xml}"
+    );
 }
 
 // ── FacturasSustituidas (F3): tiquet→factura completa declara la F2 sustituida (ADR-0140) ──
@@ -517,7 +566,10 @@ fn xml_alta_f3_emite_bloque_facturas_sustituidas() {
     let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
         .expect("el registro se puede declarar");
 
-    assert!(xml.contains("<sum1:FacturasSustituidas><sum1:IDFacturaSustituida>"), "{xml}");
+    assert!(
+        xml.contains("<sum1:FacturasSustituidas><sum1:IDFacturaSustituida>"),
+        "{xml}"
+    );
     assert!(
         xml.contains("<sum1:NumSerieFactura>T-2026-000145</sum1:NumSerieFactura>"),
         "declara el nº de la F2 sustituida: {xml}"
@@ -527,9 +579,15 @@ fn xml_alta_f3_emite_bloque_facturas_sustituidas() {
         "fecha de la F2 en formato AEAT DD-MM-YYYY: {xml}"
     );
     // Posición XSD: FacturasSustituidas va tras TipoFactura y antes de DescripcionOperacion.
-    let pos_tipo = xml.find("<sum1:TipoFactura>").expect("TipoFactura presente");
-    let pos_sust = xml.find("<sum1:FacturasSustituidas>").expect("FacturasSustituidas presente");
-    let pos_desc = xml.find("<sum1:DescripcionOperacion>").expect("DescripcionOperacion presente");
+    let pos_tipo = xml
+        .find("<sum1:TipoFactura>")
+        .expect("TipoFactura presente");
+    let pos_sust = xml
+        .find("<sum1:FacturasSustituidas>")
+        .expect("FacturasSustituidas presente");
+    let pos_desc = xml
+        .find("<sum1:DescripcionOperacion>")
+        .expect("DescripcionOperacion presente");
     assert!(
         pos_tipo < pos_sust && pos_sust < pos_desc,
         "orden XSD: TipoFactura < FacturasSustituidas < DescripcionOperacion: {xml}"
@@ -543,7 +601,10 @@ fn xml_alta_sin_sustitucion_no_emite_bloque() {
     let record = record_alta_centimos(&hash);
     let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
         .expect("el registro se puede declarar");
-    assert!(!xml.contains("<sum1:FacturasSustituidas>"), "sin sustitución no debe emitir el bloque: {xml}");
+    assert!(
+        !xml.contains("<sum1:FacturasSustituidas>"),
+        "sin sustitución no debe emitir el bloque: {xml}"
+    );
 }
 
 #[test]
@@ -554,5 +615,8 @@ fn xml_alta_sin_destinatario_omite_bloque() {
     let xml = aeat::build_soap(&record, &config_minima(), None, "hub-test")
         .expect("el registro se puede declarar");
 
-    assert!(!xml.contains("<sum1:Destinatarios>"), "no debe emitir Destinatarios vacío: {xml}");
+    assert!(
+        !xml.contains("<sum1:Destinatarios>"),
+        "no debe emitir Destinatarios vacío: {xml}"
+    );
 }

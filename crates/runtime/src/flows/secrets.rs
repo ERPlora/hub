@@ -263,7 +263,9 @@ mod tests {
         let _key = EnvVarGuard::set(&test_key_b64(7));
         let db = db().await;
 
-        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
 
         // What the column holds is the envelope, not the credential.
         let stored = db
@@ -274,7 +276,10 @@ mod tests {
             .as_str()
             .unwrap()
             .to_string();
-        assert!(!stored.contains("sk-live-42"), "the value is encrypted at rest");
+        assert!(
+            !stored.contains("sk-live-42"),
+            "the value is encrypted at rest"
+        );
         assert!(secret_box::is_encrypted(&stored));
 
         // And the ONE reader gets it back.
@@ -287,14 +292,26 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(7));
         let db = db().await;
-        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
-        put(&db, HUB, "WEBHOOK_TOKEN", "whsec-9", "hub_user:1").await.unwrap();
+        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
+        put(&db, HUB, "WEBHOOK_TOKEN", "whsec-9", "hub_user:1")
+            .await
+            .unwrap();
 
-        let names: Vec<String> = list(&db, HUB).await.unwrap().into_iter().map(|s| s.name).collect();
+        let names: Vec<String> = list(&db, HUB)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.name)
+            .collect();
         assert_eq!(names, vec!["API_KEY", "WEBHOOK_TOKEN"]);
         // Serialising the listing is what the endpoint does; no value can ride along.
         let json = serde_json::to_string(&list(&db, HUB).await.unwrap()).unwrap();
-        assert!(!json.contains("sk-live-42") && !json.contains("whsec-9"), "{json}");
+        assert!(
+            !json.contains("sk-live-42") && !json.contains("whsec-9"),
+            "{json}"
+        );
     }
 
     #[tokio::test]
@@ -305,7 +322,10 @@ mod tests {
         let first = put(&db, HUB, "API_KEY", "old", "hub_user:1").await.unwrap();
         let second = put(&db, HUB, "API_KEY", "new", "hub_user:2").await.unwrap();
 
-        assert_eq!(first.created_at, second.created_at, "the same row was rotated");
+        assert_eq!(
+            first.created_at, second.created_at,
+            "the same row was rotated"
+        );
         assert_eq!(second.updated_by, "hub_user:2");
         assert_eq!(list(&db, HUB).await.unwrap().len(), 1);
         assert_eq!(
@@ -319,7 +339,9 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(7));
         let db = db().await;
-        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
+        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
         delete(&db, HUB, "API_KEY", "hub_user:1").await.unwrap();
 
         assert!(list(&db, HUB).await.unwrap().is_empty());
@@ -328,9 +350,15 @@ mod tests {
             .query("SELECT value_enc FROM _flow_secrets", &Params::new())
             .await
             .unwrap();
-        assert_eq!(leftovers.rows[0]["value_enc"], json!(""), "the tombstone keeps no envelope");
+        assert_eq!(
+            leftovers.rows[0]["value_enc"],
+            json!(""),
+            "the tombstone keeps no envelope"
+        );
         // Re-creating it later is not a conflict with its own tombstone.
-        put(&db, HUB, "API_KEY", "sk-live-43", "hub_user:1").await.unwrap();
+        put(&db, HUB, "API_KEY", "sk-live-43", "hub_user:1")
+            .await
+            .unwrap();
         assert_eq!(
             resolve(&db, HUB, &["API_KEY".to_string()]).await.unwrap()["API_KEY"],
             "sk-live-43"
@@ -342,8 +370,12 @@ mod tests {
         let _lock = env_lock();
         let _key = EnvVarGuard::set(&test_key_b64(7));
         let db = db().await;
-        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1").await.unwrap();
-        assert!(resolve(&db, "hub-other", &["API_KEY".to_string()]).await.is_err());
+        put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
+            .await
+            .unwrap();
+        assert!(resolve(&db, "hub-other", &["API_KEY".to_string()])
+            .await
+            .is_err());
         assert!(list(&db, "hub-other").await.unwrap().is_empty());
     }
 
@@ -379,7 +411,10 @@ mod tests {
         let err = put(&db, HUB, "API_KEY", "sk-live-42", "hub_user:1")
             .await
             .expect_err("storing it unencrypted would outlive the decision in a backup");
-        assert!(format!("{err}").contains(secret_box::MASTER_KEY_ENV), "{err}");
+        assert!(
+            format!("{err}").contains(secret_box::MASTER_KEY_ENV),
+            "{err}"
+        );
         assert!(list(&db, HUB).await.unwrap().is_empty(), "nothing landed");
     }
 

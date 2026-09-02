@@ -103,7 +103,9 @@ pub async fn load(
     };
     let zip = base64::engine::general_purpose::STANDARD
         .decode(text("zip_base64"))
-        .map_err(|e| RuntimeError::Storage(format!("paquete local de `{module_id}` ilegible: {e}")))?;
+        .map_err(|e| {
+            RuntimeError::Storage(format!("paquete local de `{module_id}` ilegible: {e}"))
+        })?;
     Ok(Some(StoredPackage {
         module_id: module_id.to_string(),
         version: text("version"),
@@ -141,7 +143,9 @@ mod tests {
     /// identidad, que las migraciones ALTERan) y después el catálogo versionado.
     async fn db_with_schema() -> impl DatabaseAdapter {
         let db = fresh_db().await;
-        crate::installer::ensure_hub_module_table(&db).await.unwrap();
+        crate::installer::ensure_hub_module_table(&db)
+            .await
+            .unwrap();
         crate::identity::ensure_tables(&db).await.unwrap();
         crate::system_migrations::apply(&db, "hub-a").await.unwrap();
         db
@@ -152,11 +156,22 @@ mod tests {
     async fn a_saved_package_comes_back_exactly_as_it_went_in() {
         let db = db_with_schema().await;
         let zip = vec![0u8, 1, 2, 250, 255];
-        save(&db, "hub-a", "notes", "1.0.0", "deadbeef", Some(r#"{"key_id":"mk"}"#), &zip)
-            .await
-            .unwrap();
+        save(
+            &db,
+            "hub-a",
+            "notes",
+            "1.0.0",
+            "deadbeef",
+            Some(r#"{"key_id":"mk"}"#),
+            &zip,
+        )
+        .await
+        .unwrap();
 
-        let stored = load(&db, "hub-a", "notes").await.unwrap().expect("guardado");
+        let stored = load(&db, "hub-a", "notes")
+            .await
+            .unwrap()
+            .expect("guardado");
         assert_eq!(stored.version, "1.0.0");
         assert_eq!(stored.sha256, "deadbeef");
         assert_eq!(stored.signature_json.as_deref(), Some(r#"{"key_id":"mk"}"#));
@@ -168,8 +183,12 @@ mod tests {
     #[tokio::test]
     async fn saving_again_replaces_the_copy_instead_of_piling_up() {
         let db = db_with_schema().await;
-        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"old").await.unwrap();
-        save(&db, "hub-a", "notes", "2.0.0", "bbb", None, b"new").await.unwrap();
+        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"old")
+            .await
+            .unwrap();
+        save(&db, "hub-a", "notes", "2.0.0", "bbb", None, b"new")
+            .await
+            .unwrap();
 
         let stored = load(&db, "hub-a", "notes").await.unwrap().unwrap();
         assert_eq!(stored.version, "2.0.0");
@@ -180,7 +199,9 @@ mod tests {
     #[tokio::test]
     async fn a_package_belongs_to_one_hub_and_the_neighbour_never_sees_it() {
         let db = db_with_schema().await;
-        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"mine").await.unwrap();
+        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"mine")
+            .await
+            .unwrap();
 
         assert!(load(&db, "hub-b", "notes").await.unwrap().is_none());
         assert!(load(&db, "hub-a", "notes").await.unwrap().is_some());
@@ -190,8 +211,12 @@ mod tests {
     #[tokio::test]
     async fn forgetting_removes_only_that_module_and_can_be_repeated() {
         let db = db_with_schema().await;
-        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"n").await.unwrap();
-        save(&db, "hub-a", "tasks", "1.0.0", "bbb", None, b"t").await.unwrap();
+        save(&db, "hub-a", "notes", "1.0.0", "aaa", None, b"n")
+            .await
+            .unwrap();
+        save(&db, "hub-a", "tasks", "1.0.0", "bbb", None, b"t")
+            .await
+            .unwrap();
 
         forget(&db, "hub-a", "notes").await.unwrap();
         forget(&db, "hub-a", "notes").await.unwrap();

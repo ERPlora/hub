@@ -53,9 +53,10 @@ pub(crate) fn err_status_and_code(
         // like `invalid_payload` (it IS a payload-contract refusal, caught before any read),
         // with its own stable code so the caller can tell "you did not send what the query
         // needs" from "what you sent does not validate".
-        E::MissingRequiredParam { .. } => {
-            (StatusCode::UNPROCESSABLE_ENTITY, "missing_required_param".into())
-        }
+        E::MissingRequiredParam { .. } => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "missing_required_param".into(),
+        ),
         // hub#1173: the twin of the above at the same door — a param the LIST query does not
         // declare. Same `422` (it is a payload-contract refusal, caught before any read) with its
         // own stable code, so the caller can tell "that query has no such filter" from "you did
@@ -132,7 +133,8 @@ pub(crate) fn err_status_and_code(
 /// Deliberately generic and stable: the `code` beside it is what a caller branches on and what the
 /// shell translates (ADR-0055), and the detail belongs in the server log, not in a cashier's
 /// dialog.
-pub(crate) const REDACTED_MESSAGE: &str = "the request could not be completed — the hub recorded the details";
+pub(crate) const REDACTED_MESSAGE: &str =
+    "the request could not be completed — the hub recorded the details";
 
 /// Does this sentence carry the database driver's own words?
 ///
@@ -638,7 +640,9 @@ mod error_redaction_tests {
     /// `/api/command` and asserts the driver's words never come back.)
     #[test]
     fn plumbing_is_redacted_and_keeps_its_stable_code() {
-        let e = RuntimeError::Io(std::io::Error::other("/srv/erplora/modules/sales: permission denied"));
+        let e = RuntimeError::Io(std::io::Error::other(
+            "/srv/erplora/modules/sales: permission denied",
+        ));
 
         let error = error_of(e);
         assert_eq!(error["message"], REDACTED_MESSAGE);
@@ -689,7 +693,10 @@ mod error_redaction_tests {
         assert_eq!(error["code"], "read_unavailable");
         assert_eq!(error["query"], "taxes.rules.list");
         assert!(
-            !error["message"].as_str().unwrap_or_default().contains("hub#"),
+            !error["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("hub#"),
             "an issue number is not something a cashier can act on: {error}"
         );
     }
@@ -767,7 +774,10 @@ mod error_redaction_tests {
         });
         assert_eq!(elevation["permission"], "sales.refund");
         assert!(
-            elevation["message"].as_str().unwrap_or_default().contains("sales.refund"),
+            elevation["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("sales.refund"),
             "{elevation}"
         );
 
@@ -778,7 +788,10 @@ mod error_redaction_tests {
         assert_eq!(dependents["code"], "has_dependents");
         assert_eq!(dependents["dependents"][0], "sales");
         assert!(
-            dependents["message"].as_str().unwrap_or_default().contains("sales"),
+            dependents["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("sales"),
             "{dependents}"
         );
     }

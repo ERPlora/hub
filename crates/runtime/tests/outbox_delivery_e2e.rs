@@ -29,7 +29,10 @@ use erplora_wasm_host::{Event, Output};
 use serde_json::json;
 
 fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixture_outbox142").join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixture_outbox142")
+        .join(name)
 }
 fn admin() -> RequestContext {
     RequestContext::new("h1", "u1", ["*".to_string()])
@@ -89,8 +92,12 @@ impl NativeHandler for EmittingHandler {
 async fn runtime() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&fixture("ob")).await.expect("instalar ob");
-    rt.install_from_dir(&fixture("ob2")).await.expect("instalar ob2");
+    rt.install_from_dir(&fixture("ob"))
+        .await
+        .expect("instalar ob");
+    rt.install_from_dir(&fixture("ob2"))
+        .await
+        .expect("instalar ob2");
     rt.register_native("ob", Arc::new(EmittingHandler));
     rt
 }
@@ -106,9 +113,15 @@ async fn a_failing_listener_does_not_block_its_sibling() {
     let rt = runtime().await;
 
     // Dispara el evento. `ob.bad` es el listener de `ob` en `ob.e`; `ob2.good` es el de `ob2`.
-    rt.execute_command("ob.fire", &Params::new(), &admin()).await.unwrap();
+    rt.execute_command("ob.fire", &Params::new(), &admin())
+        .await
+        .unwrap();
     // Antes del drain, ningún listener ha corrido (entrega 100% asíncrona vía relay).
-    assert_eq!(runs(&rt, "good").await, 0, "el listener no corre inline; va por el relay");
+    assert_eq!(
+        runs(&rt, "good").await,
+        0,
+        "el listener no corre inline; va por el relay"
+    );
 
     // Un ciclo del relay: `ob.bad` falla, pero `ob2.good` SE ENTREGA igual.
     rt.drain_outbox().await.unwrap();
@@ -142,7 +155,11 @@ async fn a_failing_listener_does_not_block_its_sibling() {
 
     // Re-drenar no duplica al bueno (idempotencia por _event_delivery). El malo sigue fallando.
     rt.drain_outbox().await.unwrap();
-    assert_eq!(runs(&rt, "good").await, 1, "reentrega no duplica el listener bueno (idempotente)");
+    assert_eq!(
+        runs(&rt, "good").await,
+        1,
+        "reentrega no duplica el listener bueno (idempotente)"
+    );
 }
 
 /// **hub#142 — síntoma (2): un evento devuelto por un handler (`Output.events`) llega a los
@@ -177,11 +194,19 @@ async fn a_handler_emitted_event_reaches_listeners_alongside_a_failing_sibling_r
 
     // (1) Una fila cuyo listener falla: `ob.fire` → `ob.e` → `ob.bad` (SQL roto). Cae PRIMERO
     //     en el orden del lote (created_at) — el escenario "fila venenosa" del issue.
-    rt.execute_command("ob.fire", &Params::new(), &admin()).await.unwrap();
+    rt.execute_command("ob.fire", &Params::new(), &admin())
+        .await
+        .unwrap();
     // (2) Evento del HANDLER: `ob.emit_handler` devuelve `ob.from_handler` en `Output.events`.
     //     Se encola en el outbox dentro de la misma tx del command; cae DESPUÉS en el lote.
-    rt.execute_command("ob.emit_handler", &Params::new(), &admin()).await.unwrap();
-    assert_eq!(runs(&rt, "handler").await, 0, "el handler-emitted event no se entrega inline");
+    rt.execute_command("ob.emit_handler", &Params::new(), &admin())
+        .await
+        .unwrap();
+    assert_eq!(
+        runs(&rt, "handler").await,
+        0,
+        "el handler-emitted event no se entrega inline"
+    );
 
     // Un SOLO ciclo del relay procesa ambas filas (BATCH=50). La venenosa falla y se difiere;
     // la del handler se entrega igual.
@@ -196,18 +221,31 @@ async fn a_handler_emitted_event_reaches_listeners_alongside_a_failing_sibling_r
     // La fila del handler quedó entregada; la venenosa, diferida (pendiente de reintento).
     let rows = rt
         .db_for_test()
-        .query("SELECT event_name, status FROM _event_outbox ORDER BY created_at", &Params::new())
+        .query(
+            "SELECT event_name, status FROM _event_outbox ORDER BY created_at",
+            &Params::new(),
+        )
         .await
         .unwrap();
-    assert_eq!(rows.rows.len(), 2, "dos filas en el outbox (venenosa + handler)");
-    assert_eq!(rows.rows[0]["event_name"], json!("ob.e"), "la venenosa va primero por created_at");
     assert_eq!(
-        rows.rows[0]["status"], json!("pending"),
+        rows.rows.len(),
+        2,
+        "dos filas en el outbox (venenosa + handler)"
+    );
+    assert_eq!(
+        rows.rows[0]["event_name"],
+        json!("ob.e"),
+        "la venenosa va primero por created_at"
+    );
+    assert_eq!(
+        rows.rows[0]["status"],
+        json!("pending"),
         "la venenosa se difiere (no delivered ni dead): reintento"
     );
     assert_eq!(rows.rows[1]["event_name"], json!("ob.from_handler"));
     assert_eq!(
-        rows.rows[1]["status"], json!("delivered"),
+        rows.rows[1]["status"],
+        json!("delivered"),
         "el evento del handler se entregó pese a la fila que falla antes en el lote"
     );
 }

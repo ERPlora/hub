@@ -18,8 +18,11 @@
 
 use std::path::PathBuf;
 
-use erplora_db::{Params, testutil::fresh_db};
-use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER, SCHEMA_VERSION};
+use erplora_db::{testutil::fresh_db, Params};
+use erplora_runtime::export::{
+    export_hub, BundlePurpose, ExportSelection, ModuleDataSelection, HUB_ID_PLACEHOLDER,
+    SCHEMA_VERSION,
+};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::json;
 
@@ -43,8 +46,12 @@ fn ctx(hub: &str) -> RequestContext {
 async fn fresh() -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1"); // ctx y runtime comparten hub (como en prod)
-    rt.install_from_dir(&modules_root().join("taxes")).await.expect("instalar taxes");
-    rt.install_from_dir(&modules_root().join("inventory")).await.expect("instalar inventory");
+    rt.install_from_dir(&modules_root().join("taxes"))
+        .await
+        .expect("instalar taxes");
+    rt.install_from_dir(&modules_root().join("inventory"))
+        .await
+        .expect("instalar inventory");
     rt
 }
 
@@ -67,8 +74,16 @@ fn full_selection() -> ExportSelection {
         fiscal: false,
         media: false,
         modules: vec![
-            ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
-            ModuleDataSelection { module_id: "inventory".into(), with_data: true, tables: None },
+            ModuleDataSelection {
+                module_id: "taxes".into(),
+                with_data: true,
+                tables: None,
+            },
+            ModuleDataSelection {
+                module_id: "inventory".into(),
+                with_data: true,
+                tables: None,
+            },
         ],
         purpose: Default::default(),
     }
@@ -88,7 +103,9 @@ const CREATED_AT: &str = "2026-07-11T18:00:00Z";
 /// casilla no es un control. Con `purpose: Template` las secciones **no entran en el bundle**.
 #[tokio::test]
 async fn una_plantilla_no_exporta_identidades_ni_fiscal() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -109,7 +126,11 @@ async fn una_plantilla_no_exporta_identidades_ni_fiscal() {
         bundle.files.keys().collect::<Vec<_>>()
     );
     assert!(
-        !bundle.manifest.sections.iter().any(|s| s == "hub_users" || s == "fiscal"),
+        !bundle
+            .manifest
+            .sections
+            .iter()
+            .any(|s| s == "hub_users" || s == "fiscal"),
         "el manifest no puede anunciar secciones de identidad/fiscal: {:?}",
         bundle.manifest.sections
     );
@@ -117,7 +138,10 @@ async fn una_plantilla_no_exporta_identidades_ni_fiscal() {
 
     // …y lo que SÍ es una plantilla sigue viajando entero: los datos de negocio.
     let inv = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
-    assert!(inv.contains("Café"), "una plantilla debe llevar los datos de negocio");
+    assert!(
+        inv.contains("Café"),
+        "una plantilla debe llevar los datos de negocio"
+    );
 }
 
 /// El espejo: un **backup/migración** sigue llevándolo TODO. Sin identidades, restaurar perdería
@@ -125,15 +149,24 @@ async fn una_plantilla_no_exporta_identidades_ni_fiscal() {
 /// Es el default cuando el manifest no declara propósito.
 #[tokio::test]
 async fn un_backup_si_exporta_identidades() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
 
     let bundle = export_hub(&rt, "h1", &full_selection(), "backup", "es", CREATED_AT)
         .await
         .expect("export de backup");
 
-    assert_eq!(bundle.manifest.purpose, BundlePurpose::Backup, "el default es backup");
-    assert!(bundle.files.contains_key("data/hub_users.sql"), "un backup SÍ lleva identidades");
+    assert_eq!(
+        bundle.manifest.purpose,
+        BundlePurpose::Backup,
+        "el default es backup"
+    );
+    assert!(
+        bundle.files.contains_key("data/hub_users.sql"),
+        "un backup SÍ lleva identidades"
+    );
 }
 
 /// **hub#464 — a backup carries the staff's profile and preferences, not just their `hub_user`
@@ -143,12 +176,21 @@ async fn un_backup_si_exporta_identidades() {
 /// are hub-scoped and were left out of the export. Now they travel under the `hub_users` section.
 #[tokio::test]
 async fn a_backup_carries_the_staff_profile_and_preferences() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     // A user with a real profile + preferences set.
-    let uid = erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Ana", "1234", "cashier", None)
-        .await
-        .expect("crear usuario");
+    let uid = erplora_runtime::identity::create_user(
+        rt.db(),
+        &rt.hub_id(),
+        "Ana",
+        "1234",
+        "cashier",
+        None,
+    )
+    .await
+    .expect("crear usuario");
     let mut p = Params::new();
     p.insert("hub_id".into(), json!("h1"));
     p.insert("user_id".into(), json!(uid));
@@ -192,9 +234,18 @@ async fn a_backup_carries_the_staff_profile_and_preferences() {
         .expect("un backup lleva data/hub_user_pref.sql (hub#464)");
     let profile_sql = std::str::from_utf8(profile).unwrap();
     let pref_sql = std::str::from_utf8(pref).unwrap();
-    assert!(profile_sql.contains("Ana"), "el perfil viaja con el nombre: {profile_sql}");
-    assert!(profile_sql.contains(HUB_ID_PLACEHOLDER), "usa el placeholder, no el literal");
-    assert!(pref_sql.contains("'es'"), "el idioma elegido viaja: {pref_sql}");
+    assert!(
+        profile_sql.contains("Ana"),
+        "el perfil viaja con el nombre: {profile_sql}"
+    );
+    assert!(
+        profile_sql.contains(HUB_ID_PLACEHOLDER),
+        "usa el placeholder, no el literal"
+    );
+    assert!(
+        pref_sql.contains("'es'"),
+        "el idioma elegido viaja: {pref_sql}"
+    );
 }
 
 /// **hub#464 — a template carries NEITHER the profile nor the preferences.** Same identity gate as
@@ -202,11 +253,20 @@ async fn a_backup_carries_the_staff_profile_and_preferences() {
 /// `purpose: Template` bundle, whatever the selection says.
 #[tokio::test]
 async fn a_template_carries_neither_profile_nor_preferences() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
-    let _uid = erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Ana", "1234", "cashier", None)
-        .await
-        .unwrap();
+    let _uid = erplora_runtime::identity::create_user(
+        rt.db(),
+        &rt.hub_id(),
+        "Ana",
+        "1234",
+        "cashier",
+        None,
+    )
+    .await
+    .unwrap();
 
     let selection = ExportSelection {
         users: true,
@@ -217,7 +277,10 @@ async fn a_template_carries_neither_profile_nor_preferences() {
         .await
         .expect("export de plantilla");
 
-    assert!(!bundle.files.contains_key("data/hub_users.sql"), "una plantilla no lleva identidades");
+    assert!(
+        !bundle.files.contains_key("data/hub_users.sql"),
+        "una plantilla no lleva identidades"
+    );
     assert!(
         !bundle.files.contains_key("data/hub_user_profile.sql"),
         "una plantilla tampoco lleva perfiles (hub#464)"
@@ -230,7 +293,9 @@ async fn a_template_carries_neither_profile_nor_preferences() {
 
 #[tokio::test]
 async fn full_export_produces_manifest_and_data_files() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té verde", "TEV").await;
@@ -256,38 +321,74 @@ async fn full_export_produces_manifest_and_data_files() {
     assert_eq!(m.created_at, CREATED_AT);
 
     // Los dos módulos, con datos, y con la versión REAL de su module.json.
-    let taxes = m.modules.iter().find(|x| x.id == "taxes").expect("taxes en manifest");
-    let inventory = m.modules.iter().find(|x| x.id == "inventory").expect("inventory en manifest");
+    let taxes = m
+        .modules
+        .iter()
+        .find(|x| x.id == "taxes")
+        .expect("taxes en manifest");
+    let inventory = m
+        .modules
+        .iter()
+        .find(|x| x.id == "inventory")
+        .expect("inventory en manifest");
     assert!(taxes.with_data && inventory.with_data);
     assert!(!taxes.version.is_empty() && !inventory.version.is_empty());
 
     // Secciones y ficheros coherentes.
-    for section in ["hub_users", "hub_settings", "modules/taxes", "modules/inventory"] {
-        assert!(m.sections.iter().any(|s| s == section), "falta sección {section}");
+    for section in [
+        "hub_users",
+        "hub_settings",
+        "modules/taxes",
+        "modules/inventory",
+    ] {
+        assert!(
+            m.sections.iter().any(|s| s == section),
+            "falta sección {section}"
+        );
     }
-    assert!(bundle.files.contains_key("data/hub_users.sql"), "falta data/hub_users.sql");
-    assert!(bundle.files.contains_key("data/hub_settings.sql"), "falta data/hub_settings.sql");
-    assert!(bundle.files.contains_key("data/taxes.sql"), "falta data/taxes.sql");
-    assert!(bundle.files.contains_key("data/inventory.sql"), "falta data/inventory.sql");
+    assert!(
+        bundle.files.contains_key("data/hub_users.sql"),
+        "falta data/hub_users.sql"
+    );
+    assert!(
+        bundle.files.contains_key("data/hub_settings.sql"),
+        "falta data/hub_settings.sql"
+    );
+    assert!(
+        bundle.files.contains_key("data/taxes.sql"),
+        "falta data/taxes.sql"
+    );
+    assert!(
+        bundle.files.contains_key("data/inventory.sql"),
+        "falta data/inventory.sql"
+    );
 
     // Los datos reales del hub están en el SQL (los productos creados arriba).
     let inv_sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
-    assert!(inv_sql.contains("Café") && inv_sql.contains("Té verde"), "productos ausentes del SQL");
+    assert!(
+        inv_sql.contains("Café") && inv_sql.contains("Té verde"),
+        "productos ausentes del SQL"
+    );
     // Los datos de taxes (categoría creada arriba) también viajan.
     let tax_sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
-    assert!(tax_sql.contains("barberia.corte"), "categoría fiscal ausente del SQL de taxes");
+    assert!(
+        tax_sql.contains("barberia.corte"),
+        "categoría fiscal ausente del SQL de taxes"
+    );
 }
 
 #[tokio::test]
 async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     // La demo del SaaS fallaba en `taxes` al restaurar un blueprint (duplicate key
     // ix_tax_cat_hub_key): el módulo AUTO-SIEMBRA al instalarse sus categorías canónicas
     // (is_system=1) y sus alias de fábrica (source='shipped'); si el bundle ADEMÁS los trae como
     // datos, chocan con la auto-siembra en las claves únicas (hub_id,key)/(hub_id,alias). El export
     // NO debe capturar filas propiedad del módulo — las re-siembra el módulo (ADR-0085/0113, opción A).
     let rt = fresh().await; // instala taxes → siembra categorías is_system=1 + alias 'shipped'
-    // Categoría de USUARIO (is_system=0) → SÍ debe viajar (no over-exclusión).
+                            // Categoría de USUARIO (is_system=0) → SÍ debe viajar (no over-exclusión).
     rt.execute_command(
         "taxes.categories.create",
         &params(json!({ "key": "user.custom", "name": "Categoría del usuario" })),
@@ -296,15 +397,23 @@ async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
     .await
     .expect("crear categoría de usuario");
 
-    let bundle = export_hub(&rt, "h1", &full_selection(), "t", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &full_selection(), "t", "es", CREATED_AT)
+        .await
+        .expect("export");
     let tax_sql = String::from_utf8(bundle.files["data/taxes.sql"].clone()).unwrap();
 
     // La de USUARIO viaja; las canónicas is_system NO → solo 1 INSERT en taxes_category (tabla con
     // unique (hub_id,key) que crasheaba). "taxes_category (" (espacio+paréntesis) NO casa con
     // "taxes_category_alias (".
-    assert!(tax_sql.contains("user.custom"), "la categoría de usuario (is_system=0) debe viajar:\n{tax_sql}");
+    assert!(
+        tax_sql.contains("user.custom"),
+        "la categoría de usuario (is_system=0) debe viajar:\n{tax_sql}"
+    );
     let cat_inserts = tax_sql.matches("INSERT INTO taxes_category (").count();
-    assert_eq!(cat_inserts, 1, "solo la categoría de usuario debe viajar (las is_system no):\n{tax_sql}");
+    assert_eq!(
+        cat_inserts, 1,
+        "solo la categoría de usuario debe viajar (las is_system no):\n{tax_sql}"
+    );
     // Ningún alias de fábrica ('shipped') viaja (tabla con unique (hub_id,alias) que crasheaba).
     assert!(
         !tax_sql.contains("INSERT INTO taxes_category_alias"),
@@ -314,7 +423,9 @@ async fn export_omits_module_owned_seed_rows_that_collide_on_restore() {
 
 #[tokio::test]
 async fn exported_sql_uses_hub_id_placeholder_never_the_literal() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -327,14 +438,19 @@ async fn exported_sql_uses_hub_id_placeholder_never_the_literal() {
         // El hub_id de origen NUNCA viaja: el import inyecta el del destino (ADR-0072).
         assert!(!sql.contains("'h1'"), "{path} contiene el hub_id literal");
         if path.starts_with("data/") && !sql.trim().is_empty() {
-            assert!(sql.contains(HUB_ID_PLACEHOLDER), "{path} sin placeholder {HUB_ID_PLACEHOLDER}");
+            assert!(
+                sql.contains(HUB_ID_PLACEHOLDER),
+                "{path} sin placeholder {HUB_ID_PLACEHOLDER}"
+            );
         }
     }
 }
 
 #[tokio::test]
 async fn tenant_isolation_other_hub_rows_excluded() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h2", "Secreto Ajeno", "SEC").await;
@@ -345,12 +461,17 @@ async fn tenant_isolation_other_hub_rows_excluded() {
 
     let inv_sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
     assert!(inv_sql.contains("Café"));
-    assert!(!inv_sql.contains("Secreto Ajeno"), "fuga de datos de otro tenant en el export");
+    assert!(
+        !inv_sql.contains("Secreto Ajeno"),
+        "fuga de datos de otro tenant en el export"
+    );
 }
 
 #[tokio::test]
 async fn soft_deleted_rows_are_not_exported() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Vivo", "VIV").await;
     create_product(&rt, "h1", "Borrado", "BOR").await;
@@ -367,38 +488,69 @@ async fn soft_deleted_rows_are_not_exported() {
         .and_then(|p| p["id"].as_str().map(str::to_string))
         .expect("precondición: el producto existe antes del delete");
     // El schema del delete (schemas/product_id.json) pide `product_id`, no `id`.
-    rt.execute_command("inventory.products.delete", &params(json!({ "product_id": id })), &ctx("h1"))
-        .await
-        .expect("soft-delete");
+    rt.execute_command(
+        "inventory.products.delete",
+        &params(json!({ "product_id": id })),
+        &ctx("h1"),
+    )
+    .await
+    .expect("soft-delete");
 
     let bundle = export_hub(&rt, "h1", &full_selection(), "barberia", "es", CREATED_AT)
         .await
         .expect("export");
     let inv_sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
     assert!(inv_sql.contains("Vivo"));
-    assert!(!inv_sql.contains("Borrado"), "una fila soft-deleted viajó en el export");
+    assert!(
+        !inv_sql.contains("Borrado"),
+        "una fila soft-deleted viajó en el export"
+    );
 }
 
 #[tokio::test]
 async fn module_without_data_is_listed_but_not_dumped() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
     let mut sel = full_selection();
     sel.modules = vec![
-        ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None },
+        ModuleDataSelection {
+            module_id: "taxes".into(),
+            with_data: true,
+            tables: None,
+        },
         // inventory: checkbox «módulo» marcado, checkbox «datos» SIN marcar.
-        ModuleDataSelection { module_id: "inventory".into(), with_data: false, tables: None },
+        ModuleDataSelection {
+            module_id: "inventory".into(),
+            with_data: false,
+            tables: None,
+        },
     ];
 
-    let bundle = export_hub(&rt, "h1", &sel, "barberia", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &sel, "barberia", "es", CREATED_AT)
+        .await
+        .expect("export");
 
-    let inv = bundle.manifest.modules.iter().find(|x| x.id == "inventory").expect("inventory listado");
+    let inv = bundle
+        .manifest
+        .modules
+        .iter()
+        .find(|x| x.id == "inventory")
+        .expect("inventory listado");
     assert!(!inv.with_data);
-    assert!(!bundle.files.contains_key("data/inventory.sql"), "no debía volcar datos de inventory");
     assert!(
-        !bundle.manifest.sections.iter().any(|s| s == "modules/inventory"),
+        !bundle.files.contains_key("data/inventory.sql"),
+        "no debía volcar datos de inventory"
+    );
+    assert!(
+        !bundle
+            .manifest
+            .sections
+            .iter()
+            .any(|s| s == "modules/inventory"),
         "sección modules/inventory de más"
     );
     // El módulo CON datos sí viaja completo.
@@ -407,7 +559,9 @@ async fn module_without_data_is_listed_but_not_dumped() {
 
 #[tokio::test]
 async fn deselected_sections_are_absent() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
 
     let sel = ExportSelection {
@@ -416,15 +570,24 @@ async fn deselected_sections_are_absent() {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "taxes".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "taxes".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: Default::default(),
     };
-    let bundle = export_hub(&rt, "h1", &sel, "solo-taxes", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &sel, "solo-taxes", "es", CREATED_AT)
+        .await
+        .expect("export");
 
     assert!(!bundle.files.contains_key("data/hub_users.sql"));
     assert!(!bundle.files.contains_key("data/hub_settings.sql"));
     for s in ["hub_users", "hub_settings", "fiscal", "media"] {
-        assert!(!bundle.manifest.sections.iter().any(|x| x == s), "sección {s} no seleccionada presente");
+        assert!(
+            !bundle.manifest.sections.iter().any(|x| x == s),
+            "sección {s} no seleccionada presente"
+        );
     }
 }
 
@@ -436,7 +599,9 @@ async fn deselected_sections_are_absent() {
 /// lleva `hub_id`) — no por adivinar nombres de columna.
 #[tokio::test]
 async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
 
     // Dos hubs con su propia categoría + producto ligados entre sí.
@@ -450,8 +615,14 @@ async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
         )
         .await
         .unwrap();
-        let prods = rt.execute_query("inventory.products.list", &Params::new(), &ctx(hub)).await.unwrap();
-        let cats = rt.execute_query("inventory.categories.list", &Params::new(), &ctx(hub)).await.unwrap();
+        let prods = rt
+            .execute_query("inventory.products.list", &Params::new(), &ctx(hub))
+            .await
+            .unwrap();
+        let cats = rt
+            .execute_query("inventory.categories.list", &Params::new(), &ctx(hub))
+            .await
+            .unwrap();
         rt.execute_command(
             "inventory.products.add_category",
             &params(json!({
@@ -464,9 +635,16 @@ async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
         .unwrap();
     }
 
-    let bundle = export_hub(&rt, "h1", &full_selection(), "restaurante", "es", CREATED_AT)
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &full_selection(),
+        "restaurante",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export");
     let sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
 
     assert!(
@@ -474,17 +652,30 @@ async fn join_tables_without_hub_id_are_exported_scoped_by_their_parent() {
         "el vínculo producto↔categoría no viaja en el bundle:\n{sql}"
     );
     // Aislamiento de tenant: solo el vínculo de h1 (el de h2 tiene otros ids).
-    let vinculos = sql.matches("INSERT INTO inventory_product_categories").count();
-    assert_eq!(vinculos, 1, "esperado 1 vínculo (el de h1), hay {vinculos}:\n{sql}");
+    let vinculos = sql
+        .matches("INSERT INTO inventory_product_categories")
+        .count();
+    assert_eq!(
+        vinculos, 1,
+        "esperado 1 vínculo (el de h1), hay {vinculos}:\n{sql}"
+    );
     // Idempotencia: re-aplicar el bundle no puede duplicar (PK compuesta, sin columna `id`).
-    for line in sql.lines().filter(|l| l.contains("inventory_product_categories")) {
-        assert!(line.contains("WHERE NOT EXISTS"), "vínculo sin guarda de idempotencia: {line}");
+    for line in sql
+        .lines()
+        .filter(|l| l.contains("inventory_product_categories"))
+    {
+        assert!(
+            line.contains("WHERE NOT EXISTS"),
+            "vínculo sin guarda de idempotencia: {line}"
+        );
     }
 }
 
 #[tokio::test]
 async fn sha256_covers_exactly_the_bundle_files() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
 
@@ -494,12 +685,22 @@ async fn sha256_covers_exactly_the_bundle_files() {
 
     // Cobertura exacta: cada fichero tiene hash y no hay hashes huérfanos.
     for path in bundle.files.keys() {
-        let h = bundle.manifest.sha256.get(path).unwrap_or_else(|| panic!("{path} sin sha256"));
+        let h = bundle
+            .manifest
+            .sha256
+            .get(path)
+            .unwrap_or_else(|| panic!("{path} sin sha256"));
         assert_eq!(h.len(), 64, "{path}: sha256 no es hex de 64");
-        assert!(h.chars().all(|c| c.is_ascii_hexdigit()), "{path}: sha256 no-hex");
+        assert!(
+            h.chars().all(|c| c.is_ascii_hexdigit()),
+            "{path}: sha256 no-hex"
+        );
     }
     for path in bundle.manifest.sha256.keys() {
-        assert!(bundle.files.contains_key(path), "sha256 huérfano para {path}");
+        assert!(
+            bundle.files.contains_key(path),
+            "sha256 huérfano para {path}"
+        );
     }
 }
 
@@ -516,7 +717,9 @@ async fn sha256_covers_exactly_the_bundle_files() {
 /// CASUALIDAD, porque aquel hub devolvió las tablas en un orden que sí colaba.
 #[tokio::test]
 async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     rt.execute_command(
         "inventory.categories.create",
@@ -544,12 +747,21 @@ async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
     .await
     .expect("asignar categoría al producto");
 
-    let bundle = export_hub(&rt, "h1", &full_selection(), "test", "es", "2026-07-31T00:00:00Z")
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &full_selection(),
+        "test",
+        "es",
+        "2026-07-31T00:00:00Z",
+    )
+    .await
+    .expect("export");
     let sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
 
-    let pos_categoria = sql.find("INSERT INTO inventory_category ").expect("volcó categorías");
+    let pos_categoria = sql
+        .find("INSERT INTO inventory_category ")
+        .expect("volcó categorías");
     let pos_vinculo = sql
         .find("INSERT INTO inventory_product_categories ")
         .expect("volcó los vínculos producto↔categoría");
@@ -574,21 +786,47 @@ async fn export_vuelca_las_tablas_en_orden_de_dependencia() {
 /// Con `cloud_user_id = NULL` viajan nombre, rol y PIN, y no viaja la cuenta del SaaS.
 #[tokio::test]
 async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
-    erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "Manager", "1234", "manager", None)
-        .await
-        .expect("usuario local");
-    erplora_runtime::identity::create_user(rt.db(), &rt.hub_id(), "support", "", "owner", Some("4"))
-        .await
-        .expect("usuario cloud");
+    erplora_runtime::identity::create_user(
+        rt.db(),
+        &rt.hub_id(),
+        "Manager",
+        "1234",
+        "manager",
+        None,
+    )
+    .await
+    .expect("usuario local");
+    erplora_runtime::identity::create_user(
+        rt.db(),
+        &rt.hub_id(),
+        "support",
+        "",
+        "owner",
+        Some("4"),
+    )
+    .await
+    .expect("usuario cloud");
 
-    let bundle = export_hub(&rt, "h1", &full_selection(), "test", "es", "2026-07-31T00:00:00Z")
-        .await
-        .expect("export");
+    let bundle = export_hub(
+        &rt,
+        "h1",
+        &full_selection(),
+        "test",
+        "es",
+        "2026-07-31T00:00:00Z",
+    )
+    .await
+    .expect("export");
     let sql = String::from_utf8(bundle.files["data/hub_users.sql"].clone()).unwrap();
 
-    assert!(sql.contains("Manager"), "el usuario local es plantilla y debe viajar:\n{sql}");
+    assert!(
+        sql.contains("Manager"),
+        "el usuario local es plantilla y debe viajar:\n{sql}"
+    );
     assert!(
         sql.contains("support") && sql.contains("owner"),
         "el usuario Cloud debe viajar CON su rol (es backup, no solo blueprint):\n{sql}"
@@ -612,7 +850,9 @@ async fn export_desvincula_los_usuarios_de_su_cuenta_cloud_sin_perder_su_rol() {
 /// explícitamente la sección `fiscal` (que es la que ya mueve el certificado, ADR-0113 §2).
 #[tokio::test]
 async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "inventory", "sales", "invoice", "verifactu"] {
@@ -643,22 +883,40 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
         settings_items: None,
         fiscal,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "verifactu".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "verifactu".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: Default::default(),
     };
 
-    let sin = export_hub(&rt, "h1", &seleccion(false), "t", "es", "2026-07-31T00:00:00Z")
-        .await
-        .expect("export sin fiscal");
+    let sin = export_hub(
+        &rt,
+        "h1",
+        &seleccion(false),
+        "t",
+        "es",
+        "2026-07-31T00:00:00Z",
+    )
+    .await
+    .expect("export sin fiscal");
     let sql_sin = String::from_utf8(sin.files["data/verifactu.sql"].clone()).unwrap();
     assert!(
         !sql_sin.contains("B12345674"),
         "sin marcar «fiscal», el NIF del emisor NO puede viajar:\n{sql_sin}"
     );
 
-    let con = export_hub(&rt, "h1", &seleccion(true), "t", "es", "2026-07-31T00:00:00Z")
-        .await
-        .expect("export con fiscal");
+    let con = export_hub(
+        &rt,
+        "h1",
+        &seleccion(true),
+        "t",
+        "es",
+        "2026-07-31T00:00:00Z",
+    )
+    .await
+    .expect("export con fiscal");
     let sql_con = String::from_utf8(con.files["data/verifactu.sql"].clone()).unwrap();
     assert!(
         sql_con.contains("B12345674"),
@@ -674,7 +932,9 @@ async fn la_config_fiscal_del_negocio_solo_viaja_si_se_marca_fiscal() {
 /// y se pierde la sección entera — el mismo fallo que el orden de tablas, un nivel más abajo.
 #[tokio::test]
 async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciadas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     for m in ["taxes", "services"] {
@@ -722,7 +982,11 @@ async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciad
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "services".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "services".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose: Default::default(),
     };
     let bundle = export_hub(&rt, "h1", &seleccion, "t", "es", "2026-07-31T00:00:00Z")
@@ -763,7 +1027,9 @@ async fn export_ordena_las_filas_padre_antes_que_hija_en_tablas_autorreferenciad
 /// (ADR-0113 §1), y sin ella restaurar dejaría al hub sin poder emitir.
 #[tokio::test]
 async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     rt.install_from_dir(&modules_root().join("invoice_series"))
@@ -803,13 +1069,24 @@ async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "invoice_series".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "invoice_series".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose,
     };
 
-    let plantilla = export_hub(&rt, "h1", &seleccion(BundlePurpose::Template), "t", "es", CREATED_AT)
-        .await
-        .expect("export plantilla");
+    let plantilla = export_hub(
+        &rt,
+        "h1",
+        &seleccion(BundlePurpose::Template),
+        "t",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export plantilla");
     let sql_plantilla =
         String::from_utf8(plantilla.files["data/invoice_series.sql"].clone()).unwrap();
     assert!(
@@ -821,9 +1098,16 @@ async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
         "el libro de números entregados (RD 1007/2023) es de UNA instalación:\n{sql_plantilla}"
     );
 
-    let backup = export_hub(&rt, "h1", &seleccion(BundlePurpose::Backup), "t", "es", CREATED_AT)
-        .await
-        .expect("export backup");
+    let backup = export_hub(
+        &rt,
+        "h1",
+        &seleccion(BundlePurpose::Backup),
+        "t",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export backup");
     let sql_backup = String::from_utf8(backup.files["data/invoice_series.sql"].clone()).unwrap();
     assert!(
         sql_backup.contains("INSERT INTO invoice_series_series"),
@@ -851,7 +1135,9 @@ async fn una_plantilla_no_lleva_la_numeracion_fiscal() {
 /// lleva todas: es la numeración de su dueño volviendo a su sitio (ADR-0113 §1).
 #[tokio::test]
 async fn una_plantilla_no_lleva_la_numeracion_de_invoice() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
     // `invoice` depende de `sales` (que trae `inventory` y `taxes` detrás): mismo orden que el
@@ -894,13 +1180,24 @@ async fn una_plantilla_no_lleva_la_numeracion_de_invoice() {
         settings_items: None,
         fiscal: false,
         media: false,
-        modules: vec![ModuleDataSelection { module_id: "invoice".into(), with_data: true, tables: None }],
+        modules: vec![ModuleDataSelection {
+            module_id: "invoice".into(),
+            with_data: true,
+            tables: None,
+        }],
         purpose,
     };
 
-    let plantilla = export_hub(&rt, "h1", &seleccion(BundlePurpose::Template), "t", "es", CREATED_AT)
-        .await
-        .expect("export plantilla");
+    let plantilla = export_hub(
+        &rt,
+        "h1",
+        &seleccion(BundlePurpose::Template),
+        "t",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export plantilla");
     let sql_plantilla = String::from_utf8(plantilla.files["data/invoice.sql"].clone()).unwrap();
     assert!(
         !sql_plantilla.contains("INSERT INTO invoice_invoiceseries"),
@@ -911,9 +1208,16 @@ async fn una_plantilla_no_lleva_la_numeracion_de_invoice() {
         "el libro de números entregados de `invoice` (RD 1007/2023) es de UNA instalación:\n{sql_plantilla}"
     );
 
-    let backup = export_hub(&rt, "h1", &seleccion(BundlePurpose::Backup), "t", "es", CREATED_AT)
-        .await
-        .expect("export backup");
+    let backup = export_hub(
+        &rt,
+        "h1",
+        &seleccion(BundlePurpose::Backup),
+        "t",
+        "es",
+        CREATED_AT,
+    )
+    .await
+    .expect("export backup");
     let sql_backup = String::from_utf8(backup.files["data/invoice.sql"].clone()).unwrap();
     assert!(
         sql_backup.contains("INSERT INTO invoice_invoiceseries"),
@@ -939,7 +1243,9 @@ async fn una_plantilla_no_lleva_la_numeracion_de_invoice() {
 /// la herramienta del operador para no publicar lo que no quiere publicar.
 #[tokio::test]
 async fn el_export_puede_acotar_tabla_a_tabla_dentro_de_un_modulo() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     rt.execute_command(
@@ -958,10 +1264,15 @@ async fn el_export_puede_acotar_tabla_a_tabla_dentro_de_un_modulo() {
         }],
         ..full_selection()
     };
-    let bundle = export_hub(&rt, "h1", &solo_productos, "t", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &solo_productos, "t", "es", CREATED_AT)
+        .await
+        .expect("export");
     let sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
 
-    assert!(sql.contains("INSERT INTO inventory_product"), "la tabla marcada entra:\n{sql}");
+    assert!(
+        sql.contains("INSERT INTO inventory_product"),
+        "la tabla marcada entra:\n{sql}"
+    );
     assert!(
         !sql.contains("INSERT INTO inventory_category"),
         "una tabla NO marcada no puede colarse:\n{sql}"
@@ -971,7 +1282,9 @@ async fn el_export_puede_acotar_tabla_a_tabla_dentro_de_un_modulo() {
 /// `None` = todas: es lo que manda hoy el shell, y su significado no cambia.
 #[tokio::test]
 async fn sin_seleccion_de_tablas_el_volcado_es_el_de_siempre() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     // Categoría de USUARIO: las que siembra el módulo están excluidas por `is_module_seeded`, así
@@ -984,11 +1297,16 @@ async fn sin_seleccion_de_tablas_el_volcado_es_el_de_siempre() {
     .await
     .expect("crear categoría de inventario");
 
-    let bundle = export_hub(&rt, "h1", &full_selection(), "t", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &full_selection(), "t", "es", CREATED_AT)
+        .await
+        .expect("export");
     let sql = String::from_utf8(bundle.files["data/inventory.sql"].clone()).unwrap();
 
     assert!(sql.contains("INSERT INTO inventory_product"));
-    assert!(sql.contains("INSERT INTO inventory_category"), "sin acotar, entra todo:\n{sql}");
+    assert!(
+        sql.contains("INSERT INTO inventory_category"),
+        "sin acotar, entra todo:\n{sql}"
+    );
 }
 
 /// 🔴 La casilla **ACOTA, nunca amplía** — misma propiedad que `settings_items` desde hub#405.
@@ -998,10 +1316,14 @@ async fn sin_seleccion_de_tablas_el_volcado_es_el_de_siempre() {
 /// convertiría en la puerta por la que vuelve justo lo que se decidió que no viaja.
 #[tokio::test]
 async fn una_casilla_no_puede_levantar_lo_que_el_proposito_excluye() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), "h1");
-    rt.install_from_dir(&modules_root().join("invoice_series")).await.expect("instalar");
+    rt.install_from_dir(&modules_root().join("invoice_series"))
+        .await
+        .expect("instalar");
     let mut p = Params::new();
     p.insert("hub".into(), json!("h1"));
     rt.db()
@@ -1029,7 +1351,9 @@ async fn una_casilla_no_puede_levantar_lo_que_el_proposito_excluye() {
         }],
         purpose: BundlePurpose::Template,
     };
-    let bundle = export_hub(&rt, "h1", &marcandola, "t", "es", CREATED_AT).await.expect("export");
+    let bundle = export_hub(&rt, "h1", &marcandola, "t", "es", CREATED_AT)
+        .await
+        .expect("export");
     let sql = String::from_utf8(bundle.files["data/invoice_series.sql"].clone()).unwrap();
 
     assert!(
@@ -1049,7 +1373,9 @@ async fn una_casilla_no_puede_levantar_lo_que_el_proposito_excluye() {
 /// peor que no darlo.
 #[tokio::test]
 async fn el_export_sabe_decir_que_tablas_tiene_cada_modulo_y_cuantas_filas() {
-    if !erplora_runtime::require_modules_workspace() { return; }
+    if !erplora_runtime::require_modules_workspace() {
+        return;
+    }
     let rt = fresh().await;
     create_product(&rt, "h1", "Café", "CAF").await;
     create_product(&rt, "h1", "Té", "TEV").await;
@@ -1058,26 +1384,43 @@ async fn el_export_sabe_decir_que_tablas_tiene_cada_modulo_y_cuantas_filas() {
         .await
         .expect("recuento");
 
-    let inventory = mapa.iter().find(|m| m.module_id == "inventory").expect("inventory");
+    let inventory = mapa
+        .iter()
+        .find(|m| m.module_id == "inventory")
+        .expect("inventory");
     let productos = inventory
         .tables
         .iter()
         .find(|t| t.table == "inventory_product")
         .expect("inventory_product");
-    assert_eq!(productos.rows, 2, "el recuento es el de las filas que se volcarían");
+    assert_eq!(
+        productos.rows, 2,
+        "el recuento es el de las filas que se volcarían"
+    );
 
     // Una tabla vacía se DECLARA con su 0, no se omite: si desaparece, quien monta la plantilla no
     // puede saber que existe — y el 0 es justo la información (misma lección que saas#1257).
     assert!(
         inventory.tables.iter().any(|t| t.rows == 0),
         "las tablas vacías del módulo también se listan: {:?}",
-        inventory.tables.iter().map(|t| (&t.table, t.rows)).collect::<Vec<_>>()
+        inventory
+            .tables
+            .iter()
+            .map(|t| (&t.table, t.rows))
+            .collect::<Vec<_>>()
     );
 
     // Y solo las SUYAS: `taxes_*` no puede aparecer bajo `inventory`.
     assert!(
-        inventory.tables.iter().all(|t| t.table.starts_with("inventory")),
+        inventory
+            .tables
+            .iter()
+            .all(|t| t.table.starts_with("inventory")),
         "una tabla de otro módulo se coló: {:?}",
-        inventory.tables.iter().map(|t| &t.table).collect::<Vec<_>>()
+        inventory
+            .tables
+            .iter()
+            .map(|t| &t.table)
+            .collect::<Vec<_>>()
     );
 }
