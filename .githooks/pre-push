@@ -357,9 +357,11 @@ mkdir -p "$STATE_DIR"
 # scope with nothing catching it until the post-merge push. Note what is NOT
 # touched — the LOCK stays (hub#526: two suites at once melt the machine).
 #
-# ⚠️ Scoping is NOT a bypass: a scoped run publishes `local-gate/hub-tests-scoped`,
-# a context `merge-pr.sh` deliberately does not accept as workspace proof (see the
-# header). Only a real full run seals `local-gate/hub-tests`.
+# ⚠️ Scoping is NOT a bypass: a scoped run publishes `local-gate/hub-tests-scoped`
+# and NEVER `local-gate/hub-tests` — the seal always names what really ran.
+# `merge-pr.sh` accepts both since pm#230 (it did not until then, which is why the
+# default was `workspace`); what it still refuses is an ABSENT seal, or one that is
+# not `success`. Only a real full run seals `local-gate/hub-tests`.
 #
 # Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
 # `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
@@ -812,16 +814,40 @@ publish_status() {
     disown 2>/dev/null || true
 }
 
-# ── Política de alcance (Ioan, 2026-08-29) ───────────────────────────────────
-# `workspace` (defecto): una PR con Rust corre la suite ENTERA aquí. Es obligatorio desde que
-# Actions dejó de correrla en las PRs: `merge-pr.sh` autoriza el merge con la atestación de este
-# gate (pm#58/#60), y una pasada parcial dejaría el merge apoyado en menos de lo que promete.
-# `scoped`: el reparto de hub#1207 (local rápido + Actions completo). Volver a él es cambiar esta
-# variable, cuando la nube vuelva a correr la suite en las PRs.
-GATE_SCOPE_POLICY="${HUB_GATE_SCOPE_POLICY:-workspace}"
+# ── Política de alcance: la decide la REF EMPUJADA (Ioan, 2026-09-03 — hub#1451) ──
+#
+# Enmienda la decisión del 2026-08-29 (pm#197/hub#1346), que dejó el defecto en `workspace`. Aquel
+# defecto era correcto CON su premisa: Actions había dejado de correr la suite en las PRs y
+# `merge-pr.sh` solo aceptaba `local-gate/hub-tests`, así que una pasada acotada dejaba la PR
+# inmergeable. pm#230 quita esa premisa —el script acepta también `local-gate/hub-tests-scoped`—
+# y entonces pagar la suite entera en cada rama deja de comprar nada.
+#
+# Lo que compraba el defecto viejo, y dónde está ahora: el coste real no son los ~25-30 min, es que
+# el lock es de MÁQUINA ENTERA (hub#526, que NO se toca), así que con 4-6 workers el cuarto push
+# espera horas. La red completa no desaparece, se MUEVE a post-merge: `test-hub.yml`,
+# `test-web.yml` y `test-hub-modules.yml` corren `--workspace` + los e2e del catálogo publicado en
+# el `push` a develop/main (hub#572). Lo que una rama acotada puede colar —romper un paquete FUERA
+# de su alcance— se ve ahí, sobre el árbol que de verdad resulta del merge.
+#
+# La regla es la ref, no el diff, porque la pregunta que responde cada una es distinta:
+#   · rama de PR   → `scoped`   : «¿he roto lo que toco?» — el resolutor decide qué paquetes
+#   · develop/main → `workspace`: «¿está sano el árbol que se despliega?» — no se acota nunca
+#   · un tag, o una ref ilegible → `workspace`: el hub solo se despliega con un tag `v1.1.N`;
+#     firmar una release con una pasada parcial es justo lo que no puede pasar.
+#
+# Sobre esto siguen mandando dos cosas, y las dos tienen su caso en scripts/prepush-gate.test.sh:
+# el RESOLUTOR (un diff transversal —`schemas/`, `Cargo.lock`, el manifiesto, Rust sin dueño— se
+# ensancha al workspace aunque la política diga `scoped`, y con él vuelven las baterías de
+# módulos), y `HUB_GATE_SCOPE_POLICY`, que fuerza los dos modos a mano para depurar.
+case "$pushed_ref" in
+    refs/heads/develop | refs/heads/main) GATE_SCOPE_POLICY_DEFAULT=workspace ;;
+    refs/heads/*)                         GATE_SCOPE_POLICY_DEFAULT=scoped ;;
+    *)                                    GATE_SCOPE_POLICY_DEFAULT=workspace ;;
+esac
+GATE_SCOPE_POLICY="${HUB_GATE_SCOPE_POLICY:-$GATE_SCOPE_POLICY_DEFAULT}"
 if [ "$GATE_SCOPE_POLICY" = workspace ] && [ "$SCOPE_MODE" = packages ]; then
     SCOPE_MODE=workspace
-    SCOPE_REASON="$SCOPE_REASON — pero la política es correr el workspace entero (pm#58/#60)"
+    SCOPE_REASON="$SCOPE_REASON — pero la política de esta ref (${pushed_ref:-?}) es correr el workspace entero (hub#1451)"
 fi
 
 case "$SCOPE_MODE" in
