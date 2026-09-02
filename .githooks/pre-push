@@ -904,11 +904,6 @@ if [ -f "$green" ]; then
     # no se bloquea nada: el de Rust ya le da checks a la PR; lo que falta es la garantía, y
     # esa se consigue reempujando con el árbol tocado.
     publish_status "$pushed_sha"
-    # Verde → se le encarga la review local del código a un revisor Fable. No corre
-    # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
-    # para a toda la flota y una review perdida solo cuesta una review.
-    review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
-[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
 
@@ -1036,11 +1031,6 @@ if [ -f "$green" ]; then
     echo "✅ pre-push: another push just validated this tree → skipping the rebuild." >&2
     # Mismo motivo que el cache-hit de arriba: aquí NO se publica el sello web (pm#198).
     publish_status "$pushed_sha"
-    # Verde → se le encarga la review local del código a un revisor Fable. No corre
-    # tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
-    # para a toda la flota y una review perdida solo cuesta una review.
-    review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
-[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
     exit 0
 fi
 
@@ -1207,9 +1197,4 @@ elif [ "$web_light_touched" = 1 ]; then
     publish_status "$pushed_sha" "$WEB_CONTEXT" \
         "web pipeline guard green on the pusher's machine — the app itself is untouched (hook ${HOOK_ID:-unknown})"
 fi
-# Verde → se le encarga la review local del código a un revisor Fable. No corre
-# tests ni bloquea: el handoff sale 0 pase lo que pase, porque un gate roto
-# para a toda la flota y una review perdida solo cuesta una review.
-review_handoff="${ERPLORA_FLEET_DIR:-$HOME/.erplora/fleet}/pr-reviewer-handoff.sh"
-[ -x "$review_handoff" ] && "$review_handoff" "$pushed_ref" "$pushed_sha" >/dev/null 2>&1
 exit 0
