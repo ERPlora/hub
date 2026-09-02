@@ -27,7 +27,7 @@ pub mod errors;
 pub mod event_shape;
 pub mod events;
 pub mod export;
-pub mod fiscal_gateway;
+pub mod cloud_call;
 pub mod fiscal_profile;
 pub mod flows;
 pub mod gateway_identity;
