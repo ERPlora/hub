@@ -11,6 +11,7 @@
 //! and administering the hub stays `admin`. Ownership is a fact of the ACCOUNT plane; the mark is
 //! only its shadow on the row.
 use erplora_db::testutil::fresh_db;
+use erplora_runtime::hub_users::NewHubUser;
 use erplora_runtime::Runtime;
 
 async fn runtime(hub_id: &str) -> Runtime {
@@ -55,6 +56,32 @@ async fn the_seeded_creator_is_the_account_owner() {
         !marta.is_account_owner,
         "everybody else is not: the mark names ONE row"
     );
+}
+
+/// The fleet case in its TRUE shape, and the one the seed-twice test below cannot see (its first
+/// boot already marks through the CREATE path): the owner's row **predates the mark** — created by
+/// an ordinary alta, or in production by a boot older than v56 — so `seed_owner` only ever takes
+/// the idempotent path for it. That path is then the ONLY one that can mark the row: drop the
+/// marking there and every hub already in production keeps an unnamed owner, with the guard
+/// protecting nothing, silently.
+#[tokio::test]
+async fn a_row_that_predates_the_mark_is_marked_by_the_idempotent_path() {
+    let rt = runtime("hub-owner-mark-preexisting").await;
+    // The row exists before anybody names an owner — an ordinary alta marks nobody.
+    rt.create_hub_user(&NewHubUser {
+        name: "Ioan Beilic".into(),
+        email: "ioan@example.com".into(),
+        role: "admin".into(),
+        ..NewHubUser::default()
+    })
+    .await
+    .unwrap();
+    assert!(owners(&rt).await.is_empty());
+
+    // The next boot finds the row: idempotent, it seeds nothing…
+    assert!(!rt.seed_owner("ioan@example.com").await.unwrap());
+    // …and the mark still has to land on it.
+    assert_eq!(owners(&rt).await, vec!["Ioan Beilic".to_string()]);
 }
 
 /// The mark has to reach a hub that already existed — the owner's row is normally already there
