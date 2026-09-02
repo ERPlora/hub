@@ -3644,6 +3644,11 @@ mod kind_contract_tests {
         // haría invisible justo lo que pasó. Mismas columnas y mismos tipos que hub#660/hub#955
         // pusieron en `_event_outbox`, porque es el mismo gesto sobre la otra cola durable. Al
         // escribirla el máximo era la v53 en `origin/develop` y en TODAS las ramas remotas.
-        assert_eq!(MIGRATIONS.len(), 51, "el catálogo cambió de tamaño");
+        // + `hub_gateway_identity` (v55, hub#1432): la identidad de MÁQUINA para la pasarela
+        // fiscal (ADR-0419/0425) — singleton por hub, clave cifrada con `secret_box` que nace en
+        // el hub y no sale (solo viaja el CSR), cert + CA públicos. PROHIBIDA en bundles de
+        // export. Al escribirla el máximo era la v54 en `origin/develop` y en TODAS las ramas
+        // remotas.
+        assert_eq!(MIGRATIONS.len(), 52, "el catálogo cambió de tamaño");
     }
 }
