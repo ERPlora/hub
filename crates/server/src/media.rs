@@ -77,15 +77,16 @@ async fn require_admin(st: &AppState, headers: &HeaderMap) -> Result<(), Respons
 
 /// Cabeceras de autenticación de máquina (`X-Hub-Token` + `X-Hub-Id`) para hablar con el Cloud.
 /// `None` si el hub no está enrolado (sin token de máquina) → no se puede proxyar.
-fn cloud_headers(st: &AppState) -> Option<Vec<(&'static str, String)>> {
+fn cloud_headers(st: &AppState, url: &str) -> Option<Vec<(&'static str, String)>> {
     let token = st.machine_token()?;
-    Some(
-        cloud_client::Auth::HubToken {
-            hub_id: st.hub_id(),
-            token,
-        }
-        .headers(),
-    )
+    let auth = cloud_client::Auth::HubToken {
+        hub_id: st.hub_id(),
+        token,
+    };
+    // hub#1464: por LA puerta, que es la única que comprueba el destino. Aquí todas las URLs son
+    // de nuestra nube, y precisamente por eso el día que una deje de serlo nadie lo notaría sin
+    // esto — que es como estaban `system.rs` y `usage_series.rs` cuando se abrió la issue.
+    Some(cloud_client::CloudClient::new(&st.config.cloud_base_url).headers_for(url, &auth))
 }
 
 /// Base del Cloud sin barra final.
@@ -107,14 +108,14 @@ fn fmt_iso(s: &str) -> String {
 /// `GET /api/v1/hub/device/media/?folder=` → mapea el shape RAW del Cloud al del frontend
 /// (formatea bytes/fecha, quota "sin límite").
 async fn cloud_list(st: &AppState, folder: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
-    };
     let url = format!(
         "{}/api/v1/hub/device/media/?folder={}",
         cloud_base(st),
         pct_encode(folder)
     );
+    let Some(headers) = cloud_headers(st, &url) else {
+        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+    };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -189,7 +190,8 @@ async fn cloud_list(st: &AppState, folder: &str) -> Response {
 
 /// Reenvía un multipart de subida al Cloud (`POST …/media/`).
 async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &url) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
     // El multipart se recoge ENTERO antes de decidir: el orden de los campos no está garantizado
@@ -225,7 +227,6 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
             reqwest::multipart::Part::bytes(data).file_name(fname),
         );
     }
-    let url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
     let mut r = st.http.post(&url).multipart(form);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -239,14 +240,14 @@ async fn cloud_upload(st: &AppState, mut mp: Multipart) -> Response {
 
 /// `DELETE …/media/?path=` en el Cloud.
 async fn cloud_delete(st: &AppState, path: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
-    };
     let url = format!(
         "{}/api/v1/hub/device/media/?path={}",
         cloud_base(st),
         pct_encode(path)
     );
+    let Some(headers) = cloud_headers(st, &url) else {
+        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+    };
     let mut r = st.http.delete(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -263,10 +264,10 @@ async fn cloud_delete(st: &AppState, path: &str) -> Response {
 
 /// `POST …/media/rename/` en el Cloud (que hace el copy+delete sobre Object Storage).
 async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+    let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &url) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let url = format!("{}/api/v1/hub/device/media/rename/", cloud_base(st));
     let mut r = st
         .http
         .post(&url)
@@ -286,10 +287,10 @@ async fn cloud_rename(st: &AppState, path: &str, name: &str) -> Response {
 
 /// `POST …/media/folder/` en el Cloud.
 async fn cloud_create_folder(st: &AppState, parent: &str, name: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+    let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &url) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let url = format!("{}/api/v1/hub/device/media/folder/", cloud_base(st));
     let mut r = st
         .http
         .post(&url)
@@ -331,14 +332,14 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
     let Ok(permit) = st.media_fetch_limiter.clone().acquire_owned().await else {
         return err(StatusCode::SERVICE_UNAVAILABLE, "media limiter closed");
     };
-    let Some(headers) = cloud_headers(st) else {
-        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
-    };
     let url = format!(
         "{}/api/v1/hub/device/media/raw?path={}",
         cloud_base(st),
         pct_encode(path)
     );
+    let Some(headers) = cloud_headers(st, &url) else {
+        return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
+    };
     let mut r = st.http.get(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -414,10 +415,10 @@ async fn cloud_raw(st: &AppState, path: &str) -> Response {
 /// `POST …/media/move/` en el Cloud (que hace el copy+delete sobre Object Storage). Mueve un
 /// fichero o carpeta de `from` al destino `to` (ambos relativos a `media/`).
 async fn cloud_move(st: &AppState, from: &str, to: &str) -> Response {
-    let Some(headers) = cloud_headers(st) else {
+    let url = format!("{}/api/v1/hub/device/media/move/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &url) else {
         return err(StatusCode::BAD_GATEWAY, "hub sin token de máquina");
     };
-    let url = format!("{}/api/v1/hub/device/media/move/", cloud_base(st));
     let mut r = st.http.post(&url).json(&json!({ "from": from, "to": to }));
     for (k, v) in headers {
         r = r.header(k, v);
@@ -753,12 +754,12 @@ fn flatten_folder_ids(folders: &Value, out: &mut Vec<String>) {
 /// Listado CRUDO de una carpeta tal cual lo da el Cloud (sin el mapeo cosmético que necesita la
 /// UI): aquí solo interesan `folders` y `files[].path`.
 async fn cloud_list_raw(st: &AppState, folder: &str) -> Option<Value> {
-    let headers = cloud_headers(st)?;
     let url = format!(
         "{}/api/v1/hub/device/media/?folder={}",
         cloud_base(st),
         pct_encode(folder)
     );
+    let headers = cloud_headers(st, &url)?;
     let mut r = st.http.get(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -778,12 +779,12 @@ async fn cloud_list_raw(st: &AppState, folder: &str) -> Option<Value> {
 /// un tercero (ADR-0003).
 async fn fetch_object_bytes(st: &AppState, path: &str) -> Option<Vec<u8>> {
     let _permit = st.media_fetch_limiter.clone().acquire_owned().await.ok()?;
-    let headers = cloud_headers(st)?;
     let url = format!(
         "{}/api/v1/hub/device/media/raw?path={}",
         cloud_base(st),
         pct_encode(path)
     );
+    let headers = cloud_headers(st, &url)?;
     let mut r = st.http.get(&url);
     for (k, v) in headers {
         r = r.header(k, v);
@@ -1106,7 +1107,8 @@ pub(crate) async fn upload_bundle_media(
             .push(BundleMediaUpload { name, bytes });
     }
 
-    let Some(headers) = cloud_headers(st) else {
+    let upload_url = format!("{}/api/v1/hub/device/media/", cloud_base(st));
+    let Some(headers) = cloud_headers(st, &upload_url) else {
         report.failed += by_folder.values().map(Vec::len).sum::<usize>() as u32;
         return report;
     };

@@ -63,11 +63,12 @@ impl ModuleMediaStorage {
             hub_id: hub_id.to_string(),
             token: token.to_string(),
         };
-        let mut request = http.post(url).json(&serde_json::json!({
+        let headers = cloud_client::CloudClient::new(base_url).headers_for(&url, &auth);
+        let mut request = http.post(&url).json(&serde_json::json!({
             "parent": parent,
             "name": name,
         }));
-        for (key, value) in auth.headers() {
+        for (key, value) in headers {
             request = request.header(key, value);
         }
         let response = request
@@ -161,11 +162,10 @@ impl ModuleStorage for ModuleMediaStorage {
             hub_id: self.hub_id.clone(),
             token,
         };
-        let mut request = self
-            .http
-            .post(format!("{}/api/v1/hub/device/media/", self.base_url))
-            .multipart(form);
-        for (key, value) in auth.headers() {
+        let url = format!("{}/api/v1/hub/device/media/", self.base_url);
+        let headers = cloud_client::CloudClient::new(&self.base_url).headers_for(&url, &auth);
+        let mut request = self.http.post(&url).multipart(form);
+        for (key, value) in headers {
             request = request.header(key, value);
         }
         let response = request
