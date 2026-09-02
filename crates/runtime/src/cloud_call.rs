@@ -78,7 +78,12 @@ pub const PATH_NOT_MINE: &str = "cloud_call.path_not_mine";
 /// a `..` segment that could climb out of `/api/`, and anything not rooted at `/api/`.
 pub fn check_path(path: &str) -> Result<()> {
     let rooted = path.starts_with("/api/");
-    let climbs = path.split('/').any(|segment| segment == "..");
+    // WHATWG URL parsers (the `url` crate under reqwest included) also treat the percent-encoded
+    // forms as dot segments, so refusing the literal `..` alone would still let a path climb.
+    let climbs = path.split('/').any(|segment| {
+        let s = segment.to_ascii_lowercase();
+        matches!(s.as_str(), ".." | ".%2e" | "%2e." | "%2e%2e")
+    });
     let switches_host = path.starts_with("//") || path.contains("://");
     // A backslash or a control character in a URL is how a request line gets split; neither has
     // any business in an API path, so they are refused rather than escaped.
@@ -167,6 +172,10 @@ mod tests {
             "//evil.example/api/v1/steal/",
             "/api/v1/../../../steal/",
             "/api/../etc/passwd",
+            "/api/%2e%2e/steal/",
+            "/api/v1/%2E%2E/%2E%2E/steal/",
+            "/api/.%2e/steal/",
+            "/api/%2e./steal/",
             "/not-the-api/",
             "api/v1/hub/device/",
             "",
