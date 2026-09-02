@@ -36,6 +36,71 @@ use serde_json::Value;
 /// offending code and a hostile page decides how long that is.
 const FIELD_MAX: usize = 200;
 
+/// How many reports may reach the log per window, and how long the window is.
+///
+/// The same 60/h the SaaS settled on in `saas#973` §5, where THIS endpoint —the Django twin— was
+/// filed as "log injection and free flood": no quota, one `csp_logger.warning` per POST, and the
+/// logs go to Loki. It was proved against production. The door is opened by anybody who loads the
+/// page, so without a quota it is an unbounded write into the business's own log.
+///
+/// Sixty is not a measurement of violations; it is the point past which counting stops being
+/// useful. A hub with sixty recorded in an hour is already told.
+const MAX_PER_WINDOW: u32 = 60;
+const WINDOW_SECS: u64 = 3600;
+
+/// A fixed-window counter, GLOBAL to the endpoint.
+///
+/// Deliberately not per-reporter, which is where the SaaS keys it (`key="ip"`): behind Cloudflare
+/// the client address arrives in `X-Forwarded-For`, chosen by whoever posts, so a per-IP quota here
+/// is evaded by rotating a header. A global one is not.
+///
+/// Fixed window and not a token bucket: the worst case is twice the quota across a window boundary,
+/// which for a log line is nothing, and this way there is no per-request allocation and no timer.
+struct Limiter {
+    /// `(window_start_unix, count)`.
+    state: std::sync::Mutex<(u64, u32)>,
+}
+
+impl Limiter {
+    const fn new() -> Self {
+        Self {
+            state: std::sync::Mutex::new((0, 0)),
+        }
+    }
+
+    /// `true` if this report may reach the log. Never blocks the response — see [`receive`].
+    fn allow(&self, now: u64) -> bool {
+        // A poisoned mutex must not turn the report door into a panic loop: a thread that died
+        // elsewhere is not a reason to stop hearing what the policy refused.
+        let mut guard = match self.state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let (window_start, count) = *guard;
+        if now.saturating_sub(window_start) >= WINDOW_SECS {
+            *guard = (now, 1);
+            return true;
+        }
+        if count >= MAX_PER_WINDOW {
+            return false;
+        }
+        *guard = (window_start, count + 1);
+        true
+    }
+}
+
+/// The endpoint's quota, for the life of the process.
+static LIMITER: Limiter = Limiter::new();
+
+/// Seconds since the epoch, or `0` if the clock is before it — a clock that broken is somebody
+/// else's incident, and it must not cost the report.
+fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 /// What is worth keeping out of a violation report. Everything else the browser sends
 /// (`referrer`, `status-code`, `original-policy`, the full `script-sample`) is either noise or a
 /// copy of what we already know.
@@ -92,16 +157,24 @@ pub(crate) fn summarise(raw: &[u8]) -> Violation {
 
 /// `POST /csp-report/` — where the browser posts what this hub's policy refused.
 ///
-/// Always `204`. The browser is not asking a question and has nothing to do with an error, and a
-/// non-2xx here would only teach it to keep retrying a door that works.
+/// Always `204` — including over quota. The browser is not asking a question and has nothing to do
+/// with an error, and a non-2xx here would only teach it to keep retrying a door that works; some
+/// clients retry the report itself, so a `429` would defend the quota by generating more traffic
+/// than it turns away. The quota shortens what is WRITTEN, never what is ANSWERED.
 pub(crate) async fn receive(body: Bytes) -> StatusCode {
     use erplora_runtime::error_registry::{severity, source, ErrorEvent, ErrorRegistry};
+
+    // The quota decides what gets WRITTEN, never what gets answered. Over it, the report is
+    // dropped here and the browser still gets its `204` — see the doc comment.
+    if !LIMITER.allow(now_unix()) {
+        return StatusCode::NO_CONTENT;
+    }
 
     let violation = summarise(&body);
 
     // WARN and not INFO: this fires when a wall the till depends on has just refused something.
-    // It is bounded — every field is clipped and the body limit caps the request — so it costs no
-    // more than the request line `TraceLayer` already writes for the same POST.
+    // It is bounded — every field is clipped, the body limit caps the request and the quota caps
+    // the rate — so it cannot outgrow the request line `TraceLayer` already writes for this POST.
     tracing::warn!(
         blocked_uri = %violation.blocked_uri,
         directive = %violation.directive,
@@ -180,6 +253,47 @@ mod tests {
             assert_eq!(v, summarise(raw), "summarise is not deterministic");
             assert!(v.blocked_uri.len() <= FIELD_MAX + 1);
         }
+    }
+
+    #[test]
+    fn hub1447_a_flood_cannot_write_the_log_without_end() {
+        // saas#973 §5, recreado aquí y arreglado antes de mergear: el mismo endpoint en el SaaS
+        // era «inyección en logs y flood» — sin cuota, `csp_logger.warning` por cada POST, y los
+        // logs van a Loki. Probado entonces contra producción. La puerta del hub la abre cualquiera
+        // que cargue la página, así que sin cuota es una escritura ilimitada en el log del negocio.
+        let limiter = Limiter::new();
+        let t0 = 1_000_000;
+        for i in 0..MAX_PER_WINDOW {
+            assert!(limiter.allow(t0), "el informe {i} debería pasar");
+        }
+        assert!(
+            !limiter.allow(t0),
+            "el informe {} entró: la cuota no corta",
+            MAX_PER_WINDOW + 1
+        );
+        // Y no es un cierre permanente: la ventana siguiente vuelve a abrir, o una violación real
+        // que empiece mañana no se vería nunca.
+        assert!(
+            limiter.allow(t0 + WINDOW_SECS),
+            "la ventana no se renueva: la puerta queda cerrada para siempre"
+        );
+    }
+
+    #[test]
+    fn hub1447_the_quota_is_global_and_not_per_reporter() {
+        // A propósito distinto del SaaS, que acota por IP: detrás de Cloudflare la IP del cliente
+        // llega en `X-Forwarded-For`, que quien postea elige. Una cuota por IP en el hub se evade
+        // rotando la cabecera; una global no. Un negocio con 60 violaciones registradas en una
+        // hora ya está avisado — el objetivo es enterarse, no contar.
+        let limiter = Limiter::new();
+        let t0 = 2_000_000;
+        for _ in 0..MAX_PER_WINDOW {
+            limiter.allow(t0);
+        }
+        assert!(
+            !limiter.allow(t0),
+            "la cuota se agotó y aún deja pasar: no es global"
+        );
     }
 
     #[test]

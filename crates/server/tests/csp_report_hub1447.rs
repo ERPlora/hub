@@ -197,3 +197,20 @@ async fn hub1447_an_oversized_report_does_not_land_in_the_log() {
         resp.status()
     );
 }
+
+#[tokio::test]
+async fn hub1447_a_flood_is_still_answered_204_and_never_taught_to_retry() {
+    // La cuota (saas#973 §5) recorta lo que se ESCRIBE, nunca lo que se responde. Un `429` aquí
+    // le enseñaría al navegador a reintentar una puerta que funciona, y algunos reintentan el
+    // informe: la cuota se defendería generando más tráfico del que corta.
+    let app = dev_app().await;
+    for i in 0..80 {
+        let resp = app.clone().oneshot(report(REAL_REPORT)).await.unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::NO_CONTENT,
+            "el informe {i} recibió {} — la cuota no puede cambiar la respuesta",
+            resp.status()
+        );
+    }
+}
