@@ -304,43 +304,70 @@ async fn find(rt: &Runtime, id: &str) -> erplora_runtime::Result<Option<HubUserR
     Ok(rt.list_hub_users().await?.into_iter().find(|u| u.id == id))
 }
 
-/// La misma barandilla de la fila del dueño (hub#1429) en **la otra puerta del mismo cambio**:
-/// `/api/members` (ADR-0157 §7), donde a la persona se la nombra por EMAIL y no por id.
+/// **La MISMA decisión de Personal en la otra puerta del mismo cambio**: `/api/members`
+/// (ADR-0157 §7), donde a la persona se la nombra por EMAIL y no por id.
 ///
-/// Hace falta aquí y no basta con `guard_decision` porque `create_login_user` escribe el `role`
-/// directamente sobre la fila que encuentra por email —un alta con la dirección del dueño y
-/// `role: employee` lo DEGRADA— y `deactivate_login_user` la desactiva. Cerrar una puerta y dejar
-/// la otra abierta no es media guarda: es ninguna.
+/// Hace falta aquí, y entera, porque los dos handlers escriben directamente sobre la fila que
+/// encuentran por email: `create_login_user` le pone el `role` (`SET role = :role, is_active = 1`)
+/// y `deactivate_login_user` la desactiva. Sin esto quedaban abiertas las tres:
 ///
-/// `Some(response)` = rechazado. Solo mira las filas ya marcadas como del dueño, así que compara
-/// contra el email de ACCESO de esa fila (el que siembra el aprovisionamiento), no contra el del
-/// perfil.
-pub(crate) async fn guard_owner_row_by_email(
+///  - la fila del **dueño** —un alta con su dirección y `role: employee` lo DEGRADA— (hub#1429);
+///  - **`self_deactivation`** — un administrador se daba de baja a sí mismo (hub#1444);
+///  - **`last_admin`** — y podía degradarse siendo el último, dejando el hub sin nadie que pudiera
+///    instalar un módulo, tocar un ajuste ni reincorporar a nadie (hub#1444). `self_deactivation`
+///    no lo cubre: una degradación no es una baja.
+///
+/// Cerrar una puerta y dejar la otra abierta no es media guarda: es ninguna — y por eso la decisión
+/// es [`guard_decision`] literal, la misma función pura, y no una copia con sus propias reglas que
+/// pueda derivar de la de Personal.
+///
+/// `input` es el `UpdateHubUser` **equivalente** a lo que el handler va a escribir. `Some(response)`
+/// = rechazado, sin escribir nada.
+pub(crate) async fn guard_members_door_by_email(
     rt: &Runtime,
-    actor_id: &str,
+    actor: &erplora_runtime::identity::HubUser,
     email: &str,
+    input: &UpdateHubUser,
 ) -> Option<Response> {
     let users = match rt.list_hub_users().await {
         Ok(users) => users,
         Err(e) => return Some(crate::err_response(e)),
     };
-    if owner_row_belongs_to_somebody_else(&users, actor_id, email) {
-        return Some(forbidden(
-            OWNER_ROW_IS_THE_OWNERS,
-            "this is the account owner's record: only they can change it",
-        ));
+    let Some(target_id) = census_id_by_access_email(&users, email) else {
+        // Nadie en el censo lleva ese email: el alta va a CREAR la fila, así que no hay a quién
+        // proteger — pero el rango sí se mira igual (hub#356: nadie reparte un rol por encima del
+        // suyo), que es la única de las reglas que no habla de una fila existente.
+        return match input.role.as_deref().and_then(|r| grant_decision(&actor.role, r)) {
+            Some(Guard::Forbidden { code, message }) => Some(forbidden(code, message)),
+            _ => None,
+        };
+    };
+    match guard_decision(&users, &actor.id, &actor.role, &target_id, input) {
+        Some(Guard::NotFound) => Some(not_found()),
+        Some(Guard::Rejected { code, message }) => Some(rejected(code, message)),
+        Some(Guard::Forbidden { code, message }) => Some(forbidden(code, message)),
+        None => None,
     }
-    None
 }
 
-fn owner_row_belongs_to_somebody_else(users: &[HubUserRow], actor_id: &str, email: &str) -> bool {
+/// El id de la fila del censo cuyo email de **ACCESO** es `email`.
+///
+/// Se compara contra `hub_user.email` a propósito y no contra el email que pinta Personal, que es un
+/// `COALESCE` con el del perfil: el del perfil lo edita cada uno en «Mi perfil» y sin control de
+/// unicidad, así que dejarlo decidir permitiría hacerse pasar por la fila de otro —la del dueño, la
+/// del último administrador— con solo escribir su dirección. `hub_user.email` no: lo escriben el
+/// aprovisionamiento, `/api/members` y el alta de Personal, y `ensure_email_is_free` impide que dos
+/// filas del hub compartan uno. Es además el mismo email por el que estos handlers resuelven la
+/// fila que van a escribir, así que la guarda y la escritura no pueden apuntar a filas distintas.
+fn census_id_by_access_email(users: &[HubUserRow], email: &str) -> Option<String> {
     let email = email.trim();
-    users.iter().any(|u| {
-        u.is_account_owner
-            && u.id != actor_id
-            && !email.is_empty()
-            && u.email.eq_ignore_ascii_case(email)
-    })
+    if email.is_empty() {
+        return None;
+    }
+    users
+        .iter()
+        .find(|u| !u.email.is_empty() && u.email.eq_ignore_ascii_case(email))
+        .map(|u| u.id.clone())
 }
 
 /// Qué hay que contarle al SaaS de esta edición (ADR-0157 §7). Pura: la decisión es la parte
@@ -882,33 +909,82 @@ mod tests {
         ));
     }
 
-    /// The email-shaped half of the same rule, for the `/api/members` door (hub#1429).
+    /// How the `/api/members` door finds the row it is about to write (hub#1429, hub#1444): by the
+    /// **access** email, case-insensitively and trimmed — the same lookup `create_login_user` and
+    /// `deactivate_login_user` do, so the guard and the write can never land on different rows.
     #[test]
-    fn the_owners_row_is_recognised_by_its_access_email_too() {
-        let owner = with_email(account_owner("ioan"), "Ioan@Example.com");
+    fn the_census_row_is_found_by_its_access_email() {
         let census = [
-            owner,
+            with_email(account_owner("ioan"), "Ioan@Example.com"),
             with_email(user("ana", "admin", true), "ana@example.com"),
+            // Store staff: PIN only, no account. An empty address must match NOBODY, or every
+            // lookup that came in blank would land on the first of them.
+            user("luis", "employee", true),
         ];
 
-        assert!(owner_row_belongs_to_somebody_else(
-            &census,
-            "ana",
-            " ioan@example.com "
-        ));
-        assert!(
-            !owner_row_belongs_to_somebody_else(&census, "ioan", "ioan@example.com"),
-            "the owner naming their own address is not somebody else"
+        assert_eq!(
+            census_id_by_access_email(&census, " ioan@example.com "),
+            Some("ioan".to_string()),
         );
-        assert!(!owner_row_belongs_to_somebody_else(
-            &census,
-            "ana",
-            "ana@example.com"
-        ));
-        assert!(
-            !owner_row_belongs_to_somebody_else(&census, "ana", "   "),
-            "an empty address matches nobody — least of all a row whose email is empty"
+        assert_eq!(
+            census_id_by_access_email(&census, "ana@example.com"),
+            Some("ana".to_string())
         );
+        assert_eq!(census_id_by_access_email(&census, "   "), None);
+        assert_eq!(census_id_by_access_email(&census, "nadie@example.com"), None);
+    }
+
+    /// And from that row the decision is [`guard_decision`] itself — the SAME function Personal
+    /// runs, not a copy that can drift from it. This is the shape of both defects: the owner's row
+    /// reached by email (hub#1429), and the two handrails that were missing on this door (hub#1444).
+    #[test]
+    fn the_members_door_decides_with_the_very_rules_of_personal() {
+        let census = [
+            with_email(account_owner("ioan"), "ioan@example.com"),
+            with_email(user("ana", "admin", true), "ana@example.com"),
+            with_email(user("luis", "employee", true), "luis@example.com"),
+        ];
+        let demote = UpdateHubUser {
+            role: Some("employee".into()),
+            is_active: Some(true),
+            ..UpdateHubUser::default()
+        };
+
+        // hub#1429 — the alta by email is how the owner got demoted.
+        let ioan = census_id_by_access_email(&census, "ioan@example.com").unwrap();
+        assert!(matches!(
+            guard_decision(&census, "ana", "admin", &ioan, &demote),
+            Some(Guard::Forbidden {
+                code: OWNER_ROW_IS_THE_OWNERS,
+                ..
+            })
+        ));
+
+        // hub#1444 — nobody signs themselves out…
+        let ana = census_id_by_access_email(&census, "ana@example.com").unwrap();
+        assert!(matches!(
+            guard_decision(&census, "ana", "admin", &ana, &deactivate()),
+            Some(Guard::Rejected {
+                code: "self_deactivation",
+                ..
+            })
+        ));
+
+        // …and the last administrator standing cannot demote themselves either. A demotion is not
+        // a baja, so `self_deactivation` never sees it: `last_admin` is the one that has to.
+        let alone = [
+            with_email(user("ana", "admin", true), "ana@example.com"),
+            with_email(user("luis", "employee", true), "luis@example.com"),
+        ];
+        assert!(matches!(
+            guard_decision(&alone, "ana", "admin", "ana", &demote),
+            Some(Guard::Rejected {
+                code: "last_admin",
+                ..
+            })
+        ));
+        // With somebody else administering, the very same gesture is fine.
+        assert_eq!(guard_decision(&census, "ana", "admin", &ana, &demote), None);
     }
 
     fn with_email(mut row: HubUserRow, email: &str) -> HubUserRow {

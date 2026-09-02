@@ -233,10 +233,22 @@ pub async fn add_member(
             Ok(user) => user,
             Err(e) => return crate::unauthorized(e),
         };
-        // La fila del DUEÑO solo la toca el dueño (hub#1429). Esta puerta escribe el rol sobre la
-        // fila que encuentra por email, así que sin esto un alta con su dirección lo degrada.
-        if let Some(response) =
-            crate::hub_users::guard_owner_row_by_email(&rt, &actor.id, &email).await
+        // Las mismas barandillas que Personal, antes de escribir nada (hub#1429, hub#1444). Esta
+        // puerta escribe el rol sobre la fila que encuentra por email (`SET role = :role,
+        // is_active = 1`), así que el equivalente exacto de lo que va a pasar es ese
+        // `UpdateHubUser`: sin él, un alta con la dirección del dueño lo DEGRADA y el último
+        // administrador puede degradarse a sí mismo dejando el hub sin nadie que lo administre.
+        if let Some(response) = crate::hub_users::guard_members_door_by_email(
+            &rt,
+            &actor,
+            &email,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                role: Some(role.clone()),
+                is_active: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
         {
             return response;
         }
@@ -267,9 +279,20 @@ pub async fn remove_member(
             Ok(user) => user,
             Err(e) => return crate::unauthorized(e),
         };
-        // Y la baja tampoco: es la simetría de la misma puerta (hub#1429).
-        if let Some(response) =
-            crate::hub_users::guard_owner_row_by_email(&rt, &actor.id, &email).await
+        // Y la baja tampoco: es la simetría de la misma puerta (hub#1429, hub#1444). Aquí lo que
+        // se escribe es una desactivación, así que además de la fila del dueño decide
+        // `self_deactivation` (nadie se da de baja a sí mismo) y `last_admin` (el hub no se queda
+        // sin administrador activo).
+        if let Some(response) = crate::hub_users::guard_members_door_by_email(
+            &rt,
+            &actor,
+            &email,
+            &erplora_runtime::hub_users::UpdateHubUser {
+                is_active: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
         {
             return response;
         }

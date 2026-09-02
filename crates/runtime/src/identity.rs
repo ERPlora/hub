@@ -74,6 +74,25 @@ CREATE TABLE IF NOT EXISTS hub_session (\
   expires_at TEXT NOT NULL);\
 CREATE INDEX IF NOT EXISTS ix_hub_user_cloud ON hub_user (cloud_user_id);";
 
+/// Las columnas de `hub_user` que el **baseline v0 no trae** y los unit tests de este módulo montan
+/// a mano tras [`ensure_tables`], en vez de arrancar el motor de migraciones entero: `email`
+/// (**migración de sistema v9**, ADR-0157), `cloud_revoked_at` (**v11**, regla D de hub#348) y
+/// `is_account_owner` (**v56**, hub#1429).
+///
+/// ⚠️ **La lista crece con cada migración que añada una columna a `hub_user`, y hay que ampliarla a
+/// mano**: `ENSURE_TABLES` es un `CREATE TABLE IF NOT EXISTS` y no conoce ninguna columna
+/// posterior. La v56 se olvidó al escribirla y los tres tests de `seed_owner` murieron `42703`
+/// «column "is_account_owner" does not exist»; el boot real nunca lo vio porque allí
+/// `system_migrations::apply` corre ANTES de que nadie escriba (`dispatch::ensure_system_tables`,
+/// pasos 1 y 2). Vive **fuera** de `mod tests` para que el guardia de
+/// `system_migrations::kind_contract_tests` pueda leerla y avisar del olvido nombrando la columna,
+/// en vez de dejar tres panics de Postgres a que alguien los interprete.
+#[cfg(test)]
+pub(crate) const UNIT_TEST_HUB_USER_COLUMNS: &str = "\
+ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';\
+ALTER TABLE hub_user ADD COLUMN is_account_owner INTEGER NOT NULL DEFAULT 0;";
+
 /// Crea las tablas de identidad (idempotente).
 pub async fn ensure_tables(db: &dyn DatabaseAdapter) -> Result<()> {
     db.execute_batch(ENSURE_TABLES).await?;
@@ -1673,19 +1692,13 @@ mod tests {
         .unwrap();
     }
 
-    /// `ensure_tables` + las columnas que el login cloud necesita y el baseline v0 no trae:
-    /// `hub_user.email` (**migración de sistema v9**, ADR-0157) y `hub_user.cloud_revoked_at`
-    /// (**v11**, regla D de hub#348), montadas a mano — igual que `setup_identity` monta el
-    /// `device_id` (v8). Para los tests del owner sembrado / enlace por email / alta-baja de
-    /// usuarios-login / revocación, sin pasar por el boot real.
+    /// `ensure_tables` + [`UNIT_TEST_HUB_USER_COLUMNS`]: las columnas que el login cloud necesita y
+    /// el baseline v0 no trae, montadas a mano — igual que `setup_identity` monta el `device_id`
+    /// (v8). Para los tests del owner sembrado / enlace por email / alta-baja de usuarios-login /
+    /// revocación, sin pasar por el boot real.
     async fn ensure_identity_email(db: &PgAdapter) {
         ensure_tables(db).await.unwrap();
-        db.execute_batch(
-            "ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';\
-             ALTER TABLE hub_user ADD COLUMN cloud_revoked_at TEXT NOT NULL DEFAULT '';",
-        )
-        .await
-        .unwrap();
+        db.execute_batch(UNIT_TEST_HUB_USER_COLUMNS).await.unwrap();
     }
 
     /// Como [`ensure_identity_email`] pero además con `hub_session.device_id` (v8) y las dos
