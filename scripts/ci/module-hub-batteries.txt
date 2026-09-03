@@ -22,10 +22,15 @@
 # Ese par de ediciones es el acto revisable. Un borrado que no apunta a nada comprobable es
 # exactamente cómo se perdieron los 391 de `services`.
 #
-# 🔴 LO QUE ESTA LISTA NO DICE. Dice que la batería ESTÁ donde el slice prometió. NO dice que se
-# ejecute: hoy NINGÚN gate corre `erplora test --against-hub`, y hub#1381 sigue abierta para eso.
-# Un verde aquí se lee «la batería está donde dijeron», nunca «la batería pasa». Los tres
-# bloqueos medidos del corredor están en hub#1381.
+# 🔴 LO QUE ESTA LISTA NO DICE. Dice que la batería ESTÁ donde el slice prometió; no dice que
+# pase. Quien la EJECUTA es `scripts/ci/run-module-hub-batteries.sh`, en el mismo job
+# (`test-hub-modules.yml`, paso `run-batteries`): levanta un hub por módulo con el servidor
+# compilado de ESTE ref y corre cada batería contra él. Un verde de esta lista sigue leyéndose
+# «la batería está donde dijeron»; el que dice «la batería pasa» es el del corredor.
+#
+# Un módulo cuya batería el corredor no puede correr todavía va EXENTO, con su issue, en la tabla
+# `exemptions` de ese script — y la exención CADUCA SOLA: si el módulo llega a instalar, la pasada
+# se pone roja pidiendo que se borre la línea. Hoy solo `verifactu` (hub#1477).
 #
 # El formato es `<module-id>/<ruta de la batería dentro del módulo>`.
 

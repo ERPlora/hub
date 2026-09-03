@@ -367,4 +367,47 @@ printf '%s\n' "$declared_shipped" | grep -Fxq "$combo_entry" || fail \
     "the shipped manifest no longer declares $combo_entry (hub#1396)"
 ok
 
+# ── 11 · `--batteries`: the same discovery, one line per BATTERY (hub#1381) ──────────────
+# The runner (`scripts/ci/run-module-hub-batteries.sh`) needs the FILES, not just the module ids:
+# it runs the `*.hub.test.py|sh` batteries and nothing else, never the `.postgres`/`.pg` families
+# next door. It gets them from here on purpose — a second copy of "what is a hub battery" (the
+# name rule AND the `_HUB_BASE_URL` content rule) is exactly how the two halves drift apart, and
+# a discoverer that quietly stops discovering is the lie one level up (hub#1327, hub#1359).
+#
+# The verdict is unchanged: `--batteries` only swaps WHAT is printed on the agreeing path.
+catalogue="$tmp_dir/c11"
+manifest="$tmp_dir/m11.txt"
+rm -rf "$catalogue"
+make_module "$catalogue" services "tests/package_redeem.hub.test.py"
+make_module "$catalogue" verifactu "tests/desglose.hub.test.py" "tests/chain.hub.test.sh"
+cat > "$manifest" <<'EOF'
+services/tests/package_redeem.hub.test.py
+verifactu/tests/chain.hub.test.sh
+verifactu/tests/desglose.hub.test.py
+EOF
+
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 0 ] || fail "--batteries on an agreeing pair must exit 0, got $rc"
+ok
+[ "$out" = "services/tests/package_redeem.hub.test.py
+verifactu/tests/chain.hub.test.sh
+verifactu/tests/desglose.hub.test.py" ] || fail \
+    "--batteries must print <module>/<path> per battery, got: $(printf '%s' "$out" | tr '\n' ' ')"
+ok
+
+# A disagreement is still a disagreement: `--batteries` must never turn a verdict into a worklist,
+# or the runner would happily run a list that already lost a battery.
+cat > "$manifest" <<'EOF'
+services/tests/package_redeem.hub.test.py
+EOF
+out=$("$script" --catalogue "$catalogue" --manifest "$manifest" --batteries 2>"$tmp_dir/stderr")
+rc=$?
+err=$(cat "$tmp_dir/stderr")
+[ "$rc" -eq 1 ] || fail "--batteries must still fail an undeclared battery, got $rc"
+ok
+[ -z "$out" ] || fail "--batteries must print no worklist on the failing path, got: $out"
+ok
+
 printf 'PASS: %d module-hub-batteries guard cases\n' "$passed"

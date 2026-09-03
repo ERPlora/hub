@@ -457,6 +457,132 @@ if len(battery_alert) == 1:
     )
 
 
+# ── 6 · The batteries are RUN, not just counted (hub#1381) ───────────────────────────
+# Section 5 proves a battery EXISTS where the slice promised. That is half a guard: a battery
+# nobody executes is documentation. `services/tests/package_redeem.hub.test.py` inherited 391
+# lines of coverage on 2026-08-30 and was run by nobody for four days, both CIs green — the
+# module gate reports a hub battery as `⚠ … no se ha corrido` and passes anyway.
+#
+# The runner boots the server built FROM THIS REF (not a published image) with the published
+# catalogue in `HUB_MODULES_DIR`, one hub per module, and runs each battery against it. That is
+# also what makes the run mean what this workflow claims: the kernel under test against the
+# modules as published.
+RUNNER = "scripts/ci/run-module-hub-batteries.sh"
+
+runner_step = [s_ for s_ in steps if s_.get("id") == "run-batteries"]
+check(
+    "a step with `id: run-batteries` RUNS the module batteries",
+    len(runner_step) == 1,
+    f"{len(runner_step)} steps carry that id — a list that is never executed is a comment",
+)
+if len(runner_step) == 1:
+    runner_code = code_of(runner_step[0])
+    check(
+        f"the runner step runs `{RUNNER}`",
+        RUNNER in runner_code,
+        "the batteries have to be run by the shipped runner, not re-inlined here",
+    )
+    check(
+        "the runner step is not allowed to fail softly",
+        runner_step[0].get("continue-on-error") in (None, False),
+        "a runner that cannot fail the job is exactly the `⚠ … no se ha corrido` it replaces",
+    )
+    # It needs the catalogue on disk, the pairing verdict, and a server binary — in that order.
+    clone_idx = min(i for i, s_ in enumerate(steps) if MATERIALIZER in code_of(s_))
+    runner_idx = steps.index(runner_step[0])
+    check(
+        "the runner step runs AFTER the catalogue is materialised",
+        runner_idx > clone_idx,
+        f"runner step at {runner_idx}, materialiser at {clone_idx}",
+    )
+    if len(battery_step) == 1:
+        check(
+            "the runner step runs AFTER the pairing guard",
+            runner_idx > steps.index(battery_step[0]),
+            "running a list that already lost a battery buries the verdict that says so",
+        )
+    build_idx = [
+        i for i, s_ in enumerate(steps) if "cargo build -p erplora-server" in code_of(s_)
+    ]
+    check(
+        "some step builds `erplora-server` for the runner",
+        bool(build_idx),
+        "the batteries talk HTTP to a live kernel; without the binary there is nothing to talk to",
+    )
+    if build_idx:
+        check(
+            "the server is built BEFORE the batteries are run",
+            runner_idx > min(build_idx),
+            f"runner step at {runner_idx}, build at {min(build_idx)}",
+        )
+    check(
+        "the runner is handed the published catalogue, not a checkout of modules-workspace",
+        "ERPLORA_MODULES_DIR" in runner_code or "--catalogue" in runner_code,
+        "a runner pointed at the working tree measures something nobody ships",
+    )
+
+check(
+    f"`{RUNNER}` really exists in this checkout",
+    os.path.isfile(os.path.join(os.environ["REPO_ROOT"], RUNNER)),
+    "a workflow that calls a file nobody shipped fails at 3am, not at review time",
+)
+
+# Same mute-red problem as its two neighbours: a battery breaking on the cron or on a module's
+# `module-published` dispatch has nobody watching.
+RUNNER_ALERT_TITLE = "Las baterías de módulo del catálogo publicado NO pasan contra el kernel"
+runner_alert = [s_ for s_ in steps if RUNNER_ALERT_TITLE in str(s_.get("run", ""))]
+check(
+    f"a step opens the runner alert issue titled «{RUNNER_ALERT_TITLE}»",
+    len(runner_alert) == 1,
+    f"{len(runner_alert)} steps mention it",
+)
+check(
+    "the runner alert title carries no colon (colons are GitHub search syntax)",
+    ":" not in RUNNER_ALERT_TITLE,
+    RUNNER_ALERT_TITLE,
+)
+if len(runner_alert) == 1:
+    r_run = str(runner_alert[0].get("run", ""))
+    r_cond = str(runner_alert[0].get("if", ""))
+    r_code = "\n".join(l for l in r_run.splitlines() if not l.lstrip().startswith("#"))
+    check(
+        "the runner alert delegates to the shared scripts/ci/alert-issue.sh",
+        "./scripts/ci/alert-issue.sh" in r_code,
+        "a fifth copy of the list-and-filter logic is how they drift apart (hub#1246)",
+    )
+    check(
+        "the runner alert never inlines `--search`",
+        "--search" not in r_code,
+        "GitHub's search index lags behind reality (hub#1246)",
+    )
+    check(
+        "the runner alert is gated on the RUNNER step's own outcome",
+        "steps.run-batteries.outcome == 'failure'" in r_cond,
+        f"if: {r_cond!r} — a failure elsewhere must not fake a battery verdict",
+    )
+    check(
+        "the runner alert never fires on a `pull_request`",
+        "pull_request" not in r_cond,
+        f"if: {r_cond!r}",
+    )
+    for event in ("schedule", "repository_dispatch", "push"):
+        check(
+            f"the runner alert fires for `{event}` (nobody watches it otherwise)",
+            event in r_cond,
+            f"if: {r_cond!r}",
+        )
+    check(
+        "the runner alert carries a token",
+        "GH_TOKEN" in (runner_alert[0].get("env") or {}),
+        f"env is {runner_alert[0].get('env')}",
+    )
+    check(
+        "the runner alert quotes the runner's own verdict, not just the run URL",
+        "VERDICT" in r_run,
+        "an alert that does not say WHICH battery broke sends the reader back to the log",
+    )
+
+
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)
     for f in failures:
