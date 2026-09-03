@@ -328,3 +328,59 @@ describe('quién mandó la ronda sale EN EL PAPEL (hub#1410 · recorte de kitche
     expect(print.mock.calls[0]![0].data).not.toHaveProperty('waiter');
   });
 });
+
+describe('la ronda `rush` manda el aviso `!! URGENTE !!` al pie (hub#1411)', () => {
+  // El renderizador ESC/POS ya sabía pintar el aviso al pie del papel — pero solo reacciona a la
+  // forma EXACTA `priority: "HIGH"` (`escpos.rs`, contrato de dispositivo que no se toca: lo lee
+  // la `erplora-app` ya desplegada). `kitchen` habla su propio vocabulario, en minúsculas
+  // (`normal`/`rush`/`vip`, `handler/src/lib.rs`), y no es su contrato de datos lo que cambia
+  // (kitchen#39 ya filtró por él): el adaptador vive aquí, en el productor.
+  function clientWithPriority(priority: string | undefined) {
+    const query = vi.fn(async (name: string) => {
+      if (name === 'kitchen.orders.items') return [CROQUETAS];
+      if (name === 'kitchen.orders.get') {
+        return [
+          {
+            id: 'k-1',
+            label: 'Mesa 4',
+            round_number: 1,
+            order_number: 'C-018',
+            ...(priority !== undefined ? { priority } : {}),
+          },
+        ];
+      }
+      return [];
+    });
+    return { query } as never;
+  }
+
+  const okPrint = () =>
+    vi.fn<(req: PrintRequest) => Promise<PrintResult>>(async () => ({ via: 'bridge', role: 'kitchen' }));
+
+  it('una ronda `rush` manda `priority: "HIGH"` al renderizador', async () => {
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithPriority('rush'), { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data?.priority).toBe('HIGH');
+  });
+
+  it('una ronda `normal` no manda `priority` — el renderizador ya asume NORMAL sin el campo', async () => {
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithPriority('normal'), { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+
+  it('sin `priority` en la cabecera (comanda vieja) tampoco manda el campo', async () => {
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithPriority(undefined), { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+
+  it('`vip` NO dispara el aviso de cocina: es de sala, no de cocina', async () => {
+    // Decisión explícita del alcance de hub#1411: `vip` queda fuera de este mapeo — si algún día
+    // dispara algo, es una decisión de negocio propia (skill `market-decision`), no un efecto
+    // colateral de este adaptador.
+    const print = okPrint();
+    await onKitchenOrderCreated(clientWithPriority('vip'), { order_id: 'k-1' }, { print });
+    expect(print.mock.calls[0]![0].data).not.toHaveProperty('priority');
+  });
+});
