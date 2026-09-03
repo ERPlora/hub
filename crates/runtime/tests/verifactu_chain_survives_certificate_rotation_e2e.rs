@@ -3,8 +3,8 @@
 //! convenio 017 (pm#71); this file needs neither: no network, no real certificate material.
 //!
 //! **The property.** The certificate a hub signs with is a fact of the CORE
-//! (`_hub_certificate`, ADR-0202 §2.1) and can be rotated at any moment — the business
-//! re-uploads its own `.p12`, or ERPlora rotates the delegated one. The fiscal hash chain must
+//! (`_hub_certificate`, ADR-0202 §2.1) and can be rotated at any moment — the business re-uploads
+//! its own `.p12`, renews it, or replaces it with a different one. The fiscal hash chain must
 //! not care: `chain::alta_hash` (`crates/plugins/verifactu/src/chain.rs`) composes the AEAT fingerprint
 //! from `IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&TipoFactura&CuotaTotal&
 //! ImporteTotal&Huella&FechaHoraHusoGenRegistro` (Orden HAC/1177/2024) — the PREVIOUS record's
@@ -202,12 +202,13 @@ async fn the_chain_does_not_break_when_the_certificate_changes_hub1270() {
     .await
     .expect("record 1 is created while cert A signs");
 
-    // Certificate ROTATION: cert A is gone, ERPlora's delegated cert (cert B) takes over — a
-    // completely different identity, sharing nothing with the one that signed record 1.
+    // Certificate ROTATION: cert A is gone and cert B takes its place — a completely different
+    // identity, sharing nothing with the one that signed record 1. Since hub#1435 retired the
+    // delegated slot this is the shape a rotation has: the business replaces its own `.p12`.
     certificate::delete(rt.db(), HUB, CertificateKind::Own)
         .await
         .expect("delete cert A");
-    store_cert(rt.db(), HUB, CertificateKind::Delegated, "cert-B").await;
+    store_cert(rt.db(), HUB, CertificateKind::Own, "cert-B").await;
     rt.execute_command(
         "verifactu.records.create",
         &record_payload("F-2026-000002"),

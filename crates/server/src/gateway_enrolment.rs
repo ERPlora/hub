@@ -14,11 +14,12 @@
 //! (ADR-0003). The screen that shows all this belongs to the `verifactu` module; the module cannot
 //! make this call, which is exactly why the door is here.
 //!
-//! # The same split as the delegated certificate
+//! # The same split the delegated certificate used
 //!
-//! [`crate::fiscal_certificate`] is the precedent and this follows it: the layer that discovers
-//! the need is not the layer that holds the credential, every pass is best-effort, and the whole
-//! thing is bounded by a rolling budget because the control plane charges these calls per hub.
+//! The delegated-certificate fetch (ADR-0202 §2, retired in hub#1435) is the precedent and this
+//! follows it: the layer that discovers the need is not the layer that holds the credential, every
+//! pass is best-effort, and the whole thing is bounded by a rolling budget ([`CallBudget`], which
+//! outlived it) because the control plane charges these calls per hub.
 //!
 //! # What is generic and what is ours
 //!
@@ -34,7 +35,7 @@ use cloud_client::{Auth, CloudClient};
 use erplora_db::DatabaseAdapter;
 use erplora_runtime::gateway_identity;
 
-use crate::fiscal_certificate::RefetchBudget;
+use crate::call_budget::CallBudget;
 
 /// The kind this hub files under, as the control plane declares it
 /// (`apps/dashboard/fiscal/legal_documents.py`). ⚠️ It is written into rows and travels in the
@@ -75,8 +76,8 @@ pub const REJECTED_BACKOFF: Duration = Duration::from_secs(1800);
 
 /// The production budget: [`MAX_ENROLMENT_PASSES_PER_HOUR`] per rolling hour, shared by the
 /// background service and the explicit door so the numbers live in ONE place.
-pub fn hourly_budget() -> RefetchBudget {
-    RefetchBudget::new(MAX_ENROLMENT_PASSES_PER_HOUR, Duration::from_secs(3600))
+pub fn hourly_budget() -> CallBudget {
+    CallBudget::new(MAX_ENROLMENT_PASSES_PER_HOUR, Duration::from_secs(3600))
 }
 
 /// An approved document with nothing to collect. Impossible by the control plane's own rule, so
@@ -177,7 +178,7 @@ pub async fn enrol_once(
     auth: &Auth,
     db: &dyn DatabaseAdapter,
     hub_id: &str,
-    budget: &RefetchBudget,
+    budget: &CallBudget,
 ) -> std::result::Result<EnrolmentOutcome, EnrolmentRefusal> {
     if !budget.try_spend(Instant::now()) {
         // The guard doing its job, not a problem with the identity. Logged so a hub that keeps
@@ -516,8 +517,8 @@ mod tests {
     const HUB: &str = "11111111-2222-4333-8444-555566667777";
 
     /// A bearer-shaped string planted in the stub's answers: no error, no log line and no outcome
-    /// may ever carry it back. Same rule as `fiscal_certificate.rs`, and for the same reason —
-    /// these bodies come from the control plane and a proxy mishap can put anything in them.
+    /// may ever carry it back. Same rule the delegated-certificate fetch had, and for the same
+    /// reason — these bodies come from the control plane and a proxy mishap can put anything in them.
     const NEVER_ECHOED: &str = "SECRET-BEARER-abcdefghijklmnop";
 
     fn machine_auth() -> Auth {
@@ -682,8 +683,8 @@ mod tests {
         .to_string()
     }
 
-    fn budget() -> RefetchBudget {
-        RefetchBudget::new(MAX_ENROLMENT_PASSES_PER_HOUR, std::time::Duration::from_secs(3600))
+    fn budget() -> CallBudget {
+        CallBudget::new(MAX_ENROLMENT_PASSES_PER_HOUR, std::time::Duration::from_secs(3600))
     }
 
     // ── The door itself ───────────────────────────────────────────────────────────────────────
@@ -983,7 +984,7 @@ mod tests {
             (StatusCode::CREATED, "{}".into()),
         )
         .await;
-        let spent = RefetchBudget::new(0, std::time::Duration::from_secs(3600));
+        let spent = CallBudget::new(0, std::time::Duration::from_secs(3600));
 
         let outcome = enrol_once(
             &reqwest::Client::new(),

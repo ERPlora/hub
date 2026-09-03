@@ -1818,48 +1818,50 @@ mod tests {
     // ── D3: el go-live ES `testing → production`, y muere con el primer ENVÍO (hub#551) ───────
 
     /// Deja el hub en `READY` **y con el otorgamiento firmado**: es el fixture de «un hub que puede
-    /// facturar», y desde hub#817 firmar es parte de poder. La variante sin firmar
-    /// ([`hub_ready_without_grant`]) existe para los tests que prueban justo esa puerta.
+    /// facturar», y desde hub#817 firmar es parte de poder. La variante en la vía de la celda
+    /// ([`hub_on_the_cell_route`]) existe para los tests que prueban justo la puerta del Anexo I.
     async fn hub_ready(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
-        let reg = hub_ready_without_grant(db, hub_id).await;
+        let reg = hub_ready_with_own_certificate(db, hub_id).await;
         record_representation(db, hub_id, REPRESENTATION_VIGENTE, "2026-08-11T09:00:00Z")
             .await
             .expect("el fixture firma el Anexo I");
         reg
     }
 
-    /// Deja el hub en `READY` de verdad —identidad + certificado + proveedor montado— **firmando
-    /// con el certificado DELEGADO**, que es el hub al que el otorgamiento le hace falta de verdad
-    /// (ADR-0320 §1): ERPlora remite en su nombre, así que sin Anexo I no hay quien le represente.
+    /// El hub al que el otorgamiento le hace falta de verdad (ADR-0320 §1): el que **NO tiene
+    /// certificado**, así que remite por la CELDA y ERPlora lo hace en su nombre.
     ///
-    /// 🔴 El slot importa y no es decorativo: `_hub_certificate.kind` tiene `DEFAULT 'own'`, así que
-    /// una fila sin `kind` sembraba un certificado PROPIO y estos tests creían estar probando la
-    /// vía delegada mientras probaban la contraria.
-    async fn hub_ready_without_grant(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
-        hub_ready_signing_with(db, hub_id, crate::certificate::CertificateKind::Delegated).await
+    /// 🔴 Antes este fixture sembraba una fila en el slot `delegated`. Ese slot se retiró
+    /// (hub#1435) y con él la única forma de estar en la vía delegada teniendo certificado: hoy la
+    /// vía la decide la AUSENCIA de uno ([`certificate::route_of`]). Por eso aquí no se afirma
+    /// `READY` —un hub sin certificado no lo es— y no hace falta: la puerta del Anexo I se
+    /// comprueba **antes** que la de readiness, precisamente para que a quien no ha firmado se le
+    /// diga eso y no «te falta un certificado».
+    async fn hub_on_the_cell_route(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
+        let reg = hub_configured_without_certificate(db, hub_id).await;
+        assert_eq!(
+            crate::certificate::transmission_route(db, hub_id)
+                .await
+                .unwrap(),
+            crate::certificate::ROUTE_DELEGATED,
+            "el fixture tiene que estar en la vía de la celda, o no prueba la puerta del Anexo I"
+        );
+        reg
     }
 
-    /// El mismo hub `READY` y sin otorgamiento, pero **con certificado PROPIO**: la otra vía de
-    /// ADR-0320 §1, la que no necesita representante porque firma y remite el propio obligado.
+    /// El hub `READY` **con certificado PROPIO**: la otra vía de ADR-0320 §1, la que no necesita
+    /// representante porque firma y remite el propio obligado.
     async fn hub_ready_with_own_certificate(db: &dyn DatabaseAdapter, hub_id: &str) -> Registry {
-        hub_ready_signing_with(db, hub_id, crate::certificate::CertificateKind::Own).await
-    }
-
-    /// Deja el hub en `READY` de verdad: identidad + certificado en `kind` + proveedor montado.
-    async fn hub_ready_signing_with(
-        db: &dyn DatabaseAdapter,
-        hub_id: &str,
-        kind: crate::certificate::CertificateKind,
-    ) -> Registry {
-        booted_hub(db, hub_id, Some("ES")).await;
-        set_setting(db, hub_id, "business_tax_id", "B12345674").await;
-        set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
+        let reg = hub_configured_without_certificate(db, hub_id).await;
         // Straight into the system table the gate reads (`_hub_certificate`, ADR-0081): going
         // through `set_business_certificate` would need the process-global `HUB_SECRETS_KEY`, and
         // what is looked at here is the PRESENCE of the row, never its contents.
         let mut p = Params::new();
         p.insert("hub_id".into(), json!(hub_id));
-        p.insert("kind".into(), json!(kind.as_str()));
+        p.insert(
+            "kind".into(),
+            json!(crate::certificate::CertificateKind::Own.as_str()),
+        );
         db.execute(
             "INSERT INTO _hub_certificate (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by) \
              VALUES (:hub_id, :kind, 'v1:ciphertext', 'v1:ciphertext', '2026-08-08T09:00:00Z', 'hub_user:1')",
@@ -1867,6 +1869,23 @@ mod tests {
         )
         .await
         .expect("the business certificate is stored in the hub");
+        refresh(db, &reg, hub_id).await.unwrap();
+        assert_eq!(
+            load(db, hub_id).await.unwrap().unwrap().status,
+            FiscalStatus::Ready,
+            "el fixture tiene que dejarlo READY o el test no prueba nada"
+        );
+        reg
+    }
+
+    /// Todo lo que hace falta para facturar MENOS el certificado: identidad fiscal + proveedor.
+    async fn hub_configured_without_certificate(
+        db: &dyn DatabaseAdapter,
+        hub_id: &str,
+    ) -> Registry {
+        booted_hub(db, hub_id, Some("ES")).await;
+        set_setting(db, hub_id, "business_tax_id", "B12345674").await;
+        set_setting(db, hub_id, "business_legal_name", "Bar Pepe SL").await;
         let reg = registry_with(&[(
             "verifactu",
             Some(json!({ "country": "ES", "regime": "verifactu" })),
@@ -1874,11 +1893,6 @@ mod tests {
             true,
         )]);
         refresh(db, &reg, hub_id).await.unwrap();
-        assert_eq!(
-            load(db, hub_id).await.unwrap().unwrap().status,
-            FiscalStatus::Ready,
-            "el fixture tiene que dejarlo READY o el test no prueba nada"
-        );
         reg
     }
 
@@ -1892,7 +1906,7 @@ mod tests {
     #[tokio::test]
     async fn a_hub_that_has_not_signed_the_grant_cannot_go_live() {
         let db = fresh_db().await;
-        hub_ready_without_grant(&db, "hub-es").await;
+        hub_on_the_cell_route(&db, "hub-es").await;
 
         let err = go_live(&db, "hub-es")
             .await
@@ -1909,7 +1923,7 @@ mod tests {
     #[tokio::test]
     async fn a_grant_awaiting_review_does_not_open_the_go_live() {
         let db = fresh_db().await;
-        hub_ready_without_grant(&db, "hub-es").await;
+        hub_on_the_cell_route(&db, "hub-es").await;
         record_representation(
             &db,
             "hub-es",
@@ -1931,7 +1945,7 @@ mod tests {
     #[tokio::test]
     async fn a_rejected_grant_does_not_open_the_go_live() {
         let db = fresh_db().await;
-        hub_ready_without_grant(&db, "hub-es").await;
+        hub_on_the_cell_route(&db, "hub-es").await;
         record_representation(
             &db,
             "hub-es",
@@ -1954,7 +1968,7 @@ mod tests {
     #[tokio::test]
     async fn a_revoked_grant_does_not_open_the_go_live() {
         let db = fresh_db().await;
-        hub_ready_without_grant(&db, "hub-es").await;
+        hub_on_the_cell_route(&db, "hub-es").await;
         record_representation(
             &db,
             "hub-es",
@@ -1993,17 +2007,21 @@ mod tests {
         assert_eq!(after.status, FiscalStatus::Active);
     }
 
-    /// Y la puerta sigue cerrada por el otro lado: **el certificado DELEGADO no vale como propio**.
-    /// Es el de ERPlora (ADR-0202 §2.1), lo lleva cualquier hub al que se le repartió, y `can_sign`
-    /// dice `true` con él — así que preguntar «¿puede firmar?» en vez de «¿con QUÉ firma?» abriría
-    /// producción a la flota entera sin un solo Anexo I firmado.
+    /// Y la puerta sigue cerrada por el otro lado: **el hub SIN certificado sigue necesitando el
+    /// Anexo I**, que es justo el que remite por la celda con el Sello de ERPlora.
+    ///
+    /// La pregunta es «¿con QUÉ se firma?» ([`certificate::transmission_route`]), nunca «¿puede
+    /// firmar?»: con el slot delegado vivo, `can_sign` decía `true` con el certificado de ERPlora y
+    /// preguntar así habría abierto producción a la flota entera sin un solo Anexo I. Retirado el
+    /// slot (hub#1435) el `can_sign` de este hub es `false`, y la puerta tiene que seguir siendo la
+    /// del OTORGAMIENTO —no la de readiness— porque lo que le falta es un papel.
     #[tokio::test]
-    async fn only_the_delegated_certificate_still_demands_the_grant() {
+    async fn a_hub_on_the_cell_route_still_demands_the_grant() {
         let db = fresh_db().await;
-        hub_ready_without_grant(&db, "hub-es").await;
+        hub_on_the_cell_route(&db, "hub-es").await;
         assert!(
-            crate::certificate::can_sign(&db, "hub-es").await.unwrap(),
-            "el fixture tiene que poder firmar, o el test no distingue can_sign de active_kind"
+            !crate::certificate::can_sign(&db, "hub-es").await.unwrap(),
+            "un hub por la celda no tiene certificado propio: si lo tuviera, iría por la vía directa"
         );
 
         let err = go_live(&db, "hub-es")
@@ -2055,7 +2073,7 @@ mod tests {
     #[tokio::test]
     async fn a_demo_is_refused_for_being_a_demo_not_for_the_missing_grant() {
         let db = fresh_db().await;
-        let mut reg = hub_ready_without_grant(&db, "hub-demo").await;
+        let mut reg = hub_on_the_cell_route(&db, "hub-demo").await;
         reg.demo_hub = true;
         refresh(&db, &reg, "hub-demo").await.unwrap();
 
