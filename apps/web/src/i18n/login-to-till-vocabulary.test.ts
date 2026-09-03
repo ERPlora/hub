@@ -128,6 +128,10 @@ const SAME_IN_BOTH_LANGUAGES = new Set([
   'importPage.sectionFiscal',
   'importPage.sectionRoles',
   'pinPolicy.idleMinutes',
+  // hub#1430 — «PIN» itself: an acronym Spanish uses unchanged, same as the borrowings above. The
+  // sentences that surround it («Cambiar PIN», «PIN actual»…) are translated; the three letters are
+  // not a word to translate.
+  'profile.pinTitle',
   // hub#1154 — a pure format string: two placeholders and a separator, not a single word. There is
   // nothing here to translate, so the two catalogues MUST read the same. This is a different reason
   // from the borrowings above, and it is the only one of its kind: if a second entry ever needs
