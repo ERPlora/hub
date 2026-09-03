@@ -104,8 +104,11 @@ jobs:
     name: e2e con módulos reales
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     # 45 → 70 con el corredor de baterías (hub#1381): levanta UN hub por módulo con el catálogo
-    # publicado entero, y eso son 12 arranques. Medido el 2026-09-03 en local: **13 min 40 s** para
-    # 25 baterías en 11 módulos más la exención. El techo se sube por encima de la suma y no se
+    # publicado entero, y eso son 12 arranques — las **26** baterías en 12 módulos desde que
+    # hub#1483 borró la última exención (`verifactu`: hub#1477 le dio el backend de disco para sus
+    # `static_files` y el módulo ya instala sin token de máquina). Medido el 2026-09-03 en local:
+    # **13 min 40 s** con 25 de ellas; la 26ª añade un arranque más. El techo se sube por encima de
+    # la suma y no se
     # ajusta al minuto a propósito — un timeout que corta a mitad de la pasada no deja veredicto,
     # deja un rojo sin causa, que es lo más caro de diagnosticar de este job.
     timeout-minutes: 70
