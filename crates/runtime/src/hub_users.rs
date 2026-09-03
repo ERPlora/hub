@@ -1086,10 +1086,10 @@ pub async fn core_query(
         //
         // 🔴 The route comes from `certificate::route_of`, the SAME function `fiscal_profile::
         // go_live` decides the Anexo I with. It is NOT re-derived from `:has_certificate`, which
-        // is `can_sign` and answers «own OR delegated»: a hub holding only ERPlora's certificate
-        // says `true` there and is on the DELEGATED route. That deduction would be a second rule,
-        // and two rules is how a screen and a production gate end up disagreeing about the route
-        // a business is on.
+        // is `can_transmit` and answers «has this hub got a ROUTE?» (hub#1489): a hub enrolled on
+        // the cell says `true` there and is on the DELEGATED route, so that 0/1 cannot tell the
+        // two roads apart at all. That deduction would be a second rule, and two rules is how a
+        // screen and a production gate end up disagreeing about the route a business is on.
         //
         // The grant is served from the copy `_hub_fiscal_profile` MIRRORS (hub#836), never with a
         // trip to the control plane: whoever wants it refreshed opens Ajustes → Negocio, which is

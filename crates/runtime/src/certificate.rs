@@ -306,17 +306,17 @@ pub async fn slot_status(
 /// per [`active_kind`]) — the «firmando con: certificado propio / ERPlora» the module shows
 /// (ADR-0202 §2.2). `null` when the hub has neither.
 ///
-/// # ⚠️ `present` is NOT «can this hub issue?» — that question is [`can_sign`] (hub#319)
+/// # ⚠️ `present` is NOT «can this hub issue?» — that question is [`can_transmit`] (hub#319)
 ///
 /// The two used to be the same read, and hub#316/#317 warned that they would have to part company.
 /// They did: `present` answers «did the owner upload a certificate?» and stays on the **own** slot,
 /// while «can this hub issue?» — the ADR-0203 gate on [`crate::commands::execute`] and
-/// [`crate::queries::execute_page`], and the ⛔ arm of [`crate::setup_status`] (hub#370) — now reads
-/// [`can_sign`], which accepts the delegated certificate too.
+/// [`crate::queries::execute_page`], and the ⛔ arm of [`crate::setup_status`] (hub#370) — reads
+/// [`can_transmit`], which accepts the cell road too.
 ///
-/// So a delegated-only hub reports `present: false` **and** invoices normally. That is not a
+/// So a hub on the cell road reports `present: false` **and** invoices normally. That is not a
 /// contradiction: nothing of the customer's is loaded (this screen has nothing to show and nothing
-/// to delete), and ERPlora signs on their behalf. What the module shows as «firmando con: ERPlora»
+/// to delete), and ERPlora files on their behalf. What the module shows as «firmando con: ERPlora»
 /// comes from `active`/`slots` below, never from `present`.
 pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     let occupied = occupied_slots(db, hub_id).await?;
@@ -373,9 +373,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKin
 /// next signature and deleting it hands the hub back to the delegated one — both directions, with
 /// nothing to reconfigure.
 ///
-/// **«Can this hub issue?» is this function's [`can_sign`] shape** — the dispatcher gate and the ⛔
-/// arm of the setup checklist both go through it (hub#319). Use `can_sign` when the question is
-/// *whether*, and this one when it is *which*.
+/// **«Can this hub issue?» is NOT this function** — that is [`can_transmit`], which the dispatcher
+/// gate and the ⛔ arm of the setup checklist both go through (hub#319, hub#1489) and which the
+/// cell road satisfies without any certificate at all. Use `can_transmit` when the question is
+/// *whether*, and this one when it is *which certificate*.
 pub async fn active_kind(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -487,35 +488,57 @@ pub async fn slot_type(
     Ok(certificate_type_from_der(&der, &password).unwrap_or(None))
 }
 
-/// **«Can this hub issue?» — the one function that answers it** (ADR-0202 §2.1 — hub#319).
+/// **«Can this hub issue?» — the one function that answers it** (ADR-0203, ADR-0320 §1 — hub#319,
+/// hub#1489).
 ///
-/// `true` when [`active_kind`] finds a certificate to sign with, i.e. the business uploaded its own
-/// **or** the control plane handed one down. A hub holding only the delegated certificate can
-/// invoice: ERPlora signs on its behalf, which is the whole point of the delegated slot.
+/// The question is **«has this hub got a ROUTE?»**, and ADR-0320 gave it two exclusive ones:
 ///
-/// # Why this is a function and not three copies of `active_kind(..).is_some()`
+/// * [`ROUTE_OWN`] — the business uploaded its own `.p12` and files with it ([`active_kind`]); or
+/// * [`ROUTE_DELEGATED`] — ERPlora files on its behalf through the fiscal cell, which from this
+///   hub's side needs the enrolled machine identity of ADR-0419
+///   ([`crate::gateway_identity::is_enrolled`]).
+///
+/// # Why it is not «has it got a certificate?»
+///
+/// It used to be, and that was invisible while the delegated route ALSO meant holding a `.p12`:
+/// the control plane handed ERPlora's certificate down into a local slot, so a delegated hub
+/// answered `true` by accident. hub#1435 retired that slot — no private key of ERPlora's reaches
+/// the fleet any more — and the hole came out (hub#1489): a hub that transmits perfectly through
+/// the cell was refused its own sales, painted ⛔ on the checklist and never reached
+/// [`crate::fiscal_profile::FiscalStatus::Ready`], so its go-live died in `NOT_READY` with the
+/// Anexo I signed. Asking about the *certificate* answered a question nobody was asking; the route
+/// is what the gate is actually protecting.
+///
+/// **The own certificate is checked FIRST and short-circuits**, so a hub on the direct route never
+/// pays for the second read — and a deployment whose gateway table cannot be read does not lose
+/// the answer it already had.
+///
+/// # Why this is a function and not three copies of the same expression
 ///
 /// The question has three askers and they must never diverge:
 ///
 /// 1. [`crate::commands::execute`] and 2. [`crate::queries::execute_page`], which fill
 ///    [`RequestContext::has_certificate`] — the second arm of the ADR-0203 fiscal gate; and
-/// 3. [`crate::setup_status`], the ⛔ arm of the onboarding checklist (hub#370).
+/// 3. [`crate::setup_status`], the ⛔ arm of the onboarding checklist (hub#370), plus
+///    [`crate::fiscal_profile::refresh`], which computes `READY` from it.
 ///
 /// ⛔ *asserts that the dispatcher is going to refuse the operation*. If the checklist and the gate
 /// answer this differently, one of them is lying: either a ⛔ that blocks a screen while the sale
-/// goes through, or a rejection nobody warned about. They used to read
-/// `status(..)["present"]`, which describes the **own** slot only — correct while nothing could
-/// write a delegated certificate (hub#316), and wrong the moment hub#317 made that possible. Giving
-/// the question a NAME is what makes agreement structural instead of a comment asking three call
-/// sites to remember each other.
+/// goes through, or a rejection nobody warned about. Giving the question a NAME is what makes
+/// agreement structural instead of a comment asking four call sites to remember each other —
+/// which is also why this rename is the whole fix: the compiler visited every asker.
 ///
 /// **Not the same question as `status(..)["present"]`, which stays where it is.** That one describes
 /// what the owner uploaded in Ajustes → Negocio — what that screen shows and what its delete button
-/// removes — and it must keep saying `false` for a hub that only holds ERPlora's certificate.
+/// removes — and it must keep saying `false` for a hub that files through the cell. Nor is it
+/// [`transmission_route`], which answers *which* of the two roads, never *whether* there is one.
 ///
 /// [`RequestContext::has_certificate`]: crate::registry::RequestContext::has_certificate
-pub async fn can_sign(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
-    Ok(active_kind(db, hub_id).await?.is_some())
+pub async fn can_transmit(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    if active_kind(db, hub_id).await?.is_some() {
+        return Ok(true);
+    }
+    crate::gateway_identity::is_enrolled(db, hub_id).await
 }
 
 // ── Signing/identity MEDIATED by the host (ADR-0079) ──────────────────────────
@@ -1452,18 +1475,49 @@ mod tests {
         )
     }
 
-    /// **`can_sign` is `active_kind` and can never be anything else.** The two are one answer split
-    /// in two shapes («whether» and «which»), and every state has to agree — a hub that «can sign»
-    /// with nothing selected, or one that has a selection but «cannot sign», is the contradiction
-    /// the three readers of hub#319 would then propagate.
+    /// Plants the enrolled machine identity — the three fields
+    /// [`crate::gateway_identity::client_identity`] demands before the cell road exists on this
+    /// side. Written raw because what is read here is the PRESENCE of the material, never its
+    /// contents.
+    async fn enrol_machine_identity(db: &dyn DatabaseAdapter, hub_id: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert(
+            "common_name".into(),
+            json!(crate::gateway_identity::common_name(hub_id)),
+        );
+        db.execute(
+            "INSERT INTO _hub_gateway_identity \
+             (hub_id, private_key_pem, certificate_pem, ca_pem, common_name, created_at, updated_at) \
+             VALUES (:hub_id, 'v1:ciphertext', 'cert', 'ca', :common_name, \
+                     '2026-09-03T09:00:00Z', '2026-09-03T09:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("the machine identity is enrolled");
+    }
+
+    /// **`can_transmit` is «has this hub got a ROUTE?», in all four states** (hub#1489). Own
+    /// certificate and enrolled cell identity are the two roads of ADR-0320 §1 and either of them
+    /// is enough; only a hub with NEITHER has no way out. Walking all four in one test is the
+    /// point: the failure this pins is not «one state is wrong», it is «the two roads stopped
+    /// being interchangeable».
     #[tokio::test]
-    async fn can_sign_and_active_kind_agree_in_every_state() {
+    async fn can_transmit_answers_either_road_in_every_state() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(24));
         let db = db_ready().await;
 
-        for (own, expected) in [(false, None), (true, Some(CertificateKind::Own))] {
+        for (own, enrolled) in [(false, false), (true, false), (false, true), (true, true)] {
             delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!("hub-test"));
+            db.execute(
+                "DELETE FROM _hub_gateway_identity WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .unwrap();
             if own {
                 set(
                     &db,
@@ -1477,15 +1531,49 @@ mod tests {
                 .await
                 .unwrap();
             }
+            if enrolled {
+                enrol_machine_identity(&db, "hub-test").await;
+            }
 
-            let kind = active_kind(&db, "hub-test").await.unwrap();
-            assert_eq!(kind, expected, "own={own}");
             assert_eq!(
-                can_sign(&db, "hub-test").await.unwrap(),
-                kind.is_some(),
-                "own={own}: «whether» and «which» must be the same answer"
+                can_transmit(&db, "hub-test").await.unwrap(),
+                own || enrolled,
+                "own={own} enrolled={enrolled}: either road is a way out; neither is not"
             );
         }
+    }
+
+    /// **`active_kind` still answers «WHICH», and only about the own slot.** It is the half
+    /// `can_transmit` must never absorb: `route_of` picks the AEAT road with it and
+    /// `status(..)["present"]` shows the owner what they uploaded, and an enrolled cell identity is
+    /// neither of those things — it is not the customer's certificate and there is nothing on that
+    /// screen to delete.
+    #[tokio::test]
+    async fn an_enrolled_cell_identity_is_not_a_certificate() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(24));
+        let db = db_ready().await;
+        enrol_machine_identity(&db, "hub-test").await;
+
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            None,
+            "the cell identity is ERPlora's road, not a certificate of the business's"
+        );
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(false),
+            "Ajustes → Negocio has nothing to show and nothing to delete"
+        );
+        assert_eq!(
+            transmission_route(&db, "hub-test").await.unwrap(),
+            ROUTE_DELEGATED,
+            "no own certificate is the cell road (ADR-0320 §1)"
+        );
+        assert!(
+            can_transmit(&db, "hub-test").await.unwrap(),
+            "…and that road is a way out: this hub files"
+        );
     }
 
     // ── hub#470: what the certificate IS, read out of the bytes it was stored from ─────────────
