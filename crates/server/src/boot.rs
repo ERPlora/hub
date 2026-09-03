@@ -957,6 +957,12 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // arrancar. El seed de arriba sí aborta el boot, y es la excepción a propósito.
     fiscal_certificate::spawn_refetch_service(&state, certificate_budget);
 
+    // hub#1457: el alta de la identidad de MÁQUINA converge sola. Mira un dato LOCAL en cada
+    // tick —clave sin certificado, o sea «alguien pidió el CSR en este hub»— y solo entonces
+    // gasta una llamada, así que una flota de hubs que firman con su propio certificado no le
+    // cuesta nada al plano de control ni llena de revisiones el escritorio del operador.
+    gateway_enrolment::spawn_enrolment_service(&state);
+
     // «Llama a MI nube con MI credencial de máquina» (hub#1459): el primitivo genérico con el
     // que un motor first-party pide algo al plano de control sin sostener jamás el `X-Hub-Token`.
     // El host pone destino y credencial; el motor pone método, ruta y cuerpo — y qué significa la

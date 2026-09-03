@@ -94,6 +94,20 @@ async fn load_private_key_pem(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<
     Ok(Some(pem))
 }
 
+/// The internal CA already stored for this hub, if any — **public material**, unlike everything
+/// else this module guards.
+///
+/// Its reader is the enrolment door (hub#1457): the yearly renewal brings back a new certificate
+/// for the SAME key, signed by the SAME authority, so an issued certificate that arrives without
+/// its CA is installable as long as this hub already knows the CA. Without this the renewal of
+/// every hub in the fleet would stop on a technicality that has nothing to do with the identity.
+pub async fn stored_ca_pem(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<String>> {
+    let Some((_, _, ca_pem, _)) = load_row(db, hub_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some(ca_pem).filter(|pem| !pem.trim().is_empty()))
+}
+
 /// **Who this machine is on the wire**, as the host lends it to an engine (hub#1459).
 ///
 /// The three public facts of the enrolled identity and nothing else: the mTLS client identity
@@ -482,6 +496,28 @@ mod tests {
             String::from_utf8(cert.to_pem().unwrap()).unwrap(),
             String::from_utf8(ca.to_pem().unwrap()).unwrap(),
         )
+    }
+
+    /// The CA is remembered so a renewal that brings only the certificate can still be installed
+    /// (hub#1457). Empty is `None`, never an empty PEM somebody would try to parse.
+    #[tokio::test]
+    async fn the_stored_ca_is_readable_only_once_one_has_been_installed() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(47));
+        let db = db_ready().await;
+
+        assert_eq!(stored_ca_pem(&db, HUB).await.unwrap(), None, "sin fila, nada");
+
+        let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
+        assert_eq!(
+            stored_ca_pem(&db, HUB).await.unwrap(),
+            None,
+            "con clave pero sin certificado, la columna está vacía y eso NO es una CA"
+        );
+
+        let (cert, ca) = sign_with_test_ca(&csr, None, 365);
+        install_certificate(&db, HUB, &cert, &ca).await.unwrap();
+        assert_eq!(stored_ca_pem(&db, HUB).await.unwrap(), Some(ca));
     }
 
     #[tokio::test]

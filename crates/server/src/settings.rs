@@ -21,6 +21,7 @@ use serde_json::{json, Map, Value};
 use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
 
 use crate::auth;
+use crate::gateway_enrolment;
 use crate::state::AppState;
 
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente).
@@ -374,6 +375,102 @@ pub async fn put_gateway_identity_certificate(
         }))
         .into_response(),
         Err(e) => crate::err_response(e),
+    }
+}
+
+/// POST /api/business/gateway-identity/enrol — **el alta, de punta a punta y sin operador**
+/// (hub#1457): presenta el CSR en el expediente legal del hub y recoge el certificado firmado.
+///
+/// Idempotente: repetirlo mientras la solicitud está pendiente no abre una segunda revisión (el
+/// plano de control deduplica los MISMOS bytes) y, una vez aprobada, instala. Auth = sesión admin:
+/// al otro lado viaja el `X-Hub-Token`, que es secreto del runtime (ADR-0003).
+///
+/// Un rechazo, un presupuesto agotado o una nube inalcanzable son **respuestas con código**
+/// (ADR-0055) — la pantalla del módulo programa contra el código, nunca contra la prosa.
+pub async fn post_gateway_identity_enrol(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let Some(machine) = auth::machine_auth(&st) else {
+        // Sin credencial de máquina el bootstrap no terminó: el hub no puede hablar con su nube.
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "code": "enrolment.no_machine_credential",
+                "detail": "este hub no tiene credencial de máquina: el bootstrap no ha terminado",
+            })),
+        )
+            .into_response();
+    };
+
+    let hub_id = st.hub_id();
+    let budget = gateway_enrolment::hourly_budget();
+    let outcome = gateway_enrolment::enrol_once(
+        &st.http,
+        &st.config.cloud_base_url,
+        &machine,
+        rt.db(),
+        &hub_id,
+        &budget,
+    )
+    .await;
+
+    let status = match erplora_runtime::gateway_identity::status(rt.db(), &hub_id).await {
+        Ok(s) => s,
+        Err(e) => return crate::err_response(e),
+    };
+    let mut body = json!({
+        "common_name": status.common_name,
+        "has_key": status.has_key,
+        "has_certificate": status.has_certificate,
+        "not_after": status.not_after,
+    });
+    match outcome {
+        Ok(outcome) => {
+            let (state, extra) = match outcome {
+                gateway_enrolment::EnrolmentOutcome::Filed { version } => {
+                    ("filed", json!({ "version": version }))
+                }
+                gateway_enrolment::EnrolmentOutcome::AwaitingReview { version } => {
+                    ("awaiting_review", json!({ "version": version }))
+                }
+                gateway_enrolment::EnrolmentOutcome::Installed { not_after } => {
+                    ("installed", json!({ "not_after": not_after }))
+                }
+                gateway_enrolment::EnrolmentOutcome::Rejected { version, reason } => (
+                    "rejected",
+                    json!({ "version": version, "rejected_reason": reason }),
+                ),
+                gateway_enrolment::EnrolmentOutcome::OutOfBudget => ("out_of_budget", json!({})),
+            };
+            body["state"] = json!(state);
+            if let (Some(target), Some(extra)) = (body.as_object_mut(), extra.as_object()) {
+                for (key, value) in extra {
+                    target.insert(key.clone(), value.clone());
+                }
+            }
+            Json(body).into_response()
+        }
+        Err(refusal) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "code": refusal.code,
+                "detail": refusal.detail,
+                "common_name": status.common_name,
+                "has_certificate": status.has_certificate,
+            })),
+        )
+            .into_response(),
     }
 }
 

@@ -60,6 +60,7 @@ pub mod event_stream;
 pub mod export_import;
 /// ERPlora's DELEGATED fiscal certificate, fetched from the control plane (ADR-0202 §2 — hub#317).
 pub mod fiscal_certificate;
+pub mod gateway_enrolment;
 pub mod cloud_call;
 /// The I/O half of a flow step (hub#662): the call itself, outside the runtime's global lock.
 pub mod flow_io;
