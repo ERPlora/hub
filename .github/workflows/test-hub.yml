@@ -200,6 +200,16 @@ jobs:
       - name: Contrato de test-hub.yml (scripts/tests/test-hub-workflow.test.sh)
         run: bash scripts/tests/test-hub-workflow.test.sh
 
+      # Contrato del suelo de bash (hub#1468): que TODOS los scripts del repo —los de
+      # `scripts/`, y el hook `pre-push`— sigan parseando con el bash más viejo de la máquina.
+      # Este runner es Ubuntu con bash 5, así que aquí la comprobación es la genérica; la de
+      # verdad (bash 3.2, el de macOS) la hace el gate pre-push, que corre donde vive la flota.
+      # Aun así este paso corre AQUÍ porque una batería que no invoca nadie no deja rojo en
+      # ningún sitio (hub#1392) y porque su control portable —un error de sintaxis normal—
+      # prueba en cualquier máquina que el checker no está vacío. Bash puro, milisegundos.
+      - name: Contrato del suelo de bash (hub#1468)
+        run: bash scripts/tests/shell-syntax.test.sh
+
       # Contrato de publicación de los SDK (hub#1236): que `@erplora/module-sdk` siga siendo
       # publicable, que `erplora-guest-sdk` siga resolviendo en un clon por git tag y que
       # `scripts/stamp-version.sh` escriba de verdad el número en los TRES ficheros que lo llevan.

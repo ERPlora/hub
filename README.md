@@ -75,6 +75,12 @@ docker/          Dockerfile (multi-stage: frontend Vite → builder Rust →
 - **Rust** para `crates/*` y `apps/tauri/src-tauri` (`cargo check --workspace` /
   `cargo test --workspace`).
 - **PostgreSQL** (los tests corren contra un Postgres real; en CI, service container `postgres:18`).
+- **bash 3.2** es el SUELO de los scripts del repo (`scripts/`, `.githooks/`): es el bash que
+  trae macOS y al que resuelve `#!/usr/bin/env bash` cuando el de Homebrew no va primero en el
+  PATH — y macOS es donde corren la flota y el gate pre-push. Lo impone
+  [`scripts/ci/shell-syntax.sh`](scripts/ci/shell-syntax.sh) (hub#1468). En la práctica solo
+  prohíbe una cosa: el `case` con arms sin paréntesis dentro de un `$( … )` — se escribe
+  `(patrón)`, no `patrón)`.
 
 > El registry npm del repo es el público (`.npmrc`); el `~/.npmrc` global apunta a un
 > CodeArtifact privado de otro proyecto.
