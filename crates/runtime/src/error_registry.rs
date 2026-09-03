@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::errors::{DemoLock, RuntimeError};
+use crate::errors::RuntimeError;
 
 /// Ventana de dedup local: si la misma huella se reportó hace menos de esto, se omite.
 const DEDUP_WINDOW: Duration = Duration::from_secs(30);
@@ -459,6 +459,11 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `DemoLock` solo lo nombran los tests: el camino de producción llegó a él por
+    // `RuntimeError::DemoLocked { lock }` y dejó de nombrar el tipo al retirarse
+    // `certificate_type_mismatch` (hub#1490), así que el `use` del módulo pasó a ser ruido
+    // permanente en cada compilación (hub#1501).
+    use crate::errors::DemoLock;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 

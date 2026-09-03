@@ -86,6 +86,28 @@ else
     ok "Cargo.toml declara \`[workspace.lints.clippy]\` con \`correctness = deny\`"
 fi
 
+# ── 1b. rustc's own `unused_imports` is at DENY (hub#1501 → hub#1504) ──────────
+# The next notch of the ratchet, on the rustc side. Until hub#1501 the only guard
+# against an unused import was the warning itself, and hub#1501 is the proof that
+# a warning guards nothing: `DemoLock` went unused in `error_registry.rs` with the
+# merge of hub#1490 and nobody saw it until another worker tripped over it — by
+# then there were FOUR, not one. The level lives in `[workspace.lints.rust]`, not
+# in a `-D` flag of the workflow (assertion 4): that is where the ratchet is
+# operated, and the table is what EVERY member inherits — the two crates the CI
+# clippy step excludes (`erplora-tauri`, the Android plugin) included, which is
+# why the notch was measured on macOS before being raised (hub#1504).
+rust_lints=$(toml_table "$root_manifest" "workspace.lints.rust")
+
+if [ -z "$rust_lints" ]; then
+    bad "Cargo.toml declara \`[workspace.lints.rust]\`" \
+        "no hay tabla \`[workspace.lints.rust]\` en el manifest raíz: los lints del propio rustc (\`unused_imports\`, \`future_incompatible\`) no los hereda nadie"
+elif ! printf '%s\n' "$rust_lints" | grep -qE '^[[:space:]]*unused_imports[[:space:]]*=.*"deny"'; then
+    bad "\`[workspace.lints.rust]\` pone \`unused_imports\` en \`deny\` (hub#1501, hub#1504)" \
+        "\`unused_imports\` no está en \"deny\": un import sin usar vuelve a ser un warning permanente que se aprende a ignorar (hub#1501 se coló así con hub#1490 y llegó a cuatro)"
+else
+    ok "\`[workspace.lints.rust]\` pone \`unused_imports\` en \`deny\` (hub#1501, hub#1504)"
+fi
+
 # ── 2. The ratchet is documented WHERE it is operated ────────────────────────
 # A ratchet nobody knows how to turn stays at its first notch forever.
 if printf '%s\n' "$clippy_lints" | grep -qi 'ratchet'; then
