@@ -122,13 +122,52 @@ impl ProducerFacts {
     }
 }
 
-/// What this process last heard from the control plane about the manufacturer.
+/// Which text on the public archive covers the version this hub is running (hub#1449,
+/// ERPlora/saas#1724 — art. 13.3 RRSIF).
+///
+/// The archive is versioned **by declaration** (`v1`, `v2`…), not by release number, so the root
+/// of the archive only resolves to the version an inspector needs while a single declaration is
+/// in force. The day a second one is issued, a hub still running the version the first one covers
+/// must keep linking THAT one — and only the control plane knows which declaration that is,
+/// because the mapping «release → declaration that covers it» is recorded on the archive, not in
+/// this crate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclarationReference {
+    /// Which declaration this is (`v1`, `v2`…) — the folder name on the archive, shown next to
+    /// the link so an inspector can check it against the text without following the URL.
+    pub version: String,
+    /// Where the signed text lives, on the control plane this hub belongs to.
+    pub url: String,
+}
+
+impl DeclarationReference {
+    /// Reads `{"version": …, "url": …}`, exactly as `declaration_reference()` serves it
+    /// (`apps/dashboard/fiscal/services/declaracion_responsable.py`). `None` when either half is
+    /// missing: a reference that names a text without saying where it lives is not something the
+    /// panel can link, and the caller falls back to the root of the public archive.
+    pub fn parse(block: &Json) -> Option<Self> {
+        let field = |key: &str| -> Option<String> {
+            let value = block.get(key)?.as_str()?.trim();
+            (!value.is_empty()).then(|| value.to_string())
+        };
+        Some(Self {
+            version: field("version")?,
+            url: field("url")?,
+        })
+    }
+}
+
+/// What this process last heard from the control plane about the manufacturer, and which
+/// declaration covers the version it is running.
 ///
 /// One per process in production ([`ProducerFactsCache::global`]); constructible so tests own
-/// theirs instead of racing over a static.
+/// theirs instead of racing over a static. The two facts travel together on purpose: they arrive
+/// on the same heartbeat and the same cycle (hub#1449), so a second cache that could fall behind
+/// this one would let the panel link a declaration for an identity the hub no longer holds.
 #[derive(Debug, Default)]
 pub struct ProducerFactsCache {
     facts: RwLock<Option<ProducerFacts>>,
+    declaration: RwLock<Option<DeclarationReference>>,
 }
 
 impl ProducerFactsCache {
@@ -157,6 +196,21 @@ impl ProducerFactsCache {
     /// without ever reaching the Cloud.
     pub fn current(&self) -> Option<ProducerFacts> {
         self.facts.read().ok().and_then(|slot| slot.clone())
+    }
+
+    /// Installs which declaration the control plane says covers this hub's running version.
+    pub fn store_declaration(&self, declaration: DeclarationReference) {
+        if let Ok(mut slot) = self.declaration.write() {
+            *slot = Some(declaration);
+        }
+    }
+
+    /// The declaration reference last announced, or `None` when this hub has never been told one
+    /// — an older control plane, a hub that has not spoken to it yet, or an archive the control
+    /// plane could not read. `None` is «no news», never an error: the caller falls back to the
+    /// root of the public archive, which already resolves to the declaration in force.
+    pub fn current_declaration(&self) -> Option<DeclarationReference> {
+        self.declaration.read().ok().and_then(|slot| slot.clone())
     }
 }
 
@@ -279,5 +333,68 @@ mod tests {
         cache.store(ProducerFacts::parse(&second).unwrap());
 
         assert_eq!(cache.current().unwrap().indicador_multiples_ot, "S");
+    }
+
+    /// The block exactly as `declaration_reference()` serves it (saas#1724): which text covers
+    /// the version this hub is running, and where it lives on the archive.
+    fn declaration_block() -> Json {
+        json!({
+            "version": "v1",
+            "url": "https://erplora.com/legal/declaracion-responsable/v1/",
+        })
+    }
+
+    #[test]
+    fn the_declaration_reference_is_read_field_by_field() {
+        let declaration =
+            DeclarationReference::parse(&declaration_block()).expect("the served block is valid");
+
+        assert_eq!(declaration.version, "v1");
+        assert_eq!(
+            declaration.url,
+            "https://erplora.com/legal/declaracion-responsable/v1/"
+        );
+    }
+
+    /// `version` and `url` are both required: a reference that names a text without saying where
+    /// it lives (or the reverse) is not a fact the panel can link.
+    #[test]
+    fn a_declaration_reference_missing_either_field_is_refused() {
+        for field in ["version", "url"] {
+            let mut block = declaration_block();
+            block.as_object_mut().unwrap().remove(field);
+
+            assert_eq!(
+                DeclarationReference::parse(&block),
+                None,
+                "a reference without `{field}` must not be installed"
+            );
+        }
+    }
+
+    /// Nothing heard yet is `None` — and `None` is what makes the caller fall back to the root of
+    /// the public archive instead of linking a made-up version.
+    #[test]
+    fn a_cache_nobody_has_told_the_declaration_answers_nothing() {
+        assert_eq!(ProducerFactsCache::new().current_declaration(), None);
+    }
+
+    /// hub#1449: when the AEAT publishes a second declaration, the reference the panel links has
+    /// to follow the latest heartbeat, exactly like the manufacturer's facts already do.
+    #[test]
+    fn the_cache_keeps_the_latest_declaration() {
+        let cache = ProducerFactsCache::new();
+        cache.store_declaration(DeclarationReference::parse(&declaration_block()).unwrap());
+
+        let mut second = declaration_block();
+        second["version"] = json!("v2");
+        second["url"] = json!("https://erplora.com/legal/declaracion-responsable/v2/");
+        cache.store_declaration(DeclarationReference::parse(&second).unwrap());
+
+        assert_eq!(cache.current_declaration().unwrap().version, "v2");
+        assert_eq!(
+            cache.current_declaration().unwrap().url,
+            "https://erplora.com/legal/declaracion-responsable/v2/"
+        );
     }
 }
