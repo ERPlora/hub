@@ -97,8 +97,8 @@ fn admin() -> RequestContext {
 
 /// `record_type: "anulacion"` — not `"alta"` — and NOT a simplification of the scenario.
 ///
-/// `records.create`'s own manifest schema (`schemas/record_create.json`) never accepts a
-/// `tax_breakdown`, so every call through this public command binds an EMPTY STRING to that
+/// This file's calls send no `tax_breakdown` (the schema has accepted one since verifactu#58, but
+/// a certificate rotation has no use for it), so every call here binds an EMPTY STRING to that
 /// column. On Postgres 18 that empty string trips a pre-existing bug in the sibling
 /// `ERPlora/verifactu` module (migration `013_arithmetic_integrity.sql` on its `main` — `011` is
 /// a permanent gap in that repo's numbering): its `alta`-only CHECK constraints call
