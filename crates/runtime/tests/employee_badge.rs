@@ -282,7 +282,7 @@ async fn changing_the_pin_does_not_touch_the_badge() {
         .unwrap();
     rt.set_user_badge(&ana, ANA_BADGE).await.unwrap();
 
-    rt.set_pin(&ana, "5183").await.unwrap();
+    rt.set_pin(&ana, Some("4729"), "5183").await.unwrap();
 
     assert_eq!(
         rt.verify_badge(ANA_BADGE).await.unwrap().unwrap().user.id,

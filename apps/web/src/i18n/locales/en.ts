@@ -414,6 +414,16 @@ export default {
     manageLocal:
       'This identity belongs to this business only. Other businesses are neither known nor shown here.',
     manageInSaas: 'Manage account at erplora.com',
+    pinTitle: 'PIN',
+    pinDesc: 'The PIN you use at the till. Change it whenever you want — nobody else needs to.',
+    pinSetupDesc: 'You do not have a PIN yet. Set one to be able to sign in at the till too.',
+    currentPin: 'Current PIN',
+    newPin: 'New PIN',
+    confirmPin: 'Repeat the new PIN',
+    changePin: 'Change PIN',
+    setPin: 'Set PIN',
+    pinSaved: 'PIN updated',
+    pinMismatch: 'The two PINs do not match.',
   },
   // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
   // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
@@ -1122,6 +1132,10 @@ export default {
       pin_length: 'The PIN must be {n} digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
       pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
+      // hub#1430 — self-service rotate («Mi perfil»): the CURRENT PIN did not match. The remedy is
+      // the same «try again» a wrong password gets anywhere else, never a hint about what the
+      // current one actually is.
+      pin_current_mismatch: 'That is not your current PIN. Enter it correctly to set a new one.',
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
       local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
       name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',

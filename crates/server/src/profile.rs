@@ -34,6 +34,7 @@ fn profile_json(profile: UserProfile, permissions: impl IntoIterator<Item = Stri
         "email": profile.email,
         "role": profile.role,
         "cloud_user_id": profile.cloud_user_id,
+        "has_pin": profile.has_pin,
         "avatar_url": avatar_url,
         "preferences": profile.preferences,
         "permissions": permissions.into_iter().collect::<Vec<_>>(),

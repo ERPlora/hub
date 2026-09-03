@@ -573,6 +573,38 @@ pub async fn set_pin(
     Ok(())
 }
 
+/// Compara `candidate` con el PIN de HOY del usuario activo `user_id` (self-service: confirmar el
+/// PIN actual ANTES de rotarlo, hub#1430). `None` si el usuario no tiene PIN todavía — nada que
+/// confirmar; `Some(true/false)` si lo tiene, según coincida. Hermano de [`verify_pin`] (que
+/// resuelve por NOMBRE, para el login): este resuelve por id, porque el llamador ya sabe quién es
+/// por su propia sesión.
+pub async fn own_pin_matches(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    user_id: &str,
+    candidate: &str,
+) -> Result<Option<bool>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("user_id".into(), json!(user_id));
+    let res = db
+        .query(
+            "SELECT pin_hash FROM hub_user \
+              WHERE hub_id = :hub_id AND id = :user_id AND is_active = 1",
+            &p,
+        )
+        .await?;
+    let stored = res
+        .rows
+        .first()
+        .and_then(|r| r["pin_hash"].as_str())
+        .unwrap_or_default();
+    if stored.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(check_pin(stored, candidate)))
+}
+
 fn row_to_user(row: &serde_json::Value) -> HubUser {
     HubUser {
         id: row["id"].as_str().unwrap_or_default().to_string(),

@@ -159,6 +159,66 @@
         </ion-card>
       </div>
 
+      <ion-card class="profile-card">
+        <ion-card-header>
+          <div class="card-heading">
+            <span class="card-icon"><HubIcon name="keypad-outline" /></span>
+            <ion-card-title>{{ t('profile.pinTitle') }}</ion-card-title>
+          </div>
+        </ion-card-header>
+        <ion-card-content class="profile-card-content">
+          <p class="pin-copy">{{ t(hasPin ? 'profile.pinDesc' : 'profile.pinSetupDesc') }}</p>
+          <form class="profile-form" @submit.prevent="savePin">
+            <ion-input
+              v-if="hasPin"
+              v-model="currentPin"
+              type="password"
+              inputmode="numeric"
+              mode="md"
+              fill="outline"
+              :label="t('profile.currentPin')"
+              label-placement="stacked"
+              :maxlength="hubPinLength"
+              autocomplete="off"
+            >
+              <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+            </ion-input>
+            <ion-input
+              v-model="newPin"
+              type="password"
+              inputmode="numeric"
+              mode="md"
+              fill="outline"
+              :label="t('profile.newPin')"
+              label-placement="stacked"
+              :maxlength="hubPinLength"
+              :helper-text="t('employeeForm.errors.pin_length', { n: hubPinLength })"
+              :error-text="pinError"
+              :class="{ 'ion-invalid ion-touched': Boolean(pinError) }"
+              autocomplete="off"
+            >
+              <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+            </ion-input>
+            <ion-input
+              v-model="confirmPin"
+              type="password"
+              inputmode="numeric"
+              mode="md"
+              fill="outline"
+              :label="t('profile.confirmPin')"
+              label-placement="stacked"
+              :maxlength="hubPinLength"
+              autocomplete="off"
+            >
+              <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+            </ion-input>
+            <ion-button expand="block" type="submit" :disabled="pinSaving || !canSavePin">
+              {{ pinSaving ? t('profile.saving') : t(hasPin ? 'profile.changePin' : 'profile.setPin') }}
+            </ion-button>
+          </form>
+        </ion-card-content>
+      </ion-card>
+
       <section class="management-panel">
         <span class="management-icon">
           <HubIcon :name="cloudLinked ? 'globe-outline' : 'information-circle-outline'" />
@@ -187,16 +247,19 @@ import {
   IonCardSubtitle,
   IonCardTitle,
   IonInput,
+  IonInputPasswordToggle,
   IonSelect,
   IonSelectOption,
 } from '@ionic/vue';
 import AppPage from '../components/AppPage.vue';
 import HubIcon from '../components/HubIcon.vue';
 import { availableLocales } from '../i18n';
-import { getAccessToken } from '../lib/cloud';
+import { getAccessToken, runtimeSetPin } from '../lib/cloud';
 import { config } from '../lib/config';
+import { HUB_USERS_ERROR_PREFIX, isGuessablePin } from '../lib/hub-users';
 import { openExternal } from '../lib/open-external';
-import { user } from '../lib/session';
+import { hubPinLength } from '../lib/pin-length';
+import { getHubSession, user } from '../lib/session';
 import {
   hasLocalPalette,
   themeMode,
@@ -231,6 +294,84 @@ const avatarSaving = ref(false);
 const avatarInput = ref<HTMLInputElement | null>(null);
 const personalMode = computed(() => currentUserProfile.value?.preferences.theme_mode ?? null);
 const cloudLinked = computed<boolean>(() => Boolean(getAccessToken()));
+
+// ── PIN propio (hub#1430) — «Mi perfil» rota EL PIN DE QUIEN ESTÁ AQUÍ, no el de otra persona: no
+// pasa por la puerta de Personal ni por su permiso. La misma puerta de auto-servicio que la alta de
+// PIN tras el primer login cloud (`runtimeSetPin` / `POST /api/auth/set-pin`), reutilizada para
+// rotar en vez de fijar por primera vez.
+const hasPin = computed<boolean>(() => currentUserProfile.value?.has_pin ?? false);
+const currentPin = ref('');
+const newPin = ref('');
+const confirmPin = ref('');
+const pinSaving = ref(false);
+// '' | 'length' | 'clientMismatch' (comprobados aquí) | el tail de un código `hub.users.*` que
+// devolvió el runtime (`pin_too_simple`, `pin_in_use`, `pin_current_mismatch`…).
+const pinErrorCode = ref('');
+const pinError = computed<string>(() => {
+  switch (pinErrorCode.value) {
+    case '':
+      return '';
+    case 'length':
+      return t('employeeForm.errors.pin_length', { n: hubPinLength.value });
+    case 'clientMismatch':
+      return t('profile.pinMismatch');
+    default:
+      return t(`employeeForm.errors.${pinErrorCode.value}`);
+  }
+});
+const canSavePin = computed<boolean>(() => {
+  if (!newPin.value || !confirmPin.value) return false;
+  if (hasPin.value && !currentPin.value) return false;
+  return true;
+});
+
+/** Tail `hub.users.*` de un rechazo del runtime, o `undefined` si no es de ese catálogo (hermano de
+ *  `hubUserErrorKey`, para el `RuntimeError` de `lib/cloud.ts` en vez del `HubUsersError` de
+ *  Personal). */
+function pinErrorKeyFrom(error: unknown): string | undefined {
+  const code = (error as { code?: string } | null)?.code;
+  return code?.startsWith(HUB_USERS_ERROR_PREFIX) ? code.slice(HUB_USERS_ERROR_PREFIX.length) : undefined;
+}
+
+async function savePin(): Promise<void> {
+  pinErrorCode.value = '';
+  const pin = newPin.value.trim();
+  if (pin.length !== hubPinLength.value || !/^\d+$/.test(pin)) {
+    pinErrorCode.value = 'length';
+    return;
+  }
+  if (pin !== confirmPin.value.trim()) {
+    pinErrorCode.value = 'clientMismatch';
+    return;
+  }
+  if (isGuessablePin(pin)) {
+    pinErrorCode.value = 'pin_too_simple';
+    return;
+  }
+  const session = getHubSession();
+  if (!session) {
+    await toast(t('profile.saveError'), 'danger');
+    return;
+  }
+  pinSaving.value = true;
+  try {
+    await runtimeSetPin(pin, session, hasPin.value ? currentPin.value.trim() : undefined);
+    currentPin.value = '';
+    newPin.value = '';
+    confirmPin.value = '';
+    await getUserProfile();
+    await toast(t('profile.pinSaved'), 'success');
+  } catch (error) {
+    const key = pinErrorKeyFrom(error);
+    if (key) {
+      pinErrorCode.value = key;
+    } else {
+      await toast(t('profile.saveError'), 'danger');
+    }
+  } finally {
+    pinSaving.value = false;
+  }
+}
 
 const displayName = computed<string>(() => user.value?.name?.trim() || t('profile.defaultRole'));
 const displayEmail = computed<string>(() => user.value?.email?.trim() || '');

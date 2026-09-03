@@ -554,11 +554,18 @@ pub(crate) async fn auth_courier(
 #[derive(serde::Deserialize)]
 pub(crate) struct SetPinReq {
     pin: String,
+    /// Requerido si el usuario YA tiene un PIN (hub#1430, «Mi perfil» → cambiar mi PIN); ausente u
+    /// omitido en la alta de PIN tras el primer login cloud, donde no hay nada que confirmar.
+    #[serde(default)]
+    current_pin: Option<String>,
 }
 
-/// Fija el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Lo usa el alta de PIN tras el
-/// primer login cloud (§2.9): el usuario ya está autenticado por su JWT→sesión y elige su PIN en
-/// este dispositivo de confianza. Body `{pin}` (4 dígitos; vacío lo borra). → `{ok}` (401 sin sesión).
+/// Fija (o cambia) el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Dos llamadores:
+/// la alta de PIN tras el primer login cloud (§2.9, sin `current_pin`) y «Mi perfil» → cambiar mi
+/// PIN (hub#1430) — el usuario ya está autenticado por su sesión y elige su PIN en este
+/// dispositivo. Body `{pin, current_pin?}` (`pin`: 4/6 dígitos, vacío lo borra; `current_pin`
+/// obligatorio si ya hay un PIN, y tiene que coincidir con el de hoy). → `{ok}` (401 sin sesión,
+/// 409 si el PIN actual no coincide o el nuevo ya lo tiene otro).
 pub(crate) async fn auth_set_pin(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -577,7 +584,10 @@ pub(crate) async fn auth_set_pin(
         }
         Err(e) => return err_response(e),
     };
-    match rt.set_pin(&user.id, &req.pin).await {
+    match rt
+        .set_pin(&user.id, req.current_pin.as_deref(), &req.pin)
+        .await
+    {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }

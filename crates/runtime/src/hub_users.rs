@@ -492,7 +492,7 @@ async fn ensure_name_is_free(
 /// alta y en cada cambio de PIN: sin la segunda mitad, la primera es decorativa (se da de alta con
 /// un PIN libre y se edita acto seguido al del encargado). Ver
 /// [`identity::pin_is_taken`] para por qué no se puede resolver con una restricción de la BD.
-async fn ensure_pin_is_free(
+pub(crate) async fn ensure_pin_is_free(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     pin: &str,

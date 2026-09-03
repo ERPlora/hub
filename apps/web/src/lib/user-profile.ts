@@ -26,6 +26,9 @@ export interface UserProfile {
   cloud_user_id: string | null;
   avatar_url: string | null;
   preferences: UserPreferences;
+  /** `true` si hoy hay un PIN utilizable (hub#1430): decide entre «cambiar mi PIN» y «establecer
+   *  un PIN» en «Mi perfil». */
+  has_pin: boolean;
 }
 
 export const currentUserProfile = ref<UserProfile | null>(null);
