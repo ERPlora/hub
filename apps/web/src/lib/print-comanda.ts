@@ -161,6 +161,7 @@ export async function onKitchenOrderCreated(
   const roundNumber = num(header?.round_number ?? 1);
   const orderNumber = str(header?.order_number);
   const waiter = await waiterName(client, header);
+  const priority = priorityFor(header);
 
   // El aviso va ANTES de la comprobación de hojas y ANTES de imprimir, a propósito:
   //  - antes de las hojas, porque una comanda de SOLO PANTALLA no genera ninguna y es justo el
@@ -197,6 +198,9 @@ export async function onKitchenOrderCreated(
           // no viene (`is_truthy(data, "waiter")`), y una app vieja ignora la clave que no conoce
           // — la hoja de siempre se sigue imprimiendo igual.
           ...(waiter ? { waiter } : {}),
+          // Solo cuando hace falta el aviso: el renderizador ya asume NORMAL si el campo no viene
+          // (`escpos.rs`), así que el 99 % de las comandas sigue sin la clave.
+          ...(priority ? { priority } : {}),
           items: group.items,
         },
       });
@@ -245,6 +249,22 @@ async function waiterName(client: ErploraClient, header: Record<string, unknown>
     .catch(() => [] as { id?: unknown; name?: unknown }[]);
   const user = (Array.isArray(users) ? users : []).find((u) => u && str(u.id) === waiterId);
   return str(user?.name).trim();
+}
+
+/**
+ * El aviso `!! URGENTE !!` del renderizador ESC/POS, o `''` cuando no aplica (hub#1411).
+ *
+ * El renderizador (`escpos.rs`) solo reacciona a la forma EXACTA `"HIGH"` — contrato de
+ * dispositivo que no se toca, lo lee la `erplora-app` ya desplegada. `kitchen` habla su propio
+ * vocabulario en minúsculas (`normal`/`rush`/`vip`, su contrato de datos, kitchen#39): el
+ * adaptador es este productor, no el dispositivo ni el módulo.
+ *
+ * Solo `rush` dispara el aviso. `vip` queda fuera a propósito — es una prioridad de SALA (un
+ * cliente a cuidar), no de cocina (un plato a sacar antes); si algún día tiene que sonar en el
+ * pase es una decisión de negocio propia, no un efecto colateral de este mapeo.
+ */
+function priorityFor(header: Record<string, unknown> | undefined): string {
+  return str(header?.priority) === 'rush' ? 'HIGH' : '';
 }
 
 function orderIdOf(payload: unknown): string | undefined {
