@@ -197,6 +197,75 @@ fn a_holder_without_a_name_is_never_half_declared_hub1478() {
     );
 }
 
+/// A gestor autónomo who signs with his OWN certificate: a natural person, no `organizationName`.
+const GESTOR_GIVEN_NAME: &str = "JUAN";
+const GESTOR_SURNAME: &str = "PEREZ GARCIA";
+const GESTOR_DNI: &str = "12345678Z";
+
+/// 🔴 **hub#1497 — the case #1478 deliberately left out.** A certificate of a NATURAL person
+/// carries no `organizationName`, but a qualified one still carries `givenName` (2.5.4.42) and
+/// `surname` (2.5.4.4) — the same clean pair [`subject_holds_a_natural_person`] already trusts to
+/// route a certificate to `www1` (see `certificate_type_of_x509` next door). Composing the name
+/// from THOSE fields, rather than parsing `CN` (which FNMT writes as `"APELLIDOS NOMBRE - NIF
+/// 12345678Z"`, embedding the very NIF this function must not guess), needs nothing this test does
+/// not already have.
+#[test]
+fn the_natural_person_holder_uses_given_name_and_surname_hub1497() {
+    let holder = holder_of(&[
+        ("givenName", GESTOR_GIVEN_NAME),
+        ("surname", GESTOR_SURNAME),
+        ("serialNumber", &format!("IDCES-{GESTOR_DNI}")),
+    ])
+    .expect("givenName + surname name a natural person holder");
+
+    assert_eq!(
+        holder,
+        CertificateHolder {
+            nif: GESTOR_DNI.to_owned(),
+            name: format!("{GESTOR_GIVEN_NAME} {GESTOR_SURNAME}"),
+        }
+    );
+}
+
+/// 🔒 **Half a natural person is not a holder either.** The same "both or nothing" rule that
+/// already guards NIF+name applies inside the natural-person fallback: a certificate carrying only
+/// one of the pair names nobody, exactly like [`subject_holds_a_natural_person`] requires both to
+/// call it a person at all.
+#[test]
+fn half_a_natural_person_is_not_a_holder_hub1497() {
+    assert_eq!(
+        holder_of(&[
+            ("givenName", GESTOR_GIVEN_NAME),
+            ("serialNumber", &format!("IDCES-{GESTOR_DNI}")),
+        ]),
+        None,
+        "a given name with no surname declares nobody"
+    );
+    assert_eq!(
+        holder_of(&[
+            ("surname", GESTOR_SURNAME),
+            ("serialNumber", &format!("IDCES-{GESTOR_DNI}")),
+        ]),
+        None,
+        "a surname with no given name declares nobody"
+    );
+}
+
+/// `organizationName` still wins when a subject somehow carries both — the entity name is never
+/// displaced by a natural-person fallback that only exists to fill a gap `O` leaves empty.
+#[test]
+fn an_organisation_name_still_wins_over_a_natural_person_pair_hub1497() {
+    let holder = holder_of(&[
+        ("O", GESTORIA_NAME),
+        ("givenName", GESTOR_GIVEN_NAME),
+        ("surname", GESTOR_SURNAME),
+        ("2.5.4.97", &format!("VATES-{GESTORIA_NIF}")),
+    ])
+    .expect("an organisation name still names a holder");
+
+    assert_eq!(holder.name, GESTORIA_NAME, "O wins over the natural-person fallback");
+}
+
 /// The whole hand-off, through the REAL host the fiscal engine asks: the owner uploads a
 /// container through the product's own door and the module reads the holder back. A hand-written
 /// stand-in host would be a second implementation of the question under test — the exact shape of
