@@ -51,7 +51,7 @@ async fn consulta_real_contra_preproduccion() {
         "el WSDL publica la consulta en el endpoint del alta; si difieren, vuelve el 404"
     );
 
-    let xml = aeat::build_consult_soap(&nif, &name, &ejercicio, &periodo).expect("envelope");
+    let xml = aeat::build_consult_soap(&nif, &name, &ejercicio, &periodo, None).expect("envelope");
     println!("\n── ENVELOPE ENVIADO ──────────────────────────────────────\n{xml}");
 
     let body = aeat::post_soap(endpoint, identity, &xml)

@@ -237,13 +237,6 @@ pub async fn transmission_endpoint_for(
     Ok(transmission_endpoint(&config))
 }
 
-/// El endpoint de **consulta** de este hub ahora mismo. Es el mismo que el de alta (el WSDL publica
-/// las dos operaciones en `VerifactuSOAP`, hub#287) y por eso se deriva igual, con los dos ejes de
-/// la misma lectura: recuperar la cadena tiene que hablar con la misma puerta que la emitió.
-pub(crate) fn consult_endpoint_of(config: &Json) -> &'static str {
-    aeat::consult_endpoint(&environment_of(config), &signing_type(config))
-}
-
 /// **Where ONE record's transmission is going** — resolved once and then shared by the POST, by
 /// the audit event and by the drift warning, so the wire and the paper trail cannot say
 /// different things about the same send (hub#471).
@@ -668,8 +661,13 @@ mod cert_source_tests {
                     "environment": environment,
                     "certificate_type": certificate_type,
                 });
+                // Los dos ejes que `run_consult_via` usa para la consulta, contra los que
+                // `transmission_endpoint` usa para el alta. El helper `consult_endpoint_of` que
+                // vivía aquí se retiró con hub#1436: la consulta ya no pregunta siempre por el
+                // entorno de la config —una consulta en nombre de UN registro pregunta por el
+                // suyo (guarda R4)—, así que el entorno es un parámetro y no una derivación.
                 assert_eq!(
-                    consult_endpoint_of(&cfg),
+                    aeat::consult_endpoint(&environment_of(&cfg), &signing_type(&cfg)),
                     transmission_endpoint(&cfg),
                     "({environment}, {certificate_type})"
                 );
