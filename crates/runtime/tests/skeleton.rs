@@ -141,8 +141,9 @@ async fn unknown_capabilities_error() {
     let rt = fresh_runtime().await;
     let ctx = admin_ctx();
     // `nope` no está instalado: desde ADR-0127 la ausencia del MÓDULO tiene su propio error para
-    // queries (es lo que permite a `queryOptional` distinguirla de un contrato roto). Los commands
-    // conservan `CommandNotFound`: no hay `commandOptional` que necesite la distinción.
+    // queries (es lo que permite a `queryOptional` distinguirla de un contrato roto). Desde
+    // hub#1428 los commands llevan el MISMO error propio, por la misma razón: `commandOptional`
+    // necesita distinguir "el módulo no está" de "el command no existe".
     assert!(matches!(
         rt.execute_query("nope.query", &Params::new(), &ctx)
             .await
@@ -153,6 +154,6 @@ async fn unknown_capabilities_error() {
         rt.execute_command("nope.cmd", &Params::new(), &ctx)
             .await
             .unwrap_err(),
-        RuntimeError::CommandNotFound(_)
+        RuntimeError::ModuleNotInstalled { .. }
     ));
 }

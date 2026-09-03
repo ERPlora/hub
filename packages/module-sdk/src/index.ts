@@ -2364,6 +2364,41 @@ export class ErploraClient {
       throw verdict;
     });
   }
+  /**
+   * Command a una integración **OPCIONAL** (ADR-0127, simétrica a {@link queryOptional} —
+   * hub#1428): el módulo dueño puede no estar instalado en este hub. `combos` (`depends_on: []`)
+   * da de alta un producto en `inventory` desde su propio selector SOLO si `inventory` está.
+   * Devuelve `undefined` **únicamente** ante `module_not_installed`/`module_inactive` (el mismo
+   * par que `queryOptional`, ADR-0128); el llamador decide el default.
+   *
+   * Cualquier otra causa EXPLOTA igual que en {@link command}: un command inexistente en un
+   * módulo presente, un permiso denegado, un handler roto, o el verdict `SERVER_UNAVAILABLE` de
+   * {@link UnknownOutcomeError} (hub#906) — que NO es una ausencia, es "no sabemos si se
+   * escribió", y perdonarlo le mentiría al llamante que no pasó nada.
+   *
+   * **Diseñada para acciones que el llamante puede ABANDONAR limpiamente si el módulo falta**
+   * (el alta rápida de `combos` no es un paso de una cadena que ya asumió la escritura hecha).
+   * Y no hay ventana de carrera que resolver: el runtime resuelve "¿existe el módulo?" DENTRO de
+   * la misma transacción que la escritura, antes de tocar la BD (igual que en
+   * `queries::execute_page`) — así que `undefined` significa siempre "no se escribió nada",
+   * nunca "se escribió y no lo sabemos".
+   *
+   * **Short-circuit (hub#1211):** cuando `installedModules` PRUEBA que el módulo dueño está
+   * ausente, esto devuelve `undefined` sin llamar al transporte — el intento de escritura ni
+   * siquiera se dispara. El namespace del core `hub.*` nunca se corta en corto (nunca está
+   * ausente, ver {@link isKnownAbsent}).
+   */
+  async commandOptional<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T | undefined> {
+    if (this.isKnownAbsent(name)) return undefined;
+    try {
+      return await this.command<T>(name, payload);
+    } catch (e) {
+      // `module_inactive` (cascada ADR-0128) equivale a ausencia: un módulo desactivado no está
+      // disponible, y el consumidor OBLIGATORIO nunca pregunta (la cascada lo apagó con su dep).
+      if (e instanceof ErploraError && (e.code === 'module_not_installed' || e.code === 'module_inactive')) return undefined;
+      throw e;
+    }
+  }
   /** Suscribe a un evento de dominio; devuelve una función para cancelar. */
   on(event: string, cb: (payload: unknown) => void): () => void {
     return this.transport.subscribe(event, cb);

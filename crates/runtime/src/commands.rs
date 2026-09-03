@@ -256,9 +256,30 @@ pub(crate) async fn execute_at(
         ctx
     };
 
-    let cmd = registry
-        .get_command(name)
-        .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
+    // Tres ausencias distintas para un mismo lookup fallido — mismo criterio que
+    // `queries::execute_page` (ADR-0127/0128, hub#1428): módulo NO instalado y módulo
+    // DESACTIVADO son ausencias que `commandOptional` perdona; un command inexistente en un
+    // módulo activo — o el namespace reservado del core, que nunca está "ausente" (ADR-0192,
+    // igual que exime `CORE_NAMESPACE_OWNER` en el SDK) — es un CONTRATO ROTO y explota.
+    let cmd = registry.get_command(name).ok_or_else(|| {
+        if name.starts_with(crate::hub_users::CORE_NAMESPACE) {
+            return RuntimeError::CommandNotFound(name.to_string());
+        }
+        let owner = name.split('.').next().unwrap_or("");
+        if owner.is_empty() || !registry.installed.iter().any(|m| m.id == owner) {
+            return RuntimeError::ModuleNotInstalled {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
+        }
+        if !registry.is_active(owner) {
+            return RuntimeError::ModuleInactive {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
+        }
+        RuntimeError::CommandNotFound(name.to_string())
+    })?;
 
     // ¿Puede este módulo hacer lo que declara que necesita? (ADR-0079, hub#1425). Se sella por
     // módulo LLAMANTE y en cada dispatch —no con la identidad del hub, que es una propiedad del
