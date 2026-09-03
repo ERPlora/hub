@@ -351,17 +351,17 @@ pub(crate) async fn transmit_one(
             ))
         }
         Err(err) => {
-            // **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4): si lo que
-            // falló fue el canal TLS, el certificado con el que nos identificamos es el sospechoso
-            // y hay que pedirle al plano de control el vigente. El motor no lo baja —no tiene
-            // credencial de máquina ni debe tenerla—: lo PIDE, y el servicio de refetch del server
-            // decide. Va justo aquí, encolando la contingencia, porque el fallo ES el disparador:
-            // así se converge sin polling.
-            request_certificate_refetch_on_tls(
-                &err,
-                &signing_kind(config),
-                RefetchSignal::global(),
-            );
+            // 🪦 Aquí iba el **tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4,
+            // hub#318): un fallo TLS pedía al plano de control el certificado DELEGADO vigente. Se
+            // fue con el slot que bajaba (hub#1435) y no se sustituye por nada, a propósito.
+            //
+            // Solo disparaba cuando quien se identificó era el certificado de ERPlora, porque bajar
+            // el delegado no arregla un `own` roto: el propio gana el fallback y el intento
+            // siguiente falla igual. Sin slot delegado no queda ningún caso — un fallo TLS por aquí
+            // es siempre del certificado del NEGOCIO, y ese no lo puede refrescar ERPlora: lo
+            // renueva su dueño. Lo que sí queda es lo que ya hacía la línea de abajo, y es lo
+            // correcto: el registro se encola en contingencia con backoff y el error se ve.
+            //
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
             let reason = err.to_string();
             let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
@@ -2090,11 +2090,6 @@ mod environment_chain_tests {
         /// Contingency entries, so a batch drain can be driven end to end (hub#471).
         queue: Vec<Json>,
         has_core_certificate: bool,
-        /// Which slot the core reports as signing when `has_core_certificate` is set. Defaults to
-        /// `"own"` (unchanged behaviour for every existing test) — mutated directly by tests that
-        /// simulate a certificate ROTATION between two calls (hub#1270): the label the core
-        /// reports has no bearing on the hash chain, which is exactly the property under test.
-        signing_kind: &'static str,
         reads: Mutex<Vec<(String, Params)>>,
         /// Every XML this engine archived, in order.
         ///
@@ -2112,7 +2107,6 @@ mod environment_chain_tests {
                 records,
                 queue: Vec::new(),
                 has_core_certificate: false,
-                signing_kind: "own",
                 reads: Mutex::new(Vec::new()),
                 archived: Mutex::new(Vec::new()),
             }
@@ -2187,13 +2181,10 @@ mod environment_chain_tests {
         }
 
         /// The certificate question is the CORE's to answer (hub#319) — the engine no longer
-        /// queries `_hub_certificate`, so the fixture stops pretending to be that table.
-        /// `signing_kind` defaults to `"own"`, because most of these tests are about the CHAIN
-        /// and not about which certificate signs; the rotation test overrides it.
+        /// queries `_hub_certificate`, so the fixture stops pretending to be that table. One slot
+        /// since hub#1435, so the answer is «the business's own certificate» or nothing at all.
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
-            Ok(self
-                .has_core_certificate
-                .then(|| self.signing_kind.to_string()))
+            Ok(self.has_core_certificate.then(|| "own".to_string()))
         }
 
         /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
@@ -2547,16 +2538,14 @@ mod environment_chain_tests {
             "preproduction because of the RECORD, the seal door because of TODAY's certificate"
         );
 
-        // And the SLOT alone moves nothing: a delegated container that is not a seal keeps the
-        // holder's door, on the very same record.
-        let mut slot_only = config_row("production");
-        slot_only["certificate_kind"] = json!("delegated");
+        // And a config that says nothing about the TYPE keeps the holder's door, on the very same
+        // record: «cannot tell» is never a reason to knock on the seal's (hub#470).
         assert_eq!(
-            destination_of(&queued_testing_record(), &slot_only)
+            destination_of(&queued_testing_record(), &config_row("production"))
                 .expect("a record that carries its environment resolves")
                 .endpoint,
             PREPRODUCTION_HOLDER,
-            "the slot is not the door axis (hub#470)"
+            "an unknown certificate type routes to the holder's door (hub#470)"
         );
     }
 
@@ -3252,8 +3241,8 @@ mod environment_chain_tests {
     /// half stays blocked on the FNMT seal, pm#73).
     ///
     /// The certificate a hub signs with is a fact of the CORE (`_hub_certificate`, ADR-0202
-    /// §2.1) and can be rotated at any moment — the business re-uploads its own `.p12`, or
-    /// ERPlora rotates the delegated one. `alta_hash` (chain.rs) never takes it as an input: its
+    /// §2.1) and can be rotated at any moment — the business re-uploads its own `.p12`, or deletes
+    /// it and the hub falls to the fiscal cell. `alta_hash` (chain.rs) never takes it as an input: its
     /// formula is exactly the AEAT's (`IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&
     /// TipoFactura&CuotaTotal&ImporteTotal&Huella&FechaHoraHusoGenRegistro`, Orden HAC/1177/2024)
     /// — the PREVIOUS record's own fingerprint, never who signed it. So a rotation between two
@@ -3261,10 +3250,9 @@ mod environment_chain_tests {
     /// same recompute this engine runs to audit its own chain — must still walk it and accept it.
     #[tokio::test]
     async fn the_chain_does_not_break_when_the_certificate_changes_hub1270() {
-        // Record 1, signed while the core reports the OWN certificate (cert A).
+        // Record 1, signed while the core holds the business's own certificate.
         let mut host_a = ChainHost::new(config_row("testing"), vec![]);
         host_a.has_core_certificate = true;
-        host_a.signing_kind = "own";
         let out1 = create_record(&create_input(), &host_a).await.unwrap();
         let insert1 = find_op(&out1, "verifactu._insert_record");
         assert_eq!(
@@ -3280,12 +3268,12 @@ mod environment_chain_tests {
             .to_string();
         let record1 = persisted(insert1, "accepted");
 
-        // Certificate ROTATION: the core now reports the DELEGATED slot signing — a different
-        // identity entirely, with nothing shared with the one that signed record 1. Same issuer,
-        // same environment, only the certificate changed.
+        // Certificate ROTATION, in the shape it takes since hub#1435 retired the delegated slot:
+        // the business's certificate is gone from the core and this hub is now on the CELL's road
+        // (ADR-0320) — a different identity entirely, with nothing shared with the one that signed
+        // record 1. Same issuer, same environment, only the certificate changed.
         let mut host_b = ChainHost::new(config_row("testing"), vec![record1.clone()]);
-        host_b.has_core_certificate = true;
-        host_b.signing_kind = "delegated";
+        host_b.has_core_certificate = false;
         let mut input2 = create_input();
         input2["payload"]["invoice_number"] = json!("F-2026-000124");
         let out2 = create_record(&input2, &host_b).await.unwrap();

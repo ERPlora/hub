@@ -1,21 +1,24 @@
 //! hub#470 — the AEAT entry point follows **what the certificate is**, end to end
 //! (ADR-0202 §2.1).
 //!
-//! The chain this file walks is the one that broke: the control plane installs a container in the
-//! `delegated` slot → the core classifies it → `DbHost` answers the module → `read_config` puts the
-//! answer in the config → `aeat::endpoint` turns it into a URL. Four hand-offs across two crates,
-//! and the family of defects this issue belongs to (#317 the wrong slot, #318 the wrong date
-//! format, #319 who signed, #470 what it is) is always the same shape: **one certificate fact
-//! crossing a seam and being read differently on each side.** A test that stops at any one of those
-//! hand-offs cannot see it.
+//! The chain this file walks is the one that broke: a container is stored → the core classifies it
+//! → `DbHost` answers the module → `read_config` puts the answer in the config → `aeat::endpoint`
+//! turns it into a URL. Four hand-offs across two crates, and the family of defects this issue
+//! belongs to (#317 the wrong slot, #318 the wrong date format, #319 who signed, #470 what it is) is
+//! always the same shape: **one certificate fact crossing a seam and being read differently on each
+//! side.** A test that stops at any one of those hand-offs cannot see it.
 //!
 //! # The case that matters
 //!
-//! ERPlora invoices today with a **representative** certificate (`ERPlora_Cloud__R__B27593136_.p12`
-//! — the `(R)`). hub#320 chose the entry point from the SLOT, so the day that container were
-//! uploaded to the control plane, every delegated hub in the fleet would have POSTed to `www10` and
-//! the AEAT would have rejected **all** of their records — one at a time, with nothing to warn
-//! anybody, and a rejection is not a link in the chain (ADR-0189), so each one is corrected by hand.
+//! hub#320 chose the entry point from the SLOT — «delegated ⇒ the seal's door» — and ERPlora
+//! invoices with a **representative** certificate (`ERPlora_Cloud__R__B27593136_.p12`, the `(R)`),
+//! so the day that container reached the fleet every hub would have POSTed to `www10` and the AEAT
+//! would have rejected **all** of their records: one at a time, with nothing to warn anybody, and a
+//! rejection is not a link in the chain (ADR-0189), so each one is corrected by hand.
+//!
+//! **The delegated slot is retired** (hub#1435) and the mistake is no longer reachable through it —
+//! but the axis it forced is exactly what the fiscal cell routes on today, so the chain is still
+//! walked here, now through the door the product actually uses: the owner's upload.
 //!
 //! Every certificate here is generated in the test. No `.p12` lives in this repository, and least
 //! of all the real one: it is the private key ERPlora identifies itself with before the tax agency.
@@ -24,7 +27,7 @@
 use erplora_db::testutil::fresh_db;
 use erplora_runtime::certificate::{self, CertificateKind, CertificateType};
 use erplora_runtime::native::DbHost;
-use erplora_runtime::{Runtime, RuntimeError};
+use erplora_runtime::Runtime;
 
 const HOLDER_DOOR: &str =
     "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP";
@@ -162,44 +165,29 @@ async fn entry_point(rt: &Runtime) -> &'static str {
         .unwrap()
 }
 
-/// 🔴 **The bug.** A representative container in the DELEGATED slot must transmit through the
-/// holder's door. Routing on the slot sent it to the seal's, and every record of every delegated
-/// hub would have come back rejected.
+/// 🔴 **The bug.** A representative container must transmit through the holder's door. hub#320
+/// routed on the slot instead, which sent an entire fleet to the seal's and had every record
+/// rejected.
 #[tokio::test]
-async fn a_representative_certificate_in_the_delegated_slot_uses_the_holder_door() {
+async fn a_representative_certificate_uses_the_holder_door() {
     ensure_master_key();
     let rt = hub().await;
     let (b64, password) = pkcs12(QcType::ESign);
 
-    certificate::set_delegated(rt.db(), HUB, &b64, &password, 4, Some("representative"))
+    rt.set_business_certificate(&b64, &password, "hub_user:admin")
         .await
         .unwrap();
 
     assert_eq!(
-        certificate::active_kind(rt.db(), HUB).await.unwrap(),
-        Some(CertificateKind::Delegated),
-        "the slot is unchanged — it is still ERPlora's certificate"
+        certificate::active_type(rt.db(), HUB).await.unwrap(),
+        Some(CertificateType::Representative),
+        "the core reads the type out of the container the owner uploaded"
     );
     assert_eq!(entry_point(&rt).await, HOLDER_DOOR);
 }
 
-/// The half hub#320 got right, kept: a real entity seal in that slot reaches the seal's door, and
-/// it does so all the way through the two crates.
-#[tokio::test]
-async fn an_entity_seal_in_the_delegated_slot_uses_the_seal_door() {
-    ensure_master_key();
-    let rt = hub().await;
-    let (b64, password) = pkcs12(QcType::ESeal);
-
-    certificate::set_delegated(rt.db(), HUB, &b64, &password, 4, Some("seal"))
-        .await
-        .unwrap();
-
-    assert_eq!(entry_point(&rt).await, SEAL_DOOR);
-}
-
 /// **The mirror nobody could reach before**: a business that uploads its OWN entity seal in
-/// Ajustes → Negocio reaches the seal's door too. Under hub#320 the `own` slot meant «holder», full
+/// Ajustes → Negocio reaches the seal's door. Under hub#320 the `own` slot meant «holder», full
 /// stop, so that business would have been rejected by the AEAT with a perfectly valid certificate.
 #[tokio::test]
 async fn a_business_that_uploads_its_own_seal_uses_the_seal_door() {
@@ -227,9 +215,10 @@ async fn a_business_that_uploads_its_own_seal_uses_the_seal_door() {
 async fn a_certificate_that_declares_nothing_keeps_the_holder_door() {
     ensure_master_key();
     let rt = hub().await;
-    // "DELEGATED-PKCS12" — bytes that are not a PKCS#12 at all, which is the strongest form of
-    // «the hub cannot tell»: it cannot even open the container.
-    certificate::set_delegated(rt.db(), HUB, "REVMRUdBVEVELVBLQ1MxMg==", "pw", 4, None)
+    // Bytes that are not a PKCS#12 at all, which is the strongest form of «the hub cannot tell»:
+    // it cannot even open the container. Storing an unusable one has always been allowed — it fails
+    // later, loudly, at the TLS handshake — so the door must still answer.
+    rt.set_business_certificate("Tk9ULUEtUEtDUzEy", "pw", "hub_user:admin")
         .await
         .unwrap();
 
@@ -237,44 +226,34 @@ async fn a_certificate_that_declares_nothing_keeps_the_holder_door() {
     assert_eq!(entry_point(&rt).await, HOLDER_DOOR);
 }
 
-/// 🔒 **A declaration the container contradicts is refused, and the hub keeps signing with what it
-/// had.** The loud, recoverable failure: the door does not move, the fleet does not break, and the
-/// operator gets a line naming both values.
+/// 🔒 **The type travels in the SAME upsert as the bytes.** A re-upload that changes what the
+/// certificate IS has to change the door in the same step: a row holding new bytes under the
+/// previous container's type would POST to the entry point of a certificate it no longer has, and
+/// the AEAT rejects every one of those — one at a time, corrected by hand (ADR-0189).
 #[tokio::test]
-async fn a_contested_declaration_is_refused_and_the_hub_keeps_its_certificate() {
+async fn re_uploading_a_different_certificate_moves_the_door_with_it() {
     ensure_master_key();
     let rt = hub().await;
+
     let (seal_b64, seal_pw) = pkcs12(QcType::ESeal);
-    certificate::set_delegated(rt.db(), HUB, &seal_b64, &seal_pw, 4, Some("seal"))
+    rt.set_business_certificate(&seal_b64, &seal_pw, "hub_user:admin")
         .await
         .unwrap();
+    assert_eq!(entry_point(&rt).await, SEAL_DOOR);
 
     let (representative_b64, representative_pw) = pkcs12(QcType::ESign);
-    let err = certificate::set_delegated(
-        rt.db(),
-        HUB,
-        &representative_b64,
-        &representative_pw,
-        5,
-        Some("seal"),
-    )
-    .await
-    .unwrap_err();
-    assert!(
-        matches!(
-            &err,
-            RuntimeError::CertificateTypeMismatch { declared, served }
-                if declared == "seal" && served == "representative"
-        ),
-        "{err}"
-    );
-
+    rt.set_business_certificate(&representative_b64, &representative_pw, "hub_user:admin")
+        .await
+        .unwrap();
     assert_eq!(
-        certificate::delegated_version(rt.db(), HUB).await.unwrap(),
-        Some(4),
-        "the working certificate is untouched"
+        certificate::active_type(rt.db(), HUB).await.unwrap(),
+        Some(CertificateType::Representative)
     );
-    assert_eq!(entry_point(&rt).await, SEAL_DOOR);
+    assert_eq!(
+        entry_point(&rt).await,
+        HOLDER_DOOR,
+        "the door moves with the container, not one upload later"
+    );
 }
 
 /// The type the core reports and the type the engine routes on are the SAME answer, in every state.
@@ -293,7 +272,7 @@ async fn the_core_and_the_engine_never_disagree_about_the_type() {
         ),
     ] {
         let (b64, password) = pkcs12(qc_type);
-        certificate::set_delegated(rt.db(), HUB, &b64, &password, 9, None)
+        rt.set_business_certificate(&b64, &password, "hub_user:admin")
             .await
             .unwrap();
         assert_eq!(

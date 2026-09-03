@@ -332,6 +332,10 @@ ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
 ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     },
     // ── v16 — hub#317 / ADR-0202 §2: el certificado DELEGADO guarda la VERSIÓN con la que llegó ──
+    // 🪦 **Historia, no contrato.** hub#1435 retiró el slot delegado: `cert_version` ya no se
+    // escribe y queda NULL en toda fila nueva. La columna se queda porque una migración de sistema
+    // retira estructura dejándola en paz (ADR-0269). Lo de abajo explica por qué nació.
+    //
     // El plano de control reparte su `.p12` con un entero monótono (`DelegatedCertificate.version`,
     // saas#1124) y la convergencia de la flota entera se apoya en él: el heartbeat anuncia la
     // versión del plano de control, el hub la compara con la suya y refetchea si difieren (#318), y
@@ -494,7 +498,9 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
                       AND COALESCE(TRIM(ru.email), '') = '');",
     },
     // ── v21 — hub#470 / ADR-0202 §2.1: QUÉ ES el certificado, que es lo que la AEAT segrega ──────
-    // `kind` (v14) dice de QUIÉN es el certificado — `own` del negocio, `delegated` del plano de
+    // ⚠️ `certificate_type` SIGUE VIVO y es hoy la única fuente del tipo (hub#1435 retiró el slot
+    // delegado, y con él la declaración del plano de control que se contrastaba con los bytes).
+    // `kind` (v14) decía de QUIÉN es el certificado — `own` del negocio, `delegated` del plano de
     // control—, y hub#320 lo usó para elegir la puerta de la AEAT como si dijera QUÉ es. No lo dice:
     // que el slot delegado contenga un Sello de Entidad era una premisa de ADR-0202 que nunca viajó
     // por la frontera, y el `.p12` con el que ERPlora factura hoy es de **representante**. Subido
@@ -1785,6 +1791,35 @@ CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
         kind: Kind::Expand,
         postgres: "ALTER TABLE hub_user \
           ADD COLUMN IF NOT EXISTS is_account_owner INTEGER NOT NULL DEFAULT 0;",
+    },
+
+    // ── v57 — hub#1435: the DELEGATED certificate slot is retired ────────────────────────────────
+    // ERPlora's `.p12` used to be handed down to every hub under a power of attorney (ADR-0202 §2)
+    // so the hub could sign before the AEAT on the taxpayer's behalf. ADR-0320 replaced that: the
+    // Hub builds the XML and the fiscal cell transmits it with a Seal that never leaves the
+    // platform. The SaaS shut its half in saas#1435 phase 2 — model, endpoint and columns gone — so
+    // no hub can be handed one again.
+    //
+    // 🔴 **The row has to go, not just the code.** A hub that was served the key before the
+    // retirement is holding somebody ELSE's private key, encrypted, in its own database — on a
+    // machine that has no reason to hold it and, after this change, no code that reads it. Leaving
+    // it would park the fleet's worst secret in every one of them and hand it to the next `pg_dump`.
+    // Deleting is what makes the retirement real; step 8 of ADR-0320 (revoking at the FNMT) is what
+    // closes it, because WAL and older pgBackRest backups still contain what was there.
+    //
+    // `backfill` and not `contract`: this is DML on our own table, which is where the guard puts a
+    // `DELETE FROM` — a `contract` retires STRUCTURE and is refused if it destroys rows. No column
+    // is dropped: `cert_version` numbered the central rotation and stays, unwritten and NULL, the
+    // way ADR-0269 retires structure (the previous binary keeps working against the same schema).
+    //
+    // ⚠️ It deletes ONE slot by name. The business's own certificate is the whole point of the
+    // table and is not touched, and `_hub_certificate` keeps its `(hub_id, kind)` key so a hub with
+    // both rows keeps the one that signs.
+    SystemMigration {
+        version: 57,
+        name: "retire_delegated_certificate_slot",
+        kind: Kind::Backfill,
+        postgres: "DELETE FROM _hub_certificate WHERE kind = 'delegated';",
     },
 
 ];
@@ -3680,7 +3715,16 @@ mod kind_contract_tests {
         // el único que podía, porque al SaaS le habla la credencial de máquina. `ALTER … ADD COLUMN
         // IF NOT EXISTS` con default, re-ejecutable. Al escribirla el máximo era la v55 en
         // `origin/develop` y en las 57 ramas remotas, y ningún worktree local de la flota la pedía.
-        assert_eq!(MIGRATIONS.len(), 53, "el catálogo cambió de tamaño");
+        // + `retire_delegated_certificate_slot` (v57, hub#1435): el `DELETE` de la fila `delegated`
+        // de `_hub_certificate`. Es la ÚNICA `backfill` del catálogo y tiene que serlo: el guard
+        // manda el DML a `backfill` porque un `contract` retira ESTRUCTURA y se niega a destruir
+        // filas. Aquí las filas SON el problema — son la clave privada de ERPlora aparcada en la
+        // base de un cliente, con el slot ya retirado del código (ADR-0320 punto 8) — así que
+        // borrarlas es la migración, no un efecto suyo. No se toca ninguna columna: `cert_version`
+        // se queda sin escribir y en NULL, que es como ADR-0269 retira estructura. Al escribirla el
+        // máximo era la v56 en `origin/develop` y en TODAS las ramas remotas, y ningún worktree
+        // local de la flota pedía la v57.
+        assert_eq!(MIGRATIONS.len(), 54, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

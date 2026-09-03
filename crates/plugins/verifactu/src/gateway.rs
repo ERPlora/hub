@@ -96,8 +96,9 @@ fn receipt_error(code: &str, detail: &str) -> VerifactuError {
 /// not know which road the bytes took.
 ///
 /// A 401 invalidates the cached Bearer through the host and retries ONCE with a fresh access;
-/// everything else maps to [`VerifactuError::Transmission`] — never `::Tls`, which would fire
-/// the DELEGATED-certificate refetch signal that has no business on this road.
+/// everything else maps to [`VerifactuError::Transmission`] — never `::Tls`, which on this road
+/// would send an operator to renew a certificate the hub does not even have: the mTLS against the
+/// AEAT happens in the CELL, with a Seal nobody here can see, let alone fix.
 pub(crate) async fn transmit_via_gateway(
     host: &dyn NativeHost,
     hub_id: &str,
@@ -407,7 +408,7 @@ enum TokenAnswer {
 
 /// One mint through the host's generic primitive. The machine credential rides headers this crate
 /// never sees; the body of a non-2xx is summarised by STATUS only — it may carry a bearer on a
-/// proxy mishap, and `fiscal_certificate.rs` learned that lesson first.
+/// proxy mishap, and the delegated-certificate fetch (retired in hub#1435) learned it first.
 async fn mint_token(
     host: &dyn NativeHost,
     hub_id: &str,
@@ -835,7 +836,7 @@ mod tests {
         }
         assert!(
             !crate::aeat::is_tls_failure(&err),
-            "must not trip the delegated-certificate refetch trigger"
+            "on the cell's road there is no certificate of ours to blame"
         );
     }
 
@@ -919,8 +920,8 @@ mod tests {
     }
 
     /// The refusal keeps the cell's `{code, message}` — public material — and stays a
-    /// `Transmission` error: `::Tls` would fire the delegated-certificate refetch signal, which
-    /// has no business on the gateway road.
+    /// `Transmission` error: `::Tls` would point an operator at a certificate this hub does not
+    /// have — on this road the mTLS happens in the cell, with a Seal nobody here can fix.
     #[test]
     fn a_refusal_is_a_transmission_error_never_tls() {
         let err = refusal_error(429, "gateway_overloaded", "backoff, please");
@@ -933,7 +934,7 @@ mod tests {
         }
         assert!(
             !crate::aeat::is_tls_failure(&err),
-            "must not trip the refetch trigger"
+            "never ::Tls on the cell's road"
         );
     }
 

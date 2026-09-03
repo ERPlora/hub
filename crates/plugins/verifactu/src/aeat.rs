@@ -1466,12 +1466,13 @@ pub async fn post_soap(
 /// that gets its connection refused says none of these.
 const TLS_MARKERS: [&str; 4] = ["tls", "certificate", "handshake", "alert"];
 
-/// Did this transport failure come from the TLS layer? (ADR-0202 §2 point 4 — hub#318)
+/// Did this transport failure come from the TLS layer?
 ///
-/// **The third refetch trigger depends on this answer, so it has to be narrow in both directions.**
-/// A false positive spends the hub's refetch allowance on a network outage, and the allowance is
-/// what the hub needs when the certificate really is the problem. A false negative leaves a hub
-/// signing with a revoked certificate until somebody notices by hand.
+/// **Narrow in both directions, and it has to stay that way.** A false positive tells an operator to
+/// go renew a certificate that was never the problem; a false negative leaves a hub signing with a
+/// revoked one until somebody notices by hand, because every stranded record reads as «the network».
+/// (Until hub#1435 the stakes were higher still: this answer also decided whether the hub spent one
+/// of its six hourly refetches of the delegated certificate — a slot that no longer exists.)
 ///
 /// It reads the error's **causes and not the error itself**. `reqwest`'s own message is
 /// `error sending request for url (…)` — it carries the ENDPOINT, which is the one string in the
@@ -1490,8 +1491,8 @@ pub fn is_tls_failure(error: &(dyn std::error::Error + 'static)) -> bool {
     false
 }
 
-/// Turns a transport failure into the right [`VerifactuError`] variant, which is what decides
-/// whether the hub refetches its certificate (ADR-0202 §2 point 4 — hub#318).
+/// Turns a transport failure into the right [`VerifactuError`] variant — which is what tells the
+/// operator whether the certificate or the network is the thing to go and fix.
 ///
 /// A function of its own so the decision is testable without a live handshake against the AEAT:
 /// inside the `map_err` closure it would only be reachable through a real rejected certificate.
@@ -1571,7 +1572,7 @@ mod tls_classification_tests {
     /// to decide whether to ask for a new certificate. Tested here because inside `post_soap`'s
     /// `map_err` it would take a real rejected handshake against the AEAT to reach.
     #[test]
-    fn only_a_tls_failure_becomes_the_variant_that_triggers_a_refetch() {
+    fn only_a_tls_failure_becomes_the_certificate_variant() {
         let tls = chain(&["error sending request", "invalid peer certificate: Expired"]);
         assert!(matches!(
             super::transport_error(&tls, "conexión AEAT: …".into()),
@@ -1585,7 +1586,7 @@ mod tls_classification_tests {
         ));
     }
 
-    /// 🔒 **The AEAT being unreachable must NOT spend the refetch allowance.** These are the
+    /// 🔒 **The AEAT being unreachable must NOT read as a broken certificate.** These are the
     /// failures a hub sees on a bad day at the till, they arrive once per record the contingency
     /// queue drains, and none of them is fixed by downloading a private key again.
     #[test]

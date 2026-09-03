@@ -20,7 +20,6 @@
 //!
 //! [ADR-0009]: ../../../architecture/00-overview/decision-log.md
 use erplora_db::Params;
-use erplora_runtime::certificate_refetch::RefetchSignal;
 use erplora_runtime::native::{NativeHandler, NativeHost, PendingObligation};
 use erplora_runtime::{Result, RuntimeError};
 use erplora_wasm_host::{Event, Operation, Output};

@@ -83,16 +83,15 @@ impl Runtime {
     /// del cliente (`PUT /api/business/certificate`): el certificado delegado de ERPlora lo escribe
     /// el plano de control por su propia vía (hub#317), nunca esta.
     ///
-    /// **El TIPO sale de los bytes, y aquí no hay nada con lo que contrastarlo** (hub#470). Al
-    /// certificado delegado lo acompaña una declaración del plano de control que
-    /// [`certificate::set_delegated`] comprueba; este lo sube su dueño directamente, así que no hay
-    /// frontera que cruzar ni segunda opinión que discrepe: el contenedor es la única fuente. Un
-    /// negocio que suba un **sello de entidad** propio entra por `www10` sin tocar nada, que es
-    /// justamente lo que la AEAT segrega.
-    /// **Un hub de DEMO no sube certificado** (ADR-0197 §4, hub#376). El cierre va aquí, en la
-    /// puerta del `own`, y NO en [`certificate::set`]: el certificado **delegado** de ERPlora sigue
-    /// llegando por su vía (`set_delegated`, hub#317) — es la distribución normal de la flota y una
-    /// demo la recibe como cualquier otro hub. Lo que no puede es tener identidad fiscal PROPIA.
+    /// **El TIPO sale de los bytes, y no hay nada con lo que contrastarlo** (hub#470): el
+    /// certificado lo sube su dueño directamente, así que no hay frontera que cruzar ni segunda
+    /// opinión que discrepe — el contenedor es la única fuente. Un negocio que suba un **sello de
+    /// entidad** propio entra por `www10` sin tocar nada, que es justamente lo que la AEAT segrega.
+    ///
+    /// **Un hub de DEMO no sube certificado** (ADR-0197 §4, hub#376). No se queda sin facturar por
+    /// ello: sin certificado propio va por la vía de la celda (`ROUTE_DELEGATED`, ADR-0320), como
+    /// cualquier otro hub que no haya subido el suyo. Lo que no puede es tener identidad fiscal
+    /// PROPIA.
     pub async fn set_business_certificate(
         &self,
         pkcs12_b64: &str,
@@ -107,11 +106,6 @@ impl Runtime {
             pkcs12_b64,
             password,
             by,
-            // Sin versión: la del plano de control describe la ROTACIÓN CENTRAL del certificado
-            // delegado (ADR-0202 §2.5). El del negocio lo sube y lo renueva su dueño, así que no hay
-            // número de flota que le corresponda y ponerle uno haría que este hub reportase como
-            // instalada una versión de ERPlora que no tiene.
-            None,
             certificate::derive_certificate_type(pkcs12_b64, password),
         )
         .await
