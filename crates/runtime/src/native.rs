@@ -64,10 +64,10 @@ pub trait NativeHost: Send + Sync {
     /// hub holds no certificate or holds one it cannot vouch for (ADR-0202 §2.1 — hub#470).
     ///
     /// The companion of [`certificate_signing_kind`](Self::certificate_signing_kind), and NOT a
-    /// synonym: that one says **whose** the certificate is (which is what picks the fallback and
-    /// what the `Representante` block of hub#321 hangs off), this one says **what** it is, which is
-    /// the axis the AEAT segregates its entry point by. Reading the slot as if it were the type is
-    /// the defect hub#470 closes.
+    /// synonym: that one says **whose** the certificate is (which is what picks the fallback, and
+    /// nothing else — the `Representante` hangs off WHO PRESENTS, not off the slot: ADR-0268 §4,
+    /// hub#1460), this one says **what** it is, which is the axis the AEAT segregates its entry
+    /// point by. Reading the slot as if it were the type is the defect hub#470 closes.
     ///
     /// **The core answers, and the module does not re-derive it.** Same rule as the slot: one
     /// question, one owner. `verifactu` never touches `_hub_certificate` — the private key does not

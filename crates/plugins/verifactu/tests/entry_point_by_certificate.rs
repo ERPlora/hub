@@ -22,8 +22,10 @@
 //! So the axis is now the TYPE
 //! (`erplora_runtime::certificate::CertificateType::as_str` — `"seal"` / `"representative"`),
 //! derived from the container the hub actually holds and cross-checked against what the control
-//! plane declared. The slot keeps its own job (which certificate signs, and the `Representante`
-//! block of hub#321); it just no longer decides the URL.
+//! plane declared. The slot keeps its own job — which certificate signs, and that is all it
+//! decides. It does not decide the URL, and it does not decide the `Representante` either: that
+//! one hangs off WHO PRESENTS (ADR-0268 §4), guarded next door in
+//! `representative_from_signed_identity.rs` (hub#1460).
 //!
 //! There are **two axes and they multiply**, which is why they are pinned here together rather
 //! than one test per axis: getting the type right while losing the environment is not a smaller

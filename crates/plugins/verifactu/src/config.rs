@@ -169,14 +169,15 @@ pub async fn can_sign(host: &dyn NativeHost, hub_id: &str) -> Result<bool> {
 /// Con **cuál** de los dos se firma: `"own"`, `"delegated"`, o `""` si no hay ninguno
 /// (ADR-0202 §2.1 — hub#319).
 ///
-/// ⚠️ **Esta es la respuesta que lee el endpoint AEAT (`www1` vs `www10`, hub#320) y la que tiene
-/// que leer [hub#321] (bloque `Representante`), NO una segunda consulta a `_hub_certificate`.** La
-/// selección arrastra el endpoint y el `Representante`, así que resolverla otra vez por su cuenta
-/// es cómo vuelve el defecto que hub#317 y hub#318 ya arreglaron dos veces: dos lecturas de la
-/// misma pregunta que pueden contestar distinto. Hasta que hub#321 aterrice, un hub que firme con
-/// el delegado transmite por el endpoint correcto pero **sin `Representante`**.
+/// ⚠️ **Es la respuesta del slot, y el slot es UNA lectura: quien la necesite la pide aquí, nunca
+/// con una segunda consulta a `_hub_certificate`.** Dos lecturas de la misma pregunta que pueden
+/// contestar distinto es el defecto que hub#317 y hub#318 ya arreglaron dos veces.
 ///
-/// [hub#321]: https://github.com/ERPlora/hub/issues/321
+/// 🔴 **Y no decide ni la puerta ni el `Representante`** — las dos derivaciones que ADR-0268 §4
+/// declara independientes del slot. La puerta la decide el TIPO ([`signing_type`], hub#470); el
+/// `Representante`, quién presenta (hub#1460): por la celda, la identidad FIRMADA del token; por
+/// la vía propia, el titular del certificado, que ES el obligado, así que no hay representación
+/// que declarar. El slot dice de *quién* es el certificado, y eso es todo lo que dice.
 pub(crate) fn signing_kind(config: &Json) -> String {
     str_field(config, "certificate_kind")
 }
@@ -185,10 +186,9 @@ pub(crate) fn signing_kind(config: &Json) -> String {
 /// jurarlo (ADR-0202 §2.1 — hub#470).
 ///
 /// El gemelo de [`signing_kind`], y la distinción es el fondo de hub#470: el slot dice **de quién**
-/// es el certificado —lo que decide el fallback y lo que necesitará el bloque `Representante` de
-/// hub#321— y el tipo dice **qué** es, que es lo único por lo que la AEAT segrega la puerta. Leer
-/// el slot como si fuera el tipo mandaba a `www10` a cualquier certificado repartido por el plano
-/// de control, fuese un sello o no.
+/// es el certificado —lo que decide el fallback, y nada más— y el tipo dice **qué** es, que es lo
+/// único por lo que la AEAT segrega la puerta. Leer el slot como si fuera el tipo mandaba a
+/// `www10` a cualquier certificado repartido por el plano de control, fuese un sello o no.
 ///
 /// Lo pone [`read_config`] con lo que contestó el core. El motor no vuelve a preguntar a
 /// `_hub_certificate`: una sola lectura, un solo dueño.
@@ -210,10 +210,11 @@ pub(crate) fn signing_type(config: &Json) -> String {
 /// que se presenta en el handshake TLS, así que un registro que lleva días en contingencia se
 /// transmite por la puerta del certificado que firma **hoy**, no por la del que firmaba cuando se
 /// generó: presentar el sello de ERPlora en `www1` falla siempre, diga lo que diga el XML
-/// archivado. ⚠️ La otra mitad de esa pareja —el `Representante`, que sí viaja DENTRO del
-/// `xml_content` congelado del reintento— es de [hub#321](https://github.com/ERPlora/hub/issues/321):
-/// si el hub cambió de certificado mientras el registro esperaba en la cola, ese XML describe al
-/// firmante anterior y habrá que reconstruirlo.
+/// archivado. La otra mitad de esa pareja —el `Representante`, que sí viaja DENTRO del
+/// `xml_content` congelado del reintento— la cerró hub#1460 con la misma regla: no se hornea en el
+/// constructor, se **estampa** sobre el sobre resuelto justo antes de validarlo y archivarlo
+/// ([`aeat::set_representative`]), así que un registro que esperó días en la cola declara a quien
+/// lo presenta HOY sin regenerar nada. La `Cabecera` no entra en la huella (ADR-0202 §4.6).
 pub(crate) fn transmission_endpoint(config: &Json) -> &'static str {
     aeat::endpoint(&environment_of(config), &signing_type(config))
 }
@@ -570,7 +571,7 @@ mod cert_source_tests {
         assert_eq!(
             signing_kind(&delegated_representative),
             "delegated",
-            "the slot is still reported — it is what picks the fallback and the `Representante`"
+            "the slot is still reported — it picks the fallback, and nothing else (ADR-0268 §4)"
         );
         assert_eq!(
             transmission_endpoint(&delegated_representative),
