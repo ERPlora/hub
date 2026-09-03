@@ -497,7 +497,7 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
 
     for bad in ["1234", "0000", "12", "abcd", "123456789"] {
         let err = rt
-            .set_pin(&id, bad)
+            .set_pin(&id, None, bad)
             .await
             .expect_err(&format!("`{bad}` must be refused at the self-service door"));
         // Shape errors (length, non-digits) and policy errors (guessable) are two doors with two
@@ -513,12 +513,120 @@ async fn the_self_service_pin_door_applies_the_same_rules_as_personal() {
         );
     }
 
-    rt.set_pin(&id, "2580").await.unwrap();
+    // First PIN ever: nothing to confirm yet, so `current_pin: None` is accepted.
+    rt.set_pin(&id, None, "2580").await.unwrap();
     assert!(row(&rt, &id).await.has_pin);
     assert!(rt.verify_pin("Ana Soto", "2580").await.unwrap().is_some());
 
-    // Empty still clears it (a user going back to account-only login).
-    rt.set_pin(&id, "").await.unwrap();
+    // Empty still clears it (a user going back to account-only login) — but that is ALSO a
+    // self-service credential change, so it needs the current PIN too (hub#1430).
+    rt.set_pin(&id, Some("2580"), "").await.unwrap();
+    assert!(!row(&rt, &id).await.has_pin);
+}
+
+/// «Mi perfil» → cambiar mi PIN (hub#1430): the SAME self-service door as the alta-tras-login-cloud
+/// one above, reused for a rotate instead of a first-time set. Once a PIN already exists, the door
+/// must not accept a new one without the CURRENT one matching — otherwise anybody who finds an
+/// unlocked session (the till, «Mi perfil» left open) could lock the real owner out by rewriting
+/// their PIN, no different from a stranger changing somebody else's password without knowing it.
+/// Decisión de mercado (Zettle, el módulo `pos_change_pin` de Odoo): piden el actual antes del
+/// nuevo en el mismo gesto.
+#[tokio::test]
+async fn the_self_service_pin_door_requires_the_current_pin_once_one_exists() {
+    let rt = runtime("hub-staff-rotate").await;
+    let id = rt
+        .create_hub_user(&NewHubUser {
+            name: "Bruno Vidal".into(),
+            email: "bruno@example.com".into(),
+            role: "employee".into(),
+            pin: "3216".into(),
+            badge: String::new(),
+            local: false,
+        })
+        .await
+        .unwrap();
+    assert!(row(&rt, &id).await.has_pin);
+
+    // No current PIN at all → refused, stored PIN untouched.
+    let err = rt
+        .set_pin(&id, None, "9081")
+        .await
+        .expect_err("a rotate with no current PIN must be refused");
+    assert!(
+        matches!(&err, RuntimeError::Domain { code, .. } if code == "hub.users.pin_current_mismatch"),
+        "stable code for the UI to translate: {err}"
+    );
+    assert!(rt
+        .verify_pin("Bruno Vidal", "3216")
+        .await
+        .unwrap()
+        .is_some());
+
+    // Wrong current PIN → same refusal, still untouched.
+    let err = rt
+        .set_pin(&id, Some("0000"), "9081")
+        .await
+        .expect_err("the wrong current PIN must be refused");
+    assert!(
+        matches!(&err, RuntimeError::Domain { code, .. } if code == "hub.users.pin_current_mismatch")
+    );
+    assert!(rt
+        .verify_pin("Bruno Vidal", "3216")
+        .await
+        .unwrap()
+        .is_some());
+
+    // The right current PIN rotates it.
+    rt.set_pin(&id, Some("3216"), "9081").await.unwrap();
+    assert!(rt
+        .verify_pin("Bruno Vidal", "9081")
+        .await
+        .unwrap()
+        .is_some());
+    assert!(
+        rt.verify_pin("Bruno Vidal", "3216")
+            .await
+            .unwrap()
+            .is_none(),
+        "the old PIN must stop working"
+    );
+}
+
+/// The self-service door was hashing whatever arrived with no duplicate check at all — the ONLY
+/// place `ensure_pin_is_free` claimed to run («se comprueba... en cada cambio de PIN») but did not.
+/// Reachable just once before (alta tras login cloud), the door is now reachable any time from «Mi
+/// perfil» (hub#1430), which is exactly why the gap stopped being tolerable: a PIN two people share
+/// is a misattribution at the till, not a cosmetic duplicate (see `identity::pin_is_taken`).
+#[tokio::test]
+async fn the_self_service_pin_door_refuses_a_pin_another_active_user_already_has() {
+    let rt = runtime("hub-staff-dup").await;
+    rt.create_hub_user(&NewHubUser {
+        name: "Carla Ruiz".into(),
+        email: "carla@example.com".into(),
+        role: "employee".into(),
+        pin: "4455".into(),
+        badge: String::new(),
+        local: false,
+    })
+    .await
+    .unwrap();
+    let id = rt
+        .create_hub_user(&NewHubUser {
+            name: "Diego Nu".into(),
+            email: "diego@example.com".into(),
+            role: "employee".into(),
+            pin: String::new(),
+            badge: String::new(),
+            local: false,
+        })
+        .await
+        .unwrap();
+
+    let err = rt
+        .set_pin(&id, None, "4455")
+        .await
+        .expect_err("Carla's PIN must not also open Diego's session");
+    assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == "hub.users.pin_in_use"));
     assert!(!row(&rt, &id).await.has_pin);
 }
 

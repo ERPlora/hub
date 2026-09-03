@@ -367,7 +367,11 @@ export function accessOf(user: HubUser): HubAccess {
 const ADMIN_ROLES = ['owner', 'admin'];
 
 /** Prefijo de los códigos de rechazo del core en `/api/hub/users` (namespace reservado, ADR-0192). */
-const HUB_USERS_ERROR_PREFIX = 'hub.users.';
+/** Prefijo de los códigos de dominio `hub.users.*` (hub#355 y siguientes). Exportado para que otra
+ *  puerta que recibe el MISMO catálogo de códigos por otro cliente (self-service «Mi perfil» →
+ *  cambiar mi PIN, hub#1430, vía `RuntimeError` de `lib/cloud.ts`) pueda pelarlo igual sin
+ *  duplicar el literal. */
+export const HUB_USERS_ERROR_PREFIX = 'hub.users.';
 
 /**
  * Los códigos con los que el runtime cuenta que **no pudo sincronizar el acceso con el Cloud**

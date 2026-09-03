@@ -41,6 +41,10 @@ pub struct UserProfile {
     pub cloud_user_id: Option<String>,
     pub avatar_path: Option<String>,
     pub preferences: UserPreferences,
+    /// `true` si hoy hay un PIN utilizable (hub#1430): «Mi perfil» lo usa para decidir entre
+    /// «cambiar mi PIN» (pide el actual) y «establecer un PIN» (cuenta cloud-only, nada que
+    /// confirmar todavía) — espejo del `has_pin` que ya pinta Personal.
+    pub has_pin: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -98,7 +102,7 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Resul
     p.insert("user_id".into(), json!(user_id));
     let users = db
         .query(
-            "SELECT id, name, role, cloud_user_id FROM hub_user \
+            "SELECT id, name, role, cloud_user_id, pin_hash FROM hub_user \
               WHERE hub_id = :hub_id AND id = :user_id AND is_active = 1",
             &p,
         )
@@ -156,6 +160,7 @@ pub async fn get(db: &dyn DatabaseAdapter, hub_id: &str, user_id: &str) -> Resul
             .to_string(),
         role: user["role"].as_str().unwrap_or_default().to_string(),
         cloud_user_id: user["cloud_user_id"].as_str().map(ToString::to_string),
+        has_pin: user["pin_hash"].as_str().is_some_and(|h| !h.is_empty()),
         avatar_path: profile.and_then(|r| optional(&r["avatar_path"])),
         preferences: UserPreferences {
             language: prefs.and_then(|r| optional(&r["language"])),

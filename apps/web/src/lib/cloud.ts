@@ -379,11 +379,20 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
     });
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
-      error?: string;
+      // Two shapes share this door: the hand-built ones in this file (`too_many_attempts`,
+      // `device_untrusted`…) put `error` as plain prose with `code` alongside it at the top; a
+      // `RuntimeError` the dispatcher's generic `err_response` turns into JSON (hub#1430's
+      // `pin_current_mismatch`, or any `InvalidField`/`Domain`) nests both under `error` instead.
+      error?: string | { code?: string; message?: string };
       code?: string;
     } & T;
     if (!res.ok || data.ok === false) {
-      throw new RuntimeError(data.error ?? `runtime ${path} → ${res.status}`, data.code);
+      const nested = typeof data.error === 'object' && data.error !== null ? data.error : undefined;
+      const message =
+        nested?.message ??
+        (typeof data.error === 'string' ? data.error : undefined) ??
+        `runtime ${path} → ${res.status}`;
+      throw new RuntimeError(message, data.code ?? nested?.code);
     }
     return data;
   } finally {
@@ -455,9 +464,18 @@ export async function runtimeBadgeLogin(badge: string): Promise<HubSessionResult
   );
 }
 
-/** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */
-export async function runtimeSetPin(pin: string, sessionToken: string): Promise<void> {
-  await runtimePost<{ ok: boolean }>('/api/auth/set-pin', { pin }, { 'X-Hub-Session': sessionToken });
+/**
+ * Fija (o cambia) el PIN del usuario de la sesión actual. Dos llamadores: la alta de PIN tras el
+ * primer login cloud (`currentPin` ausente, nada que confirmar) y «Mi perfil» → cambiar mi PIN
+ * (hub#1430, `currentPin` obligatorio si ya hay uno — el runtime rechaza con
+ * `hub.users.pin_current_mismatch` si no coincide).
+ */
+export async function runtimeSetPin(pin: string, sessionToken: string, currentPin?: string): Promise<void> {
+  await runtimePost<{ ok: boolean }>(
+    '/api/auth/set-pin',
+    currentPin ? { pin, current_pin: currentPin } : { pin },
+    { 'X-Hub-Session': sessionToken },
+  );
 }
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
