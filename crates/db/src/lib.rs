@@ -26,7 +26,7 @@ use sqlx::{Column, Connection, Encode, Row, Type, TypeInfo, ValueRef};
 mod migration_lock;
 pub use migration_lock::{MigrationLock, MigrationLockError};
 
-use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
+use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgRow, PgSslMode};
 
 /// Helpers de test compartidos (esquema Postgres efímero por test). Compilados para los tests del
 /// propio crate y para quien active la feature `test-util`.
@@ -360,27 +360,65 @@ impl PgAdapter {
     /// `max_connections` comes from [`PG_MAX_CONNECTIONS_ENV`] (per-hub cap injected by the
     /// SaaS at deploy time; absent/invalid → the sqlx default of 10 — ERPlora/saas#609).
     pub async fn connect(dsn: &str) -> Result<Self, DbError> {
-        let replica = Arc::new(ReplicaWatch::default());
-        let pool = pg_pool_options(pg_max_connections_from_env(), Arc::clone(&replica))
-            .connect(dsn)
-            .await?;
-        Ok(Self { pool, replica })
+        let opts: PgConnectOptions = dsn.parse()?;
+        Self::open(opts, pg_max_connections_from_env()).await
     }
 
     /// Same, from explicit connect options — the door the test helpers use, so a test pool is
-    /// configured **exactly** like a production one (timeouts and switchover recycling included)
-    /// instead of proving things about a pool shape production does not have.
+    /// configured **exactly** like a production one (timeouts, switchover recycling and TLS
+    /// policy included) instead of proving things about a pool shape production does not have.
     #[cfg(any(test, feature = "test-util"))]
     pub(crate) async fn connect_with_options(
-        opts: sqlx::postgres::PgConnectOptions,
+        opts: PgConnectOptions,
         max_connections: u32,
     ) -> Result<Self, DbError> {
+        Self::open(opts, max_connections).await
+    }
+
+    /// Shared by [`connect`] and [`connect_with_options`]: builds the pool and decides its TLS
+    /// policy in exactly one place, so the two entry points can never drift apart (hub#1398).
+    async fn open(opts: PgConnectOptions, max_connections: u32) -> Result<Self, DbError> {
         let replica = Arc::new(ReplicaWatch::default());
         let pool = pg_pool_options(max_connections, Arc::clone(&replica))
-            .connect_with(opts)
+            .connect_with(require_tls_unless_local(opts))
             .await?;
         Ok(Self { pool, replica })
     }
+}
+
+/// Ranks [`PgSslMode`] weakest-to-strongest so [`require_tls_unless_local`] can tell "already at
+/// least as strong as `require`" from "still at the unset default" without hand-matching every
+/// variant at each call site.
+fn ssl_mode_strength(mode: PgSslMode) -> u8 {
+    match mode {
+        PgSslMode::Disable => 0,
+        PgSslMode::Allow => 1,
+        PgSslMode::Prefer => 2,
+        PgSslMode::Require => 3,
+        PgSslMode::VerifyCa => 4,
+        PgSslMode::VerifyFull => 5,
+    }
+}
+
+/// Upgrades `opts` to `sslmode=require` unless the host is the local test/dev Postgres, or the
+/// DSN already asked for something at least as strong.
+///
+/// `Prefer` — sqlx's default when a DSN omits `sslmode` — tries SSL first but falls back to
+/// plaintext without complaint if the negotiation itself fails, so a MITM or a misrouted LB
+/// target could downgrade the session silently. Production's `pg_hba` already accepts nothing but
+/// `hostssl` for remote connections (`infra/postgres/scripts/render_patroni_yml.sh`), so this
+/// does not change what goes over the wire there — it makes the client refuse a downgrade instead
+/// of relying entirely on the server side to reject it. The local container
+/// (`erplora-test-pg-5433`) has no TLS configured at all, so loopback hosts are left alone —
+/// hub#1398, closing the TLS half of `crates/db`'s old pending item §8 (hub#1395 closed the
+/// timeouts half).
+fn require_tls_unless_local(opts: PgConnectOptions) -> PgConnectOptions {
+    let local = opts.get_socket().is_some()
+        || matches!(opts.get_host(), "localhost" | "127.0.0.1" | "::1" | "[::1]");
+    if local || ssl_mode_strength(opts.get_ssl_mode()) >= ssl_mode_strength(PgSslMode::Require) {
+        return opts;
+    }
+    opts.ssl_mode(PgSslMode::Require)
 }
 
 // ── Leader switchover: recycling connections pinned to the replica (hub#1376) ────────────────
@@ -2285,6 +2323,53 @@ mod tests {
         assert!(
             PG_IDLE_TIMEOUT < PG_MAX_LIFETIME,
             "idle connections have to be dropped before the hard cap, not after"
+        );
+    }
+
+    // ── TLS policy for the connect options (hub#1398) ─────────────────────────────────────────
+
+    #[test]
+    fn a_remote_dsn_gets_upgraded_to_ssl_require_hub1398() {
+        let opts: PgConnectOptions = "postgres://user:pass@10.10.1.6:5432/hub".parse().unwrap();
+        assert!(
+            matches!(opts.get_ssl_mode(), PgSslMode::Prefer),
+            "sanity: sqlx's own default for a DSN with no sslmode"
+        );
+
+        let opts = require_tls_unless_local(opts);
+
+        assert!(
+            matches!(opts.get_ssl_mode(), PgSslMode::Require),
+            "lb-db is not loopback: the client must refuse a downgrade instead of silently \
+             falling back to plaintext"
+        );
+    }
+
+    #[test]
+    fn the_local_test_database_keeps_prefer_hub1398() {
+        for host in ["localhost", "127.0.0.1", "[::1]"] {
+            let dsn = format!("postgres://postgres:test@{host}:5433/hub_test");
+            let opts: PgConnectOptions = dsn.parse().unwrap();
+            let opts = require_tls_unless_local(opts);
+            assert!(
+                matches!(opts.get_ssl_mode(), PgSslMode::Prefer),
+                "erplora-test-pg-5433 has no TLS configured — forcing require would break \
+                 every test ({host})"
+            );
+        }
+    }
+
+    #[test]
+    fn a_dsn_that_already_asks_for_a_stronger_mode_is_left_alone_hub1398() {
+        let opts: PgConnectOptions = "postgres://user:pass@lb-db:5432/hub?sslmode=verify-full"
+            .parse()
+            .unwrap();
+
+        let opts = require_tls_unless_local(opts);
+
+        assert!(
+            matches!(opts.get_ssl_mode(), PgSslMode::VerifyFull),
+            "an explicit verify-full must not be downgraded to require"
         );
     }
 
