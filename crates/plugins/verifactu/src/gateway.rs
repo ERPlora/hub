@@ -222,6 +222,22 @@ pub(crate) struct GatewayAccess {
     pub identity: reqwest::Identity,
     /// PEM of the internal CA that anchors the cell's SERVER certificate.
     pub ca_pem: Vec<u8>,
+    /// **Who the control plane SIGNED as the presenter of this burst** — the `Representante` of
+    /// every envelope that goes out through it (hub#1460). It travels on the access and not on a
+    /// second lookup on purpose: «who presents?» is the same question as «is the road open, and
+    /// with what?», and asking it twice is how hub#317/#318/#319/#470 kept coming back.
+    pub presenter_nif: String,
+    pub presenter_name: String,
+}
+
+impl GatewayAccess {
+    /// The signed presenter, in the shape the envelope builder takes.
+    pub(crate) fn presenter(&self) -> crate::aeat::Presenter<'_> {
+        crate::aeat::Presenter {
+            nif: &self.presenter_nif,
+            name: &self.presenter_name,
+        }
+    }
 }
 
 impl std::fmt::Debug for GatewayAccess {
@@ -446,6 +462,8 @@ pub(crate) async fn resolve_access(
         token: token.token,
         identity: machine.identity,
         ca_pem: machine.ca_pem,
+        presenter_nif: token.presenter_nif,
+        presenter_name: token.presenter_name,
     }))
 }
 
@@ -576,6 +594,8 @@ mod tests {
             token: "bearer-token".to_owned(),
             identity: reqwest::Identity::from_pem(bundle.as_bytes()).unwrap(),
             ca_pem,
+            presenter_nif: "B27593136".to_owned(),
+            presenter_name: "ERPLORA CLOUD SL".to_owned(),
         }
     }
 
