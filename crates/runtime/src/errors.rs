@@ -254,11 +254,6 @@ pub enum RuntimeError {
         reason: String,
         detail: String,
     },
-    /// The control plane declared one certificate type and served another (hub#470): not
-    /// installed, because the AEAT door is chosen by the TYPE and the wrong one rejects every
-    /// record, one by one.
-    #[error("el plano de control declara un certificado `{declared}` pero el contenedor que ha servido es `{served}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el equivocado la AEAT rechaza todos los registros, uno a uno")]
-    CertificateTypeMismatch { declared: String, served: String },
     /// A manifest the installer REFUSED on a contract rule (not a parse error — that is
     /// [`RuntimeError::Manifest`]): `code` names the rule (`role_grants_admin`,
     /// `system_table_write`…), `at` the offending element, `detail` the English explanation.
