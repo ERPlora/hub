@@ -66,6 +66,11 @@ on:
       - 'scripts/ci/module-hub-batteries.sh'
       - 'scripts/ci/module-hub-batteries.txt'
       - 'scripts/tests/module-hub-batteries.test.sh'
+      # Y el CORREDOR que las ejecuta (hub#1381). Sus casos son herméticos —servidor falso,
+      # baterías falsas, admin de BD de mentira— y corren en segundos, así que no tienen por qué
+      # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
+      - 'scripts/ci/run-module-hub-batteries.sh'
+      - 'scripts/tests/run-module-hub-batteries.test.sh'
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
@@ -244,6 +249,18 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/module-hub-batteries.test.sh
+
+      # ── Y el corredor que las EJECUTA (hub#1381) ─────────────────────────────────────
+      # La lista de arriba prueba que la batería ESTÁ; esta prueba que alguien la CORRE. Los casos
+      # son herméticos y cubren justo los modos de fallo que dejan un verde vacío: un hub por
+      # módulo (medido — compartirlo hace que las ventas de `cash_register` quemen números de
+      # ticket que `invoice` afirma), una batería que sale 0 imprimiendo `SKIPPED`, un módulo que
+      # no llegó a instalarse, una exención caducada, y un `docker exec -i` que se come la lista
+      # de trabajo y deja la pasada a medias diciendo que pasó.
+      - name: Corredor de baterías de módulo (hub#1381)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/run-module-hub-batteries.test.sh
 
       # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
       # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—

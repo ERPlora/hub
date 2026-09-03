@@ -34,10 +34,12 @@
 # should have retired either lingers or — worse — gets deleted later by someone assuming the
 # pairing was checked.
 #
-# 🔴 WHAT THIS GUARD DOES NOT DO. It proves a battery EXISTS in the published module. It does not
-# run it: nothing in CI runs `erplora test --against-hub` yet, and hub#1381 stays open for that.
-# Do not read a green here as "the battery passes" — read it as "the battery is where the PR that
-# deleted the e2e said it would be".
+# 🔴 WHAT THIS GUARD DOES NOT DO. It proves a battery EXISTS in the published module; it does not
+# prove it passes. What RUNS it is `scripts/ci/run-module-hub-batteries.sh`, in the same job
+# (`test-hub-modules.yml`, step `run-batteries`), which takes its worklist from here — call this
+# script with `--batteries` for the files rather than the module ids. Do not read a green here as
+# "the battery passes": read it as "the battery is where the PR that deleted the e2e said it
+# would be".
 set -uo pipefail
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -45,16 +47,24 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 catalogue="${ERPLORA_MODULES_DIR:-}"
 manifest="$script_dir/module-hub-batteries.txt"
 
+# `--batteries` swaps WHAT the agreeing path prints — one line per BATTERY instead of one per
+# module — and nothing else. The runner (`run-module-hub-batteries.sh`) needs the files: it runs
+# the `*.hub.test.py|sh` family and nothing else, and it takes them from here so that "what is a
+# hub battery" (the name rule AND the `_HUB_BASE_URL` content rule) is written once. The verdict
+# is untouched: a disagreement is still exit 1 with an empty stdout, never a worklist.
+emit=modules
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --catalogue) catalogue="$2"; shift 2 ;;
         --manifest) manifest="$2"; shift 2 ;;
+        --batteries) emit=batteries; shift ;;
         -h | --help)
-            printf 'usage: %s [--catalogue <dir>] [--manifest <file>]\n' "$0"
+            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries]\n' "$0"
             exit 0
             ;;
         *)
-            printf 'usage: %s [--catalogue <dir>] [--manifest <file>]\n' "$0" >&2
+            printf 'usage: %s [--catalogue <dir>] [--manifest <file>] [--batteries]\n' "$0" >&2
             exit 2
             ;;
     esac
@@ -218,13 +228,19 @@ if [ -n "$failures" ]; then
     exit 1
 fi
 
-# The worklist: one line per MODULE, not per battery. `erplora test <dir>` runs the whole module
-# directory, so emitting an id twice would boot the kernel image twice for nothing.
+# The worklist. By default one line per MODULE, not per battery: a module is ONE unit of work —
+# the runner boots a hub for it and runs every battery it carries against that hub, so emitting
+# the id twice would boot a kernel twice for nothing. With `--batteries`, one line per battery,
+# which is what the runner needs to know WHICH files to execute inside that hub.
 #
 # Guarded on emptiness, and the exit is EXPLICIT: a bare `grep -v` over no batteries matches
 # nothing and returns 1, which would hand the caller a "they disagree" verdict with an empty
 # stderr — a red with nothing to read, from a catalogue that agreed perfectly.
 if [ -n "$discovered" ]; then
-    printf '%s\n' "$discovered" | sed 's|/.*||' | LC_ALL=C sort -u
+    if [ "$emit" = batteries ]; then
+        printf '%s\n' "$discovered"
+    else
+        printf '%s\n' "$discovered" | sed 's|/.*||' | LC_ALL=C sort -u
+    fi
 fi
 exit 0

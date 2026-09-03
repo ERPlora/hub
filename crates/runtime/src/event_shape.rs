@@ -539,6 +539,25 @@ fn value_looks_personal(s: &str) -> bool {
             return true;
         }
     }
+    // A UUID is a MACHINE identifier and it is never anybody's datum, so it is settled BEFORE the
+    // shape heuristics below — which both catch one by accident once the hyphens are gone (hub#1381):
+    //
+    //   · the IBAN branch reads `fb394e22-…` as two letters, two digits and alphanumerics — about
+    //     one id in eighteen, since a UUID's letters are `a`-`f`;
+    //   · and any UUID carrying eleven consecutive decimal digits reads as a card or a phone.
+    //
+    // The cost was not a flaky test. `sale_id`, `order_id` and `customer_id` are exactly what the
+    // flows picker exists to map (ADR-0283), and their example vanished for a share of the ids
+    // while the identical event next door showed it — which reads as «the field is sometimes
+    // empty», not as «we withheld it». Found by the battery runner (`run-module-hub-batteries.sh`)
+    // on its first complete pass.
+    //
+    // The carve-out cannot become a hole: no IBAN is 32 characters of pure hex — every IBAN opens
+    // with a two-letter country code, and the codes whose letters are both `a`-`f` (AD, AE, BA,
+    // BE, DE, EE) are 16 to 24 characters long — and no card or phone is written in hex.
+    if looks_like_a_uuid(trimmed) {
+        return false;
+    }
     let compact: String = trimmed
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '-' && *c != '.')
@@ -567,6 +586,26 @@ fn value_looks_personal(s: &str) -> bool {
         return true;
     }
     false
+}
+
+/// The canonical `8-4-4-4-12` hexadecimal form, and the same 32 characters without its hyphens.
+/// Case-insensitive: a hub writes them lower case and an imported payload may not.
+fn looks_like_a_uuid(s: &str) -> bool {
+    const GROUPS: [usize; 5] = [8, 4, 4, 4, 12];
+    let hex = |part: &str, len: usize| {
+        part.len() == len && part.bytes().all(|b| b.is_ascii_hexdigit())
+    };
+    if s.len() == 32 {
+        return hex(s, 32);
+    }
+    let mut parts = s.split('-');
+    for len in GROUPS {
+        match parts.next() {
+            Some(part) if hex(part, len) => {}
+            _ => return false,
+        }
+    }
+    parts.next().is_none()
 }
 
 #[cfg(test)]
@@ -831,5 +870,62 @@ mod tests {
         assert!(infer("sale.completed", &[deep])
             .iter()
             .all(|f| f.path.split('.').count() <= MAX_DEPTH));
+    }
+    /// A UUID is a MACHINE identifier and it must never be withheld as if it were somebody's bank
+    /// account. Found by the module battery runner (hub#1381) on its first complete pass:
+    /// `sales/tests/void.hub.test.py` asserts that the newest `sale.voided` names the sale it just
+    /// voided, and it failed reading `None` for one `sale_id` and passed for the next — the
+    /// difference was the random UUID, nothing else.
+    ///
+    /// Two of the heuristics catch one: strip the hyphens and a canonical UUID becomes 32
+    /// alphanumeric characters, so `fb394e22-…` reads as an IBAN (two letters `fb`, two digits
+    /// `39`, alphanumerics after) — roughly one id in eighteen — and any UUID that happens to
+    /// carry eleven consecutive decimal digits reads as a card or a phone.
+    ///
+    /// The cost was not the flaky test. `sale_id`, `order_id` and `customer_id` are exactly the
+    /// fields the flows picker exists to map (ADR-0283), and their example vanished at random for
+    /// a share of the ids while an identical event next door showed it — the kind of inconsistency
+    /// that reads as «the field is sometimes empty», not as «we withheld it».
+    #[test]
+    fn a_uuid_is_a_machine_id_and_keeps_its_example_hub1381() {
+        // Every one of these is a real UUID that the IBAN branch used to withhold: two letters,
+        // then two digits, then alphanumerics once the hyphens are gone.
+        for id in [
+            "fb394e22-03fe-4389-a3c4-471b78d12789",
+            "de964b46-77d6-4fa6-bcc3-b0b7387a834b",
+            "ab12cdef-1234-4567-89ab-cdef01234567",
+        ] {
+            let fields = shape(&[json!({ "sale_id": id })]);
+            let field = &fields["sale_id"];
+            assert!(
+                !field.redacted,
+                "{id} was withheld as if it were personal data"
+            );
+            assert_eq!(field.sample, Some(json!(id)), "{id} lost its example");
+        }
+
+        // Upper case and the un-hyphenated form of the same value are the same identifier.
+        for id in [
+            "FB394E22-03FE-4389-A3C4-471B78D12789",
+            "fb394e2203fe4389a3c4471b78d12789",
+        ] {
+            assert!(
+                !shape(&[json!({ "sale_id": id })])["sale_id"].redacted,
+                "{id} was withheld"
+            );
+        }
+
+        // And the carve-out is narrow: it must not become a hole for the values these rules were
+        // written for. An IBAN, a card and an email keep going.
+        for (path, value) in [
+            ("account", "ES91 2100 0418 4502 0005 1332"),
+            ("card", "4111 1111 1111 1111"),
+            ("contact", "someone@example.com"),
+        ] {
+            assert!(
+                shape(&[json!({ path: value })])[path].redacted,
+                "{value} was handed over"
+            );
+        }
     }
 }
