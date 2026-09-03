@@ -1055,7 +1055,7 @@ pub(crate) async fn process_contingency_queue(
 // ── run_diagnostics: prueba en vivo (cert + huella + QR + envío AEAT) ──────────
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{archive_transmission_xml, derive_tax_rate, fault_reason, NativeHost, Params, Result};
     use serde_json::Value as Json;
     use std::sync::Mutex;
@@ -1096,7 +1096,8 @@ mod tests {
     // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
 
     /// A throwaway mTLS identity so a fake host can answer the capability like the real broker.
-    fn throwaway_identity() -> reqwest::Identity {
+    /// `pub(crate)`: `diagnostics::tests` builds routes with it too — one helper, not two.
+    pub(crate) fn throwaway_identity() -> reqwest::Identity {
         use openssl::asn1::Asn1Time;
         use openssl::hash::MessageDigest;
         use openssl::nid::Nid;
@@ -1471,10 +1472,7 @@ mod tests {
         let route = crate::config::resolve_route(&CertHost, "hub-1", &config)
             .await
             .unwrap();
-assert!(matches!(
-            route,
-            crate::config::TransmitRoute::Direct { .. }
-        ));
+        assert!(matches!(route, crate::config::TransmitRoute::Direct { .. }));
     }
 
     /// 🔒 REGRESIÓN de punta a punta (hub#985 §2 — hub#1460): **los bytes que salen por el cable**
