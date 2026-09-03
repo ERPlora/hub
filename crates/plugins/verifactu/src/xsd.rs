@@ -295,6 +295,14 @@ fn err(msg: impl Into<String>) -> VerifactuError {
 
 type Element<'a> = (&'a str, &'a str, usize);
 
+/// Posición del primer elemento con ese nombre, en orden de documento. Es lo que permite mirar
+/// los hijos INMEDIATOS de un elemento cuando la profundidad no basta para distinguirlo de un
+/// hermano del mismo tipo — `ObligadoEmision` y `Representante` son los dos
+/// `PersonaFisicaJuridicaESType` y cuelgan del mismo nivel con las mismas etiquetas dentro.
+fn index_of(elements: &[Element<'_>], tag: &str) -> Option<usize> {
+    elements.iter().position(|(t, _, _)| *t == tag)
+}
+
 /// Primer elemento con ese nombre, a cualquier profundidad.
 fn text_of<'a>(elements: &[Element<'a>], tag: &str) -> Option<&'a str> {
     elements
@@ -347,6 +355,19 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     if !present(&elements, "ObligadoEmision") {
         return Err(err("falta Cabecera/ObligadoEmision"));
     }
+    // El `Representante` (hub#1460) es el OTRO `PersonaFisicaJuridicaESType` de la cabecera y
+    // lleva las mismas dos etiquetas dentro, así que se comprueba su posición ANTES de leer las
+    // del obligado por nombre: si se colara delante, `text_of` estaría midiendo al representante
+    // y dando por buena una identidad fiscal del negocio que nadie ha mirado.
+    let representante = index_of(&elements, "Representante");
+    if let (Some(rep), Some(obligado)) = (representante, index_of(&elements, "ObligadoEmision")) {
+        if rep < obligado {
+            return Err(err(
+                "Representante va delante de ObligadoEmision; el xs:sequence de CabeceraType es \
+                 ObligadoEmision → Representante → RemisionVoluntaria",
+            ));
+        }
+    }
     for tag in ["NombreRazon", "NIF"] {
         match text_of(&elements, tag) {
             Some(v) if !v.is_empty() => {}
@@ -355,6 +376,35 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
                     "ObligadoEmision/{tag} es obligatorio y viene vacío (identidad fiscal del \
                      negocio sin configurar)"
                 )))
+            }
+        }
+    }
+
+    // ── Cabecera: Representante (minOccurs=0, pero completo si está) ─────────────────────────
+    //
+    // `PersonaFisicaJuridicaESType` exige `NombreRazon` **y** `NIF`, en ese orden. Medio
+    // representante es un 4102 de la AEAT con el número de cadena ya gastado, y ese es justo el
+    // fallo que este validador existe para adelantar: aquí el registro se marca `rejected`
+    // localmente con el motivo, sin quemar el eslabón.
+    if let Some(at) = representante {
+        let depth = elements[at].2;
+        for (offset, tag) in ["NombreRazon", "NIF"].into_iter().enumerate() {
+            match elements.get(at + 1 + offset) {
+                Some((t, v, d)) if *t == tag && *d == depth + 1 && !v.is_empty() => {}
+                _ => {
+                    return Err(err(format!(
+                        "Representante/{tag} es obligatorio y falta o viene vacío \
+                         (PersonaFisicaJuridicaESType exige NombreRazon y NIF, en ese orden)"
+                    )))
+                }
+            }
+        }
+        if let Some(voluntaria) = index_of(&elements, "RemisionVoluntaria") {
+            if voluntaria < at {
+                return Err(err(
+                    "Representante va detrás de RemisionVoluntaria; el xs:sequence de \
+                     CabeceraType es ObligadoEmision → Representante → RemisionVoluntaria",
+                ));
             }
         }
     }
@@ -991,6 +1041,116 @@ mod tests {
     use super::*;
 
     const XSD: &str = include_str!("../schemas/aeat/SuministroInformacion.xsd");
+
+    /// Un sobre completo y válido, con el `Representante` que hub#1460 estampa, para medir sobre
+    /// él lo que el validador dice del bloque nuevo.
+    fn envelope_with(representante: &str) -> String {
+        format!(
+            "<sum:RegFactuSistemaFacturacion><sum:Cabecera>\
+             <sum1:ObligadoEmision><sum1:NombreRazon>CLIENTE SL</sum1:NombreRazon>\
+             <sum1:NIF>B12345678</sum1:NIF></sum1:ObligadoEmision>{representante}\
+             </sum:Cabecera><sum:RegistroFactura><sum1:RegistroAlta>\
+             <sum1:IDVersion>1.0</sum1:IDVersion>\
+             <sum1:IDFactura><sum1:IDEmisorFactura>B12345678</sum1:IDEmisorFactura>\
+             <sum1:NumSerieFactura>A-1</sum1:NumSerieFactura>\
+             <sum1:FechaExpedicionFactura>02-09-2026</sum1:FechaExpedicionFactura>\
+             </sum1:IDFactura>\
+             <sum1:NombreRazonEmisor>CLIENTE SL</sum1:NombreRazonEmisor>\
+             <sum1:TipoFactura>F1</sum1:TipoFactura>\
+             <sum1:DescripcionOperacion>Servicio</sum1:DescripcionOperacion>\
+             <sum1:Destinatarios><sum1:IDDestinatario>\
+             <sum1:NombreRazon>OTRO SL</sum1:NombreRazon><sum1:NIF>B87654321</sum1:NIF>\
+             </sum1:IDDestinatario></sum1:Destinatarios>\
+             <sum1:Desglose><sum1:DetalleDesglose>\
+             <sum1:Impuesto>01</sum1:Impuesto><sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+             <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+             <sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>\
+             <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+             <sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
+             </sum1:DetalleDesglose></sum1:Desglose>\
+             <sum1:CuotaTotal>21.00</sum1:CuotaTotal>\
+             <sum1:ImporteTotal>121.00</sum1:ImporteTotal>\
+             <sum1:Encadenamiento><sum1:PrimerRegistro>S</sum1:PrimerRegistro></sum1:Encadenamiento>\
+             <sum1:SistemaInformatico><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+             <sum1:NIF>B27593136</sum1:NIF>\
+             <sum1:NombreSistemaInformatico>ERPlora Hub</sum1:NombreSistemaInformatico>\
+             <sum1:IdSistemaInformatico>EC</sum1:IdSistemaInformatico>\
+             <sum1:Version>1.0</sum1:Version>\
+             <sum1:NumeroInstalacion>hub-1</sum1:NumeroInstalacion>\
+             <sum1:TipoUsoPosibleSoloVerifactu>S</sum1:TipoUsoPosibleSoloVerifactu>\
+             <sum1:TipoUsoPosibleMultiOT>S</sum1:TipoUsoPosibleMultiOT>\
+             <sum1:IndicadorMultiplesOT>N</sum1:IndicadorMultiplesOT>\
+             </sum1:SistemaInformatico>\
+             <sum1:FechaHoraHusoGenRegistro>2026-09-02T10:00:00+02:00</sum1:FechaHoraHusoGenRegistro>\
+             <sum1:TipoHuella>01</sum1:TipoHuella>\
+             <sum1:Huella>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</sum1:Huella>\
+             </sum1:RegistroAlta></sum:RegistroFactura></sum:RegFactuSistemaFacturacion>"
+        )
+    }
+
+    /// Sin `Representante` el sobre sigue siendo el de siempre: el bloque es `minOccurs=0`.
+    #[test]
+    fn un_sobre_sin_representante_sigue_siendo_valido() {
+        validate_registro(&envelope_with("")).expect("Representante es opcional");
+    }
+
+    /// Con `Representante` bien formado, tampoco molesta — y en particular el chequeo de
+    /// `ObligadoEmision/NombreRazon`+`NIF` sigue mirando al OBLIGADO, que va primero en el
+    /// documento, no al representante que ahora comparte esos mismos nombres de etiqueta.
+    #[test]
+    fn un_representante_bien_formado_valida() {
+        let xml = envelope_with(
+            "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+             <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>",
+        );
+        validate_registro(&xml).expect("un representante completo es válido");
+    }
+
+    /// 🔒 hub#1460: el bloque nuevo también se valida ANTES de la red. `PersonaFisicaJuridicaESType`
+    /// exige `NombreRazon` **y** `NIF`, en ese orden; medio representante es un 4102 con el número
+    /// de cadena ya gastado, y ese es justo el fallo que este validador existe para evitar.
+    #[test]
+    fn un_representante_a_medias_no_llega_a_la_red() {
+        for (bloque, esperado) in [
+            (
+                "<sum1:Representante><sum1:NIF>B27593136</sum1:NIF></sum1:Representante>",
+                "NombreRazon",
+            ),
+            (
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 </sum1:Representante>",
+                "NIF",
+            ),
+            (
+                "<sum1:Representante><sum1:NombreRazon></sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>",
+                "NombreRazon",
+            ),
+        ] {
+            let error = validate_registro(&envelope_with(bloque))
+                .expect_err("medio representante no puede transmitirse");
+            let message = error.to_string();
+            assert!(
+                message.contains("Representante") && message.contains(esperado),
+                "el motivo tiene que nombrar el elemento que falta: {message}"
+            );
+        }
+    }
+
+    /// El orden del `xs:sequence` de `CabeceraType` también se mide: ObligadoEmision →
+    /// Representante → RemisionVoluntaria. Un `Representante` detrás de la incidencia es un 4102.
+    #[test]
+    fn un_representante_fuera_de_secuencia_no_llega_a_la_red() {
+        let xml = envelope_with(
+            "<sum1:RemisionVoluntaria><sum1:Incidencia>S</sum1:Incidencia></sum1:RemisionVoluntaria>\
+             <sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+             <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>",
+        );
+        let message = validate_registro(&xml)
+            .expect_err("fuera de secuencia es un rechazo del esquema")
+            .to_string();
+        assert!(message.contains("Representante"), "{message}");
+    }
 
     /// El scraper tiene que quedarse en el primer nivel: `RegistroFacturacionAltaType` tiene
     /// `complexType` inline (`FacturasRectificadas`, `Destinatarios`, `Encadenamiento`), y colar

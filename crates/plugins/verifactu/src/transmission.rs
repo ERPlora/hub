@@ -167,6 +167,31 @@ pub(crate) async fn transmit_one(
         Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
     };
 
+    // La vía se resuelve AQUÍ, antes de validar y archivar, porque el `Representante` viaja DENTRO
+    // del sobre (hub#1460): quién presenta estos bytes es un hecho de la vía, y el XML que se
+    // valida, se archiva y cuyo sha256 compara el canario (hub#1461) tiene que ser el que sale por
+    // el cable — no una versión anterior a estamparlo.
+    //
+    // **Su error se difiere a propósito.** Antes de hub#1460 la ruta se resolvía después de la
+    // validación, así que un sobre que no cumple el esquema se marcaba `rejected` LOCALMENTE aun
+    // sin vía. Propagar aquí ese error invertiría el orden: el registro volvería a la cola a
+    // reintentarse para siempre con un XML que no puede validar nunca. Se resuelve ahora, se
+    // estampa, y el `?` se cobra más abajo, exactamente donde estaba.
+    let route = resolve_route(host, &ctx.hub_id, config).await;
+    let obligado_nif = str_field(record, "issuer_nif");
+    let xml = match &route {
+        // Por la celda presenta ERPlora con el Sello, y quién es lo dice el token FIRMADO — el hub
+        // nunca ve ese certificado, así que no puede leerlo de ningunos bytes suyos.
+        Ok(TransmitRoute::Gateway(access)) => {
+            aeat::set_representative(&xml, Some(access.presenter()), &obligado_nif)
+        }
+        // Vía propia: firma el certificado del negocio, el titular ES el obligado y no se inventa
+        // representación (ADR-0268 §4). El `None` además LIMPIA: un sobre congelado en la cola
+        // pudo estamparse cuando el hub todavía iba por la celda, y re-presentarlo con la
+        // identidad de ERPlora sería una representación falsa.
+        _ => aeat::set_representative(&xml, None, &obligado_nif),
+    };
+
     // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
     // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
     // puede llegar a salir. No corta el proceso: marca el registro como rechazado LOCALMENTE con
@@ -212,7 +237,9 @@ pub(crate) async fn transmit_one(
     // directo a la AEAT, como siempre; sin certificado → la pasarela fiscal transmite LOS MISMOS
     // bytes con el Sello como canal (hub#1432). Aguas abajo nadie distingue el camino: las dos
     // devuelven el SOAP crudo de la AEAT y la cadena parse/classify/persistencia es una.
-    let route = resolve_route(host, &ctx.hub_id, config).await?;
+    //
+    // Aquí se cobra el error diferido de arriba: sin vía, el registro se queda como siempre.
+    let route = route?;
     let via_gateway = matches!(route, TransmitRoute::Gateway(_));
     let transport = match &route {
         TransmitRoute::Direct(identity) => {
@@ -1143,6 +1170,65 @@ mod tests {
         );
     }
 
+    /// 🔒 REGRESIÓN (hub#1460): `resolve_route` sube por DELANTE de la validación —para estampar
+    /// el `Representante` en el XML que se valida y archiva— pero su error se DIFIERE: un sobre
+    /// que no cumple el esquema se marca `rejected` LOCALMENTE aunque además no haya vía.
+    /// Propagar el error de la vía primero devolvería este registro a la cola a reintentarse para
+    /// siempre con un XML que no puede validar nunca — el caso real es la carrera en la que
+    /// `can_transmit` pasó y el acuñado del token falló un instante después.
+    #[tokio::test]
+    async fn an_invalid_envelope_is_rejected_locally_even_when_no_route_resolves() {
+        let record = serde_json::json!({
+            "id": "rec-xsd-no-road",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "is_first_record": 1,
+            "sequence_number": 1,
+            // Frozen from a previous attempt, and it can never validate: no Cabecera at all.
+            "xml_content": "<sum:RegFactuSistemaFacturacion></sum:RegFactuSistemaFacturacion>",
+        });
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-no-road".to_owned(),
+            now: "2026-09-03T10:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let config = serde_json::json!({ "environment": "testing" });
+
+        let (ops, events, success) = super::transmit_one(
+            &NoRoadHost,
+            &ctx,
+            &record,
+            &config,
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("an invalid envelope is a local outcome, never the route's error");
+
+        assert!(!success);
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("the record must be marked rejected, not sent back to the queue");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("rejected"))
+        );
+        assert_eq!(
+            applied.params.get("aeat_response_code"),
+            Some(&serde_json::json!("XSD"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.name == crate::events::EVENT_RECORD_REJECTED),
+            "the rejection must be visible as an event"
+        );
+    }
+
     /// Sin certificado pero con la pasarela enrolada, la ruta es la celda — jamás la AEAT
     /// directa sin identidad, que era el modelo que saas#1435 retiró.
     #[tokio::test]
@@ -1158,6 +1244,45 @@ mod tests {
             crate::config::can_transmit(&host, "hub-route-gateway", &config)
                 .await
                 .unwrap()
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#985 §2 — hub#1460): la vía por la celda lleva encima **quién presenta**,
+    /// y ese par sale del token FIRMADO por el plano de control, no de la config del hub ni del
+    /// slot del certificado.
+    ///
+    /// Es la mitad que el guard de `tests/representative_from_signed_identity.rs` no puede ver:
+    /// allí se comprueba la REGLA (presentador ≠ obligado ⇒ bloque), aquí que el dato que la
+    /// alimenta llega de verdad desde el token y no se pierde por el camino — que es como
+    /// `resolve_access` lo trataba hasta ahora, leyéndolo del JSON y tirándolo al construir el
+    /// acceso.
+    #[tokio::test]
+    async fn the_gateway_route_carries_the_signed_presenter_into_the_envelope() {
+        let config = serde_json::json!({ "environment": "testing" });
+        let route = crate::config::resolve_route(&GatewayHost, "hub-presenter", &config)
+            .await
+            .unwrap();
+
+        let crate::config::TransmitRoute::Gateway(access) = route else {
+            panic!("a certless enrolled hub goes through the cell");
+        };
+        let presenter = access.presenter();
+        // Exactly what the fake control plane signed above — not a constant of this module.
+        assert_eq!(presenter.nif, "B27593136");
+        assert_eq!(presenter.name, "ERPLORA CLOUD SL");
+
+        // And it reaches the envelope: the obligado of the mocked token is another NIF, so this is
+        // a representation and the block is emitted with the SIGNED identity.
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>CLIENTE SL\
+             </sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, Some(presenter), "B12345678");
+        assert!(
+            stamped.contains(
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>"
+            ),
+            "{stamped}"
         );
     }
 
@@ -1193,6 +1318,208 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(route, crate::config::TransmitRoute::Direct(_)));
+    }
+
+    /// 🔒 REGRESIÓN de punta a punta (hub#985 §2 — hub#1460): **los bytes que salen por el cable**
+    /// hacia la celda llevan el `Representante` de la identidad FIRMADA.
+    ///
+    /// Los dos guards anteriores miran una mitad cada uno —la regla (`tests/`) y el dato que la
+    /// alimenta (`resolve_route`)—, y las dos pueden estar verdes con el estampado desconectado
+    /// del camino real. Esto conduce `transmit_one` entero contra una celda de mentira, decodifica
+    /// el `xml_b64` que recibió y mira el sobre que de verdad viajó: es el mismo que se archiva y
+    /// el mismo cuyo sha256 comparará el canario de hub#1461.
+    #[tokio::test]
+    async fn the_bytes_that_leave_for_the_cell_carry_the_signed_representante() {
+        use base64::Engine as _;
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        /// The obligado is the CLIENT; the presenter the fake control plane signs is ERPlora.
+        const OBLIGADO_NIF: &str = "B12345678";
+
+        // A cell that records what it was handed and answers a receipt echoing the AEAT.
+        let seen: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let recorder = Arc::clone(&seen);
+        tokio::spawn(async move {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            let mut buffer = Vec::new();
+            let mut chunk = [0u8; 8192];
+            // Read until the JSON body is complete — the envelope is bigger than one chunk.
+            while let Ok(n) = socket.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..n]);
+                if buffer.windows(2).any(|w| w == b"\r\n") && buffer.ends_with(b"}") {
+                    break;
+                }
+            }
+            *recorder.lock().unwrap() = Some(String::from_utf8_lossy(&buffer).into_owned());
+            let receipt = serde_json::json!({
+                "schema_version": 1,
+                "transmission_id": "record-1460",
+                "request_sha256": "00".repeat(32),
+                "aeat_http_status": 200,
+                "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
+                    "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                     <EstadoRegistro>Correcto</EstadoRegistro></soapenv:Envelope>",
+                ),
+                "aeat_response_sha256": "00".repeat(32),
+                "received_at": "2026-09-03T04:00:00Z",
+            })
+            .to_string();
+            let answer = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{receipt}",
+                receipt.len()
+            );
+            let _ = socket.write_all(answer.as_bytes()).await;
+            let _ = socket.shutdown().await;
+        });
+
+        /// The enrolled certless hub: it lends its machine identity and its cloud call, and the
+        /// fake control plane points it at the cell above.
+        struct CellHost {
+            url: String,
+            archived: Mutex<Vec<String>>,
+        }
+        #[async_trait::async_trait]
+        impl NativeHost for CellHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn write_static_file(
+                &self,
+                relative_path: &str,
+                bytes: &[u8],
+                _content_type: &str,
+            ) -> Result<String> {
+                self.archived
+                    .lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(bytes).into_owned());
+                Ok(format!("modules/verifactu/{relative_path}"))
+            }
+            async fn machine_identity(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+                Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
+                    identity: throwaway_identity(),
+                    ca_pem: b"unused-over-plain-http".to_vec(),
+                    common_name: GATEWAY_CN.to_owned(),
+                }))
+            }
+            async fn cloud_call(
+                &self,
+                _request: erplora_runtime::cloud_call::CloudRequest,
+            ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+                Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                    status: 200,
+                    body: serde_json::json!({
+                        "token": "bearer",
+                        "expires_in": 300,
+                        "gateway_url": self.url,
+                        "obligado_nif": OBLIGADO_NIF,
+                        "presenter_nif": "B27593136",
+                        "presenter_name": "ERPLORA CLOUD SL",
+                        "mtls_common_name": GATEWAY_CN,
+                    })
+                    .to_string(),
+                }))
+            }
+        }
+
+        let host = CellHost {
+            url: url.clone(),
+            archived: Mutex::new(Vec::new()),
+        };
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-1460".to_owned(),
+            now: "2026-09-03T04:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let hash = crate::chain::alta_hash(
+            OBLIGADO_NIF,
+            "A-1",
+            "2026-09-03",
+            "F2",
+            21.0,
+            121.0,
+            "",
+            "2026-09-03T04:00:00Z",
+        );
+        let record = serde_json::json!({
+            "id": "record-1460",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": OBLIGADO_NIF,
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "A-1",
+            "invoice_date": "2026-09-03",
+            "invoice_type": "F2",
+            "description": "Servicio",
+            "base_amount": 10000,
+            "tax_rate": 21.0,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "sequence_number": 1,
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-03T04:00:00Z",
+            "record_hash": hash,
+        });
+        let config = serde_json::json!({
+            "environment": "testing",
+            "producer_facts": {
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            },
+        });
+
+        super::transmit_one(
+            &host,
+            &ctx,
+            &record,
+            &config,
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("the cell answered a receipt");
+
+        let request = seen.lock().unwrap().clone().expect("the cell was called");
+        let body = request.split("\r\n\r\n").nth(1).expect("a JSON body");
+        let envelope: Json = serde_json::from_str(body).expect("the envelope is JSON");
+        let xml = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(envelope["xml_b64"].as_str().expect("xml_b64"))
+                .expect("base64"),
+        )
+        .expect("utf8");
+
+        assert!(
+            xml.contains(
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>"
+            ),
+            "the bytes on the wire must declare the signed presenter: {xml}"
+        );
+        // And the archive holds the SAME bytes — the canary of hub#1461 compares this sha256.
+        assert_eq!(
+            host.archived.lock().unwrap().as_slice(),
+            std::slice::from_ref(&xml),
+            "what was archived is what was transmitted"
+        );
     }
 
     #[derive(Default)]

@@ -880,16 +880,114 @@ pub fn stamp_contingency_incidence(xml: &str) -> String {
     if xml.contains("<sum1:Incidencia>") {
         return xml.to_string();
     }
-    // El anclaje es el cierre de `ObligadoEmision`, que es el único elemento OBLIGATORIO de la
-    // cabecera: `RemisionVoluntaria` va justo detrás en el `xs:sequence` (solo `Representante`
-    // puede colarse en medio, y este motor todavía no lo emite — hub#321).
+    // El anclaje es lo ÚLTIMO que puede precederla en el `xs:sequence` de `CabeceraType`:
+    // ObligadoEmision → Representante? → RemisionVoluntaria?. `ObligadoEmision` es el único
+    // obligatorio, pero desde hub#1460 el `Representante` SÍ se emite, y anclar siempre en el
+    // primero metería la incidencia por delante de él — fuera de secuencia, o sea un 4102 con el
+    // número de cadena ya gastado. Con los dos anclajes las dos marcas componen en cualquier
+    // orden.
+    let cut = ["</sum1:Representante>", "</sum1:ObligadoEmision>"]
+        .into_iter()
+        .find_map(|anchor| xml.find(anchor).map(|at| at + anchor.len()));
+    match cut {
+        Some(cut) => format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..]),
+        None => xml.to_string(),
+    }
+}
+
+/// **Quién presenta estos bytes ante la AEAT**, tal y como el plano de control lo FIRMÓ para esta
+/// transmisión (`presenter_nif`/`presenter_name` del token corto de la celda).
+///
+/// No es configuración del hub ni una constante del SaaS que el motor pueda leerse por su cuenta:
+/// el hub **nunca ve el Sello**, así que la única forma que tiene de saber quién va a presentar es
+/// que se lo digan firmado — y la celda contrasta ese mismo par contra el titular del Sello que
+/// realmente presenta, de modo que un Cloud que mintiera aquí se caza allí (ADR-0268 §4, saas
+/// `presenter_identity()`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Presenter<'a> {
+    pub nif: &'a str,
+    pub name: &'a str,
+}
+
+/// Deja el bloque `Cabecera/Representante` del sobre **describiendo quién lo presenta AHORA**:
+/// lo inserta, lo sustituye o lo quita (hub#985 §2 — hub#1460).
+///
+/// # Por qué se estampa aquí y no en [`build_soap`]
+///
+/// Por lo mismo que la incidencia, y de forma aún más literal: **la vía se resuelve después de
+/// construir el sobre**, y en un reintento el sobre ni siquiera se construye — se reutiliza el
+/// `xml_content` congelado del intento anterior, que se estampó para la vía que iba a tomar
+/// entonces. Un `Representante` horneado en el constructor describiría al presentador de hace tres
+/// días: si el negocio subió su propio certificado mientras el registro esperaba en la cola, sería
+/// una representación FALSA; si el presentador rotó, es el Fault **4112** que esta pieza viene a
+/// cerrar. Por eso **SET** y no «estampa si falta».
+///
+/// La `Cabecera` no entra en la huella (ADR-0202 §4.6), así que nada de esto toca la cadena ni
+/// obliga a regenerar el registro.
+///
+/// # La regla (ADR-0268 §4), y lo que NO es entrada de ella
+///
+/// Se emite **si el presentador difiere del `IDEmisorFactura`**, y con la identidad del
+/// presentador. Si coinciden no hay representación y no se emite **venga por la vía que venga**:
+/// el slot (`own`/`delegated`) dice de *quién* es el certificado, no *quién presenta*, y derivar
+/// de él es el cuarto defecto de frontera que hub#470 ya corrigió en la otra mitad del par.
+///
+/// `presenter: None` = vía **own**: firma el certificado del negocio, el titular ES el obligado y
+/// no se inventa representación.
+///
+/// Una identidad a medias (sin NIF o sin razón social) **no se estampa**: `PersonaFisicaJuridicaESType`
+/// exige los dos, y rellenar el que falta sería declarar a alguien que no es.
+pub fn set_representative(
+    xml: &str,
+    presenter: Option<Presenter<'_>>,
+    obligado_nif: &str,
+) -> String {
+    let block = presenter.and_then(|p| representative_block(p, obligado_nif));
+    let stripped = without_representative(xml);
+    let Some(block) = block else {
+        return stripped;
+    };
+    // Justo detrás del `ObligadoEmision`, que es donde lo pone el `xs:sequence` de `CabeceraType`.
+    // Un sobre sin esa marca no es un sobre nuestro: se devuelve intacto antes que corromperlo.
     const ANCHOR: &str = "</sum1:ObligadoEmision>";
-    match xml.find(ANCHOR) {
+    match stripped.find(ANCHOR) {
         Some(at) => {
             let cut = at + ANCHOR.len();
-            format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..])
+            format!("{}{block}{}", &stripped[..cut], &stripped[cut..])
         }
-        None => xml.to_string(),
+        None => stripped,
+    }
+}
+
+/// El bloque a emitir, o `None` cuando no hay representación que declarar.
+fn representative_block(presenter: Presenter<'_>, obligado_nif: &str) -> Option<String> {
+    let nif = presenter.nif.trim();
+    let name = presenter.name.trim();
+    if nif.is_empty() || name.is_empty() {
+        return None;
+    }
+    // Identidad, no tipografía: el plano de control puede devolver el NIF con espacios o en
+    // minúsculas, y tomarlo por otro inventaría una representación del obligado por sí mismo.
+    if nif.eq_ignore_ascii_case(obligado_nif.trim()) {
+        return None;
+    }
+    Some(format!(
+        "<sum1:Representante><sum1:NombreRazon>{name}</sum1:NombreRazon>\
+         <sum1:NIF>{nif}</sum1:NIF></sum1:Representante>",
+        name = esc(name),
+        nif = esc(nif),
+    ))
+}
+
+/// El sobre sin su `Representante`, byte a byte igual al original cuando no lo llevaba.
+fn without_representative(xml: &str) -> String {
+    const OPEN: &str = "<sum1:Representante>";
+    const CLOSE: &str = "</sum1:Representante>";
+    match (xml.find(OPEN), xml.find(CLOSE)) {
+        (Some(from), Some(to)) if to > from => {
+            format!("{}{}", &xml[..from], &xml[to + CLOSE.len()..])
+        }
+        _ => xml.to_string(),
     }
 }
 
