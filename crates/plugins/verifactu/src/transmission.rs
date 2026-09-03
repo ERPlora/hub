@@ -179,18 +179,14 @@ pub(crate) async fn transmit_one(
     // estampa, y el `?` se cobra más abajo, exactamente donde estaba.
     let route = resolve_route(host, &ctx.hub_id, config).await;
     let obligado_nif = str_field(record, "issuer_nif");
-    let xml = match &route {
-        // Por la celda presenta ERPlora con el Sello, y quién es lo dice el token FIRMADO — el hub
-        // nunca ve ese certificado, así que no puede leerlo de ningunos bytes suyos.
-        Ok(TransmitRoute::Gateway(access)) => {
-            aeat::set_representative(&xml, Some(access.presenter()), &obligado_nif)
-        }
-        // Vía propia: firma el certificado del negocio, el titular ES el obligado y no se inventa
-        // representación (ADR-0268 §4). El `None` además LIMPIA: un sobre congelado en la cola
-        // pudo estamparse cuando el hub todavía iba por la celda, y re-presentarlo con la
-        // identidad de ERPlora sería una representación falsa.
-        _ => aeat::set_representative(&xml, None, &obligado_nif),
-    };
+    // Quién presenta ESTOS bytes, preguntado a la ruta que los va a llevar (ADR-0268 §4): por la
+    // celda es el par FIRMADO del token —el hub no ve ese Sello—, por la vía propia es el titular
+    // del `.p12` que el hub sí tiene puesto (hub#1478: una gestoría factura por su cliente y el
+    // titular NO es el obligado). Sin ruta no hay presentador, y `set_representative` además
+    // LIMPIA: un sobre congelado en la cola pudo estamparse cuando el hub iba por otra vía, y
+    // re-presentarlo con la identidad de entonces sería una representación falsa.
+    let presenter = route.as_ref().ok().and_then(TransmitRoute::presenter);
+    let xml = aeat::set_representative(&xml, presenter, &obligado_nif);
 
     // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
     // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
@@ -241,22 +237,24 @@ pub(crate) async fn transmit_one(
     // Aquí se cobra el error diferido de arriba: sin vía, el registro se queda como siempre.
     let route = route?;
     let transport = match &route {
-        TransmitRoute::Direct(identity) => {
+        TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(destination.endpoint, identity.clone(), &xml).await
         }
-        TransmitRoute::Gateway(access) => crate::gateway::transmit_via_gateway(
-            host,
-            &ctx.hub_id,
-            access,
-            &crate::gateway::GatewayEnvelope {
-                hub_id: &ctx.hub_id,
-                obligado_nif: &str_field(record, "issuer_nif"),
-                environment: &destination.environment,
-                transmission_id: &record_id,
-                xml: &xml,
-            },
-        )
-        .await,
+        TransmitRoute::Gateway(access) => {
+            crate::gateway::transmit_via_gateway(
+                host,
+                &ctx.hub_id,
+                access,
+                &crate::gateway::GatewayEnvelope {
+                    hub_id: &ctx.hub_id,
+                    obligado_nif: &str_field(record, "issuer_nif"),
+                    environment: &destination.environment,
+                    transmission_id: &record_id,
+                    xml: &xml,
+                },
+            )
+            .await
+        }
     };
 
     // Un cuerpo entregado que NO es un veredicto (un SOAP Fault de la AEAT, o HTML de un
@@ -842,15 +840,10 @@ pub(crate) async fn auto_rechain_and_retry(
     // sobre se acaba de reconstruir con `build_soap`, así que no trae `Representante` ninguno y
     // sin estamparlo la celda lo mandaría con el Sello de ERPlora declarando que presenta el
     // cliente — el fault 4112 medido contra prewww el 2026-09-02.
-    let xml = match route {
-        TransmitRoute::Gateway(access) => {
-            aeat::set_representative(&xml, Some(access.presenter()), &issuer_nif)
-        }
-        TransmitRoute::Direct(_) => aeat::set_representative(&xml, None, &issuer_nif),
-    };
+    let xml = aeat::set_representative(&xml, route.presenter(), &issuer_nif);
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
     let body = match route {
-        TransmitRoute::Direct(identity) => {
+        TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(destination.endpoint, identity.clone(), &xml).await?
         }
         // El id de correlación NO es el del registro: el re-anclado manda bytes DISTINTOS para el
@@ -1062,7 +1055,7 @@ pub(crate) async fn process_contingency_queue(
 // ── run_diagnostics: prueba en vivo (cert + huella + QR + envío AEAT) ──────────
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{archive_transmission_xml, derive_tax_rate, fault_reason, NativeHost, Params, Result};
     use serde_json::Value as Json;
     use std::sync::Mutex;
@@ -1103,7 +1096,8 @@ mod tests {
     // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
 
     /// A throwaway mTLS identity so a fake host can answer the capability like the real broker.
-    fn throwaway_identity() -> reqwest::Identity {
+    /// `pub(crate)`: `diagnostics::tests` builds routes with it too — one helper, not two.
+    pub(crate) fn throwaway_identity() -> reqwest::Identity {
         use openssl::asn1::Asn1Time;
         use openssl::hash::MessageDigest;
         use openssl::nid::Nid;
@@ -1325,6 +1319,128 @@ mod tests {
         );
     }
 
+    /// 🔴 **REGRESIÓN hub#1478 — la gestoría.** Por la vía propia el titular del certificado NO
+    /// siempre es el obligado: una gestoría sube **su** certificado para facturar por su cliente.
+    /// ADR-0268 §4 exige entonces el bloque `Representante` con la identidad **del titular**, y
+    /// hasta hub#1478 no había de dónde leerla: la ruta pasaba `None` fijo y el sobre salía
+    /// declarando que el cliente se presenta a sí mismo — el fault **4112** medido contra prewww.
+    ///
+    /// Es la gemela de `the_gateway_route_carries_the_signed_presenter_into_the_envelope`: allí el
+    /// par sale del token firmado porque el hub no ve el Sello; aquí sale del `.p12` que el hub SÍ
+    /// tiene puesto, leído por el primitivo del core. La regla («difieren ⇒ bloque») es la misma y
+    /// vive en un solo sitio.
+    #[tokio::test]
+    async fn the_own_route_carries_the_certificate_holder_into_the_envelope_hub1478() {
+        /// The gestoría's own container: it signs, and it belongs to somebody who is not the
+        /// client whose invoice this is.
+        struct GestoriaHost;
+        #[async_trait::async_trait]
+        impl NativeHost for GestoriaHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+            async fn certificate_holder(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::certificate::CertificateHolder>> {
+                Ok(Some(erplora_runtime::certificate::CertificateHolder {
+                    nif: "B99999999".to_owned(),
+                    name: "GESTORIA MARTINEZ SL".to_owned(),
+                }))
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&GestoriaHost, "hub-gestoria", &config)
+            .await
+            .unwrap();
+        assert!(matches!(route, crate::config::TransmitRoute::Direct { .. }));
+
+        let presenter = route
+            .presenter()
+            .expect("the own road knows who holds the certificate that signs");
+        assert_eq!(presenter.nif, "B99999999");
+        assert_eq!(presenter.name, "GESTORIA MARTINEZ SL");
+
+        // And it reaches the envelope: the client is another NIF, so this IS a representation.
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>CLIENTE SL\
+             </sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, Some(presenter), "B12345678");
+        assert!(
+            stamped.contains(
+                "<sum1:Representante><sum1:NombreRazon>GESTORIA MARTINEZ SL</sum1:NombreRazon>\
+                 <sum1:NIF>B99999999</sum1:NIF></sum1:Representante>"
+            ),
+            "{stamped}"
+        );
+    }
+
+    /// 🔒 El caso NORMAL no cambia: el negocio que sube su propio certificado ES el obligado, los
+    /// dos NIF coinciden y no se inventa representación (ADR-0268 §4). El primitivo nuevo no puede
+    /// convertir a nadie en representante de sí mismo.
+    #[tokio::test]
+    async fn a_business_that_holds_its_own_certificate_declares_no_representante_hub1478() {
+        struct OwnerHost;
+        #[async_trait::async_trait]
+        impl NativeHost for OwnerHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+            async fn certificate_holder(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::certificate::CertificateHolder>> {
+                Ok(Some(erplora_runtime::certificate::CertificateHolder {
+                    nif: "B12345678".to_owned(),
+                    name: "PELUQUERIA LA MODERNA SL".to_owned(),
+                }))
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&OwnerHost, "hub-owner", &config)
+            .await
+            .unwrap();
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>PELUQUERIA LA \
+             MODERNA SL</sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, route.presenter(), "B12345678");
+        assert!(
+            !stamped.contains("Representante"),
+            "holder == obligado: no representation to declare: {stamped}"
+        );
+    }
+
+    /// 🔒 Un contenedor cuyo sujeto no nombra entidad deja la vía propia EXACTAMENTE como estaba
+    /// antes de hub#1478: sin bloque. La ausencia no concluye nada, y adivinar un titular sería
+    /// declarar a alguien que no es.
+    #[tokio::test]
+    async fn a_certificate_that_names_no_holder_leaves_the_envelope_as_it_was_hub1478() {
+        struct AnonymousCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for AnonymousCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&AnonymousCertHost, "hub-anon", &config)
+            .await
+            .unwrap();
+        assert!(route.presenter().is_none(), "absence concludes nothing");
+    }
+
     /// El certificado del core GANA: un negocio con su propio `.p12` sigue firmando y
     /// transmitiendo directo, exactamente como hoy — la pasarela ni se consulta.
     #[tokio::test]
@@ -1356,7 +1472,7 @@ mod tests {
         let route = crate::config::resolve_route(&CertHost, "hub-1", &config)
             .await
             .unwrap();
-        assert!(matches!(route, crate::config::TransmitRoute::Direct(_)));
+        assert!(matches!(route, crate::config::TransmitRoute::Direct { .. }));
     }
 
     /// 🔒 REGRESIÓN de punta a punta (hub#985 §2 — hub#1460): **los bytes que salen por el cable**

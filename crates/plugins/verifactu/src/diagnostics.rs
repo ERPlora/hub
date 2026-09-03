@@ -318,21 +318,12 @@ pub(crate) async fn run_consult_via(
     issuer_nif: &str,
     now: &str,
 ) -> Result<Vec<aeat::ConsultRecord>> {
-    let issuer_name = obligado_name(config);
-    let (ejercicio, periodo) = year_month(now);
-    // Quién consulta. Por la celda es ERPlora con el Sello, y el par sale del token FIRMADO, igual
-    // que el `Representante` del alta (hub#1460) — pero aquí viaja como FLAG, no como bloque: el
-    // esquema de consulta no admite `Representante`. Ver `aeat::build_consult_soap`.
-    let presenter = match route {
-        TransmitRoute::Gateway(access) => Some(access.presenter()),
-        TransmitRoute::Direct(_) => None,
-    };
-    // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
-    // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
-    let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo, presenter)?;
+    // Built BEFORE opening the connection: an envelope without the obligado's registered name is
+    // not valid, and there is no point talking to Hacienda just to collect a 4102.
+    let xml = consult_envelope(config, route, issuer_nif, now)?;
     let body = match route {
         // Vía propia: TLS mutua con el certificado del core (opaca) o legacy. Ver ADR-0079.
-        TransmitRoute::Direct(identity) => {
+        TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(
                 aeat::consult_endpoint(environment, &signing_type(config)),
                 identity.clone(),
@@ -361,6 +352,33 @@ pub(crate) async fn run_consult_via(
         }
     };
     Ok(aeat::parse_consult_response(&body)?)
+}
+
+/// The envelope of ONE consult, with **who asks** answered by the road that will carry it
+/// ([`TransmitRoute::presenter`], ADR-0268 §4).
+///
+/// Through the cell the presenter is whoever the control plane SIGNED into the token, same as the
+/// alta's `Representante` (hub#1460) — but here it travels as a FLAG, not as a block: the consult
+/// schema admits no `Representante`. On the own road it is the holder of the `.p12` the hub has
+/// put up (hub#1478). Pinning this road back to `None` would emit the block on the alta and NOT
+/// the flag on the consult — the same 4112 through the other door, which is why the derivation is
+/// extracted where a test without network can guard it
+/// (`tests::the_own_route_raises_the_consult_representation_flag_hub1478`).
+fn consult_envelope(
+    config: &Json,
+    route: &TransmitRoute,
+    issuer_nif: &str,
+    now: &str,
+) -> Result<String> {
+    let issuer_name = obligado_name(config);
+    let (ejercicio, periodo) = year_month(now);
+    Ok(aeat::build_consult_soap(
+        issuer_nif,
+        &issuer_name,
+        &ejercicio,
+        &periodo,
+        route.presenter(),
+    )?)
 }
 
 /// El identificador de correlación de UNA consulta, que la celda copia a `Idempotency-Key`.
@@ -419,3 +437,50 @@ pub(crate) fn aeat_snapshot_ops(
 }
 
 // ── validate_chain (issue verifactu#4) ────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::transmission::tests::throwaway_identity;
+    use erplora_runtime::certificate::CertificateHolder;
+
+    /// 🔴 **REGRESIÓN hub#1478 — the consult door.** The alta and the consult answer the same
+    /// question through [`TransmitRoute::presenter`]; pinning THIS door back to `None` would emit
+    /// the `Representante` block on the alta and not the flag on the consult — the same 4112
+    /// through the other door. This is the mutant that survived the first review pass of hub#1498:
+    /// every consult test went straight to `build_consult_soap`, so nothing guarded the wiring.
+    #[test]
+    fn the_own_route_raises_the_consult_representation_flag_hub1478() {
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: Some(CertificateHolder {
+                nif: "B99999999".to_owned(),
+                name: "GESTORIA MARTINEZ SL".to_owned(),
+            }),
+        };
+        let config = json!({ "issuer_name": "CLIENTE SL" });
+
+        let xml = consult_envelope(&config, &route, "B12345678", "2026-09-03T10:00:00Z").unwrap();
+
+        assert!(
+            xml.contains("<sum1:IndicadorRepresentante>S</sum1:IndicadorRepresentante>"),
+            "a holder who is not the obligado consults as a representative: {xml}"
+        );
+    }
+
+    /// 🔒 A container whose subject names nobody leaves the consult exactly as it was before
+    /// hub#1478: no flag. Absence concludes nothing — the twin of
+    /// `transmission::tests::a_certificate_that_names_no_holder_leaves_the_envelope_as_it_was_hub1478`.
+    #[test]
+    fn a_route_without_a_holder_leaves_the_consult_flag_out_hub1478() {
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+        let config = json!({ "issuer_name": "CLIENTE SL" });
+
+        let xml = consult_envelope(&config, &route, "B12345678", "2026-09-03T10:00:00Z").unwrap();
+
+        assert!(!xml.contains("IndicadorRepresentante"), "{xml}");
+    }
+}

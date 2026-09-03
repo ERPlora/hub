@@ -26,9 +26,12 @@
 //!   bytes it owns. The control plane tells it, inside the signed short-lived token
 //!   (`presenter_nif` / `presenter_name`), and the cell cross-checks the same pair against the
 //!   holder of the Sello it actually presents: a Cloud that lied here is caught there.
-//! - **own (direct)** — the business signs with its own certificate, so the holder *is* the
-//!   `IDEmisorFactura`. Presenter and obligado coincide, and ADR-0268 §4 is explicit: no
-//!   representation is invented.
+//! - **own (direct)** — the certificate is the hub's own, so the holder is read from ITS subject
+//!   (hub#1478: `NativeHost::certificate_holder`, `organizationIdentifier` first). Usually that is
+//!   the business itself and presenter == obligado, so nothing is emitted; but a **gestoría** that
+//!   uploads its own certificate to file for its client is the same road with a DIFFERENT holder,
+//!   and there the block is required. Before hub#1478 the road passed `None` unconditionally and
+//!   that case went out claiming the client presented itself — fault 4112.
 use erplora_verifactu::aeat::{self, Presenter};
 
 /// The client whose invoice this is — the `ObligadoEmision`, and the `IDEmisorFactura`.
@@ -144,6 +147,40 @@ fn the_slot_is_not_an_input_to_the_representante() {
     assert!(
         differ.contains(&representative_block(PRESENTER_NAME, PRESENTER_NIF)),
         "presenter != obligado is a representation, on any road: {differ}"
+    );
+}
+
+/// 🔴 **The gestoría (hub#1478).** The own road with a holder that is NOT the obligado: the block
+/// is emitted, and with the HOLDER's identity — read from the container the hub holds, never from
+/// a constant and never from the slot.
+///
+/// The rule is the same one the cell road already exercised, which is the point: there is ONE
+/// question («does the presenter differ from the `IDEmisorFactura`?») and it does not learn which
+/// road asked it. What hub#1478 added is not a branch here — it is the primitive that lets the own
+/// road answer with something other than `None`, guarded where the wiring lives
+/// (`transmission::tests::the_own_route_carries_the_certificate_holder_into_the_envelope_hub1478`).
+#[test]
+fn the_own_road_of_a_holder_who_is_not_the_obligado_declares_the_representante_hub1478() {
+    /// A gestoría filing for its client: the certificate is the hub's own, its holder is not.
+    const GESTORIA_NIF: &str = "B99999999";
+    const GESTORIA_NAME: &str = "GESTORIA MARTINEZ SL";
+
+    let xml = aeat::set_representative(
+        &envelope(),
+        Some(Presenter {
+            nif: GESTORIA_NIF,
+            name: GESTORIA_NAME,
+        }),
+        OBLIGADO_NIF,
+    );
+
+    assert!(
+        xml.contains(&representative_block(GESTORIA_NAME, GESTORIA_NIF)),
+        "the holder of the own certificate must reach the envelope verbatim: {xml}"
+    );
+    assert!(
+        !xml.contains(OBLIGADO_NAME) || xml.contains("ObligadoEmision"),
+        "the obligado stays the obligado: {xml}"
     );
 }
 

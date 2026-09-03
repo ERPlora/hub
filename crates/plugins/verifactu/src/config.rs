@@ -115,8 +115,39 @@ pub(crate) fn has_certificate(config: &Json) -> bool {
 /// identity and the call). Without EITHER, the same visible error as always: the record stays pending,
 /// never a panic, never a silent skip.
 pub(crate) enum TransmitRoute {
-    Direct(reqwest::Identity),
+    Direct {
+        identity: reqwest::Identity,
+        /// Whose the signing container is, read from its subject by the core (hub#1478). `None`
+        /// = it names no entity, which leaves the caller exactly where it was before: no
+        /// representation declared.
+        holder: Option<erplora_runtime::certificate::CertificateHolder>,
+    },
     Gateway(crate::gateway::GatewayAccess),
+}
+
+impl TransmitRoute {
+    /// **Who presents these bytes**, for the road that carried them — the ONE input ADR-0268 §4
+    /// allows for the `Representante` block and for the consult's representation flag.
+    ///
+    /// Both roads answer the same question with the certificate that actually signs, and each
+    /// reads it from the only place it can: through the cell the hub never sees the Sello, so the
+    /// pair comes SIGNED in the token; on the own road the container is the hub's own, so its
+    /// subject is read. The slot is not an input to either — that is the fourth border defect of
+    /// hub#470, written down as a rule.
+    ///
+    /// `None` is «nobody to declare», never «the obligado»: the rule «presenter == obligado ⇒ no
+    /// block» lives inside [`crate::aeat::set_representative`] and is not duplicated here.
+    pub(crate) fn presenter(&self) -> Option<crate::aeat::Presenter<'_>> {
+        match self {
+            TransmitRoute::Gateway(access) => Some(access.presenter()),
+            TransmitRoute::Direct { holder, .. } => {
+                holder.as_ref().map(|holder| crate::aeat::Presenter {
+                    nif: &holder.nif,
+                    name: &holder.name,
+                })
+            }
+        }
+    }
 }
 
 pub(crate) async fn resolve_route(
@@ -125,9 +156,12 @@ pub(crate) async fn resolve_route(
     config: &Json,
 ) -> Result<TransmitRoute> {
     if has_certificate(config) {
-        return Ok(TransmitRoute::Direct(
-            host.certificate_identity(hub_id).await?,
-        ));
+        return Ok(TransmitRoute::Direct {
+            identity: host.certificate_identity(hub_id).await?,
+            // Read HERE, with the identity and from the same container, so the two halves of
+            // «this hub signs with X» cannot drift apart the way #317/#318/#319/#470 did.
+            holder: host.certificate_holder(hub_id).await?,
+        });
     }
     match crate::gateway::resolve_access(host, hub_id).await? {
         Some(access) => Ok(TransmitRoute::Gateway(access)),
