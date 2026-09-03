@@ -323,16 +323,13 @@ pub(crate) async fn run_consult_via(
     // Quién consulta. Por la celda es ERPlora con el Sello, y el par sale del token FIRMADO, igual
     // que el `Representante` del alta (hub#1460) — pero aquí viaja como FLAG, no como bloque: el
     // esquema de consulta no admite `Representante`. Ver `aeat::build_consult_soap`.
-    let presenter = match route {
-        TransmitRoute::Gateway(access) => Some(access.presenter()),
-        TransmitRoute::Direct(_) => None,
-    };
+    let presenter = route.presenter();
     // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
     // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
     let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo, presenter)?;
     let body = match route {
         // Vía propia: TLS mutua con el certificado del core (opaca) o legacy. Ver ADR-0079.
-        TransmitRoute::Direct(identity) => {
+        TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(
                 aeat::consult_endpoint(environment, &signing_type(config)),
                 identity.clone(),

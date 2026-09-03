@@ -488,6 +488,39 @@ pub async fn slot_type(
     Ok(certificate_type_from_der(&der, &password).unwrap_or(None))
 }
 
+/// **Whose is the certificate that signs today** (hub#1478), or `None` when this hub holds none —
+/// or holds one whose subject names no entity.
+///
+/// No column stores this: unlike the type, nothing has ever written the holder down, so the answer
+/// is read from the container every time. That costs a decrypt plus a PKCS#12 parse, the same
+/// price [`identity`] already pays on the very same path — and the alternative, a stored column,
+/// would be one more place able to disagree with the bytes, which is the whole family of defects
+/// #317/#318/#319/#470 came from.
+///
+/// Nothing about the key leaves the core: what crosses to a module is the pair of public fields of
+/// [`CertificateHolder`].
+pub async fn active_holder(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Option<CertificateHolder>> {
+    let Some(kind) = active_kind(db, hub_id).await? else {
+        return Ok(None);
+    };
+    slot_holder(db, hub_id, kind).await
+}
+
+/// [`active_holder`] for ONE slot, whichever it is.
+pub async fn slot_holder(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+) -> Result<Option<CertificateHolder>> {
+    let Some((der, password)) = load_pkcs12(db, hub_id, kind).await? else {
+        return Ok(None);
+    };
+    holder_from_der(&der, &password)
+}
+
 /// **«Can this hub issue?» — the one function that answers it** (ADR-0203, ADR-0320 §1 — hub#319,
 /// hub#1489).
 ///
@@ -880,6 +913,111 @@ fn subject_holds_a_natural_person(subject: &openssl::x509::X509NameRef) -> bool 
 #[cfg(not(target_os = "android"))]
 fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// **Whose** a certificate is: the tax id and the registered name of the entity it belongs to,
+/// read from the subject of the container the hub holds (hub#1478).
+///
+/// The companion of [`CertificateType`], and not a synonym: that one says *what* a certificate is,
+/// this one says *who* it belongs to. Both are answered by the core and cross to a module as data;
+/// neither drags the private key anywhere.
+///
+/// **Both fields or nothing.** A caller that has to declare an identity needs the pair, and
+/// completing the missing half with a guess declares somebody who is not there — which is why
+/// [`holder_from_der`] answers `None` rather than a half-filled struct.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CertificateHolder {
+    /// Normalised: upper case, and without the semantics prefix of ETSI EN 319 412-1 §5.1.4.
+    pub nif: String,
+    /// `organizationName` (`O`) of the subject — the registered name, as the certificate spells it.
+    pub name: String,
+}
+
+/// [`CertificateHolder`] of a PKCS#12 in DER, or `None` when its subject names no entity.
+///
+/// `pub` for the same reason as its neighbours: the PKCS#12 crypto lives in the core, in ONE
+/// place, and a caller holding a container in memory asks here instead of growing its own parser.
+#[cfg(not(target_os = "android"))]
+pub fn holder_from_der(der: &[u8], password: &str) -> Result<Option<CertificateHolder>> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
+    Ok(parsed
+        .cert
+        .and_then(|cert| holder_of_x509(cert.subject_name())))
+}
+
+/// Stub Android: sin OpenSSL no se puede parsear el `.p12` (ver `Cargo.toml`). Mismo mutante
+/// equivalente conocido que sus gemelos — en esta plataforma la función no se compila.
+#[cfg(target_os = "android")]
+pub fn holder_from_der(_der: &[u8], _password: &str) -> Result<Option<CertificateHolder>> {
+    Ok(None)
+}
+
+/// The entity a subject names, or `None` when it names none.
+///
+/// # The order of the two identifiers is load-bearing
+///
+/// A qualified certificate issued to a person who REPRESENTS an entity carries both: the natural
+/// person's document in `serialNumber` (2.5.4.5) and the entity's tax id in
+/// `organizationIdentifier` (2.5.4.97). Reading `serialNumber` first would answer with a private
+/// individual's document for a certificate that belongs to a company — so the entity identifier
+/// wins, and `serialNumber` is only the fallback for containers that carry nothing else.
+///
+/// The same rule in the same order already guards the fiscal cell's own credential
+/// (`verifactu-gateway/src/certificate.rs::holder_nif_of`, `verifactu-gateway#8`). This is not a
+/// second answer to one question: it is the same rule where the other half of the pair needs it.
+#[cfg(not(target_os = "android"))]
+fn holder_of_x509(subject: &openssl::x509::X509NameRef) -> Option<CertificateHolder> {
+    let nif = organization_identifier(subject)
+        .or_else(|| subject_entry(subject, openssl::nid::Nid::SERIALNUMBER))
+        .map(|raw| normalise_holder_id(&raw))
+        .filter(|nif| !nif.is_empty())?;
+    // Half an identity is not an identity: a caller declaring a party needs both, and inventing
+    // the missing one would name somebody who is not there.
+    let name = subject_entry(subject, openssl::nid::Nid::ORGANIZATIONNAME)?;
+    Some(CertificateHolder { nif, name })
+}
+
+/// `organizationIdentifier` has no `Nid` constant in the binding, so it is matched by OID.
+#[cfg(not(target_os = "android"))]
+fn organization_identifier(subject: &openssl::x509::X509NameRef) -> Option<String> {
+    let wanted = openssl::asn1::Asn1Object::from_str("2.5.4.97").ok()?;
+    subject
+        .entries()
+        .find(|entry| entry.object().nid() == wanted.nid())
+        .map(|entry| String::from_utf8_lossy(entry.data().as_slice()).into_owned())
+        .filter(|value| !value.trim().is_empty())
+}
+
+#[cfg(not(target_os = "android"))]
+fn subject_entry(subject: &openssl::x509::X509NameRef, nid: openssl::nid::Nid) -> Option<String> {
+    subject
+        .entries_by_nid(nid)
+        .next()
+        .map(|entry| String::from_utf8_lossy(entry.data().as_slice()).into_owned())
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+/// ETSI EN 319 412-1 §5.1.4 semantics identifiers: a qualified certificate writes the number as
+/// `VATES-B27593136`, `NTRES-…`, `IDCES-…`, `PASES-…`, `PNOES-…` or `TINES-…`. The prefix says
+/// *which register the number comes from*, not which number it is, so it is stripped before
+/// anybody compares — and a bare identifier, which plenty of containers carry, compares the same
+/// either way.
+#[cfg(not(target_os = "android"))]
+fn normalise_holder_id(raw: &str) -> String {
+    const PREFIXES: [&str; 6] = ["VATES-", "NTRES-", "PASES-", "IDCES-", "PNOES-", "TINES-"];
+    let value = raw.trim().to_ascii_uppercase();
+    for prefix in PREFIXES {
+        if let Some(rest) = value.strip_prefix(prefix) {
+            return rest.trim().to_owned();
+        }
+    }
+    value
 }
 
 /// `notAfter` de un PKCS#12 en DER como **instante** RFC 3339 UTC (`2028-06-10T09:12:33Z`).

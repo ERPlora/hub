@@ -78,6 +78,29 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
+    /// **Whose the signing certificate is** — the tax id and the registered name of the entity
+    /// that holds it, read from the container's subject (hub#1478).
+    ///
+    /// The third question of the same family, and independent of the other two:
+    /// [`certificate_signing_kind`](Self::certificate_signing_kind) says which SLOT signs,
+    /// [`certificate_signing_type`](Self::certificate_signing_type) says WHAT the certificate is,
+    /// and this one says WHO it belongs to. A caller that has to declare who is acting for whom
+    /// needs this one and cannot derive it from either of the others — deriving it from the slot
+    /// is the fourth border defect hub#470 closed, written down as a rule in ADR-0268 §4.
+    ///
+    /// Same rule as its siblings: the core answers and the module does not re-derive it. The
+    /// PKCS#12 crypto stays here; what crosses is the pair of public fields of
+    /// [`CertificateHolder`](crate::certificate::CertificateHolder).
+    ///
+    /// Default: `Ok(None)` — «cannot tell». Absence concludes nothing: a caller reading it is
+    /// left exactly where it was before the primitive existed.
+    async fn certificate_holder(
+        &self,
+        _hub_id: &str,
+    ) -> Result<Option<crate::certificate::CertificateHolder>> {
+        Ok(None)
+    }
+
     /// Igual que [`certificate_identity`](Self::certificate_identity) pero sobre un `.p12` **provisto
     /// en memoria** (DER + contraseña) — validar/usar un certificado recién subido. La cripto PKCS#12
     /// (OpenSSL) vive SOLO en el core; el módulo no la implementa. Default = la cripto del core.
@@ -258,6 +281,13 @@ impl NativeHost for DbHost<'_> {
         Ok(crate::certificate::active_type(self.db, hub_id)
             .await?
             .map(|t| t.as_str().to_string()))
+    }
+
+    async fn certificate_holder(
+        &self,
+        hub_id: &str,
+    ) -> Result<Option<crate::certificate::CertificateHolder>> {
+        crate::certificate::active_holder(self.db, hub_id).await
     }
 
     async fn producer_facts(&self) -> Result<Option<Json>> {
