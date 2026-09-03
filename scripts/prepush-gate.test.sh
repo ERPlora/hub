@@ -51,6 +51,15 @@ run_hook() {
         *HUB_GATE_WITH_MODULES=*|*HUB_GATE_MATERIALIZE_CMD=*) ;;
         *) set -- "$@" HUB_GATE_WITH_MODULES=0 ;;
     esac
+    # Desde hub#1466 el DEFECTO del hook es el gate rápido (la suite pesada vive en Actions).
+    # Los casos de este fichero anteriores a ese cambio prueban el gate COMPLETO —suite, caché
+    # del verde, atestación—, así que se les pone `full` explícito: es lo que de verdad ejercitan.
+    # Quien quiera probar el modo rápido, o el DEFECTO, nombra HUB_GATE_DEPTH o HUB_GATE_FAST_CMD
+    # y queda exento (mismo patrón que HUB_GATE_WITH_MODULES, arriba).
+    case " $* " in
+        *HUB_GATE_DEPTH=*|*HUB_GATE_FAST_CMD=*) ;;
+        *) set -- "$@" HUB_GATE_DEPTH=full ;;
+    esac
     ( cd "$repo" && printf '%s\n' "$stdin" | env "$@" bash "$HOOK" ) >"$repo/.out" 2>&1
     echo $?
 }
@@ -114,6 +123,95 @@ sleep 1   # the status is published in the background, after the push lands
 [ "$code" = 0 ] && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "green suite: push proceeds and the status carries the pushed sha" \
     || bad "green suite: push proceeds and the status carries the pushed sha" "exit=$code status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
+
+# ── 5bis. PROFUNDIDAD del gate (hub#1466): rápido en local, pesado en la nube ──
+#    Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
+#    `fmt` 2,8 s, `clippy` 20 s → ~27 s el gate rápido en el caso que importa (el arreglo tras
+#    una revisión), frente a los ~20 min de la suite. La suite pesada pasa a Actions, donde
+#    corren 4 a la vez en vez de una cada 20 min con el lock de la máquina.
+#
+#    ⚠️ La regla que estos tests fijan: el modo rápido NO atestigua. La atestación es lo que
+#    `merge-pr.sh` acepta como «la suite corrió sobre este sha»; firmarla tras un `cargo check`
+#    sería responder que sí a una pregunta que no se probó. Sin sello, autoriza el check de CI.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=fast \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+sleep 1
+[ "$code" = 0 ] && [ -s "$repo/FAST" ] \
+    && ok "depth=fast: corre el comando RÁPIDO" \
+    || bad "depth=fast: corre el comando RÁPIDO" "exit=$code fast=$(cat "$repo/FAST" 2>/dev/null)"
+[ ! -s "$repo/SUITE" ] \
+    && ok "depth=fast: y NO corre la suite pesada" \
+    || bad "depth=fast: y NO corre la suite pesada" "la suite corrió: $(cat "$repo/SUITE")"
+[ ! -s "$repo/STATUS" ] \
+    && ok "depth=fast: NO atestigua (sin sello, autoriza el check de CI)" \
+    || bad "depth=fast: NO atestigua" "publicó: $(cat "$repo/STATUS" 2>/dev/null)"
+
+# Rojo en el rápido = push abortado. Sin esto el modo rápido no protege nada.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=fast \
+    HUB_GATE_FAST_CMD="false" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+[ "$code" != 0 ] \
+    && ok "depth=fast ROJO: el push ABORTA (una rama que no compila no sube)" \
+    || bad "depth=fast ROJO: el push ABORTA" "exit=$code"
+[ ! -s "$repo/STATUS" ] \
+    && ok "y un rápido rojo tampoco atestigua" \
+    || bad "y un rápido rojo tampoco atestigua" "publicó: $(cat "$repo/STATUS" 2>/dev/null)"
+
+# CONTROL de la bifurcación: en `full` manda todo lo de siempre — suite y sello.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=full \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+sleep 1
+[ "$code" = 0 ] && [ -s "$repo/SUITE" ] && [ ! -s "$repo/FAST" ] \
+    && ok "depth=full (control): corre la SUITE y no el rápido" \
+    || bad "depth=full (control): corre la SUITE y no el rápido" "exit=$code suite=$(cat "$repo/SUITE" 2>/dev/null) fast=$(cat "$repo/FAST" 2>/dev/null)"
+[ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+    && ok "depth=full (control): SÍ atestigua sobre el sha empujado" \
+    || bad "depth=full (control): SÍ atestigua" "status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
+
+# El DEFECTO es rápido: es lo que decide qué corre la flota sin pasar variables.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+[ "$code" = 0 ] && [ -s "$repo/FAST" ] && [ ! -s "$repo/SUITE" ] \
+    && ok "sin variable, el DEFECTO es rápido (la suite pesada vive en Actions)" \
+    || bad "sin variable, el DEFECTO es rápido" "exit=$code fast=$(cat "$repo/FAST" 2>/dev/null) suite=$(cat "$repo/SUITE" 2>/dev/null)"
+
+# Un valor que no existe no puede degradar la protección en silencio.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_DEPTH=loquesea \
+    HUB_GATE_FAST_CMD="true" HUB_GATE_TEST_CMD="true")
+[ "$code" != 0 ] \
+    && ok "un HUB_GATE_DEPTH desconocido FALLA en vez de elegir por su cuenta" \
+    || bad "un HUB_GATE_DEPTH desconocido falla" "exit=$code"
 
 # ── 6. Same tree twice: the second push must NOT recompile ────────────────────
 #    This is what keeps the fleet's 42 pushes/day from becoming 42 full suites.
@@ -1425,7 +1523,7 @@ chmod +x "$repo/installed/pre-push"
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 out=$(cat "$repo/.out" 2>/dev/null)
@@ -1520,7 +1618,7 @@ sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 echo "# WIP uncommitted edit" >> "$repo/.githooks/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 errs=""
@@ -1553,7 +1651,7 @@ cp "$HOOK" "$repo/installed/pre-push"
 chmod +x "$repo/installed/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 errs=""

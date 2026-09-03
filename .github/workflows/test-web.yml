@@ -98,20 +98,25 @@ on:
       # only touched `no-dead-packages.test.mjs` triggered no check at all (hub#1247).
       - "scripts/tests/no-dead-packages.test.mjs"
       - ".github/workflows/test-web.yml"
-  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): pnpm verify + playwright se ejecuta en el
-  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
-  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
-  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
-  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
-  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
-  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
-  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
-  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
-  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
-  # Nightly on develop, with NO `paths` filter (hub#1253 — see header above). This is the only
-  # cloud run that no longer depends on what a change touched: the pre-push gate covers each push,
-  # and `push` above covers the merged tree, but neither catches what rots on its own — a pinned
-  # action that disappears, a transitive dependency that breaks, a flake that only shows at night.
+  # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Fuera del 29/08 al 03/09 (pm#197): la suite
+  # corría en el gate pre-push local. Medido en la tanda R2 del 02/09: ese gate es UN lock para
+  # toda la máquina, ~20 min por pasada, y cada arreglo del revisor lo paga entero. Ahora el gate
+  # local se queda con check + fmt + clippy (sin atestación) y `pnpm verify` + playwright corren
+  # AQUÍ, en paralelo. Mismos `paths` que `push`: lo que no toca web no abre un check web.
+  # Con filtro de borradores en `verify` (medido 29/08: la mitad de los minutos del runner se iban
+  # en runs cancelados por el re-push del revisor sobre borradores); `ready_for_review` en `types`
+  # porque el filtro se salta `opened`/`synchronize` del borrador.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "scripts/tests/test-web-workflow.test.sh"
+      - "scripts/tests/no-dead-packages.test.mjs"
+      - ".github/workflows/test-web.yml"
   schedule:
     - cron: "8 3 * * *" # daily, off the top of the hour (GitHub load spike)
   workflow_dispatch:
@@ -131,10 +136,12 @@ permissions:
 jobs:
   verify:
     name: pnpm verify (vue-tsc + vitest + module-sdk)
-    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo con lo
-    # que este job NO es: desde hub#1352 este workflow no tiene `pull_request`, así que en una PR
-    # del web no corre nadie en la nube — lo que autoriza el merge es el sello `local-gate/hub-web`
-    # que publica el gate pre-push (pm#198). Aquí se verifica el árbol ya mergeado.
+    # Borrador = 0 minutos de CI (hub#1466; medido 29/08). El revisor lo pone listo con `gh pr ready`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Desde el
+    # 2026-09-03 (hub#1466) este job corre en cada PR del web y su check es lo que autoriza el
+    # merge; entre el 29/08 y el 03/09 lo autorizaba el sello `local-gate/hub-web` del gate
+    # pre-push (pm#198), que en modo rápido ya no se publica. En `push` verifica el árbol mergeado.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
 

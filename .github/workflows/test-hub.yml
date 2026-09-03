@@ -78,16 +78,19 @@ name: Hub tests (Rust · Postgres)
 # merge left it. Prevention at merge time (option 1) lives in pm's merge-pr.sh
 # (pm#74) — but that is `cargo check`, it does not EXECUTE; this run does.
 on:
-  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): cargo test --workspace se ejecuta en el
-  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
-  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
-  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
-  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
-  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
-  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
-  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
-  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
-  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
+  # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Estuvo fuera del 29/08 al 03/09 (pm#197): la
+  # suite corría en el gate pre-push local y `merge-pr.sh` aceptaba su atestación. Medido en la
+  # tanda R2 del 02/09: ese gate es UN lock para toda la máquina, ~20 min por pasada, y cada
+  # arreglo del revisor lo paga entero — 6 pasadas en serie fueron las 2 h de la tanda. Ahora el
+  # gate local se queda solo con check + fmt + clippy (sin atestación) y la suite pesada corre AQUÍ,
+  # en `ci-runner-1`, 4 PRs a la vez. Este check es el que autoriza el merge (`merge-pr.sh`).
+  # Con su filtro de borradores en cada job que cuesta minutos: medido el 29/08, la mitad de los
+  # minutos del runner se iban en runs cancelados por el re-push del revisor sobre PRs en borrador.
+  # `ready_for_review` está en `types` porque el filtro se salta `opened`/`synchronize` del borrador.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  # `push` a develop/main sigue: es la red POST-MERGE de hub#572 (dos PRs verdes por separado
+  # pueden romper develop juntas, y eso solo se ve sobre el árbol resultante).
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -109,6 +112,8 @@ permissions:
 jobs:
   test:
     name: cargo test --workspace
+    # Borrador = 0 minutos de CI (hub#1466; medido 29/08). El revisor lo pone listo con `gh pr ready`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo: el
     # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
@@ -192,6 +197,8 @@ jobs:
       # rojo en ningún sitio (hub#1392). Mismo motivo que arriba: va antes de la suite.
       - name: Contrato del alcance de la suite (scripts/ci/test-scope.py)
         run: bash scripts/tests/test-scope.test.sh
+      - name: Contrato de test-hub.yml (scripts/tests/test-hub-workflow.test.sh)
+        run: bash scripts/tests/test-hub-workflow.test.sh
 
       # Contrato de publicación de los SDK (hub#1236): que `@erplora/module-sdk` siga siendo
       # publicable, que `erplora-guest-sdk` siga resolviendo en un clon por git tag y que
