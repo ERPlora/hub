@@ -62,6 +62,13 @@ fn attaching_lines(path: &Path) -> Vec<(usize, String)> {
             continue;
         }
         if pending_cfg {
+            // Una PILA de atributos entre `#[cfg(test)]` y `mod` es corriente
+            // (`#[cfg(not(target_os = "android"))]` encima del módulo de tests) y NO puede
+            // desactivar el salto: si lo hiciera, este guard leería un módulo de tests como
+            // producción y avisaría de humo hasta que alguien aprendiese a ignorarlo.
+            if trimmed.starts_with("#[") {
+                continue;
+            }
             pending_cfg = false;
             if trimmed.starts_with("mod ") {
                 in_test = true;
