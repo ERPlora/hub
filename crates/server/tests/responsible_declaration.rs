@@ -17,7 +17,7 @@
 //! (`erplora_verifactu::aeat::build_soap`) from the same producer facts. Change one side only and
 //! this test fails.
 
-use erplora_runtime::producer_facts::{ProducerFacts, AEAT_FIELDS};
+use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, AEAT_FIELDS};
 use erplora_server::settings::declaration_payload;
 use erplora_verifactu::aeat;
 use serde_json::{json, Value};
@@ -75,7 +75,7 @@ fn sistema_informatico_xml() -> String {
 #[test]
 fn the_declaration_panel_serves_the_same_facts_as_the_xml_hub528() {
     let version = erplora_server::version::HUB_VERSION;
-    let payload = declaration_payload(Some(&facts()), version, HUB_ID, CLOUD);
+    let payload = declaration_payload(Some(&facts()), None, version, HUB_ID, CLOUD);
     let block = payload["sistemaInformatico"]
         .as_object()
         .expect("the panel serves the SistemaInformatico block");
@@ -115,7 +115,7 @@ fn the_declaration_panel_serves_the_same_facts_as_the_xml_hub528() {
     // `hub_id` somebody could paste): a panel built out of constants would sail through the loop
     // by coincidence, on this build, and start lying on the next release. So the same call is
     // made with a different installation and a different release, and the values MUST follow.
-    let other = declaration_payload(Some(&facts()), "0.0.1", "other-installation", CLOUD);
+    let other = declaration_payload(Some(&facts()), None, "0.0.1", "other-installation", CLOUD);
     assert_eq!(
         other["sistemaInformatico"]["Version"],
         json!("0.0.1"),
@@ -134,7 +134,7 @@ fn the_declaration_panel_serves_the_same_facts_as_the_xml_hub528() {
 /// digests.
 #[test]
 fn the_installed_version_and_this_installation_are_this_hubs_own_facts_hub528() {
-    let payload = declaration_payload(Some(&facts()), "9.9.9", HUB_ID, CLOUD);
+    let payload = declaration_payload(Some(&facts()), None, "9.9.9", HUB_ID, CLOUD);
 
     assert_eq!(payload["version"], json!("9.9.9"), "`version`: {payload}");
     assert_eq!(
@@ -160,7 +160,7 @@ fn the_installed_version_and_this_installation_are_this_hubs_own_facts_hub528() 
 /// owns. A screen that filled the gap with constants is the defect this issue is about.
 #[test]
 fn without_the_producer_facts_the_panel_invents_nothing_hub528() {
-    let payload = declaration_payload(None, "1.0.0", HUB_ID, CLOUD);
+    let payload = declaration_payload(None, None, "1.0.0", HUB_ID, CLOUD);
 
     assert_eq!(payload["sistemaInformatico"], Value::Null);
     assert_eq!(payload["version"], json!("1.0.0"));
@@ -172,12 +172,19 @@ fn without_the_producer_facts_the_panel_invents_nothing_hub528() {
     );
 }
 
-/// The signed text is served by the control plane this hub belongs to, not by a hardcoded host: a
-/// PRE hub must not send its owner to the production archive, and a self-hosted control plane has
-/// no erplora.com at all.
+/// Without a `declaration` reference from the control plane (an older SaaS, a hub that has never
+/// reached it, or an archive it could not read) the panel falls back to the ROOT of the public
+/// archive on this hub's own control plane, not a hardcoded host: a PRE hub must not send its
+/// owner to the production archive, and a self-hosted control plane has no erplora.com at all.
 #[test]
-fn the_signed_declaration_is_linked_on_this_hubs_control_plane_hub528() {
-    let payload = declaration_payload(Some(&facts()), "1.0.0", HUB_ID, "https://pre.erplora.com/");
+fn without_a_declaration_reference_the_panel_falls_back_to_the_archive_root_hub528() {
+    let payload = declaration_payload(
+        Some(&facts()),
+        None,
+        "1.0.0",
+        HUB_ID,
+        "https://pre.erplora.com/",
+    );
 
     assert_eq!(
         payload["declarationUrl"],
@@ -186,11 +193,55 @@ fn the_signed_declaration_is_linked_on_this_hubs_control_plane_hub528() {
     );
 }
 
+/// 🔴 hub#1449: the defect this issue is about. While a single declaración responsable was in
+/// force, linking the archive root worked by coincidence — the root resolves to whichever one is
+/// current. The day a second one is issued, a hub still running the release the first one covers
+/// must keep linking THAT text, not the one the root now resolves to (art. 13.3 RRSIF). The panel
+/// links the EXACT reference the SaaS names, never a URL this hub composes.
+#[test]
+fn the_panel_links_the_exact_declaration_the_saas_names_not_the_composed_root_hub1449() {
+    let declaration = DeclarationReference {
+        version: "v1".to_string(),
+        url: "https://erplora.com/legal/declaracion-responsable/v1/".to_string(),
+    };
+
+    let payload = declaration_payload(Some(&facts()), Some(&declaration), "1.0.0", HUB_ID, CLOUD);
+
+    assert_eq!(
+        payload["declarationUrl"],
+        json!("https://erplora.com/legal/declaracion-responsable/v1/"),
+        "the panel must serve the reference the SaaS named, not a composed root: {payload}"
+    );
+}
+
+/// The exact reference wins even on a control plane other than the one hardcoded above: `url`
+/// travels verbatim from the SaaS, which already composed it with ITS OWN `cloud_base_url` (a PRE
+/// hub gets the PRE reference). The hub must not rewrite it or append anything.
+#[test]
+fn the_exact_declaration_is_served_as_is_never_rewritten_by_this_hub_hub1449() {
+    let declaration = DeclarationReference {
+        version: "v2".to_string(),
+        url: "https://pre.erplora.com/legal/declaracion-responsable/v2/".to_string(),
+    };
+
+    // A different `cloud_base_url` than the one baked into the reference: if the hub composed
+    // anything from it while a reference is present, this would catch it.
+    let payload = declaration_payload(Some(&facts()), Some(&declaration), "1.0.0", HUB_ID, CLOUD);
+
+    assert_eq!(
+        payload["declarationUrl"],
+        json!("https://pre.erplora.com/legal/declaracion-responsable/v2/"),
+        "the url must ride verbatim, not be recomposed from cloud_base_url: {payload}"
+    );
+}
+
 /// The DOOR, not only the projection: `GET /api/system/declaration` must serve the block the
 /// process-wide cache holds — the one the heartbeat installs and `verifactu` reads — plus this
-/// binary's version and this hub's own id. The pure-function tests above cannot see a handler
-/// that hands `declaration_payload` a stale copy, a literal or `None`; this one goes through the
-/// router, so the value on the wire is compared with the value the engine would put in the XML.
+/// binary's version and this hub's own id, AND (hub#1449) the exact declaration reference the same
+/// cache holds, never the composed root while one is known. The pure-function tests above cannot
+/// see a handler that hands `declaration_payload` a stale copy, a literal or `None`; this one goes
+/// through the router, so the value on the wire is compared with the value the engine would put in
+/// the XML.
 #[tokio::test]
 async fn the_route_projects_the_process_wide_producer_facts_hub528() {
     use axum::body::Body;
@@ -209,8 +260,14 @@ async fn the_route_projects_the_process_wide_producer_facts_hub528() {
     let cloud_base_url = config.cloud_base_url.clone();
     let router = app(AppState::with_config(rt, config));
 
-    // What the heartbeat would have installed: the same block the XML is built from.
+    // What the heartbeat would have installed: the same block the XML is built from, and the
+    // reference to the declaration that covers this release.
     ProducerFactsCache::global().store(facts());
+    let declaration = DeclarationReference {
+        version: "v1".to_string(),
+        url: "https://erplora.com/legal/declaracion-responsable/v1/".to_string(),
+    };
+    ProducerFactsCache::global().store_declaration(declaration.clone());
 
     let response = router
         .oneshot(
@@ -235,17 +292,23 @@ async fn the_route_projects_the_process_wide_producer_facts_hub528() {
 
     let expected = declaration_payload(
         Some(&facts()),
+        Some(&declaration),
         erplora_server::version::HUB_VERSION,
         &hub_id,
         &cloud_base_url,
     );
     assert_eq!(
         served, expected,
-        "the route does not serve the process-wide producer facts + this binary + this hub"
+        "the route does not serve the process-wide producer facts + declaration + this binary + this hub"
     );
     assert_eq!(
         served["sistemaInformatico"]["NombreRazon"],
         json!("ERPLORA CLOUD SL"),
         "the manufacturer's block did not come from the cache: {served}"
+    );
+    assert_eq!(
+        served["declarationUrl"],
+        json!("https://erplora.com/legal/declaracion-responsable/v1/"),
+        "the route must serve the exact reference the cache holds, not a composed root: {served}"
     );
 }

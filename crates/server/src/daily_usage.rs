@@ -15,7 +15,7 @@
 
 use erplora_db::{DatabaseAdapter, Params};
 use erplora_runtime::native::PendingObligation;
-use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
+use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -237,6 +237,16 @@ pub struct HeartbeatResponse {
     /// `None` again means «nothing was announced», and it is NOT a set of defaults: there are
     /// none for a legal declaration. The engine refuses to build an envelope it cannot fill.
     pub producer: Option<ProducerFacts>,
+    /// Which declaración responsable on the public archive covers the release this hub is
+    /// running (hub#1449, ERPlora/saas#1724 — art. 13.3 RRSIF), when the control plane could
+    /// compute one.
+    ///
+    /// Rides beside `producer`, never inside it: `producer` is the literal AEAT element set the
+    /// fleet emits verbatim into the XML, and this is a different kind of fact — where the signed
+    /// text lives, not something a record carries. `None` is «no news» (an older SaaS, or an
+    /// archive the control plane could not read), and the caller keeps linking the root of the
+    /// public archive, which already resolves to the declaration in force.
+    pub declaration: Option<DeclarationReference>,
 }
 
 impl HeartbeatResponse {
@@ -259,6 +269,7 @@ impl HeartbeatResponse {
         // whatever this hub already had.
         Self {
             producer: body.get("producer").and_then(ProducerFacts::parse),
+            declaration: body.get("declaration").and_then(DeclarationReference::parse),
         }
     }
 }
@@ -372,6 +383,12 @@ pub async fn send_heartbeat(
     // reads the cache through `NativeHost::producer_facts`.
     if let Some(facts) = answer.producer.clone() {
         ProducerFactsCache::global().store(facts);
+    }
+    // Same reasoning, same site (hub#1449): the reference travels on the same beat as the facts
+    // it is about, so it is installed in the same cache and by the same caller — no second place
+    // that could forget, no second cache that could fall behind.
+    if let Some(declaration) = answer.declaration.clone() {
+        ProducerFactsCache::global().store_declaration(declaration);
     }
     Ok(answer)
 }
@@ -829,6 +846,52 @@ mod tests {
         );
 
         assert!(HeartbeatResponse::parse(&broken).producer.is_none());
+    }
+
+    // ── Which declaration covers this version rides the same beat (hub#1449, saas#1724) ──────
+    //
+    // The panel used to compose the archive's ROOT by hand: correct only while a single
+    // declaración responsable is in force. `declaration` names the exact one that covers the
+    // running release, the same way `producer` names the manufacturer — sibling key, same cycle.
+
+    fn served_declaration_body() -> String {
+        r#"{"ok": true, "producer": {
+             "NombreRazon": "ERPLORA CLOUD SL", "NIF": "B27593136",
+             "NombreSistemaInformatico": "ERPlora Hub", "IdSistemaInformatico": "EC",
+             "TipoUsoPosibleSoloVerifactu": "S", "TipoUsoPosibleMultiOT": "S",
+             "IndicadorMultiplesOT": "S"},
+           "declaration": {"version": "v1",
+             "url": "https://erplora.com/legal/declaracion-responsable/v1/"}}"#
+            .to_string()
+    }
+
+    /// hub#1449: the exact reference the SaaS names — not a URL this hub composes — must be read
+    /// off the beat, at the same level as `producer` and not nested inside it (the `producer`
+    /// block is the literal AEAT element set; a stray key there would be an invented element).
+    #[test]
+    fn the_beat_carries_which_declaration_covers_this_release() {
+        let declaration = HeartbeatResponse::parse(&served_declaration_body())
+            .declaration
+            .expect("the reference the SaaS serves must be read");
+
+        assert_eq!(declaration.version, "v1");
+        assert_eq!(
+            declaration.url,
+            "https://erplora.com/legal/declaracion-responsable/v1/"
+        );
+    }
+
+    /// A control plane that has nothing to say (an older SaaS, or an unreadable archive on its
+    /// side) sends no `declaration` key at all — the SaaS OMITS it, never an empty one — and that
+    /// is «no news», not an error: the panel falls back to the root of the public archive.
+    #[test]
+    fn a_beat_without_the_key_announces_no_declaration() {
+        assert!(HeartbeatResponse::parse(&served_producer_body())
+            .declaration
+            .is_none());
+        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#)
+            .declaration
+            .is_none());
     }
 
     /// A 2xx whose body is unreadable is still a heartbeat that ARRIVED: it must come back `Ok`,

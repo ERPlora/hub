@@ -18,7 +18,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Map, Value};
 
-use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
+use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
 
 use crate::auth;
 use crate::gateway_enrolment;
@@ -744,6 +744,7 @@ pub async fn get_responsible_declaration(
     }
     Json(declaration_payload(
         ProducerFactsCache::global().current().as_ref(),
+        ProducerFactsCache::global().current_declaration().as_ref(),
         crate::version::HUB_VERSION,
         &st.hub_id(),
         &st.config.cloud_base_url,
@@ -772,6 +773,7 @@ pub async fn get_responsible_declaration(
 /// so the block comes back `null` and the screen says so, instead of filling the gap.
 pub fn declaration_payload(
     facts: Option<&ProducerFacts>,
+    declaration: Option<&DeclarationReference>,
     version: &str,
     hub_id: &str,
     cloud_base_url: &str,
@@ -787,19 +789,25 @@ pub fn declaration_payload(
         }
         block
     });
+    // hub#1449 / art. 13.3 RRSIF: while a single declaration is in force, the archive's ROOT
+    // resolves to it and composing the root worked by coincidence. The day a second one is
+    // issued, a hub still running the release the first one covers must keep linking THAT text —
+    // only the control plane knows which one that is, and it names it on the heartbeat. The root
+    // is a FALLBACK for a control plane that has said nothing (an older SaaS, a hub that has never
+    // reached it, or an archive it could not read), never the answer once an exact one is known.
+    let declaration_url = match declaration {
+        Some(declaration) => declaration.url.clone(),
+        None => format!(
+            "{}/legal/declaracion-responsable/",
+            cloud_base_url.trim_end_matches('/')
+        ),
+    };
     json!({
         // The two facts this hub owns travel at the top level too: they are what the screen can
         // always show, including on a hub the control plane has never spoken to.
         "version": version,
         "numeroInstalacion": hub_id,
-        // The signed text lives on the control plane THIS hub belongs to (a PRE hub must not send
-        // its owner to the production archive). No version in the path: the archive is versioned by
-        // DECLARATION (`v1`, `v2`…), not by release number, so the root resolves to the current one
-        // and lists every previous one (art. 13.3).
-        "declarationUrl": format!(
-            "{}/legal/declaracion-responsable/",
-            cloud_base_url.trim_end_matches('/')
-        ),
+        "declarationUrl": declaration_url,
         "sistemaInformatico": sistema_informatico,
     })
 }
