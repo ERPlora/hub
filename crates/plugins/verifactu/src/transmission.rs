@@ -636,7 +636,6 @@ pub(crate) async fn refuse_transmission(
 /// de la cola de contingencia si fue aceptado). Compartido por el primer intento y por el
 /// reintento tras re-anclar.
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn response_ops(
     record: &Json,
     resp: &aeat::AeatResponse,
@@ -1954,6 +1953,20 @@ mod tests {
             Some(&serde_json::json!("accepted")),
             "tras re-anclar, la AEAT aceptó: {:?}",
             applied.params
+        );
+        // verifactu#75: what the row keeps is what the CELL saw — the key and the digest of the
+        // re-anchored envelope, not the record's. This pins the wiring of the call site in
+        // `auto_rechain_and_retry`, which the builder-level tests on `response_ops` cannot see.
+        assert_eq!(
+            applied.params.get("transmission_id").and_then(Json::as_str),
+            envelopes[2]["transmission_id"].as_str(),
+            "the row has to remember the key the re-anchored delivery went out under: {:?}",
+            applied.params
+        );
+        assert_eq!(
+            applied.params.get("xml_sha256").and_then(Json::as_str),
+            Some(crate::gateway::xml_sha256(&xml_of(&envelopes[2])).as_str()),
+            "the row has to remember the digest of the bytes the cell saw"
         );
         assert!(
             !ops.iter()
