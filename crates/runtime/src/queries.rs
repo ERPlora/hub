@@ -750,7 +750,7 @@ fn is_ident(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{coalesce_first_arg_spans, code_spans, required_binds};
+    use super::required_binds;
 
     // ── hub#1086: el escáner de binds obligatorios ───────────────────────────────────────────
     // La regla: un bind es obligatorio iff aparece AL MENOS UNA VEZ fuera del primer argumento

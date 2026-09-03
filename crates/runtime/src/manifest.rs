@@ -1415,7 +1415,6 @@ fn deserialize_risk<'de, D>(d: D) -> std::result::Result<Option<AiRisk>, D::Erro
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::Deserialize as _;
     let raw = <Option<String> as serde::Deserialize>::deserialize(d)?;
     Ok(raw.map(|value| match value.as_str() {
         "normal" => AiRisk::Normal,
@@ -2202,7 +2201,6 @@ mod tests {
         let m: Manifest = serde_json::from_str(raw).expect("parsea");
         assert_eq!(m.commands["x.op"].ai.as_ref().unwrap().risk, None);
     }
-    use super::*;
 
     /// hub#380 — «my data belongs to the installation that produced it» is something the MODULE
     /// says, not something the core knows by name.
