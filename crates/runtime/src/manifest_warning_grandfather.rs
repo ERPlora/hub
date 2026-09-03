@@ -39,9 +39,6 @@ pub const GRANDFATHERED_MANIFEST_WARNINGS: &[(&str, &str)] = &[
     ),
     ("inventory", "commands.inventory.products.create.validates"),
     ("inventory", "commands.inventory.products.update.validates"),
-    // modifiers#6 — the only published manifest with a root `author`, which is in neither
-    // `ROOT_FIELDS` nor `schemas/module.schema.json` (`additionalProperties: false`).
-    ("modifiers", "author"),
 ];
 
 /// Whether this exact `(module, path)` pair is a known, owned debt.
