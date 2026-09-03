@@ -928,4 +928,100 @@ mod tests {
             );
         }
     }
+    /// Regression test for ERPlora/hub#1358 — the same defect from the side the issue measured it:
+    /// not «this id was withheld», but «**one identifier in nine** loses its example, at random».
+    ///
+    /// The test above pins three ids that happen to read as an IBAN. That is only HALF the defect,
+    /// and the smaller half. Measured with the issue's own script over 200 000 UUIDv4: **10.89 %**
+    /// withheld — 5.19 % by the IBAN shape and **5.69 % by the digit run**, which no hand-picked
+    /// IBAN-shaped example reaches. So this case does what the issue asks for: a thousand ids the
+    /// runtime really mints, and none of them may lose its example.
+    ///
+    /// Why the randomness is not flake. WITHOUT the fix, at ~10.9 % per id the chance that a
+    /// thousand of them are all clean is `0.891^1000` — zero for any practical purpose, so it
+    /// fails every run. WITH the fix, «a UUID is never withheld» is a property of the shape, not a
+    /// statistic: it passes deterministically. And a corpus that quietly stopped reaching the
+    /// traps would pass while proving nothing, so the traps are asserted to be IN it first.
+    #[test]
+    fn no_uuid_the_runtime_mints_ever_loses_its_example_hub1358() {
+        // The two rules exactly as they were before the carve-out, kept here as the POSITIVE
+        // CONTROL: they say which of the generated ids used to be withheld. If they ever stop
+        // matching anything, the corpus below is not exercising the defect and the assertion that
+        // follows is empty.
+        fn looked_like_an_iban(s: &str) -> bool {
+            let c: String = s.chars().filter(|ch| *ch != '-' && *ch != '.').collect();
+            let b = c.as_bytes();
+            (15..=34).contains(&c.len())
+                && b[..2].iter().all(u8::is_ascii_alphabetic)
+                && b[2..4].iter().all(u8::is_ascii_digit)
+                && b[4..].iter().all(u8::is_ascii_alphanumeric)
+        }
+        fn looked_like_a_phone(s: &str) -> bool {
+            let mut run = 0usize;
+            for ch in s.chars().filter(|ch| *ch != '-' && *ch != '.') {
+                run = if ch.is_ascii_digit() { run + 1 } else { 0 };
+                if run >= 11 {
+                    return true;
+                }
+            }
+            false
+        }
+
+        // The issue's own digit-run example, which is NOT IBAN-shaped: a twelve-digit run once the
+        // hyphens are gone. It is pinned by hand because it is the half a random corpus could in
+        // principle miss.
+        let digit_run = "31b4f647-8107-4081-9df6-9945729d0e82";
+        assert!(
+            looked_like_a_phone(digit_run) && !looked_like_an_iban(digit_run),
+            "the pinned example stopped being the digit-run case"
+        );
+        assert!(
+            !shape(&[json!({ "grant_id": digit_run })])["grant_id"].redacted,
+            "{digit_run} was withheld as a card or a phone number"
+        );
+
+        // A thousand ids as `context.new_ids` hands them out.
+        let ids: Vec<String> = (0..1_000)
+            .map(|_| uuid::Uuid::new_v4().to_string())
+            .collect();
+        let ibans = ids.iter().filter(|id| looked_like_an_iban(id)).count();
+        let phones = ids.iter().filter(|id| looked_like_a_phone(id)).count();
+        assert!(
+            ibans > 0 && phones > 0,
+            "the corpus reached neither trap ({ibans} IBAN-shaped, {phones} digit-run): it would \
+             pass without proving anything"
+        );
+
+        let withheld: Vec<&String> = ids
+            .iter()
+            .filter(|id| shape(&[json!({ "new_id": id })])["new_id"].redacted)
+            .collect();
+        assert!(
+            withheld.is_empty(),
+            "{} of {} identifiers lost their example ({:.2} %) — the picker of ADR-0283 shows the \
+             same field with an example in one hub and without it in the next. First: {:?}",
+            withheld.len(),
+            ids.len(),
+            withheld.len() as f64 * 100.0 / ids.len() as f64,
+            withheld.first(),
+        );
+
+        // And the memory of `record()` — «once withheld, always withheld» — is what made this
+        // permanent rather than intermittent: ONE old event carrying an unlucky id used to leave
+        // the field with no example in that hub for good, long after the events that show it fine.
+        let unlucky = ids
+            .iter()
+            .find(|id| looked_like_an_iban(id) || looked_like_a_phone(id))
+            .expect("the corpus was asserted to contain one");
+        let newest = "9c2f7a10-4d3b-4c8e-9f01-2a6b5c4d3e2f";
+        let fields = shape(&[
+            json!({ "sale_id": newest }),
+            json!({ "sale_id": unlucky }),
+        ]);
+        assert!(
+            !fields["sale_id"].redacted,
+            "an older event carrying {unlucky} still poisons the field for good"
+        );
+        assert_eq!(fields["sale_id"].sample, Some(json!(newest)));
+    }
 }
