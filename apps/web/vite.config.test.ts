@@ -3,6 +3,7 @@
 // port. These tests pin the contract: the port and the runtime target come from the environment
 // (VITE_PORT, VITE_RUNTIME_TARGET, or derived from HUB_BIND), with today's values as defaults.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { availableParallelism } from 'node:os';
 
 const ENV_KEYS = ['VITE_PORT', 'VITE_RUNTIME_TARGET', 'HUB_BIND'] as const;
 let saved: Record<string, string | undefined>;
@@ -173,5 +174,38 @@ describe('the unit suite survives a machine shared with the fleet (hub#1367)', (
     // `retry` would turn this same starvation green — and with it every real flake the suite
     // exists to catch. The fix is to stop measuring the machine, not to re-roll the dice.
     expect(cfg.test.retry ?? 0).toBe(0);
+  });
+});
+
+// hub#1364: the `test` block never bounded the pool, so vitest fell back to its own default —
+// `Math.max(availableParallelism() - 1, 1)` (vitest 4.1.10, `resolveMaxWorkers`). That number is
+// the WHOLE machine, and this suite no longer runs alone on one: since hub#1466 it runs as the
+// `pnpm verify` job of `test-web.yml`, on `ci-runner-1` (a cx53: 16 vCPU / 32 GB) which serves SIX
+// runner slots. Every other pool there is already capped — `CARGO_BUILD_JOBS=8` per slot, exactly
+// so that six cargos are not 96 rustc — and vitest was the last one that was not: six web jobs
+// would ask for 15 forks each, 90 processes on 16 vCPU. A pool that sizes itself off the machine
+// is not sizing itself off what it is allowed to take.
+//
+// The contract is a CEILING, not a target: the value may only ever LOWER vitest's own default,
+// never raise it, so the same config is also safe on the 2-core GitHub-hosted fallback
+// (`vars.CI_RUNNER_LABEL` unset) where the default is already 1. `VITEST_MAX_WORKERS` still wins
+// over anything declared here (vitest applies it last), which is the escape hatch for a one-off.
+describe('the vitest pool is bounded, not sized off the machine (hub#1364)', () => {
+  const vitestDefaultWorkers = Math.max(availableParallelism() - 1, 1);
+
+  it('caps the pool instead of leaving vitest to take the whole box', async () => {
+    const cfg = await loadConfig();
+    expect(typeof cfg.test.maxWorkers).toBe('number');
+    expect(cfg.test.maxWorkers).toBeGreaterThanOrEqual(1);
+    // Six slots on 16 vCPU: the cap is what makes concurrent web jobs share the runner instead of
+    // each claiming it whole. A number, not a percentage — a percentage is still the machine.
+    expect(cfg.test.maxWorkers).toBeLessThanOrEqual(4);
+  });
+
+  it('is a ceiling: it never asks for more workers than vitest itself would', async () => {
+    const cfg = await loadConfig();
+    // On a small runner (2 vCPU → default 1) this must not RAISE the pool. Bounding the fleet's
+    // shared runner is not worth oversubscribing every other machine that runs this suite.
+    expect(cfg.test.maxWorkers).toBeLessThanOrEqual(vitestDefaultWorkers);
   });
 });
