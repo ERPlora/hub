@@ -101,8 +101,11 @@ pub(crate) const NON_NEGATIVE_TYPES: [&str; 3] = ["F1", "F2", "F3"];
 /// `lines` es el número de líneas de la **factura entera**, que es lo que se puede leer de una vez
 /// (`ingest_invoice`); `invoice.audit` usa el de **cada entrada**, que es menor o igual. Usar el
 /// total es por tanto igual de permisivo o más, nunca menos — que es el lado seguro. `None`
-/// (nadie sabe cuántas líneas hay: `records.create`, cuyo esquema ni siquiera admite desglose)
-/// cae a **una**, la factura de una sola línea.
+/// (nadie sabe cuántas líneas hay) cae a **una**, la factura de una sola línea.
+///
+/// Por la puerta manual (`records.create`) el conteo **lo declara el llamante**
+/// ([`declared_line_count`], hub#1391) y por tanto no es confiable: lo que impide que un número
+/// inventado compre tolerancia es el segundo techo de aquí abajo, que no depende de él.
 ///
 /// # Y el segundo techo: el que también sabe medir la TABLA
 ///
@@ -416,10 +419,10 @@ pub(crate) async fn create_record(input: &Json, host: &dyn NativeHost) -> Result
             invoice_number,
             invoice_date,
             invoice_type,
-            // El esquema de `records.create` (`additionalProperties: false`) no admite
-            // `tax_breakdown`, así que por esta puerta no llega desglose que contrastar y no hay
-            // líneas que contar: manda la regla del `tax_rate` de la fila.
-            line_count: None,
+            // Cuántas líneas agrega el desglose que se acaba de recibir. Por esta puerta lo
+            // dice el llamante (`ingest_invoice` lo cuenta él mismo); sin él se juzga como una
+            // factura de una línea, que es el lado seguro (hub#1391).
+            line_count: declared_line_count(&payload),
             // El command público declara el tipo que quiere y no se le toca: aquí no hay
             // degradación que anotar (la resuelve `ingest_invoice`, que sí conoce al destinatario).
             downgraded_from: String::new(),
@@ -448,6 +451,30 @@ pub(crate) async fn create_record(input: &Json, host: &dyn NativeHost) -> Result
         },
     )
     .await
+}
+
+/// Cuántas **líneas de factura** agrega el desglose que trae el payload, cuando el llamante lo
+/// declara (`line_count` en `schemas/record_create.json`, `integer` con mínimo 1).
+///
+/// Es el dato que hace juzgable la cuota agregada: `invoice` redondea por línea y suma, así que la
+/// desviación admisible crece con el número de líneas (ver [`line_rate_tolerance_cents`]). Por la
+/// puerta del listener lo cuenta la propia lectura acotada de la factura; por ésta —recuperación
+/// de numeración, integraciones, el asistente— no hay factura que contar, y quien la tiene es el
+/// llamante.
+///
+/// 🔒 **Es un dato NO CONFIABLE y por eso solo puede aflojar hasta el techo.** El llamante escribe
+/// ese número, así que la tolerancia por líneas no puede ser la única regla: la acota el segundo
+/// techo de [`line_rate_tolerance_cents`] (`|expected| + 1`, el mismo que mide la tabla en
+/// `015_quota_rate_check_needs_the_line_count.sql`), y con él un `line_count` inventado no compra
+/// nada que el `CHECK` del módulo no fuera a aceptar igual.
+///
+/// Cualquier cosa que no sea un entero ≥ 1 —ausente, nulo, cero, negativo, un texto— es `None`:
+/// nadie lo sabe, y entonces se juzga como una factura de una sola línea.
+fn declared_line_count(payload: &Json) -> Option<i64> {
+    match payload.get("line_count") {
+        Some(Json::Number(n)) => n.as_i64().filter(|lines| *lines >= 1),
+        _ => None,
+    }
 }
 
 /// Un importe **opcional** en céntimos, tal cual venga: `Json::Null` cuando nadie lo escribió.

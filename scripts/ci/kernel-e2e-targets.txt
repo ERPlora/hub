@@ -57,4 +57,5 @@ staff_commissions_e2e                            # → staff
 verifactu_chain_import_e2e                       # → verifactu
 verifactu_chain_survives_certificate_rotation_e2e # → verifactu
 verifactu_desglose_e2e                           # → verifactu
+verifactu_manual_door_line_count_e2e             # → verifactu
 void_reversal_e2e                                # → sales (mitad `inventory`: `_restock_on_void`)
