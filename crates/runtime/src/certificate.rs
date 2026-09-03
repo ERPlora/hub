@@ -929,7 +929,9 @@ fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
 pub struct CertificateHolder {
     /// Normalised: upper case, and without the semantics prefix of ETSI EN 319 412-1 §5.1.4.
     pub nif: String,
-    /// `organizationName` (`O`) of the subject — the registered name, as the certificate spells it.
+    /// `organizationName` (`O`) of the subject — the registered name, as the certificate spells
+    /// it — or, for a natural person's own certificate (no `O`), `givenName` + `surname`
+    /// (hub#1497).
     pub name: String,
 }
 
@@ -978,8 +980,21 @@ fn holder_of_x509(subject: &openssl::x509::X509NameRef) -> Option<CertificateHol
         .filter(|nif| !nif.is_empty())?;
     // Half an identity is not an identity: a caller declaring a party needs both, and inventing
     // the missing one would name somebody who is not there.
-    let name = subject_entry(subject, openssl::nid::Nid::ORGANIZATIONNAME)?;
+    let name = subject_entry(subject, openssl::nid::Nid::ORGANIZATIONNAME)
+        .or_else(|| natural_person_name(subject))?;
     Some(CertificateHolder { nif, name })
+}
+
+/// `givenName` + `surname` (hub#1497): the fallback for a natural person's OWN certificate, which
+/// carries no `organizationName` — the gap #1478 deliberately left out. Same clean pair
+/// [`subject_holds_a_natural_person`] already trusts to route a certificate to `www1`, composed
+/// rather than parsed out of `CN` (FNMT writes `"APELLIDOS NOMBRE - NIF 12345678Z"`, embedding the
+/// very NIF this function must not guess). Both fields or nothing, same rule as its neighbour.
+#[cfg(not(target_os = "android"))]
+fn natural_person_name(subject: &openssl::x509::X509NameRef) -> Option<String> {
+    let given = subject_entry(subject, openssl::nid::Nid::GIVENNAME)?;
+    let surname = subject_entry(subject, openssl::nid::Nid::SURNAME)?;
+    Some(format!("{given} {surname}"))
 }
 
 /// `organizationIdentifier` has no `Nid` constant in the binding, so it is matched by OID.
