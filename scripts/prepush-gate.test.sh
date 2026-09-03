@@ -236,6 +236,24 @@ else
         *) bad "hub#1472: y lleva --no-deps, como la CI" "sin --no-deps clippy también analiza las dependencias: más lento y con avisos que no son nuestros" ;;
     esac
 fi
+# ── 5quater. …y SIN `cargo fmt --check` (hub#1474): la CI no exige fmt y develop no está formateado ──
+#    Segunda mordida de la misma sonda, con el clippy ya en paridad: `cargo fmt --all --check`
+#    sale con exit 1 y 364 diffs sobre develop (medido 03/09), y ni test-hub.yml ni actionlint
+#    tienen paso de fmt. Regla: el gate rápido solo exige lo que la CI exige. Se mira el bloque
+#    ENTERO del comando por defecto (todas las asignaciones `fast_cmd=`), no una línea.
+fast_block="$(awk '/HUB_GATE_DEPTH:-fast}" = fast/{f=1} f && !/^ *#/ && /fast_cmd=/{print} f && /^    fi$/{exit}' "$HOOK")"
+if [ -z "$fast_block" ]; then
+    bad "hub#1474: el bloque del comando rápido por defecto existe" "no se encontraron asignaciones fast_cmd= tras el arranque del modo rápido"
+else
+    case "$fast_block" in
+        *"cargo fmt"*) bad "hub#1474: el modo rápido NO invoca cargo fmt" "invoca cargo fmt: develop tiene 364 ficheros sin formatear y la CI no exige fmt → todo push aborta" ;;
+        *) ok "hub#1474: el modo rápido NO invoca cargo fmt (la CI tampoco)" ;;
+    esac
+    case "$fast_block" in
+        *"cargo check"*) ok "hub#1474: y sí invoca cargo check (control)" ;;
+        *) bad "hub#1474: y sí invoca cargo check (control)" "sin cargo check el modo rápido no protege nada" ;;
+    esac
+fi
 
 # ── 6. Same tree twice: the second push must NOT recompile ────────────────────
 #    This is what keeps the fleet's 42 pushes/day from becoming 42 full suites.

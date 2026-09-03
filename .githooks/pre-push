@@ -1201,8 +1201,8 @@ fi
 
 # ── hub#1466: la PROFUNDIDAD del gate — rápido aquí, pesado en la nube ───────
 # Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
-# `fmt --check` 2,8 s, `clippy` 20 s → ~27 s en el caso que manda (rehacer un arreglo tras una
-# revisión), contra ~20 min de la suite. Y el problema no era la duración sino el LOCK: una
+# `clippy` 18-20 s → ~25 s en el caso que manda (rehacer un arreglo tras una revisión), contra
+# ~20 min de la suite. Solo lo que la CI exige: clippy con sus flags (hub#1472) y sin fmt (hub#1474). Y el problema no era la duración sino el LOCK: una
 # pasada cada 20 min para toda la máquina. En Actions corren 4 a la vez.
 #
 # Lo que el modo rápido SÍ protege: que una rama que no compila, no formatea o no pasa clippy
@@ -1222,18 +1222,20 @@ if [ "${HUB_GATE_DEPTH:-fast}" = fast ]; then
     fast_cmd="${HUB_GATE_FAST_CMD:-}"
     if [ -z "$fast_cmd" ]; then
         fast_cmd="cargo check --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
-        fast_cmd="$fast_cmd && cargo fmt --all --check"
+        # SIN `cargo fmt --check` (hub#1474): develop no está formateado con rustfmt (364 diffs el
+        # 03/09) y la CI no tiene paso de fmt. El gate rápido solo exige lo que la CI exige; fmt
+        # entra el día que la CI lo exija y develop esté formateado (PR mecánica aparte).
         # Los MISMOS flags que el paso «cargo clippy --workspace» de test-hub.yml, y sin `-D warnings`:
         # develop arrastra ~209 avisos (03/09) y la CI no es estricta; ser más estricto aquí bloqueó
         # TODO push del hub nada más auto-instalarse el hook (hub#1472, cazado por la sonda de #1466).
         # El día que la CI se ponga estricta, se cambian los dos a la vez.
         fast_cmd="$fast_cmd && cargo clippy --workspace --all-targets --no-deps --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
     fi
-    echo "⚡ pre-push: gate RÁPIDO (check + fmt + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
+    echo "⚡ pre-push: gate RÁPIDO (check + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
     if ! eval "$fast_cmd"; then
         echo "" >&2
         echo "❌ pre-push: el gate rápido es ROJO → push ABORTADO." >&2
-        echo "   Compila/formatea/pasa clippy y reintenta. Para correr además la suite entera aquí:" >&2
+        echo "   Compila y pasa clippy (mismos flags que la CI) y reintenta. Para correr además la suite entera aquí:" >&2
         echo "     HUB_GATE_DEPTH=full git push" >&2
         exit 1
     fi
