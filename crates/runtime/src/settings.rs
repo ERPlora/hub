@@ -214,7 +214,7 @@ fn validate_country(v: &Value) -> std::result::Result<String, String> {
         .as_str()
         .ok_or("debe ser un string ISO-3166 de 2 letras (p. ej. \"ES\")")?;
     let up = s.trim().to_ascii_uppercase();
-    if up.len() == 2 && up.chars().all(|c| c.is_ascii_alphabetic()) {
+    if ISO_3166_1_ALPHA2.binary_search(&up.as_str()).is_ok() {
         Ok(up)
     } else {
         Err(format!(
@@ -222,6 +222,52 @@ fn validate_country(v: &Value) -> std::result::Result<String, String> {
         ))
     }
 }
+
+/// Los **249 códigos que ISO 3166-1 alpha-2 tiene ASIGNADOS**, ordenados para `binary_search`.
+///
+/// Es una lista CERRADA a propósito: pedir «dos letras ASCII» dejaba pasar `ZZ`, `XX`, `AA` y el
+/// resto de los rangos que la norma reserva al uso privado (hub#1496). Un hub con un país que no
+/// existe no casa NINGUNA regla fiscal —la clave del resolutor es `(country, region, categoría)`,
+/// ADR-0085— así que `taxes.calculate` responde `no_rate` o cae al `fallback_zero` y el negocio
+/// vende al 0 % sin que nada lo reporte.
+///
+/// **Fuente**: `/usr/share/zoneinfo/iso3166.tab` (la base tz, que sigue la norma), la MISMA con la
+/// que se construyó el enum de `country_code` de ERPlora/taxes#41 — así el país que acepta el core
+/// y el que acepta el schema del módulo son el mismo conjunto, no dos aproximaciones.
+///
+/// ⚠️ **No confundir con [`AEAT_COUNTRY_CODES`]**, que está unas líneas más abajo y NO es esta
+/// lista: aquella es el `CountryType2` del XSD de VeriFactu — le faltan nueve códigos ISO
+/// (**`ES` incluido**, que el XSD prohíbe como `IDOtro/CodigoPais`) y le sobran cinco que ISO no
+/// asigna (`QU`, `XB`, `XG`, `XN`, `XU`). Validar el país del hub con ella dejaría fuera a España.
+/// La guarda `the_aeat_list_is_not_the_iso_list_and_must_not_be_unified_hub1496` fija la diferencia.
+#[rustfmt::skip]
+const ISO_3166_1_ALPHA2: &[&str] = &[
+    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR",
+    "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE",
+    "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ",
+    "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD",
+    "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR",
+    "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM",
+    "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "FI",
+    "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
+    "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS",
+    "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU",
+    "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT",
+    "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN",
+    "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK",
+    "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME",
+    "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ",
+    "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
+    "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU",
+    "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM",
+    "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS",
+    "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI",
+    "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV",
+    "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK",
+    "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA",
+    "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+    "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+];
 
 /// `region_code`: subdivisión ISO-3166-2 (`ES-MD`, `ES-CN`…) o vacío/`null` = todo el país.
 ///
@@ -234,18 +280,27 @@ fn validate_region(v: &Value) -> std::result::Result<String, String> {
         Value::String(s) => {
             let up = s.trim().to_ascii_uppercase();
             // `XX-YYY`: país + subdivisión.
-            let ok = up.len() >= 4
+            let shape_ok = up.len() >= 4
                 && up.len() <= 6
                 && up.as_bytes()[2] == b'-'
                 && up[..2].chars().all(|c| c.is_ascii_alphabetic())
                 && up[3..].chars().all(|c| c.is_ascii_alphanumeric());
-            if ok {
-                Ok(up)
-            } else {
-                Err(format!(
+            if !shape_ok {
+                return Err(format!(
                     "región inválida `{s}`: se espera ISO-3166-2 (p. ej. ES-CN) o vacío"
-                ))
+                ));
             }
+            // La región REFINA un país (`errors.rs`: «it refines a country, it does not change
+            // it»), así que su prefijo tiene que ser un país que ISO asigne: `ZZ-CN` no refina
+            // nada (hub#1496). Que además coincida con el `country_code` DEL HUB no se puede saber
+            // desde un valor suelto — esa mitad la cierra `set_many`.
+            if ISO_3166_1_ALPHA2.binary_search(&&up[..2]).is_err() {
+                return Err(format!(
+                    "región inválida `{s}`: `{}` no es un país ISO-3166-1 alpha-2",
+                    &up[..2]
+                ));
+            }
+            Ok(up)
         }
         _ => Err("debe ser un string ISO-3166-2 (p. ej. \"ES-CN\") o null".to_string()),
     }
@@ -1276,6 +1331,36 @@ pub async fn set_many(
         enforce_country_freeze(db, hub_id, incoming).await?;
     }
 
+    // 1d) And the REGION has to hang from the country this hub declares (hub#1496). The shape
+    //     (`ES-CN`) and the fact that `ES` is a country ISO assigns are already settled by
+    //     `validate_region` without leaving the value; that `ES-CN` is coherent with THIS hub can
+    //     only be known by looking at the batch, so the door is here. A hub in `PT` whose region
+    //     says `ES-CN` resolves its tax through a jurisdiction that is not its own: the resolver
+    //     of ADR-0085 matches the most specific rule first, and no rule of the hub's own country
+    //     is ever going to serve that region.
+    //
+    //     The country in play is the one the batch carries — the settings form posts them
+    //     together — and otherwise the one already stored (`country_code_of`, which degrades to
+    //     the default exactly like every read does). Emptying the region is always fine: "the
+    //     whole country" contradicts no country. Same shape as its two neighbours above: only
+    //     when the batch carries the key, so no other settings write pays for the read.
+    if let Some((_, region)) = normalized
+        .iter()
+        .find(|(k, _)| *k == "region_code")
+        .filter(|(_, r)| !r.is_empty())
+    {
+        let country = match normalized.iter().find(|(k, _)| *k == "country_code") {
+            Some((_, c)) => c.clone(),
+            None => country_code_of(db, hub_id).await?,
+        };
+        if region[..2] != country {
+            return Err(RuntimeError::InvalidPayload {
+                name: "settings.region_code".into(),
+                detail: format!("región `{region}`: no pertenece al país del hub (`{country}`)"),
+            });
+        }
+    }
+
     // 2) Upsert por clave (mismo SQL en SQLite y Postgres: ON CONFLICT sobre la PK compuesta).
     let now = now_rfc3339();
     for (key, value) in &normalized {
@@ -1374,6 +1459,112 @@ mod tests {
         assert_eq!(validate_bool(&json!(false)).unwrap(), "false");
         assert!(validate_bool(&json!("true")).is_err());
         assert!(validate_bool(&json!(1)).is_err());
+    }
+
+    // ── La identidad fiscal del hub es un país que EXISTE (hub#1496) ────────────────────
+    //
+    // `country_code` es la mitad de la clave con la que se resuelve el impuesto
+    // (`country + region + categoría` → `rate_pct`, ADR-0085). Hasta aquí el validador solo
+    // pedía dos letras ASCII, así que `ZZ` —que ISO 3166-1 deja SIN ASIGNAR, reservado al uso
+    // privado— era una identidad fiscal válida para el core. Un hub con `ZZ` no casa NINGUNA
+    // regla: `taxes.calculate` responde `no_rate` o cae al `fallback_zero` (vende al 0 % sin que
+    // nada lo reporte) y el checklist de setup dice «0 reglas» con la pantalla llena. Es el
+    // mismo agujero que ERPlora/taxes#41 cerró en el schema del módulo, un piso más abajo: allí
+    // quedaba inservible UNA regla, aquí el hub ENTERO.
+
+    #[test]
+    fn a_country_that_iso_never_assigned_is_not_an_identity_hub1496() {
+        // Los países de verdad pasan, y siguen normalizándose a mayúsculas.
+        assert_eq!(validate_country(&json!("ES")).unwrap(), "ES");
+        assert_eq!(validate_country(&json!("es")).unwrap(), "ES");
+        assert_eq!(validate_country(&json!(" pt ")).unwrap(), "PT");
+        assert_eq!(validate_country(&json!("FR")).unwrap(), "FR");
+
+        // Los rangos que ISO deja libres NO son países: `ZZ`/`XX`/`AA`/`QQ` (uso privado) y
+        // `EU`/`UK`/`EZ`/`UN` (códigos de otras listas que CLDR sí conoce y por eso no sirve
+        // como filtro ISO — ERPlora/taxes#41).
+        for not_a_country in ["ZZ", "XX", "AA", "QQ", "OO", "EU", "UK", "EZ", "UN", "XK"] {
+            assert!(
+                validate_country(&json!(not_a_country)).is_err(),
+                "`{not_a_country}` no es un país asignado por ISO 3166-1: no puede ser la \
+                 identidad fiscal de un hub"
+            );
+        }
+
+        // Y lo que ya se rechazaba se sigue rechazando.
+        assert!(validate_country(&json!("Spain")).is_err());
+        assert!(validate_country(&json!("E1")).is_err());
+        assert!(validate_country(&json!("")).is_err());
+        assert!(validate_country(&json!(5)).is_err());
+    }
+
+    /// La lista es CERRADA y se cuenta: 249 códigos asignados. Barre las 676 combinaciones de dos
+    /// letras y cuenta cuántas pasan, para que una lista que pierda entradas en silencio —o que
+    /// vuelva a abrirse a «dos letras cualesquiera»— salga en rojo aquí y no en la caja.
+    #[test]
+    fn the_country_list_is_the_249_codes_iso_assigns_hub1496() {
+        let accepted = ('A'..='Z')
+            .flat_map(|a| ('A'..='Z').map(move |b| format!("{a}{b}")))
+            .filter(|code| validate_country(&json!(code)).is_ok())
+            .count();
+        assert_eq!(
+            accepted, 249,
+            "ISO 3166-1 alpha-2 asigna 249 códigos (fuente: /usr/share/zoneinfo/iso3166.tab, la \
+             misma con la que se validó el enum de ERPlora/taxes#41)"
+        );
+        assert!(ISO_3166_1_ALPHA2.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    /// **Las dos listas de países de este fichero NO son la misma, y no se pueden unificar.**
+    ///
+    /// [`AEAT_COUNTRY_CODES`] es el `CountryType2` del XSD de VeriFactu **menos `ES`** y con cinco
+    /// códigos que ISO no asigna (`QU`, `XB`, `XG`, `XN`, `XU`); [`ISO_3166_1_ALPHA2`] es la lista
+    /// ISO entera. Usar la de la AEAT para validar el país del hub dejaría fuera a **España**, que
+    /// es el país de toda la flota de hoy. Esta guarda fija la diferencia exacta para que el
+    /// siguiente que las vea juntas no las «arregle».
+    #[test]
+    fn the_aeat_list_is_not_the_iso_list_and_must_not_be_unified_hub1496() {
+        let aeat_only: Vec<&str> = AEAT_COUNTRY_CODES
+            .iter()
+            .copied()
+            .filter(|c| ISO_3166_1_ALPHA2.binary_search(c).is_err())
+            .collect();
+        assert_eq!(
+            aeat_only,
+            ["QU", "XB", "XG", "XN", "XU"],
+            "la AEAT enumera códigos que ISO no asigna: su lista no es la lista ISO"
+        );
+        assert!(
+            AEAT_COUNTRY_CODES.binary_search(&"ES").is_err(),
+            "el XSD prohíbe `CodigoPais=ES` para un IDOtro; validar el país del hub con esta \
+             lista dejaría fuera a España"
+        );
+        assert!(
+            ISO_3166_1_ALPHA2.binary_search(&"ES").is_ok(),
+            "y la lista ISO sí lo tiene: es la que valida la identidad del hub"
+        );
+    }
+
+    /// La región REFINA un país (`errors.rs`: «it refines a country, it does not change it»), así
+    /// que su prefijo tiene que ser un país que ISO asigne. `ZZ-CN` no refina nada.
+    #[test]
+    fn a_region_carries_a_country_that_exists_hub1496() {
+        assert_eq!(validate_region(&json!("ES-CN")).unwrap(), "ES-CN");
+        assert_eq!(validate_region(&json!("es-md")).unwrap(), "ES-MD");
+        assert_eq!(validate_region(&json!("PT-20")).unwrap(), "PT-20");
+        assert_eq!(validate_region(&json!("")).unwrap(), "");
+        assert_eq!(validate_region(&Value::Null).unwrap(), "");
+
+        for not_a_country in ["ZZ-CN", "XX-01", "EU-01", "QQ-ABC"] {
+            assert!(
+                validate_region(&json!(not_a_country)).is_err(),
+                "`{not_a_country}` no cuelga de un país asignado por ISO 3166-1"
+            );
+        }
+        // Y la forma sigue mandando.
+        assert!(validate_region(&json!("ES")).is_err());
+        assert!(validate_region(&json!("ESCN")).is_err());
+        assert!(validate_region(&json!(7)).is_err());
     }
 
     // ── NIF del obligado tributario validado EN LA PUERTA (hub#1088) ────────────────────
@@ -1633,6 +1824,109 @@ mod tests {
 
         // La moneda NO se aplicó (sigue el default) porque el lote completo se rechazó.
         let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["currency"], json!("EUR"));
+    }
+
+    /// **La región tiene que colgar del país que el hub declara** (hub#1496).
+    ///
+    /// La forma la valida `validate_region` sin salir del valor; que `ES-CN` sea coherente con
+    /// `country_code = ES` solo se puede saber MIRANDO EL LOTE, así que la puerta está aquí —
+    /// misma forma que los dos congelados de arriba. Un hub `ES` con región `FR-IDF` resuelve el
+    /// impuesto por una jurisdicción que no es la suya: el resolutor de ADR-0085 casa la regla más
+    /// específica primero, y esa región no la va a servir ninguna regla del país del hub.
+    #[tokio::test]
+    async fn a_region_from_another_country_is_refused_hub1496() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        // Coherente en el MISMO lote: pasa.
+        set_many(
+            &db,
+            "hub-1",
+            &map(&[
+                ("country_code", json!("ES")),
+                ("region_code", json!("ES-CN")),
+            ]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .expect("una región de tu propio país es la que se pide");
+
+        // Incoherente en el mismo lote: se rechaza el lote entero.
+        let err = set_many(
+            &db,
+            "hub-1",
+            &map(&[
+                ("country_code", json!("PT")),
+                ("region_code", json!("ES-CN")),
+            ]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
+
+        // Y contra el país YA PERSISTIDO cuando el lote solo trae la región (el hub es `ES`).
+        let err = set_many(
+            &db,
+            "hub-1",
+            &map(&[("region_code", json!("FR-IDF"))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
+
+        // Nada de eso se persistió: la región sigue siendo la que se guardó bien.
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["country_code"], json!("ES"));
+        assert_eq!(all["region_code"], json!("ES-CN"));
+
+        // Vaciar la región siempre vale: «todo el país» no contradice a ningún país.
+        set_many(
+            &db,
+            "hub-1",
+            &map(&[("region_code", json!(""))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .expect("vaciar la región es volver a «todo el país»");
+    }
+
+    /// Y el país inexistente se para en la PUERTA de settings, no solo en el validador suelto: es
+    /// por ahí por donde entra un integrador, un flujo o el asistente (hub#1496).
+    #[tokio::test]
+    async fn set_many_refuses_a_country_iso_never_assigned_hub1496() {
+        let db = fresh_db().await;
+        ensure_table(&db).await;
+
+        let err = set_many(
+            &db,
+            "hub-1",
+            &map(&[("country_code", json!("ZZ")), ("currency", json!("USD"))]),
+            "hub_user:1",
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, RuntimeError::InvalidPayload { .. }),
+            "err = {err:?}"
+        );
+
+        // Atómico: ni el país ni la moneda que iba en el mismo lote.
+        let all = get_all(&db, "hub-1").await.unwrap();
+        assert_eq!(all["country_code"], json!("ES"), "sigue el default");
         assert_eq!(all["currency"], json!("EUR"));
     }
 
