@@ -1170,6 +1170,65 @@ mod tests {
         );
     }
 
+    /// 🔒 REGRESIÓN (hub#1460): `resolve_route` sube por DELANTE de la validación —para estampar
+    /// el `Representante` en el XML que se valida y archiva— pero su error se DIFIERE: un sobre
+    /// que no cumple el esquema se marca `rejected` LOCALMENTE aunque además no haya vía.
+    /// Propagar el error de la vía primero devolvería este registro a la cola a reintentarse para
+    /// siempre con un XML que no puede validar nunca — el caso real es la carrera en la que
+    /// `can_transmit` pasó y el acuñado del token falló un instante después.
+    #[tokio::test]
+    async fn an_invalid_envelope_is_rejected_locally_even_when_no_route_resolves() {
+        let record = serde_json::json!({
+            "id": "rec-xsd-no-road",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "is_first_record": 1,
+            "sequence_number": 1,
+            // Frozen from a previous attempt, and it can never validate: no Cabecera at all.
+            "xml_content": "<sum:RegFactuSistemaFacturacion></sum:RegFactuSistemaFacturacion>",
+        });
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-no-road".to_owned(),
+            now: "2026-09-03T10:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let config = serde_json::json!({ "environment": "testing" });
+
+        let (ops, events, success) = super::transmit_one(
+            &NoRoadHost,
+            &ctx,
+            &record,
+            &config,
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("an invalid envelope is a local outcome, never the route's error");
+
+        assert!(!success);
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("the record must be marked rejected, not sent back to the queue");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("rejected"))
+        );
+        assert_eq!(
+            applied.params.get("aeat_response_code"),
+            Some(&serde_json::json!("XSD"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.name == crate::events::EVENT_RECORD_REJECTED),
+            "the rejection must be visible as an event"
+        );
+    }
+
     /// Sin certificado pero con la pasarela enrolada, la ruta es la celda — jamás la AEAT
     /// directa sin identidad, que era el modelo que saas#1435 retiró.
     #[tokio::test]
