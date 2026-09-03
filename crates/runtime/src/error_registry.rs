@@ -312,6 +312,14 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
+        // hub#1428: the OWNER module being absent is an expected absence, not a Hub fault. It is
+        // the very case `queryOptional`/`commandOptional` exist to make routine (`combos` writing
+        // into an `inventory` this hub does not have), and every dispatch failure travels to the
+        // Cloud through `error_sink` — filing that as an unexpected Hub bug is noise that buries
+        // the real ones. It matters more since hub#1428 moved COMMANDS onto these two variants:
+        // until then an absent module answered `CommandNotFound`, which was already USER here.
+        | E::ModuleNotInstalled { .. }
+        | E::ModuleInactive { .. }
         | E::InternalCommand(_)
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
@@ -631,6 +639,26 @@ mod tests {
         );
         assert_eq!(
             severity_of(&RuntimeError::NotImplemented("x")),
+            severity::USER
+        );
+        // hub#1428: la ausencia del MODULO dueño es una ausencia ESPERABLE, no un fallo del Hub.
+        // `commandOptional`/`queryOptional` existen precisamente para que sea rutina (`combos`
+        // escribiendo en un `inventory` que este hub no tiene). Sin estas dos lineas caian en el
+        // brazo `_ => UNEXPECTED` y cada integracion opcional ausente viajaba al Cloud
+        // (`error_sink`) como bug del Hub — con el agravante de que hub#1428 acababa de mover ahi
+        // los commands, que hasta entonces daban `CommandNotFound` (USER).
+        assert_eq!(
+            severity_of(&RuntimeError::ModuleNotInstalled {
+                module: "inventory".into(),
+                operation: "inventory.products.create".into()
+            }),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::ModuleInactive {
+                module: "inventory".into(),
+                operation: "inventory.products.create".into()
+            }),
             severity::USER
         );
         // Fallos no esperados.
