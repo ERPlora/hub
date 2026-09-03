@@ -26,16 +26,11 @@ const TERMS: [&str; 4] = ["verifactu", "ticketbai", "agenciatributaria", "aeat"]
 /// knowledge, frozen at their 2026-09-02 values. The rule is a RATCHET: shrink freely
 /// (update the number down in the same PR), never grow — growth means country
 /// knowledge is leaking back into the base. A file not listed here has budget 0.
-const RATCHET: [(&str, usize, &str); 11] = [
+const RATCHET: [(&str, usize, &str); 10] = [
     (
         "crates/server/src/boot.rs",
         2,
         "composition root — the ONE authorised engine-mounting point (hub#1404)",
-    ),
-    (
-        "crates/runtime/src/errors.rs",
-        1,
-        "container-kind error message",
     ),
     (
         "crates/runtime/src/export.rs",

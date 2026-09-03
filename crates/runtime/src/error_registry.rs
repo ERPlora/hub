@@ -398,7 +398,6 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
         E::InvalidField { .. } => "invalid_field",
-        E::CertificateTypeMismatch { .. } => "certificate_type_mismatch",
         E::ManifestRejected { code, .. } => code.as_str(),
         // hub#1086: its own stable code, so a caller can tell "you did not send what the
         // query needs" from "what you sent does not validate".

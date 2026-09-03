@@ -91,7 +91,6 @@ fn variant_of(e: &RuntimeError) -> &'static str {
         E::Storage(_) => "Storage",
         E::Certificate(_) => "Certificate",
         E::InvalidField { .. } => "InvalidField",
-        E::CertificateTypeMismatch { .. } => "CertificateTypeMismatch",
         E::ManifestRejected { .. } => "ManifestRejected",
         E::ReadUnavailable { .. } => "ReadUnavailable",
         E::ProtectsGuard { .. } => "ProtectsGuard",
@@ -218,10 +217,6 @@ fn census(db: RuntimeError) -> Vec<RuntimeError> {
             field: s("name"),
             reason: s("required"),
             detail: s("the name is required"),
-        },
-        E::CertificateTypeMismatch {
-            declared: s("own"),
-            served: s("delegated"),
         },
         E::ManifestRejected {
             module: s("sales"),
