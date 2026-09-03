@@ -170,18 +170,6 @@ pub enum CloudUrlGuard {
 /// keeps pointing at production (see the `/hub-local` skill) — refusing on `dev_mode` alone would
 /// break it. `ci` is what tells the two apart: it is the signal that nobody is at the terminal to
 /// read a warning, so unattended-in-CI is the only case that hard-refuses.
-/// Carpeta media del hub (`HUB_MEDIA_DIR`, por defecto `./media`).
-///
-/// Aparte de [`Config::from_env`] porque el arranque la necesita **antes** de que exista el
-/// `AppState`: el backend de ficheros de módulos se inyecta en el runtime antes de instalar nada
-/// (hub#1477). Una sola definición para que las dos rutas no puedan discrepar — dos hubs mirando
-/// carpetas distintas es exactamente el fallo que nadie encuentra.
-pub fn media_dir_from_env() -> PathBuf {
-    std::env::var("HUB_MEDIA_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("media"))
-}
-
 pub fn cloud_url_guard(dev_mode: bool, cloud_base_url: &str, ci: bool) -> CloudUrlGuard {
     if !dev_mode || cloud_base_url.trim() != PRODUCTION_CLOUD_BASE_URL {
         return CloudUrlGuard::Ok;
@@ -191,6 +179,18 @@ pub fn cloud_url_guard(dev_mode: bool, cloud_base_url: &str, ci: bool) -> CloudU
     } else {
         CloudUrlGuard::Warn
     }
+}
+
+/// Carpeta media del hub (`HUB_MEDIA_DIR`, por defecto `./media`).
+///
+/// Aparte de [`HubConfig::from_env_with_auth`] porque el arranque la necesita **antes** de que
+/// exista el `AppState`: el backend de ficheros de módulos se inyecta en el runtime antes de
+/// instalar nada (hub#1477). Una sola definición para que las dos rutas no puedan discrepar — dos
+/// hubs mirando carpetas distintas es exactamente el fallo que nadie encuentra.
+pub fn media_dir_from_env() -> PathBuf {
+    std::env::var("HUB_MEDIA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("media"))
 }
 
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
