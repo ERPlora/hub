@@ -181,6 +181,18 @@ pub fn cloud_url_guard(dev_mode: bool, cloud_base_url: &str, ci: bool) -> CloudU
     }
 }
 
+/// Carpeta media del hub (`HUB_MEDIA_DIR`, por defecto `./media`).
+///
+/// Aparte de [`HubConfig::from_env_with_auth`] porque el arranque la necesita **antes** de que
+/// exista el `AppState`: el backend de ficheros de módulos se inyecta en el runtime antes de
+/// instalar nada (hub#1477). Una sola definición para que las dos rutas no puedan discrepar — dos
+/// hubs mirando carpetas distintas es exactamente el fallo que nadie encuentra.
+pub fn media_dir_from_env() -> PathBuf {
+    std::env::var("HUB_MEDIA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("media"))
+}
+
 /// Configuración de despliegue del hub (ARQUITECTURA.md §2.3; decisiones del humano):
 ///  - `hub_id`: lo inyecta el despliegue vía env `HUB_ID` (sin selector de hub).
 ///  - `cloud_base_url`: el Cloud Portal contra el que se resuelven marketplace + asistente.
@@ -320,9 +332,7 @@ impl HubConfig {
         // Carpeta media del hub (logs `_logs/`, perfiles, export/import…). Por defecto `./media`;
         // el despliegue la fija explícitamente con `HUB_MEDIA_DIR`. En Hub Cloud (ADR-0154) los
         // ficheros de módulos viven en Object Storage vía el Cloud; `media_dir` es scratch local.
-        let media_dir = std::env::var("HUB_MEDIA_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("media"));
+        let media_dir = media_dir_from_env();
         // Modo desarrollo explícito (hub#239): abre las vías de carga de código LOCAL. Ausente o
         // con cualquier otro valor ⇒ producción (fail-closed).
         let dev_mode =

@@ -303,6 +303,22 @@ pub trait EventSink: Send + Sync + std::fmt::Debug {
     fn emit(&self, source: EventSource<'_>, event: &str, payload: &serde_json::Value);
 }
 
+/// Un módulo que el hub recibió la orden de instalar y **no** se instaló (hub#1477).
+///
+/// No es un log: es estado que la sonda de readiness consulta. Por eso lleva las tres cosas que
+/// hacen falta para actuar sin entrar al contenedor — **quién** falta, **de dónde** salía y **por
+/// qué** no entró.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailedInstall {
+    /// Id del módulo. Si el manifest ni siquiera cargó no hay id que leer, y entonces es el nombre
+    /// de la carpeta: es lo único que hay y es justo lo que el operador ve en el disco.
+    pub module_id: String,
+    /// El paquete del que salía, para poder ir a mirarlo.
+    pub source: String,
+    /// El error, tal cual: sin el motivo, saber que falta no dice qué arreglar.
+    pub reason: String,
+}
+
 #[derive(Debug, Default)]
 pub struct Registry {
     pub installed: Vec<Manifest>,
@@ -340,6 +356,19 @@ pub struct Registry {
     /// Backend de `static_files` declarado por módulos. Lo inyecta el host y resuelve a disco
     /// Local o Cloud→S3 sin exponer paths físicos al módulo.
     pub module_storage: Option<std::sync::Arc<dyn crate::module_storage::ModuleStorage>>,
+    /// Módulos que este hub **recibió la orden de instalar** y no llegaron a instalarse
+    /// (hub#1477). Lo llena [`crate::Runtime::install_all_from_dir`], que es tolerante a propósito
+    /// —un módulo de terceros roto no debe brickear el arranque— pero cuya tolerancia era, hasta
+    /// ahora, **silencio**: el fallo salía por un `eprintln!` y ahí moría.
+    ///
+    /// Vive aquí porque es la ÚNICA huella que queda de ese módulo: un install que falla no
+    /// escribe en `hub_module`, así que `/readyz` —que compara `hub_module` contra el Registry— no
+    /// tenía forma de saber que faltaba y publicaba `missing: []` sobre un hub incompleto.
+    ///
+    /// Describe el **último intento**, no un historial: cada pasada de `install_all_from_dir` lo
+    /// reemplaza. Si acumulase, un módulo ya arreglado seguiría denunciado para siempre y la sonda
+    /// no volvería a ponerse verde nunca.
+    pub failed_installs: Vec<FailedInstall>,
     /// **This deploy is an ephemeral DEMO hub** (ADR-0197, hub#376). The host seals it at boot
     /// from `HubConfig.demo` (env `HUB_DEMO`, written only by the SaaS provisioning), exactly
     /// like it seals `native`, `notify_transport` or `module_storage`. It lives HERE, and not in

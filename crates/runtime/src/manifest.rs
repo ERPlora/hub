@@ -557,10 +557,7 @@ pub struct StaticFilesDef {
 impl StaticFilesDef {
     /// Un solo segmento portable: minúsculas ASCII, dígitos, `_` y `-`; sin separadores ni `..`.
     pub fn is_valid_folder(&self) -> bool {
-        let mut chars = self.folder.chars();
-        matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
-            && self.folder.len() <= 64
-            && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+        crate::module_storage::valid_module_folder(&self.folder)
     }
 
     /// `true` si el módulo concedió esa acción. Una acción que el host no conoce simplemente no

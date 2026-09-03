@@ -138,20 +138,39 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         );
     }
 
-    // El mismo backend de ficheros sirve a TODOS los módulos: disco bajo `media/modules/` en
-    // Local y proxy Cloud→S3 en Cloud. Se inyecta antes de instalar para que cada manifest con
+    // El mismo backend de ficheros sirve a TODOS los módulos, con el mismo contrato lógico
+    // (`media/modules/<folder>/`). Se inyecta antes de instalar para que cada manifest con
     // `static_files.folder` materialice su carpeta al activarse.
     let machine_token_cell = cfg.machine_token_cell.take().unwrap_or_else(|| {
         std::sync::Arc::new(std::sync::RwLock::new(cfg.hub.cloud_api_token.clone()))
     });
-    // Backend de ficheros de módulos: proxy autenticado Hub→Cloud→Object Storage (ADR-0154), sin
-    // credenciales de almacenamiento en el Hub.
-    let module_storage = module_storage::ModuleMediaStorage::cloud(
-        cfg.hub.cloud_base_url.clone(),
-        cfg.hub.hub_id.clone(),
-        machine_token_cell.clone(),
-    );
-    runtime.set_module_storage(std::sync::Arc::new(module_storage));
+    // Cuál de los dos lo decide `backend_for`, con el MISMO interruptor que decide si se escanea
+    // `HUB_MODULES_DIR` (más abajo): si el hub instala módulos de disco, sus ficheros también van a
+    // disco. Este comentario prometía el backend de disco desde el principio y no existía
+    // (hub#1477) — y como `verifactu` es el único módulo del catálogo con `static_files`, era el
+    // único que no se podía instalar sin Cloud.
+    let module_storage: std::sync::Arc<dyn erplora_runtime::module_storage::ModuleStorage> =
+        match module_storage::backend_for(cfg.hub.dev_mode) {
+            module_storage::Backend::Disk => {
+                let media_dir = state::media_dir_from_env();
+                eprintln!(
+                    "módulos: ficheros de `static_files` en disco ({}/modules) — modo desarrollo",
+                    media_dir.display()
+                );
+                std::sync::Arc::new(module_storage::ModuleDiskStorage::new(media_dir))
+            }
+            // Producción: proxy autenticado Hub→Cloud→Object Storage (ADR-0154), sin credenciales
+            // de almacenamiento en el Hub. Sin token de máquina falla, y debe fallar: un hub real
+            // sin token tiene un problema de despliegue que caer a disco solo taparía.
+            module_storage::Backend::Cloud => {
+                std::sync::Arc::new(module_storage::ModuleMediaStorage::cloud(
+                    cfg.hub.cloud_base_url.clone(),
+                    cfg.hub.hub_id.clone(),
+                    machine_token_cell.clone(),
+                ))
+            }
+        };
+    runtime.set_module_storage(module_storage);
 
     // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
     // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
