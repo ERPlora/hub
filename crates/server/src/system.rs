@@ -279,16 +279,22 @@ async fn cloud_storage(
 ) -> (Value, Value) {
     let empty = (Value::Array(vec![]), Value::Null);
     let Some(token) = token else { return empty };
-    let url = format!(
-        "{}/api/v1/hub/device/storage/",
-        cloud_base_url.trim_end_matches('/')
+    // hub#1464: la credencial la pone LA puerta (`CloudClient`), que comprueba el destino. A mano
+    // funcionaba igual, y por eso era peligroso: nadie habría notado el día que la URL cambiase.
+    let base = cloud_base_url.trim_end_matches('/');
+    let request = cloud_client::CloudClient::new(base).machine_request(
+        "GET",
+        "/api/v1/hub/device/storage/",
+        &cloud_client::Auth::HubToken {
+            hub_id: hub_id.to_string(),
+            token,
+        },
     );
-    let resp = http
-        .get(&url)
-        .header("X-Hub-Token", token)
-        .header("X-Hub-Id", hub_id)
-        .send()
-        .await;
+    let mut outgoing = http.get(&request.url);
+    for (name, value) in request.headers {
+        outgoing = outgoing.header(name, value);
+    }
+    let resp = outgoing.send().await;
     let Ok(resp) = resp else { return empty };
     if !resp.status().is_success() {
         return empty;

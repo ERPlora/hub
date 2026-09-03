@@ -89,16 +89,21 @@ async fn fetch_series(
         }
     }
 
-    let url = format!(
-        "{}/api/v1/hub/device/metrics/series/?range={range}",
-        cloud_base_url.trim_end_matches('/')
+    // hub#1464: por LA puerta (`CloudClient`), que es la que comprueba el destino.
+    let base = cloud_base_url.trim_end_matches('/');
+    let request = cloud_client::CloudClient::new(base).machine_request(
+        "GET",
+        &format!("/api/v1/hub/device/metrics/series/?range={range}"),
+        &cloud_client::Auth::HubToken {
+            hub_id: hub_id.to_string(),
+            token: token.to_string(),
+        },
     );
-    let resp = http
-        .get(&url)
-        .header("X-Hub-Token", token)
-        .header("X-Hub-Id", hub_id)
-        .send()
-        .await;
+    let mut outgoing = http.get(&request.url);
+    for (name, value) in request.headers {
+        outgoing = outgoing.header(name, value);
+    }
+    let resp = outgoing.send().await;
     // Any failure — unreachable, timeout, non-2xx, non-JSON — collapses to the same honest
     // degradation. Upstream error bodies never pass through: see the module doc.
     let Ok(resp) = resp else {

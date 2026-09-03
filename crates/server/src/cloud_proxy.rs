@@ -37,7 +37,9 @@ pub(crate) async fn cloud_get_raw_full(
         return Err(CloudGetError::NoCredential);
     };
     let mut r = st.http.get(&req.url);
-    for (k, v) in auth.headers() {
+    for (k, v) in
+        cloud_client::CloudClient::new(&st.config.cloud_base_url).headers_for(&req.url, &auth)
+    {
         r = r.header(k, v);
     }
     if let Some(language) = headers.get(axum::http::header::ACCEPT_LANGUAGE) {
@@ -591,7 +593,7 @@ pub(crate) async fn fetch_blueprint(
 
     // 1) URL firmada + sha256 + versión (hub-scoped: se autentica el runtime, no el usuario).
     let mut r = st.http.get(&req.url);
-    for (k, v) in auth.headers() {
+    for (k, v) in cloud.headers_for(&req.url, auth) {
         r = r.header(k, v);
     }
     let resp = r

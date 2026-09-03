@@ -63,7 +63,7 @@ pub(crate) async fn assistant_checkout(
     let cloud = cloud_client::CloudClient::new(&st.config.cloud_base_url);
     let req = cloud.assistant_checkout(&auth);
     let mut r = st.http.post(&req.url);
-    for (k, v) in auth.headers() {
+    for (k, v) in cloud.headers_for(&req.url, &auth) {
         r = r.header(k, v);
     }
     match r.json(&body).send().await {
