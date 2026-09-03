@@ -52,11 +52,20 @@ pub(crate) struct GatewayEnvelope<'a> {
     pub xml: &'a str,
 }
 
+impl GatewayEnvelope<'_> {
+    /// The digest of the EXACT bytes that travel. The cell recomputes it over what it decodes
+    /// and echoes it back as `request_sha256`; comparing the two is the canary of ADR-0320 §2
+    /// («el gateway NO modifica el XML») — see [`post_transmission`].
+    pub(crate) fn xml_sha256(&self) -> String {
+        sha2::Sha256::digest(self.xml.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
+}
+
 pub(crate) fn envelope_json(envelope: &GatewayEnvelope<'_>) -> serde_json::Value {
-    let xml_sha256: String = sha2::Sha256::digest(envelope.xml.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let xml_sha256 = envelope.xml_sha256();
     serde_json::json!({
         "schema_version": SCHEMA_VERSION,
         "hub_id": envelope.hub_id,
@@ -73,6 +82,13 @@ pub(crate) fn envelope_json(envelope: &GatewayEnvelope<'_>) -> serde_json::Value
 /// fresh token first — the Bearer lives 300 s and a queue drain can outlive it legitimately.
 fn refusal_error(status: u16, code: &str, message: &str) -> VerifactuError {
     VerifactuError::Transmission(format!("pasarela fiscal: {status} {code}: {message}"))
+}
+
+/// A 200 whose RECEIPT does not hold up. Same treatment as a refusal —contingency with backoff,
+/// never `::Tls`— and a stable `code` an operator can grep: the prose is for humans, the code is
+/// what a test and an alert assert on (ADR-0055).
+fn receipt_error(code: &str, detail: &str) -> VerifactuError {
+    VerifactuError::Transmission(format!("pasarela fiscal: recibo inválido ({code}): {detail}"))
 }
 
 /// POSTs the envelope to the cell and hands back the AEAT's raw SOAP body — the SAME string
@@ -146,6 +162,39 @@ async fn post_transmission(
         let value: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
             VerifactuError::Transmission(format!("recibo de la pasarela ilegible: {e}"))
         })?;
+        // ── The canary of ADR-0320 (hub#1461) ─────────────────────────────────────────────────
+        // The cell recomputes the sha256 OVER THE BYTES IT DECODED and echoes it here. That it
+        // equals ours is the only proof available on this side of the wire that what reached the
+        // AEAT are the bytes this SIF produced — hash and chain included. §2 of the ADR («the
+        // gateway does NOT modify the XML») stops being a promise and becomes a per-delivery check.
+        //
+        // It runs BEFORE looking at the AEAT body on purpose: if the bytes are not ours, neither
+        // is the verdict riding with them, and filing it would be exactly the silent send with
+        // different bytes this exists to prevent. The record goes to contingency with its reason
+        // visible, like a 504 — what the AEAT ended up holding is unknown.
+        let sent = envelope.xml_sha256();
+        match value.get("request_sha256").and_then(|v| v.as_str()) {
+            // Fails CLOSED: with no field there is no canary, and skipping the check when it is
+            // missing cannot tell a healthy cell from an intermediary that stripped it.
+            None => {
+                return Err(receipt_error(
+                    "receipt_without_request_sha256",
+                    "la pasarela no devolvió el digest de lo que transmitió",
+                ));
+            }
+            // Compared case-insensitively: the contract asks for lowercase hex, but a difference
+            // in case is not a difference in bytes, and refusing one would stop the filing.
+            Some(echoed) if !echoed.eq_ignore_ascii_case(&sent) => {
+                return Err(receipt_error(
+                    "request_digest_mismatch",
+                    &format!(
+                        "los bytes transmitidos no son los enviados: enviado {sent}, \
+                         recibo {echoed}"
+                    ),
+                ));
+            }
+            Some(_) => {}
+        }
         let b64 = value
             .get("aeat_response_b64")
             .and_then(|v| v.as_str())
@@ -548,18 +597,42 @@ mod tests {
         )
     }
 
+    /// The exact bytes every canned transmission of this module puts on the wire. The cell
+    /// recomputes THEIR digest and echoes it, so a receipt quoting anything else is not ours.
+    const SENT_XML: &str = "<x/>";
+
+    fn digest_of(xml: &str) -> String {
+        sha2::Sha256::digest(xml.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
+
+    /// A receipt as the REAL cell answers it: `request_sha256` is the digest of the bytes it
+    /// decoded, so on the happy path it equals the hub's own. This is the POSITIVE control of
+    /// the canary — if the check were wrong, every honest delivery below would go red.
     fn receipt_with(aeat_body: &str) -> String {
+        receipt_quoting(&digest_of(SENT_XML), aeat_body)
+    }
+
+    /// The same receipt with the echoed digest under the caller's control, to forge the shapes
+    /// the canary must refuse.
+    fn receipt_quoting(request_sha256: &str, aeat_body: &str) -> String {
+        let mut receipt = receipt_without_digest(aeat_body);
+        receipt["request_sha256"] = serde_json::Value::String(request_sha256.to_owned());
+        receipt.to_string()
+    }
+
+    fn receipt_without_digest(aeat_body: &str) -> serde_json::Value {
         serde_json::json!({
             "schema_version": 1,
             "transmission_id": "record-42",
-            "request_sha256": "00".repeat(32),
             "certificate_generation": "seal-test",
             "aeat_http_status": 200,
             "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(aeat_body),
             "aeat_response_sha256": "00".repeat(32),
             "received_at": "2026-09-02T10:00:00Z",
         })
-        .to_string()
     }
 
     fn test_access(url: &str) -> GatewayAccess {
@@ -718,12 +791,82 @@ mod tests {
         let host = LendingHost::minting(&url);
         let hub = a_hub("receipt-200");
 
-        let body = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope("<x/>"))
+        let body = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope(SENT_XML))
             .await
             .unwrap();
 
         assert_eq!(body, soap);
         assert_eq!(host.calls(), 0, "no 401, no fresh token minted");
+    }
+
+    /// 🔒 REGRESSION — the canary of ADR-0320 §2/§4 (hub#1461). The cell recomputes the sha256
+    /// **over the bytes it decoded** and echoes it as `request_sha256`; if that is not the digest
+    /// of what left here, what travelled the wire are not our bytes. The receipt is refused WHOLE
+    /// — the AEAT verdict riding with it belongs to a delivery we do not recognise — and the
+    /// record goes to contingency: a silent send with different bytes is never filed as a verdict.
+    #[tokio::test]
+    async fn a_receipt_that_quotes_another_digest_is_refused_not_believed() {
+        let soap = "<soapenv:Envelope>veredicto de OTROS bytes</soapenv:Envelope>";
+        let forged = receipt_quoting(&digest_of("<tampered/>"), soap);
+        let url = canned_cell(vec![http_json("200 OK", &forged)]).await;
+        let host = LendingHost::minting(&url);
+        let hub = a_hub("digest-mismatch");
+
+        let err = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope(SENT_XML))
+            .await
+            .unwrap_err();
+
+        let message = err.to_string();
+        assert!(
+            message.contains("request_digest_mismatch"),
+            "the failure names itself with a stable code an operator can grep: {message}"
+        );
+        assert!(
+            message.contains(&digest_of(SENT_XML)) && message.contains(&digest_of("<tampered/>")),
+            "both digests ride along — that is the forensic value of the canary: {message}"
+        );
+        assert!(
+            !message.contains(soap),
+            "an unverified AEAT body is never quoted back: {message}"
+        );
+        match &err {
+            VerifactuError::Transmission(_) => {}
+            other => panic!("contingency + backoff, never ::Tls; got {other:?}"),
+        }
+        assert!(
+            !crate::aeat::is_tls_failure(&err),
+            "must not trip the delegated-certificate refetch trigger"
+        );
+    }
+
+    /// And it fails CLOSED: a receipt WITHOUT `request_sha256` is a receipt without a canary,
+    /// and a canary skipped when the field is missing cannot tell a healthy cell from an
+    /// intermediary that stripped it — that is a guard that fails open. Same treatment as a
+    /// receipt without `aeat_response_b64`.
+    #[tokio::test]
+    async fn a_receipt_without_the_digest_is_refused_the_canary_never_fails_open() {
+        let soap = "<soapenv:Envelope>sin canario</soapenv:Envelope>";
+        let url = canned_cell(vec![http_json(
+            "200 OK",
+            &receipt_without_digest(soap).to_string(),
+        )])
+        .await;
+        let host = LendingHost::minting(&url);
+        let hub = a_hub("digest-missing");
+
+        let err = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope(SENT_XML))
+            .await
+            .unwrap_err();
+
+        let message = err.to_string();
+        assert!(
+            message.contains("receipt_without_request_sha256"),
+            "{message}"
+        );
+        assert!(
+            !message.contains(soap),
+            "the body of an unverifiable receipt is not surfaced: {message}"
+        );
     }
 
     /// A 401 invalidates the cached Bearer and retries EXACTLY once with a fresh access; the
@@ -742,7 +885,7 @@ mod tests {
         let host = LendingHost::minting(&url);
         let hub = a_hub("401-retry");
 
-        let body = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope("<x/>"))
+        let body = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope(SENT_XML))
             .await
             .unwrap();
 
@@ -765,7 +908,7 @@ mod tests {
         let host = LendingHost::minting(&url);
         let hub = a_hub("401-twice");
 
-        let err = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope("<x/>"))
+        let err = transmit_via_gateway(&host, &hub, &test_access(&url), &envelope(SENT_XML))
             .await
             .unwrap_err();
 
