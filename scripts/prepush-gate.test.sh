@@ -213,6 +213,30 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     && ok "un HUB_GATE_DEPTH desconocido FALLA en vez de elegir por su cuenta" \
     || bad "un HUB_GATE_DEPTH desconocido falla" "exit=$code"
 
+# ── 5ter. El comando rápido por defecto calca la CI: clippy SIN -D warnings (hub#1472) ──
+#    Cazado por la sonda de hub#1466 nada más mergear: el hook se auto-instaló y TODO push del
+#    hub abortaba, también uno sano. `develop` arrastra 209 avisos de clippy (medido 03/09) y
+#    `test-hub.yml` corre `cargo clippy --workspace --all-targets --no-deps --exclude …` SIN
+#    `-D warnings`; el gate local era más estricto que la CI que autoriza el merge. Es una
+#    aserción sobre el TEXTO del hook a propósito: el comando por defecto no se puede ejecutar
+#    en estos bancos (no hay cargo), y lo que hay que fijar es la paridad de flags con la CI.
+#    El día que la CI se ponga estricta, se cambian los dos a la vez y este test con ellos.
+# The ASSIGNMENT line, never a comment: the first draft grabbed the comment that explains this
+# very rule (it mentions `-D warnings`) and failed against the fixed hook.
+fast_default="$(awk '/HUB_GATE_DEPTH:-fast}" = fast/{f=1} f && !/^ *#/ && /fast_cmd=.*cargo clippy/{print; exit}' "$HOOK")"
+if [ -z "$fast_default" ]; then
+    bad "hub#1472: el modo rápido tiene un clippy por defecto" "no se encontró la línea de clippy en el bloque rápido"
+else
+    case "$fast_default" in
+        *"-D warnings"*) bad "hub#1472: el clippy del modo rápido NO lleva -D warnings" "lleva -D warnings: con los 209 avisos de develop aborta cualquier push, también uno sano (la CI no es estricta)" ;;
+        *) ok "hub#1472: el clippy del modo rápido NO lleva -D warnings (paridad con test-hub.yml)" ;;
+    esac
+    case "$fast_default" in
+        *"--no-deps"*) ok "hub#1472: y lleva --no-deps, como la CI" ;;
+        *) bad "hub#1472: y lleva --no-deps, como la CI" "sin --no-deps clippy también analiza las dependencias: más lento y con avisos que no son nuestros" ;;
+    esac
+fi
+
 # ── 6. Same tree twice: the second push must NOT recompile ────────────────────
 #    This is what keeps the fleet's 42 pushes/day from becoming 42 full suites.
 repo=$(make_repo)

@@ -1223,7 +1223,11 @@ if [ "${HUB_GATE_DEPTH:-fast}" = fast ]; then
     if [ -z "$fast_cmd" ]; then
         fast_cmd="cargo check --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
         fast_cmd="$fast_cmd && cargo fmt --all --check"
-        fast_cmd="$fast_cmd && cargo clippy --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android --all-targets -- -D warnings"
+        # Los MISMOS flags que el paso «cargo clippy --workspace» de test-hub.yml, y sin `-D warnings`:
+        # develop arrastra ~209 avisos (03/09) y la CI no es estricta; ser más estricto aquí bloqueó
+        # TODO push del hub nada más auto-instalarse el hook (hub#1472, cazado por la sonda de #1466).
+        # El día que la CI se ponga estricta, se cambian los dos a la vez.
+        fast_cmd="$fast_cmd && cargo clippy --workspace --all-targets --no-deps --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
     fi
     echo "⚡ pre-push: gate RÁPIDO (check + fmt + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
     if ! eval "$fast_cmd"; then
