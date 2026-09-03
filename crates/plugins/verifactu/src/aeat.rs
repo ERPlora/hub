@@ -1150,11 +1150,28 @@ pub struct ConsultRecord {
 ///
 /// `ObligadoEmisionConsultaType` exige **`NombreRazon` además del NIF**: sin él no se construye
 /// el sobre. Mandarlo incompleto solo produce otro 4102 DESPUÉS de haber hablado con Hacienda.
+///
+/// # `presenter` — quién consulta, que en la consulta NO es un bloque sino un FLAG
+///
+/// Por la celda consulta ERPlora con el Sello por cuenta del obligado (ADR-0320, hub#1436), y eso
+/// hay que declararlo o la AEAT devuelve el fault **4112** («el titular del certificado debe ser
+/// Obligado Emisión, Colaborador Social, Apoderado o Sucesor») en vez de la cadena del cliente.
+///
+/// ⚠️ Pero **no se declara como en el alta**. `CabeceraConsultaSf` no tiene `Representante`
+/// —ese bloque es de `CabeceraType`, el del alta (hub#1460)—: declara la secuencia
+/// `IDVersion → (ObligadoEmision | Destinatario) → IndicadorRepresentante?`, y la representación
+/// es un flag de un solo valor (`S`), sin identidad. Estampar aquí un `<sum1:Representante>` con
+/// [`set_representative`] sería otro 4102: el elemento no existe en este esquema.
+///
+/// La regla de cuándo levantarlo es la MISMA que la del bloque del alta (ADR-0268 §4): solo si el
+/// presentador **difiere** del obligado. `None` —la vía propia, donde firma el certificado del
+/// negocio— nunca lo levanta.
 pub fn build_consult_soap(
     issuer_nif: &str,
     issuer_name: &str,
     ejercicio: &str,
     periodo: &str,
+    presenter: Option<Presenter<'_>>,
 ) -> Result<String, VerifactuError> {
     if issuer_nif.trim().is_empty() {
         return Err(VerifactuError::Payload(
@@ -1176,6 +1193,15 @@ pub fn build_consult_soap(
         return Err(VerifactuError::MissingField("Periodo"));
     }
     let periodo_xml = format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo));
+    // Cierra la `Cabecera` (`xs:sequence`: IDVersion → ObligadoEmision → IndicadorRepresentante?)
+    // y solo cuando hay representación de verdad. Del presentador viaja el HECHO, no la identidad:
+    // el esquema de consulta no tiene dónde ponerla.
+    let indicador = match presenter {
+        Some(p) if !p.nif.trim().eq_ignore_ascii_case(issuer_nif.trim()) => {
+            "<sum1:IndicadorRepresentante>S</sum1:IndicadorRepresentante>"
+        }
+        _ => "",
+    };
     Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
@@ -1188,7 +1214,7 @@ pub fn build_consult_soap(
          <sum1:ObligadoEmision>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
          <sum1:NIF>{nif}</sum1:NIF>\
-         </sum1:ObligadoEmision>\
+         </sum1:ObligadoEmision>{indicador}\
          </con:Cabecera>\
          <con:FiltroConsulta>\
          <con:PeriodoImputacion>\

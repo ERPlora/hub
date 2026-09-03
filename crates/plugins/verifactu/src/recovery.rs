@@ -21,7 +21,7 @@ pub(crate) async fn query_aeat_records(input: &Json, host: &dyn NativeHost) -> R
         host,
         &ctx.hub_id,
         &config,
-        consult_endpoint_of(&config),
+        &environment_of(&config),
         &issuer_nif,
         &ctx.now,
     )
@@ -67,7 +67,7 @@ pub(crate) async fn recover_from_aeat(input: &Json, host: &dyn NativeHost) -> Re
         host,
         &ctx.hub_id,
         &config,
-        consult_endpoint_of(&config),
+        &environment_of(&config),
         &issuer_nif,
         &ctx.now,
     )

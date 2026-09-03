@@ -281,29 +281,105 @@ pub(crate) fn obligado_name(config: &Json) -> String {
     str_field(config, "issuer_name")
 }
 
-/// Consulta a la AEAT (TLS mutua con el cert de la config) los registros del emisor en el
-/// periodo actual y los parsea. Red real — sin cert/red devuelve error (no silencioso).
+/// Consulta a la AEAT los registros del emisor en el periodo actual y los parsea, **por la vía
+/// que este hub tenga** (ADR-0320, hub#1436). Red real — sin vía ni red devuelve error, nunca
+/// silencioso.
 ///
-/// The `endpoint` is a parameter and not derived here: a consult on behalf of the hub asks the
-/// environment the hub is in now (`consult_endpoint_of`), while a consult on behalf of ONE
-/// record asks the environment that record's chain lives in (hub#471). Same call, two owners.
+/// El `environment` es un parámetro y no se deriva aquí: una consulta en nombre del HUB pregunta
+/// por el entorno en el que el hub está ahora, mientras que una consulta en nombre de UN registro
+/// pregunta por el entorno en el que vive la cadena de ese registro (hub#471, guarda R4). Misma
+/// llamada, dos dueños. Antes el parámetro era la URL ya resuelta; ahora es el entorno, porque la
+/// celda deriva ella misma la puerta AEAT del par (entorno, tipo del certificado que presenta) y
+/// pasarle una URL sería pedirle que enrutara — que es justo lo que su contrato no hace.
 pub(crate) async fn run_consult(
     host: &dyn NativeHost,
     hub_id: &str,
     config: &Json,
-    endpoint: &str,
+    environment: &str,
     issuer_nif: &str,
     now: &str,
 ) -> Result<Vec<aeat::ConsultRecord>> {
-    // Identity mTLS vía `build_identity`: cert del core (opaca) o legacy. Ver ADR-0079.
-    let identity = build_identity(host, hub_id, config).await?;
+    let route = resolve_route(host, hub_id, config).await?;
+    run_consult_via(host, hub_id, config, &route, environment, issuer_nif, now).await
+}
+
+/// La consulta sobre una vía **ya resuelta**.
+///
+/// Existe para el auto-rechain (`transmission::auto_rechain_and_retry`), que resolvió la vía al
+/// transmitir: volver a resolverla ahí sería la SEGUNDA lectura de la misma pregunta que
+/// `config.rs` documenta como el origen de hub#317/#318/#319/#470 — y además podría consultar por
+/// una vía y re-transmitir por otra, anclando la cadena desde una puerta que no es la que emitió.
+pub(crate) async fn run_consult_via(
+    host: &dyn NativeHost,
+    hub_id: &str,
+    config: &Json,
+    route: &TransmitRoute,
+    environment: &str,
+    issuer_nif: &str,
+    now: &str,
+) -> Result<Vec<aeat::ConsultRecord>> {
     let issuer_name = obligado_name(config);
     let (ejercicio, periodo) = year_month(now);
+    // Quién consulta. Por la celda es ERPlora con el Sello, y el par sale del token FIRMADO, igual
+    // que el `Representante` del alta (hub#1460) — pero aquí viaja como FLAG, no como bloque: el
+    // esquema de consulta no admite `Representante`. Ver `aeat::build_consult_soap`.
+    let presenter = match route {
+        TransmitRoute::Gateway(access) => Some(access.presenter()),
+        TransmitRoute::Direct(_) => None,
+    };
     // Se construye ANTES de abrir la conexión: si falta la razón social del obligado, el sobre
     // no es válido y no tiene sentido hablar con Hacienda para llevarse un 4102.
-    let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo)?;
-    let body = aeat::post_soap(endpoint, identity, &xml).await?;
+    let xml = aeat::build_consult_soap(issuer_nif, &issuer_name, &ejercicio, &periodo, presenter)?;
+    let body = match route {
+        // Vía propia: TLS mutua con el certificado del core (opaca) o legacy. Ver ADR-0079.
+        TransmitRoute::Direct(identity) => {
+            aeat::post_soap(
+                aeat::consult_endpoint(environment, &signing_type(config)),
+                identity.clone(),
+                &xml,
+            )
+            .await?
+        }
+        // Por la celda: los MISMOS bytes, y vuelve el SOAP crudo de la AEAT — el parser de abajo
+        // no distingue el camino. La consulta viaja por la ruta de transmisión de la celda porque
+        // la AEAT publica la consulta en el MISMO `VerifactuSOAP` que el alta (hub#287): a la
+        // celda le llega un sobre opaco hacia la puerta que ya deriva del entorno.
+        TransmitRoute::Gateway(access) => {
+            crate::gateway::transmit_via_gateway(
+                host,
+                hub_id,
+                access,
+                &crate::gateway::GatewayEnvelope {
+                    hub_id,
+                    obligado_nif: issuer_nif,
+                    environment,
+                    transmission_id: &consult_correlation_id(issuer_nif, now),
+                    xml: &xml,
+                },
+            )
+            .await?
+        }
+    };
     Ok(aeat::parse_consult_response(&body)?)
+}
+
+/// El identificador de correlación de UNA consulta, que la celda copia a `Idempotency-Key`.
+///
+/// 🔴 Lleva el instante dentro **a propósito**. Para un alta la clave es el id del registro y su
+/// gracia es que se repita: reenviar los mismos bytes tras un 504 tiene que ser el mismo envío.
+/// Una consulta es lo contrario — pregunta por un estado que cambia—, así que una clave repetida
+/// serviría una foto vieja el día que la celda implemente la idempotencia que hoy tiene
+/// reservada, y una recuperación de cadena que ancla sobre datos rancios es exactamente el fallo
+/// mudo que `recover_from_aeat` existe para evitar. El prefijo `consult-` además la hace
+/// reconocible en los logs de la celda, donde todo lo demás son altas.
+fn consult_correlation_id(issuer_nif: &str, now: &str) -> String {
+    let safe = |value: &str| -> String {
+        value
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .collect()
+    };
+    format!("consult-{}-{}", safe(issuer_nif), safe(now))
 }
 
 /// Intenciones para volcar el snapshot de consulta AEAT: limpia el anterior de este emisor +
