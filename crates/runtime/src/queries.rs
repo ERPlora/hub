@@ -163,9 +163,10 @@ pub async fn execute_page(
             .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
         // Same reader as `commands::execute` and as the ⛔ arm of `setup_status`, on purpose: the
-        // own certificate if there is one, otherwise ERPlora's delegated one (ADR-0202 §2.1,
-        // hub#319). Degrading to `false` keeps the ADR-0203 gate failing CLOSED.
-        let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
+        // own certificate if there is one, otherwise the enrolled machine identity that opens the
+        // cell road (ADR-0320 §1, hub#319/hub#1489). Degrading to `false` keeps the ADR-0203 gate
+        // failing CLOSED.
+        let has_cert = crate::certificate::can_transmit(db, &ctx.hub_id)
             .await
             .unwrap_or(false);
         enriched_ctx = ctx

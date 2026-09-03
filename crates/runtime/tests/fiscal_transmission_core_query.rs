@@ -10,10 +10,10 @@
 //! Three properties this query owes its callers, one test each:
 //!
 //! 1. **The route comes from `certificate::route_of`, never re-derived.** `:has_certificate` is
-//!    `can_sign`, which answers «own OR delegated»: a hub whose only certificate is ERPlora's
-//!    answers `1` there and is on the DELEGATED route. Deducing the route from that 0/1 would be
-//!    a second rule, and two rules is how the screen and `go_live` end up disagreeing about which
-//!    route a business is on.
+//!    `can_transmit`, which answers «has this hub got a ROUTE?» (hub#1489): a hub enrolled on the
+//!    cell answers `1` there and is on the DELEGATED route, so that 0/1 cannot tell the two roads
+//!    apart. Deducing the route from it would be a second rule, and two rules is how the screen
+//!    and `go_live` end up disagreeing about which route a business is on.
 //! 2. **The grant is served from the MIRRORED copy** (`_hub_fiscal_profile`, hub#836), with no
 //!    trip to the control plane. Whoever wants it refreshed opens Ajustes → Negocio, which is
 //!    where the `GET` lives; a screen that fetched on every open would put a network call behind
@@ -89,8 +89,8 @@ async fn hub1416_an_own_certificate_puts_the_hub_on_its_own_route() {
 ///
 /// Since hub#1435 this is also the ONLY way to be on the delegated route: the slot that used to
 /// hold ERPlora's `.p12` is retired, so «no certificate» and «the cell files for me» are the same
-/// state. The route must NOT be re-derived from `can_sign` — that answers «has a certificate», and
-/// it is `false` exactly here.
+/// state. The route must NOT be re-derived from `can_transmit` — since hub#1489 that answers «has
+/// a ROUTE», which an enrolled hub on this very road says `true` to.
 #[tokio::test]
 async fn hub1416_a_hub_with_no_certificate_at_all_reads_delegated() {
     let rt = runtime().await;

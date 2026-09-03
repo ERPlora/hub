@@ -171,12 +171,13 @@ pub(crate) async fn execute_at(
             .await
             .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        // «Can this hub issue?» — the OWN certificate if the business uploaded one, otherwise the
-        // DELEGATED one ERPlora handed down (ADR-0202 §2.1, hub#319). One named function, shared
-        // with `queries::execute_page` and with the ⛔ arm of `setup_status`, because a gate and a
-        // checklist that disagree about this turn ⛔ into a lie in one direction or the other.
-        // Degrading to `false` on error keeps the gate failing CLOSED.
-        let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
+        // «Can this hub issue?» — its OWN certificate if the business uploaded one, otherwise the
+        // enrolled machine identity that opens the cell road (ADR-0320 §1, hub#319/hub#1489). One
+        // named function, shared with `queries::execute_page` and with the ⛔ arm of
+        // `setup_status`, because a gate and a checklist that disagree about this turn ⛔ into a
+        // lie in one direction or the other. Degrading to `false` on error keeps the gate failing
+        // CLOSED.
+        let has_cert = crate::certificate::can_transmit(db, &ctx.hub_id)
             .await
             .unwrap_or(false);
         // What this hub OWES right now (ADR-0273 D2/D4): the mode plus the events the provider

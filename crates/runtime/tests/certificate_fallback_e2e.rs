@@ -10,15 +10,18 @@
 //!
 //! All three used to answer it by looking at the **own** slot directly, which was merely *strict*
 //! while nothing else could sign. hub#317 added a second slot (ERPlora's delegated certificate) and
-//! from that moment the three answers had to move together — **to `certificate::can_sign`, all at
+//! from that moment the three answers had to move together — **to one named function, all at
 //! once**. Moving one alone is what starts the lie: a ⛔ that blocks a screen while the runtime
 //! accepts the sale, or a runtime that refuses while the checklist says everything is done.
 //!
 //! **hub#1435 retired that second slot** and the hub is back to one — but the lesson is not: the
 //! question still has three askers and they still have to answer identically, which is precisely
-//! what a single named function (`can_sign`) makes structural. So the test that matters here is not
-//! «which slot wins»; it is that the three answers are **the same answer**, in both states a hub can
-//! be in. That is what this file pins.
+//! what a single named function makes structural. hub#1489 then renamed that function to what it
+//! actually decides (`certificate::can_transmit` — «has this hub got a ROUTE?», its own certificate
+//! or the enrolled cell identity), and the fourth reader parted company on purpose: the fiscal
+//! ENGINE gates on the OWN certificate, because on the cell road it signs nothing. So the test that
+//! matters here is not «which slot wins»; it is that the three core answers are **the same answer**,
+//! in both states this fixture can be in.
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, DatabaseAdapter, Params};
@@ -224,7 +227,7 @@ async fn the_checklist_blocks(rt: &Runtime, hub_id: &str) -> bool {
 }
 
 /// **The property of hub#319: one hub, one answer.** Whatever the hub holds, the dispatcher gate,
-/// the checklist and the fiscal engine say the same thing — and they say `can_sign`.
+/// the checklist say the same thing — and they say `can_transmit`.
 ///
 /// This is the assertion the issue asks for explicitly, and the reason it is ONE test rather than
 /// three: the failure mode is not «a reader is wrong», it is «two readers stopped agreeing», and
@@ -233,28 +236,31 @@ async fn assert_the_readers_agree(slots: Slots, expected_can_issue: bool) {
     let hub_id = "hub-fallback";
     let rt = hub(hub_id, slots).await;
 
-    let can_sign = certificate::can_sign(rt.db(), hub_id).await.unwrap();
+    let can_transmit = certificate::can_transmit(rt.db(), hub_id).await.unwrap();
     let gate = the_gate_accepts(&rt, hub_id).await;
     let blocks = the_checklist_blocks(&rt, hub_id).await;
     let engine = the_engine_can_sign(&rt, hub_id).await;
 
     assert_eq!(
-        can_sign, expected_can_issue,
-        "{slots:?}: the core's own answer to «can this hub sign?»"
+        can_transmit, expected_can_issue,
+        "{slots:?}: the core's own answer to «has this hub got a route?»"
     );
     assert_eq!(
-        gate, can_sign,
-        "{slots:?}: the dispatcher gate disagrees with `can_sign`"
+        gate, can_transmit,
+        "{slots:?}: the dispatcher gate disagrees with `can_transmit`"
     );
     assert_eq!(
-        !blocks, can_sign,
-        "{slots:?}: the checklist ⛔ disagrees with `can_sign` — a ⛔ that does not block, or a \
+        !blocks, can_transmit,
+        "{slots:?}: the checklist ⛔ disagrees with `can_transmit` — a ⛔ that does not block, or a \
          rejection nobody warned about"
     );
+    // The ENGINE answers a narrower question and must keep answering it (hub#1489): «can *I* sign
+    // with a business certificate?», which is `build_identity`'s gate and only ever the own slot.
+    // On the cell road the engine signs NOTHING — the cell does, with ERPlora's Seal — so tying
+    // this to `can_transmit` would demand a certificate of the very hub that has no need of one.
     assert_eq!(
-        engine, can_sign,
-        "{slots:?}: `build_identity` disagrees with `can_sign` — the runtime would accept a sale \
-         the fiscal engine then refuses to register, or the reverse"
+        engine, slots.own,
+        "{slots:?}: `build_identity` must gate on the OWN certificate, no more and no less"
     );
 }
 
@@ -264,14 +270,14 @@ async fn a_hub_with_its_own_certificate_can_issue() {
     assert_the_readers_agree(OWN_ONLY, true).await;
 }
 
-/// **No certificate: the hub cannot issue, and the three still agree.** An empty hub fails CLOSED
-/// and the checklist says so — the honest, uniform answer.
+/// **No certificate AND nothing enrolled: the hub cannot issue, and the three still agree.** An
+/// empty hub fails CLOSED and the checklist says so — the honest, uniform answer.
 ///
-/// ⚠️ This is also where a real gap shows through, and it is NOT this file's to close: a hub on the
-/// fiscal cell's road (ADR-0320) holds no certificate either, so it lands here — `can_sign` false,
-/// ⛔ shown — even though the cell transmits for it perfectly well. `can_sign` still means «has a
-/// certificate of its own». Retiring the delegated slot did not create that; it removed the only
-/// state that used to paper over it. Tracked as hub#1489.
+/// ⚠️ «No certificate» is no longer the same thing as «no way out» (hub#1489): a hub on the fiscal
+/// cell's road (ADR-0320 §1) holds no certificate either and files perfectly well, so what puts a
+/// hub here is having NEITHER road. This fixture has no machine identity enrolled, which is what
+/// keeps it in this state — `crates/runtime/tests/fiscal_route_gate_hub1489.rs` walks the other
+/// one.
 #[tokio::test]
 async fn a_hub_with_no_certificate_at_all_still_cannot_issue() {
     assert_the_readers_agree(NEITHER, false).await;

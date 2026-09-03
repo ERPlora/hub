@@ -67,7 +67,7 @@ async fn runtime_with_verifactu(hub_id: &str) -> Runtime {
 /// Writes one slot straight into the core table, exactly like
 /// `crates/runtime/tests/certificate_fallback_e2e.rs::store_slot` — going through the real
 /// writers would need the process-global `HUB_SECRETS_KEY`, and everything this file reads (the
-/// dispatcher's `can_sign`, the engine's `has_certificate`) looks only at the PRESENCE of the
+/// dispatcher's `can_transmit`, the engine's `has_certificate`) looks only at the PRESENCE of the
 /// row, never at its content. `marker` stands in for "which physical certificate" purely for the
 /// test's own readability: cert A and cert B share nothing, on purpose.
 async fn store_cert(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKind, marker: &str) {

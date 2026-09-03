@@ -155,6 +155,37 @@ pub async fn client_identity(
     Ok(Some((identity, ca_pem.into_bytes())))
 }
 
+/// **Is the cell road open from THIS side?** — the local half of «can this hub file?» (hub#1489).
+///
+/// `true` when the three things [`client_identity`] demands are installed: the private key
+/// generated on this hub, the certificate the operator signed for it, and the internal CA that
+/// anchors the cell's server certificate. It is deliberately the SAME triple, read from the same
+/// row: a presence check that accepted less would promise a road that
+/// `reqwest::Identity::from_pem` then refuses to build.
+///
+/// # Why the core asks this instead of asking the engine
+///
+/// The engine's own answer (`config::can_transmit`) is the live one and it is worth more — it
+/// mints a token against the control plane and learns whether this hub is routed through the cell
+/// at all. It is also a NETWORK call, and the three readers of [`crate::certificate::can_transmit`]
+/// are the dispatcher gate, the onboarding checklist and the boot-time profile refresh. A hub with
+/// no connectivity would fail every sale, and that is precisely the direction ADR-0203 must not
+/// fail in: the gate exists to stop a sale nobody can file, not to stop a sale nobody can phone
+/// home about.
+///
+/// So this is the offline predicate: **has this hub got something to present at the ingress?**
+/// Everything downstream of the handshake (the token, the grant, the quota) is refused by the
+/// cell with its own code on the record, where it is visible and recoverable — a contingency, not
+/// a rejected sale.
+///
+/// Never decrypts: presence of the ciphertext is presence of the key.
+pub async fn is_enrolled(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    let Some((private_key_pem, certificate_pem, ca_pem, _)) = load_row(db, hub_id).await? else {
+        return Ok(false);
+    };
+    Ok(!private_key_pem.is_empty() && !certificate_pem.is_empty() && !ca_pem.is_empty())
+}
+
 /// What exists, without touching key material beyond its presence.
 pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<GatewayIdentityStatus> {
     let row = load_row(db, hub_id).await?;
@@ -518,6 +549,48 @@ mod tests {
         let (cert, ca) = sign_with_test_ca(&csr, None, 365);
         install_certificate(&db, HUB, &cert, &ca).await.unwrap();
         assert_eq!(stored_ca_pem(&db, HUB).await.unwrap(), Some(ca));
+    }
+
+    /// 🔒 **A filed CSR is NOT a route** (hub#1489). Between `ensure_key_and_csr` and the operator
+    /// approving it a hub holds a private key and nothing else, and that gap is days long. Reading
+    /// it as «enrolled» would let `certificate::can_transmit` open the fiscal gate for a hub that
+    /// cannot complete a single mTLS handshake: every sale accepted, every record unfilable. So the
+    /// answer walks the real lifecycle — nothing, key only, fully installed — and only the last one
+    /// is a road.
+    #[tokio::test]
+    async fn only_a_fully_installed_identity_counts_as_enrolled() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(53));
+        let db = db_ready().await;
+
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "sin fila no hay nada que presentar en el ingress"
+        );
+
+        let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "con la clave generada y el CSR presentado todavía no hay certificado: no es una vía"
+        );
+
+        let (cert, ca) = sign_with_test_ca(&csr, None, 365);
+        install_certificate(&db, HUB, &cert, &ca).await.unwrap();
+        assert!(
+            is_enrolled(&db, HUB).await.unwrap(),
+            "clave + certificado + CA: exactamente lo que `client_identity` monta"
+        );
+        assert!(
+            client_identity(&db, HUB).await.unwrap().is_some(),
+            "y la respuesta tiene que ser la MISMA que la del constructor real, o `is_enrolled` \
+             estaría prometiendo una conexión que no se puede abrir"
+        );
+
+        delete(&db, HUB).await.unwrap();
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "rotar la clave cierra la vía hasta que se re-enrola"
+        );
     }
 
     #[tokio::test]

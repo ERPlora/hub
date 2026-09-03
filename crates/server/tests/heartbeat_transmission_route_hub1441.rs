@@ -50,8 +50,9 @@ async fn wire(rt: &Runtime) -> Value {
 }
 
 /// A hub whose only occupied slot is the DELEGATED one reports `delegated` — and that is the
-/// regression the issue asks for. `certificate::can_sign` answers «own OR delegated», so a route
-/// deduced from it would call this hub `own` and take its grant page away.
+/// regression the issue asks for. `certificate::can_transmit` answers «has this hub got a ROUTE?»
+/// (hub#1489), a 0/1 that cannot tell the two roads apart, so a route deduced from it would call
+/// this hub `own` and take its grant page away.
 #[tokio::test]
 async fn hub1441_a_delegated_only_hub_reports_the_delegated_route() {
     let rt = hub().await;
