@@ -1358,11 +1358,33 @@ mod tests {
                     break;
                 }
             }
-            *recorder.lock().unwrap() = Some(String::from_utf8_lossy(&buffer).into_owned());
+            let raw = String::from_utf8_lossy(&buffer).into_owned();
+            *recorder.lock().unwrap() = Some(raw.clone());
+            // Like the REAL cell: the digest is recomputed over the bytes IT decoded, never
+            // copied from the envelope. That way the canary of hub#1461 compares two independent
+            // computations of the same fact — if the hub digested anything else, this goes red.
+            let request_sha256 = raw
+                .split("\r\n\r\n")
+                .nth(1)
+                .and_then(|body| serde_json::from_str::<Json>(body).ok())
+                .and_then(|envelope| {
+                    let b64 = envelope["xml_b64"].as_str()?.to_owned();
+                    base64::engine::general_purpose::STANDARD.decode(b64).ok()
+                })
+                .map(|xml| {
+                    use sha2::Digest as _;
+                    sha2::Sha256::digest(&xml)
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<String>()
+                })
+                // With no digest the delivery is refused upstream, which is what should happen
+                // if this fake cell ever stops resembling the real one.
+                .unwrap_or_default();
             let receipt = serde_json::json!({
                 "schema_version": 1,
                 "transmission_id": "record-1460",
-                "request_sha256": "00".repeat(32),
+                "request_sha256": request_sha256,
                 "aeat_http_status": 200,
                 "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
                     "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
@@ -1484,7 +1506,7 @@ mod tests {
             },
         });
 
-        super::transmit_one(
+        let (ops, _events, success) = super::transmit_one(
             &host,
             &ctx,
             &record,
@@ -1519,6 +1541,27 @@ mod tests {
             host.archived.lock().unwrap().as_slice(),
             std::slice::from_ref(&xml),
             "what was archived is what was transmitted"
+        );
+
+        // 🔒 POSITIVE CONTROL for the canary (hub#1461). The cell above recomputes the digest
+        // exactly like the real one, so this road is the HONEST one: the delivery must reach a
+        // verdict. Without this half, a canary that refused EVERY receipt would leave the test
+        // green — `transmit_one` returns `Ok` when it queues contingency too — and the whole
+        // fleet would stop filing invoices with nobody noticing.
+        assert!(success, "the honest delivery must be filed, not queued");
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("the AEAT verdict must reach the record");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("accepted")),
+            "the receipt held up, so the verdict is filed"
+        );
+        assert!(
+            !ops.iter()
+                .any(|o| o.command == "verifactu._enqueue_contingency"),
+            "a receipt whose digest matches is NOT a transmission failure"
         );
     }
 
