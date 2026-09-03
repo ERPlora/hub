@@ -52,15 +52,25 @@ pub(crate) struct GatewayEnvelope<'a> {
     pub xml: &'a str,
 }
 
+/// The digest of an exact XML payload, lowercase hex.
+///
+/// ONE definition on purpose (verifactu#75). Three places need this number and they must never be
+/// able to disagree: the envelope that asks the cell to echo it back as `request_sha256`, the
+/// canary in [`post_transmission`] that compares the two, and the `xml_sha256` column the record
+/// keeps so a later reader can tell whether the stored XML still is the XML that travelled.
+pub(crate) fn xml_sha256(xml: &str) -> String {
+    sha2::Sha256::digest(xml.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 impl GatewayEnvelope<'_> {
     /// The digest of the EXACT bytes that travel. The cell recomputes it over what it decodes
     /// and echoes it back as `request_sha256`; comparing the two is the canary of ADR-0320 §2
     /// («el gateway NO modifica el XML») — see [`post_transmission`].
     pub(crate) fn xml_sha256(&self) -> String {
-        sha2::Sha256::digest(self.xml.as_bytes())
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+        xml_sha256(self.xml)
     }
 }
 

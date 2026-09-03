@@ -197,7 +197,17 @@ pub(crate) async fn transmit_one(
         let reason = e.to_string();
         return Ok((
             vec![
-                apply_transmission(&record_id, "rejected", "XSD", &reason, "", &xml, "", 0),
+                apply_transmission(
+                    &record_id,
+                    "rejected",
+                    "XSD",
+                    &reason,
+                    "",
+                    &xml,
+                    "",
+                    &record_id,
+                    0,
+                ),
                 op(
                     "verifactu._insert_event",
                     json!({
@@ -331,6 +341,7 @@ pub(crate) async fn transmit_one(
                             &xml_storage_path,
                             event_id,
                             &ctx.now,
+                            &record_id,
                             Some(&format!("recuperación automática fallida: {e}")),
                         ))
                     }
@@ -345,6 +356,7 @@ pub(crate) async fn transmit_one(
                 &xml_storage_path,
                 event_id,
                 &ctx.now,
+                &record_id,
                 None,
             ))
         }
@@ -374,6 +386,7 @@ pub(crate) async fn transmit_one(
                     "",
                     &xml,
                     &xml_storage_path,
+                    &record_id,
                     1,
                 ),
                 op(
@@ -629,6 +642,7 @@ pub(crate) fn response_ops(
     xml_storage_path: &str,
     event_id: &str,
     now: &str,
+    transmission_id: &str,
     note: Option<&str>,
 ) -> (Vec<Operation>, Vec<Event>, bool) {
     let record_id = &str_field(record, "id");
@@ -664,6 +678,7 @@ pub(crate) fn response_ops(
             &resp.csv,
             xml,
             xml_storage_path,
+            transmission_id,
             0,
         ),
         op(
@@ -842,6 +857,10 @@ pub(crate) async fn auto_rechain_and_retry(
     // cliente — el fault 4112 medido contra prewww el 2026-09-02.
     let xml = aeat::set_representative(&xml, route.presenter(), &issuer_nif);
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
+    // Se calcula UNA vez y se usa dos: en el sobre que ve la celda y en la fila que lo recuerda.
+    // Derivarlo dos veces es cómo el registro acabaría diciendo que salió bajo una clave que la
+    // celda nunca vio (verifactu#75).
+    let delivery_id = rechain_delivery_id(&record_id, &anchor_hash);
     let body = match route {
         TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(destination.endpoint, identity.clone(), &xml).await?
@@ -859,7 +878,7 @@ pub(crate) async fn auto_rechain_and_retry(
                     hub_id: &ctx.hub_id,
                     obligado_nif: &issuer_nif,
                     environment: &destination.environment,
-                    transmission_id: &format!("{record_id}-rechain-{}", short(&anchor_hash)),
+                    transmission_id: &delivery_id,
                     xml: &xml,
                 },
             )
@@ -886,6 +905,7 @@ pub(crate) async fn auto_rechain_and_retry(
         &xml_storage_path,
         event_id,
         &ctx.now,
+        &delivery_id,
         Some(&note),
     );
     // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
@@ -918,7 +938,23 @@ pub(crate) async fn archive_transmission_xml(
     .await
 }
 
+/// El id con el que se presenta UNA entrega re-anclada.
+///
+/// No es el del registro, y esa diferencia es el motivo de que la columna `transmission_id` no
+/// sea redundante con `id` (verifactu#75): el re-anclado manda bytes DISTINTOS para el mismo
+/// registro, así que reutilizar la clave sería el `409 transmission_digest_mismatch` que la celda
+/// tiene reservado. Lleva el ancla dentro, que es lo que cambió — mismo ancla ⇒ mismos bytes ⇒
+/// misma clave, que es la idempotencia que sí se quiere.
+pub(crate) fn rechain_delivery_id(record_id: &str, anchor_hash: &str) -> String {
+    format!("{record_id}-rechain-{}", short(anchor_hash))
+}
+
 /// Intención UPDATE del registro tras un intento de transmisión.
+///
+/// `transmission_id` es el id con el que salió ESTA entrega — la `Idempotency-Key` por la que
+/// indexa la celda fiscal cuando la vía es la pasarela. Se persiste junto al digest de los bytes
+/// que se archivan aquí mismo, que es lo que permite a un lector posterior decidir si el XML
+/// guardado sigue siendo el que viajó (verifactu#75).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_transmission(
     record_id: &str,
@@ -928,6 +964,7 @@ pub(crate) fn apply_transmission(
     csv: &str,
     xml: &str,
     xml_storage_path: &str,
+    transmission_id: &str,
     retry_increment: i64,
 ) -> Operation {
     op(
@@ -940,6 +977,11 @@ pub(crate) fn apply_transmission(
             "aeat_csv": csv,
             "xml_content": xml,
             "xml_storage_path": xml_storage_path,
+            // La huella de la entrega. El digest sale de la MISMA función que el sobre del
+            // gateway, así que lo que la fila guarda y lo que la celda tiene que devolver como
+            // `request_sha256` no pueden ser dos números distintos.
+            "xml_sha256": crate::gateway::xml_sha256(xml),
+            "transmission_id": transmission_id,
             "retry_increment": retry_increment,
         }),
     )
@@ -2028,6 +2070,20 @@ pub(crate) mod tests {
             "tras re-anclar, la AEAT aceptó: {:?}",
             applied.params
         );
+        // verifactu#75: what the row keeps is what the CELL saw — the key and the digest of the
+        // re-anchored envelope, not the record's. This pins the wiring of the call site in
+        // `auto_rechain_and_retry`, which the builder-level tests on `response_ops` cannot see.
+        assert_eq!(
+            applied.params.get("transmission_id").and_then(Json::as_str),
+            envelopes[2]["transmission_id"].as_str(),
+            "the row has to remember the key the re-anchored delivery went out under: {:?}",
+            applied.params
+        );
+        assert_eq!(
+            applied.params.get("xml_sha256").and_then(Json::as_str),
+            Some(crate::gateway::xml_sha256(&xml_of(&envelopes[2])).as_str()),
+            "the row has to remember the digest of the bytes the cell saw"
+        );
         assert!(
             !ops.iter()
                 .any(|o| o.command == "verifactu._enqueue_contingency"),
@@ -2929,6 +2985,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             Some("re-anclado automáticamente tras 4102"),
         );
 
@@ -2948,6 +3005,120 @@ mod environment_chain_tests {
         assert!(
             message.contains("remitido a «testing»"),
             "and so must the drift note: {message}"
+        );
+    }
+
+    /// 🔴 verifactu#75. A filed record kept the XML and nothing that PINS IT DOWN. The digest of
+    /// the bytes that travelled was computed over the outgoing envelope and thrown away, so if
+    /// `xml_content` — or the archived object behind `xml_storage_path` — moved afterwards,
+    /// nothing noticed: a retry recomputed the digest over whatever was there and transmitted
+    /// DIFFERENT bytes believing they were the same ones.
+    #[test]
+    fn a_filed_transmission_stamps_the_digest_of_the_bytes_that_travelled() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            "<sf:RegistroFactura>QA</sf:RegistroFactura>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            "rec-2",
+            None,
+        );
+
+        let apply = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("filing a verdict updates the record");
+        assert_eq!(
+            apply.params.get("xml_sha256").and_then(Json::as_str),
+            Some(crate::gateway::xml_sha256("<sf:RegistroFactura>QA</sf:RegistroFactura>").as_str()),
+            "the row has to keep the digest of the bytes it is storing"
+        );
+    }
+
+    /// The digest that is PERSISTED and the digest the cell is asked to echo back as
+    /// `request_sha256` must be the same number, and the only way to guarantee that is for both to
+    /// come out of the SAME function. If they ever diverge, the canary of ADR-0320 §2 starts
+    /// comparing one thing and the audit trail recording another.
+    #[test]
+    fn the_persisted_digest_is_the_one_the_cell_is_asked_to_echo() {
+        let xml = "<sf:RegistroFactura>QA</sf:RegistroFactura>";
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            xml,
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            "rec-2",
+            None,
+        );
+        let persisted = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .and_then(|o| o.params.get("xml_sha256"))
+            .and_then(Json::as_str)
+            .expect("the record keeps a digest")
+            .to_string();
+
+        let envelope = crate::gateway::GatewayEnvelope {
+            hub_id: "hub-1",
+            obligado_nif: "12345678Z",
+            environment: "testing",
+            transmission_id: "rec-2",
+            xml,
+        };
+        assert_eq!(
+            persisted,
+            envelope.xml_sha256(),
+            "what the row keeps and what the cell is asked to echo have to be ONE number"
+        );
+    }
+
+    /// 🔴 verifactu#75. The id the delivery went out under is the `Idempotency-Key` the fiscal
+    /// cell indexes on, and it is NOT always the record id: the automatic re-anchor presents the
+    /// SAME record under `{id}-rechain-{anchor}` because the bytes changed. Without the column
+    /// there is no way to cross a hub record with the cell's log line.
+    #[test]
+    fn a_filed_transmission_stamps_the_id_it_went_out_under() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let rechained = rechain_delivery_id("rec-2", HASH_TESTING_2);
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            &rechained,
+            Some("re-anclado automáticamente tras 4102"),
+        );
+
+        let apply = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("filing a verdict updates the record");
+        assert_eq!(
+            apply.params.get("transmission_id").and_then(Json::as_str),
+            Some(rechained.as_str()),
+            "the row has to keep the key the cell actually saw, not the record id"
+        );
+        assert_ne!(
+            rechained, "rec-2",
+            "a re-anchored retry never goes out under the record id — that is the whole reason \
+             the column is not redundant with `id`"
         );
     }
 
@@ -2974,6 +3145,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3009,6 +3181,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3083,6 +3256,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3152,6 +3326,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3187,6 +3362,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3236,6 +3412,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -3267,6 +3444,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
