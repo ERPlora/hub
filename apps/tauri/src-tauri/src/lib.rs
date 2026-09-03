@@ -1032,7 +1032,7 @@ fn open_main_window(app: &tauri::App, cache_dir: Option<PathBuf>) -> tauri::Resu
 // y la `PrintQueue` con reintentos drena en segundo plano. Los outcomes y eventos del watchdog se
 // loguean; el canal hacia la UI se cablearía con eventos Tauri en una fase posterior.
 
-use erplora_peripherals::discovery::{self, parse_printer_id, LocalNetworkAccess, PrinterDiscovery};
+use erplora_peripherals::discovery::{self, LocalNetworkAccess, PrinterDiscovery};
 use erplora_peripherals::drawer;
 use erplora_peripherals::escpos::{self, DocumentType};
 use erplora_peripherals::protocol::Device;

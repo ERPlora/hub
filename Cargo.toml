@@ -68,6 +68,12 @@ suspicious = { level = "warn", priority = -1 }
 # RECHAZARÁ en una versión futura. También está limpio hoy, así que se cierra igual — y así el
 # hub no se entera de una rotura del lenguaje el día que le toque subir de toolchain.
 future_incompatible = { level = "deny", priority = -1 }
+# Un import sin usar es un ERROR, no un warning (hub#1501 → hub#1504). El warning no guardaba
+# nada: `DemoLock` se quedó sin uso en `error_registry.rs` con el merge de hub#1490 y nadie lo vio
+# hasta tropezar con él de paso — y para entonces eran cuatro. Muesca subida con el workspace a
+# cero, medidos también los dos crates que el clippy del CI excluye (`erplora-tauri`, plugin
+# Android) en macOS. La vigila `scripts/tests/clippy-lints.test.sh`.
+unused_imports = { level = "deny", priority = -1 }
 
 [workspace.package]
 edition = "2021"
