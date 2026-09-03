@@ -238,10 +238,14 @@ fi
 # filter on every job that costs minutes — a draft PR is 0 CI minutes until `gh pr ready`.
 wf_self="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/workflows/test-web.yml"
 on_txt="$(on_block)"
-if ! printf '%s' "$on_txt" | grep -qE '^  pull_request:'; then
+# Here-strings, never `printf … | grep -q`: under `pipefail`, grep -q closes the pipe at the first
+# match and printf dies with "Broken pipe" → a MATCH becomes a failure (red only on Linux; the
+# Mac's printf finishes first). Bit us on the first CI run of hub#1471.
+pr_sub="$(on_sub_block pull_request)"
+if ! grep -qE '^  pull_request:' <<<"$on_txt"; then
     bad "test-web.yml runs on \`pull_request\` again (hub#1466)" \
         "\`on.pull_request\` is missing: the heavy suite moved back to Actions on 2026-09-03 and the local gate no longer attests — without this trigger nothing green ever authorises a web PR"
-elif ! printf '%s' "$(on_sub_block pull_request)" | grep -qE 'ready_for_review'; then
+elif ! grep -qE 'ready_for_review' <<<"$pr_sub"; then
     bad "\`pull_request.types\` includes \`ready_for_review\`" \
         "without it a draft that becomes ready never gets a run (the draft filter skipped the earlier events)"
 else
@@ -249,7 +253,7 @@ else
 fi
 pr_paths="$(on_sub_block pull_request)"
 for p in "apps/web/**" "packages/**" "$guard_path" ".github/workflows/test-web.yml"; do
-    printf '%s' "$pr_paths" | grep -qF "$p" \
+    grep -qF "$p" <<<"$pr_paths" \
         && ok "\`pull_request.paths\` includes \`$p\`" \
         || bad "\`pull_request.paths\` includes \`$p\`" "a PR touching it would open with no web check"
 done
@@ -258,7 +262,8 @@ draft_if="github.event_name != 'pull_request' || !github.event.pull_request.draf
 minute_jobs="$(awk '/^jobs:/{f=1;next} f&&/^  [a-z_-]+:$/{sub(/:$/,"",$1); j=$1} f&&j!=""&&/run: *(pnpm|cargo)/{print j; j=""}' "$wf_self" | sort -u)"
 [ -n "$minute_jobs" ] || bad "test-web.yml has jobs that run pnpm/cargo" "none parsed — the draft-filter assertion below would be vacuous"
 for job in $minute_jobs; do
-    if awk -v J="  $job:" '$0==J{f=1;next} f&&/^  [a-z-]+:$/{exit} f' "$wf_self" | grep -qF "$draft_if"; then
+    job_body="$(awk -v J="  $job:" '$0==J{f=1;next} f&&/^  [a-z-]+:$/{exit} f' "$wf_self")"
+    if grep -qF "$draft_if" <<<"$job_body"; then
         ok "job \`$job\` skips draft PRs (\`if:\` with the draft filter)"
     else
         bad "job \`$job\` skips draft PRs" "no \`if: $draft_if\` on the job: a draft PR would burn runner minutes and get cancelled on the reviewer's re-push (measured 29/08: half the minutes)"
