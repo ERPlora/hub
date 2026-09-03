@@ -107,9 +107,13 @@ discovered=$(
                 -type f \( -name '*.test.py' -o -name '*.test.sh' \) -print 2>/dev/null |
                 while IFS= read -r file; do
                     rel=${file#"$mod_dir"/}
+                    # The arms are parenthesised — `(pattern)`, not `pattern)` — because this
+                    # `case` lives inside a command substitution and bash 3.2, the one macOS
+                    # ships, would otherwise read the first `)` as the end of the `$( … )`
+                    # (hub#1468). Guard: `scripts/ci/shell-syntax.sh`.
                     case "$rel" in
-                        *.hub.test.py | *.hub.test.sh) ;;
-                        *)
+                        (*.hub.test.py | *.hub.test.sh) ;;
+                        (*)
                             # Not named as a hub battery: it only counts if it reaches for the
                             # hub's base URL, the way the toolkit classifies by content.
                             grep -q '_HUB_BASE_URL' "$file" 2>/dev/null || continue
@@ -178,7 +182,7 @@ fi
 checkable=$(
     printf '%s\n' "$declared" | grep -v '^$' |
         while IFS= read -r entry; do
-            case "$entry" in */*) ;; *) continue ;; esac
+            case "$entry" in (*/*) ;; (*) continue ;; esac
             module=${entry%%/*}
             [ -d "$catalogue/$module" ] && printf '%s\n' "$entry"
         done | LC_ALL=C sort

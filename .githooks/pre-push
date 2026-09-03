@@ -1199,6 +1199,27 @@ else
     fi
 fi
 
+# ── hub#1468: que los scripts de este repo PARSEEN donde se ejecutan ─────────
+# Milisegundos, y va antes que cualquier cargo: el bug que lo motivó (un `case` dentro de
+# `$( … )`, que bash 3.2 no parsea) dejó la batería de ESTE hook sin poder ejecutarse entera
+# en la máquina donde vive el gate, y CI no lo vio nunca porque los runners son Ubuntu con
+# bash 5. En macOS `/bin/bash` es 3.2, así que aquí —y solo aquí— la comprobación es la de
+# verdad: `--require-legacy` impide que una máquina sin bash < 4 haga pasar un parseo de
+# bash 5 por el contrato del suelo. Fuera de macOS se comprueba igual, pero sin exigirlo.
+# Silencioso en verde: solo habla cuando algo no parsea. Contrato: scripts/tests/shell-syntax.test.sh.
+SHELL_SYNTAX="$(git rev-parse --show-toplevel)/scripts/ci/shell-syntax.sh"
+if [ -f "$SHELL_SYNTAX" ]; then
+    shell_syntax_args=""
+    [ "$(uname -s)" = Darwin ] && shell_syntax_args="--require-legacy"
+    if ! shell_syntax_out=$(bash "$SHELL_SYNTAX" $shell_syntax_args 2>&1); then
+        echo "" >&2
+        echo "$shell_syntax_out" >&2
+        echo "❌ pre-push: un script del repo no parsea con el bash de esta máquina → push ABORTADO." >&2
+        echo "   Verde en CI (Ubuntu, bash 5) y rojo aquí es el peor reparto posible: arréglalo antes de subir." >&2
+        exit 1
+    fi
+fi
+
 # ── hub#1466: la PROFUNDIDAD del gate — rápido aquí, pesado en la nube ───────
 # Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
 # `clippy` 18-20 s → ~25 s en el caso que manda (rehacer un arreglo tras una revisión), contra

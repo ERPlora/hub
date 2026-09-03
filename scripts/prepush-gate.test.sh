@@ -495,6 +495,15 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Write a fake `gh` and echo the directory to prepend to PATH.
+#
+# 🔴 Every `case` arm in the bodies below is PARENTHESISED — `("repo view")`, not
+# `"repo view")`. The bodies arrive through a heredoc fed to a command substitution,
+# and bash 3.2 (what macOS ships, and what `env bash` resolves to when Homebrew's is
+# not first on PATH) scans `$( … )` for its closing paren without understanding
+# `case`: the first bare arm ends the substitution and the parser dies at the next
+# `;;`. This file — the battery of the ONLY pre-merge proof of the hub — could not
+# be parsed at all on the machine the gate runs on, and CI never saw it because the
+# runners are Ubuntu with bash 5 (hub#1468). Guard: `scripts/ci/shell-syntax.sh`.
 make_gh() {
     local dir=$1/ghbin
     mkdir -p "$dir"
@@ -520,10 +529,10 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view")
+    ("repo view")
         echo 'gh: HTTP 404: Not Found (https://api.github.com/repos/ERPlora/hub)' >&2
         exit 1 ;;
-    "auth status")
+    ("auth status")
         echo 'github.com'                                              >&2
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
@@ -587,14 +596,14 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status")
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status")
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
 esac
 # `gh api …` — the push landed (the ref reads back), writing the status does not.
 for a in "$@"; do [ "$a" = "-X" ] && { echo 'gh: HTTP 403: Resource not accessible by integration' >&2; exit 1; }; done
-for a in "$@"; do case "$a" in repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
+for a in "$@"; do case "$a" in (repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -620,11 +629,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -702,11 +711,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1013,11 +1022,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "$@"; do [ "$a" = "-X" ] && { echo posted > "$REPO_DIR/POSTED"; exit 0; }; done
-for a in "$@"; do case "$a" in repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
+for a in "$@"; do case "$a" in (repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
 exit 0
 GH
 )
@@ -1045,11 +1054,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1078,12 +1087,12 @@ sha=$(git -C "$repo" rev-parse HEAD)
 other=1111111111111111111111111111111111111111
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
-for a in "\$@"; do case "\$a" in repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1272,11 +1281,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1439,11 +1448,11 @@ for pair in "refs/heads/fix/sello|local-gate/hub-tests-scoped" "refs/heads/devel
     sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
     ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1473,11 +1482,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" Cargo.lock)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1856,11 +1865,11 @@ attest_case() { # <SKIP_HUB_WEB 0|1> -> imprime los args del status publicado (v
     # nada estuviera roto. Se acumulan, y las aserciones buscan cada contexto dentro del montón.
     ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2235,11 +2244,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2269,11 +2278,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" docs/nota.md)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2305,11 +2314,11 @@ touch_and_commit "$repo" crates/c/src/lib.rs >/dev/null
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2337,11 +2346,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2376,6 +2385,61 @@ if grep -nE "pr-reviewer|review_handoff|/reviewed/" "$hook"; then
 else
     ok "hub#1417: the gate never calls the removed local PR reviewer again"
 fi
+
+# ── hub#1468: un script que no parsea con el bash de ESTA máquina aborta el push ──
+#    El bug que lo motivó llegó a `develop` con todos los checks en verde: los runners son
+#    Ubuntu con bash 5 y el `case` dentro de `$( … )` solo lo rechaza el 3.2 de macOS, que es
+#    donde vive este gate. Aquí se comprueba que el cable BITE de verdad — no que exista.
+#    El banco lleva su propio `scripts/ci/shell-syntax.sh` (el real, copiado) porque los repos
+#    de mentira de este fichero no tienen `scripts/`, y sin él el gate se lo salta a propósito.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cat > "$repo/scripts/ci/broken.sh" <<'BROKEN'
+#!/usr/bin/env bash
+# Arms sin paréntesis dentro de una sustitución: lo que bash 3.2 no parsea.
+x=$(
+    case "a" in
+        a) echo one ;;
+        *) echo other ;;
+    esac
+)
+echo "$x"
+BROKEN
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="touch $repo/RAN")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+if [ "$(uname -s)" = Darwin ]; then
+    [ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+    grep -q 'broken.sh' <<<"$out"         || errs="$errs no-file-named"
+    grep -q 'no parsea' <<<"$out"         || errs="$errs no-verdict"
+    [ ! -f "$repo/RAN" ]                  || errs="$errs ran-the-suite-anyway"
+    [ -z "$errs" ] \
+        && ok "hub#1468: un script que no parsea con el bash del sistema aborta el push" \
+        || bad "hub#1468: un script que no parsea con el bash del sistema aborta el push" "$errs"
+else
+    # Fuera de macOS no hay bash < 4 y este positivo NO se puede montar: bash 5 parsea el
+    # fixture sin pestañear. Se dice en voz alta en vez de contarlo como verde.
+    printf '  \033[33m—\033[0m hub#1468: sin bash < 4 en esta máquina, el positivo del suelo solo corre en macOS\n'
+fi
+
+# …y con el checker fuera del checkout el gate no se inventa un rojo: los 99 casos de arriba
+# corren en repos de mentira sin `scripts/`, y siguen pasando. Aquí se fija explícitamente.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="true")
+[ "$code" = 0 ] \
+    && ok "hub#1468: sin el checker en el checkout, el gate sigue su camino" \
+    || bad "hub#1468: sin el checker en el checkout, el gate sigue su camino" "exit=$code"
 
 echo
 echo "  $pass passed, $fail failed"
