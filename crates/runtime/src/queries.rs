@@ -466,14 +466,18 @@ pub(crate) async fn run_list(
     // (42P08) al preparar — TODA lista fallaba en Hub Cloud (decisión 2026-07-05). El SQL ya
     // se compone por llamada, así que emitir solo las condiciones provistas es equivalente.
     let mut conds: Vec<String> = Vec::new();
-    let has = |k: &str| p.get(k).is_some_and(|v| !v.is_null());
+    // Toma `p` como argumento (no por captura): el filtro `range` necesita mutar `p` a mitad de
+    // este mismo bucle (empuja el `to` al día siguiente — verifactu#70), y una closure que
+    // capturara `p` por referencia mantendría vivo el préstamo mientras dura el bucle e
+    // impediría ese `insert` (E0502).
+    let has = |p: &Params, k: &str| p.get(k).is_some_and(|v| !v.is_null());
 
     // `CAST(... AS TEXT)` en búsqueda/eq/like: la UI (inputs/selects HTML) manda strings, y la
     // nube es Postgres (estricto: `integer = text` da error). Comparar como texto en ambos lados
     // hace que un `'1'` de un <select> case con una columna entera en SQLite **y** Postgres.
     // `range` NO castea: compara con el tipo real (numérico o fecha ISO como texto), que es lo
     // correcto para `>=`/`<=` (un cast a texto rompería el orden numérico).
-    if !spec.search.is_empty() && has("search") {
+    if !spec.search.is_empty() && has(&p, "search") {
         let likes: Vec<String> = spec
             .search
             .iter()
@@ -491,23 +495,39 @@ pub(crate) async fn run_list(
         }
         match f.op {
             FilterOp::Eq => {
-                if has(&format!("f_{col}")) {
+                if has(&p, &format!("f_{col}")) {
                     conds.push(format!("CAST(sub.{col} AS TEXT) = CAST(:f_{col} AS TEXT)"));
                 }
             }
             FilterOp::Like => {
-                if has(&format!("f_{col}")) {
+                if has(&p, &format!("f_{col}")) {
                     conds.push(format!(
                         "CAST(sub.{col} AS TEXT) LIKE '%' || CAST(:f_{col} AS TEXT) || '%'"
                     ));
                 }
             }
             FilterOp::Range => {
-                if has(&format!("f_{col}_from")) {
+                if has(&p, &format!("f_{col}_from")) {
                     conds.push(format!("sub.{col} >= :f_{col}_from"));
                 }
-                if has(&format!("f_{col}_to")) {
-                    conds.push(format!("sub.{col} <= :f_{col}_to"));
+                if has(&p, &format!("f_{col}_to")) {
+                    // A bare `YYYY-MM-DD` bound (what every `daterange` control sends — an
+                    // `ion-input type="date"`) is a strict prefix of any INSTANT that falls on
+                    // that same day, so `<=` silently drops every row timestamped later that
+                    // day: the range comes back empty even though rows exist (verifactu#70).
+                    // Push the bound to the START of the NEXT day and compare with `<` instead
+                    // — correct whether the column is a full instant or itself a bare date (a
+                    // date-only value never has a time to lose, so the widened bound answers
+                    // the same rows either way). A bound that already carries a time is left
+                    // exactly as the caller wrote it.
+                    let to_key = format!("f_{col}_to");
+                    match p.get(&to_key).and_then(|v| v.as_str()).and_then(next_day) {
+                        Some(next) => {
+                            p.insert(to_key.clone(), json!(next));
+                            conds.push(format!("sub.{col} < :{to_key}"));
+                        }
+                        None => conds.push(format!("sub.{col} <= :{to_key}")),
+                    }
                 }
             }
         }
@@ -748,6 +768,14 @@ fn is_ident(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// `"2026-01-15"` → `Some("2026-01-16")`. `None` for anything that is not EXACTLY a bare
+/// `YYYY-MM-DD` calendar date — in particular a full ISO-8601 instant (`…T14:23:11+02:00`),
+/// which already means what it says and is left untouched (verifactu#70).
+fn next_day(s: &str) -> Option<String> {
+    let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()?;
+    Some(date.succ_opt()?.format("%Y-%m-%d").to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::required_binds;
@@ -809,5 +837,29 @@ mod tests {
     fn repeated_bind_is_listed_once() {
         let sql = "SELECT * FROM t WHERE a = :x OR b = :x";
         assert_eq!(required_binds(sql), vec!["x"]);
+    }
+
+    // ── verifactu#70: el widener del extremo superior de `range` ────────────────────────────
+    use super::next_day;
+
+    #[test]
+    fn bare_date_moves_to_the_next_day() {
+        assert_eq!(next_day("2026-01-15").as_deref(), Some("2026-01-16"));
+    }
+
+    #[test]
+    fn bare_date_crosses_a_month_boundary() {
+        assert_eq!(next_day("2026-01-31").as_deref(), Some("2026-02-01"));
+    }
+
+    #[test]
+    fn a_bound_that_already_carries_a_time_is_left_untouched() {
+        assert_eq!(next_day("2026-01-15T14:23:11+02:00"), None);
+    }
+
+    #[test]
+    fn garbage_is_not_a_date() {
+        assert_eq!(next_day("not-a-date"), None);
+        assert_eq!(next_day(""), None);
     }
 }
