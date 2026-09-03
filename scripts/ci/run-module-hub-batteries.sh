@@ -42,8 +42,8 @@
 # ── ONE HUB PER MODULE, AND WHY IT IS NOT A PREFERENCE ──────────────────────────────────────
 # Measured on 2026-09-03 against `origin/develop@34fa7c3c` with the 27 published modules installed:
 # all 26 declared batteries against ONE shared hub → 22 pass, 4 fail; the same batteries with a
-# hub each → every one of them passes (bar the exemption below). The failures were not the
-# modules' fault: `cash_register/tests/session.hub.test.py` completes real sales, whose auto-F2
+# hub each → every one of them passes. The failures were not the modules' fault:
+# `cash_register/tests/session.hub.test.py` completes real sales, whose auto-F2
 # invoices burn TICKET numbers through the outbox asynchronously, and
 # `invoice/tests/from_sale.hub.test.py` then reads N+2 where it asserts N+1. A shared hub reports
 # failures that belong to nobody, which is worse than not running at all.
@@ -68,13 +68,16 @@ ready_timeout="${ERPLORA_HUB_READY_TIMEOUT:-180}"
 # deleted. An exemption nobody is forced to revisit is exactly how the hole this script closes
 # would come back.
 #
-# `verifactu` is the only one, and it is not a coverage loss today: its e2e
-# (`verifactu_desglose_e2e`, `verifactu_chain_import_e2e`, `reset_fiscal_test`) are still standing
-# in `scripts/ci/kernel-e2e-targets.txt`, so the behaviour is asserted where it always was. What
-# it cannot do is INSTALL without a Cloud machine token — see hub#1477.
-exemptions=(
-    "verifactu=hub#1477 install needs a Cloud machine token for static_files (no credential in CI)"
-)
+# EMPTY since hub#1483, and the self-expiry is what emptied it: `verifactu` was the only entry —
+# it could not INSTALL without a Cloud machine token for its `static_files`, the one module of the
+# 27 published that declares any. hub#1477 gave the runtime a disk backend for them
+# (`ModuleDiskStorage`, `crates/server/src/module_storage.rs`), chosen under `HUB_DEV_MODE=1`,
+# which is exactly how this runner boots its hubs — so the module installed, the run went red
+# demanding the line go, and it went. Its batteries run like everyone else's now.
+#
+# An empty table is a normal state, not a special case: see `exemption_for` and case 10 of
+# `scripts/tests/run-module-hub-batteries.test.sh` for the shell trap it hides.
+exemptions=()
 
 usage() {
     cat <<'USAGE'
@@ -163,6 +166,12 @@ modules=$(printf '%s\n' "$batteries" | sed 's|/.*||' | awk '!seen[$0]++')
 
 exemption_for() { # $1=module id → prints "issue reason", empty when not exempt
     local entry
+    # The count guard is not style: the table is EMPTY today (hub#1483 deleted the last entry) and
+    # `"${arr[@]}"` on an empty array under `set -u` is an unbound variable on bash 3.2 — still
+    # `/bin/bash` on macOS. Without it this function printed a shell error per module into STDERR,
+    # which is the channel the verdict itself is written to, and reached «not exempt» through the
+    # failed subshell instead of through its own logic.
+    [ "${#exemptions[@]}" -gt 0 ] || return 1
     for entry in "${exemptions[@]}"; do
         case "$entry" in "$1="*) printf '%s' "${entry#*=}"; return 0 ;; esac
     done

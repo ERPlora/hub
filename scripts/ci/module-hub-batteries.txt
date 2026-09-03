@@ -30,7 +30,9 @@
 #
 # Un módulo cuya batería el corredor no puede correr todavía va EXENTO, con su issue, en la tabla
 # `exemptions` de ese script — y la exención CADUCA SOLA: si el módulo llega a instalar, la pasada
-# se pone roja pidiendo que se borre la línea. Hoy solo `verifactu` (hub#1477).
+# se pone roja pidiendo que se borre la línea. Hoy la tabla está VACÍA: la única que hubo,
+# `verifactu`, caducó sola en cuanto hub#1477 le dio al runtime el backend de disco para
+# `static_files` y el módulo instaló sin token de máquina (hub#1483). Las 26 baterías corren.
 #
 # El formato es `<module-id>/<ruta de la batería dentro del módulo>`.
 

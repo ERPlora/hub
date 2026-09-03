@@ -165,7 +165,7 @@ run_runner() { # rest=extra args; env: INSTALLED, BATTERY_EXIT_*
     BOOT_LOG="$tmp_dir/boot.log" \
     DB_LOG="$tmp_dir/db.log" \
     BATTERY_LOG="$tmp_dir/battery.log" \
-        $watchdog bash "$script" \
+        $watchdog "${RUNNER_BASH:-bash}" "$script" \
             --catalogue "$catalogue" \
             --manifest "$manifest" \
             --server "$server" \
@@ -306,6 +306,32 @@ boots=$(grep -c . "$tmp_dir/boot.log")
 ok
 ran=$(grep -c . "$tmp_dir/battery.log")
 [ "$ran" -eq 3 ] || fail "9: the run was truncated — $ran of 3 batteries ran"
+ok
+
+
+# ── 10 · An EMPTY exemption table is a normal state, not shell noise ─────────────────────
+# The table is data, and hub#1483 emptied it: `verifactu` was the only entry and it installs on
+# its own since hub#1477, so the self-expiry fired and the run went red demanding the line go
+# (hub#1487, this runner's own alert on `develop`). An empty bash array expanded as `"${arr[@]}"`
+# under `set -u` is an
+# UNBOUND VARIABLE on bash 3.2 — still `/bin/bash` on macOS — so `exemption_for` would print
+# `exemptions[@]: unbound variable` once per module and land on «not exempt» by way of the failed
+# subshell rather than by its own logic. STDERR is where this runner writes its verdict; twelve
+# spurious error lines around it is how a real red becomes unreadable.
+#
+# Run under the strictest bash on the box: on macOS `/bin/bash` is 3.2 and this case is sharp,
+# on CI it is bash 5 and the case still asserts the happy path is clean.
+strict_bash="bash"
+[ -x /bin/bash ] && strict_bash="/bin/bash"
+INSTALLED=alpha,beta RUNNER_BASH="$strict_bash" run_runner
+[ "$rc" -eq 0 ] || fail "10: the happy path with no exemptions must be green under $strict_bash, got $rc"
+ok
+printf '%s' "$err" | grep -q 'unbound variable' \
+    && fail "10: the runner leaked a shell error into its verdict channel under $strict_bash:
+$(printf '%s' "$err" | grep -n 'unbound variable' | head -3)"
+ok
+ran=$(grep -c . "$tmp_dir/battery.log")
+[ "$ran" -eq 3 ] || fail "10: $ran of 3 batteries ran under $strict_bash"
 ok
 
 printf 'run-module-hub-batteries.test.sh: %s checks passed\n' "$passed"
