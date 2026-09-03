@@ -72,6 +72,12 @@ impl Runtime {
     /// `read_dir` que falla por OTRA razón (permisos, etc.) o un **ciclo** de `depends_on` (error
     /// estructural del conjunto, se reporta y no se instala nada del lote).
     pub async fn install_all_from_dir(&mut self, root: &Path) -> Result<Vec<String>> {
+        // hub#1477: lo que no entre se ANOTA, además de loguearse. El veredicto describe ESTE
+        // intento, así que lo primero es retirar el anterior: si acumulase, un módulo ya arreglado
+        // seguiría denunciado para siempre y `/readyz` no volvería a ponerse verde nunca.
+        self.registry.failed_installs.clear();
+        let mut failures: Vec<crate::registry::FailedInstall> = Vec::new();
+
         // 1) Carga manifests; un manifest inválido se omite (log), no aborta el lote.
         let mut found: Vec<(std::path::PathBuf, crate::manifest::Manifest)> = Vec::new();
         // Un dir de módulos ausente NO es un error: significa "no hay módulos que instalar" (lote
@@ -90,7 +96,16 @@ impl Runtime {
             }
             match crate::manifest::Manifest::load(&path) {
                 Ok(manifest) => found.push((path, manifest)),
-                Err(e) => eprintln!("✗ módulo {}: {e}", path.display()),
+                // Sin manifest no hay id que leer: el nombre de la carpeta es lo único que hay, y
+                // es justo lo que quien mire el disco va a ver (hub#1477).
+                Err(e) => record_failed_install(
+                    &mut failures,
+                    path.file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| path.display().to_string()),
+                    &path,
+                    &e,
+                ),
             }
         }
         // 2) Estado persistido por hub ANTES de instalar (hub#31): `install` reactiva todo al
@@ -118,9 +133,16 @@ impl Runtime {
                     eprintln!("✓ módulo instalado: {id}");
                     installed.push(id);
                 }
-                Err(e) => eprintln!("✗ módulo {}: {e}", found[i].0.display()),
+                Err(e) => {
+                    record_failed_install(&mut failures, found[i].1.id.clone(), &found[i].0, &e)
+                }
             }
         }
+
+        // Deja el veredicto donde la sonda de readiness lo va a mirar (hub#1477). Va ANTES del
+        // paso 5 porque ese paso puede propagar un error: si se colocara después, un fallo al
+        // reponer estados dejaría el hub incompleto Y sin la anotación que lo explica.
+        self.registry.failed_installs = failures;
 
         // 5) Repón el estado inactivo previo de este hub sobre el registro recién reconstruido y
         // persístelo (el upsert del install lo había dejado `active`). Solo módulos presentes en
@@ -497,5 +519,108 @@ impl Runtime {
                     .collect(),
             })
             .collect()
+    }
+}
+
+/// Anota —y denuncia— un módulo que se pidió instalar y no entró (hub#1477).
+///
+/// Las tres salidas son deliberadamente la misma llamada, porque separarlas es como se llegó al
+/// bug: el `eprintln!` estaba, y con eso se dio el caso por cubierto. Un log dentro de un
+/// contenedor no lo mira nadie.
+///
+/// - **Log**, para quien ya esté leyendo el arranque.
+/// - **ErrorRegistry**, que es lo que sale del hub y llega a un humano.
+/// - **La lista del Registry**, que es lo que consulta `/readyz` — el único de los tres que
+///   impide dar por buena una versión incompleta.
+fn record_failed_install(
+    failures: &mut Vec<crate::registry::FailedInstall>,
+    module_id: String,
+    source: &Path,
+    error: &RuntimeError,
+) {
+    let failure = crate::registry::FailedInstall {
+        module_id,
+        source: source.display().to_string(),
+        reason: error.to_string(),
+    };
+    eprintln!("✗ módulo {}: {}", failure.source, failure.reason);
+    crate::error_registry::ErrorRegistry::global().report(failed_install_event(&failure));
+    failures.push(failure);
+}
+
+/// El informe de un módulo que no se pudo instalar, sin mandarlo todavía.
+///
+/// Aparte para poder fijarlo con un test, igual que `server::boot::incomplete_boot_event`: lo que
+/// importa es el **contenido** —el código estable contra el que se programa y el módulo al que se
+/// atribuye—, no que se haya llamado a un sink global.
+///
+/// Aquí el fallo **sí** tiene dueño: a diferencia de un arranque incompleto (donde lo que se cayó
+/// es el arranque entero), aquí se sabe exactamente qué paquete no entró, así que se le cuelga.
+pub(crate) fn failed_install_event(
+    failure: &crate::registry::FailedInstall,
+) -> crate::error_registry::ErrorEvent {
+    use crate::error_registry::{severity, source, ErrorEvent};
+
+    ErrorEvent::new(
+        source::HUB,
+        "module_install_failed",
+        format!(
+            "el módulo `{}` no se pudo instalar y el hub sigue sin él: {}",
+            failure.module_id, failure.reason
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_module(failure.module_id.clone())
+    .with_context(serde_json::json!({
+        "module_id": failure.module_id,
+        "source": failure.source,
+        "reason": failure.reason,
+    }))
+}
+
+#[cfg(test)]
+mod failed_install_report_tests {
+    //! hub#1477: un módulo que no se instaló no puede morir en el log de un contenedor.
+    use super::failed_install_event;
+    use crate::registry::FailedInstall;
+
+    fn failure() -> FailedInstall {
+        FailedInstall {
+            module_id: "verifactu".to_string(),
+            source: "/tmp/modules/verifactu".to_string(),
+            reason: "host.module_storage: Hub Cloud sin token de máquina".to_string(),
+        }
+    }
+
+    /// El código es el contrato: contra él se programan la alerta y el filtro, no contra la prosa
+    /// (ADR-0055).
+    #[test]
+    fn the_report_carries_a_stable_code_and_the_reason_that_explains_it() {
+        let event = failed_install_event(&failure());
+
+        assert_eq!(event.error_code, "module_install_failed");
+        assert_eq!(event.severity, crate::error_registry::severity::UNEXPECTED);
+        assert_eq!(event.context["module_id"], "verifactu");
+        assert_eq!(event.context["source"], "/tmp/modules/verifactu");
+        assert!(
+            event.context["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("sin token de máquina"),
+            "sin el motivo, saber que falta no dice qué arreglar: {}",
+            event.context["reason"]
+        );
+    }
+
+    /// **Aquí sí hay culpable.** Un arranque incompleto es del hub (`module_boot_incomplete`, no
+    /// lleva `module_id`); esto es un paquete concreto que no entró, y atribuirlo es lo que permite
+    /// filtrar por módulo en vez de leerse el mensaje.
+    #[test]
+    fn the_failure_is_attributed_to_the_module_that_did_not_make_it_in() {
+        let event = failed_install_event(&failure());
+
+        assert_eq!(event.source, crate::error_registry::source::HUB);
+        assert_eq!(event.module_id.as_deref(), Some("verifactu"));
+        assert!(event.message.contains("verifactu"), "{}", event.message);
     }
 }

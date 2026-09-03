@@ -304,3 +304,98 @@ async fn a_switchover_the_hub_recovered_from_shows_up_in_readyz_hub1376() {
         "el switchover que el hub sobrevivió tiene que verse desde fuera. cuerpo: {body}"
     );
 }
+
+// ── hub#1477: lo que NUNCA llegó a `hub_module` ──────────────────────────────────────
+
+/// El backend de ficheros del Cloud cuando no hay token de máquina: rechaza.
+#[derive(Debug)]
+struct RefusingStorage;
+
+#[async_trait::async_trait]
+impl erplora_runtime::module_storage::ModuleStorage for RefusingStorage {
+    async fn ensure_module_folder(
+        &self,
+        _hub_id: &str,
+        _folder: &str,
+    ) -> erplora_runtime::Result<()> {
+        Err(erplora_runtime::RuntimeError::Storage(
+            "Hub Cloud sin token de máquina".to_string(),
+        ))
+    }
+
+    async fn write_module_file(
+        &self,
+        _hub_id: &str,
+        _folder: &str,
+        _relative_path: &str,
+        _bytes: &[u8],
+        _content_type: &str,
+    ) -> erplora_runtime::Result<String> {
+        unreachable!("este test no escribe ficheros")
+    }
+}
+
+/// **Un módulo que se pidió instalar y NO entró deja el hub fuera de rotación** — aunque la base de
+/// datos no sepa nada de él.
+///
+/// Es el agujero de hub#1477 por la puerta que mira Swarm. `install` falla ANTES de escribir en
+/// `hub_module`, así que `missing` sale vacío y todo lo que la BD sabe está perfecto. Antes eso era
+/// un `200 UP`: el hub servía sin el módulo, Swarm daba la versión por buena y mataba la tarea vieja
+/// que sí lo tenía. El caso real era `verifactu` —el único módulo con `static_files`— y lo que se
+/// perdía, el módulo **fiscal**.
+#[tokio::test]
+async fn a_module_that_never_installed_takes_the_hub_out_of_rotation() {
+    let root = std::env::temp_dir().join(format!(
+        "erplora-readyz-1477-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let module = root.join("archive");
+    std::fs::create_dir_all(&module).unwrap();
+    std::fs::write(
+        module.join("module.json"),
+        r#"{"id":"archive","name":"Archive","version":"1.0.0","static_files":{"folder":"archive"}}"#,
+    )
+    .unwrap();
+
+    let db = fresh_db().await;
+    erplora_runtime::migrations::ensure_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::installer::ensure_hub_module_table(&db)
+        .await
+        .unwrap();
+    erplora_runtime::identity::ensure_tables(&db).await.unwrap();
+    erplora_runtime::system_migrations::apply(&db, DEV_HUB_ID)
+        .await
+        .unwrap();
+    let mut runtime = Runtime::new(Box::new(db));
+    runtime.set_module_storage(std::sync::Arc::new(RefusingStorage));
+    // El escaneo de arranque es tolerante: NO se cae, sigue adelante… y antes se callaba.
+    runtime.install_all_from_dir(&root).await.unwrap();
+    let state = AppState::with_config(runtime, HubConfig::from_env_with_auth(AuthMode::Dev));
+
+    let (status, body) = get(state, "/readyz").await;
+
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "cuerpo: {body}");
+    assert_eq!(body["status"], "DOWN");
+    // Lo que la BD sabe sigue estando perfecto: por eso el fallo era invisible.
+    assert_eq!(body["checks"]["modules"]["missing"], json!([]));
+    // Y aun así la sonda dice QUÉ falta y POR QUÉ, sin entrar al contenedor.
+    assert_eq!(
+        body["checks"]["modules"]["failed"][0]["module_id"],
+        json!("archive")
+    );
+    assert!(
+        body["checks"]["modules"]["failed"][0]["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("sin token de máquina"),
+        "cuerpo: {body}"
+    );
+
+    std::fs::remove_dir_all(root).unwrap();
+}
