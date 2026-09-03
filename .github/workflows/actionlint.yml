@@ -92,6 +92,15 @@ on:
       # Sin esta entrada, un slice de hub#1264 que borra el `.rs` y olvida el `.txt` no encuentra
       # NINGÚN guardia antes de mergear y tumba `develop` en el push — el rojo de hub#1354 (hub#1369).
       - 'crates/runtime/tests/**'
+      # scripts/tests/ wiring guard (hub#1392): a glob, not one entry per file, because the
+      # guard's own job is to sweep EVERY *.test.sh|mjs under scripts/tests/ — a PR that only
+      # adds or deletes one of them must still run it.
+      - 'scripts/tests/*.test.sh'
+      - 'scripts/tests/*.test.mjs'
+      # Hermetic unit tests for scripts/ci/n-minus-one.sh (hub#1282): lives outside `.github/`,
+      # so without this path a PR touching only the test would not run it.
+      - 'scripts/tests/n-minus-one.test.sh'
+      - 'scripts/ci/n-minus-one.sh'
   workflow_dispatch:
 
 permissions:
@@ -286,3 +295,29 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/service-container-ports.test.sh
+
+      # ── Unit tests for scripts/ci/n-minus-one.sh (hub#1282) ───────────────────────────
+      # Every external dependency (git tags, docker, curl, building+booting the branch's own
+      # binary) is stubbed via the script's own seams, so these cases are hermetic and run in
+      # seconds — no need to wait for the daily/dispatch-only `n-minus-one.yml` job, which boots
+      # real Postgres and two real binaries. Discovered UNWIRED while building the guard below
+      # (hub#1392): the file existed and passed standalone, but no workflow ever ran it — only a
+      # comment in `n-minus-one.yml` named it, exactly the false-safety hub#1392 exists to catch.
+      - name: Contrato de scripts/ci/n-minus-one.sh (hub#1282)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/n-minus-one.test.sh
+
+      # ── Every scripts/tests/ contract test is invoked for real somewhere (hub#1392) ────
+      # A test in scripts/tests/ that no workflow (or `.githooks/pre-push`) actually EXECUTES
+      # is documentation nobody runs, and a missing wire leaves no red anywhere — the same
+      # defect hub#1381 closed one level up for the modules' batteries. This scan is
+      # discovery-based (glob over scripts/tests/*.test.sh|mjs, not a fixed list), so it also
+      # covers itself: deleting ITS OWN invocation is the one gap nothing here can catch,
+      # exactly as with every other self-referential guard in this file.
+      #
+      # pyyaml already installed by the test-hub-modules.yml contract step above.
+      - name: "Contrato: todo test de scripts/tests/ está invocado de verdad (hub#1392)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/scripts-tests-wiring.test.sh

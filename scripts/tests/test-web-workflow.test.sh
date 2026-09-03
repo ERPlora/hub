@@ -152,12 +152,25 @@ else
     ok "workflow_dispatch → update_baselines regenera las capturas y las sube como artefacto"
 fi
 
-# ── 7. This very file runs somewhere (the sin it exists to punish) ───────────
-if grep -q 'scripts/tests/test-web-workflow.test.sh' "$workflow"; then
-    ok "test-web.yml corre este mismo contrato"
-else
+# ── 7. This very file runs somewhere for REAL, and its own path still triggers ──
+#      test-web.yml when only it changes (hub#1365) ─────────────────────────────
+# `test-web.yml` names this file THREE times: a header comment, twice in `paths:`
+# (push and pull_request) and the step that runs it. A whole-file `grep -q` on the
+# bare name treated all three the same, so deleting only the `run:` step still
+# matched a `paths:` entry and this check stayed on ✓ — proven by mutation: with
+# the step removed, the old one-liner kept reporting the file green. Same split
+# `visual-baselines-workflow.test.sh` and `canonical-mirrors-workflow.test.sh`
+# already use for their own caller. Tolerated spellings of the working line:
+# block form (`bash ./x`) or inline (`run: bash x`), with or without `./`.
+SELF='scripts/tests/test-web-workflow.test.sh'
+if ! grep -qE "^[[:space:]]*(run:[[:space:]]*)?bash (\\./)?${SELF//./\\.}[[:space:]]*$" "$workflow"; then
     bad "test-web.yml corre este mismo contrato" \
-        "este fichero no lo ejecuta ningún workflow — exactamente el defecto que hub#1240 arregla"
+        "ningún paso lo EJECUTA (\`bash ./${SELF}\`) — nombrarlo en un comentario o en \`paths:\` no cuenta, y sin ese paso el resto de esta guardia no corre nunca (hub#1365)"
+elif ! grep -qE "^[[:space:]]*- [\"']?${SELF//./\\.}[\"']?[[:space:]]*$" "$workflow"; then
+    bad "$SELF sigue en el filtro \`paths:\` de test-web.yml" \
+        "sin él, una PR que solo tocara este test no dispararía ningún check"
+else
+    ok "test-web.yml corre este mismo contrato y sigue en su filtro \`paths:\`"
 fi
 
 # ── 8. Nightly schedule on develop (hub#1253) ────────────────────────────────
