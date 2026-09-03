@@ -208,4 +208,25 @@ describe('the vitest pool is bounded, not sized off the machine (hub#1364)', () 
     // shared runner is not worth oversubscribing every other machine that runs this suite.
     expect(cfg.test.maxWorkers).toBeLessThanOrEqual(vitestDefaultWorkers);
   });
+
+  it('follows the machine DOWN: on a 2-core box the cap resolves to 1, not 4', async () => {
+    // The two assertions above only bite on a ≤4-core machine, and none of the machines that run
+    // this suite today has that few (dev Mac and ci-runner-1 are both 16). Simulate the 2-vCPU
+    // GitHub-hosted fallback so a hardcoded `maxWorkers: 4` — which drops the ceiling and
+    // oversubscribes the box vitest itself would size at 1 — goes red on EVERY machine.
+    vi.resetModules();
+    vi.doMock('node:os', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('node:os')>();
+      const availableParallelism = () => 2;
+      return { ...actual, availableParallelism, default: { ...actual, availableParallelism } };
+    });
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfg = (await import('./vite.config.ts')).default as any;
+      expect(cfg.test.maxWorkers).toBe(1);
+    } finally {
+      vi.doUnmock('node:os');
+      vi.resetModules();
+    }
+  });
 });
