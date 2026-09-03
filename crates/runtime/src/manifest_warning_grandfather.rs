@@ -76,4 +76,30 @@ mod tests {
             assert!(seen.insert(*pair), "duplicated grandfather entry: {pair:?}");
         }
     }
+
+    /// **hub#1500 / hub#1505** — `modifiers` republished without the root `author` (modifiers#8,
+    /// v0.1.8), so its entry left the list and must not come back through a merge. The shrink
+    /// guard in `installer` (`every_grandfathered_manifest_warning_still_warns_hub1243`) only runs
+    /// with the catalogue checked out; this one runs in the plain suite, so a stale line is caught
+    /// before `test-hub-modules.yml` dies over it again (hub#1505: three pushes, three red runs).
+    ///
+    /// What remains is `inventory`'s `validates` debt (hub#610) and nothing else — "nothing is
+    /// added here" is the list's own contract, and asserting the SET of modules (not a count)
+    /// keeps holding as `inventory` shrinks to zero.
+    #[test]
+    fn modifiers_author_left_the_list_and_only_inventory_debt_remains_hub1500() {
+        assert!(
+            !is_grandfathered("modifiers", "author"),
+            "hub#1505: `modifiers` no longer declares a root `author` — a stale entry here puts \
+             `every_grandfathered_manifest_warning_still_warns_hub1243` red on every push"
+        );
+        let modules: std::collections::BTreeSet<&str> = GRANDFATHERED_MANIFEST_WARNINGS
+            .iter()
+            .map(|(module, _)| *module)
+            .collect();
+        assert!(
+            modules.iter().all(|module| *module == "inventory"),
+            "hub#1500: only `inventory` (hub#610) still owns grandfathered debt, found {modules:?}"
+        );
+    }
 }
