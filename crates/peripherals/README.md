@@ -38,7 +38,16 @@ transporte. Lo que cambia es por dónde salen los bytes.
   entero. Descartados por reintroducir el problema del driver: `libusb`, WebUSB, OPOS/JavaPOS.
 - **Fase 1 = sin cola** para Bluetooth y USB: `PrintJob.target` es `NetworkTarget` y la política de
   reintentos de `queue` está escrita alrededor de un `connect` TCP. El fallo no se pierde: vuelve
-  al llamante y el print host marca el trabajo `failed`.
+  al llamante y el print host marca el trabajo `failed`. Matiz del USB: el `Ok` de `lp` significa
+  que **el spooler aceptó el trabajo**, que es hasta donde ve `lp`; sin papel o con el cable fuera
+  el trabajo se queda **retenido en la cola del SO** (con el título `ERPlora`, para reconocerlo
+  allí) y `lp` sale 0 igual. Lo que sí vuelve como error es que el spooler lo rechace (cola
+  inexistente, deshabilitada o que no acepta trabajos), con la frase de `lp` dentro.
+- **El descubrimiento USB pregunta dos veces**: `lpstat -e` (los nombres de destino, que CUPS
+  **nunca** traduce) y `lpstat -v` (el URI de cada cola, que dice el cable). La segunda **sí se
+  traduce** —«dispositivo para …» en un Mac en español, y macOS elige el idioma por
+  `AppleLanguages`, no por `LANG`/`LC_ALL`—, así que cada línea se casa contra los nombres de la
+  primera en vez de contra una plantilla por idioma.
 - **Windows queda fuera** (spooler RAW: `OpenPrinter`/`StartDocPrinter`/`WritePrinter`) — misma
   idea contra el otro spooler, pero no se puede verificar sin una máquina Windows real: hub#1269.
 

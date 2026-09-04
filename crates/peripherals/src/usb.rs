@@ -2,7 +2,8 @@
 //!
 //! The transport is CUPS on macOS and Linux: `lp -d <queue> -o raw` hands our already-rendered
 //! ESC/POS straight to the spooler, filters bypassed. That indirection is the whole point of the
-//! design. The standing "red-only" decision (ADR-0196 §2.7) refused USB because *a driver per
+//! design. The standing "red-only" decision (ADR-0196 §4; `ARQUITECTURA.md` §2.7 in the hub's own
+//! doc) refused USB because *a driver per
 //! operating system does not scale* — and that is still true. What changed is that we no longer
 //! need one: the vendor (Star, Epson) already ships the CUPS driver, the OS already owns the
 //! cable, and ESC/POS is already the universal language we generate. So the generic transport is
@@ -20,6 +21,7 @@
 //!     overwrite the previous. Discovering and printing do not need the registry; giving it a
 //!     proper identity is hub#1536.
 
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -80,7 +82,7 @@ pub trait CupsClient {
 /// CUPS to skip its filter chain and hand the bytes to the backend untouched. Without it the
 /// spooler would try to *render* our ESC/POS as if it were a document, and what comes out of the
 /// printer is a page of garbage instead of a receipt.
-pub fn lp_args<'a>(queue: &'a str) -> Vec<&'a str> {
+pub fn lp_args(queue: &str) -> Vec<&str> {
     vec!["-d", queue, "-t", JOB_TITLE, "-o", "raw"]
 }
 
@@ -91,6 +93,12 @@ pub fn lp_args<'a>(queue: &'a str) -> Vec<&'a str> {
 /// connect. Widening it to cover a spooler is a real change to the one piece of the print chain
 /// that already works, so it is not smuggled in here. The failure stays visible either way: the
 /// error comes straight back to the caller and the print host reports the job `failed`.
+///
+/// `Ok` means the SPOOLER took the job, which is as far as `lp` can see. A printer that is out of
+/// paper, unplugged or paused keeps the job held in the OS queue — under the title `ERPlora`, so it
+/// can be told apart there — and `lp` still exits 0. What does come back as an error is the spooler
+/// refusing: a queue that does not exist, is disabled or is rejecting jobs, with `lp`'s own sentence
+/// in it.
 pub fn send_raw(client: &dyn CupsClient, target: &UsbTarget, payload: &[u8]) -> Result<()> {
     let out = client.run(CUPS_LP, &lp_args(&target.queue), payload)?;
     if out.success {
@@ -112,24 +120,44 @@ fn first_meaningful_line(text: &str) -> Option<&str> {
     text.lines().map(str::trim).find(|l| !l.is_empty())
 }
 
-/// The USB print queues the OS knows about, read from `lpstat -v`.
+/// The USB print queues the OS knows about, out of two `lpstat` listings: `-e`, the bare
+/// destination names, and `-v`, each destination's device URI.
 ///
-/// Each line reads `device for <queue>: <device-uri>`. The URI is the only thing that says which
-/// cable a queue is on, and it is what lets us keep the network printers out: they are already
-/// found by the sweep, and offering them twice would turn one printer into two devices.
+/// Two listings because `lpstat -v` is LOCALISED: `device for <queue>: <uri>` in the C locale,
+/// `dispositivo para …` on a Spanish Mac, `<queue> のデバイス: …` in Japanese — and macOS picks that
+/// language from the system preference (`AppleLanguages`), not from `LANG`/`LC_ALL`, so forcing a
+/// locale on the child does not help. What no translation moves is that the line carries the queue
+/// name as a word of its own and ends with the URI; and `lpstat -e` prints the names untranslated.
+/// So each line is matched against those names instead of against a template we would have to
+/// guess per language.
 ///
-/// A queue name our own contract would refuse is skipped rather than listed — a printer on screen
-/// that fails the moment it is picked is worse than one that is not there.
-pub fn parse_usb_queues(lpstat_v: &str) -> Vec<PrinterInfo> {
-    lpstat_v
+/// The URI is the only thing that says which cable a queue is on, and it is what keeps the network
+/// printers out: the sweep already finds them, and offering them twice would turn one printer into
+/// two devices. A queue name our own contract would refuse is skipped rather than listed — a
+/// printer on screen that fails the moment it is picked is worse than one that is not there.
+pub fn parse_usb_queues(destinations: &str, devices: &str) -> Vec<PrinterInfo> {
+    let names: HashSet<&str> = destinations
+        .lines()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .collect();
+    devices
         .lines()
         .filter_map(|line| {
-            // The queue name cannot contain a space (CUPS forbids it) and a device URI cannot
-            // carry an unescaped one, so `": "` separates the two exactly once.
-            let (queue, uri) = line.trim().strip_prefix("device for ")?.split_once(": ")?;
-            if !uri.to_ascii_lowercase().starts_with(USB_DEVICE_URI_SCHEME)
-                || !is_cups_queue_name(queue)
-            {
+            let (before_uri, uri) = split_at_device_uri(line)?;
+            if !uri.to_ascii_lowercase().starts_with(USB_DEVICE_URI_SCHEME) {
+                return None;
+            }
+            let Some(queue) = queue_named_in(before_uri, &names) else {
+                // A USB cable we cannot put a name to is the one case where the till HAS a USB
+                // printer and the screen will not show it — worth a line in the log, never a guess:
+                // an invented name is a printer that fails the moment it is picked.
+                tracing::warn!(
+                    "usb: `lpstat -v` lists a USB queue that `lpstat -e` does not name; not offered: {line}"
+                );
+                return None;
+            };
+            if !is_cups_queue_name(queue) {
                 return None;
             }
             Some(PrinterInfo {
@@ -147,23 +175,56 @@ pub fn parse_usb_queues(lpstat_v: &str) -> Vec<PrinterInfo> {
         .collect()
 }
 
+/// Splits an `lpstat -v` line into what comes before the device URI and the URI itself. The URI
+/// is where `://` is, extended left over its scheme: the one landmark no translation moves.
+fn split_at_device_uri(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim();
+    let separator = line.find("://")?;
+    let scheme_start = line[..separator]
+        .char_indices()
+        .rev()
+        .find(|&(_, c)| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    Some((&line[..scheme_start], &line[scheme_start..]))
+}
+
+/// The destination name that `before_uri` carries as a word of its own — the one nearest the URI,
+/// should a template word happen to be a queue name too. Words are cut on whitespace and on the
+/// `:` (or full-width `：`) CUPS puts between the name and the URI, with or without space around it.
+fn queue_named_in<'a>(before_uri: &'a str, names: &HashSet<&str>) -> Option<&'a str> {
+    before_uri
+        .rsplit(|c: char| c.is_whitespace() || c == ':' || c == '：')
+        .find(|word| !word.is_empty() && names.contains(word))
+}
+
 /// Every USB print queue this machine has, ready to be offered next to the network ones.
+///
+/// Asks twice — `lpstat -e` for the names (CUPS 2.2+, 2016; macOS and any current Linux have it),
+/// `lpstat -v` for the cables — because the second listing is localised and the first is not; see
+/// [`parse_usb_queues`]. A till with no printer at all answers an empty list from both, exit 0.
 ///
 /// The failure is returned, not swallowed into an empty list: "this till has no USB printer" and
 /// "we could not ask the OS" need opposite things from the user, and a silent empty list reads as
 /// the first while being the second. The caller decides whether that is fatal — for the shell's
 /// discovery it is not: a venue whose LAN printers work must not lose them because CUPS is absent.
 pub fn discover_usb_printers(client: &dyn CupsClient) -> Result<Vec<PrinterInfo>> {
-    let out = client.run(CUPS_LPSTAT, &["-v"], &[])?;
-    if !out.success {
-        let reason = first_meaningful_line(&out.stderr)
-            .or_else(|| first_meaningful_line(&out.stdout))
-            .unwrap_or("no reason given");
-        return Err(PeripheralError::Unreachable(format!(
-            "could not list the OS print queues: {reason}"
-        )));
+    let destinations = lpstat(client, "-e")?;
+    let devices = lpstat(client, "-v")?;
+    Ok(parse_usb_queues(&destinations, &devices))
+}
+
+/// One `lpstat` listing, or why it could not be had.
+fn lpstat(client: &dyn CupsClient, flag: &str) -> Result<String> {
+    let out = client.run(CUPS_LPSTAT, &[flag], &[])?;
+    if out.success {
+        return Ok(out.stdout);
     }
-    Ok(parse_usb_queues(&out.stdout))
+    let reason = first_meaningful_line(&out.stderr)
+        .or_else(|| first_meaningful_line(&out.stdout))
+        .unwrap_or("no reason given");
+    Err(PeripheralError::Unreachable(format!(
+        "could not list the OS print queues (`lpstat {flag}`): {reason}"
+    )))
 }
 
 /// A human name out of a `usb://Make/Model?serial=…` device URI.
@@ -322,15 +383,17 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
 
-    /// Records what would have been run, and answers whatever the test wants it to.
+    /// Records what would have been run, and answers whatever the test wants it to — per argv,
+    /// so a discovery that asks two questions (`-e`, then `-v`) can be given two answers.
     struct FakeCups {
-        answer: CupsOutput,
+        /// `(args, answer)`; an empty `args` answers any call.
+        answers: Vec<(Vec<&'static str>, CupsOutput)>,
         calls: RefCell<Vec<(String, Vec<String>, Vec<u8>)>>,
     }
 
     impl FakeCups {
         fn answering(answer: CupsOutput) -> Self {
-            Self { answer, calls: RefCell::new(Vec::new()) }
+            Self { answers: vec![(Vec::new(), answer)], calls: RefCell::new(Vec::new()) }
         }
         fn ok() -> Self {
             Self::answering(CupsOutput {
@@ -338,6 +401,19 @@ mod tests {
                 stdout: "request id is Star_TSP143-7 (1 file(s))".into(),
                 stderr: String::new(),
             })
+        }
+        /// A healthy CUPS whose `lpstat -e` prints `destinations` and whose `lpstat -v` prints
+        /// `devices`.
+        fn listing(destinations: &str, devices: &str) -> Self {
+            let ok = |stdout: &str| CupsOutput {
+                success: true,
+                stdout: stdout.into(),
+                stderr: String::new(),
+            };
+            Self {
+                answers: vec![(vec!["-e"], ok(destinations)), (vec!["-v"], ok(devices))],
+                calls: RefCell::new(Vec::new()),
+            }
         }
     }
 
@@ -348,7 +424,16 @@ mod tests {
                 args.iter().map(|a| a.to_string()).collect(),
                 stdin.to_vec(),
             ));
-            Ok(self.answer.clone())
+            let scripted = self
+                .answers
+                .iter()
+                .find(|(for_args, _)| for_args.is_empty() || for_args.as_slice() == args)
+                .map(|(_, answer)| answer.clone());
+            Ok(scripted.unwrap_or_else(|| CupsOutput {
+                success: false,
+                stdout: String::new(),
+                stderr: format!("fake cups: nothing scripted for `{program} {args:?}`"),
+            }))
         }
     }
 
@@ -381,9 +466,10 @@ mod tests {
 
     #[test]
     fn hub1083_a_refused_job_comes_back_as_an_error_naming_the_queue_and_the_reason() {
-        // Paper out, queue disabled, printer unplugged: `lp` exits non-zero and says why. That
-        // sentence is the only thing standing between the cashier and a ticket that silently never
-        // printed, so it has to survive into the error.
+        // A queue that does not exist, is disabled or is rejecting jobs: `lp` exits non-zero and
+        // says why, and that sentence is the only thing standing between the cashier and a ticket
+        // that silently never printed, so it has to survive into the error. (Paper out or a pulled
+        // cable are NOT this case: the spooler accepts the job and holds it — see `send_raw`.)
         let cups = FakeCups::answering(CupsOutput {
             success: false,
             stdout: String::new(),
@@ -407,7 +493,7 @@ mod tests {
                        device for Kitchen: socket://10.0.0.5:9100\n\
                        device for EPSON_TM: usb://EPSON/TM-T20III\n";
 
-        let found = parse_usb_queues(listing);
+        let found = parse_usb_queues("Star_TSP143\nOffice_Laser\nKitchen\nEPSON_TM\n", listing);
 
         let ids: Vec<&str> = found.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(ids, vec!["usb:Star_TSP143", "usb:EPSON_TM"], "only the USB cables");
@@ -426,15 +512,62 @@ mod tests {
     }
 
     #[test]
+    fn hub1083_a_listing_in_the_systems_language_still_finds_the_usb_queue() {
+        // CUPS localises the `lpstat -v` line, and macOS picks that language from the system
+        // preference (`AppleLanguages`), NOT from `LANG`/`LC_ALL` — forcing the C locale on the
+        // child does not help there (measured 2026-09-05: `dispositivo para …` with `LC_ALL=C`).
+        // A till in Spain runs in Spanish, so an English-only parser would list zero USB printers
+        // for exactly the customer this transport exists for. Templates are the real ones from
+        // CUPS' `locale/cups_<lang>.po`; the Spanish line is verbatim from a Mac.
+        let listing = "dispositivo para Star_TSP143: usb://Star/TSP143?serial=X5\n\
+                       dispositivo para Brother_HL_3150CDW_series: dnssd://Brother%20HL-3150CDW%20series._ipp._tcp.local./?uuid=e3248000-80ce-11db-8000-3c2af45a10ef\n\
+                       matériel pour EPSON_TM : usb://EPSON/TM-T20III\n\
+                       Gerät für Bar_Star: usb://Star/TSP654\n\
+                       dispositiu per Cuina: usb://EPSON/TM-T88\n\
+                       Kitchen_Star のデバイス: usb://Star/TSP143\n\
+                       用于 Caja_Epson 的设备：usb://EPSON/TM-m30\n";
+        // `lpstat -e` is the same in every language: bare names, one per line.
+        let names = "Star_TSP143\nBrother_HL_3150CDW_series\nEPSON_TM\nBar_Star\nCuina\nKitchen_Star\nCaja_Epson\n";
+
+        let ids: Vec<String> = parse_usb_queues(names, listing).into_iter().map(|p| p.id).collect();
+
+        assert_eq!(
+            ids,
+            vec![
+                "usb:Star_TSP143",
+                "usb:EPSON_TM",
+                "usb:Bar_Star",
+                "usb:Cuina",
+                "usb:Kitchen_Star",
+                "usb:Caja_Epson"
+            ],
+            "every USB queue must be found whatever language CUPS speaks, and the Bonjour one never"
+        );
+    }
+
+    #[test]
     fn hub1083_a_queue_we_could_never_address_is_not_offered() {
-        // If the OS reports a destination whose name our own contract refuses, listing it would
-        // put a printer on screen that fails the moment it is picked. Better absent than a trap.
-        let listing = "device for has space: usb://Star/TSP143\n\
+        // If the OS reports a destination whose name our own contract refuses (`-oraw` would be
+        // read by `lp -d` as a flag), listing it would put a printer on screen that fails the
+        // moment it is picked. Better absent than a trap.
+        let listing = "device for -oraw: usb://Star/TSP143\n\
                        device for good_one: usb://Star/TSP143\n";
 
-        let ids: Vec<String> = parse_usb_queues(listing).into_iter().map(|p| p.id).collect();
+        let ids: Vec<String> =
+            parse_usb_queues("-oraw\ngood_one\n", listing).into_iter().map(|p| p.id).collect();
 
         assert_eq!(ids, vec!["usb:good_one"]);
+    }
+
+    #[test]
+    fn hub1083_a_usb_cable_the_destination_list_does_not_name_is_not_guessed() {
+        // Matching against `lpstat -e` is what makes the parser language-proof; the flip side is
+        // that a line whose name is not in that list must NOT be offered under whatever word sits
+        // before the colon (`のデバイス` in Japanese) — that is a printer that fails when picked.
+        let listing = "Kitchen_Star のデバイス: usb://Star/TSP143\n";
+
+        assert!(parse_usb_queues("", listing).is_empty(), "no name, no guess");
+        assert!(parse_usb_queues("Other_Queue\n", listing).is_empty(), "a different name is no name");
     }
 
     // ── The REAL runner ──────────────────────────────────────────────────────────────────────
@@ -506,24 +639,29 @@ mod tests {
         // CUPS actually emits, which no hand-written fixture can promise.
         let real = "device for Brother_HL_3150CDW_series: dnssd://Brother%20HL-3150CDW%20series._ipp._tcp.local./?uuid=e3248000-80ce-11db-8000-3c2af45a10ef\n";
 
-        assert!(parse_usb_queues(real).is_empty(), "a Bonjour printer is not on a USB cable");
+        assert!(
+            parse_usb_queues("Brother_HL_3150CDW_series\n", real).is_empty(),
+            "a Bonjour printer is not on a USB cable"
+        );
     }
 
     #[test]
     fn hub1083_discovery_asks_the_os_for_its_queues_and_their_cables() {
-        let cups = FakeCups::answering(CupsOutput {
-            success: true,
-            stdout: "device for Star_TSP143: usb://Star/TSP143\ndevice for Office: ipp://10.0.0.9:631/ipp/print\n".into(),
-            stderr: String::new(),
-        });
+        let cups = FakeCups::listing(
+            "Star_TSP143\nOffice\n",
+            "device for Star_TSP143: usb://Star/TSP143\ndevice for Office: ipp://10.0.0.9:631/ipp/print\n",
+        );
 
         let found = discover_usb_printers(&cups).expect("a healthy CUPS answers");
 
-        assert_eq!(cups.calls.borrow()[0].0, CUPS_LPSTAT);
+        let calls = cups.calls.borrow();
+        let asked: Vec<(&str, &[String])> =
+            calls.iter().map(|(program, args, _)| (program.as_str(), args.as_slice())).collect();
         assert_eq!(
-            cups.calls.borrow()[0].1,
-            vec!["-v"],
-            "`-v` is what prints the device URI; without it there is no way to tell a cable from a LAN"
+            asked,
+            vec![(CUPS_LPSTAT, &["-e".to_string()][..]), (CUPS_LPSTAT, &["-v".to_string()][..])],
+            "`-e` is the names (never translated); `-v` is what prints the device URI, without \
+             which there is no way to tell a cable from a LAN"
         );
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].id, "usb:Star_TSP143");
@@ -547,9 +685,12 @@ mod tests {
 
     #[test]
     fn hub1083_a_listing_without_any_usb_queue_is_an_empty_answer_not_a_failure() {
-        // A till with only LAN printers is normal, not broken.
-        assert!(parse_usb_queues("device for Office: ipp://10.0.0.9:631/ipp/print\n").is_empty());
-        assert!(parse_usb_queues("").is_empty());
-        assert!(parse_usb_queues("lpstat: No destinations added.\n").is_empty());
+        // A till with only LAN printers is normal, not broken — and so is one with no printer at
+        // all, where both listings come back empty with exit 0 (checked in CUPS' `lpstat.c`:
+        // `show_devices` prints nothing and returns 0 when there is nothing to show).
+        assert!(parse_usb_queues("Office\n", "device for Office: ipp://10.0.0.9:631/ipp/print\n").is_empty());
+        assert!(parse_usb_queues("", "").is_empty());
+        assert!(parse_usb_queues("", "lpstat: No destinations added.\n").is_empty());
+        assert!(discover_usb_printers(&FakeCups::listing("", "")).expect("empty is fine").is_empty());
     }
 }
