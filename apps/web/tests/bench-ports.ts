@@ -31,12 +31,32 @@ export const BENCH_WINDOW_LAST = 9799;
 
 const PROBE = fileURLToPath(new URL('./free-port-probe.mjs', import.meta.url));
 
+// The probe RELEASES the ports before the bench binds them (`cargo run` needs seconds, the assistant
+// spec binds its own port minutes later), so two scans that START on the same ports can still hand
+// out the same one. Runner slots share the machine — `ci-runner-1` serves its slots as
+// `ci-runner-1a` … `ci-runner-1f`, one job at a time each — so the window is split into one
+// sub-window per slot letter: a scan that starts inside its own sub-window cannot begin on a
+// neighbour slot's ports. Past a busy port (a zombie of the slot's previous job) the scan moves
+// on, and past the sub-window it wraps into the rest of the window.
+export const SLOT_LETTERS = 26;
+export const SLOT_SPAN = Math.floor((BENCH_WINDOW_LAST - BENCH_WINDOW_FIRST + 1) / SLOT_LETTERS);
+
+/** Slot index of a `<machine><digit><letter>` runner name (`ci-runner-1d` → 3); undefined otherwise. */
+export function runnerSlot(runnerName: string | undefined): number | undefined {
+  const match = /\d([a-z])$/.exec(runnerName ?? '');
+  if (match === null) return undefined;
+  return match[1].charCodeAt(0) - 'a'.charCodeAt(0);
+}
+
 /**
- * Where this job starts scanning the window. Derived from the CI job identity so two concurrent
- * jobs on the same runner begin far apart (they do not race for the same first port), and a RETRY
- * of one job lands on the same bench it had before.
+ * Where this job starts scanning the window: its slot's own sub-window when the runner name carries
+ * a slot letter; otherwise (GitHub-hosted runner, a local `CI=1` run) a spread over the whole window
+ * derived from the job identity, so two concurrent jobs at least begin far apart.
  */
 export function scanStart(env: BenchEnv, pid: number): number {
+  const slot = runnerSlot(env.RUNNER_NAME);
+  if (slot !== undefined) return BENCH_WINDOW_FIRST + slot * SLOT_SPAN;
+
   const seed = [
     env.GITHUB_RUN_ID ?? '',
     env.GITHUB_JOB ?? '',

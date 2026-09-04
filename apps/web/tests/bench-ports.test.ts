@@ -21,6 +21,7 @@ import {
   freePorts,
   resolveBenchPorts,
   scanStart,
+  SLOT_SPAN,
 } from './bench-ports.ts';
 
 const opened: Server[] = [];
@@ -74,7 +75,7 @@ describe('bench-ports (hub#1517)', () => {
     await Promise.all(ports.map((p) => occupy(p)));
   });
 
-  it('two jobs of the SAME runner start the scan at different points', () => {
+  it('without a slot name two jobs start the scan at different points (the spread fallback)', () => {
     const a = scanStart({ GITHUB_RUN_ID: '33787018647', GITHUB_JOB: 'e2e' }, 100);
     const b = scanStart({ GITHUB_RUN_ID: '33786909054', GITHUB_JOB: 'e2e' }, 100);
     expect(a).not.toBe(b);
@@ -84,7 +85,7 @@ describe('bench-ports (hub#1517)', () => {
     }
   });
 
-  it('the scan start is deterministic for one job (a retry lands on the same bench)', () => {
+  it('the spread fallback is deterministic for one identity', () => {
     const env = { GITHUB_RUN_ID: '33787018647', GITHUB_JOB: 'e2e', RUNNER_NAME: 'ci-runner-1-3' };
     expect(scanStart(env, 100)).toBe(scanStart(env, 100));
   });
@@ -102,5 +103,39 @@ describe('bench-ports (hub#1517)', () => {
     );
     expect(ports.web).toBe(4173);
     expect(ports.assistant).toBe(9100);
+  });
+
+  it('REGRESSION: a pinned port is never handed to the other halves of the bench', () => {
+    // Pin the runtime to the very port the scan would hand out first. Without the exclusion the
+    // allocator gives Vite that same port and the bench fights itself.
+    const env = { CI: '1' };
+    const [first] = freePorts(1, scanStart(env, 4242));
+    const ports = resolveBenchPorts({ ...env, HUB_BIND: `127.0.0.1:${first}` }, 4242);
+    expect(ports.runtime).toBe(first);
+    expect(ports.web).not.toBe(first);
+    expect(ports.assistant).not.toBe(first);
+    expect(ports.web).not.toBe(ports.assistant);
+  });
+
+  it('two SLOTS of the same runner machine scan DISJOINT sub-windows, whatever the run or pid', () => {
+    // `ci-runner-1` serves its slots as `ci-runner-1a`…`ci-runner-1f`, one job at a time each. The
+    // probe releases the ports before the bench binds them, so two scans starting close together
+    // could still pick the same first port; a scan that starts inside its own slot's sub-window
+    // cannot race the neighbour slot for it.
+    const d1 = scanStart({ RUNNER_NAME: 'ci-runner-1d', GITHUB_RUN_ID: '1' }, 100);
+    const d2 = scanStart({ RUNNER_NAME: 'ci-runner-1d', GITHUB_RUN_ID: '2', GITHUB_RUN_ATTEMPT: '2' }, 999);
+    const e1 = scanStart({ RUNNER_NAME: 'ci-runner-1e', GITHUB_RUN_ID: '1' }, 100);
+    expect(d1).toBe(d2); // same slot: same sub-window, whatever the run id, attempt or pid
+    expect(Math.abs(d1 - e1)).toBeGreaterThanOrEqual(SLOT_SPAN);
+    for (const start of [d1, e1]) {
+      expect(start).toBeGreaterThanOrEqual(BENCH_WINDOW_FIRST);
+      expect(start + SLOT_SPAN - 1).toBeLessThanOrEqual(BENCH_WINDOW_LAST);
+    }
+  });
+
+  it('a runner without a slot letter (GitHub-hosted, or a local CI=1 run) falls back to the spread', () => {
+    const a = scanStart({ RUNNER_NAME: 'GitHub Actions 5', GITHUB_RUN_ID: '1' }, 100);
+    const b = scanStart({ RUNNER_NAME: 'GitHub Actions 5', GITHUB_RUN_ID: '2' }, 100);
+    expect(a).not.toBe(b);
   });
 });

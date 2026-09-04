@@ -8,8 +8,8 @@
 //
 // Usage: node free-port-probe.mjs <first> <last> <start> <count> [excluded...]
 // Sweeps upward from <start>, wrapping inside [<first>, <last>], and prints <count> free ports one
-// per line. Ports found are HELD OPEN until the whole set is collected — otherwise a second port
-// could be the same as the first, since nothing else took it in between.
+// per line. Ports found are HELD OPEN until the whole set is collected, so the set is free at ONE
+// instant rather than each port at a different one; the sweep itself never revisits a port.
 import { createServer } from 'node:net';
 
 const [first, last, start, count] = process.argv.slice(2, 6).map(Number);
