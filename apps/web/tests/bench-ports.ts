@@ -41,10 +41,15 @@ const PROBE = fileURLToPath(new URL('./free-port-probe.mjs', import.meta.url));
 export const SLOT_LETTERS = 26;
 export const SLOT_SPAN = Math.floor((BENCH_WINDOW_LAST - BENCH_WINDOW_FIRST + 1) / SLOT_LETTERS);
 
-/** Slot index of a `<machine><digit><letter>` runner name (`ci-runner-1d` → 3); undefined otherwise. */
+/**
+ * Slot index of a runner name. `install.sh` names the first slot of a machine `ci-runner-1` — no
+ * letter — and the rest `ci-runner-1b` … `ci-runner-1f`, so a name ending in a digit is slot 0 and a
+ * trailing letter counts from `a`. A name with neither (a local `CI=1` run) has no slot.
+ */
 export function runnerSlot(runnerName: string | undefined): number | undefined {
-  const match = /\d([a-z])$/.exec(runnerName ?? '');
+  const match = /\d([a-z])?$/.exec(runnerName ?? '');
   if (match === null) return undefined;
+  if (match[1] === undefined) return 0;
   return match[1].charCodeAt(0) - 'a'.charCodeAt(0);
 }
 

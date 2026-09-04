@@ -20,6 +20,7 @@ import {
   CLASSIC_BENCH_PORTS,
   freePorts,
   resolveBenchPorts,
+  runnerSlot,
   scanStart,
   SLOT_SPAN,
 } from './bench-ports.ts';
@@ -133,9 +134,25 @@ describe('bench-ports (hub#1517)', () => {
     }
   });
 
-  it('a runner without a slot letter (GitHub-hosted, or a local CI=1 run) falls back to the spread', () => {
-    const a = scanStart({ RUNNER_NAME: 'GitHub Actions 5', GITHUB_RUN_ID: '1' }, 100);
-    const b = scanStart({ RUNNER_NAME: 'GitHub Actions 5', GITHUB_RUN_ID: '2' }, 100);
+  it('a run without a runner slot (a local CI=1 run) falls back to the spread', () => {
+    const a = scanStart({ GITHUB_RUN_ID: '1' }, 100);
+    const b = scanStart({ GITHUB_RUN_ID: '2' }, 100);
     expect(a).not.toBe(b);
+  });
+
+  it('the FIRST slot carries no letter: `ci-runner-1` is slot 0, next to `ci-runner-1b`, and never overlaps it', () => {
+    // `install.sh` names the slots `ci-runner-1`, `ci-runner-1b` … `ci-runner-1f`. Sending the
+    // letterless first slot to the spread fallback would let it start anywhere in the window —
+    // including on top of a lettered slot's ports, which is the race this partition exists to end.
+    expect(runnerSlot('ci-runner-1')).toBe(0);
+    expect(runnerSlot('ci-runner-1b')).toBe(1);
+    expect(runnerSlot('ci-runner-1f')).toBe(5);
+    expect(runnerSlot('GitHub Actions 5')).toBe(0); // its own VM: any sub-window is fine
+    expect(runnerSlot(undefined)).toBeUndefined();
+    expect(runnerSlot('macbook-ioan')).toBeUndefined();
+    const first = scanStart({ RUNNER_NAME: 'ci-runner-1', GITHUB_RUN_ID: '9' }, 7);
+    const second = scanStart({ RUNNER_NAME: 'ci-runner-1b', GITHUB_RUN_ID: '9' }, 7);
+    expect(first).toBe(BENCH_WINDOW_FIRST);
+    expect(second - first).toBe(SLOT_SPAN);
   });
 });
