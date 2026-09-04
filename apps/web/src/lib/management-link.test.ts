@@ -55,10 +55,15 @@ vi.mock('./open-external', () => ({ openExternal }));
 
 // The one-time pass the runtime mints (pm#196). Mocked, not stubbed through `fetch`, because what
 // this file is about is which address the door ends up opening.
-const { runtimeManagementHandoff } = vi.hoisted(() => ({
-  runtimeManagementHandoff: vi.fn(async () => 'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F'),
+//
+// The name is the module's REAL export: the pass is not a thing of the management link, it is how
+// this app leaves for the SaaS, and `saas-door` — which management now goes through — asks `./cloud`
+// for it under this name. A mock that exports what the module does not is how a suite stays green
+// over an import that does not exist (and vitest does not typecheck mocks: `pnpm typecheck` does).
+const { runtimeBrowserHandoff } = vi.hoisted(() => ({
+  runtimeBrowserHandoff: vi.fn(async () => 'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F'),
 }));
-vi.mock('./cloud', () => ({ runtimeManagementHandoff }));
+vi.mock('./cloud', () => ({ runtimeBrowserHandoff }));
 
 // A pass that cannot be minted must not fail MUTE: the door still opens, and the reason is reported.
 const { reportClientError } = vi.hoisted(() => ({ reportClientError: vi.fn() }));
@@ -75,8 +80,8 @@ beforeEach(() => {
   session.value = null;
   setHubSession('runtime-token', 'cloud');
   openExternal.mockClear();
-  runtimeManagementHandoff.mockClear();
-  runtimeManagementHandoff.mockResolvedValue(
+  runtimeBrowserHandoff.mockClear();
+  runtimeBrowserHandoff.mockResolvedValue(
     'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
   );
   reportClientError.mockClear();
@@ -145,7 +150,7 @@ describe('openManagement', () => {
   it('trades the till session for a one-time address, so the browser lands already signed in', async () => {
     await openManagement();
 
-    expect(runtimeManagementHandoff).toHaveBeenCalledWith(managementPath());
+    expect(runtimeBrowserHandoff).toHaveBeenCalledWith(managementPath());
     expect(openExternal).toHaveBeenCalledWith(
       'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
     );
@@ -156,7 +161,7 @@ describe('openManagement', () => {
 
     await openManagement();
 
-    expect(runtimeManagementHandoff).toHaveBeenCalledWith(
+    expect(runtimeBrowserHandoff).toHaveBeenCalledWith(
       '/dashboard/?view=advanced&hub=a%20b%2Fc%26d&utm_source=hub',
     );
   });
@@ -165,7 +170,7 @@ describe('openManagement', () => {
   // opened the panel. So it degrades to exactly today's behaviour — and says why, because a failure
   // nobody can see is a failure that never gets fixed.
   it('still opens the panel when the pass cannot be minted, and reports why', async () => {
-    runtimeManagementHandoff.mockRejectedValue(new Error('handoff_unavailable'));
+    runtimeBrowserHandoff.mockRejectedValue(new Error('handoff_unavailable'));
 
     await openManagement();
 
@@ -177,7 +182,7 @@ describe('openManagement', () => {
   });
 
   it('does not turn an empty answer into an address', async () => {
-    runtimeManagementHandoff.mockResolvedValue('');
+    runtimeBrowserHandoff.mockResolvedValue('');
 
     await openManagement();
 

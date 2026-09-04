@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { planUpgradeIsOfferable, upgradePlanUrl } from './upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from './upgrade-plan-link';
 
 const appSource = readFileSync(new URL('../App.vue', import.meta.url), 'utf8');
 
@@ -88,5 +88,37 @@ describe('en la copia que reparte una tienda', () => {
   it('App.vue esconde el botón con esa regla, no lo pinta siempre', () => {
     // El fallo de hub#756 era exactamente esto: el botón se pintaba sin mirar de dónde venía la app.
     expect(appSource).toContain('planUpgradeIsOfferable');
+  });
+});
+
+// pm#196 — este es uno de los enlaces que la issue nombra por su nombre: «billing pide login y 2FA
+// otra vez». Dentro de la app instalada el navegador del sistema no comparte cookies con el
+// webview, así que la dueña aterrizaba en un login justo cuando iba a cambiar de plan. El pase de
+// un solo uso lo cruza logueada; para pedirlo hace falta la RUTA, porque la dirección la arma el
+// runtime (una página que eligiera el host elegiría dónde se gasta el pase).
+describe('la ruta del plan, para el pase de un solo uso', () => {
+  it('es una ruta PROPIA del SaaS, sin host', () => {
+    const path = upgradePlanPath();
+    expect(path.startsWith('/')).toBe(true);
+    expect(path).not.toContain('://');
+    // `//host` es una URL protocol-relative: el runtime la rechaza, y aquí no se genera jamás.
+    expect(path.startsWith('//')).toBe(false);
+  });
+
+  it('es exactamente la cola del enlace de siempre, para que el destino no se bifurque', () => {
+    expect(upgradePlanUrl()).toBe(`https://erplora.com${upgradePlanPath()}`);
+  });
+
+  it('App.vue cruza por la puerta compartida, no con el enlace pelado', () => {
+    // El fallo que arregla pm#196: el mecanismo existía y este enlace no lo usaba.
+    //
+    // 🪤 Se afirma sobre la LLAMADA, no sobre los nombres sueltos: `toContain('saasDoor')` a secas
+    // lo satisface la línea del `import`, así que devolver la llamada al enlace pelado dejaba el
+    // test en verde. Comprobado mutando el fichero — con la aserción floja el mutante sobrevivía.
+    expect(appSource).toContain(
+      "openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'))",
+    );
+    // Y la forma vieja no puede quedarse de vuelta por otro camino.
+    expect(appSource).not.toContain('openExternal(upgradePlanUrl())');
   });
 });

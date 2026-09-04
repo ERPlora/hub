@@ -37,7 +37,18 @@ import type { DeviceContext } from './device';
  */
 export function upgradePlanUrl(): string {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
-  return `${base}/dashboard/hubs/${encodeURIComponent(config.hubId)}/change-plan/?utm_source=hub`;
+  return `${base}${upgradePlanPath()}`;
+}
+
+/**
+ * La misma página **como ruta propia del SaaS**, que es lo que pide el pase de un solo uso (pm#196).
+ *
+ * Separada de [`upgradePlanUrl`] a propósito: la dirección la arma el runtime con SU idea de dónde
+ * está el SaaS. Una página que pudiera elegir el host estaría eligiendo dónde se gasta el pase — y
+ * el pase abre una sesión.
+ */
+export function upgradePlanPath(): string {
+  return `/dashboard/hubs/${encodeURIComponent(config.hubId)}/change-plan/?utm_source=hub`;
 }
 
 /**

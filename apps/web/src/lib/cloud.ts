@@ -487,7 +487,6 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
   );
 }
 
-/** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
 /**
  * **Trades the till's session for a one-time SaaS address** (pm#196, hub#1400) —
  * `POST /api/auth/handoff`.
@@ -506,7 +505,7 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
  * it. Throws `RuntimeError` with its code (`handoff_requires_cloud_login`, `handoff_unavailable`…)
  * when the door refuses: the caller decides whether to degrade to the link of always.
  */
-export async function runtimeManagementHandoff(next: string): Promise<string> {
+export async function runtimeBrowserHandoff(next: string): Promise<string> {
   const { runtimeHeaders } = await import('./runtime');
   const result = await runtimePost<{ url?: string }>(
     '/api/auth/handoff',
@@ -516,6 +515,7 @@ export async function runtimeManagementHandoff(next: string): Promise<string> {
   return result.url ?? '';
 }
 
+/** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
 export async function runtimeLogout(sessionToken: string): Promise<void> {
   try {
     await fetch(`${RUNTIME_URL}/api/auth/logout`, {

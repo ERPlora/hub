@@ -17,8 +17,7 @@ import { openExternal } from './open-external';
 import { toastError } from './toast';
 import { i18n } from '../i18n';
 import { hasPermission, openedWithCloudLogin } from './session';
-import { runtimeManagementHandoff } from './cloud';
-import { reportClientError } from './error-report';
+import { saasDoor } from './saas-door';
 
 /**
  * The permission that opens this door: the one the core already owns (ADR-0248, hub#435).
@@ -82,24 +81,12 @@ export function managementUrl(): string {
  * The address that actually gets opened: the one-time one when the runtime hands it over, the usual
  * one when it does not.
  *
- * The pass (pm#196) is what makes the browser land ALREADY SIGNED IN. When it cannot be minted —the
- * SaaS does not answer, the session is no longer valid— the door does **not** go dead: it falls back
- * to the link of always, which is exactly the behaviour from before this issue, so degrading is
- * never worse than not having tried. What it does not do is keep quiet: the reason is reported, or
- * the failure turns invisible and nobody ever fixes it.
+ * The pass (pm#196) is what makes the browser land ALREADY SIGNED IN. Everything about minting it,
+ * degrading when it cannot be minted, and saying so out loud lives in {@link saasDoor} — this is
+ * one of its four callers, not the owner of the mechanism.
  */
 async function managementDoor(): Promise<string> {
-  const fallback = managementUrl();
-  try {
-    const url = await runtimeManagementHandoff(managementPath());
-    return url || fallback;
-  } catch (error) {
-    reportClientError({
-      message: `management handoff failed: ${error instanceof Error ? error.message : String(error)}`,
-      component: 'management-link',
-    });
-    return fallback;
-  }
+  return saasDoor(managementPath(), managementUrl(), 'management');
 }
 
 /**
@@ -115,9 +102,10 @@ async function managementDoor(): Promise<string> {
  * which is precisely what it fixed: `openExternal` hands the address to the system browser through
  * the shell, and opens a tab in a browser. One door, both surfaces.
  *
- * When the trip cannot be made it is SAID, here rather than at the caller: this door is opened from
- * an icon-only action in the topbar, and a silent failure there is indistinguishable from a dead
- * button — the exact defect hub#475 existed to end.
+ * When the trip cannot be made it is SAID, here rather than at the caller: a silent failure on a
+ * topbar action is indistinguishable from a dead button — the exact defect hub#475 existed to end.
+ * (The button carries a visible label since hub#1400; the reasoning holds either way, because what
+ * a label cannot tell you is that the press went nowhere.)
  */
 export async function openManagement(): Promise<void> {
   try {

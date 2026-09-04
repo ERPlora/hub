@@ -331,6 +331,7 @@ import {
 import { isAdmin } from '../lib/session';
 import { config } from '../lib/config';
 import { openExternal } from '../lib/open-external';
+import { saasDoor } from '../lib/saas-door';
 import { SaveDownloadError, saveDownload, saveDownloadMessageKey } from '../lib/save-download';
 import HubIcon from './HubIcon.vue';
 import GrantFilePicker from './GrantFilePicker.vue';
@@ -567,9 +568,13 @@ async function openDashboard() {
     // si la página le pide los datos fiscales, esto es lo que se lo explica.
     errorKey.value = 'grant.errors.identity_not_shared';
   }
-  const url = `${config.cloudApiUrl}/dashboard/hubs/${encodeURIComponent(config.hubId)}/fiscal/representation-grant/`;
+  // pm#196 — se cruza con el pase de un solo uso. El apoderamiento se firma en erplora.com y desde
+  // la app instalada se llegaba SIN sesión: login y segundo factor otra vez en mitad de un trámite
+  // fiscal. Si el pase no se puede acuñar, `saasDoor` devuelve este mismo enlace y lo reporta.
+  const path = `/dashboard/hubs/${encodeURIComponent(config.hubId)}/fiscal/representation-grant/`;
+  const url = `${config.cloudApiUrl}${path}`;
   try {
-    await openExternal(url);
+    await openExternal(await saasDoor(path, url, 'representation-grant'));
   } catch {
     errorKey.value = 'grant.errors.open_external_failed';
   }

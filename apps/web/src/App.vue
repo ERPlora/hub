@@ -196,7 +196,8 @@ import { user, isAuthed, logout } from './lib/session';
 import { refreshModuleNav, refreshModuleNavAfterInstall } from './lib/nav';
 import { toastError } from './lib/toast';
 import { openExternal } from './lib/open-external';
-import { planUpgradeIsOfferable, upgradePlanUrl } from './lib/upgrade-plan-link';
+import { planUpgradeIsOfferable, upgradePlanPath, upgradePlanUrl } from './lib/upgrade-plan-link';
+import { saasDoor } from './lib/saas-door';
 import { resolveEntitlement, needsActivation } from './lib/entitlement';
 import { getDeviceContext } from './lib/device';
 import { railCollapsed } from './lib/shell';
@@ -267,9 +268,13 @@ onMounted(async () => {
   canOfferPlanUpgrade.value = planUpgradeIsOfferable(context?.distribution);
 });
 
+// pm#196 — cruza por la puerta compartida: dentro de la app instalada el navegador del sistema NO
+// comparte cookies con el webview, así que sin el pase de un solo uso la dueña aterrizaba en un
+// login —contraseña y segundo factor— justo al ir a cambiar de plan. Si el pase no se puede acuñar,
+// `saasDoor` devuelve el enlace de siempre: degradar, nunca un botón muerto.
 async function onUpgradePlan(): Promise<void> {
   try {
-    await openExternal(upgradePlanUrl());
+    await openExternal(await saasDoor(upgradePlanPath(), upgradePlanUrl(), 'upgrade-plan'));
   } catch {
     await toastError(t('nav.upgradePlanError'));
   }
