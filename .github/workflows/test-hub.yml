@@ -117,7 +117,24 @@ jobs:
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo: el
     # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 40
+    # 🔴 Este número NO es el presupuesto de la suite: es el BACKSTOP del job (hub#1519).
+    # Un job que agota `timeout-minutes` lo marca GitHub como `cancelled`, indistinguible de una
+    # cancelación por concurrencia o por un push más nuevo: no nombra un test, no señala una línea,
+    # y `merge-pr.sh` lo lee como no-verde y se niega a mergear sin explicar por qué. Así murió el
+    # run 33787341170 a los 40m20s, con la suite entera en verde y los doc-tests como última línea
+    # del log: la cola bloqueada por un rojo que no era un rojo.
+    #
+    # Un PASO que agota SU `timeout-minutes` FALLA (el job queda en `failure`, no en `cancelled`),
+    # así que el presupuesto vive ahora en cada paso caro, y este de aquí solo cubre lo que queda
+    # FUERA de ellos (arranque del contenedor, checkout, caché). Por eso tiene que quedar
+    # ESTRICTAMENTE por encima de la suma de los presupuestos de los pasos — si no, el hachazo mudo
+    # del job vuelve a llegar primero. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+    #
+    # 70 medido, no elegido a ojo: las cinco pasadas verdes del 03/09 sobre este mismo runner
+    # duraron 33m07s, 33m09s, 32m32s, 33m37s y 32m46s (jobs de los runs 33815145661, 33811810476,
+    # 33811694999, 33802962820 y 33788925868). 70 deja >50% de margen sobre la peor. Mismo número
+    # que `test-hub-modules.yml`, que ya lo usa.
+    timeout-minutes: 70
     permissions:
       contents: read
       issues: write   # open/refresh the develop-broken alert issue (hub#572)
@@ -385,14 +402,89 @@ jobs:
       #
       # `--no-deps`: linta el workspace, no las ~600 cajas de terceros (sus avisos no los
       # arreglamos y solo ensucian el log).
+      #
+      # Presupuesto propio (hub#1519): medido en 2m33s el 03/09, 8 min es 3× ese reloj. El
+      # `timeout` de shell salta un minuto ANTES que el del paso para poder decir en voz alta que
+      # lo que se agotó fue el TIEMPO y no un lint — el `timeout-minutes` de abajo es la red por si
+      # el propio `timeout` no llegara a arrancar.
       - name: cargo clippy --workspace
+        id: clippy
+        timeout-minutes: 8
         run: |
-          cargo clippy --workspace --all-targets --no-deps \
+          set -uo pipefail
+          # 🔴 `set +e` NO sobra: Actions corre este bloque como `bash -e {0}` (este workflow no
+          # fija `shell:`) y `set -uo pipefail` NO apaga ese `-e`. Sin esta línea, el `timeout` al
+          # saltar abortaría el bloque en la línea de abajo y ni el `rc=$?`, ni el `overrun=true`,
+          # ni el `::error::` llegarían a ejecutarse: el paso saldría rojo MUDO, que es justo lo que
+          # hub#1519 viene a quitar. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+          set +e
+          timeout 7m cargo clippy --workspace --all-targets --no-deps \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+          rc=$?
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (clippy)::clippy pasó de 7 min. NO es un lint roto: es el reloj (hub#1519)."
+          fi
+          exit "$rc"
 
-      - name: cargo test --workspace
+      # `--lib --bins --tests` = todo lo que EJECUTA menos los doc-tests, que se van al paso de
+      # abajo (hub#1519). El workspace no tiene ni un target `example`, así que la selección
+      # explícita no deja nada fuera respecto al `cargo test` pelado que había aquí.
+      #
+      # El presupuesto de 50 min sale del reloj real: este paso midió 29m49s el 03/09 (run
+      # 33811810476). El `timeout` de shell es el que manda porque es el único que puede EXPLICARSE:
+      # devuelve 124, y con eso el paso muere en rojo diciendo que se acabó el tiempo, en vez de
+      # dejar el `cancelled` mudo que bloqueaba la cola.
+      - name: cargo test --workspace (sin doc-tests)
         id: tests
-        run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+        timeout-minutes: 50
+        run: |
+          set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
+          timeout 48m cargo test --workspace --lib --bins --tests \
+            --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+          rc=$?
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (suite)::La suite pasó de 48 min. NO hay ningún test roto: se acabó el presupuesto (hub#1519). Antes de re-lanzar, mira cuántos jobs comparten el runner."
+          fi
+          exit "$rc"
+
+      # Los doc-tests, en su propio paso y CONTADOS (hub#1519). Eran la última línea del log cuando
+      # cayó el hachazo del run 33787341170 y nada lo dijo; aquí un exceso de tiempo se lee como lo
+      # que es, y su resultado no queda escondido detrás de los 30 min de la suite.
+      #
+      # Se cuentan porque un paso de doc-tests que no ejecuta NINGUNO sale tan verde como uno que
+      # los pasa — el verde vacío que este repo ya se comió en hub#1216. Hoy son 4 (los de
+      # `erplora_guest_sdk`, medidos en el run 33811810476); si la selección de targets deja de
+      # coger nada, esto se pone rojo en vez de mentir.
+      - name: cargo test --doc (doc-tests, contados)
+        id: doctests
+        timeout-minutes: 8
+        run: |
+          set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
+          log="$RUNNER_TEMP/doctests.log"
+          timeout 7m cargo test --workspace --doc \
+            --exclude erplora-tauri --exclude tauri-plugin-erplora-android 2>&1 | tee "$log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (doc-tests)::Los doc-tests pasaron de 7 min. NO es un test roto: es el reloj (hub#1519)."
+            exit "$rc"
+          fi
+          total=$(sed 's/\x1b\[[0-9;]*m//g' "$log" \
+                    | awk '/^test result: ok\./ { s += $4 } END { print s+0 }')
+          echo "doc-tests ejecutados: ${total}"
+          if [ "$rc" -eq 0 ] && [ "$total" -eq 0 ]; then
+            echo "::error title=Doc-tests vacíos::cargo test --doc salió verde sin ejecutar un solo doc-test (hub#1519): la selección de targets dejó de coger nada."
+            exit 1
+          fi
+          exit "$rc"
 
       # When the POST-MERGE run on develop goes red (hub#572), make it loud:
       # open (or refresh, idempotently — one open issue, never one per run) an
@@ -402,10 +494,17 @@ jobs:
       # outcome so an environmental failure (disk, service container) does not
       # fake a "develop is broken" verdict; a run cancelled by a newer merge
       # never triggers it (`failure()` excludes cancellation).
+      #
+      # Desde hub#1519 mira los DOS pasos de la suite (se partió en tests + doc-tests: un doc-test
+      # roto en develop tiene que abrir la alerta igual) y descarta explícitamente el exceso de
+      # presupuesto: un `timeout` deja el paso en `failure` igual que un test roto, y decir
+      # «develop está roto» porque el runner iba lento es exactamente el veredicto falso que este
+      # `if:` lleva desde el principio evitando.
       - name: Open or refresh the develop-broken alert issue (hub#572)
         if: >-
-          failure() && steps.tests.outcome == 'failure' &&
-          github.event_name == 'push' && github.ref == 'refs/heads/develop'
+          failure() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
+          (steps.tests.outcome == 'failure' || steps.doctests.outcome == 'failure') &&
+          steps.tests.outputs.overrun != 'true' && steps.doctests.outputs.overrun != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}
