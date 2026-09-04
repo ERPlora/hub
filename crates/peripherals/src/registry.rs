@@ -296,9 +296,25 @@ impl DeviceRegistry {
     }
 
     /// Asigna el rol (`receipt`/`kitchen`/`bar`…). Acepta clave o MAC.
+    ///
+    /// A key the registry does not hold is an ERROR, not a no-op (hub#1083). The only ways to get
+    /// here are a `usb:{queue}` — discovered and printing, but without an identity in this
+    /// registry until hub#1536 — or a registration that failed upstream; in both, "your click did
+    /// nothing" must not be how the user finds out.
     pub fn set_role(&self, key_or_mac: &str, role: &str) -> Result<()> {
         let Some(key) = self.resolve_key(key_or_mac) else {
-            return Ok(());
+            return Err(crate::PeripheralError::InvalidPrinterId(
+                if key_or_mac.starts_with("usb:") {
+                    format!(
+                        "`{key_or_mac}` is a USB print queue: it prints, but it cannot be given a \
+                         role (kitchen/bar/receipt) yet"
+                    )
+                } else {
+                    format!(
+                        "no registered device under `{key_or_mac}`; scan for printers again and retry"
+                    )
+                },
+            ));
         };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
@@ -802,6 +818,41 @@ mod tests {
     }
 
     // ── Datos ya persistidos en casa de clientes ────────────────────────────────────────────────
+
+    // ── hub#1083: a role on a printer the registry does not hold is an ERROR, not a no-op ──────
+    //
+    // A USB queue is discovered and prints, but never enters the registry (its identity is
+    // hub#1536). The printing settings screen still offers the role control and sends
+    // `usb:{queue}` as the key: answering `Ok` there is a click that does nothing, with no message —
+    // the silent failure the production-ready rule forbids.
+
+    #[test]
+    fn hub1083_a_role_on_a_usb_queue_is_refused_instead_of_silently_dropped() {
+        let (registry, _) = temp_registry("rol-cola-usb");
+
+        let err = registry
+            .set_role("usb:Star_TSP143", "kitchen")
+            .expect_err("a queue the registry cannot hold must not accept a role in silence");
+
+        assert!(matches!(err, crate::PeripheralError::InvalidPrinterId(_)), "got {err:?}");
+        assert!(registry.get_all().is_empty(), "nothing may have been written");
+    }
+
+    #[test]
+    fn a_role_on_a_device_the_registry_does_not_know_is_an_error_too() {
+        // Same rule for any unknown key: the only way to reach it is a registration that failed
+        // upstream, and "your click did nothing" must not be how the user finds out.
+        let (registry, _) = temp_registry("rol-desconocido");
+        registry.register(None, "10.0.0.7", 9100, "Cocina", "network").unwrap();
+
+        let err = registry
+            .set_role("network:10.0.0.99:9100", "bar")
+            .expect_err("an unknown key cannot take a role");
+
+        assert!(matches!(err, crate::PeripheralError::InvalidPrinterId(_)), "got {err:?}");
+        assert_eq!(registry.get_all().len(), 1, "the registered one is untouched");
+        assert_eq!(registry.get_all()[0].role, None, "and it did not receive the role by mistake");
+    }
 
     #[test]
     fn carga_un_devices_json_antiguo_sin_campo_key() {

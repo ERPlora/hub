@@ -1227,6 +1227,33 @@ fn merge_bluetooth_printers(
     }
 }
 
+/// Folds the machine's USB print queues into the discovery outcome (hub#1083).
+///
+/// Same rule as the Bluetooth merge, and for the same reason: "which printers can this device
+/// print on?" is ONE question to the person setting up a till, whatever cable each answer arrives
+/// by. Deduplicated by id, so a re-scan cannot turn one printer into two.
+///
+/// A `PermissionDenied` outcome stays a refusal without printers. On desktop — the only place a
+/// USB queue exists — that branch is unreachable (there is no local-network gate to deny), but the
+/// shell having ONE merge rule beats it having two that differ in a case nobody can hit.
+fn merge_usb_printers(
+    outcome: PrinterDiscovery,
+    usb: Vec<erplora_peripherals::protocol::PrinterInfo>,
+) -> PrinterDiscovery {
+    match outcome {
+        PrinterDiscovery::Scanned { mut printers } => {
+            for queue in usb {
+                if printers.iter().any(|known| known.id == queue.id) {
+                    continue;
+                }
+                printers.push(queue);
+            }
+            PrinterDiscovery::Scanned { printers }
+        }
+        blocked @ PrinterDiscovery::PermissionDenied { .. } => blocked,
+    }
+}
+
 /// `erplora_discover_printers` — re-escanea la red (mDNS + subred), lista las impresoras
 /// Bluetooth EMPAREJADAS (solo Android, ADR-0204), registra y devuelve las impresoras. Espejo de
 /// `Command::DiscoverPrinters` del bridge.
@@ -1259,7 +1286,34 @@ async fn erplora_discover_printers(
         let _ = state.registry.register(Some(&p.mac), "", 0, &p.name, "bluetooth");
     }
 
-    Ok(merge_bluetooth_printers(outcome, bonded))
+    // The machine's own USB print queues (hub#1083; desktop only — Android has no queue to ask).
+    // `spawn_blocking` because asking CUPS spawns a client and waits for it: on a wedged `cupsd`
+    // that wait runs to its timeout, and doing it on the async runtime would stall every other
+    // command for as long as it lasted.
+    //
+    // A CUPS failure must not poison the network half: a venue whose LAN printers work fine has to
+    // keep seeing them when the CUPS client tools are missing. Logged, so it is not a silent zero.
+    #[cfg(not(target_os = "android"))]
+    let usb = tokio::task::spawn_blocking(|| {
+        erplora_peripherals::usb::discover_usb_printers(&erplora_peripherals::usb::SystemCups)
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(erplora_peripherals::PeripheralError::Unreachable(format!(
+            "the USB queue listing did not finish: {e}"
+        )))
+    })
+    .unwrap_or_else(|e| {
+        log::warn!("shell: could not list the OS print queues ({e}); USB printers will not appear");
+        Vec::new()
+    });
+    #[cfg(target_os = "android")]
+    let usb = Vec::new();
+
+    Ok(merge_usb_printers(
+        merge_bluetooth_printers(outcome, bonded),
+        usb,
+    ))
 }
 
 /// `erplora_get_devices` — contenido del registro persistente de dispositivos (con sus roles).
@@ -1298,6 +1352,36 @@ fn bluetooth_send(
         })
 }
 
+/// Sends already-rendered bytes to the printer behind an OS print queue (hub#1083).
+///
+/// Direct, not queued — the same phase-1 shape as `bluetooth_send`, and the reasoning is in
+/// `erplora_peripherals::usb::send_raw`: [`PrintQueue`] is the NETWORK path, its jobs carry a
+/// socket target, and widening it is a real change to the one piece of the print chain that
+/// already works. The failure stays visible: the error comes back to the caller and the print host
+/// reports the job `failed`.
+#[cfg(not(target_os = "android"))]
+fn usb_send(target: &discovery::UsbTarget, payload: &[u8]) -> Result<(), HardwareError> {
+    erplora_peripherals::usb::send_raw(&erplora_peripherals::usb::SystemCups, target, payload)?;
+    Ok(())
+}
+
+/// Android has no OS print queue to hand bytes to, and USB Host there was declined on purpose
+/// (hub#1083): the SPP transport of ADR-0204 already covers the cheap printer on a tablet.
+///
+/// This says so instead of quietly doing nothing. A hub configured on the desktop till and then
+/// opened on a tablet keeps the same `printer_id`, so this IS reachable — and a ticket that
+/// vanishes without a word is exactly the failure mode the print chain keeps being bitten by.
+#[cfg(target_os = "android")]
+fn usb_send(target: &discovery::UsbTarget, _payload: &[u8]) -> Result<(), HardwareError> {
+    Err(HardwareError::from(
+        erplora_peripherals::PeripheralError::Unreachable(format!(
+            "`usb:{}` is a printer on a desktop till's print queue; this device cannot reach it \
+             (use a network or a bonded Bluetooth printer here)",
+            target.queue
+        )),
+    ))
+}
+
 /// ⚠️ `(async)` is load-bearing (ADR-0204): the bluetooth arm crosses into Kotlin through
 /// `run_mobile_plugin`, which dispatches onto Android's main looper and BLOCKS for the answer — a
 /// plain command runs on that very thread and the till would hang on the press that prints.
@@ -1327,6 +1411,7 @@ fn erplora_print(
             })?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
+        discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
     }
     Ok(())
 }
@@ -1351,6 +1436,7 @@ fn erplora_test_print(
             })?;
         }
         discovery::PrintTarget::Bluetooth(bt) => bluetooth_send(&app, &bt.mac, &payload)?,
+        discovery::PrintTarget::Usb(usb) => usb_send(&usb, &payload)?,
     }
     Ok(())
 }
@@ -1370,6 +1456,10 @@ async fn erplora_open_drawer(
         }
         discovery::PrintTarget::Bluetooth(bt) => {
             bluetooth_send(&app, &bt.mac, drawer::kick_command(pin.unwrap_or(2)))?;
+        }
+        // The kick is ESC/POS like any other document, so it rides the same raw queue.
+        discovery::PrintTarget::Usb(usb) => {
+            usb_send(&usb, drawer::kick_command(pin.unwrap_or(2)))?;
         }
     }
     Ok(())
@@ -1824,6 +1914,57 @@ mod tests {
             1,
             "the same bonded printer merged twice must stay one device"
         );
+    }
+
+    // ── hub#1083: the machine's USB print queues join discovery ──────────────────────────────
+    //
+    // The USB thermal printer is the cheapest in the catalogue and the one a single-till bar or
+    // salon actually buys. It reaches us through the OS print queue, so the merge is pure and
+    // testable on any laptop — including the CI machines that have no printer plugged in.
+
+    fn a_usb_printer() -> erplora_peripherals::protocol::PrinterInfo {
+        erplora_peripherals::protocol::PrinterInfo {
+            id: "usb:Star_TSP143".into(),
+            name: "Star TSP143".into(),
+            kind: "usb".into(),
+            category: erplora_peripherals::protocol::default_printer_category(),
+            status: "ready".into(),
+            paper_width: 80,
+            mac: None,
+        }
+    }
+
+    #[test]
+    fn hub1083_a_usb_queue_joins_the_scanned_list() {
+        let merged =
+            merge_usb_printers(PrinterDiscovery::Scanned { printers: vec![] }, vec![a_usb_printer()]);
+        let printers = merged.scanned_printers().expect("still a scanned outcome");
+        assert_eq!(printers.len(), 1);
+        assert_eq!(printers[0].id, "usb:Star_TSP143");
+        assert_eq!(printers[0].kind, "usb");
+    }
+
+    #[test]
+    fn hub1083_a_usb_queue_already_listed_is_not_duplicated() {
+        let once =
+            merge_usb_printers(PrinterDiscovery::Scanned { printers: vec![] }, vec![a_usb_printer()]);
+        let twice = merge_usb_printers(once, vec![a_usb_printer()]);
+        assert_eq!(
+            twice.scanned_printers().expect("scanned").len(),
+            1,
+            "the same queue merged twice must stay one device"
+        );
+    }
+
+    #[test]
+    fn hub1083_a_blocked_scan_stays_blocked_and_carries_no_usb_queues() {
+        let merged = merge_usb_printers(
+            PrinterDiscovery::PermissionDenied {
+                permission: "android.permission.ACCESS_LOCAL_NETWORK".into(),
+            },
+            vec![a_usb_printer()],
+        );
+        assert_eq!(merged.scanned_printers(), None);
     }
 
     // ── hub#447: forgetting BY CHOICE lands on the chooser, forgetting on a 410 does not ─────
