@@ -176,21 +176,43 @@ emit(bool(suite) and all(all(f in s["run"] for f in ("--lib", "--bins", "--tests
 # unreachable, so that is what is matched here — `|| rc=$?` is exempt by construction, not by a
 # special case. `set +e` must come BEFORE the capture: after it, it changes nothing.
 CAPTURE = re.compile(r"^[ \t]*[A-Za-z_][A-Za-z0-9_]*=(?:\$\?|\$\{PIPESTATUS\[)", re.M)
+# The clear has to be a COMMAND, so this is anchored to the start of a line and reads a real `set`
+# with a `+…e` flag (`set +e`, `set +ex`, `set -u +e`) — a `#` comment can never satisfy it. The
+# substring search that stood here first could: every budgeted step explains its `set +e` in a
+# comment right above the command, so deleting the command left the guard green. `set +u`/`set +x`
+# stay unmatched on purpose: they do not clear errexit.
+CLEARS_ERREXIT = re.compile(r"^[ \t]*set[ \t]+(?:[-+][A-Za-z]+[ \t]+)*\+[A-Za-z]*e", re.M)
 
-leaky = []
-for s in steps:
-    run = s.get("run") or ""
+
+def leaks(run):
+    """The step captures `$?`/PIPESTATUS on a line `bash -e` aborts before ever reaching."""
     m = CAPTURE.search(run)
     if not m:
-        continue
-    off = run.find("set +e")
-    if off != -1 and off < m.start():
-        continue
-    leaky.append(s.get("name") or s.get("id") or "<unnamed>")
+        return False
+    clear = CLEARS_ERREXIT.search(run)
+    return not (clear and clear.start() < m.start())
+
+
+leaky = [s.get("name") or s.get("id") or "<unnamed>"
+         for s in steps if leaks(s.get("run") or "")]
 
 emit(not leaky, "a step that reads `$?` clears errexit first (hub#1519)",
      "Actions runs these under `bash -e`, so the capture line is unreachable and the overrun "
      "stays mute: " + ", ".join(leaky))
+
+
+# Positive control. A guard no mutant can turn red is decoration, and this one is one line away
+# from being exactly that: every budgeted step here EXPLAINS its `set +e` in a comment right above
+# the command, so a search for the bare substring is satisfied by the explanation alone. The
+# mutant below is the real one (command deleted, comment left) and it MUST be caught.
+MUTANT = "set -uo pipefail\n# `set +e` por lo mismo que en `clippy`\nrc=${PIPESTATUS[0]}\n"
+SAFE = "set -uo pipefail\nset +e\nrc=${PIPESTATUS[0]}\n"
+
+
+emit(leaks(MUTANT) and not leaks(SAFE),
+     "the errexit guard catches a `set +e` that is only a COMMENT (hub#1519)",
+     "a comment that merely NAMES `set +e` exempts the step, so deleting the real command "
+     "leaves this contract green: the guard is decorative for every step it protects")
 PY
 )" || bad "the budget contract could be evaluated" "python3/PyYAML failed on $WF"
 while IFS=$'\t' read -r verdict name detail; do
