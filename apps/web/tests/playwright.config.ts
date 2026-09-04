@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
+import { resolveBenchPorts } from './bench-ports';
 
 // E2E del shell del Hub contra el runtime REAL (Axum :8787) y Vite (:5173). Sin mocks (regla del
 // proyecto): el test arranca su propio runtime con BD efímera y un directorio de módulos VACÍO,
@@ -17,9 +18,32 @@ import { resolveUpdateSnapshotsMode } from '../src/lib/visual-baseline-gate';
 
 const HUB_ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..');
 const WEB_DIR = join(HUB_ROOT, 'apps', 'web');
-const RUNTIME_BIND = process.env.HUB_BIND ?? '127.0.0.1:8787';
+// hub#1517 — los puertos del banco NO son fijos en CI. `ci-runner-1` sirve SEIS ranuras en la
+// misma máquina, así que dos jobs `e2e` se solapan a diario; con `reuseExistingServer: false` (que
+// en CI es deliberado) el segundo no reutilizaba el puerto ocupado: MORÍA en él —
+// «Error: http://127.0.0.1:8787/readyz is already used» — y el rojo caía en la PR que llegase
+// segunda, sin relación con su diff. Fuera de CI siguen siendo los de siempre, que es lo que hace
+// que `reuseExistingServer` encuentre el `pnpm dev` del desarrollador. Ver `bench-ports.ts`.
+const PORTS = resolveBenchPorts(process.env, process.pid);
+const RUNTIME_BIND = process.env.HUB_BIND ?? `127.0.0.1:${PORTS.runtime}`;
 const RUNTIME_URL = process.env.HUB_RUNTIME_URL ?? `http://${RUNTIME_BIND}`;
-const WEB_URL = process.env.HUB_WEB_URL ?? 'http://localhost:5173';
+const WEB_URL = process.env.HUB_WEB_URL ?? `http://localhost:${PORTS.web}`;
+
+// Los specs siguen al banco por el ENTORNO, no por una fixture: ya leen
+// `process.env.HUB_RUNTIME_URL` (`ImportPanel`, `DashboardPage`, `ExportPanel`,
+// `NoStrayGetApiQuery`, `shell-visual-helpers`) y los workers de Playwright heredan el `process.env`
+// del proceso que carga este config. Exportarlo aquí es lo que evita tocar un solo spec.
+//
+// 🔴 Se exportan los CUATRO, y `HUB_BIND` no sobra: Playwright EVALÚA ESTE FICHERO DOS VECES —una
+// en el proceso runner y otra en cada worker, que hereda el env del runner (medido: el worker lee
+// el valor que escribió el runner antes de escribir el suyo)—. Con `HUB_BIND` fuera, la segunda
+// evaluación se encontraba el runtime sin fijar y volvía a sortear un puerto: un subproceso de
+// sonda por worker para un puerto que nadie usa. Con los cuatro puestos, releer el config es un
+// no-op — y esa idempotencia es lo que afirma `playwright.config.test.ts`.
+process.env.HUB_BIND = RUNTIME_BIND;
+process.env.HUB_RUNTIME_URL = RUNTIME_URL;
+process.env.HUB_WEB_URL = WEB_URL;
+process.env.HUB_E2E_ASSISTANT_PORT = String(PORTS.assistant);
 
 // Postgres del banco de e2e. La BD tiene que EXISTIR (el runtime no la crea): en local es el
 // contenedor `erplora-test-pg-5433` del repo (`createdb -h localhost -p 5433 hub_e2e_web`), en CI
@@ -131,9 +155,10 @@ export default defineConfig({
     },
     {
       // `vite` directo (no `pnpm dev`): salta el `predev` de sync-modules, que aquí no tiene nada
-      // que sincronizar y solo añadiría 24 avisos. `--strictPort` para que un 5173 ocupado falle
-      // en voz alta en vez de servir el shell de otra rama en el puerto siguiente.
-      command: 'pnpm exec vite --port 5173 --strictPort',
+      // que sincronizar y solo añadiría 24 avisos. `--strictPort` para que un puerto ocupado falle
+      // en voz alta en vez de servir el shell de otra rama en el puerto siguiente — y el puerto lo
+      // reparte `resolveBenchPorts`, así que en CI ya no es el mismo para dos jobs (hub#1517).
+      command: `pnpm exec vite --port ${PORTS.web} --strictPort`,
       cwd: WEB_DIR,
       url: WEB_URL,
       reuseExistingServer: !process.env.CI,

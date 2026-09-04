@@ -215,6 +215,7 @@ export default defineConfig({
       'sync-modules.test.mjs',
       'vite.config.test.ts',
       'tests/playwright.config.test.ts',
+      'tests/bench-ports.test.ts',
     ],
     environment: 'node',
     // hub#1367 — these two are anti-hang BACKSTOPS, not assertions, and vitest's defaults
