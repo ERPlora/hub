@@ -73,6 +73,15 @@ export default {
     changeHubCancel: 'Cancel',
     changeHubConfirm: 'Switch',
   },
+  // hub#1518 — a screen whose code never arrived (the connection dropped, or the file went stale
+  // after a deploy). Said in plain words: nobody at a till knows what a "chunk" or a "module" is.
+  viewLoad: {
+    failedToast: 'That section could not be opened. Check your connection and try again.',
+    blockedTitle: 'ERPlora could not finish opening',
+    blockedBody:
+      'The connection dropped while this screen was loading. Check your connection and try again.',
+    blockedAction: 'Try again',
+  },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
   // one noun for two things is how a cashier ends up uninstalling the till.

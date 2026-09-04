@@ -71,6 +71,15 @@ export default {
     changeHubCancel: 'Cancelar',
     changeHubConfirm: 'Cambiar',
   },
+  // hub#1518 — una pantalla cuyo código no llegó (se cortó la conexión, o el fichero se quedó
+  // viejo tras un despliegue). Dicho en cristiano: en un mostrador nadie sabe qué es un «chunk».
+  viewLoad: {
+    failedToast: 'No se ha podido abrir esa sección. Revisa la conexión y vuelve a intentarlo.',
+    blockedTitle: 'ERPlora no ha podido terminar de abrirse',
+    blockedBody:
+      'Se ha cortado la conexión mientras se cargaba esta pantalla. Revisa la conexión y vuelve a intentarlo.',
+    blockedAction: 'Reintentar',
+  },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
   // para dos cosas es como un cajero acaba desinstalando el TPV.
