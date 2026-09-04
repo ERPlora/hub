@@ -52,19 +52,39 @@ fi
 draft_if="github.event_name != 'pull_request' || !github.event.pull_request.draft"
 jobs="$(awk '/^jobs:/{f=1;next} f&&/^  [a-z_-]+:$/{sub(/:$/,"",$1); print $1}' "$WF")"
 [ -n "$jobs" ] || bad "the workflow declares jobs" "no \`jobs:\` entries parsed"
+checked=0
 for job in $jobs; do
     body="$(awk -v J="  $job:" '$0==J{f=1;next} f&&/^  [a-z_-]+:$/{exit} f' "$WF")"
     # Only jobs that run cargo/pnpm cost minutes; alert-style jobs are gated on push already.
     # Here-strings, never `printf … | grep -q`: under `pipefail`, grep -q closes the pipe at the
     # first match and printf dies with "Broken pipe" → a MATCH becomes a failure (red only on
     # Linux; the Mac's printf finishes first). Bit us on the first CI run of hub#1471.
-    grep -qE 'run: *(cargo|pnpm)' <<<"$body" || continue
+    #
+    # The command is looked for ANYWHERE in the job, not right after `run:` (hub#1519): the cargo
+    # steps now carry a shell block (`run: |` + `set -uo pipefail` + `timeout 48m cargo …`), and
+    # the old `run: *(cargo|pnpm)` matched none of them — the draft filter stopped being checked
+    # and nothing said so. Same rule as section 5: the name NOT followed by a path character, which
+    # is what keeps the `$HOME/.cargo/bin` of the toolchain step out. Erring loose is the safe
+    # direction here: a job wrongly counted as costly only demands an `if:` it
+    # already has, while one wrongly skipped asserts nothing at all. `\b` is avoided on purpose
+    # (BSD and GNU ERE differ, and this file must parse under the bash 3.2 floor of hub#1468).
+    grep -qE '(cargo|pnpm)([^[:alnum:]_./-]|$)' <<<"$body" || continue
+    checked=$((checked+1))
     if grep -qF "$draft_if" <<<"$body"; then
         ok "job \`$job\` skips draft PRs"
     else
         bad "job \`$job\` skips draft PRs" "no \`if: $draft_if\`: a draft PR would burn runner minutes and get cancelled on the reviewer's re-push (measured 29/08)"
     fi
 done
+# Positive control (hub#1519): the loop above is a `continue` away from checking NOTHING and
+# saying nothing about it — which is how the draft filter stopped being verified the day the
+# cargo steps moved from `run: cargo …` to a `run: |` block. A battery that passes vacuously is
+# the defect this repo keeps paying for, so the count is an assertion, not a debug line.
+if [ "$checked" -gt 0 ]; then
+    ok "the draft-filter check actually inspected a job that costs minutes ($checked)"
+else
+    bad "the draft-filter check actually inspected a job that costs minutes" "every job was skipped by the cargo/pnpm filter, so \`skips draft PRs\` was never asserted: the filter no longer matches how the steps are written"
+fi
 
 # ── 4. this contract is RUN by the workflow it guards (hub#1381: an unexecuted battery is worth 0) ──
 if grep -q 'scripts/tests/test-hub-workflow.test.sh' "$WF"; then
@@ -93,6 +113,7 @@ fi
 # dependency is proven on the runner.
 budget_out="$(WF="$WF" python3 - <<'PY'
 import os
+import re
 
 import yaml
 
@@ -106,7 +127,17 @@ def emit(ok, name, detail=""):
     print(("PASS" if ok else "FAIL") + "\t" + name + "\t" + detail)
 
 
-costly = [s for s in steps if "cargo" in (s.get("run") or "")]
+# `cargo` NOT followed by a path character, instead of the bare substring: the `Toolchain` step
+# mentions it only inside `$HOME/.cargo/bin`, where what follows is a `/`, so this drops that path
+# (a `curl | sh` of seconds, whose right net is the job-level backstop) while still matching every
+# way the command is actually spelled — `cargo test`, `"$CARGO_HOME/bin/cargo" bench`, a wrapper
+# behind a variable. Deliberately NOT anchored to the start of a line: a step that reaches the
+# toolchain through a path costs the same minutes, and a filter that stopped seeing it would leave
+# this budget guard MUTE — the exact failure mode hub#1519 is about. Erring loose is the safe
+# direction: at worst a step that merely prints the word is asked for a budget it can afford.
+CARGO = re.compile(r"cargo(?![\w./-])")
+
+costly = [s for s in steps if CARGO.search(s.get("run") or "")]
 emit(bool(costly), "the `test` job runs cargo at all",
      "no step runs cargo: the rest of this contract would pass vacuously")
 
