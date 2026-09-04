@@ -27,6 +27,12 @@ const LS_KEY = 'erplora.session';
 // command. Es la autoridad de permisos LOCAL (ARQUITECTURA.md §2.9); el JWT cloud es solo el
 // adaptador de login. Distinto del JWT del usuario (ese vive en cloud.ts para hablar con el Cloud).
 const HUB_SESSION_KEY = 'erplora.hub_session';
+// **Con qué se probó la identidad** de esa misma sesión (`hub_session.credential_kind`, hub#658).
+// Vive AQUÍ y no en `SessionUser` a propósito: es una propiedad de la SESIÓN, no de la persona, y
+// `applyProfile` reconstruye el usuario entero cada vez que se lee `/api/profile` — un campo
+// aparcado ahí se borraría solo al primer refresco y la puerta a erplora.com desaparecería a los
+// segundos de aparecer (hub#1400).
+const HUB_SESSION_CREDENTIAL_KEY = 'erplora.hub_session_credential';
 
 function read(): SessionUser | null {
   try {
@@ -38,6 +44,36 @@ function read(): SessionUser | null {
 }
 
 const _user = ref<SessionUser | null>(read());
+
+function readCredentialKind(): string {
+  try {
+    return localStorage.getItem(HUB_SESSION_CREDENTIAL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+// Reactivo, no una lectura de `localStorage` cuando alguien pregunta: `canOpenManagement` es un
+// `computed` sobre esto, y un getter plano lo dejaría congelado en lo que fuera cierto al cargar el
+// módulo — en un arranque en frío, antes de que nadie haya entrado.
+const _hubSessionCredential = ref<string>(readCredentialKind());
+
+/** El login **cloud**: email y contraseña contra el SaaS (`identity::CREDENTIAL_CLOUD`). */
+export const CREDENTIAL_CLOUD = 'cloud';
+
+/**
+ * ¿La sesión activa se abrió tecleando email y contraseña?
+ *
+ * El cerrojo de hub#1400: solo a esa sesión se le entrega una del SaaS en el navegador. Un PIN es
+ * credencial de **turno** —corta y tecleada delante de gente— y ADR-0226 ya dice que la credencial
+ * del usuario local no es nunca administrativa.
+ *
+ * **Falla cerrado**: si la sesión no dice cómo se abrió (una anterior a este despliegue), la
+ * respuesta es «no». «No consta» y «fue una contraseña» son respuestas distintas, y confundirlas
+ * abriría la puerta justo a las sesiones que este cerrojo existe para dejar fuera. Se cura solo
+ * cuando esa sesión caduca. La autoridad sigue siendo el runtime, que revalida en `/api/auth/handoff`.
+ */
+export const openedWithCloudLogin = computed(() => _hubSessionCredential.value === CREDENTIAL_CLOUD);
 
 export const user = computed(() => _user.value);
 export const isAuthed = computed(() => _user.value != null);
@@ -112,11 +148,21 @@ export function getHubSession(): string | null {
   }
 }
 
-/** Guarda (o borra) el token de sesión del runtime emitido por `/api/auth/{pin,cloud}`. */
-export function setHubSession(token: string | null): void {
+/**
+ * Guarda (o borra) el token de sesión del runtime emitido por `/api/auth/{pin,cloud,badge,courier}`.
+ *
+ * `credentialKind` es lo que ese login contestó en `credential_kind` (hub#1400). Es opcional para
+ * que un camino que se olvide de pasarlo deje la sesión **cerrada** en vez de abierta: omitirlo no
+ * es «fue una contraseña», es «no consta».
+ */
+export function setHubSession(token: string | null, credentialKind?: string | null): void {
+  const kind = token ? (credentialKind ?? '') : '';
+  _hubSessionCredential.value = kind;
   try {
     if (token) localStorage.setItem(HUB_SESSION_KEY, token);
     else localStorage.removeItem(HUB_SESSION_KEY);
+    if (kind) localStorage.setItem(HUB_SESSION_CREDENTIAL_KEY, kind);
+    else localStorage.removeItem(HUB_SESSION_CREDENTIAL_KEY);
   } catch {
     /* noop */
   }

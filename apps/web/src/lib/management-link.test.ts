@@ -27,10 +27,15 @@ vi.mock('./config', () => ({ config }));
 // it look wired while never reacting to a login. `hasPermission` lee de ese mismo ref — la regla
 // del comodín vive ahí ahora (hub#506), así que el mock la expone sobre el mismo estado mutable.
 vi.mock('./session', async () => {
-  const { ref } = await import('vue');
+  const { computed, ref } = await import('vue');
   const user = ref<{ permissions?: string[] } | null>(null);
+  // The second half of the lock (hub#1400): HOW the person at the till proved who they are. A real
+  // `ref` again — `canOpenManagement` has to close the moment a cashier takes over by PIN.
+  const credentialKind = ref('cloud');
   return {
     user,
+    credentialKind,
+    openedWithCloudLogin: computed(() => credentialKind.value === 'cloud'),
     hasPermission: (permission: string) => {
       const granted = user.value?.permissions ?? [];
       return granted.includes('*') || granted.includes(permission);
@@ -41,15 +46,34 @@ vi.mock('./session', async () => {
 const { openExternal } = vi.hoisted(() => ({ openExternal: vi.fn(async () => {}) }));
 vi.mock('./open-external', () => ({ openExternal }));
 
-import { canOpenManagement, managementUrl, openManagement } from './management-link';
-import { user } from './session';
+// The one-time pass the runtime mints (pm#196). Mocked, not stubbed through `fetch`, because what
+// this file is about is which address the door ends up opening.
+const { runtimeManagementHandoff } = vi.hoisted(() => ({
+  runtimeManagementHandoff: vi.fn(async () => 'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F'),
+}));
+vi.mock('./cloud', () => ({ runtimeManagementHandoff }));
+
+// A pass that cannot be minted must not fail MUTE: the door still opens, and the reason is reported.
+const { reportClientError } = vi.hoisted(() => ({ reportClientError: vi.fn() }));
+vi.mock('./error-report', () => ({ reportClientError }));
+
+import { canOpenManagement, managementPath, managementUrl, openManagement } from './management-link';
+import { user, credentialKind } from './session';
 
 const session = user as unknown as { value: { permissions?: string[] } | null };
+const credential = credentialKind as unknown as { value: string };
 
 beforeEach(() => {
   config.cloudApiUrl = 'https://erplora.com';
   config.hubId = 'hub-1';
   session.value = null;
+  credential.value = 'cloud';
+  openExternal.mockClear();
+  runtimeManagementHandoff.mockClear();
+  runtimeManagementHandoff.mockResolvedValue(
+    'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
+  );
+  reportClientError.mockClear();
 });
 
 afterEach(() => {
@@ -105,10 +129,55 @@ describe('openManagement', () => {
 
     await openManagement();
 
+    expect(openExternal).toHaveBeenCalledTimes(1);
+    expect(assign).not.toHaveBeenCalled();
+  });
+
+  // pm#196 — the half that actually mattered. The address went to the system browser as it stood,
+  // and inside the installed app that browser is a different cookie jar from the webview: the owner
+  // typed their password AND their second factor again, right before paying.
+  it('trades the till session for a one-time address, so the browser lands already signed in', async () => {
+    await openManagement();
+
+    expect(runtimeManagementHandoff).toHaveBeenCalledWith(managementPath());
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://erplora.com/auth/handoff/code-abc/?next=%2Fdashboard%2F',
+    );
+  });
+
+  it('asks for the panel it would have opened, marker and all — the pass must not lose the destination', async () => {
+    config.hubId = 'a b/c&d';
+
+    await openManagement();
+
+    expect(runtimeManagementHandoff).toHaveBeenCalledWith(
+      '/dashboard/?view=advanced&hub=a%20b%2Fc%26d&utm_source=hub',
+    );
+  });
+
+  // A door that goes dead when the pass cannot be minted is worse than today's, which at least
+  // opened the panel. So it degrades to exactly today's behaviour — and says why, because a failure
+  // nobody can see is a failure that never gets fixed.
+  it('still opens the panel when the pass cannot be minted, and reports why', async () => {
+    runtimeManagementHandoff.mockRejectedValue(new Error('handoff_unavailable'));
+
+    await openManagement();
+
     expect(openExternal).toHaveBeenCalledWith(
       'https://erplora.com/dashboard/?view=advanced&hub=hub-1&utm_source=hub',
     );
-    expect(assign).not.toHaveBeenCalled();
+    expect(reportClientError).toHaveBeenCalledTimes(1);
+    expect(reportClientError.mock.calls[0][0].message).toContain('handoff');
+  });
+
+  it('does not turn an empty answer into an address', async () => {
+    runtimeManagementHandoff.mockResolvedValue('');
+
+    await openManagement();
+
+    expect(openExternal).toHaveBeenCalledWith(
+      'https://erplora.com/dashboard/?view=advanced&hub=hub-1&utm_source=hub',
+    );
   });
 });
 
@@ -139,6 +208,42 @@ describe('canOpenManagement', () => {
 
   it('is closed to a session whose permissions never arrived', () => {
     session.value = {};
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  // hub#1400, the lock, and the control that stops the escalation: a PIN is a credential of the
+  // SHIFT — short, memorable, typed in front of people — and ADR-0226 already says the local user's
+  // credential is never administrative. Turning it into the key to the billing panel would hand the
+  // business's money to whoever opens the register. `hub.administer` is a permission of the ROLE and
+  // does not answer this question, so it is necessary and NOT sufficient.
+  it('stays shut for a PIN session, even when its role administers the hub', () => {
+    session.value = { permissions: ['hub.administer'] };
+    credential.value = 'pin';
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('stays shut for a PIN session holding the owner wildcard', () => {
+    session.value = { permissions: ['*'] };
+    credential.value = 'pin';
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  it('stays shut for a badge session', () => {
+    session.value = { permissions: ['*'] };
+    credential.value = 'badge';
+
+    expect(canOpenManagement.value).toBe(false);
+  });
+
+  // What a session opened before this shipped looks like. Showing the door to one that the runtime
+  // will then refuse is precisely what hub#1400 forbids — "promete algo que no cumple". It cures
+  // itself when that session expires.
+  it('stays shut when the session never said how it was opened', () => {
+    session.value = { permissions: ['*'] };
+    credential.value = '';
 
     expect(canOpenManagement.value).toBe(false);
   });

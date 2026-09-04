@@ -16,7 +16,9 @@ import { config } from './config';
 import { openExternal } from './open-external';
 import { toastError } from './toast';
 import { i18n } from '../i18n';
-import { hasPermission } from './session';
+import { hasPermission, openedWithCloudLogin } from './session';
+import { runtimeManagementHandoff } from './cloud';
+import { reportClientError } from './error-report';
 
 /**
  * The permission that opens this door: the one the core already owns (ADR-0248, hub#435).
@@ -37,10 +39,34 @@ export const ADMINISTER_PERMISSION = 'hub.administer';
  *
  * La regla del comodín vive en un solo sitio (`hasPermission`, hub#506): antes estaba duplicada
  * aquí y en `app-update.ts`, y ninguna de las dos sabía de la otra.
+ *
+ * 🔒 **Y una segunda mitad** (hub#1400): además del permiso, la sesión tiene que haberse abierto
+ * tecleando email y contraseña. `hub.administer` es un permiso del ROL y la pregunta aquí es sobre
+ * el MÉTODO — un PIN es credencial de **turno**, corta y tecleada delante de gente, y ADR-0226 ya
+ * dice que la credencial del usuario local no es nunca administrativa. Convertirla en la llave del
+ * panel de facturación regalaría el billing del negocio a quien abre la caja.
+ *
+ * Se filtra aquí y no solo en el runtime porque una entrada que se enseña y luego se rechaza es
+ * peor que no enseñarla: *«promete algo que no cumple»* (hub#1400). La autoridad sigue siendo el
+ * runtime, que lo revalida en `POST /api/auth/handoff`.
  */
-export const canOpenManagement: ComputedRef<boolean> = computed(() =>
-  hasPermission(ADMINISTER_PERMISSION),
+export const canOpenManagement: ComputedRef<boolean> = computed(
+  () => hasPermission(ADMINISTER_PERMISSION) && openedWithCloudLogin.value,
 );
+
+/**
+ * The management panel **as a path of the SaaS**, marker and all.
+ *
+ * Separate from [`managementUrl`] because the one-time pass (pm#196) carries the destination as a
+ * relative route: the runtime builds the address with ITS idea of where the SaaS is, and a page that
+ * could choose the host would be choosing where the pass is spent.
+ *
+ * Built on demand: `config.hubId` is resolved from the runtime during boot
+ * (`GET /api/hub/context`), so a value captured at module load would be the empty fallback.
+ */
+export function managementPath(): string {
+  return `/dashboard/?view=advanced&hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
+}
 
 /**
  * The URL of the management panel for the hub this till belongs to.
@@ -49,7 +75,30 @@ export const canOpenManagement: ComputedRef<boolean> = computed(() =>
  * (`GET /api/hub/context`), so a value captured at module load would be the empty fallback.
  */
 export function managementUrl(): string {
-  return `${config.cloudApiUrl}/dashboard/?view=advanced&hub=${encodeURIComponent(config.hubId)}&utm_source=hub`;
+  return `${config.cloudApiUrl}${managementPath()}`;
+}
+
+/**
+ * La dirección que se abre de verdad: la de un solo uso si el runtime la da, la de siempre si no.
+ *
+ * El pase (pm#196) es lo que hace que el navegador aterrice **ya logueado**. Cuando no se puede
+ * emitir —el SaaS no contesta, la sesión ya no vale— la puerta **no se queda muerta**: cae al enlace
+ * de toda la vida, que es exactamente el comportamiento de antes de esta issue, así que degradar
+ * nunca es peor que no haberlo intentado. Lo que no se hace es callarse: el motivo se reporta, o el
+ * fallo se vuelve invisible y nadie lo arregla nunca.
+ */
+async function managementDoor(): Promise<string> {
+  const fallback = managementUrl();
+  try {
+    const url = await runtimeManagementHandoff(managementPath());
+    return url || fallback;
+  } catch (error) {
+    reportClientError({
+      message: `management handoff failed: ${error instanceof Error ? error.message : String(error)}`,
+      component: 'management-link',
+    });
+    return fallback;
+  }
 }
 
 /**
@@ -71,7 +120,7 @@ export function managementUrl(): string {
  */
 export async function openManagement(): Promise<void> {
   try {
-    await openExternal(managementUrl());
+    await openExternal(await managementDoor());
   } catch {
     await toastError(i18n.global.t('topbar.manageError'));
   }

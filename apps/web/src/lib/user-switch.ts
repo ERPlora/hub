@@ -100,7 +100,7 @@ export async function switchUser(name: string, pin: string): Promise<void> {
   const previous = getHubSession();
   const session = await runtimePinLogin(name, pin);
 
-  setHubSession(session.token);
+  setHubSession(session.token, session.credential_kind);
   // A FRESH user, never a spread of the previous one: the old avatar must not survive the swap
   // (`applyProfile` keeps the session's current avatar when the arriving profile has none, and the
   // face in the sidebar is the one thing on screen that says whose sale this is). The e-mail is

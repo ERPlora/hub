@@ -7,9 +7,9 @@
 //   - **It is filtered, not walled** (ADR-0248): a cashier does not see it. There is no consequence
 //     to warn them about — managing the plan is not their task, and the account it leads to may not
 //     even exist for them. A wall is for what will refuse THEIR sale, and this refuses nothing.
-//   - **The name says where it goes.** The only affordance an icon-only topbar action has is its
-//     accessible name, and this one crosses a product boundary: it has to say `erplora.com` out
-//     loud, in every language, or the till just teleports somewhere without warning.
+//   - **The name says where it goes, and it is READ.** This crosses a product boundary, so it has
+//     to say `erplora.com` — out loud in the accessible name, and on screen in the entry itself
+//     (hub#1400: at the till it used to be icon-only, so you had to guess the pictogram).
 //   - **It leaves through `openManagement`**, the one helper that knows how the door opens on each
 //     surface: a new tab in a browser, the system browser in the installed app.
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -104,17 +104,49 @@ describe('the entry to management', () => {
   });
 
   // The mark used to be `open-outline`, the shell's generic "this leads to the SaaS" (Billing,
-  // Profile, ModuleView). In the topbar that is not enough: those three sit next to a sentence that
-  // says where they go, and this one is icon-only among three other icon-only actions. A cloud names
-  // the DESTINATION — the online account — instead of merely announcing that something opens.
+  // Profile, ModuleView). In the topbar that is not enough: a cloud names the DESTINATION — the
+  // online account — instead of merely announcing that something opens.
   it('carries the cloud: the destination, not just the fact that it leaves', () => {
     const icon = manageButton(mountTopbar())!.find('[data-icon]');
 
     expect(icon.attributes('data-icon')).toBe('cloud-outline');
   });
+
+  // hub#1400. This used to be icon-only on the wide viewport — the very screen people work on — and
+  // laballed only in the phone overflow. So on a phone you could read it and at the till you had to
+  // guess the pictogram. ADR-0251 argued it out ("the accessible name says erplora.com out loud"),
+  // but the accessible name is not what somebody looking at the screen reads.
+  it('can be READ at the till: the entry carries visible text, not only an icon', () => {
+    const button = manageButton(mountTopbar());
+
+    expect(button!.text()).toContain('erplora.com');
+  });
+
+  it('puts the words in both languages, because the entry is what is read', () => {
+    for (const locale of ['en', 'es']) {
+      expect(manageButton(mountTopbar(locale))!.text()).toContain('erplora.com');
+    }
+  });
+
+  // The visible word and the accessible name are not the same string on purpose: the short one is
+  // what fits in a topbar next to three other actions, the long one is the whole sentence. WCAG
+  // 2.5.3 only asks that the name CONTAIN what is written, which is why the short one is the brand.
+  it('keeps the icon beside the words instead of standing in for them', () => {
+    const icon = manageButton(mountTopbar())!.find('[data-icon]');
+
+    expect(icon.attributes('slot')).toBe('start');
+  });
 });
 
 describe('the catalogues', () => {
+  // The short label is the BRAND, so it is the same word in every language — what changes around it
+  // is the sentence the accessible name reads out. Naming the destination is what the market does
+  // with a link to a sibling product (Shopify POS → "Shopify admin", Square → "Dashboard").
+  it('carry a short label that is the destination itself', () => {
+    expect(en.topbar.manageShort).toBe('erplora.com');
+    expect(es.topbar.manageShort).toBe('erplora.com');
+  });
+
   it('name the destination in both languages', () => {
     expect(en.topbar.manage).toContain('erplora.com');
     expect(es.topbar.manage).toContain('erplora.com');

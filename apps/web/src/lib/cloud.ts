@@ -337,6 +337,15 @@ export interface HubSessionResult {
   token: string;
   user: { id: string; name: string; role: string };
   permissions: string[];
+  /**
+   * **Con qué acaba de probar su identidad** quien entra: `cloud` (email + contraseña), `pin`,
+   * `badge` (hub#658). Lo escribe el runtime en la fila de `hub_session` y lo devuelve aquí porque
+   * el shell tiene que decidir qué pinta antes de que nadie pulse nada — la puerta a erplora.com
+   * solo se ofrece a un login de contraseña (hub#1400).
+   *
+   * Opcional en el tipo: una respuesta que no lo traiga deja la sesión cerrada, no abierta.
+   */
+  credential_kind?: string;
 }
 
 export interface CourierSessionResult extends HubSessionResult {
@@ -479,6 +488,34 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
 }
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
+/**
+ * **Cambia la sesión del TPV por una dirección de un solo uso del SaaS** (pm#196, hub#1400) —
+ * `POST /api/auth/handoff`.
+ *
+ * El enlace a erplora.com se abre en el navegador del sistema, que **no comparte el tarro de
+ * cookies** con la webview de la app instalada: hasta ahora llegaba sin sesión y la dueña volvía a
+ * teclear contraseña y segundo factor justo antes de pagar. El runtime canjea la sesión del hub por
+ * un pase de un solo uso y devuelve la dirección que lo gasta.
+ *
+ * Va por el runtime y no directo al SaaS porque el SaaS **no puede ver** lo que aquí se comprueba:
+ * si quien está delante tecleó su contraseña o un PIN de turno solo lo dice `credential_kind`
+ * (hub#658). Las dos credenciales que necesita —`X-Hub-Session` y el Bearer del usuario— las pone
+ * `runtimeHeaders`, la misma puerta que ya usa el resto del shell.
+ *
+ * `next` es una ruta **relativa** del SaaS; el runtime la valida y rechaza cualquier cosa que salga
+ * de él. Lanza `RuntimeError` con su código (`handoff_requires_cloud_login`, `handoff_unavailable`…)
+ * cuando la puerta se niega: quien llama decide si degrada al enlace de siempre.
+ */
+export async function runtimeManagementHandoff(next: string): Promise<string> {
+  const { runtimeHeaders } = await import('./runtime');
+  const result = await runtimePost<{ url?: string }>(
+    '/api/auth/handoff',
+    { next },
+    runtimeHeaders(),
+  );
+  return result.url ?? '';
+}
+
 export async function runtimeLogout(sessionToken: string): Promise<void> {
   try {
     await fetch(`${RUNTIME_URL}/api/auth/logout`, {
