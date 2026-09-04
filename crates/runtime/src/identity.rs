@@ -1502,6 +1502,49 @@ pub async fn resolve_session(
     Ok(res.rows.first().map(row_to_user))
 }
 
+/// [`resolve_session`] diciendo además **con qué se probó la identidad** que abrió la sesión.
+///
+/// La columna existe desde hub#658 como traza («¿quién abrió ESTA sesión y con qué?»), y desde
+/// pm#196 también **decide**: entregarle al navegador una sesión del SaaS solo está permitido si
+/// quien está delante tecleó su contraseña, nunca desde un PIN de turno (ADR-0226 — la credencial
+/// del usuario local no es nunca administrativa). El permiso del rol no basta para contestar esa
+/// pregunta, porque el rol dice qué puede hacer y no cómo lo demostró.
+///
+/// Los mismos dos lados del `JOIN` acotados por `hub_id` que [`resolve_session`]: una sesión de
+/// otro hub de la misma base no resuelve aquí (hub#497).
+pub async fn resolve_session_with_credential(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<(HubUser, Credential)>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("token".into(), json!(token));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .query(
+            "SELECT u.id, u.name, u.role, u.cloud_user_id, u.is_active, \
+                    s.credential_kind, s.credential_ref \
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id AND u.hub_id = s.hub_id \
+              WHERE s.hub_id = :hub_id AND s.token = :token \
+                AND s.expires_at > :now AND u.is_active = 1",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().map(|row| {
+        (
+            row_to_user(row),
+            Credential {
+                kind: row["credential_kind"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                reference: row["credential_ref"].as_str().unwrap_or_default().to_string(),
+            },
+        )
+    }))
+}
+
 /// Cierra una sesión (logout).
 pub async fn delete_session(db: &dyn DatabaseAdapter, hub_id: &str, token: &str) -> Result<()> {
     let mut p = Params::new();
