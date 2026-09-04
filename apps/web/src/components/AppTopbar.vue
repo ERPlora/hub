@@ -81,13 +81,17 @@
                write). Only whoever administers the hub sees it (`hub.administer`, ADR-0248): a
                filter, not a wall, because it refuses a cashier nothing — it simply is not their
                task. The mark is a CLOUD, not the shell's generic `open-outline`: Billing, Profile
-               and ModuleView use that one next to a sentence that explains it, while this sits
-               icon-only among three other icons and has to name the DESTINATION (the online
-               account), not merely announce that something opens. The accessible name says
-               `erplora.com` out loud, which is all an icon-only action crossing a product boundary
-               has. It leaves through the door OUT — new tab in a browser, system browser in the
-               installed app — and the reasons live in management-link.ts. Note: the labels of the
-               login→till path ("Mi plan", "Añadir funciones") belong to hub#365. -->
+               and ModuleView use that one next to a sentence that explains it, while this has to
+               name the DESTINATION (the online account), not merely announce that something opens.
+               It is LABELLED, not icon-only (hub#1400): ADR-0251 settled that the accessible name
+               says `erplora.com` out loud, but nobody looking at a till READS the accessible name —
+               the phone overflow below carried the words and the screen people actually work on
+               did not, so the way out was the one thing you had to guess. The visible word is the
+               brand alone and the accessible name stays the whole sentence; WCAG 2.5.3 only asks
+               that the name CONTAIN what is written. It leaves through the door OUT — new tab in a
+               browser, system browser in the installed app — and the reasons live in
+               management-link.ts. Note: the labels of the login→till path ("Mi plan",
+               "Añadir funciones") belong to hub#365. -->
           <ion-button
             v-if="canOpenManagement"
             data-testid="topbar-manage"
@@ -96,7 +100,8 @@
             :title="t('topbar.manage')"
             @click="openManagement"
           >
-            <HubIcon slot="icon-only" name="cloud-outline" />
+            <HubIcon slot="start" name="cloud-outline" />
+            <ion-label>{{ t('topbar.manageShort') }}</ion-label>
           </ion-button>
 
           <!-- «Switch business» (hub#447): the installed app remembers ONE business (`hub.url`,

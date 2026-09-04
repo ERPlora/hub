@@ -24,18 +24,25 @@ const { config } = vi.hoisted(() => ({
 vi.mock('./config', () => ({ config }));
 
 // A real `ref`: `canOpenManagement` is a computed over the session, and a plain object would make
-// it look wired while never reacting to a login. `hasPermission` lee de ese mismo ref — la regla
-// del comodín vive ahí ahora (hub#506), así que el mock la expone sobre el mismo estado mutable.
+// it look wired while never reacting to a login. `hasPermission` reads from that same ref — the
+// wildcard rule lives there now (hub#506) — so the mock exposes it over the same mutable state.
+//
+// The mock's surface is EXACTLY the module's: the second half of the lock (hub#1400) — HOW the
+// person at the till proved who they are — goes in through `setHubSession`, the one funnel the five
+// real login paths already use, and never through a handle invented for the test. A mock that
+// exports what the module does not is how a suite stays green over an import that does not exist.
 vi.mock('./session', async () => {
   const { computed, ref } = await import('vue');
   const user = ref<{ permissions?: string[] } | null>(null);
-  // The second half of the lock (hub#1400): HOW the person at the till proved who they are. A real
-  // `ref` again — `canOpenManagement` has to close the moment a cashier takes over by PIN.
-  const credentialKind = ref('cloud');
+  const credentialKind = ref('');
   return {
     user,
-    credentialKind,
+    CREDENTIAL_CLOUD: 'cloud',
     openedWithCloudLogin: computed(() => credentialKind.value === 'cloud'),
+    // Mirrors the real signature: omitting the kind is "it does not say", not "it was a password".
+    setHubSession: (token: string | null, kind?: string | null) => {
+      credentialKind.value = token ? (kind ?? '') : '';
+    },
     hasPermission: (permission: string) => {
       const granted = user.value?.permissions ?? [];
       return granted.includes('*') || granted.includes(permission);
@@ -58,16 +65,15 @@ const { reportClientError } = vi.hoisted(() => ({ reportClientError: vi.fn() }))
 vi.mock('./error-report', () => ({ reportClientError }));
 
 import { canOpenManagement, managementPath, managementUrl, openManagement } from './management-link';
-import { user, credentialKind } from './session';
+import { user, setHubSession } from './session';
 
 const session = user as unknown as { value: { permissions?: string[] } | null };
-const credential = credentialKind as unknown as { value: string };
 
 beforeEach(() => {
   config.cloudApiUrl = 'https://erplora.com';
   config.hubId = 'hub-1';
   session.value = null;
-  credential.value = 'cloud';
+  setHubSession('runtime-token', 'cloud');
   openExternal.mockClear();
   runtimeManagementHandoff.mockClear();
   runtimeManagementHandoff.mockResolvedValue(
@@ -219,31 +225,32 @@ describe('canOpenManagement', () => {
   // does not answer this question, so it is necessary and NOT sufficient.
   it('stays shut for a PIN session, even when its role administers the hub', () => {
     session.value = { permissions: ['hub.administer'] };
-    credential.value = 'pin';
+    setHubSession('runtime-token', 'pin');
 
     expect(canOpenManagement.value).toBe(false);
   });
 
   it('stays shut for a PIN session holding the owner wildcard', () => {
     session.value = { permissions: ['*'] };
-    credential.value = 'pin';
+    setHubSession('runtime-token', 'pin');
 
     expect(canOpenManagement.value).toBe(false);
   });
 
   it('stays shut for a badge session', () => {
     session.value = { permissions: ['*'] };
-    credential.value = 'badge';
+    setHubSession('runtime-token', 'badge');
 
     expect(canOpenManagement.value).toBe(false);
   });
 
-  // What a session opened before this shipped looks like. Showing the door to one that the runtime
-  // will then refuse is precisely what hub#1400 forbids — "promete algo que no cumple". It cures
+  // What a session opened before this shipped looks like: the login answered nothing, so the kind
+  // never reached `setHubSession`. Showing the door to a session the runtime will then refuse is
+  // precisely what hub#1400 forbids — it would promise something it does not deliver. It cures
   // itself when that session expires.
   it('stays shut when the session never said how it was opened', () => {
     session.value = { permissions: ['*'] };
-    credential.value = '';
+    setHubSession('runtime-token');
 
     expect(canOpenManagement.value).toBe(false);
   });

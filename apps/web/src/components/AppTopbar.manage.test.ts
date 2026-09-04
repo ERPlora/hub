@@ -69,6 +69,17 @@ const mountTopbar = (locale = 'en') =>
 const manageButton = (wrapper: ReturnType<typeof mountTopbar>) =>
   wrapper.findAll('ion-button').find((b) => b.attributes('data-testid') === 'topbar-manage');
 
+// What the eye reads on the button. NOT `wrapper.text()`: `ion-label` is a REGISTERED custom
+// element here (importing `@ionic/vue` defines it), and happy-dom hands those back with an empty
+// `textContent` — which is exactly what `text()` reads, so it answers '' however loudly the button
+// is labelled. `innerHTML` carries what was painted. Reading the label ELEMENT keeps the assertion
+// honest in the other direction too: go back to icon-only and there is no `ion-label` inside the
+// button at all, so this returns '' and the tests below fail.
+const visibleWords = (button: ReturnType<typeof manageButton>) => {
+  const label = button!.find('ion-label');
+  return label.exists() ? label.element.innerHTML.trim() : '';
+};
+
 beforeEach(() => {
   openManagement.mockClear();
   canOpenManagement.value = true;
@@ -119,12 +130,12 @@ describe('the entry to management', () => {
   it('can be READ at the till: the entry carries visible text, not only an icon', () => {
     const button = manageButton(mountTopbar());
 
-    expect(button!.text()).toContain('erplora.com');
+    expect(visibleWords(button)).toContain('erplora.com');
   });
 
   it('puts the words in both languages, because the entry is what is read', () => {
     for (const locale of ['en', 'es']) {
-      expect(manageButton(mountTopbar(locale))!.text()).toContain('erplora.com');
+      expect(visibleWords(manageButton(mountTopbar(locale)))).toContain('erplora.com');
     }
   });
 
