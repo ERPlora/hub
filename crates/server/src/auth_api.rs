@@ -838,6 +838,12 @@ pub(crate) async fn mint_session_with_extra(
                 "token": token,
                 "user": user,
                 "permissions": permissions,
+                // **Con qué acaba de probar su identidad quien entra** (hub#1400). El shell no puede
+                // preguntarlo después —no hay ruta que lo cuente— y lo necesita antes de pintar: la
+                // puerta a erplora.com solo se ofrece a un login de contraseña, y una entrada que se
+                // enseña y luego se rechaza es peor que no enseñarla. Viaja desde aquí porque los
+                // cinco caminos que abren sesión pasan por esta función; el sexto lo hereda.
+                "credential_kind": credential.kind,
             });
             if let (Some(target), Some(source)) = (
                 payload.as_object_mut(),
