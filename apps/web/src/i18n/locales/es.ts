@@ -690,6 +690,7 @@ export default {
     declarationDesc:
       'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
     declarationRead: 'Leer la declaración firmada',
+    declarationTextVersion: 'Versión de la declaración',
     declarationDataTitle: 'Datos identificativos de este sistema',
     declarationPending:
       'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',

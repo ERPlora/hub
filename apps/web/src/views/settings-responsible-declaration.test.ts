@@ -17,6 +17,7 @@ import { ref } from 'vue';
 import { createI18n } from 'vue-i18n';
 
 import en from '../i18n/locales/en';
+import es from '../i18n/locales/es';
 
 // The icon registry drags ~70 virtual `~icons/…?raw` ids this environment denies; it has its own
 // test (`lib/icons.test.ts`). Same seam as the neighbouring Settings tests.
@@ -71,7 +72,7 @@ const i18n = createI18n({
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: { en },
+  messages: { en, es },
 });
 
 /** A stub that DOES render what it wraps (a bare stub swallows its slot). */
@@ -138,6 +139,7 @@ async function mountTaxTab() {
 beforeEach(() => {
   vi.unstubAllGlobals();
   push.mockClear();
+  i18n.global.locale.value = 'en';
 });
 
 describe('Settings › Business · responsible declaration (hub#528)', () => {
@@ -162,6 +164,58 @@ describe('Settings › Business · responsible declaration (hub#528)', () => {
     expect(card.find('a.responsible-declaration-link').attributes('href')).toBe(
       'https://pre.erplora.com/legal/declaracion-responsable/',
     );
+  });
+
+  // hub#1510 (item 4 of hub#1449's DoD). Art. 13.3 RRSIF lets several declarations coexist — one
+  // per range of versions — so the link on its own does not say WHICH text it points at. Naming it
+  // next to the link is what lets an inspector check that the text they are reading covers this
+  // release, without following the URL and comparing folder names.
+  it('names WHICH declaration text covers this release, next to the link (hub#1510)', async () => {
+    stubDeclarationFetch(
+      declarationPayload({
+        declarationUrl: 'https://erplora.com/legal/declaracion-responsable/v2/',
+        declarationVersion: 'v2',
+      }),
+    );
+    const wrapper = await mountTaxTab();
+
+    const card = wrapper.find('.responsible-declaration');
+    const version = card.find('.responsible-declaration-version');
+    expect(version.exists(), 'the declaration version is rendered').toBe(true);
+    expect(version.text()).toContain('v2');
+    // Next to the LINK, not buried among the nine elements of the record's block: they are the
+    // pair an inspector reads together.
+    const link = card.find('a.responsible-declaration-link');
+    expect(link.exists()).toBe(true);
+    expect(version.element.parentElement).toBe(link.element.parentElement);
+    // The label is translated, never hardcoded (ADR-0055/0199).
+    expect(version.text()).toContain(en.settings.declarationTextVersion);
+    // The BINARY's version keeps its own row: `v2` is the text, `2.4.1` is the release.
+    expect(card.text()).toContain('2.4.1');
+    // `en` alone cannot prove the label is translated — an English literal reads the same as the
+    // `en` string (a hardcoded mutant survived that check). Painted again in `es`, the language
+    // the business actually reads, the Spanish label is there and the English one is gone: no
+    // single literal satisfies both locales.
+    i18n.global.locale.value = 'es';
+    const spanish = (await mountTaxTab()).find('.responsible-declaration-version');
+    expect(spanish.text()).toContain(es.settings.declarationTextVersion);
+    expect(spanish.text()).not.toContain(en.settings.declarationTextVersion);
+    expect(spanish.text()).toContain('v2');
+  });
+
+  it('without a named declaration nothing is painted next to the link (hub#1510)', async () => {
+    // No `declarationVersion`: an older control plane, or a hub that has never reached it. The
+    // link falls back to the archive root, which has no version to name.
+    stubDeclarationFetch(declarationPayload());
+    const wrapper = await mountTaxTab();
+
+    const card = wrapper.find('.responsible-declaration');
+    expect(card.find('a.responsible-declaration-link').exists()).toBe(true);
+    expect(
+      card.find('.responsible-declaration-version').exists(),
+      'an empty version label reads as «this declaration has no version», a different claim',
+    ).toBe(false);
+    expect(card.text()).not.toContain(en.settings.declarationTextVersion);
   });
 
   it('does not invent the manufacturer identity while the hub has not received it (hub#528)', async () => {

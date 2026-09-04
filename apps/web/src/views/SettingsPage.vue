@@ -451,14 +451,27 @@
             </p>
 
             <template v-else-if="declaration">
-              <a
-                class="responsible-declaration-link mt-2"
-                :href="declaration.declarationUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {{ t('settings.declarationRead') }}
-              </a>
+              <!-- The link and the name of the text it points at, as ONE unit (hub#1510): art.
+                   13.3 RRSIF lets several declarations coexist — one per range of versions — so
+                   «read the declaration» on its own does not say WHICH one an inspector is about
+                   to open. Shown together, the panel can be checked against the text without
+                   following the URL and comparing folder names. Absent when the control plane
+                   named none: the link then falls back to the archive root, which has no version,
+                   and an empty label would read as «this declaration has no version». -->
+              <div class="responsible-declaration-ref mt-2">
+                <a
+                  class="responsible-declaration-link"
+                  :href="declaration.declarationUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ t('settings.declarationRead') }}
+                </a>
+                <span v-if="declaration.declarationVersion" class="responsible-declaration-version">
+                  {{ t('settings.declarationTextVersion') }}
+                  <strong>{{ declaration.declarationVersion }}</strong>
+                </span>
+              </div>
 
               <h3 class="text-base font-semibold mt-4 mb-1">
                 {{ t('settings.declarationDataTitle') }}
@@ -1472,6 +1485,21 @@ ion-label p.responsible-declaration-value {
 }
 
 /* Link to the signed text: it reads as a link (which is what it is), not as a mute button. */
+/* Link + which text it points at, on one line that WRAPS: at 390 px the label and the link do not
+   fit side by side, and the version must not be pushed off the card — it is half of what an
+   inspection reads here (hub#1510). */
+.responsible-declaration-ref {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.responsible-declaration-version {
+  font-size: 0.85rem;
+  color: var(--ion-color-medium);
+}
+
 .responsible-declaration-link {
   display: inline-block;
   color: var(--ion-color-primary);
