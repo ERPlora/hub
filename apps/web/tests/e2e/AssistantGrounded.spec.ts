@@ -28,7 +28,10 @@ import { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const HUB_ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..', '..');
-const RUNTIME_PORT = 8791; // puerto propio: no pisa el 8787 de `pnpm dev`
+// Puerto propio: este spec arranca SU runtime, y no puede pisar el 8787 de `pnpm dev`. En CI lo
+// reparte `resolveBenchPorts` y lo exporta el config — sin eso, dos jobs `e2e` a la vez en
+// `ci-runner-1` (seis ranuras) chocaban aquí con `AddrInUse` igual que en el banco (hub#1517).
+const RUNTIME_PORT = Number(process.env.HUB_E2E_ASSISTANT_PORT) || 8791;
 const RUNTIME = `http://127.0.0.1:${RUNTIME_PORT}`;
 const PG = process.env.E2E_DATABASE_URL ?? 'postgres://postgres:test@localhost:5434/hub_e2e_assistant';
 
@@ -107,7 +110,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   // SIGKILL y ESPERAR a que muera, no `kill()` a secas.
   //
-  // El SIGTERM por defecto no bajaba este runtime: se quedaba vivo reteniendo el :8791, y la
+  // El SIGTERM por defecto no bajaba este runtime: se quedaba vivo reteniendo el puerto, y la
   // siguiente ejecución fallaba con `AddrInUse` — pero no de forma visible. Su runtime moría, los
   // tests hablaban con el ANTERIOR, cuyo fixture-cloud ya estaba cerrado, y el síntoma era
   // «No se pudo contactar con el asistente»: un error de red que manda a investigar el asistente
