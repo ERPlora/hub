@@ -412,6 +412,12 @@ jobs:
         timeout-minutes: 8
         run: |
           set -uo pipefail
+          # 🔴 `set +e` NO sobra: Actions corre este bloque como `bash -e {0}` (este workflow no
+          # fija `shell:`) y `set -uo pipefail` NO apaga ese `-e`. Sin esta línea, el `timeout` al
+          # saltar abortaría el bloque en la línea de abajo y ni el `rc=$?`, ni el `overrun=true`,
+          # ni el `::error::` llegarían a ejecutarse: el paso saldría rojo MUDO, que es justo lo que
+          # hub#1519 viene a quitar. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+          set +e
           timeout 7m cargo clippy --workspace --all-targets --no-deps \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
           rc=$?
@@ -434,6 +440,9 @@ jobs:
         timeout-minutes: 50
         run: |
           set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
           timeout 48m cargo test --workspace --lib --bins --tests \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
           rc=$?
@@ -456,6 +465,9 @@ jobs:
         timeout-minutes: 8
         run: |
           set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
           log="$RUNNER_TEMP/doctests.log"
           timeout 7m cargo test --workspace --doc \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android 2>&1 | tee "$log"

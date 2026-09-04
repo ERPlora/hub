@@ -161,6 +161,36 @@ emit(bool(suite) and all(all(f in s["run"] for f in ("--lib", "--bins", "--tests
      "the non-doc suite step selects its targets explicitly (hub#1519)",
      "a bare `cargo test` runs the doc-tests too, so the doc step would be decorative and the "
      "doc-tests would run twice")
+
+# The overrun message only exists if the shell gets far enough to print it. Actions runs a `run:`
+# block as `bash -e {0}` — this workflow overrides no `shell:`, so `-e` is ON — and `set -uo
+# pipefail` does NOT clear it. A bare `timeout ... cargo ...` that returns 124 therefore aborts the
+# block ON THAT LINE: the `rc=$?` below it, the `overrun=true` output and the `::error
+# title=Presupuesto...::` annotation never run. The step still goes red, so this does not show up as
+# a broken build — it shows up as the budget guard going MUTE, which is the exact failure hub#1519
+# exists to remove. Worse, `steps.<id>.outputs.overrun` then stays empty and the develop-broken
+# alert fires on a merely slow runner: the false verdict its `if:` is there to prevent.
+#
+# The repo already spells the two idioms that survive `-e`: `cmd || rc=$?` (a checked command, so
+# `-e` stays quiet) and an explicit `set +e` (test-hub-modules.yml). Only a STANDALONE capture is
+# unreachable, so that is what is matched here — `|| rc=$?` is exempt by construction, not by a
+# special case. `set +e` must come BEFORE the capture: after it, it changes nothing.
+CAPTURE = re.compile(r"^[ \t]*[A-Za-z_][A-Za-z0-9_]*=(?:\$\?|\$\{PIPESTATUS\[)", re.M)
+
+leaky = []
+for s in steps:
+    run = s.get("run") or ""
+    m = CAPTURE.search(run)
+    if not m:
+        continue
+    off = run.find("set +e")
+    if off != -1 and off < m.start():
+        continue
+    leaky.append(s.get("name") or s.get("id") or "<unnamed>")
+
+emit(not leaky, "a step that reads `$?` clears errexit first (hub#1519)",
+     "Actions runs these under `bash -e`, so the capture line is unreachable and the overrun "
+     "stays mute: " + ", ".join(leaky))
 PY
 )" || bad "the budget contract could be evaluated" "python3/PyYAML failed on $WF"
 while IFS=$'\t' read -r verdict name detail; do
