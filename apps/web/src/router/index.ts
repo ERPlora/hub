@@ -5,6 +5,11 @@ import { isAuthed, logout } from '../lib/session';
 import { isModuleBlocked, isModuleEntitled, needsActivation } from '../lib/entitlement';
 import { apiDocsEnabled } from '../lib/api-docs';
 import { machineRegistrationRequired } from '../lib/runtime';
+import { reportClientError } from '../lib/error-report';
+import { toastError } from '../lib/toast';
+import { i18n } from '../i18n';
+import { showViewLoadFailure } from './view-load-failure-notice';
+import { browserRecoveryStorage, clearViewLoadRecovery, recoverFromViewLoadError } from './view-load-recovery';
 
 // Rutas del Hub (port de HubShell.tsx). Cada vista es un SFC Vue cargado de forma diferida.
 // `/m/:moduleId` monta el Web Component (Lit) del módulo en runtime (ModuleView).
@@ -147,3 +152,48 @@ export async function authGate(to: RouteLocationNormalized): Promise<true | Rout
 }
 
 router.beforeEach(authGate);
+
+/**
+ * hub#1518 — a screen whose code never arrives must not leave the hub blank.
+ *
+ * Every view is loaded on demand, so opening a screen is a network fetch that can die (the till
+ * hops wifi→4G, a chunk went stale after a deploy, the CI runner's network blinks). On the FIRST
+ * navigation that failure is fatal and mute: `main.ts` mounts inside `router.isReady().then(...)`,
+ * so nothing ever mounts — a white page with no message and no way out.
+ *
+ * The ladder, and why retrying the `import()` in place cannot work, live in
+ * `./view-load-recovery`; the last-rung message in `./view-load-failure-notice`.
+ */
+router.onError((error, to, from) => {
+  // An empty `matched` is START_LOCATION: the document has not painted any route yet, which is the
+  // only case where aborting the navigation leaves the person looking at nothing.
+  const isInitial = from.matched.length === 0;
+  const outcome = recoverFromViewLoadError(
+    error,
+    { toPath: to.fullPath, isInitial },
+    // A DOCUMENT reload, not `location.assign(to.fullPath)`: on the first navigation the tab is
+    // already AT `to` (the router replays `window.location`), and assigning the URL a document
+    // already has, differing at most in its fragment, is a fragment navigation per the HTML spec —
+    // nothing reloads. The e2e that found this lands on `/settings#data`: measured in Chromium,
+    // `assign('/settings#data')` = 1 document load (still blank), `reload()` = 2.
+    { storage: browserRecoveryStorage(), reload: () => window.location.reload() },
+  );
+  // Reloaded once already (or the mark cannot be stored, which would loop): say it in the DOM,
+  // because there is no Vue, no Ionic and no toast to say it with.
+  if (outcome === 'exhausted') showViewLoadFailure();
+  // App already open: it keeps the screen — and whatever was half-typed on it — and hears why.
+  if (outcome === 'notify') void toastError(i18n.global.t('viewLoad.failedToast'));
+  // Registering ANY error listener switches off vue-router's own `console.error`. Anything we did
+  // not recognise as a missing file is a bug in the view itself and has to stay exactly as loud.
+  if (outcome === 'ignored') console.error(error);
+  // A navigation that fails without a trace is a failure nobody sees: all four rungs report it.
+  // `reportClientError` posts with `keepalive`, so it survives the reload of the first rung.
+  reportClientError({
+    message: `router.onError[${outcome}] ${error instanceof Error ? error.message : String(error)}`,
+    stack: error instanceof Error ? error.stack : null,
+    component: 'router',
+  });
+});
+
+// A navigation that lands forgets the mark, so a network hiccup later on can still recover.
+router.afterEach(() => clearViewLoadRecovery(browserRecoveryStorage()));
