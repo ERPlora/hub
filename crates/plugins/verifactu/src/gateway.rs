@@ -64,9 +64,15 @@ pub(crate) struct GatewayReadiness {
     /// say (an older cell, or an intermediary's error page).
     pub(crate) status: String,
     pub(crate) reason: String,
-    /// The REAL switch behind the door (infra#142): a cell can hold a perfectly `verified` Seal
-    /// and still be closed. Without this, «switched off» and «the Seal expired» are the same 503 —
-    /// which is exactly the pair an operator needs to tell apart.
+    /// The REAL switch behind the door, read from `conditions.transmission_enabled` (infra#142):
+    /// a cell can hold a perfectly `verified` Seal and still be closed. Without this, «switched
+    /// off» and «the Seal expired» are the same 503 — which is exactly the pair an operator needs
+    /// to tell apart.
+    ///
+    /// ⚠️ NOT the cell's top-level field of the same name: that one is the WHOLE gate (its
+    /// `readiness()` overwrites it with `ready` before answering, and `docs/api.md` pins the
+    /// meaning — «conserva su significado histórico, la puerta ENTERA»). Reading it would make
+    /// this a copy of [`GatewayReadiness::ready`] and lose the only pair it exists to separate.
     pub(crate) transmission_enabled: bool,
     /// Whose Seal the cell has mounted, from the subject. It is how somebody looking at the screen
     /// sees WHICH entity would be filing on their behalf, before a single record travels.
@@ -119,6 +125,9 @@ pub(crate) async fn probe_readiness(
 ///
 /// A body that is not the contract loses no verdict — `ready` comes from the STATUS, which an
 /// intermediary's error page cannot fake into a 200 with our own CA in front of it.
+///
+/// The switch is taken from `conditions`, never from the top-level twin: see
+/// [`GatewayReadiness::transmission_enabled`].
 fn read_readiness(ready: bool, body: &str) -> GatewayReadiness {
     let value: serde_json::Value = serde_json::from_str(body).unwrap_or(serde_json::Value::Null);
     let text = |key: &str| {
@@ -132,8 +141,14 @@ fn read_readiness(ready: bool, body: &str) -> GatewayReadiness {
         ready,
         status: text("status"),
         reason: text("reason"),
+        // The switch, from `conditions` (infra#142). The top-level field of the same name is the
+        // whole gate, so it only serves as the fallback for a cell too old to publish
+        // `conditions` — there it is the best answer available, and it is never worse than the
+        // `false` a missing key would give.
         transmission_enabled: value
-            .get("transmission_enabled")
+            .get("conditions")
+            .and_then(|c| c.get("transmission_enabled"))
+            .or_else(|| value.get("transmission_enabled"))
             .and_then(serde_json::Value::as_bool)
             .unwrap_or(false),
         holder_nif: text("holder_nif"),
@@ -660,6 +675,47 @@ mod tests {
         assert_eq!(readiness.status, "expired");
         assert!(readiness.reason.contains("2026-08-31"));
         assert!(!readiness.transmission_enabled);
+    }
+
+    /// 🔴 **The switch, read from where the cell actually publishes it.** The TOP-LEVEL
+    /// `transmission_enabled` is the WHOLE gate: `readiness()` overwrites it with `ready` before
+    /// serialising, and the cell's own `docs/api.md` pins that meaning — «conserva su significado
+    /// histórico (la puerta ENTERA, las cuatro a la vez)». The switch infra#142 added lives in
+    /// `conditions.transmission_enabled`.
+    ///
+    /// Reading the top-level one turns this field into a copy of `ready` and loses the ONE pair an
+    /// operator needs to tell apart, which is the pair infra#142 exists for: a Seal that expired
+    /// with transmission ON, and a perfectly verified Seal somebody switched OFF. Both arrive as
+    /// the same 503, and a diagnostic that cannot separate them sends the business to renew
+    /// something that is fine (hub#1485 again, one layer down).
+    #[test]
+    fn the_real_switch_is_read_from_the_conditions_not_from_the_whole_gate_hub1485() {
+        // Seal expired, switch still ON: the gate is shut BY the seal.
+        let broken_seal = read_readiness(
+            false,
+            r#"{"status":"expired","reason":"el sello terminó el 2026-08-31",
+                "transmission_enabled":false,"ingress":"mtls",
+                "conditions":{"transmission_enabled":true,"mtls_ingress":true,
+                              "token_public_key":true,"certificate_verified":false}}"#,
+        );
+        // Seal verified, switch OFF on purpose: the same 503, the opposite cause.
+        let switched_off = read_readiness(
+            false,
+            r#"{"status":"verified","reason":"",
+                "transmission_enabled":false,"ingress":"mtls",
+                "conditions":{"transmission_enabled":false,"mtls_ingress":true,
+                              "token_public_key":true,"certificate_verified":true}}"#,
+        );
+
+        assert!(!broken_seal.ready && !switched_off.ready, "both are a 503");
+        assert!(
+            broken_seal.transmission_enabled,
+            "transmission is ON here — what failed is the Seal, not the switch"
+        );
+        assert!(
+            !switched_off.transmission_enabled,
+            "and here the switch is exactly what is off, with the Seal fine"
+        );
     }
 
     /// The positive control: a healthy cell reports itself as such, holder included, so the screen
