@@ -73,6 +73,70 @@ else
     bad "test-hub.yml runs this contract" "add a step \`bash scripts/tests/test-hub-workflow.test.sh\` — otherwise this file guards nothing"
 fi
 
+# ── 5. a time-budget overrun is a NAMED red, never a mute `cancelled` (hub#1519) ──
+# GitHub marks a job that hits the JOB-level `timeout-minutes` as `cancelled` — indistinguishable
+# from a cancel by concurrency or by a newer push. It names no test, and `merge-pr.sh` reads it as
+# not-green and refuses to merge without saying why: the queue blocks and the block does not
+# explain itself. A STEP that hits its OWN `timeout-minutes` FAILS instead, and a failed step is a
+# red that points at itself. So: every step that costs minutes carries its own budget, and the
+# job's budget stays strictly ABOVE their sum, which leaves the job-level cancel as what it should
+# be — the backstop for a hang OUTSIDE a budgeted step (container init, cache), never the normal
+# way the suite ends.
+#
+# Run 33787341170 died exactly this way: 40m20s, step `cargo test --workspace` cancelled with the
+# whole suite already green and the doc-tests as the last thing on the log. Hence the split: the
+# doc-tests get their own step so an overrun there is legible as an overrun THERE.
+#
+# Parsed as YAML, not as text: these are numeric assertions about a step's own budget, and
+# associating a number with the step it belongs to is what indentation-guessing gets wrong.
+# `scripts/tests/test-scope.test.sh` already imports PyYAML from this same workflow, so the
+# dependency is proven on the runner.
+budget_out="$(WF="$WF" python3 - <<'PY'
+import os
+
+import yaml
+
+doc = yaml.safe_load(open(os.environ["WF"], encoding="utf-8"))
+job = (doc.get("jobs") or {}).get("test") or {}
+steps = job.get("steps") or []
+job_budget = job.get("timeout-minutes")
+
+
+def emit(ok, name, detail=""):
+    print(("PASS" if ok else "FAIL") + "\t" + name + "\t" + detail)
+
+
+costly = [s for s in steps if "cargo" in (s.get("run") or "")]
+emit(bool(costly), "the `test` job runs cargo at all",
+     "no step runs cargo: the rest of this contract would pass vacuously")
+
+unbudgeted = [s.get("name") or s.get("id") or "<unnamed>"
+              for s in costly if s.get("timeout-minutes") is None]
+emit(not unbudgeted, "every cargo step carries its own `timeout-minutes` (hub#1519)",
+     "these can only be stopped by the job-level cancel, which is mute: " + ", ".join(unbudgeted))
+
+step_total = sum(s.get("timeout-minutes") or 0 for s in steps)
+emit(isinstance(job_budget, int) and job_budget > step_total,
+     "job budget (%s) > sum of the step budgets (%s) (hub#1519)" % (job_budget, step_total),
+     "the job-level cancel would fire first and turn a named red back into a mute `cancelled`")
+
+doc_steps = [s for s in costly if "cargo test" in s["run"] and "--doc" in s["run"]]
+emit(len(doc_steps) == 1, "the doc-tests run in their OWN step (hub#1519)",
+     "they were the last thing running when run 33787341170 was axed and nothing said so; "
+     "found %d step(s) running `cargo test --doc`" % len(doc_steps))
+
+suite = [s for s in costly if "cargo test" in s["run"] and "--doc" not in s["run"]]
+emit(bool(suite) and all(all(f in s["run"] for f in ("--lib", "--bins", "--tests")) for s in suite),
+     "the non-doc suite step selects its targets explicitly (hub#1519)",
+     "a bare `cargo test` runs the doc-tests too, so the doc step would be decorative and the "
+     "doc-tests would run twice")
+PY
+)" || bad "the budget contract could be evaluated" "python3/PyYAML failed on $WF"
+while IFS=$'\t' read -r verdict name detail; do
+    [ -n "${verdict:-}" ] || continue
+    if [ "$verdict" = PASS ]; then ok "$name"; else bad "$name" "$detail"; fi
+done <<<"$budget_out"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
