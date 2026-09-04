@@ -148,3 +148,123 @@ test('hub#1108: a jobId that would climb out of the prefix never leaves the proc
     }
   }
 });
+
+// ── hub#1530 — the `printer` grant belongs to the module that makes THE REQUEST ────────────────
+//
+// The owner grants «printer» in Settings → Permissions to ONE module at a time (ADR-0079), and the
+// hub applies it per request: `crates/server/src/flows_api.rs::calling_module` reads
+// `X-Erplora-Module` off the request itself and `require_module_capability` resolves the grant from
+// that, every time. So the door is right — what has to be right on this side is WHICH module the
+// request names.
+//
+// `forModule` builds the scope with `Object.create(this)`, so a client that is scoped again
+// inherits every memoised surface of the scope it came from — and each surface captured its
+// module's header when it was built. A surface inherited that way keeps stamping the PREVIOUS
+// module, which means the second module acts under the grant the owner gave to the first, and the
+// `403` envelope blames the first (`error.module`) when the gate does refuse.
+//
+// The fetch below is the hub's gate, modelled: only the module the owner granted gets through.
+// Asserting the refusal rather than the header string is deliberate — it is the consequence that
+// matters, and it stays true if the header ever changes name.
+
+/** A fetch that answers like the hub's capability gate: only `granted` holds `printer`. */
+function gateGranting(granted: string): { fetchImpl: typeof fetch; calls: Call[] } {
+  const calls: Call[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    const headers = init.headers as Record<string, string>;
+    calls.push({ url, method: String(init.method), headers, body: undefined });
+    const acting = headers[MODULE_HEADER];
+    const json =
+      acting === granted
+        ? { ok: true, data: { jobId: 'j1', status: 'pending' } }
+        : {
+            ok: false,
+            error: {
+              code: 'capability_denied',
+              // What `dispatch_api.rs` puts in the envelope: the module the gate blamed.
+              module: acting,
+              message: `el módulo \`${acting}\` no tiene la capability \`printer\``,
+            },
+          };
+    return {
+      status: acting === granted ? 200 : 403,
+      headers: { get: () => 'application/json' },
+      json: async () => json,
+    };
+  }) as unknown as typeof fetch;
+  return { fetchImpl, calls };
+}
+
+test('hub#1530: a client scoped again acts as the NEW module — the previous grant does not travel', async () => {
+  const { fetchImpl, calls } = gateGranting(PRINTING);
+  const base = new ErploraClient(
+    new HttpWsTransport({ baseUrl: 'http://hub', fetchImpl, headers: () => ({}) }),
+  );
+
+  // The owner granted `printer` to `printing`, and `printing` uses it. Nothing wrong here.
+  const printing = base.forModule(PRINTING);
+  await printing.printQueue.retry('j1');
+
+  // Now the same connection acts for another module. `inventory` has no `printer` grant, so the
+  // hub must refuse it — and it can only do that if the request says `inventory`.
+  const rogue = printing.forModule('inventory');
+  await assert.rejects(
+    () => rogue.printQueue.retry('j1'),
+    (e: unknown) => e instanceof ErploraError && e.code === 'capability_denied',
+    'the second module must be refused: it never got the printer grant',
+  );
+
+  assert.equal(
+    calls.at(-1)?.headers[MODULE_HEADER],
+    'inventory',
+    'the request must name the module that is ACTING, so the refusal blames the right one',
+  );
+});
+
+test('hub#1530: no module-scoped surface survives a re-scope — the guard for the NEXT one', () => {
+  // Three surfaces memoise today (`flows`, `events`, `printQueue`) and `printQueue` was the one
+  // that got forgotten. This test does not name them: it DISCOVERS every getter that refuses an
+  // unscoped client with `module_scope_required` — that is what makes a surface module-scoped —
+  // and demands that each one is rebuilt per scope. A fourth surface added tomorrow is covered the
+  // day it is written, without anybody remembering this bug.
+  const transport = () =>
+    new HttpWsTransport({
+      baseUrl: 'http://hub',
+      fetchImpl: (async () => ({
+        status: 200,
+        headers: { get: () => 'application/json' },
+        json: async () => ({ ok: true, data: {} }),
+      })) as unknown as typeof fetch,
+      headers: () => ({}),
+    });
+
+  const unscoped = new ErploraClient(transport());
+  const scopedSurfaces = Object.getOwnPropertyNames(ErploraClient.prototype).filter((name) => {
+    const desc = Object.getOwnPropertyDescriptor(ErploraClient.prototype, name);
+    if (typeof desc?.get !== 'function') return false;
+    try {
+      desc.get.call(unscoped);
+      return false;
+    } catch (e) {
+      return e instanceof ErploraError && e.code === MODULE_SCOPE_REQUIRED;
+    }
+  });
+
+  assert.ok(
+    scopedSurfaces.includes('printQueue') && scopedSurfaces.length >= 3,
+    `the probe must find the module-scoped surfaces, found: ${scopedSurfaces.join(', ') || '(none)'}`,
+  );
+
+  const base = new ErploraClient(transport());
+  const first = base.forModule('printing');
+  const second = first.forModule('inventory');
+  for (const name of scopedSurfaces) {
+    const a = (first as unknown as Record<string, unknown>)[name];
+    const b = (second as unknown as Record<string, unknown>)[name];
+    assert.notEqual(
+      a,
+      b,
+      `\`${name}\` is shared across scopes: the second module would act under the first one's grant`,
+    );
+  }
+});

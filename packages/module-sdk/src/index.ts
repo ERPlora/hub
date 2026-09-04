@@ -2139,8 +2139,17 @@ export class ErploraClient {
     const scoped = Object.create(this) as ErploraClient;
     scoped.moduleId = id;
     // Not inherited: the parent's memoised surfaces belong to the parent's scope (or to none).
+    //
+    // hub#1530 — this is a SECURITY line, not housekeeping. Each surface captured the module
+    // header at the moment it was built, and the hub resolves the owner's grant from that header on
+    // every request (`flows_api.rs::calling_module` → `require_module_capability`). Inheriting one
+    // through the prototype chain would let this scope act under the PREVIOUS module's grant, and
+    // make the `403` blame that module instead of the one that asked. Every field declared next to
+    // `flowsApi` belongs here: `print.test.ts` discovers the module-scoped surfaces and fails if
+    // any of them survives a re-scope, so a fourth one is covered the day it is written.
     scoped.flowsApi = undefined;
     scoped.eventsApi = undefined;
+    scoped.printApi = undefined;
     return scoped;
   }
 
