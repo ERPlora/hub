@@ -1502,16 +1502,16 @@ pub async fn resolve_session(
     Ok(res.rows.first().map(row_to_user))
 }
 
-/// [`resolve_session`] diciendo además **con qué se probó la identidad** que abrió la sesión.
+/// [`resolve_session`], also saying **what the identity was proved with** when the session opened.
 ///
-/// La columna existe desde hub#658 como traza («¿quién abrió ESTA sesión y con qué?»), y desde
-/// pm#196 también **decide**: entregarle al navegador una sesión del SaaS solo está permitido si
-/// quien está delante tecleó su contraseña, nunca desde un PIN de turno (ADR-0226 — la credencial
-/// del usuario local no es nunca administrativa). El permiso del rol no basta para contestar esa
-/// pregunta, porque el rol dice qué puede hacer y no cómo lo demostró.
+/// The column has existed since hub#658 as a trace ("who opened THIS session, and with what?"), and
+/// since pm#196 it also **decides**: handing the browser a SaaS session is allowed only when the
+/// person standing there typed their password, never from a shift PIN (ADR-0226 — the local user's
+/// credential is never administrative). The role's permission is not enough to answer that
+/// question, because the role says what they may do and not how they proved it.
 ///
-/// Los mismos dos lados del `JOIN` acotados por `hub_id` que [`resolve_session`]: una sesión de
-/// otro hub de la misma base no resuelve aquí (hub#497).
+/// The same two sides of the `JOIN` bounded by `hub_id` as [`resolve_session`]: a session from
+/// another hub of the same database does not resolve here (hub#497).
 pub async fn resolve_session_with_credential(
     db: &dyn DatabaseAdapter,
     hub_id: &str,

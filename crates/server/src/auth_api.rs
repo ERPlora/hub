@@ -604,17 +604,17 @@ pub(crate) async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) 
 
 #[derive(serde::Deserialize, Default)]
 pub(crate) struct HandoffReq {
-    /// Dónde aterrizar dentro del SaaS. **Ruta propia** siempre; ver [`handoff_destination`].
+    /// Where to land inside the SaaS. Always an **own route**; see [`handoff_destination`].
     #[serde(default)]
     next: Option<String>,
 }
 
-/// Dónde va quien no pide nada: el panel. Es la puerta que abre el enlace «gestiona tu negocio».
+/// Where whoever asks for nothing goes: the panel. It is the door the "manage your business" link opens.
 const HANDOFF_DEFAULT_NEXT: &str = "/dashboard/";
 
-/// Percent-encoding de un valor de query **completo**: solo sobreviven los no-reservados de
-/// RFC 3986. A diferencia del de `media`, aquí `/` también se escapa — el destino viaja DENTRO de
-/// un parámetro, y dejarle barras crudas es dejarle reescribir la ruta que lo transporta.
+/// Percent-encoding of a **whole** query value: only RFC 3986 unreserved characters survive.
+/// Unlike the one in `media`, here `/` is escaped too — the destination travels INSIDE a parameter,
+/// and leaving it raw slashes is letting it rewrite the route that carries it.
 fn pct_encode_strict(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
@@ -628,15 +628,15 @@ fn pct_encode_strict(s: &str) -> String {
     out
 }
 
-/// El destino pedido, si es una ruta **del propio SaaS**; `None` si sale de él.
+/// The requested destination, if it is a route **of the SaaS itself**; `None` if it leaves it.
 ///
-/// El SaaS tiene su propia lista blanca al canjear el código, y aun así esto se comprueba **aquí**:
-/// un hub que reenvía direcciones absolutas es un hub que apuntaría una sesión recién abierta al
-/// sitio de otro, y rechazarlo antes evita además gastar el código de un solo uso en el intento.
+/// The SaaS has its own allow-list when redeeming the code, and this is still checked **here**: a
+/// hub that forwards absolute addresses is a hub that would point a freshly opened session at
+/// somebody else's site, and refusing early also avoids spending the one-time code on the attempt.
 ///
-/// Se exige empezar por `/` y que el siguiente carácter no sea `/` ni `\`: `//host` es una URL
-/// «protocol-relative» y `/\host` lo es también para los navegadores, que normalizan la barra
-/// invertida. Por eso `\` se rechaza en cualquier posición, no solo en la segunda.
+/// It must start with `/` and the next character must be neither `/` nor `\`: `//host` is a
+/// protocol-relative URL, and so is `/\host` for browsers, which normalise the backslash. That is
+/// why `\` is rejected in any position, not only in the second one.
 fn handoff_destination(next: Option<&str>) -> Option<String> {
     let next = next.map(str::trim).filter(|n| !n.is_empty());
     let Some(next) = next else {
@@ -655,29 +655,29 @@ fn handoff_destination(next: Option<&str>) -> Option<String> {
     Some(next.to_string())
 }
 
-/// **`POST /api/auth/handoff`** — entrega al navegador la sesión del SaaS de quien está en el TPV
-/// (pm#196, hub#1400). Body `{next?}` → `200 {url}` con una dirección de un solo uso.
+/// **`POST /api/auth/handoff`** — hands the browser the SaaS session of whoever is at the till
+/// (pm#196, hub#1400). Body `{next?}` → `200 {url}` with a one-time address.
 ///
-/// El TPV enlaza a erplora.com para lo que no vende (plan, facturas, checkout de módulos). Dentro
-/// de la app instalada ese enlace se abre en el navegador del sistema, que es **otro tarro de
-/// cookies** que el webview: la dueña volvía a teclear contraseña y segundo factor justo antes de
-/// pagar. Esta ruta es la mitad Hub→SaaS del correo de un solo uso que ADR-0157 §8 ya tiene en la
-/// dirección contraria.
+/// The till links to erplora.com for what it does not sell (plan, invoices, module checkout).
+/// Inside the installed app that link opens in the system browser, which is a **different cookie
+/// jar** from the webview: the owner typed her password and second factor again right before
+/// paying. This route is the Hub→SaaS half of the one-time email ADR-0157 §8 already has in the
+/// opposite direction.
 ///
-/// **Por qué pasa por el runtime** si el navegador ya tiene el JWT y podría pedirlo él: porque el
-/// SaaS no puede ver lo que aquí se comprueba. Si quien está delante demostró quién es con **su
-/// contraseña** o con un **PIN de turno** solo lo dice `hub_session.credential_kind` (hub#658). El
-/// cerrojo (hub#1400) es que solo lo primero se lleva una sesión de navegador: un PIN es corto,
-/// memorizable y se teclea delante de gente (ADR-0226 — la credencial del usuario local no es nunca
-/// administrativa), y convertirlo en la llave del panel de facturación entregaría el dinero del
-/// negocio a quien abra la caja.
+/// **Why it goes through the runtime** when the browser already holds the JWT and could ask for it
+/// itself: because the SaaS cannot see what is checked here. Whether the person standing there
+/// proved who they are with **their password** or with a **shift PIN** is something only
+/// `hub_session.credential_kind` says (hub#658). The lock (hub#1400) is that only the first one
+/// carries off a browser session: a PIN is short, memorable and typed in front of people (ADR-0226
+/// — the local user's credential is never administrative), and turning it into the key to the
+/// billing panel would hand the business's money to whoever opens the till.
 ///
-/// Por eso `hub.administer` (ADR-0248) es necesario y **no suficiente**: es un permiso del ROL y la
-/// pregunta es sobre el MÉTODO. La tercera comprobación cierra el hueco que dejan las otras dos —
-/// el JWT presentado tiene que nombrar a la misma persona que la sesión, porque un TPV del que
-/// nadie ha cerrado sesión conserva los tokens del anterior en `localStorage`.
+/// That is why `hub.administer` (ADR-0248) is necessary and **not sufficient**: it is a permission
+/// of the ROLE and the question is about the METHOD. The third check closes the gap the other two
+/// leave — the presented JWT has to name the same person as the session, because a till nobody has
+/// signed out of keeps the previous person's tokens in `localStorage`.
 ///
-/// Cada rechazo va por su CÓDIGO, nunca por su prosa (ADR-0055).
+/// Every refusal travels as its CODE, never as its prose (ADR-0055).
 pub(crate) async fn auth_handoff(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -701,7 +701,7 @@ pub(crate) async fn auth_handoff(
             }
             Ok(None) => return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required"),
             Err(e) => {
-                eprintln!("[handoff] no se pudo resolver la sesión: {e}");
+                eprintln!("[handoff] could not resolve the session: {e}");
                 return refuse(StatusCode::INTERNAL_SERVER_ERROR, "handoff_session_unreadable");
             }
         }
@@ -718,15 +718,15 @@ pub(crate) async fn auth_handoff(
         return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_required");
     };
     let Some(pem) = st.config.jwt_public_key.as_deref() else {
-        // Sin clave pública el hub no puede comprobar a quién nombra el token, y esta puerta
-        // existe justamente para comprobarlo. Se dice, no se abre a medias.
-        eprintln!("[handoff] el hub no tiene clave pública del SaaS: la puerta queda cerrada");
+        // Without the public key the hub cannot check who the token names, and this door exists
+        // precisely to check it. It says so; it does not open halfway.
+        eprintln!("[handoff] the hub has no SaaS public key: the door stays shut");
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "handoff_not_configured");
     };
     let claims = match cloud_client::verify_user_jwt(&access, pem) {
         Ok(claims) => claims,
         Err(e) => {
-            eprintln!("[handoff] JWT de usuario inválido: {e}");
+            eprintln!("[handoff] invalid user JWT: {e}");
             return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_invalid");
         }
     };
@@ -753,29 +753,29 @@ pub(crate) async fn auth_handoff(
                 Ok(body) => match body.get("code").and_then(Value::as_str) {
                     Some(code) if !code.is_empty() => code.to_string(),
                     _ => {
-                        eprintln!("[handoff] el SaaS respondió sin código de un solo uso");
+                        eprintln!("[handoff] the SaaS answered without a one-time code");
                         return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
                     }
                 },
                 Err(e) => {
-                    eprintln!("[handoff] respuesta ilegible del SaaS: {e}");
+                    eprintln!("[handoff] unreadable answer from the SaaS: {e}");
                     return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
                 }
             }
         }
         Ok(response) => {
-            eprintln!("[handoff] el SaaS rechazó el pase: {}", response.status());
+            eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
             return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
         }
         Err(e) => {
-            eprintln!("[handoff] no se pudo pedir el pase al SaaS: {e}");
+            eprintln!("[handoff] could not ask the SaaS for the pass: {e}");
             return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
         }
     };
 
-    // La dirección la arma el runtime con SU idea de dónde está el SaaS: una página que pudiera
-    // elegir el host estaría eligiendo dónde se gasta el código. Y el código de un solo uso es
-    // toda la credencial que viaja — ni el Bearer ni el token de máquina la acompañan.
+    // The runtime builds the address with ITS idea of where the SaaS is: a page that could pick
+    // the host would be picking where the code gets spent. And the one-time code is the whole
+    // credential that travels — neither the Bearer nor the machine token goes with it.
     let url = format!(
         "{}/auth/handoff/{}/?next={}",
         st.config.cloud_base_url.trim_end_matches('/'),
@@ -838,11 +838,12 @@ pub(crate) async fn mint_session_with_extra(
                 "token": token,
                 "user": user,
                 "permissions": permissions,
-                // **Con qué acaba de probar su identidad quien entra** (hub#1400). El shell no puede
-                // preguntarlo después —no hay ruta que lo cuente— y lo necesita antes de pintar: la
-                // puerta a erplora.com solo se ofrece a un login de contraseña, y una entrada que se
-                // enseña y luego se rechaza es peor que no enseñarla. Viaja desde aquí porque los
-                // cinco caminos que abren sesión pasan por esta función; el sexto lo hereda.
+                // **What whoever signs in just proved their identity with** (hub#1400). The shell
+                // cannot ask for it afterwards —no route tells it— and needs it before painting:
+                // the door to erplora.com is offered only to a password login, and an entry that is
+                // shown and then refused is worse than one never shown. It travels from here
+                // because the five paths that open a session go through this function; the sixth
+                // inherits it.
                 "credential_kind": credential.kind,
             });
             if let (Some(target), Some(source)) = (

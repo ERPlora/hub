@@ -338,12 +338,12 @@ export interface HubSessionResult {
   user: { id: string; name: string; role: string };
   permissions: string[];
   /**
-   * **Con qué acaba de probar su identidad** quien entra: `cloud` (email + contraseña), `pin`,
-   * `badge` (hub#658). Lo escribe el runtime en la fila de `hub_session` y lo devuelve aquí porque
-   * el shell tiene que decidir qué pinta antes de que nadie pulse nada — la puerta a erplora.com
-   * solo se ofrece a un login de contraseña (hub#1400).
+   * **What whoever just signed in proved their identity WITH**: `cloud` (email + password), `pin`,
+   * `badge` (hub#658). The runtime writes it on the `hub_session` row and returns it here because
+   * the shell has to decide what to paint before anybody presses anything — the door to erplora.com
+   * is offered only to a password login (hub#1400).
    *
-   * Opcional en el tipo: una respuesta que no lo traiga deja la sesión cerrada, no abierta.
+   * Optional in the type: an answer that does not carry it leaves the session shut, not open.
    */
   credential_kind?: string;
 }
@@ -489,22 +489,22 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
 /**
- * **Cambia la sesión del TPV por una dirección de un solo uso del SaaS** (pm#196, hub#1400) —
+ * **Trades the till's session for a one-time SaaS address** (pm#196, hub#1400) —
  * `POST /api/auth/handoff`.
  *
- * El enlace a erplora.com se abre en el navegador del sistema, que **no comparte el tarro de
- * cookies** con la webview de la app instalada: hasta ahora llegaba sin sesión y la dueña volvía a
- * teclear contraseña y segundo factor justo antes de pagar. El runtime canjea la sesión del hub por
- * un pase de un solo uso y devuelve la dirección que lo gasta.
+ * The link to erplora.com opens in the system browser, which does **not share the cookie jar** with
+ * the installed app's webview: until now it landed signed out, and the owner typed her password and
+ * second factor again right before paying. The runtime trades the hub session for a one-time pass
+ * and returns the address that spends it.
  *
- * Va por el runtime y no directo al SaaS porque el SaaS **no puede ver** lo que aquí se comprueba:
- * si quien está delante tecleó su contraseña o un PIN de turno solo lo dice `credential_kind`
- * (hub#658). Las dos credenciales que necesita —`X-Hub-Session` y el Bearer del usuario— las pone
- * `runtimeHeaders`, la misma puerta que ya usa el resto del shell.
+ * It goes through the runtime and not straight to the SaaS because the SaaS **cannot see** what is
+ * checked here: whether the person standing there typed their password or a shift PIN is something
+ * only `credential_kind` says (hub#658). The two credentials it needs —`X-Hub-Session` and the
+ * user's Bearer— are put in by `runtimeHeaders`, the same door the rest of the shell already uses.
  *
- * `next` es una ruta **relativa** del SaaS; el runtime la valida y rechaza cualquier cosa que salga
- * de él. Lanza `RuntimeError` con su código (`handoff_requires_cloud_login`, `handoff_unavailable`…)
- * cuando la puerta se niega: quien llama decide si degrada al enlace de siempre.
+ * `next` is a **relative** route of the SaaS; the runtime validates it and rejects anything leaving
+ * it. Throws `RuntimeError` with its code (`handoff_requires_cloud_login`, `handoff_unavailable`…)
+ * when the door refuses: the caller decides whether to degrade to the link of always.
  */
 export async function runtimeManagementHandoff(next: string): Promise<string> {
   const { runtimeHeaders } = await import('./runtime');

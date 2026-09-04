@@ -4,8 +4,9 @@
 //! never to a PIN of the shift (ADR-0226). The runtime already writes that in
 //! `hub_session.credential_kind` (hub#658) and `POST /api/auth/handoff` reads it there, which is the
 //! authority. But the shell has to decide **what to paint** before anybody presses anything, and an
-//! entry that is shown and then refused is exactly what hub#1400 forbids: "una entrada bien visible
-//! que después pide contraseña es peor que el icono de hoy, porque promete algo que no cumple".
+//! entry that is shown and then refused is exactly what hub#1400 forbids: a clearly visible entry
+//! that then asks for a password is worse than today's icon, because it promises what it does not
+//! deliver.
 //!
 //! So the answer travels back with the session that was just minted. It is asserted on the LOGIN
 //! response and not on a fixture because every way into this hub goes through `mint_session_*`: the

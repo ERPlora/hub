@@ -27,11 +27,11 @@ const LS_KEY = 'erplora.session';
 // command. Es la autoridad de permisos LOCAL (ARQUITECTURA.md §2.9); el JWT cloud es solo el
 // adaptador de login. Distinto del JWT del usuario (ese vive en cloud.ts para hablar con el Cloud).
 const HUB_SESSION_KEY = 'erplora.hub_session';
-// **Con qué se probó la identidad** de esa misma sesión (`hub_session.credential_kind`, hub#658).
-// Vive AQUÍ y no en `SessionUser` a propósito: es una propiedad de la SESIÓN, no de la persona, y
-// `applyProfile` reconstruye el usuario entero cada vez que se lee `/api/profile` — un campo
-// aparcado ahí se borraría solo al primer refresco y la puerta a erplora.com desaparecería a los
-// segundos de aparecer (hub#1400).
+// **What identity was proved WITH** on that same session (`hub_session.credential_kind`, hub#658).
+// It lives HERE and not in `SessionUser` on purpose: it is a property of the SESSION, not of the
+// person, and `applyProfile` rebuilds the whole user every time `/api/profile` is read — a field
+// parked there would wipe itself on the first refresh, and the door to erplora.com would vanish
+// seconds after showing up (hub#1400).
 const HUB_SESSION_CREDENTIAL_KEY = 'erplora.hub_session_credential';
 
 function read(): SessionUser | null {
@@ -53,25 +53,26 @@ function readCredentialKind(): string {
   }
 }
 
-// Reactivo, no una lectura de `localStorage` cuando alguien pregunta: `canOpenManagement` es un
-// `computed` sobre esto, y un getter plano lo dejaría congelado en lo que fuera cierto al cargar el
-// módulo — en un arranque en frío, antes de que nadie haya entrado.
+// Reactive, not a read of `localStorage` whenever somebody asks: `canOpenManagement` is a
+// `computed` over this, and a plain getter would freeze it on whatever was true when the module
+// loaded — on a cold boot, before anybody has signed in.
 const _hubSessionCredential = ref<string>(readCredentialKind());
 
-/** El login **cloud**: email y contraseña contra el SaaS (`identity::CREDENTIAL_CLOUD`). */
+/** The **cloud** login: email and password against the SaaS (`identity::CREDENTIAL_CLOUD`). */
 export const CREDENTIAL_CLOUD = 'cloud';
 
 /**
- * ¿La sesión activa se abrió tecleando email y contraseña?
+ * Was the active session opened by typing an email and a password?
  *
- * El cerrojo de hub#1400: solo a esa sesión se le entrega una del SaaS en el navegador. Un PIN es
- * credencial de **turno** —corta y tecleada delante de gente— y ADR-0226 ya dice que la credencial
- * del usuario local no es nunca administrativa.
+ * The lock of hub#1400: only that session is handed a SaaS one in the browser. A PIN is a credential
+ * of the SHIFT —short, typed in front of people— and ADR-0226 already says the local user's
+ * credential is never administrative.
  *
- * **Falla cerrado**: si la sesión no dice cómo se abrió (una anterior a este despliegue), la
- * respuesta es «no». «No consta» y «fue una contraseña» son respuestas distintas, y confundirlas
- * abriría la puerta justo a las sesiones que este cerrojo existe para dejar fuera. Se cura solo
- * cuando esa sesión caduca. La autoridad sigue siendo el runtime, que revalida en `/api/auth/handoff`.
+ * **Fails closed**: if the session does not say how it was opened (one from before this shipped),
+ * the answer is "no". "It does not say" and "it was a password" are different answers, and mixing
+ * them up would open the door to precisely the sessions this lock exists to keep out. It cures
+ * itself when that session expires. The authority is still the runtime, which revalidates in
+ * `/api/auth/handoff`.
  */
 export const openedWithCloudLogin = computed(() => _hubSessionCredential.value === CREDENTIAL_CLOUD);
 
@@ -149,11 +150,11 @@ export function getHubSession(): string | null {
 }
 
 /**
- * Guarda (o borra) el token de sesión del runtime emitido por `/api/auth/{pin,cloud,badge,courier}`.
+ * Stores (or clears) the runtime session token minted by `/api/auth/{pin,cloud,badge,courier}`.
  *
- * `credentialKind` es lo que ese login contestó en `credential_kind` (hub#1400). Es opcional para
- * que un camino que se olvide de pasarlo deje la sesión **cerrada** en vez de abierta: omitirlo no
- * es «fue una contraseña», es «no consta».
+ * `credentialKind` is what that login answered in `credential_kind` (hub#1400). It is optional so
+ * that a path which forgets to pass it leaves the session **shut** instead of open: omitting it is
+ * not "it was a password", it is "it does not say".
  */
 export function setHubSession(token: string | null, credentialKind?: string | null): void {
   const kind = token ? (credentialKind ?? '') : '';

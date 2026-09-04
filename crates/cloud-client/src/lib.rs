@@ -548,18 +548,18 @@ impl CloudClient {
         )
     }
 
-    /// **Un pase de un solo uso para abrir la sesión de esta persona en el navegador** (pm#196) —
-    /// `POST /api/v1/auth/handoff/issue/` con el **JWT del usuario**.
+    /// **A one-time pass to open this person's session in the browser** (pm#196) —
+    /// `POST /api/v1/auth/handoff/issue/` with the **user's JWT**.
     ///
-    /// Es la mitad Hub→SaaS del correo que ADR-0157 §8 ya tiene en la dirección contraria: el TPV
-    /// enlaza a erplora.com para todo lo que deliberadamente no vende (el plan, las facturas, el
-    /// checkout de módulos), y dentro de la app instalada el navegador del sistema es otro tarro de
-    /// cookies, así que hasta ahora ese enlace llegaba **sin sesión**.
+    /// It is the Hub→SaaS half of the e-mail ADR-0157 §8 already has in the opposite direction: the
+    /// till links to erplora.com for everything it deliberately does not sell (the plan, the
+    /// invoices, the module checkout), and inside the installed app the system browser is a
+    /// different cookie jar, so until now that link landed **signed out**.
     ///
-    /// 🔒 Va firmado con [`Auth::UserJwt`] **a propósito, nunca con el token de máquina**: lo que se
-    /// pide es una sesión del navegador *para una persona concreta*, y el token de máquina no nombra
-    /// a ninguna. Firmarlo con él convertiría un secreto de despliegue filtrado en la llave del
-    /// billing de cualquier miembro del hub.
+    /// 🔒 It is signed with [`Auth::UserJwt`] **on purpose, never with the machine token**: what is
+    /// being asked for is a browser session *for one specific person*, and the machine token names
+    /// nobody. Signing it with that one would turn a leaked deployment secret into the key to the
+    /// billing of any member of the hub.
     pub fn browser_handoff_issue(&self, auth: &Auth) -> PreparedRequest {
         self.signed(
             "POST",

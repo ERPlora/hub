@@ -411,10 +411,10 @@ impl Runtime {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
-    /// Resuelve una sesión válida a su `hub_user` **y a la credencial con la que se abrió**.
+    /// Resolves a valid session to its `hub_user` **and to the credential it was opened with**.
     ///
-    /// La usa la puerta del handoff al navegador (pm#196): «puede administrar» y «tecleó su
-    /// contraseña» son dos preguntas distintas, y solo la segunda la contesta esta columna.
+    /// Used by the browser handoff door (pm#196): "can administer" and "typed their password" are
+    /// two different questions, and only the second one is answered by this column.
     pub async fn resolve_session_with_credential(
         &self,
         token: &str,

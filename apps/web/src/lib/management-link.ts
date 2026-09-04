@@ -40,15 +40,15 @@ export const ADMINISTER_PERMISSION = 'hub.administer';
  * La regla del comodín vive en un solo sitio (`hasPermission`, hub#506): antes estaba duplicada
  * aquí y en `app-update.ts`, y ninguna de las dos sabía de la otra.
  *
- * 🔒 **Y una segunda mitad** (hub#1400): además del permiso, la sesión tiene que haberse abierto
- * tecleando email y contraseña. `hub.administer` es un permiso del ROL y la pregunta aquí es sobre
- * el MÉTODO — un PIN es credencial de **turno**, corta y tecleada delante de gente, y ADR-0226 ya
- * dice que la credencial del usuario local no es nunca administrativa. Convertirla en la llave del
- * panel de facturación regalaría el billing del negocio a quien abre la caja.
+ * 🔒 **And a second half** (hub#1400): on top of the permission, the session has to have been
+ * opened by typing an email and a password. `hub.administer` is a permission of the ROLE, and the
+ * question here is about the METHOD — a PIN is a credential of the SHIFT, short and typed in front
+ * of people, and ADR-0226 already says the local user's credential is never administrative. Turning
+ * it into the key to the billing panel would hand the business's money to whoever opens the till.
  *
- * Se filtra aquí y no solo en el runtime porque una entrada que se enseña y luego se rechaza es
- * peor que no enseñarla: *«promete algo que no cumple»* (hub#1400). La autoridad sigue siendo el
- * runtime, que lo revalida en `POST /api/auth/handoff`.
+ * It is filtered here and not only in the runtime because an entry that is shown and then refused is
+ * worse than one that was never shown: it promises something it does not deliver (hub#1400). The
+ * authority is still the runtime, which revalidates it in `POST /api/auth/handoff`.
  */
 export const canOpenManagement: ComputedRef<boolean> = computed(
   () => hasPermission(ADMINISTER_PERMISSION) && openedWithCloudLogin.value,
@@ -79,13 +79,14 @@ export function managementUrl(): string {
 }
 
 /**
- * La dirección que se abre de verdad: la de un solo uso si el runtime la da, la de siempre si no.
+ * The address that actually gets opened: the one-time one when the runtime hands it over, the usual
+ * one when it does not.
  *
- * El pase (pm#196) es lo que hace que el navegador aterrice **ya logueado**. Cuando no se puede
- * emitir —el SaaS no contesta, la sesión ya no vale— la puerta **no se queda muerta**: cae al enlace
- * de toda la vida, que es exactamente el comportamiento de antes de esta issue, así que degradar
- * nunca es peor que no haberlo intentado. Lo que no se hace es callarse: el motivo se reporta, o el
- * fallo se vuelve invisible y nadie lo arregla nunca.
+ * The pass (pm#196) is what makes the browser land ALREADY SIGNED IN. When it cannot be minted —the
+ * SaaS does not answer, the session is no longer valid— the door does **not** go dead: it falls back
+ * to the link of always, which is exactly the behaviour from before this issue, so degrading is
+ * never worse than not having tried. What it does not do is keep quiet: the reason is reported, or
+ * the failure turns invisible and nobody ever fixes it.
  */
 async function managementDoor(): Promise<string> {
   const fallback = managementUrl();
