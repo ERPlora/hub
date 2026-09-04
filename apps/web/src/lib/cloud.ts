@@ -504,15 +504,24 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
  * `next` is a **relative** route of the SaaS; the runtime validates it and rejects anything leaving
  * it. Throws `RuntimeError` with its code (`handoff_requires_cloud_login`, `handoff_unavailable`…)
  * when the door refuses: the caller decides whether to degrade to the link of always.
+ *
+ * **A stale Bearer is refreshed ONCE and asked again.** The access token lives one hour
+ * (`SIMPLE_JWT.ACCESS_TOKEN_LIFETIME`) and the till session lives the whole day; the runtime
+ * verifies `exp` before naming the person, so from the second hour on it answers
+ * `handoff_user_token_invalid`. Left alone, that degrades to the plain link — the login form, the
+ * issue's own symptom, four hours late. Same single retry `cloudFetch` and `runtimeGet` do.
  */
 export async function runtimeBrowserHandoff(next: string): Promise<string> {
   const { runtimeHeaders } = await import('./runtime');
-  const result = await runtimePost<{ url?: string }>(
-    '/api/auth/handoff',
-    { next },
-    runtimeHeaders(),
-  );
-  return result.url ?? '';
+  const ask = () =>
+    runtimePost<{ url?: string }>('/api/auth/handoff', { next }, runtimeHeaders());
+  try {
+    return (await ask()).url ?? '';
+  } catch (error) {
+    const stale = error instanceof RuntimeError && error.code === 'handoff_user_token_invalid';
+    if (!stale || !(await refreshTokens())) throw error;
+    return (await ask()).url ?? '';
+  }
 }
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */
