@@ -17,7 +17,8 @@
  * `sessionStorage` so a permanently broken build can never turn the till into a boot loop.
  *
  * The ladder:
- *   1. first navigation, not tried yet → reload the target path once;
+ *   1. first navigation, not tried yet → reload the document once (the tab is already at the
+ *      target; a same-URL `assign` would be a fragment navigation, not a reload);
  *   2. it failed again after that reload (or the mark cannot be stored) → the caller paints a
  *      visible message; never a blank page;
  *   3. navigating inside an app that is already open → the router simply aborts, so the person
@@ -55,7 +56,7 @@ export function isViewLoadError(error: unknown): boolean {
 }
 
 export type ViewLoadOutcome =
-  /** Reloading the target path now; a fresh document gets a clean module map. */
+  /** Reloading the document now; a fresh one gets a clean module map. */
   | 'reload'
   /** Already reloaded once (or cannot remember): show the failure instead of a blank page. */
   | 'exhausted'
@@ -102,13 +103,13 @@ export function clearViewLoadRecovery(storage: RecoveryStorage): void {
 export function recoverFromViewLoadError(
   error: unknown,
   nav: { toPath: string; isInitial: boolean },
-  io: { storage: RecoveryStorage; reload: (path: string) => void },
+  io: { storage: RecoveryStorage; reload: () => void },
 ): ViewLoadOutcome {
   if (!isViewLoadError(error)) return 'ignored';
   if (!nav.isInitial) return 'notify';
   if (readMark(io.storage) === nav.toPath) return 'exhausted';
   if (!markPersisted(io.storage, nav.toPath)) return 'exhausted';
-  io.reload(nav.toPath);
+  io.reload();
   return 'reload';
 }
 

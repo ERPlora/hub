@@ -62,7 +62,7 @@ describe('isViewLoadError', () => {
 });
 
 describe('recoverFromViewLoadError · first navigation (the blank screen)', () => {
-  it('reloads the target path once, so the retry starts from a clean module map', () => {
+  it('reloads the document once, so the retry starts from a clean module map', () => {
     const storage = fakeStorage();
     const reload = vi.fn();
 
@@ -73,7 +73,7 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     );
 
     expect(outcome).toBe('reload');
-    expect(reload).toHaveBeenCalledWith('/settings#data');
+    expect(reload).toHaveBeenCalledTimes(1);
     expect(storage.dump()[VIEW_LOAD_RECOVERY_KEY]).toBe('/settings#data');
   });
 
@@ -103,7 +103,7 @@ describe('recoverFromViewLoadError · first navigation (the blank screen)', () =
     );
 
     expect(outcome).toBe('reload');
-    expect(reload).toHaveBeenCalledWith('/settings#data');
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('refuses to reload when the mark cannot be stored — that would be an endless reload loop', () => {

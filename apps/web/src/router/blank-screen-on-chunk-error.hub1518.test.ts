@@ -49,15 +49,15 @@ const CHUNK_ERROR = new TypeError(
 const BROKEN = '/hub1518-broken';
 const HEALTHY = '/hub1518-healthy';
 
-let assign: ReturnType<typeof vi.fn>;
+let reload: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   sessionStorage.clear();
   toastErrorSpy.mockClear();
   reportSpy.mockClear();
   document.getElementById(VIEW_LOAD_FAILURE_ID)?.remove();
-  assign = vi.fn();
-  vi.spyOn(window.location, 'assign').mockImplementation(assign as unknown as (url: string | URL) => void);
+  reload = vi.fn();
+  vi.spyOn(window.location, 'reload').mockImplementation(reload as unknown as () => void);
 
   // A screen whose file never arrives, and one that loads fine.
   router.addRoute({
@@ -89,7 +89,12 @@ describe('hub#1518 · a view whose file never arrives', () => {
     //     an abort here is a permanently blank page.
     await navigate(BROKEN);
 
-    expect(assign).toHaveBeenCalledWith(BROKEN);
+    // A DOCUMENT reload — never `location.assign(to.fullPath)`. On the first navigation the tab is
+    // already AT `to` (the router replays `window.location`), and assigning the URL a document
+    // already has, differing at most in its fragment, is a fragment navigation per the HTML spec:
+    // nothing reloads. The e2e that found this lands on `/settings#data` — measured in Chromium,
+    // `assign('/settings#data')` = 1 document load (still blank), `reload()` = 2.
+    expect(reload).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem(VIEW_LOAD_RECOVERY_KEY)).toBe(BROKEN);
     expect(document.getElementById(VIEW_LOAD_FAILURE_ID)).toBeNull();
     // Recovered, but not hidden: the reload is reported so a hub that keeps doing this is visible.
@@ -99,16 +104,19 @@ describe('hub#1518 · a view whose file never arrives', () => {
 
     // 2 · The reload happened and the very same screen failed again: give up reloading (a reload
     //     loop is worse) and SAY it. What must never happen is the white page.
-    assign.mockClear();
+    reload.mockClear();
     await navigate(BROKEN);
 
-    expect(assign).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
     const notice = document.getElementById(VIEW_LOAD_FAILURE_ID);
     expect(notice).not.toBeNull();
     expect(notice?.textContent?.trim()).not.toBe('');
   });
 
   it('does not reload when the app is already open — it tells the person instead', async () => {
+    // The mark a recovery reload leaves behind: landing anywhere must forget it, or the NEXT blink
+    // on this screen finds the mark, skips the reload and goes straight to the wall of text.
+    sessionStorage.setItem(VIEW_LOAD_RECOVERY_KEY, HEALTHY);
     await navigate(HEALTHY);
     expect(router.currentRoute.value.path).toBe(HEALTHY);
     // A landed navigation forgets the mark, so a later hiccup can still recover by reloading.
@@ -116,7 +124,7 @@ describe('hub#1518 · a view whose file never arrives', () => {
 
     await navigate(BROKEN);
 
-    expect(assign).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
     expect(document.getElementById(VIEW_LOAD_FAILURE_ID)).toBeNull();
     expect(toastErrorSpy).toHaveBeenCalledTimes(1);
     // The person stays where they were, with whatever they had half-typed.
@@ -134,7 +142,7 @@ describe('hub#1518 · a view whose file never arrives', () => {
     await navigate('/hub1518-bug');
 
     expect(consoleError).toHaveBeenCalledWith(bug);
-    expect(assign).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(VIEW_LOAD_RECOVERY_KEY)).toBeNull();
     expect(toastErrorSpy).not.toHaveBeenCalled();
     router.removeRoute('hub1518-bug');

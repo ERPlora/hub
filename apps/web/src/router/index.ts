@@ -171,7 +171,12 @@ router.onError((error, to, from) => {
   const outcome = recoverFromViewLoadError(
     error,
     { toPath: to.fullPath, isInitial },
-    { storage: browserRecoveryStorage(), reload: (path) => window.location.assign(path) },
+    // A DOCUMENT reload, not `location.assign(to.fullPath)`: on the first navigation the tab is
+    // already AT `to` (the router replays `window.location`), and assigning the URL a document
+    // already has, differing at most in its fragment, is a fragment navigation per the HTML spec —
+    // nothing reloads. The e2e that found this lands on `/settings#data`: measured in Chromium,
+    // `assign('/settings#data')` = 1 document load (still blank), `reload()` = 2.
+    { storage: browserRecoveryStorage(), reload: () => window.location.reload() },
   );
   // Reloaded once already (or the mark cannot be stored, which would loop): say it in the DOM,
   // because there is no Vue, no Ionic and no toast to say it with.
