@@ -737,6 +737,9 @@ export default {
     declarationDesc:
       'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
     declarationRead: 'Read the signed declaration',
+    // WHICH signed text covers this release (`v1`, `v2`…), next to the link — hub#1510. Art. 13.3
+    // RRSIF lets several declarations coexist, so the link alone does not identify the text.
+    declarationTextVersion: 'Declaration version',
     declarationDataTitle: 'Identifying data of this system',
     declarationPending:
       'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',

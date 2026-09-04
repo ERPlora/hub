@@ -164,6 +164,49 @@ describe('Settings › Business · responsible declaration (hub#528)', () => {
     );
   });
 
+  // hub#1510 (item 4 of hub#1449's DoD). Art. 13.3 RRSIF lets several declarations coexist — one
+  // per range of versions — so the link on its own does not say WHICH text it points at. Naming it
+  // next to the link is what lets an inspector check that the text they are reading covers this
+  // release, without following the URL and comparing folder names.
+  it('names WHICH declaration text covers this release, next to the link (hub#1510)', async () => {
+    stubDeclarationFetch(
+      declarationPayload({
+        declarationUrl: 'https://erplora.com/legal/declaracion-responsable/v2/',
+        declarationVersion: 'v2',
+      }),
+    );
+    const wrapper = await mountTaxTab();
+
+    const card = wrapper.find('.responsible-declaration');
+    const version = card.find('.responsible-declaration-version');
+    expect(version.exists(), 'the declaration version is rendered').toBe(true);
+    expect(version.text()).toContain('v2');
+    // Next to the LINK, not buried among the nine elements of the record's block: they are the
+    // pair an inspector reads together.
+    const link = card.find('a.responsible-declaration-link');
+    expect(link.exists()).toBe(true);
+    expect(version.element.parentElement).toBe(link.element.parentElement);
+    // The label is translated, never hardcoded (ADR-0055/0199).
+    expect(version.text()).toContain(en.settings.declarationTextVersion);
+    // The BINARY's version keeps its own row: `v2` is the text, `2.4.1` is the release.
+    expect(card.text()).toContain('2.4.1');
+  });
+
+  it('without a named declaration nothing is painted next to the link (hub#1510)', async () => {
+    // No `declarationVersion`: an older control plane, or a hub that has never reached it. The
+    // link falls back to the archive root, which has no version to name.
+    stubDeclarationFetch(declarationPayload());
+    const wrapper = await mountTaxTab();
+
+    const card = wrapper.find('.responsible-declaration');
+    expect(card.find('a.responsible-declaration-link').exists()).toBe(true);
+    expect(
+      card.find('.responsible-declaration-version').exists(),
+      'an empty version label reads as «this declaration has no version», a different claim',
+    ).toBe(false);
+    expect(card.text()).not.toContain(en.settings.declarationTextVersion);
+  });
+
   it('does not invent the manufacturer identity while the hub has not received it (hub#528)', async () => {
     stubDeclarationFetch(declarationPayload({ sistemaInformatico: null }));
     const wrapper = await mountTaxTab();

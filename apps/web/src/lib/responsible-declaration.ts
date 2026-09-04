@@ -44,6 +44,17 @@ export interface SystemDeclaration {
   /** Where the SIGNED text lives, on the control plane this hub belongs to. */
   declarationUrl: string;
   /**
+   * WHICH declaration text that URL points at (`v1`, `v2`…), as the control plane named it
+   * (hub#1510). Art. 13.3 RRSIF lets several coexist — one per range of versions — so this is what
+   * lets an inspector check that the text they are reading covers this release without following
+   * the link and comparing folder names. Not the same fact as `version`, which is the binary.
+   *
+   * **Absent, never an empty string**: without a reference the link falls back to the archive
+   * root, which has no version to name, and a blank label next to the link would read as «this
+   * declaration has no version» — a different claim.
+   */
+  declarationVersion?: string;
+  /**
    * The block as it travels in every record, or `null` when the manufacturer's half has not
    * reached this hub yet. `null` is NOT «use defaults»: there are none for a legal declaration,
    * and in that state the fiscal engine refuses to build an envelope at all.
@@ -72,10 +83,14 @@ export async function fetchResponsibleDeclaration(): Promise<SystemDeclaration> 
     !!block &&
     typeof block === 'object' &&
     DECLARATION_FIELDS.every((field) => str((block as Record<string, unknown>)[field]).length > 0);
+  // Whitespace is not a version: a reference trimmed to nothing is one the control plane did not
+  // name, and the panel must stay silent about it rather than paint an empty label.
+  const declarationVersion = str(payload.declarationVersion).trim();
   return {
     version: str(payload.version),
     numeroInstalacion: str(payload.numeroInstalacion),
     declarationUrl: payload.declarationUrl,
+    ...(declarationVersion ? { declarationVersion } : {}),
     sistemaInformatico: complete
       ? (Object.fromEntries(
           DECLARATION_FIELDS.map((field) => [field, str((block as Record<string, unknown>)[field])]),

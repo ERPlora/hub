@@ -78,6 +78,42 @@ describe('reading the responsible declaration (hub#528)', () => {
     },
   );
 
+  it('carries the version of the declaration the control plane named (hub#1510)', async () => {
+    stubFetch({
+      version: '2.4.1',
+      numeroInstalacion: HUB_ID,
+      declarationUrl: 'https://erplora.com/legal/declaracion-responsable/v2/',
+      declarationVersion: 'v2',
+      sistemaInformatico: block(),
+    });
+
+    const declaration = await fetchResponsibleDeclaration();
+
+    expect(declaration.declarationVersion).toBe('v2');
+    // A different fact from the BINARY's version: the release this hub runs, not the text
+    // covering it. Conflating them is what hub#1510 exists to avoid.
+    expect(declaration.version).toBe('2.4.1');
+  });
+
+  it.each([undefined, null, '', '   '])(
+    'with %o as the declaration version there is NO version, not an empty label (hub#1510)',
+    async (served) => {
+      stubFetch({
+        version: '2.4.1',
+        numeroInstalacion: HUB_ID,
+        declarationUrl: 'https://erplora.com/legal/declaracion-responsable/',
+        declarationVersion: served,
+        sistemaInformatico: block(),
+      });
+
+      const declaration = await fetchResponsibleDeclaration();
+
+      expect(declaration.declarationVersion).toBeUndefined();
+      // The link keeps resolving: the archive-root fallback of hub#528 is untouched.
+      expect(declaration.declarationUrl).toBe('https://erplora.com/legal/declaracion-responsable/');
+    },
+  );
+
   it('a runtime refusal THROWS — it never resolves into an empty declaration (hub#528)', async () => {
     stubFetch({ ok: false }, 401);
 

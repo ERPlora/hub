@@ -312,3 +312,54 @@ async fn the_route_projects_the_process_wide_producer_facts_hub528() {
         "the route must serve the exact reference the cache holds, not a composed root: {served}"
     );
 }
+
+/// 🔴 hub#1510 (item 4 of hub#1449's DoD): the link alone does not say WHICH text it points at.
+/// Art. 13.3 RRSIF lets several declarations coexist — one per range of versions — so an inspector
+/// standing in front of the till has to be able to check that the text they are reading is the one
+/// that covers this release, without following the URL and comparing folder names. The reference
+/// the control plane names already carries that (`v1`, `v2`…); the panel serves it next to the
+/// link, at the TOP level: it is a property of the declaration, not one of the nine elements of
+/// `SistemaInformatico` that travel inside every record.
+#[test]
+fn the_panel_names_which_declaration_text_covers_this_release_hub1510() {
+    let declaration = DeclarationReference {
+        version: "v2".to_string(),
+        url: "https://erplora.com/legal/declaracion-responsable/v2/".to_string(),
+    };
+
+    let payload = declaration_payload(Some(&facts()), Some(&declaration), "1.0.0", HUB_ID, CLOUD);
+
+    assert_eq!(
+        payload["declarationVersion"],
+        json!("v2"),
+        "the panel must name the declaration the SaaS referenced: {payload}"
+    );
+    // The version of the BINARY is a different fact and keeps its own key: the release this hub
+    // runs, not the text that covers it. Conflating them is what this issue exists to avoid.
+    assert_eq!(payload["version"], json!("1.0.0"));
+    assert_eq!(
+        payload["sistemaInformatico"]["Version"],
+        json!("1.0.0"),
+        "the declaration version must not leak into the record's block: {payload}"
+    );
+}
+
+/// Without a reference (an older control plane, a hub that has never reached it) the link falls
+/// back to the archive ROOT, and the root has no version to name. The key is then **absent**, not
+/// `null` nor an empty string: the panel prints what it was told and stays silent about what it
+/// was not, exactly like `sistemaInformatico`. A `""` on the wire would paint an empty label next
+/// to the link and read as «this declaration has no version», which is a different claim.
+#[test]
+fn without_a_reference_the_declaration_version_is_absent_never_empty_hub1510() {
+    let payload = declaration_payload(Some(&facts()), None, "1.0.0", HUB_ID, CLOUD);
+
+    assert!(
+        payload.get("declarationVersion").is_none(),
+        "no reference means no version key at all, not an empty one: {payload}"
+    );
+    // The link still resolves — the fallback of hub#528 is untouched.
+    assert_eq!(
+        payload["declarationUrl"],
+        json!("https://erplora.com/legal/declaracion-responsable/")
+    );
+}

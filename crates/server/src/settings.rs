@@ -802,14 +802,33 @@ pub fn declaration_payload(
             cloud_base_url.trim_end_matches('/')
         ),
     };
-    json!({
+    let mut payload = json!({
         // The two facts this hub owns travel at the top level too: they are what the screen can
         // always show, including on a hub the control plane has never spoken to.
         "version": version,
         "numeroInstalacion": hub_id,
         "declarationUrl": declaration_url,
         "sistemaInformatico": sistema_informatico,
-    })
+    });
+    // hub#1510 / art. 13.3 RRSIF: the link alone does not say WHICH text it points at, and several
+    // declarations coexist — one per range of versions. Naming the reference (`v1`, `v2`…) next to
+    // it is what lets an inspector standing at the till check that the text they are reading is the
+    // one covering this release, without following the URL and comparing folder names.
+    //
+    // It rides at the TOP level, beside `declarationUrl`: it is a property of the declaration, not
+    // one of the nine elements of `SistemaInformatico` that travel inside every record — and it is
+    // NOT the binary's `version`, which is the release this hub runs, not the text that covers it.
+    //
+    // ABSENT, never an empty string: without a reference the link falls back to the archive root,
+    // and the root has no version to name. A `""` on the wire would paint an empty label next to
+    // the link and read as «this declaration has no version», which is a different claim.
+    if let (Some(declaration), Some(fields)) = (declaration, payload.as_object_mut()) {
+        fields.insert(
+            "declarationVersion".into(),
+            Value::String(declaration.version.clone()),
+        );
+    }
+    payload
 }
 
 #[cfg(test)]
