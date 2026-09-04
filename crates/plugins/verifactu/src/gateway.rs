@@ -40,6 +40,121 @@ pub(crate) fn transmissions_url(base: &str) -> String {
     format!("{}/v1/verifactu/transmissions", base.trim_end_matches('/'))
 }
 
+/// The cell's readiness path, appended HERE for the same reason as [`transmissions_url`]: which
+/// paths the cell publishes is this crate's knowledge, never the core's.
+pub(crate) fn readyz_url(base: &str) -> String {
+    format!("{}/readyz", base.trim_end_matches('/'))
+}
+
+/// The readiness probe's budget. Deliberately NOT [`GATEWAY_TIMEOUT`]: that one is sized for an
+/// AEAT round trip riding inside the cell's leg, while `/readyz` touches no AEAT — the cell answers
+/// it from the secret it has mounted. This one sits behind a button somebody is watching, so a
+/// silent cell has to come back as a failure in seconds, not after a minute and a quarter.
+const READYZ_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// What the cell answered about **its own** ability to file today (`docs/api.md`, «Endpoints
+/// operativos»). Only public material: the four Gate-1 states, the reason and who the mounted Seal
+/// belongs to. No fingerprints, no password, no certificate material — the cell does not publish
+/// them and this side does not ask.
+pub(crate) struct GatewayReadiness {
+    /// The cell answered 200. It is the whole verdict: `/readyz` is 503 for every reason that
+    /// stops a filing, including «switched off on purpose».
+    pub(crate) ready: bool,
+    /// `verified` | `expired` | `invalid` | `absent` — the Seal's state, empty if the cell did not
+    /// say (an older cell, or an intermediary's error page).
+    pub(crate) status: String,
+    pub(crate) reason: String,
+    /// The REAL switch behind the door, read from `conditions.transmission_enabled` (infra#142):
+    /// a cell can hold a perfectly `verified` Seal and still be closed. Without this, «switched
+    /// off» and «the Seal expired» are the same 503 — which is exactly the pair an operator needs
+    /// to tell apart.
+    ///
+    /// ⚠️ NOT the cell's top-level field of the same name: that one is the WHOLE gate (its
+    /// `readiness()` overwrites it with `ready` before answering, and `docs/api.md` pins the
+    /// meaning — «conserva su significado histórico, la puerta ENTERA»). Reading it would make
+    /// this a copy of [`GatewayReadiness::ready`] and lose the only pair it exists to separate.
+    pub(crate) transmission_enabled: bool,
+    /// Whose Seal the cell has mounted, from the subject. It is how somebody looking at the screen
+    /// sees WHICH entity would be filing on their behalf, before a single record travels.
+    pub(crate) holder_nif: String,
+}
+
+/// **Is the cell able to file right now?** — the check that replaces sending a sample invoice on
+/// the delegated road (hub#1485).
+///
+/// It proves the whole chain this side owns without handing anything to Hacienda: the machine
+/// identity opens the cell's mTLS ingress (a certificate that does not chain with the client CA
+/// dies in the handshake, so reaching the answer at all IS the enrolment working), the Bearer was
+/// already minted by the control plane to build the [`GatewayAccess`], and the body says whether
+/// the Seal on the other side can sign today.
+///
+/// A transport failure is an `Err`; a cell that answers «not ready» is an `Ok` with `ready: false`.
+/// The two are different facts on a diagnostic screen — «I could not reach the cell» sends somebody
+/// to the network, «the cell is not ready» sends them to us.
+pub(crate) async fn probe_readiness(
+    access: &GatewayAccess,
+) -> Result<GatewayReadiness, VerifactuError> {
+    let client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .identity(access.identity.clone())
+        .add_root_certificate(reqwest::Certificate::from_pem(&access.ca_pem).map_err(|e| {
+            VerifactuError::Transmission(format!("CA de la pasarela ilegible: {e}"))
+        })?)
+        .timeout(READYZ_TIMEOUT)
+        .build()
+        .map_err(|e| VerifactuError::Transmission(format!("cliente mTLS de la pasarela: {e}")))?;
+
+    let response = client
+        .get(readyz_url(&access.url))
+        .send()
+        .await
+        .map_err(|e| VerifactuError::Transmission(format!("conexión con la pasarela: {e}")))?;
+
+    let ready = response.status().as_u16() == 200;
+    let body = response
+        .text()
+        .await
+        .map_err(|e| VerifactuError::Transmission(format!("respuesta de la pasarela: {e}")))?;
+
+    Ok(read_readiness(ready, &body))
+}
+
+/// The body of `/readyz` turned into facts. Split from the transport so the mapping is guarded
+/// without a cell: a probe that reported `ready` on a 503 body, or that lost the reason of a
+/// refusal, would be a green light nobody could check.
+///
+/// A body that is not the contract loses no verdict — `ready` comes from the STATUS, which an
+/// intermediary's error page cannot fake into a 200 with our own CA in front of it.
+///
+/// The switch is taken from `conditions`, never from the top-level twin: see
+/// [`GatewayReadiness::transmission_enabled`].
+fn read_readiness(ready: bool, body: &str) -> GatewayReadiness {
+    let value: serde_json::Value = serde_json::from_str(body).unwrap_or(serde_json::Value::Null);
+    let text = |key: &str| {
+        value
+            .get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned()
+    };
+    GatewayReadiness {
+        ready,
+        status: text("status"),
+        reason: text("reason"),
+        // The switch, from `conditions` (infra#142). The top-level field of the same name is the
+        // whole gate, so it only serves as the fallback for a cell too old to publish
+        // `conditions` — there it is the best answer available, and it is never worse than the
+        // `false` a missing key would give.
+        transmission_enabled: value
+            .get("conditions")
+            .and_then(|c| c.get("transmission_enabled"))
+            .or_else(|| value.get("transmission_enabled"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        holder_nif: text("holder_nif"),
+    }
+}
+
 /// What travels: the exact XML bytes plus the identity/destination facts the cell cross-checks.
 pub(crate) struct GatewayEnvelope<'a> {
     pub hub_id: &'a str,
@@ -530,6 +645,105 @@ pub(crate) async fn resolve_access(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 🔒 The readiness path is appended HERE, and it tolerates the trailing slash exactly like
+    /// [`transmissions_url`] — a control plane that hands out `https://cell/` must not turn into a
+    /// probe of `https://cell//readyz`.
+    #[test]
+    fn the_readiness_path_tolerates_a_trailing_slash() {
+        assert_eq!(
+            readyz_url("https://cell.internal"),
+            "https://cell.internal/readyz"
+        );
+        assert_eq!(
+            readyz_url("https://cell.internal/"),
+            "https://cell.internal/readyz"
+        );
+    }
+
+    /// A cell that refuses keeps its REASON. On the diagnostic screen that sentence is the whole
+    /// difference between «renew the Seal» and «somebody switched transmission off»: infra#142
+    /// added `conditions` precisely because both used to arrive as the same mute 503.
+    #[test]
+    fn a_refusal_keeps_the_reason_and_the_real_switch() {
+        let readiness = read_readiness(
+            false,
+            r#"{"status":"expired","reason":"el sello terminó el 2026-08-31","transmission_enabled":false}"#,
+        );
+
+        assert!(!readiness.ready);
+        assert_eq!(readiness.status, "expired");
+        assert!(readiness.reason.contains("2026-08-31"));
+        assert!(!readiness.transmission_enabled);
+    }
+
+    /// 🔴 **The switch, read from where the cell actually publishes it.** The TOP-LEVEL
+    /// `transmission_enabled` is the WHOLE gate: `readiness()` overwrites it with `ready` before
+    /// serialising, and the cell's own `docs/api.md` pins that meaning — «conserva su significado
+    /// histórico (la puerta ENTERA, las cuatro a la vez)». The switch infra#142 added lives in
+    /// `conditions.transmission_enabled`.
+    ///
+    /// Reading the top-level one turns this field into a copy of `ready` and loses the ONE pair an
+    /// operator needs to tell apart, which is the pair infra#142 exists for: a Seal that expired
+    /// with transmission ON, and a perfectly verified Seal somebody switched OFF. Both arrive as
+    /// the same 503, and a diagnostic that cannot separate them sends the business to renew
+    /// something that is fine (hub#1485 again, one layer down).
+    #[test]
+    fn the_real_switch_is_read_from_the_conditions_not_from_the_whole_gate_hub1485() {
+        // Seal expired, switch still ON: the gate is shut BY the seal.
+        let broken_seal = read_readiness(
+            false,
+            r#"{"status":"expired","reason":"el sello terminó el 2026-08-31",
+                "transmission_enabled":false,"ingress":"mtls",
+                "conditions":{"transmission_enabled":true,"mtls_ingress":true,
+                              "token_public_key":true,"certificate_verified":false}}"#,
+        );
+        // Seal verified, switch OFF on purpose: the same 503, the opposite cause.
+        let switched_off = read_readiness(
+            false,
+            r#"{"status":"verified","reason":"",
+                "transmission_enabled":false,"ingress":"mtls",
+                "conditions":{"transmission_enabled":false,"mtls_ingress":true,
+                              "token_public_key":true,"certificate_verified":true}}"#,
+        );
+
+        assert!(!broken_seal.ready && !switched_off.ready, "both are a 503");
+        assert!(
+            broken_seal.transmission_enabled,
+            "transmission is ON here — what failed is the Seal, not the switch"
+        );
+        assert!(
+            !switched_off.transmission_enabled,
+            "and here the switch is exactly what is off, with the Seal fine"
+        );
+    }
+
+    /// The positive control: a healthy cell reports itself as such, holder included, so the screen
+    /// can name the entity that would be filing before a single record travels.
+    #[test]
+    fn a_ready_cell_reports_verified_and_who_holds_the_seal() {
+        let readiness = read_readiness(
+            true,
+            r#"{"status":"verified","reason":"","transmission_enabled":true,"holder_nif":"B27593136"}"#,
+        );
+
+        assert!(readiness.ready);
+        assert_eq!(readiness.status, "verified");
+        assert!(readiness.transmission_enabled);
+        assert_eq!(readiness.holder_nif, "B27593136");
+    }
+
+    /// An intermediary's error page is not the contract, and it must not become a green light.
+    /// `ready` rides the HTTP status, which is the one thing a captive portal cannot forge into a
+    /// 200 with our own CA pinned in front of the connection.
+    #[test]
+    fn a_body_that_is_not_the_contract_loses_no_verdict() {
+        let readiness = read_readiness(false, "<html><body>502 Bad Gateway</body></html>");
+
+        assert!(!readiness.ready);
+        assert!(readiness.status.is_empty());
+        assert!(!readiness.transmission_enabled);
+    }
 
     /// The envelope must speak the cell's contract to the byte: schema 1, STANDARD base64,
     /// lowercase-hex sha256 of the exact bytes, and the record id as transmission id.
