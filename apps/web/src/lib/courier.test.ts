@@ -38,6 +38,11 @@ describe('shell courier boot', () => {
       access: 'access-jwt',
       refresh: 'refresh-jwt',
       token: 'local-session',
+      // hub#1400 — the courier IS a cloud login: `auth_courier` shares `auth_cloud`'s handler
+      // (`Credential::cloud()`), so the door to erplora.com has to be offered after it just as it
+      // is after typing an email and a password. A fixture without this field hid the real
+      // contract of the endpoint it is meant to stand in for.
+      credential_kind: 'cloud',
       user: { id: 'local-1', name: 'Ana', role: 'employee' },
       permissions: ['sales.read'],
       cloud_user: { id: 'cloud-1', name: 'Ana', email: 'ana@example.com' },
@@ -47,7 +52,7 @@ describe('shell courier boot', () => {
     expect(window.location.hash).toBe('');
     expect(runtimeCourierSession).toHaveBeenCalledWith('opaque-code', 'device-1');
     expect(setTokens).toHaveBeenCalledWith('access-jwt', 'refresh-jwt');
-    expect(setHubSession).toHaveBeenCalledWith('local-session');
+    expect(setHubSession).toHaveBeenCalledWith('local-session', 'cloud');
     expect(setUser).toHaveBeenCalledWith(expect.objectContaining({
       id: 'local-1', cloudUserId: 'cloud-1', role: 'employee',
     }));

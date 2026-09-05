@@ -94,7 +94,7 @@ ok "build-hub.yml define el job \`publish-module-sdk\`"
 code=$(job_code)
 
 # ── 1. The permission hub#1308 blamed — present, and it must stay ────────────
-if printf '%s' "$code" | grep -qE '^\s+packages:\s*write'; then
+if grep -qE '^\s+packages:\s*write' <<<"$code"; then
     ok "el job declara \`permissions: packages: write\` (lo que hub#1308 creyó que faltaba)"
 else
     bad "el job declara \`permissions: packages: write\`" \
@@ -102,15 +102,15 @@ else
 fi
 
 # ── 2. The registry and the scope: what keeps the SDK OUT of public npmjs ────
-if printf '%s' "$code" | grep -qF "registry-url: '$REGISTRY'" ||
-    printf '%s' "$code" | grep -qF "registry-url: $REGISTRY"; then
+if grep -qF "registry-url: '$REGISTRY'" <<<"$code" ||
+    grep -qF "registry-url: $REGISTRY" <<<"$code"; then
     ok "\`setup-node\` fija registry-url = $REGISTRY"
 else
     bad "\`setup-node\` fija registry-url = $REGISTRY" \
         "sin registry-url, \`npm publish\` va al npmjs PÚBLICO: el SDK de un repo privado, en abierto y sin vuelta atrás"
 fi
 
-if printf '%s' "$code" | grep -qE "scope:\s*'?$SCOPE'?"; then
+if grep -qE "scope:\s*'?$SCOPE'?" <<<"$code"; then
     ok "\`setup-node\` fija scope = $SCOPE"
 else
     bad "\`setup-node\` fija scope = $SCOPE" \
@@ -118,7 +118,7 @@ else
 fi
 
 # ── 3. The token that authenticates the PUT ──────────────────────────────────
-if printf '%s' "$code" | grep -qE 'NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}'; then
+if grep -qE 'NODE_AUTH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}' <<<"$code"; then
     ok "el paso de publicación cablea NODE_AUTH_TOKEN = secrets.GITHUB_TOKEN"
 else
     bad "el paso de publicación cablea NODE_AUTH_TOKEN = secrets.GITHUB_TOKEN" \
@@ -132,7 +132,7 @@ fi
 publish_lines=$(printf '%s' "$code" | grep -E '^[[:space:]]*(if[[:space:]]+!?[[:space:]]*)?npm publish' || true)
 if [ -z "$publish_lines" ]; then
     bad "el job ejecuta \`npm publish\`" "no hay ninguna línea \`npm publish\` en el job"
-elif printf '%s' "$publish_lines" | grep -qvE '\-\-tag'; then
+elif grep -qvE '\-\-tag' <<<"$publish_lines"; then
     bad "todo \`npm publish\` lleva \`--tag\` explícito" \
         "sin --tag, una candidata vX.Y.Z-rc.N movería el dist-tag \`latest\` y un \`npm install\` a secas se la llevaría"
 else
@@ -140,7 +140,7 @@ else
 fi
 
 # ── 5. The silencing that must never be the fix ──────────────────────────────
-if printf '%s' "$code" | grep -q 'continue-on-error'; then
+if grep -q 'continue-on-error' <<<"$code"; then
     bad "el job NO lleva \`continue-on-error\`" \
         "silenciarlo deja la release en verde sin publicar nada: el fallo mudo que la regla de entrega prohíbe (hub#1308)"
 else
@@ -160,21 +160,21 @@ else
         "es la razón REAL del 403 y la UI la trunca a 'Permission permission_…': sin clasificarla, el siguiente lector vuelve a diagnosticar mal, como hizo hub#1308 (nombrar el marcador en un mensaje NO es clasificarlo)"
 fi
 
-if printf '%s' "$code" | grep -qF './scripts/ci/alert-issue.sh'; then
+if grep -qF './scripts/ci/alert-issue.sh' <<<"$code"; then
     ok "el fallo de publicación abre/refresca la incidencia por scripts/ci/alert-issue.sh"
 else
     bad "el fallo de publicación abre/refresca la incidencia por scripts/ci/alert-issue.sh" \
         "un run de tag en rojo no avisa a nadie por sí solo (hub#652); y el lookup compartido es lo único idempotente (hub#1246)"
 fi
 
-if printf '%s' "$code" | grep -q -- '--search'; then
+if grep -q -- '--search' <<<"$code"; then
     bad "la alerta no usa \`gh issue list --search\`" \
         "lee el índice de búsqueda de GitHub, que va por detrás de la realidad (hub#1246)"
 else
     ok "la alerta no inlinea \`--search\`"
 fi
 
-if printf '%s' "$code" | grep -qF "$ALERT_TITLE"; then
+if grep -qF "$ALERT_TITLE" <<<"$code"; then
     ok "la alerta usa el título estable «${ALERT_TITLE}»"
 else
     bad "la alerta usa el título estable «${ALERT_TITLE}»" \

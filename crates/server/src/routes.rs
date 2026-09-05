@@ -147,6 +147,14 @@ pub fn app(state: AppState) -> Router {
             "/api/business/gateway-identity/certificate",
             axum::routing::put(settings::put_gateway_identity_certificate),
         )
+        // hub#1457: el alta ENTERA sin operador delante — el runtime presenta el CSR en el
+        // expediente legal del hub (saas#1833) con su credencial de máquina y recoge el
+        // certificado cuando una persona lo firma. La PANTALLA es del módulo `verifactu`; el
+        // módulo no puede hacer esta llamada, que es justo por lo que la puerta vive aquí.
+        .route(
+            "/api/business/gateway-identity/enrol",
+            post(settings::post_gateway_identity_enrol),
+        )
         // Export/import del hub a blueprint (ADR-0113): capa server sobre el motor del runtime
         // (`export_hub`/`import_sections`). Auth = sesión admin (owner/admin), como /api/settings.
         // El inspect recibe el zip crudo → body limit propio (el default de axum son 2 MiB).
@@ -416,6 +424,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/courier", post(auth_courier))
         .route("/api/auth/logout", post(auth_logout))
+        // The door to erplora.com from the till (pm#196, hub#1400): trades the hub session for a
+        // one-time address that opens the SaaS session in the system browser. Only for whoever
+        // typed their password, not for a shift PIN — see `auth_handoff`.
+        .route("/api/auth/handoff", post(auth_handoff))
         // ── Gestión de usuarios-login del Hub (identidad, ADR-0157 §7 / checklist core #2) ──────
         // Alta/baja/listado de quién puede ENTRAR en el hub. Gate owner/admin (sesión, NO api key).
         // Cada alta/baja crea/desactiva el `hub_user` local Y notifica al SaaS (`members`). NO es

@@ -554,11 +554,18 @@ pub(crate) async fn auth_courier(
 #[derive(serde::Deserialize)]
 pub(crate) struct SetPinReq {
     pin: String,
+    /// Requerido si el usuario YA tiene un PIN (hub#1430, «Mi perfil» → cambiar mi PIN); ausente u
+    /// omitido en la alta de PIN tras el primer login cloud, donde no hay nada que confirmar.
+    #[serde(default)]
+    current_pin: Option<String>,
 }
 
-/// Fija el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Lo usa el alta de PIN tras el
-/// primer login cloud (§2.9): el usuario ya está autenticado por su JWT→sesión y elige su PIN en
-/// este dispositivo de confianza. Body `{pin}` (4 dígitos; vacío lo borra). → `{ok}` (401 sin sesión).
+/// Fija (o cambia) el PIN del **usuario de la sesión actual** (`X-Hub-Session`). Dos llamadores:
+/// la alta de PIN tras el primer login cloud (§2.9, sin `current_pin`) y «Mi perfil» → cambiar mi
+/// PIN (hub#1430) — el usuario ya está autenticado por su sesión y elige su PIN en este
+/// dispositivo. Body `{pin, current_pin?}` (`pin`: 4/6 dígitos, vacío lo borra; `current_pin`
+/// obligatorio si ya hay un PIN, y tiene que coincidir con el de hoy). → `{ok}` (401 sin sesión,
+/// 409 si el PIN actual no coincide o el nuevo ya lo tiene otro).
 pub(crate) async fn auth_set_pin(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -577,7 +584,10 @@ pub(crate) async fn auth_set_pin(
         }
         Err(e) => return err_response(e),
     };
-    match rt.set_pin(&user.id, &req.pin).await {
+    match rt
+        .set_pin(&user.id, req.current_pin.as_deref(), &req.pin)
+        .await
+    {
         Ok(()) => Json(json!({ "ok": true })).into_response(),
         Err(e) => err_response(e),
     }
@@ -590,6 +600,189 @@ pub(crate) async fn auth_logout(State(st): State<AppState>, headers: HeaderMap) 
         let _ = rt.delete_session(&token).await;
     }
     Json(json!({ "ok": true })).into_response()
+}
+
+#[derive(serde::Deserialize, Default)]
+pub(crate) struct HandoffReq {
+    /// Where to land inside the SaaS. Always an **own route**; see [`handoff_destination`].
+    #[serde(default)]
+    next: Option<String>,
+}
+
+/// Where whoever asks for nothing goes: the panel. It is the door the "manage your business" link opens.
+const HANDOFF_DEFAULT_NEXT: &str = "/dashboard/";
+
+/// Percent-encoding of a **whole** query value: only RFC 3986 unreserved characters survive.
+/// Unlike the one in `media`, here `/` is escaped too — the destination travels INSIDE a parameter,
+/// and leaving it raw slashes is letting it rewrite the route that carries it.
+fn pct_encode_strict(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+/// The requested destination, if it is a route **of the SaaS itself**; `None` if it leaves it.
+///
+/// The SaaS has its own allow-list when redeeming the code, and this is still checked **here**: a
+/// hub that forwards absolute addresses is a hub that would point a freshly opened session at
+/// somebody else's site, and refusing early also avoids spending the one-time code on the attempt.
+///
+/// It must start with `/` and the next character must be neither `/` nor `\`: `//host` is a
+/// protocol-relative URL, and so is `/\host` for browsers, which normalise the backslash. That is
+/// why `\` is rejected in any position, not only in the second one.
+fn handoff_destination(next: Option<&str>) -> Option<String> {
+    let next = next.map(str::trim).filter(|n| !n.is_empty());
+    let Some(next) = next else {
+        return Some(HANDOFF_DEFAULT_NEXT.to_string());
+    };
+    let mut chars = next.chars();
+    if chars.next() != Some('/') {
+        return None;
+    }
+    if matches!(chars.next(), Some('/') | Some('\\')) {
+        return None;
+    }
+    if next.contains('\\') || next.chars().any(|c| c.is_control()) {
+        return None;
+    }
+    Some(next.to_string())
+}
+
+/// **`POST /api/auth/handoff`** — hands the browser the SaaS session of whoever is at the till
+/// (pm#196, hub#1400). Body `{next?}` → `200 {url}` with a one-time address.
+///
+/// The till links to erplora.com for what it does not sell (plan, invoices, module checkout).
+/// Inside the installed app that link opens in the system browser, which is a **different cookie
+/// jar** from the webview: the owner typed her password and second factor again right before
+/// paying. This route is the Hub→SaaS half of the one-time email ADR-0157 §8 already has in the
+/// opposite direction.
+///
+/// **Why it goes through the runtime** when the browser already holds the JWT and could ask for it
+/// itself: because the SaaS cannot see what is checked here. Whether the person standing there
+/// proved who they are with **their password** or with a **shift PIN** is something only
+/// `hub_session.credential_kind` says (hub#658). The lock (hub#1400) is that only the first one
+/// carries off a browser session: a PIN is short, memorable and typed in front of people (ADR-0226
+/// — the local user's credential is never administrative), and turning it into the key to the
+/// billing panel would hand the business's money to whoever opens the till.
+///
+/// That is why `hub.administer` (ADR-0248) is necessary and **not sufficient**: it is a permission
+/// of the ROLE and the question is about the METHOD. The third check closes the gap the other two
+/// leave — the presented JWT has to name the same person as the session, because a till nobody has
+/// signed out of keeps the previous person's tokens in `localStorage`.
+///
+/// Every refusal travels as its CODE, never as its prose (ADR-0055).
+pub(crate) async fn auth_handoff(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    body: Option<Json<HandoffReq>>,
+) -> Response {
+    fn refuse(status: StatusCode, code: &str) -> Response {
+        (status, Json(json!({ "ok": false, "code": code }))).into_response()
+    }
+
+    let Some(session) = auth::session_token(&headers) else {
+        return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required");
+    };
+    let (user, credential, administers) = {
+        let rt = st.runtime.read().await;
+        match rt.resolve_session_with_credential(&session).await {
+            Ok(Some((user, credential))) => {
+                let administers = rt
+                    .session_permissions(&user.role)
+                    .contains(erplora_runtime::hub_users::ADMINISTER_PERMISSION);
+                (user, credential, administers)
+            }
+            Ok(None) => return refuse(StatusCode::UNAUTHORIZED, "handoff_session_required"),
+            Err(e) => {
+                eprintln!("[handoff] could not resolve the session: {e}");
+                return refuse(StatusCode::INTERNAL_SERVER_ERROR, "handoff_session_unreadable");
+            }
+        }
+    };
+
+    if credential.kind != erplora_runtime::identity::CREDENTIAL_CLOUD {
+        return refuse(StatusCode::FORBIDDEN, "handoff_requires_cloud_login");
+    }
+    if !administers {
+        return refuse(StatusCode::FORBIDDEN, "handoff_requires_administer");
+    }
+
+    let Some(access) = auth::bearer(&headers) else {
+        return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_required");
+    };
+    let Some(pem) = st.config.jwt_public_key.as_deref() else {
+        // Without the public key the hub cannot check who the token names, and this door exists
+        // precisely to check it. It says so; it does not open halfway.
+        eprintln!("[handoff] the hub has no SaaS public key: the door stays shut");
+        return refuse(StatusCode::SERVICE_UNAVAILABLE, "handoff_not_configured");
+    };
+    let claims = match cloud_client::verify_user_jwt(&access, pem) {
+        Ok(claims) => claims,
+        Err(e) => {
+            eprintln!("[handoff] invalid user JWT: {e}");
+            return refuse(StatusCode::UNAUTHORIZED, "handoff_user_token_invalid");
+        }
+    };
+    if user.cloud_user_id.as_deref() != Some(claims.user_id_str().as_str()) {
+        return refuse(StatusCode::FORBIDDEN, "handoff_identity_mismatch");
+    }
+
+    let Some(next) = handoff_destination(body.and_then(|b| b.0.next).as_deref()) else {
+        return refuse(StatusCode::BAD_REQUEST, "handoff_destination_not_allowed");
+    };
+
+    let auth = cloud_client::Auth::UserJwt {
+        hub_id: auth::hub_id(&headers, &st.hub_id()),
+        access,
+    };
+    let prepared = cloud_client::CloudClient::new(&st.config.cloud_base_url).browser_handoff_issue(&auth);
+    let mut request = st.http.post(&prepared.url).json(&json!({}));
+    for (name, value) in prepared.headers {
+        request = request.header(name, value);
+    }
+    let code = match request.send().await {
+        Ok(response) if response.status().is_success() => {
+            match response.json::<Value>().await {
+                Ok(body) => match body.get("code").and_then(Value::as_str) {
+                    Some(code) if !code.is_empty() => code.to_string(),
+                    _ => {
+                        eprintln!("[handoff] the SaaS answered without a one-time code");
+                        return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+                    }
+                },
+                Err(e) => {
+                    eprintln!("[handoff] unreadable answer from the SaaS: {e}");
+                    return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+                }
+            }
+        }
+        Ok(response) => {
+            eprintln!("[handoff] the SaaS refused the pass: {}", response.status());
+            return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+        }
+        Err(e) => {
+            eprintln!("[handoff] could not ask the SaaS for the pass: {e}");
+            return refuse(StatusCode::BAD_GATEWAY, "handoff_unavailable");
+        }
+    };
+
+    // The runtime builds the address with ITS idea of where the SaaS is: a page that could pick
+    // the host would be picking where the code gets spent. And the one-time code is the whole
+    // credential that travels — neither the Bearer nor the machine token goes with it.
+    let url = format!(
+        "{}/auth/handoff/{}/?next={}",
+        st.config.cloud_base_url.trim_end_matches('/'),
+        pct_encode_strict(&code),
+        pct_encode_strict(&next),
+    );
+    Json(json!({ "ok": true, "url": url })).into_response()
 }
 
 /// Abre una sesión para `user` y devuelve `{ok, token, user}`.
@@ -645,6 +838,13 @@ pub(crate) async fn mint_session_with_extra(
                 "token": token,
                 "user": user,
                 "permissions": permissions,
+                // **What whoever signs in just proved their identity with** (hub#1400). The shell
+                // cannot ask for it afterwards —no route tells it— and needs it before painting:
+                // the door to erplora.com is offered only to a password login, and an entry that is
+                // shown and then refused is worse than one never shown. It travels from here
+                // because the five paths that open a session go through this function; the sixth
+                // inherits it.
+                "credential_kind": credential.kind,
             });
             if let (Some(target), Some(source)) = (
                 payload.as_object_mut(),

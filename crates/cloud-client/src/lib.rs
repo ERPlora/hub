@@ -40,7 +40,12 @@ pub enum Auth {
 
 impl Auth {
     /// Cabeceras `(nombre, valor)` para esta credencial. Siempre incluye `X-Hub-Id`.
-    pub fn headers(&self) -> Vec<(&'static str, String)> {
+    ///
+    /// 🔒 `pub(crate)` desde hub#1464: materializa una credencial de ERPlora y **no sabe adónde
+    /// va**, así que no puede negarse. La única forma de obtener una petición firmada es
+    /// [`CloudClient::signed`], que sí toma el destino. Antes era `pub`, y cualquier crate podía
+    /// saltarse esa comprobación sin escribir nada que pareciera raro.
+    pub(crate) fn headers(&self) -> Vec<(&'static str, String)> {
         match self {
             Auth::HubToken { hub_id, token } => {
                 vec![("X-Hub-Id", hub_id.clone()), ("X-Hub-Token", token.clone())]
@@ -208,6 +213,25 @@ fn encode_path_segment(s: &str) -> String {
     out
 }
 
+/// `host/ruta` de una URL para un mensaje de log: **sin query** (puede llevar secretos) y sin
+/// fragmento. `"<sin host>"` cuando no hay host legible — el aviso sigue siendo útil.
+fn host_and_path(url: &str) -> String {
+    let Some(host) = trusted::host_of(url) else {
+        return "<sin host>".to_string();
+    };
+    let path = url
+        .split_once("://")
+        .map_or(url, |(_, rest)| rest)
+        .split(['?', '#'])
+        .next()
+        .unwrap_or("")
+        .split_once('/')
+        .map_or("", |(_, p)| p);
+    format!("{host}/{path}")
+}
+
+pub mod trusted;
+
 /// Construye peticiones contra un Cloud Portal concreto.
 #[derive(Debug, Clone)]
 pub struct CloudClient {
@@ -224,12 +248,46 @@ impl CloudClient {
         Self { base_url: b }
     }
 
-    fn get(&self, path: &str, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "GET",
-            url: format!("{}{}", self.base_url, path),
-            headers: auth.headers(),
+    /// **LA PUERTA** — el ÚNICO sitio que pone credenciales de ERPlora en una petición saliente
+    /// (hub#1464, ADR-0431 §2).
+    ///
+    /// Toma el destino **a propósito**: una firma que no sabe adónde va no puede negarse, y
+    /// `Auth::headers` no lo sabía — por eso deja de ser API pública. Aquí no se bloquea ningún
+    /// destino (ADR-0431 §1: la URL es asunto de quien llama); lo que no viaja fuera de casa es
+    /// lo NUESTRO: `X-Hub-Token`, `X-Hub-Id`, el Bearer del usuario y `X-Webhook-Secret`.
+    fn signed(&self, method: &'static str, url: String, auth: &Auth) -> PreparedRequest {
+        if !trusted::is_ours(&url, &self.base_url, trusted::trusted_from_env()) {
+            // Un fallo mudo aquí reaparece como un 401 inexplicable muy lejos del motivo. Host y
+            // ruta, nunca la query: puede llevar secretos.
+            eprintln!(
+                "[hub#1464] credenciales retenidas: `{}` no es un host de ERPlora \
+                 (HUB_CLOUD_API_URL + HUB_TRUSTED_HOSTS)",
+                host_and_path(&url)
+            );
+            return PreparedRequest {
+                method,
+                url,
+                headers: Vec::new(),
+            };
         }
+        PreparedRequest {
+            method,
+            url,
+            headers: auth.headers(), // LA PUERTA
+        }
+    }
+
+    /// Las cabeceras de credencial para **esta URL**, ya filtradas por destino (hub#1464).
+    ///
+    /// Para quien no construye la petición con un builder de este cliente —proxies que reenvían
+    /// un multipart, descargas que van por `reqwest` a pelo— y aun así necesita firmar. Delega en
+    /// [`signed`](Self::signed): la comprobación vive en un sitio, no en dos.
+    pub fn headers_for(&self, url: &str, auth: &Auth) -> Vec<(&'static str, String)> {
+        self.signed("GET", url.to_string(), auth).headers
+    }
+
+    fn get(&self, path: &str, auth: &Auth) -> PreparedRequest {
+        self.signed("GET", format!("{}{}", self.base_url, path), auth)
     }
 
     fn public_get(&self, path: &str) -> PreparedRequest {
@@ -293,42 +351,33 @@ impl CloudClient {
     /// (`orders_today`, `last_sale_at`, `terminals`) lo construye el server desde
     /// la base de datos local. Se ejecuta en el mismo tick que el entitlement.
     pub fn heartbeat(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/heartbeat/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/heartbeat/", self.base_url),
+            auth,
+        )
     }
 
-    /// **ERPlora's DELEGATED fiscal certificate for this hub** (ADR-0202 §2, saas#1125 — hub#317).
-    /// `GET /api/v1/hub/device/fiscal/certificate/` → [`DelegatedCertificate`].
+    /// **One call an engine asked the runtime to make on its behalf** (hub#1459).
     ///
-    /// **Machine credential, and only that.** The SaaS pins `IsHubMachine` here on purpose — unlike
-    /// its neighbours it does NOT accept a member's JWT, because that JWT lives in a browser and
-    /// this response carries a private key. So the call is made BY the runtime, with the
-    /// `cloud_api_token`, and its body must never be proxied to the web app.
+    /// The generic shape of every machine call: the CALLER chooses the method, the path and the
+    /// body; this builder puts the destination (this hub's own cloud) and the machine credential.
+    /// It replaced `fiscal_gateway_token`, which named ONE caller's use case and so taught the
+    /// core what a fiscal gateway is — the path is now the engine's, and stays in the engine.
     ///
-    /// **404 is a normal answer**, not a failure: `no_delegated_certificate` means the control plane
-    /// has never uploaded one (`version == 0`). The hub keeps whatever it has and carries on.
-    pub fn fiscal_certificate(&self, auth: &Auth) -> PreparedRequest {
-        self.get("/api/v1/hub/device/fiscal/certificate/", auth)
-    }
-
-    /// **The short-lived authorisation for the fiscal gateway** (hub#1432, hub#985 §1).
-    /// `POST /api/v1/hub/device/fiscal/gateway-token/` → a 5-minute Bearer the cell verifies
-    /// offline, plus `gateway_url` (the ONE cell URL, behind the private LB — the hub reads no
-    /// `VERIFACTU_GATEWAY_URL` env, saas#1794) and `mtls_common_name`.
+    /// **Machine credential, and only that**, like its fiscal neighbours: the answers travelling
+    /// this way carry bearers, so the call is made BY the runtime with the `cloud_api_token` and
+    /// its body must never be proxied to the web app.
     ///
-    /// **Machine credential, and only that**, like its fiscal neighbours: the answer is a bearer
-    /// token, so the call is made BY the runtime with the `cloud_api_token` and its body must
-    /// never be proxied to the web app. A 409 (`own_certificate_direct`) is an ANSWER — that hub
-    /// transmits direct with its own certificate and no token exists for it.
-    pub fn fiscal_gateway_token(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/fiscal/gateway-token/", self.base_url),
-            headers: auth.headers(),
-        }
+    /// The path is validated by the runtime BEFORE it gets here (`cloud_call::check_path`): a
+    /// credential handed to a destination the caller chooses is a credential leaked.
+    pub fn machine_request(
+        &self,
+        method: &'static str,
+        path: &str,
+        auth: &Auth,
+    ) -> PreparedRequest {
+        self.signed(method, format!("{}{}", self.base_url, path), auth)
     }
 
     /// **El otorgamiento de representación firmado** (hub#817 / saas#1438, hub#1293).
@@ -343,14 +392,14 @@ impl CloudClient {
     /// un JWT del SaaS vivo (ADR-0003), y el `cloud_api_token` no cruza al navegador — la pantalla
     /// llama al runtime y es el runtime quien pone la cabecera.
     pub fn representation_grant(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!(
+        self.signed(
+            "POST",
+            format!(
                 "{}/api/v1/hub/device/fiscal/representation-grant/",
                 self.base_url
             ),
-            headers: auth.headers(),
-        }
+            auth,
+        )
     }
 
     /// **El modelo oficial del otorgamiento, pre-relleno** (hub#1293).
@@ -360,14 +409,14 @@ impl CloudClient {
     /// modificado», así que vive en UN sitio, el SaaS, y el Hub solo trae los bytes: dos copias del
     /// mismo documento legal son dos documentos que acaban diciendo cosas distintas.
     pub fn representation_grant_model(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!(
+        self.signed(
+            "POST",
+            format!(
                 "{}/api/v1/hub/device/fiscal/representation-grant/model/",
                 self.base_url
             ),
-            headers: auth.headers(),
-        }
+            auth,
+        )
     }
 
     /// **Identidad fiscal del negocio hacia el SaaS** (ADR-0201 decisión 5, 7/11 — hub#333).
@@ -379,22 +428,22 @@ impl CloudClient {
     /// y nunca cruza al webview. Y sube una COPIA — el NIF del negocio se queda en `hub_settings`;
     /// el del `BillingProfile` es a quién factura ERPlora. Dos NIF distintos que no se leen.
     pub fn fiscal_identity(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/fiscal-identity/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/fiscal-identity/", self.base_url),
+            auth,
+        )
     }
 
     /// Redeems the native-shell one-time courier code.  This request is made by the Hub runtime
     /// with its machine credential, never by browser JavaScript, so the SaaS can bind redemption
     /// to the exact destination Hub.  The body (`{"code":"…"}`) is supplied by the caller.
     pub fn session_courier(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/session-courier/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/session-courier/", self.base_url),
+            auth,
+        )
     }
 
     /// **Catálogo de blueprints** — plantillas de hub publicadas en el vendor portal del SaaS
@@ -446,11 +495,11 @@ impl CloudClient {
     /// devuelve como [`EnrollGrant`]; el runtime lo re-persiste. Usar deliberadamente (compromiso de
     /// credencial / rotación periódica): un hub en ECS necesita redeploy para tomar el nuevo env. §2.3.
     pub fn enroll_rotate(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            auth,
+        )
     }
 
     /// **Revocación** (kill-switch) de la credencial de máquina — `DELETE /api/v1/hub/device/enroll/`
@@ -458,11 +507,11 @@ impl CloudClient {
     /// perdido/robado); se re-habilita re-enrolando (`enroll_rotate`). Normalmente lo invoca el
     /// dashboard/admin del owner (revoca un dispositivo que NO tiene a mano), no el propio hub. §2.3.
     pub fn enroll_revoke(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "DELETE",
-            url: format!("{}/api/v1/hub/device/enroll/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "DELETE",
+            format!("{}/api/v1/hub/device/enroll/", self.base_url),
+            auth,
+        )
     }
 
     /// **Alta de un miembro del hub** (ADR-0157 §7) — `POST /api/v1/hub/device/members/` con la
@@ -473,11 +522,11 @@ impl CloudClient {
     /// el día a día del POS es sesión local/PIN: casi nunca hay un JWT del SaaS fresco. El body
     /// `{email, role}` lo construye el llamador (server). Ver `members_remove` para la baja.
     pub fn members_add(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/members/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/members/", self.base_url),
+            auth,
+        )
     }
 
     /// **Baja de un miembro del hub** (ADR-0157 §7, *simetría obligatoria* del deprovisioning) —
@@ -488,15 +537,35 @@ impl CloudClient {
     /// son seguros en un segmento crudo). El deprovisioning es el fallo típico del invitation flow:
     /// esta baja es su contrapartida obligatoria del alta.
     pub fn members_remove(&self, auth: &Auth, email: &str) -> PreparedRequest {
-        PreparedRequest {
-            method: "DELETE",
-            url: format!(
+        self.signed(
+            "DELETE",
+            format!(
                 "{}/api/v1/hub/device/members/{}/",
                 self.base_url,
                 encode_path_segment(email)
             ),
-            headers: auth.headers(),
-        }
+            auth,
+        )
+    }
+
+    /// **A one-time pass to open this person's session in the browser** (pm#196) —
+    /// `POST /api/v1/auth/handoff/issue/` with the **user's JWT**.
+    ///
+    /// It is the Hub→SaaS half of the e-mail ADR-0157 §8 already has in the opposite direction: the
+    /// till links to erplora.com for everything it deliberately does not sell (the plan, the
+    /// invoices, the module checkout), and inside the installed app the system browser is a
+    /// different cookie jar, so until now that link landed **signed out**.
+    ///
+    /// 🔒 It is signed with [`Auth::UserJwt`] **on purpose, never with the machine token**: what is
+    /// being asked for is a browser session *for one specific person*, and the machine token names
+    /// nobody. Signing it with that one would turn a leaked deployment secret into the key to the
+    /// billing of any member of the hub.
+    pub fn browser_handoff_issue(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/auth/handoff/issue/", self.base_url),
+            auth,
+        )
     }
 
     /// **Refresh del JWT de usuario** contra el Cloud (hub#15, §2.3) — `POST /api/v1/auth/refresh/`
@@ -575,11 +644,11 @@ impl CloudClient {
         installed: &[String],
     ) -> PreparedInstallPlan {
         PreparedInstallPlan {
-            request: PreparedRequest {
-                method: "POST",
-                url: format!("{}/api/v1/marketplace/install-plan/", self.base_url),
-                headers: auth.headers(),
-            },
+            request: self.signed(
+                "POST",
+                format!("{}/api/v1/marketplace/install-plan/", self.base_url),
+                auth,
+            ),
             body: InstallPlanRequest {
                 module_id: module_id.to_string(),
                 version: Some(version)
@@ -594,25 +663,25 @@ impl CloudClient {
     /// `POST /api/v1/marketplace/modules/{module_id}/mark_installed/` con body
     /// `{"version":"…"}` (verificado en `api_views.py::mark_installed`). §2.2.
     pub fn mark_installed(&self, auth: &Auth, module_id: &str) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!(
+        self.signed(
+            "POST",
+            format!(
                 "{}/api/v1/marketplace/modules/{module_id}/mark_installed/",
                 self.base_url
             ),
-            headers: auth.headers(),
-        }
+            auth,
+        )
     }
 
     /// Stream SSE del asistente vía el proxy del Cloud (§9.3 — el Hub nunca habla con el LLM
     /// directamente). `POST /api/v1/hub/device/assistant/chat/stream/` con el JWT del usuario
     /// + `X-Hub-Id`. El body lo construye el llamador (server) a partir del payload del frontend.
     pub fn assistant_chat_stream(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/assistant/chat/stream/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/assistant/chat/stream/", self.base_url),
+            auth,
+        )
     }
 
     /// **El plan del asistente de ESTE hub** (saas#1540): tier, uso del mes y planes de pago
@@ -622,11 +691,11 @@ impl CloudClient {
     /// endpoint, así que no conocía ni su tier, ni su consumo, ni qué se podía contratar. Con eso,
     /// quedarse sin mensajes solo podía presentarse como una avería.
     pub fn assistant_config(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "GET",
-            url: format!("{}/api/v1/hub/device/assistant/config/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "GET",
+            format!("{}/api/v1/hub/device/assistant/config/", self.base_url),
+            auth,
+        )
     }
 
     /// **Abrir el checkout del plan del asistente** (saas#1540, ADR-0033).
@@ -635,14 +704,14 @@ impl CloudClient {
     /// Sin este camino, un «ver planes» no lleva a ninguna parte y el único momento de conversión
     /// del tier gratuito muere en una frase.
     pub fn assistant_checkout(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!(
+        self.signed(
+            "POST",
+            format!(
                 "{}/api/v1/hub/device/assistant/subscription/checkout/",
                 self.base_url
             ),
-            headers: auth.headers(),
-        }
+            auth,
+        )
     }
 
     /// **Embeddings vía el proxy del Cloud** (§9.3/§9.4/§9.6 — el Hub nunca llama a un proveedor
@@ -658,11 +727,11 @@ impl CloudClient {
     /// con el JWT de usuario para la embebida de la petición en query-time del router. El I/O de
     /// red lo hace el cliente HTTP del llamador (espejo de [`assistant_chat_stream`]).
     pub fn embeddings(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/assistant/embeddings/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/assistant/embeddings/", self.base_url),
+            auth,
+        )
     }
 
     /// **Notificación WhatsApp PREMIUM de ERPlora vía el proxy del Cloud** (ADR-0012 + ADR-0006).
@@ -682,11 +751,11 @@ impl CloudClient {
     ///
     /// El resto de canales (email) tiene su propio proxy — ver [`CloudClient::notify_email`].
     pub fn notify_whatsapp(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/notify/whatsapp/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/notify/whatsapp/", self.base_url),
+            auth,
+        )
     }
 
     /// **Email del negocio del hub vía el proxy del Cloud** (ADR-0283 §5 K4, saas#1347).
@@ -701,11 +770,11 @@ impl CloudClient {
     /// `X-Hub-Id`, `IsHubMachine`). **Body**: `{"to": "a@b.c" | ["a@b.c", …], "subject": "…",
     /// "text": "…", "html": "…"?}`; respuesta `{"message_id": "<…>"}`.
     pub fn notify_email(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/notify/email/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/notify/email/", self.base_url),
+            auth,
+        )
     }
 
     /// **Inbound WhatsApp: the hub's own inbox** (ADR-0283 K1c, saas#1353).
@@ -739,11 +808,11 @@ impl CloudClient {
     /// the number of rows this call actually changed, so a repeated ack answers `0` rather than
     /// failing. That is what makes the ack safe to retry after a crash.
     pub fn whatsapp_inbox_ack(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/whatsapp/inbox/ack/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/whatsapp/inbox/ack/", self.base_url),
+            auth,
+        )
     }
 
     /// **El plan del canal de WhatsApp y su consumo del mes** (hub#1089).
@@ -775,11 +844,11 @@ impl CloudClient {
     /// es éxito. Espejo del estilo de [`notify_whatsapp`]: aquí solo se construye la petición
     /// (método/URL/cabeceras); el I/O del POST lo hace el cliente HTTP del llamador.
     pub fn report_error(&self, auth: &Auth) -> PreparedRequest {
-        PreparedRequest {
-            method: "POST",
-            url: format!("{}/api/v1/hub/device/error-report/", self.base_url),
-            headers: auth.headers(),
-        }
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/error-report/", self.base_url),
+            auth,
+        )
     }
 
     /// **DEPRECADO** — apuntaba a un endpoint ficticio `…/versions/{version}/install/` que
@@ -1018,80 +1087,6 @@ impl EmbeddingsResponse {
     }
 }
 
-/// Response of [`CloudClient::fiscal_certificate`]: ERPlora's DELEGATED fiscal certificate for this
-/// hub (ADR-0202 §2, saas#1125 — hub#317).
-///
-/// # This value holds someone else's PRIVATE KEY
-///
-/// Not the customer's: it is the key with which **ERPlora** identifies itself before the AEAT for
-/// every hub under its power of attorney, so one leak compromises the fleet rather than one
-/// business. Everything about this type is built around not spilling it:
-///
-/// - [`Debug`] is **hand-written and redacted** (see the impl below). The derived one would print
-///   the container and the passphrase in full, and `Debug` is what ends up in a `tracing` field, in
-///   an `unwrap()` panic message and in `{:?}` inside an error string.
-/// - Nothing here is [`serde::Serialize`]: the value cannot be re-emitted into a response, a log
-///   line or a bundle by accident.
-/// - The caller must never put a parse/HTTP error's body into a message — see
-///   `erplora-server`'s `fiscal_certificate` module, which is the only consumer.
-#[derive(Clone, Deserialize)]
-pub struct DelegatedCertificate {
-    /// Monotonic version of the control plane (`DelegatedCertificate.version` in the SaaS). What the
-    /// hub caches to answer «am I up to date?»; `0` never arrives here (the SaaS answers 404).
-    pub version: i64,
-    /// The PKCS#12 container, base64 — exactly the shape `certificate::set` stores.
-    pub pkcs12_b64: String,
-    /// Passphrase of that container.
-    pub password: String,
-    /// `notAfter` as the SaaS read it. **Advisory metadata, not the source of truth**: the hub
-    /// derives the expiry from the container it actually stored (`certificate::expiry`), so a wrong
-    /// or missing value here cannot make a hub believe a certificate is valid for longer than it is.
-    #[serde(default)]
-    pub not_after: Option<String>,
-    /// **What kind of certificate this is** — `"seal"` (Sello de Entidad) or `"representative"`
-    /// (ADR-0202 §2.1 — hub#470). The AEAT segregates its VERI\*FACTU entry point by this, and by
-    /// nothing else: `www1`/`prewww1` for a natural person, `www10`/`prewww10` for a seal.
-    ///
-    /// **It exists because the slot does not answer it.** `delegated` says the control plane handed
-    /// the container down, not what is inside it — and the `.p12` ERPlora invoices with today is a
-    /// *representative* certificate, so treating the slot as the type would have sent the whole
-    /// delegated fleet to `www10` and had every record rejected.
-    ///
-    /// Like `not_after`, it is **checked, not trusted**: `certificate::set_delegated` derives the
-    /// same fact from the container and refuses to install when the two disagree. Unlike
-    /// `not_after`, a value the hub cannot derive on its own is honoured — the declaration is what
-    /// keeps a real seal working on a build whose classifier could not recognise it.
-    ///
-    /// `None` = an older control plane that says nothing (this field landed with hub#470). Then the
-    /// container answers alone, and «cannot tell» routes to the holder's entry point.
-    #[serde(default)]
-    pub certificate_type: Option<String>,
-}
-
-/// Redacted on purpose — the derived `Debug` would print ERPlora's private key and its passphrase
-/// (see the type's docs). What survives is what diagnosing a rotation actually needs and what the
-/// heartbeat already announces in the clear: the version and the expiry.
-///
-/// The secrets are printed as a fixed `«···»`, never as a prefix and never as a length: a redaction
-/// that leaked either would still be handing an attacker who reads the log a head start.
-impl std::fmt::Debug for DelegatedCertificate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DelegatedCertificate")
-            .field("version", &self.version)
-            .field("pkcs12_b64", &"«···»")
-            .field("password", &"«···»")
-            .field("not_after", &self.not_after)
-            .field("certificate_type", &self.certificate_type)
-            .finish()
-    }
-}
-
-impl DelegatedCertificate {
-    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
@@ -1127,28 +1122,118 @@ mod tests {
             checkout.url
         );
     }
+    /// 🔒 hub#1464 (ADR-0431 §2): la puerta RETIENE las credenciales cuando el destino no es
+    /// nuestro. La AEAT es el caso real — el motor fiscal llama ahí a diario, y hasta hoy lo
+    /// único que impedía que el token de máquina la acompañase era la forma del código.
+    #[test]
+    fn hub1464_the_only_door_strips_credentials_for_a_host_that_is_not_ours() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "SUPER-SECRET-MACHINE-TOKEN".into(),
+        };
+        let aeat = "https://www2.agenciatributaria.gob.es/wlpl/SSII-FACT/ws/fe/SistemaFacturacion";
+
+        let r = c.signed("POST", aeat.into(), &auth);
+
+        assert!(r.headers.is_empty(), "{:?}", r.headers);
+        assert_eq!(
+            r.url, aeat,
+            "la petición SE construye igual: el hub no bloquea destinos (ADR-0431 §1), solo \
+             retiene lo suyo"
+        );
+    }
+
+    /// Control positivo: la misma puerta sigue firmando lo que va a nuestra nube. Una guardia que
+    /// lo retiene todo no guarda nada — deja el hub sin plano de control.
+    #[test]
+    fn hub1464_the_only_door_keeps_signing_our_own_cloud() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine".into(),
+        };
+
+        let r = c.signed(
+            "GET",
+            "https://erplora.com/api/v1/hub/device/enroll/".into(),
+            &auth,
+        );
+
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Token" && v == "machine"));
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
+    }
+
+    /// 🔒 Y la puerta es UNA. Este test es de FUENTE a propósito: `Auth::headers` es `pub(crate)`,
+    /// así que el compilador ya impide que OTRO crate añada credenciales; lo que no impide es que
+    /// un builder nuevo de ESTE fichero se las ponga a mano y se salte el filtro de destino.
+    #[test]
+    fn hub1464_no_builder_attaches_credentials_behind_the_doors_back() {
+        // Solo producción: este módulo de tests nombra `auth.headers()` para hablar de él, y un
+        // escáner que se lee a sí mismo se denuncia siempre.
+        let production = include_str!("lib.rs")
+            .split("\n#[cfg(test)]")
+            .next()
+            .expect("el fichero tiene código antes de sus tests");
+
+        let offenders: Vec<(usize, &str)> = production
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| l.contains("auth.headers()"))
+            .filter(|(_, l)| !l.trim_start().starts_with("//") && !l.contains("LA PUERTA"))
+            .map(|(n, l)| (n + 1, l.trim()))
+            .collect();
+
+        assert!(
+            offenders.is_empty(),
+            "hub#1464: estos sitios ponen credenciales sin pasar por `signed()`, que es quien \
+             comprueba el destino:\n{offenders:#?}"
+        );
+    }
+
+    /// El aviso nombra host y ruta — y JAMÁS la query, que puede llevar secretos.
+    #[test]
+    fn hub1464_the_warning_names_the_host_and_path_but_never_the_query() {
+        let printed = host_and_path("https://evil.example/hook?token=SECRET-IN-QUERY#frag");
+
+        assert_eq!(printed, "evil.example/hook");
+        assert!(!printed.contains("SECRET-IN-QUERY"), "{printed}");
+        assert_eq!(host_and_path("nada-de-esto-es-una-url"), "<sin host>");
+    }
+
     /// **The gateway-token request is a machine POST** (hub#1432, hub#985 §1).
     ///
     /// The short-lived authorisation the fiscal cell verifies offline. Machine credential like
     /// its fiscal neighbours: the token endpoint answers a Bearer the browser must never see.
     #[test]
-    fn the_fiscal_gateway_token_request_is_a_machine_post() {
+    fn a_machine_request_carries_the_destination_and_the_machine_credential() {
         let c = CloudClient::new("https://erplora.com");
         let auth = Auth::HubToken {
-            hub_id: "h1".into(),
-            token: "t".into(),
+            hub_id: "hub-1".into(),
+            token: "machine".into(),
         };
 
-        let r = c.fiscal_gateway_token(&auth);
+        let r = c.machine_request("POST", "/api/v1/hub/device/fiscal/gateway-token/", &auth);
 
         assert_eq!(r.method, "POST");
-        assert!(
-            r.url.ends_with("/api/v1/hub/device/fiscal/gateway-token/"),
-            "la ruta real del SaaS: {}",
-            r.url
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/fiscal/gateway-token/"
         );
-        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
-        assert!(r.headers.contains(&("X-Hub-Token", "t".to_string())));
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Token" && v == "machine"));
+        assert!(r
+            .headers
+            .iter()
+            .any(|(n, v)| *n == "X-Hub-Id" && v == "hub-1"));
     }
 
     use super::*;
@@ -1796,109 +1881,6 @@ mod tests {
         assert_eq!(purchase.price, "9.00");
         assert_eq!(purchase.currency, "EUR");
         assert_eq!(purchase.purchase_url, "/marketplace/invoice/");
-    }
-
-    // ── ERPlora's delegated fiscal certificate (ADR-0202 §2, hub#317) ─────────────────────────
-    // The response of this endpoint is a PRIVATE KEY plus its passphrase, so the security tests
-    // come first: what the type prints, and which credential the request carries.
-
-    const SERVED_CERTIFICATE: &str = r#"{
-        "version": 4,
-        "pkcs12_b64": "TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg==",
-        "password": "the-passphrase-of-erplora",
-        "not_after": "2028-06-10"
-    }"#;
-
-    /// 🔒 **The private key must not be printable.** `Debug` is not cosmetic here: it is what a
-    /// `tracing` field, an `unwrap()` panic and a `{:?}` inside an error string all reach for. A
-    /// derived `Debug` would hand the container and the passphrase to every one of them, so the
-    /// redaction is the type's job and not the discipline of each call site.
-    #[test]
-    fn debugging_the_delegated_certificate_never_prints_the_key_or_its_passphrase() {
-        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
-
-        let printed = format!("{cert:?}");
-        assert!(
-            !printed.contains("TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg=="),
-            "el Debug ha impreso el contenedor PKCS#12: {printed}"
-        );
-        assert!(
-            !printed.contains("the-passphrase-of-erplora"),
-            "el Debug ha impreso la contraseña: {printed}"
-        );
-        // It still has to be USEFUL for diagnosis: the version is the whole point of the fetch and
-        // is not a secret (the heartbeat announces it in the clear).
-        assert!(
-            printed.contains('4'),
-            "el Debug debería seguir diciendo la versión: {printed}"
-        );
-    }
-
-    /// 🔒 A *fragment* of the passphrase must not leak either — a redaction that printed the first
-    /// characters, or the length, would still be a redaction that helps whoever reads the log.
-    #[test]
-    fn the_redacted_debug_leaks_neither_a_prefix_nor_the_length_of_the_secret() {
-        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
-        let printed = format!("{cert:?}");
-        for fragment in ["the-passphrase", "the-pass", "TUlJS3Rn", "erplora-"] {
-            assert!(
-                !printed.contains(fragment),
-                "el Debug filtra el fragmento {fragment:?}: {printed}"
-            );
-        }
-        assert!(
-            !printed.contains(&"the-passphrase-of-erplora".len().to_string()),
-            "el Debug filtra la longitud de la contraseña: {printed}"
-        );
-    }
-
-    /// 🔒 The MACHINE credential and nothing else: the SaaS pins `IsHubMachine` on this endpoint
-    /// precisely so a member's JWT — which lives in a browser — can never be what asks for the key.
-    #[test]
-    fn fiscal_certificate_uses_the_machine_token_and_the_canonical_path() {
-        let c = CloudClient::new("https://erplora.com/");
-        let auth = Auth::HubToken {
-            hub_id: "h1".into(),
-            token: "machine-tok".into(),
-        };
-        let r = c.fiscal_certificate(&auth);
-        assert_eq!(r.method, "GET");
-        assert_eq!(
-            r.url,
-            "https://erplora.com/api/v1/hub/device/fiscal/certificate/"
-        );
-        assert!(r.headers.contains(&("X-Hub-Id", "h1".to_string())));
-        assert!(r
-            .headers
-            .contains(&("X-Hub-Token", "machine-tok".to_string())));
-        // Never the user's JWT: it is the HUB that authenticates itself.
-        assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
-    }
-
-    /// The contract of saas#1125 §2.4, parsed as served.
-    #[test]
-    fn the_delegated_certificate_parses_the_served_contract() {
-        let cert = DelegatedCertificate::parse(SERVED_CERTIFICATE).unwrap();
-        assert_eq!(cert.version, 4);
-        assert_eq!(
-            cert.pkcs12_b64,
-            "TUlJS3RnSUJBekNDQ25JR0NTcUdTSWIzRFFFSEFhQ0NDbU1FZ2dwZg=="
-        );
-        assert_eq!(cert.password, "the-passphrase-of-erplora");
-        assert_eq!(cert.not_after.as_deref(), Some("2028-06-10"));
-    }
-
-    /// `not_after` is advisory (the hub reads the expiry from the container it stored), so its
-    /// absence must not throw away a certificate that is otherwise perfectly usable. Unknown fields
-    /// are tolerated too — the SaaS may add metadata without breaking deployed runtimes.
-    #[test]
-    fn a_certificate_without_not_after_still_parses() {
-        let cert = DelegatedCertificate::parse(
-            r#"{"version": 1, "pkcs12_b64": "QQ==", "password": "p", "issuer": "ERPlora SL"}"#,
-        )
-        .unwrap();
-        assert_eq!(cert.version, 1);
-        assert_eq!(cert.not_after, None);
     }
 
     /// Inbound WhatsApp (ADR-0283 K1c, saas#1353): the hub POLLS its own inbox with the MACHINE

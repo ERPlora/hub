@@ -1287,6 +1287,153 @@ test('queryAllOptional tells an EMPTY module apart from an ABSENT one', async ()
   assert.deepEqual(await c.queryAllOptional('services.services.list'), []);
 });
 
+// ── commandOptional: la puerta OPCIONAL para ESCRIBIR (hub#1428, simétrica a queryOptional) ──
+//
+// `combos` (`depends_on: []`) quiere dar de alta un producto en `inventory` desde su propio
+// selector, SOLO si `inventory` está instalado en este hub — igual que `queryOptional` deja leer
+// una integración que puede faltar. `commandOptional` perdona UNA sola cosa: la ausencia del
+// módulo dueño (`module_not_installed`/`module_inactive`, el mismo par que distingue el runtime
+// para las queries desde ADR-0127/0128). Todo lo demás EXPLOTA como en `command()`: un command
+// inexistente en un módulo presente, un permiso denegado, un handler roto, o el fallo de
+// transporte que hub#906 convierte en `UnknownOutcomeError` (sigue siendo `SERVER_UNAVAILABLE`,
+// nunca una ausencia).
+
+function transporteQueFallaCommand(code: string) {
+  return {
+    query: async () => ({}),
+    command: async () => { throw new ErploraError(code, `error ${code}`); },
+    subscribe: () => () => {},
+  };
+}
+
+test('commandOptional devuelve undefined SOLO si el módulo no está instalado', async () => {
+  const c = new ErploraClient(transporteQueFallaCommand('module_not_installed'));
+  assert.equal(await c.commandOptional('inventory.products.create', { name: 'Corte' }), undefined);
+});
+
+test('commandOptional también trata module_inactive como ausencia (cascada ADR-0128)', async () => {
+  const c = new ErploraClient(transporteQueFallaCommand('module_inactive'));
+  assert.equal(await c.commandOptional('inventory.products.create'), undefined);
+});
+
+test('commandOptional NO se traga un contrato roto (command inexistente en módulo presente)', async () => {
+  const c = new ErploraClient(transporteQueFallaCommand('command_not_found'));
+  await assert.rejects(() => c.commandOptional('inventory.products.create'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === 'command_not_found', 'el contrato roto EXPLOTA');
+    return true;
+  });
+});
+
+test('commandOptional NO se traga permisos ni fallos del handler', async () => {
+  for (const code of ['permission_denied', 'invalid_payload', 'wasm', 'db']) {
+    const c = new ErploraClient(transporteQueFallaCommand(code));
+    await assert.rejects(() => c.commandOptional('inventory.products.create'), (e) => {
+      assert.equal((e as ErploraError).code, code);
+      return true;
+    });
+  }
+});
+
+test('commandOptional NO se traga el verdict de un fallo de transporte (hub#906)', async () => {
+  // El hub murió a mitad de la petición: la escritura PUEDE haber comprometido antes de perder la
+  // respuesta. `command()` lo convierte en `UnknownOutcomeError` (código SERVER_UNAVAILABLE, NO
+  // uno de los dos que `commandOptional` perdona) — tragárselo como ausencia le mentiría al
+  // llamante «no se escribió nada» cuando la verdad es «no lo sabemos».
+  const c = new ErploraClient(transporteQueFallaCommand(SERVER_UNAVAILABLE));
+  await assert.rejects(() => c.commandOptional('inventory.products.create'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === SERVER_UNAVAILABLE);
+    assert.equal((e as { outcomeUnknown?: boolean }).outcomeUnknown, true, 'sigue siendo el verdict de hub#906');
+    return true;
+  });
+});
+
+test('commandOptional con el módulo presente devuelve el resultado tal cual', async () => {
+  const c = new ErploraClient({
+    query: async () => ({}),
+    command: async () => ({ id: 'p1', name: 'Corte' }),
+    subscribe: () => () => {},
+  });
+  assert.deepEqual(await c.commandOptional('inventory.products.create', { name: 'Corte' }), {
+    id: 'p1',
+    name: 'Corte',
+  });
+});
+
+// ── commandOptional short-circuit: una ausencia PROBADA no cuesta un viaje (hub#1211/hub#1428) ─
+//
+// Mismo mecanismo que `queryOptional`: cuando `installedModules` (inyectado por el shell) PRUEBA
+// que el módulo dueño está ausente, el SDK no debe llamar NUNCA al transporte — así el intento de
+// escritura ni siquiera se dispara, y `undefined` significa siempre «no se escribió nada», jamás
+// «se escribió y no lo sabemos» (no hay ventana de carrera: el runtime resuelve la ausencia DENTRO
+// de la misma petición que la escritura, antes de tocar la BD — nunca en un chequeo aparte).
+
+function transporteDeComandoQueCuenta(respuesta: unknown = { ok: true }) {
+  const calls: Array<{ name: string; payload?: Record<string, unknown> }> = [];
+  return {
+    calls,
+    transport: {
+      query: async () => ({}),
+      command: async (name: string, payload?: Record<string, unknown>) => {
+        calls.push({ name, payload });
+        return respuesta;
+      },
+      subscribe: () => () => {},
+    },
+  };
+}
+
+test('command_optional_does_not_travel_when_the_owner_module_is_absent_hub1428', async () => {
+  const { transport, calls } = transporteDeComandoQueCuenta();
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['combos']) });
+
+  const result = await c.commandOptional('inventory.products.create', { name: 'Corte' });
+
+  assert.equal(result, undefined, 'con inventory no instalado, el llamante ve una ausencia');
+  assert.equal(calls.length, 0, 'el SDK no debe intentar la escritura para averiguarlo');
+});
+
+test('command_optional_still_travels_when_the_owner_module_is_installed_hub1428', async () => {
+  const { transport, calls } = transporteDeComandoQueCuenta({ id: 'p1' });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['inventory']) });
+
+  const result = await c.commandOptional('inventory.products.create', { name: 'Corte' });
+
+  assert.deepEqual(result, { id: 'p1' });
+  assert.equal(calls.length, 1, 'el módulo SÍ está: la escritura tiene que viajar de verdad');
+});
+
+test('command_optional_still_travels_when_the_installed_set_is_not_known_yet_hub1428', async () => {
+  const c = new ErploraClient(transporteQueFallaCommand('module_not_installed'), {
+    installedModules: () => undefined,
+  });
+  assert.equal(await c.commandOptional('inventory.products.create'), undefined);
+});
+
+test('a_command_not_found_still_explodes_hub1428', async () => {
+  // El módulo SÍ está presente (no hay corto-circuito) pero el command no existe: contrato roto,
+  // no ausencia — tiene que explotar exactamente como antes.
+  const c = new ErploraClient(transporteQueFallaCommand('command_not_found'), {
+    installedModules: () => new Set(['inventory']),
+  });
+  await assert.rejects(() => c.commandOptional('inventory.products.create'), (e) => {
+    assert.ok(e instanceof ErploraError && e.code === 'command_not_found', 'el contrato roto SIGUE explotando');
+    return true;
+  });
+});
+
+test('command_optional_never_short_circuits_the_core_namespace_hub1428', async () => {
+  // `hub.*` nunca está "ausente" (ADR-0192): `installedModules` nunca lo lista, así que un
+  // corto-circuito ciego a ese conjunto convertiría todo `commandOptional('hub.…')` en un
+  // `undefined` silencioso — la ausencia falsa que el fix entero existe para evitar.
+  const { transport, calls } = transporteDeComandoQueCuenta({ ok: true });
+  const c = new ErploraClient(transport, { installedModules: () => new Set(['sales']) });
+
+  const result = await c.commandOptional('hub.set_pin', { pin: '1234' });
+
+  assert.deepEqual(result, { ok: true }, 'el core respondió y el llamante lo ve');
+  assert.equal(calls.length, 1, 'el namespace del core SIEMPRE viaja: nada puede probarlo ausente');
+});
+
 // ── hub#363: the approval dialog's TRANSPORT half ────────────────────────────
 //
 // The runtime has said `requires_elevation` since hub#360 and has minted approvals since hub#361,

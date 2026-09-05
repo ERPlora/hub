@@ -82,7 +82,7 @@ fi
 pending_list="$(printf '%s' "$RELEASE_CHANNELS_PENDING" \
     | tr -d '[:space:]' | tr 'A-Z' 'a-z' | tr ',' '\n' | grep -v '^$')"
 
-in_list() { printf '%s\n' "$2" | grep -qx -- "$1"; }
+in_list() { grep -qx -- "$1" <<<"$2"; }
 is_pending() { in_list "$1" "$pending_list"; }
 
 while IFS= read -r entry; do

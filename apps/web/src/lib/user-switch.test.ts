@@ -16,9 +16,14 @@
 // So the contract pinned here is:
 //
 //   - **the till is never signed out.** `switchUser` mints the new session and swaps who the
-//     screen attributes to; it never calls `logout()`, which would tear the shell's world down
-//     (cloud tokens, assistant, entitlement) around a cashier holding a queue;
-//   - **a refused PIN changes nothing at all.** The person who was signed in is still signed in;
+//     screen attributes to; it never calls `logout()`, which would tear the shell's world down and
+//     bounce the router to /login around a cashier holding a queue;
+//   - **the erplora.com credentials leave with the person who leaves** (hub#1538). They are hers,
+//     not the till's: her pass to the plan, the invoices and the payment methods cannot sit in the
+//     box for the whole of somebody else's shift. This is the half that used to be pinned to
+//     signing out — the one gesture this feature exists to avoid — so it never happened at all;
+//   - **a refused PIN changes nothing at all.** The person who was signed in is still signed in,
+//     and so are her credentials: a mistyped digit is not a hand-over;
 //   - **the previous session dies server-side** — the point of switching is attribution, and a
 //     live token for the person who walked away is the opposite of it — but only AFTER the new one
 //     exists, so a failed hand-over never strands the till with no session;
@@ -28,15 +33,28 @@
 //     `personal` device there is nobody to switch to, and where the PIN is not usable the offer
 //     would be a button that always fails.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { watch } from 'vue';
 
 const runtimePinLogin = vi.fn();
 const runtimeLogout = vi.fn(async (_token: string) => {});
-/** Not called by anything here — it is the fingerprint of `logout()`, which must never run. */
-const clearTokens = vi.fn();
-vi.mock('./cloud', () => ({
+// **The token store is deliberately NOT mocked** (hub#1538). Whether the previous person's
+// erplora.com credentials really leave the till is a statement about `localStorage`, and a
+// `vi.fn()` standing in for `clearTokens` can only say that a call happened — which is how this
+// file used to read the opposite behaviour into the code (see «never signs the till out»). Only
+// the two runtime doors are stubbed; `setTokens`/`getAccessToken`/`clearTokens` are the real ones.
+vi.mock('./cloud', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./cloud')>()),
   runtimePinLogin: (name: string, pin: string) => runtimePinLogin(name, pin),
   runtimeLogout: (token: string) => runtimeLogout(token),
-  clearTokens: () => clearTokens(),
+}));
+
+// Adopting a session makes `setHubSession` reach for these two through a dynamic import: the
+// cookie the browser fetches photos with (hub#791) and the SDK's active-module set (hub#1211).
+// Neither is part of the hand-over, and with the real `./cloud` now in the graph they are no
+// longer inert — left alone they fire actual requests at a runtime that is not running.
+vi.mock('./runtime', () => ({
+  ensureMediaCookie: vi.fn(async () => {}),
+  refreshActiveModuleIds: vi.fn(async () => {}),
 }));
 
 const getUserProfile = vi.fn(async () => null);
@@ -48,7 +66,12 @@ vi.mock('./user-profile', () => ({
 const resetUserThemePreferences = vi.fn();
 vi.mock('./theme', () => ({ resetUserThemePreferences: () => resetUserThemePreferences() }));
 const resetUserLocale = vi.fn();
-vi.mock('../i18n', () => ({ resetUserLocale: () => resetUserLocale() }));
+vi.mock('../i18n', () => ({
+  resetUserLocale: () => resetUserLocale(),
+  // The real `./cloud` imports this to stamp `Accept-Language` on its requests. Nothing here
+  // reaches a request, but the binding has to exist for the module to load.
+  getLocale: () => 'es',
+}));
 
 import {
   closeUserSwitch,
@@ -61,7 +84,8 @@ import {
 } from './user-switch';
 import { deviceMode, deviceTrusted } from './device-mode';
 import { pinPolicy } from './pin-policy';
-import { getHubSession, setHubSession, setUser, user } from './session';
+import { getAccessToken, setTokens } from './cloud';
+import { getHubSession, isAuthed, setHubSession, setUser, user } from './session';
 
 /** Who was at the till before the hand-over, session token included. */
 function seedCashier(): void {
@@ -74,6 +98,15 @@ function seedCashier(): void {
     permissions: ['till.sell'],
   });
   setHubSession('sess-nacho');
+}
+
+/**
+ * The owner's erplora.com credentials, exactly as her password login left them in this box
+ * (`setTokens`, `LoginPage.vue`). Unrelated to the till session: two planes, two credentials
+ * (ADR-0003).
+ */
+function seedCloudLogin(): void {
+  setTokens('acc-owner', 'ref-owner');
 }
 
 /** The runtime accepting four digits: a fresh session for somebody else. */
@@ -104,9 +137,9 @@ beforeEach(() => {
   deviceMode.value = 'shared';
   deviceTrusted.value = false;
   pinPolicy.value = 'per_shift';
+  localStorage.clear();
   runtimePinLogin.mockReset();
   runtimeLogout.mockClear();
-  clearTokens.mockClear();
   getUserProfile.mockClear();
   resetUserProfile.mockClear();
   resetUserThemePreferences.mockClear();
@@ -189,17 +222,53 @@ describe('the hand-over itself', () => {
   });
 
   it('never signs the till out — the sale is still on screen', async () => {
-    // The whole point. `logout()` clears the cloud tokens, the assistant, the entitlement and the
-    // user profile, and the shell then bounces to /login: the cashier's screen, route and
-    // half-typed gesture are gone. `clearTokens` is that call's fingerprint (session.logout
-    // reaches it through a dynamic import of this same mocked module).
+    // The whole point. `logout()` nulls the session, so `isAuthed` goes false and the router guard
+    // (`router/index.ts`) sends the app to /login: the cashier's screen, route and half-typed
+    // gesture are gone.
+    //
+    // 🔴 This used to be pinned as `expect(clearTokens).not.toHaveBeenCalled()` — `clearTokens` as
+    // a FINGERPRINT of `logout()` rather than as itself. hub#1538 showed what that costs: nobody
+    // had decided to keep the previous person's erplora.com credentials on the till, yet the
+    // assertion read as if somebody had, and it would have failed the fix that takes them away.
+    // What was always meant is asserted directly here — the till session never blinks out, not
+    // even for a single frame in the middle of the swap, and the route is untouched.
     seedCashier();
     seedCounterTill();
+    seedCloudLogin();
     accepts();
+
+    const authedDuringSwap: boolean[] = [];
+    const stop = watch(isAuthed, (v) => authedDuringSwap.push(v), { flush: 'sync' });
+    const routeBefore = window.location.pathname;
+
+    await switchUser('Sofía', '8317');
+    stop();
+
+    expect(authedDuringSwap).not.toContain(false);
+    expect(isAuthed.value).toBe(true);
+    expect(getHubSession()).toBe('sess-sofia');
+    expect(window.location.pathname).toBe(routeBefore);
+  });
+
+  it('takes the previous person’s erplora.com credentials off the till', async () => {
+    // hub#1538. Handing the counter over is not «the owner is still here under another name»: her
+    // pass to erplora.com — plan, invoices, payment methods — has to leave with her. Until this,
+    // only signing out cleared it, and signing out is the one gesture this feature exists to
+    // avoid, so the credentials sat in the box for the whole of the next person's shift.
+    //
+    // The runtime's own check stays where it is (`handoff_identity_mismatch`,
+    // `crates/server/src/auth_api.rs`, hub#1400): that is defence in depth on the door, and the
+    // door is not the same thing as not leaving the keys on the counter.
+    seedCashier();
+    seedCounterTill();
+    seedCloudLogin();
+    accepts();
+    expect(getAccessToken()).toBe('acc-owner'); // the positive: the box really does hold them
 
     await switchUser('Sofía', '8317');
 
-    expect(clearTokens).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem('erplora.refresh')).toBeNull();
   });
 
   it('revokes the session of the person who walked away, and only once the new one exists', async () => {
@@ -249,9 +318,13 @@ describe('the hand-over itself', () => {
 
   it('changes NOTHING when the runtime refuses the PIN', async () => {
     // A typo at a busy counter is the common case. Whoever was signed in stays signed in — an
-    // attempt that logs the previous cashier out would make a mistyped digit cost the shift.
+    // attempt that logs the previous cashier out would make a mistyped digit cost the shift. And
+    // «nothing» now has to be read literally, credentials included (hub#1538): a refused PIN is
+    // not a hand-over, so there is nobody yet to take erplora.com away from. Asserted on the
+    // store itself, not on a spy, because that is the state somebody would be robbed of.
     seedCashier();
     seedCounterTill();
+    seedCloudLogin();
     runtimePinLogin.mockRejectedValue(refusal());
 
     await expect(switchUser('Sofía', '0000')).rejects.toThrow();
@@ -259,7 +332,7 @@ describe('the hand-over itself', () => {
     expect(user.value?.id).toBe('u-nacho');
     expect(getHubSession()).toBe('sess-nacho');
     expect(runtimeLogout).not.toHaveBeenCalled();
-    expect(clearTokens).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('acc-owner');
   });
 });
 

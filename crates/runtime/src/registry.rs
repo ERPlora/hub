@@ -303,6 +303,22 @@ pub trait EventSink: Send + Sync + std::fmt::Debug {
     fn emit(&self, source: EventSource<'_>, event: &str, payload: &serde_json::Value);
 }
 
+/// Un módulo que el hub recibió la orden de instalar y **no** se instaló (hub#1477).
+///
+/// No es un log: es estado que la sonda de readiness consulta. Por eso lleva las tres cosas que
+/// hacen falta para actuar sin entrar al contenedor — **quién** falta, **de dónde** salía y **por
+/// qué** no entró.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailedInstall {
+    /// Id del módulo. Si el manifest ni siquiera cargó no hay id que leer, y entonces es el nombre
+    /// de la carpeta: es lo único que hay y es justo lo que el operador ve en el disco.
+    pub module_id: String,
+    /// El paquete del que salía, para poder ir a mirarlo.
+    pub source: String,
+    /// El error, tal cual: sin el motivo, saber que falta no dice qué arreglar.
+    pub reason: String,
+}
+
 #[derive(Debug, Default)]
 pub struct Registry {
     pub installed: Vec<Manifest>,
@@ -340,6 +356,19 @@ pub struct Registry {
     /// Backend de `static_files` declarado por módulos. Lo inyecta el host y resuelve a disco
     /// Local o Cloud→S3 sin exponer paths físicos al módulo.
     pub module_storage: Option<std::sync::Arc<dyn crate::module_storage::ModuleStorage>>,
+    /// Módulos que este hub **recibió la orden de instalar** y no llegaron a instalarse
+    /// (hub#1477). Lo llena [`crate::Runtime::install_all_from_dir`], que es tolerante a propósito
+    /// —un módulo de terceros roto no debe brickear el arranque— pero cuya tolerancia era, hasta
+    /// ahora, **silencio**: el fallo salía por un `eprintln!` y ahí moría.
+    ///
+    /// Vive aquí porque es la ÚNICA huella que queda de ese módulo: un install que falla no
+    /// escribe en `hub_module`, así que `/readyz` —que compara `hub_module` contra el Registry— no
+    /// tenía forma de saber que faltaba y publicaba `missing: []` sobre un hub incompleto.
+    ///
+    /// Describe el **último intento**, no un historial: cada pasada de `install_all_from_dir` lo
+    /// reemplaza. Si acumulase, un módulo ya arreglado seguiría denunciado para siempre y la sonda
+    /// no volvería a ponerse verde nunca.
+    pub failed_installs: Vec<FailedInstall>,
     /// **This deploy is an ephemeral DEMO hub** (ADR-0197, hub#376). The host seals it at boot
     /// from `HubConfig.demo` (env `HUB_DEMO`, written only by the SaaS provisioning), exactly
     /// like it seals `native`, `notify_transport` or `module_storage`. It lives HERE, and not in
@@ -370,6 +399,14 @@ pub struct Registry {
     /// Vive en el Registry, y no en disco ni en `hub_module`, por lo mismo que el resto de lo que
     /// aporta un módulo: su vida ES la del módulo instalado.
     pub(crate) seed_natural_keys: HashMap<String, HashMap<String, Vec<crate::export::NaturalKey>>>,
+    /// **Las tablas que el seed de cada módulo siembra como MARCADOR DE POSICIÓN** (hub#1535):
+    /// `module_id → tablas`. Las lee [`crate::seed::declared_placeholder_tables`] del mismo texto
+    /// que se siembra, en el mismo sitio y con la misma vida que [`Self::seed_natural_keys`].
+    ///
+    /// Una tabla está aquí cuando la guarda de su seed es el hub entero (`WHERE hub_id = :hub_id`):
+    /// el módulo declara así que planta un objeto completo y solo mientras el hub no tenga nada
+    /// suyo. El import lo lee para retirar el marcador cuando llegan los datos del negocio.
+    pub(crate) seed_placeholder_tables: HashMap<String, Vec<String>>,
 }
 
 impl Registry {
@@ -409,6 +446,18 @@ impl Registry {
             .flatten()
             .cloned()
             .collect()
+    }
+
+    /// ¿Algún módulo instalado siembra `table` como MARCADOR DE POSICIÓN de tabla entera
+    /// (hub#1535)?
+    ///
+    /// Por tabla y no por módulo, por lo mismo que [`Self::seed_natural_keys_for`]: una tabla
+    /// tiene un único dueño (hub#633 lo valida al instalar) y el import trabaja sobre el SQL de
+    /// una sección, no siempre sobre un módulo.
+    pub(crate) fn seeds_placeholder_table(&self, table: &str) -> bool {
+        self.seed_placeholder_tables
+            .values()
+            .any(|tables| tables.iter().any(|t| t == table))
     }
 
     /// ¿Está el módulo instalado **y** activo?
@@ -723,6 +772,7 @@ impl Registry {
         self.navigation.retain(|n| n.module_id != module_id);
         self.locales.remove(module_id);
         self.seed_natural_keys.remove(module_id);
+        self.seed_placeholder_tables.remove(module_id);
         for cmds in self.listeners.values_mut() {
             cmds.retain(|name| self.commands.contains_key(name));
         }
@@ -769,6 +819,11 @@ impl Registry {
                 .get(module_id)
                 .cloned()
                 .unwrap_or_default(),
+            seed_placeholder_tables: self
+                .seed_placeholder_tables
+                .get(module_id)
+                .cloned()
+                .unwrap_or_default(),
             // A listener belongs to the module that owns the command it fires (hub#659 makes that
             // the only shape a manifest can declare), so this is exactly the module's own share of
             // the map — the same rule `remove_module` uses to prune it.
@@ -811,6 +866,10 @@ impl Registry {
             self.seed_natural_keys
                 .insert(module_id.clone(), snapshot.seed_natural_keys);
         }
+        if !snapshot.seed_placeholder_tables.is_empty() {
+            self.seed_placeholder_tables
+                .insert(module_id.clone(), snapshot.seed_placeholder_tables);
+        }
         for (event, command) in snapshot.listeners {
             let listeners = self.listeners.entry(event).or_default();
             if !listeners.contains(&command) {
@@ -834,6 +893,8 @@ pub struct ModuleSnapshot {
     listeners: Vec<(String, String)>,
     /// The natural keys the module's seed declares, per table (hub#842).
     seed_natural_keys: HashMap<String, Vec<crate::export::NaturalKey>>,
+    /// The tables the module's seed plants as a whole-table placeholder (hub#1535).
+    seed_placeholder_tables: Vec<String>,
 }
 
 impl ModuleSnapshot {
@@ -885,6 +946,26 @@ pub struct RequestContext {
     /// read; a caller never writes it — `system_params` overwrites it with the value from `ctx`
     /// after cloning the payload, exactly like `hub_id` or `has_certificate`.
     pub is_demo_hub: bool,
+    /// **¿Están CONCEDIDAS todas las capabilities que declara el módulo que está llamando?**
+    /// (ADR-0079, hub#1425). Lo sella el dispatcher —`commands::execute_at` y `queries::execute`,
+    /// por módulo llamante— con [`crate::capabilities::all_granted`], que es [`enforce`] mismo;
+    /// `system_params` lo expone como `:capabilities_granted` (0/1).
+    ///
+    /// MISMO patrón que [`Self::has_certificate`]: una condición del hub que el módulo necesita
+    /// para PINTAR —verifactu#62: «estás activado y no puedes firmar»—, sonada por el runtime y
+    /// nunca adivinada por el módulo, que además no puede leer `_module_capability_grants` (tabla
+    /// de sistema, vedada por `migration_guard`).
+    ///
+    /// **Es 0/1 agregado, no la lista**: el módulo ya sabe qué declara (está en su manifest); lo
+    /// que no sabe es si se lo han concedido. Un booleano cierra el caso sin publicar el mapa de
+    /// permisos del hub a cualquier módulo instalado.
+    ///
+    /// El default es `false`, y es deliberado: sin sellar significa «no lo sé», y de las dos
+    /// lecturas equivocadas la cara es la otra —una pantalla que calla mientras el módulo no puede
+    /// firmar es exactamente el fallo que hub#1425 cierra; una que avisa de más se corrige mirando
+    /// Ajustes → Permisos—. Nunca lo escribe quien llama: `system_params` lo sobrescribe DESPUÉS
+    /// de clonar el payload, igual que `:hub_id`.
+    pub capabilities_granted: bool,
     /// **IDENTIDAD FISCAL del hub** (`hub_settings.country_code` / `region_code` — ADR-0085). La
     /// inyecta el dispatcher junto a la identidad de negocio.
     ///
@@ -1044,6 +1125,7 @@ impl RequestContext {
             business_legal_name: String::new(),
             business_address: String::new(),
             has_certificate: false,
+            capabilities_granted: false,
             is_demo_hub: false,
             fiscal_mode: None,
             fiscal_triggers: Vec::new(),
@@ -1191,6 +1273,14 @@ impl RequestContext {
     /// Lo rellena el dispatcher junto a `with_business`. Builder para no romper los `new(...)`/tests.
     pub fn with_certificate(mut self, present: bool) -> Self {
         self.has_certificate = present;
+        self
+    }
+
+    /// Copia con la respuesta de `capabilities::all_granted` para el módulo LLAMANTE (hub#1425).
+    /// Solo la sella el dispatcher, por módulo y en cada dispatch; nunca quien llama. Builder para
+    /// no romper los `new(...)`/tests.
+    pub fn with_capabilities_granted(mut self, granted: bool) -> Self {
+        self.capabilities_granted = granted;
         self
     }
 

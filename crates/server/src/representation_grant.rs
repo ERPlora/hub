@@ -524,19 +524,14 @@ pub async fn get_representation_grant(State(st): State<AppState>, headers: Heade
     };
     match fetch_state(&st.http, &st.config.cloud_base_url, &machine).await {
         Ok(body) => {
-            let previous = stored_state(&st).await;
             let state = grant_state_from_cloud(&body);
             mirror_into_profile(&st, &state).await;
-            // 🔴 **Approval arrives DAYS later, and nobody tells the hub.** A reviewer approves at
-            // ERPlora, and the delegated certificate is unlocked on that side (saas#1438); the hub
-            // only learns of it when it next asks — which is here, on the screen the customer opens
-            // to check. Without this, the person would read «vigente» and still find a go-live that
-            // refuses, until the next hourly refetch happened to run.
-            if state.0 == erplora_runtime::fiscal_profile::REPRESENTATION_VIGENTE
-                && previous.0 != erplora_runtime::fiscal_profile::REPRESENTATION_VIGENTE
-            {
-                crate::fiscal_certificate::refetch_after_grant(&st);
-            }
+            // 🪦 Aquí iba el CUARTO disparador del refetch (hub#817): al pasar el otorgamiento a
+            // vigente, el plano de control desbloqueaba el certificado delegado (saas#1438) y el
+            // hub lo pedía en el acto en vez de esperar al latido del día siguiente. Se fue con el
+            // slot (hub#1435): ya no hay clave que bajar. Lo que el Anexo I autoriza hoy lo aplica
+            // la CELDA en cada transmisión (ADR-0320), así que un otorgamiento recién aprobado
+            // surte efecto en el envío siguiente sin que el hub tenga que traerse nada.
             Json(json!({
                 "ok": true,
                 "status": state.0,

@@ -51,6 +51,15 @@ run_hook() {
         *HUB_GATE_WITH_MODULES=*|*HUB_GATE_MATERIALIZE_CMD=*) ;;
         *) set -- "$@" HUB_GATE_WITH_MODULES=0 ;;
     esac
+    # Desde hub#1466 el DEFECTO del hook es el gate rápido (la suite pesada vive en Actions).
+    # Los casos de este fichero anteriores a ese cambio prueban el gate COMPLETO —suite, caché
+    # del verde, atestación—, así que se les pone `full` explícito: es lo que de verdad ejercitan.
+    # Quien quiera probar el modo rápido, o el DEFECTO, nombra HUB_GATE_DEPTH o HUB_GATE_FAST_CMD
+    # y queda exento (mismo patrón que HUB_GATE_WITH_MODULES, arriba).
+    case " $* " in
+        *HUB_GATE_DEPTH=*|*HUB_GATE_FAST_CMD=*) ;;
+        *) set -- "$@" HUB_GATE_DEPTH=full ;;
+    esac
     ( cd "$repo" && printf '%s\n' "$stdin" | env "$@" bash "$HOOK" ) >"$repo/.out" 2>&1
     echo $?
 }
@@ -114,6 +123,137 @@ sleep 1   # the status is published in the background, after the push lands
 [ "$code" = 0 ] && [ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
     && ok "green suite: push proceeds and the status carries the pushed sha" \
     || bad "green suite: push proceeds and the status carries the pushed sha" "exit=$code status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
+
+# ── 5bis. PROFUNDIDAD del gate (hub#1466): rápido en local, pesado en la nube ──
+#    Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
+#    `fmt` 2,8 s, `clippy` 20 s → ~27 s el gate rápido en el caso que importa (el arreglo tras
+#    una revisión), frente a los ~20 min de la suite. La suite pesada pasa a Actions, donde
+#    corren 4 a la vez en vez de una cada 20 min con el lock de la máquina.
+#
+#    ⚠️ La regla que estos tests fijan: el modo rápido NO atestigua. La atestación es lo que
+#    `merge-pr.sh` acepta como «la suite corrió sobre este sha»; firmarla tras un `cargo check`
+#    sería responder que sí a una pregunta que no se probó. Sin sello, autoriza el check de CI.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=fast \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+sleep 1
+[ "$code" = 0 ] && [ -s "$repo/FAST" ] \
+    && ok "depth=fast: corre el comando RÁPIDO" \
+    || bad "depth=fast: corre el comando RÁPIDO" "exit=$code fast=$(cat "$repo/FAST" 2>/dev/null)"
+[ ! -s "$repo/SUITE" ] \
+    && ok "depth=fast: y NO corre la suite pesada" \
+    || bad "depth=fast: y NO corre la suite pesada" "la suite corrió: $(cat "$repo/SUITE")"
+[ ! -s "$repo/STATUS" ] \
+    && ok "depth=fast: NO atestigua (sin sello, autoriza el check de CI)" \
+    || bad "depth=fast: NO atestigua" "publicó: $(cat "$repo/STATUS" 2>/dev/null)"
+
+# Rojo en el rápido = push abortado. Sin esto el modo rápido no protege nada.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=fast \
+    HUB_GATE_FAST_CMD="false" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+[ "$code" != 0 ] \
+    && ok "depth=fast ROJO: el push ABORTA (una rama que no compila no sube)" \
+    || bad "depth=fast ROJO: el push ABORTA" "exit=$code"
+[ ! -s "$repo/STATUS" ] \
+    && ok "y un rápido rojo tampoco atestigua" \
+    || bad "y un rápido rojo tampoco atestigua" "publicó: $(cat "$repo/STATUS" 2>/dev/null)"
+
+# CONTROL de la bifurcación: en `full` manda todo lo de siempre — suite y sello.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="echo \$1 > $repo/STATUS" \
+    HUB_GATE_DEPTH=full \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+sleep 1
+[ "$code" = 0 ] && [ -s "$repo/SUITE" ] && [ ! -s "$repo/FAST" ] \
+    && ok "depth=full (control): corre la SUITE y no el rápido" \
+    || bad "depth=full (control): corre la SUITE y no el rápido" "exit=$code suite=$(cat "$repo/SUITE" 2>/dev/null) fast=$(cat "$repo/FAST" 2>/dev/null)"
+[ "$(cat "$repo/STATUS" 2>/dev/null)" = "$sha" ] \
+    && ok "depth=full (control): SÍ atestigua sobre el sha empujado" \
+    || bad "depth=full (control): SÍ atestigua" "status=$(cat "$repo/STATUS" 2>/dev/null) want=$sha"
+
+# El DEFECTO es rápido: es lo que decide qué corre la flota sin pasar variables.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_FAST_CMD="echo fast >> $repo/FAST; true" \
+    HUB_GATE_TEST_CMD="echo suite >> $repo/SUITE; true")
+[ "$code" = 0 ] && [ -s "$repo/FAST" ] && [ ! -s "$repo/SUITE" ] \
+    && ok "sin variable, el DEFECTO es rápido (la suite pesada vive en Actions)" \
+    || bad "sin variable, el DEFECTO es rápido" "exit=$code fast=$(cat "$repo/FAST" 2>/dev/null) suite=$(cat "$repo/SUITE" 2>/dev/null)"
+
+# Un valor que no existe no puede degradar la protección en silencio.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(git -C "$repo" rev-parse HEAD)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_DEPTH=loquesea \
+    HUB_GATE_FAST_CMD="true" HUB_GATE_TEST_CMD="true")
+[ "$code" != 0 ] \
+    && ok "un HUB_GATE_DEPTH desconocido FALLA en vez de elegir por su cuenta" \
+    || bad "un HUB_GATE_DEPTH desconocido falla" "exit=$code"
+
+# ── 5ter. El comando rápido por defecto calca la CI: clippy SIN -D warnings (hub#1472) ──
+#    Cazado por la sonda de hub#1466 nada más mergear: el hook se auto-instaló y TODO push del
+#    hub abortaba, también uno sano. `develop` arrastra 209 avisos de clippy (medido 03/09) y
+#    `test-hub.yml` corre `cargo clippy --workspace --all-targets --no-deps --exclude …` SIN
+#    `-D warnings`; el gate local era más estricto que la CI que autoriza el merge. Es una
+#    aserción sobre el TEXTO del hook a propósito: el comando por defecto no se puede ejecutar
+#    en estos bancos (no hay cargo), y lo que hay que fijar es la paridad de flags con la CI.
+#    El día que la CI se ponga estricta, se cambian los dos a la vez y este test con ellos.
+# The ASSIGNMENT line, never a comment: the first draft grabbed the comment that explains this
+# very rule (it mentions `-D warnings`) and failed against the fixed hook.
+fast_default="$(awk '/HUB_GATE_DEPTH:-fast}" = fast/{f=1} f && !/^ *#/ && /fast_cmd=.*cargo clippy/{print; exit}' "$HOOK")"
+if [ -z "$fast_default" ]; then
+    bad "hub#1472: el modo rápido tiene un clippy por defecto" "no se encontró la línea de clippy en el bloque rápido"
+else
+    case "$fast_default" in
+        *"-D warnings"*) bad "hub#1472: el clippy del modo rápido NO lleva -D warnings" "lleva -D warnings: con los 209 avisos de develop aborta cualquier push, también uno sano (la CI no es estricta)" ;;
+        *) ok "hub#1472: el clippy del modo rápido NO lleva -D warnings (paridad con test-hub.yml)" ;;
+    esac
+    case "$fast_default" in
+        *"--no-deps"*) ok "hub#1472: y lleva --no-deps, como la CI" ;;
+        *) bad "hub#1472: y lleva --no-deps, como la CI" "sin --no-deps clippy también analiza las dependencias: más lento y con avisos que no son nuestros" ;;
+    esac
+fi
+# ── 5quater. …y SIN `cargo fmt --check` (hub#1474): la CI no exige fmt y develop no está formateado ──
+#    Segunda mordida de la misma sonda, con el clippy ya en paridad: `cargo fmt --all --check`
+#    sale con exit 1 y 364 diffs sobre develop (medido 03/09), y ni test-hub.yml ni actionlint
+#    tienen paso de fmt. Regla: el gate rápido solo exige lo que la CI exige. Se mira el bloque
+#    ENTERO del comando por defecto (todas las asignaciones `fast_cmd=`), no una línea.
+fast_block="$(awk '/HUB_GATE_DEPTH:-fast}" = fast/{f=1} f && !/^ *#/ && /fast_cmd=/{print} f && /^    fi$/{exit}' "$HOOK")"
+if [ -z "$fast_block" ]; then
+    bad "hub#1474: el bloque del comando rápido por defecto existe" "no se encontraron asignaciones fast_cmd= tras el arranque del modo rápido"
+else
+    case "$fast_block" in
+        *"cargo fmt"*) bad "hub#1474: el modo rápido NO invoca cargo fmt" "invoca cargo fmt: develop tiene 364 ficheros sin formatear y la CI no exige fmt → todo push aborta" ;;
+        *) ok "hub#1474: el modo rápido NO invoca cargo fmt (la CI tampoco)" ;;
+    esac
+    case "$fast_block" in
+        *"cargo check"*) ok "hub#1474: y sí invoca cargo check (control)" ;;
+        *) bad "hub#1474: y sí invoca cargo check (control)" "sin cargo check el modo rápido no protege nada" ;;
+    esac
+fi
 
 # ── 6. Same tree twice: the second push must NOT recompile ────────────────────
 #    This is what keeps the fleet's 42 pushes/day from becoming 42 full suites.
@@ -355,6 +495,15 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Write a fake `gh` and echo the directory to prepend to PATH.
+#
+# 🔴 Every `case` arm in the bodies below is PARENTHESISED — `("repo view")`, not
+# `"repo view")`. The bodies arrive through a heredoc fed to a command substitution,
+# and bash 3.2 (what macOS ships, and what `env bash` resolves to when Homebrew's is
+# not first on PATH) scans `$( … )` for its closing paren without understanding
+# `case`: the first bare arm ends the substitution and the parser dies at the next
+# `;;`. This file — the battery of the ONLY pre-merge proof of the hub — could not
+# be parsed at all on the machine the gate runs on, and CI never saw it because the
+# runners are Ubuntu with bash 5 (hub#1468). Guard: `scripts/ci/shell-syntax.sh`.
 make_gh() {
     local dir=$1/ghbin
     mkdir -p "$dir"
@@ -380,10 +529,10 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view")
+    ("repo view")
         echo 'gh: HTTP 404: Not Found (https://api.github.com/repos/ERPlora/hub)' >&2
         exit 1 ;;
-    "auth status")
+    ("auth status")
         echo 'github.com'                                              >&2
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
@@ -420,7 +569,7 @@ grep -qi 'without checks\|no checks' <<<"$out"   || errs="$errs no-symptom"
 log="$repo/.state/publish-status.log"
 [ -s "$log" ] && grep -q 'HTTP 404' "$log" \
     && ok "unpublishable status: the reason is recorded in publish-status.log" \
-    || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(cat "$log" 2>/dev/null | head -3)"
+    || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(head -3 "$log" 2>/dev/null)"
 
 # ── 16. `gh` not installed at all is the same silent hole ─────────────────────
 repo=$(make_repo)
@@ -447,14 +596,14 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status")
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status")
         echo '  ✓ Logged in to github.com account other-company (keyring)' >&2
         exit 0 ;;
 esac
 # `gh api …` — the push landed (the ref reads back), writing the status does not.
 for a in "$@"; do [ "$a" = "-X" ] && { echo 'gh: HTTP 403: Resource not accessible by integration' >&2; exit 1; }; done
-for a in "$@"; do case "$a" in repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
+for a in "$@"; do case "$a" in (repos/*/git/ref/*) echo "$FAKE_REF_SHA"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -480,11 +629,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -562,11 +711,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -873,11 +1022,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<'GH'
 case "$1 $2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "$@"; do [ "$a" = "-X" ] && { echo posted > "$REPO_DIR/POSTED"; exit 0; }; done
-for a in "$@"; do case "$a" in repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
+for a in "$@"; do case "$a" in (repos/*/git/ref/*) echo 'gh: HTTP 404: Not Found' >&2; exit 1 ;; esac; done
 exit 0
 GH
 )
@@ -905,11 +1054,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(git -C "$repo" rev-parse HEAD)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -938,12 +1087,12 @@ sha=$(git -C "$repo" rev-parse HEAD)
 other=1111111111111111111111111111111111111111
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { echo posted > "$repo/POSTED"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
-for a in "\$@"; do case "\$a" in repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$other"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/compare/*) echo "ahead"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1132,11 +1281,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1157,17 +1306,187 @@ grep -q 'toy-c' <<<"$args"                         || errs="$errs description-do
     && ok "attestation: a scoped run posts its OWN context and names the packages" \
     || bad "attestation: a scoped run posts its OWN context and names the packages" "$errs args='$args'"
 
+# ── 40b. hub#1451: `scoped` es el DEFECTO fuera de develop/main ──────────────
+#
+#    Hasta aquí el defecto era `workspace` (29/08, pm#197/hub#1346): Actions dejó de correr la
+#    suite en las PRs y `merge-pr.sh` solo aceptaba `local-gate/hub-tests`, así que una pasada
+#    acotada dejaba la PR sin poder mergearse. Eso lo cierra pm#230 —el script acepta también
+#    `local-gate/hub-tests-scoped`— y con ello el defecto puede volver a ser el alcance.
+#
+#    La regla es la REF EMPUJADA, no el diff:
+#      · una rama de PR  → `scoped`   (el diff decide qué paquetes corren)
+#      · develop / main  → `workspace` (post-merge: es el árbol que de verdad se despliega)
+#      · un tag, o una ref que no se pudo leer → `workspace` (conservador: una release no se acota)
+#    `HUB_GATE_SCOPE_POLICY` sigue forzando los dos modos, que es el escape para depurar.
+#
+#    Lo que NO cambia y estos casos vigilan: un diff transversal se ensancha igual (el resolutor
+#    manda sobre la política), el sello sigue diciendo la verdad de lo que corrió, y un rojo sigue
+#    abortando el push.
+
+# Igual que `run_scoped` pero SIN fijar la política: mide el DEFECTO, que es lo que hub#1451
+# cambia. La ref empujada es un parámetro porque es justo lo que decide el modo.
+run_default_ref() {
+    local repo=$1 sha=$2 ref=$3
+    shift 3
+    rm -f "$repo/SCOPE"
+    run_hook "$repo" "$ref $sha $ref $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+        HUB_GATE_TEST_CMD='printf "%s|%s\n" "$HUB_GATE_SCOPE_MODE" "$HUB_GATE_SCOPE_PACKAGES" > '"$repo/SCOPE" \
+        "$@"
+}
+
+# 40b.1 — una rama de PR corre POR ALCANCE sin que nadie pida nada.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/1451-algo)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                  || errs="$errs exit=$code(want 0) out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
+grep -q '^packages|' <<<"$scope" || errs="$errs default-on-a-PR-branch-is-NOT-scoped"
+grep -q 'toy-c' <<<"$scope"      || errs="$errs missing-touched-package"
+grep -q 'toy-a' <<<"$scope"      && errs="$errs pulled-in-untouched-toy-a"
+[ -z "$errs" ] \
+    && ok "hub#1451: por DEFECTO una rama de PR corre por ALCANCE, no el workspace" \
+    || bad "hub#1451: por DEFECTO una rama de PR corre por ALCANCE, no el workspace" "$errs scope='$scope'"
+
+# 40b.2 — develop y main NO se acotan: son el árbol que se despliega, y ahí la red completa es
+#         el punto, no el coste.
+for integration in develop main; do
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+    code=$(run_default_ref "$repo" "$sha" "refs/heads/$integration")
+    scope=$(cat "$repo/SCOPE" 2>/dev/null)
+    errs=""
+    [ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+    grep -q '^workspace|' <<<"$scope" || errs="$errs push-to-$integration-got-scoped"
+    [ -z "$errs" ] \
+        && ok "hub#1451: un push a $integration corre el WORKSPACE aunque el diff sea de un crate" \
+        || bad "hub#1451: un push a $integration corre el WORKSPACE aunque el diff sea de un crate" "$errs scope='$scope'"
+done
+
+# 40b.3 — un TAG tampoco. El hub solo se despliega con un tag `v1.1.N`: acotar ahí sería firmar
+#         una release con una pasada parcial.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/tags/v1.1.99)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs tag-push-got-scoped"
+[ -z "$errs" ] \
+    && ok "hub#1451: un push de TAG corre el workspace (una release no se acota)" \
+    || bad "hub#1451: un push de TAG corre el workspace (una release no se acota)" "$errs scope='$scope'"
+
+# 40b.4 — el escape sigue existiendo en LOS DOS sentidos.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/x HUB_GATE_SCOPE_POLICY=workspace)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs env-workspace-did-not-override-the-default"
+[ -z "$errs" ] \
+    && ok "hub#1451: HUB_GATE_SCOPE_POLICY=workspace fuerza la suite entera en una rama de PR" \
+    || bad "hub#1451: HUB_GATE_SCOPE_POLICY=workspace fuerza la suite entera en una rama de PR" "$errs scope='$scope'"
+
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_default_ref "$repo" "$sha" refs/heads/develop HUB_GATE_SCOPE_POLICY=scoped)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                  || errs="$errs exit=$code(want 0)"
+grep -q '^packages|' <<<"$scope" || errs="$errs env-scoped-did-not-override-on-develop"
+[ -z "$errs" ] \
+    && ok "hub#1451: HUB_GATE_SCOPE_POLICY=scoped fuerza el alcance incluso en develop" \
+    || bad "hub#1451: HUB_GATE_SCOPE_POLICY=scoped fuerza el alcance incluso en develop" "$errs scope='$scope'"
+
+# 40b.5 — EL control que sostiene todo lo demás: el resolutor manda sobre la política. Un diff que
+#         toca `schemas/` —el contrato que leen los tests del runtime, o sea las baterías de
+#         módulos— se ensancha al workspace ESTANDO en una rama de PR y en modo por defecto.
+#         Sin esto, «scoped por defecto» sería una vía para colar un cambio de contrato sin que
+#         nadie corriera lo que ese contrato gobierna.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" schemas/module.schema.json)
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/contrato)
+scope=$(cat "$repo/SCOPE" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                   || errs="$errs exit=$code(want 0)"
+grep -q '^workspace|' <<<"$scope" || errs="$errs schemas-diff-stayed-scoped"
+[ -z "$errs" ] \
+    && ok "hub#1451: tocar schemas/ ESCALA al workspace aun en una rama y en modo por defecto" \
+    || bad "hub#1451: tocar schemas/ ESCALA al workspace aun en una rama y en modo por defecto" "$errs scope='$scope'"
+
+# 40b.6 — y un ROJO sigue abortando el push. Un gate más rápido que deja pasar un rojo no es un
+#         gate rápido: es ningún gate.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+# `false`, no `exit 1`: el hook hace `eval "$test_cmd"`, así que un `exit` se lleva por delante
+# al propio hook y el caso mediría otra cosa.
+code=$(run_default_ref "$repo" "$sha" refs/heads/fix/rojo HUB_GATE_TEST_CMD="touch $repo/RAN; false")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]              || errs="$errs exit=$code(want 1)"
+[ -f "$repo/RAN" ]           || errs="$errs the-suite-never-ran"
+grep -qi 'ABORTED' <<<"$out" || errs="$errs does-not-say-the-push-was-aborted"
+[ -z "$errs" ] \
+    && ok "hub#1451: en modo por defecto un test ROJO sigue abortando el push" \
+    || bad "hub#1451: en modo por defecto un test ROJO sigue abortando el push" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
+# 40b.7 — el sello dice la verdad de lo que corrió, en los dos lados del defecto: la rama publica
+#         el contexto ACOTADO (el que `merge-pr.sh` acepta desde pm#230) y develop el COMPLETO.
+for pair in "refs/heads/fix/sello|local-gate/hub-tests-scoped" "refs/heads/develop|local-gate/hub-tests"; do
+    ref=${pair%%|*}; want=${pair##*|}
+    repo=$(make_cargo_repo)
+    git -C "$repo" config --bool hooks.hubPrepushGate true
+    sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+    ghdir=$(make_gh "$repo" <<GH
+case "\$1 \$2" in
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
+esac
+for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+exit 0
+GH
+)
+    code=$(run_hook "$repo" "$ref $sha $ref $ZERO" \
+        HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" PATH="$ghdir:$PATH" \
+        HUB_GATE_PUSH_POLL_TRIES=2 HUB_GATE_PUSH_POLL_DELAY=0 \
+        HUB_GATE_TEST_CMD="true")
+    sleep 2
+    args=$(tr '\n' ' ' < "$repo/POSTARGS" 2>/dev/null)
+    errs=""
+    [ "$code" = 0 ]                          || errs="$errs exit=$code(want 0)"
+    grep -q "context=$want" <<<"$args"       || errs="$errs did-not-post-$want"
+    if [ "$want" = local-gate/hub-tests ]; then
+        grep -q -- '--workspace' <<<"$args"  || errs="$errs full-run-does-not-claim-workspace"
+    else
+        grep -q -- '--workspace' <<<"$args"  && errs="$errs scoped-run-claims-workspace"
+        grep -q 'context=local-gate/hub-tests ' <<<"$args " && errs="$errs scoped-run-claimed-the-full-context"
+    fi
+    [ -z "$errs" ] \
+        && ok "hub#1451: el sello por defecto de $ref es $want" \
+        || bad "hub#1451: el sello por defecto de $ref es $want" "$errs args='$args'"
+done
+
 # ── 41. A real full-workspace run keeps the full-suite context and wording ────
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" Cargo.lock)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" > "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1255,7 +1574,7 @@ chmod +x "$repo/installed/pre-push"
 sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 out=$(cat "$repo/.out" 2>/dev/null)
@@ -1350,7 +1669,7 @@ sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
 echo "# WIP uncommitted edit" >> "$repo/.githooks/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 errs=""
@@ -1383,7 +1702,7 @@ cp "$HOOK" "$repo/installed/pre-push"
 chmod +x "$repo/installed/pre-push"
 ( cd "$repo" && printf '%s\n' "refs/heads/x $sha refs/heads/x $ZERO" | env \
     HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
-    HUB_GATE_TEST_CMD="touch $repo/RAN" \
+    HUB_GATE_DEPTH=full HUB_GATE_TEST_CMD="touch $repo/RAN" \
     bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
 code=$?
 errs=""
@@ -1489,8 +1808,13 @@ errs=""
     && ok "web: un diff de solo documentacion no corre nada" \
     || bad "web: un diff de solo documentacion no corre nada" "$errs"
 
-# 5. Politica por defecto = WORKSPACE. Desde que Actions no corre la suite en las PRs, un
-#    `packages` local dejaria el merge autorizado por una pasada parcial (pm#58/#60): se ensancha.
+# 5. Politica por defecto = la que dicta la REF (hub#1451). Este caso decia lo contrario —«por
+#    defecto una PR con Rust corre el WORKSPACE entero»— y era correcto con SU premisa: el 29/08
+#    (pm#197) Actions dejo de correr la suite en las PRs y `merge-pr.sh` solo aceptaba
+#    `local-gate/hub-tests`, asi que una pasada acotada dejaba la PR inmergeable. pm#230 acepta
+#    tambien `local-gate/hub-tests-scoped`, la premisa cae, y con ella este contrato: se REESCRIBE
+#    a proposito, no se ajusta al codigo. El desglose completo de la regla nueva —develop/main,
+#    tags, los dos escapes, la escalada por `schemas/`— esta en el bloque 40b.
 repo=$(make_cargo_repo)
 git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" crates/a/src/lib.rs)
@@ -1500,11 +1824,11 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     HUB_GATE_TEST_CMD='printf "%s\n" "$HUB_GATE_SCOPE_MODE" > '"$repo/SCOPE")
 errs=""
 [ "$code" = 0 ] || errs="$errs exit=$code(want 0)"
-[ "$(cat "$repo/SCOPE" 2>/dev/null)" = workspace ] \
-    || errs="$errs mode=$(cat "$repo/SCOPE" 2>/dev/null)(want workspace)"
+[ "$(cat "$repo/SCOPE" 2>/dev/null)" = packages ] \
+    || errs="$errs mode=$(cat "$repo/SCOPE" 2>/dev/null)(want packages)"
 [ -z "$errs" ] \
-    && ok "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" \
-    || bad "politica: por defecto una PR con Rust corre el WORKSPACE entero, no un subconjunto" "$errs"
+    && ok "politica: por defecto una rama de PR corre por ALCANCE (hub#1451 enmienda pm#197)" \
+    || bad "politica: por defecto una rama de PR corre por ALCANCE (hub#1451 enmienda pm#197)" "$errs"
 
 # 6. Sin base contra la que diffear no se sabe que toca el cambio: para Rust ya se ensancha al
 #    workspace, y para web hay que ser igual de conservador o el diff se cuela sin probar.
@@ -1541,11 +1865,11 @@ attest_case() { # <SKIP_HUB_WEB 0|1> -> imprime los args del status publicado (v
     # nada estuviera roto. Se acumulan, y las aserciones buscan cada contexto dentro del montón.
     ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1649,8 +1973,11 @@ grep -q 'raising Postgres lock limits' "$repo/.out" \
     || bad "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
 # (b) El orden, sobre el fichero: definida POR ENCIMA de su primera llamada.
-def_line=$(grep -n '^raise_lock_limits() {' "$HOOK" | head -1 | cut -d: -f1)
-call_line=$(grep -n '^[[:space:]]\+raise_lock_limits[[:space:]]*$' "$HOOK" | head -1 | cut -d: -f1)
+# `-m1` on the grep, not `| head -1`: here grep reads the FILE, so stopping at
+# the first match leaves no producer on the other side of a pipe to kill — and
+# `cut` reads all of its output (hub#1552).
+def_line=$(grep -n -m1 '^raise_lock_limits() {' "$HOOK" | cut -d: -f1)
+call_line=$(grep -n -m1 '^[[:space:]]\+raise_lock_limits[[:space:]]*$' "$HOOK" | cut -d: -f1)
 errs=""
 [ -n "$def_line" ]  || errs="$errs no-encuentro-la-definicion"
 [ -n "$call_line" ] || errs="$errs no-encuentro-la-llamada"
@@ -1920,11 +2247,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1954,11 +2281,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" docs/nota.md)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -1990,11 +2317,11 @@ touch_and_commit "$repo" crates/c/src/lib.rs >/dev/null
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2022,11 +2349,11 @@ git -C "$repo" config --bool hooks.hubPrepushGate true
 sha=$(touch_and_commit "$repo" apps/web/src/App.vue)
 ghdir=$(make_gh "$repo" <<GH
 case "\$1 \$2" in
-    "repo view") echo 'ERPlora/hub'; exit 0 ;;
-    "auth status") exit 0 ;;
+    ("repo view") echo 'ERPlora/hub'; exit 0 ;;
+    ("auth status") exit 0 ;;
 esac
 for a in "\$@"; do [ "\$a" = "-X" ] && { printf '%s\n' "\$@" >> "$repo/POSTARGS"; exit 0; }; done
-for a in "\$@"; do case "\$a" in repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
+for a in "\$@"; do case "\$a" in (repos/*/git/ref/*) echo "$sha"; exit 0 ;; esac; done
 exit 0
 GH
 )
@@ -2061,6 +2388,119 @@ if grep -nE "pr-reviewer|review_handoff|/reviewed/" "$hook"; then
 else
     ok "hub#1417: the gate never calls the removed local PR reviewer again"
 fi
+
+# ── hub#1468: un script que no parsea con el bash de ESTA máquina aborta el push ──
+#    El bug que lo motivó llegó a `develop` con todos los checks en verde: los runners son
+#    Ubuntu con bash 5 y el `case` dentro de `$( … )` solo lo rechaza el 3.2 de macOS, que es
+#    donde vive este gate. Aquí se comprueba que el cable BITE de verdad — no que exista.
+#    El banco lleva su propio `scripts/ci/shell-syntax.sh` (el real, copiado) porque los repos
+#    de mentira de este fichero no tienen `scripts/`, y sin él el gate se lo salta a propósito.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cat > "$repo/scripts/ci/broken.sh" <<'BROKEN'
+#!/usr/bin/env bash
+# Arms sin paréntesis dentro de una sustitución: lo que bash 3.2 no parsea.
+x=$(
+    case "a" in
+        a) echo one ;;
+        *) echo other ;;
+    esac
+)
+echo "$x"
+BROKEN
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="touch $repo/RAN")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+if [ "$(uname -s)" = Darwin ]; then
+    [ "$code" = 1 ]                       || errs="$errs exit=$code(want 1)"
+    grep -q 'broken.sh' <<<"$out"         || errs="$errs no-file-named"
+    grep -q 'no parsea' <<<"$out"         || errs="$errs no-verdict"
+    [ ! -f "$repo/RAN" ]                  || errs="$errs ran-the-suite-anyway"
+    [ -z "$errs" ] \
+        && ok "hub#1468: un script que no parsea con el bash del sistema aborta el push" \
+        || bad "hub#1468: un script que no parsea con el bash del sistema aborta el push" "$errs"
+else
+    # Fuera de macOS no hay bash < 4 y este positivo NO se puede montar: bash 5 parsea el
+    # fixture sin pestañear. Se dice en voz alta en vez de contarlo como verde.
+    printf '  \033[33m—\033[0m hub#1468: sin bash < 4 en esta máquina, el positivo del suelo solo corre en macOS\n'
+fi
+
+# …y con el checker fuera del checkout el gate no se inventa un rojo: los 99 casos de arriba
+# corren en repos de mentira sin `scripts/`, y siguen pasando. Aquí se fija explícitamente.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="true")
+[ "$code" = 0 ] \
+    && ok "hub#1468: sin el checker en el checkout, el gate sigue su camino" \
+    || bad "hub#1468: sin el checker en el checkout, el gate sigue su camino" "exit=$code"
+
+# ── hub#1534: un script que canaliza hacia un lector que CORTA aborta el push ──
+#    `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO, y es una
+#    carrera: verde en macOS y en un runner ocioso, rojo en uno cargado. El 04/09 tumbó la PR
+#    de hub#1530 diciendo que faltaba una línea puesta desde julio. Aquí se comprueba que el
+#    cable BITE —no que exista—, igual que el de hub#1468 justo arriba. El banco copia los DOS
+#    scripts reales porque el scanner delega el descubrimiento en `shell-syntax.sh`.
+#    La línea ofensora se CONSTRUYE, nunca se escribe literal: así este fichero sigue limpio
+#    bajo el guard que está probando.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cp "$(dirname "$0")/ci/no-short-circuit-pipes.sh" "$repo/scripts/ci/no-short-circuit-pipes.sh"
+{
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -uo pipefail\n'
+    printf 'block=NEEDLE\n'
+    printf "printf '%%s' \"\$block\" | %s -q NEEDLE\n" grep
+} > "$repo/scripts/ci/short-circuit.sh"
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="touch $repo/RAN")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                          || errs="$errs exit=$code(want 1)"
+grep -q 'short-circuit.sh' <<<"$out"     || errs="$errs no-file-named"
+grep -q 'lector que corta' <<<"$out"     || errs="$errs no-verdict"
+[ ! -f "$repo/RAN" ]                     || errs="$errs ran-the-suite-anyway"
+[ -z "$errs" ] \
+    && ok "hub#1534: un script que canaliza hacia un lector que corta aborta el push" \
+    || bad "hub#1534: un script que canaliza hacia un lector que corta aborta el push" "$errs"
+
+# …y con el mismo banco LIMPIO (here-string en vez de tubería) el gate deja pasar: un guard que
+# no se puede satisfacer es un guard que se acaba desactivando.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cp "$(dirname "$0")/ci/no-short-circuit-pipes.sh" "$repo/scripts/ci/no-short-circuit-pipes.sh"
+{
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -uo pipefail\n'
+    printf 'block=NEEDLE\n'
+    printf '%s -q NEEDLE <<<"$block"\n' grep
+} > "$repo/scripts/ci/clean.sh"
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="true")
+[ "$code" = 0 ] \
+    && ok "hub#1534: el arreglo con here-string pasa el gate" \
+    || bad "hub#1534: el arreglo con here-string pasa el gate" "exit=$code out=$(cat "$repo/.out" 2>/dev/null)"
 
 echo
 echo "  $pass passed, $fail failed"

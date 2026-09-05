@@ -23,6 +23,19 @@ pub trait ModuleStorage: Send + Sync + std::fmt::Debug {
     ) -> Result<String>;
 }
 
+/// Un solo segmento portable para `static_files.folder`: minúsculas ASCII, dígitos, `_` y `-`; sin
+/// separadores ni `..`.
+///
+/// Vive aquí —y no solo en el manifest— porque **el backend también tiene que validarlo**: el
+/// instalador comprueba el folder antes de llamar, pero un backend que se fía de que alguien validó
+/// antes es un escape de directorio esperando a que cambie el orden de las llamadas.
+pub fn valid_module_folder(folder: &str) -> bool {
+    let mut chars = folder.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_lowercase())
+        && folder.len() <= 64
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+}
+
 /// Valida una ruta de fichero relativa y portable. Acepta subcarpetas, pero nunca rutas absolutas,
 /// componentes vacíos, `.`/`..`, separadores Windows ni un path que termine en `/`.
 pub fn valid_relative_file_path(path: &str) -> bool {
@@ -39,6 +52,21 @@ pub fn valid_relative_file_path(path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::valid_relative_file_path;
+
+    use super::valid_module_folder;
+
+    #[test]
+    fn only_accepts_a_single_portable_folder_segment() {
+        assert!(valid_module_folder("verifactu"));
+        assert!(valid_module_folder("my_folder-2"));
+        assert!(!valid_module_folder(""));
+        assert!(!valid_module_folder(".."));
+        assert!(!valid_module_folder("../escape"));
+        assert!(!valid_module_folder("/etc"));
+        assert!(!valid_module_folder("a/b"));
+        assert!(!valid_module_folder("Upper"));
+        assert!(!valid_module_folder(&"a".repeat(65)));
+    }
 
     #[test]
     fn only_accepts_safe_relative_file_paths() {

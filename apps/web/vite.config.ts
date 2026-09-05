@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 
 import { stripModuleVersion } from './src/lib/module-url';
 
@@ -74,6 +75,24 @@ const RUNTIME_TARGET = (() => {
   }
   return 'http://127.0.0.1:8787';
 })();
+
+// hub#1364 — the vitest pool is CAPPED, not sized off the machine. Left alone, vitest 4 resolves
+// `maxWorkers` to `Math.max(availableParallelism() - 1, 1)` (`resolveMaxWorkers`), i.e. the whole
+// box. This suite stopped having a box to itself: since hub#1466 it runs as the `pnpm verify` job
+// of `test-web.yml` on `ci-runner-1`, a cx53 (16 vCPU / 32 GB) that serves SIX runner slots — so
+// six web jobs would ask for 15 forks each, 90 processes on 16 vCPU. Every other pool there is
+// already bounded (`CARGO_BUILD_JOBS=8` per slot, precisely so six cargos are not 96 rustc);
+// vitest was the last one that was not. The same starvation was measured on the dev machine when
+// the gate still ran this suite (hub#1367: 15.8 s idle → 390 s under fleet load).
+//
+// The cap is a CEILING, never a target: `Math.min` with vitest's own default means this can only
+// LOWER the pool, so the 2-core GitHub-hosted fallback (`vars.CI_RUNNER_LABEL` unset, default 1)
+// is not oversubscribed to bound a runner it never touches. A number and not a percentage on
+// purpose — a percentage is still the machine, which is the thing being bounded. `VITEST_MAX_WORKERS`
+// overrides this (vitest applies the env last) for a one-off run on an idle box.
+// `minWorkers` is deliberately NOT set: vitest 4 removed it (absent from the whole dist).
+// Contract: vite.config.test.ts (hub#1364).
+const VITEST_MAX_WORKERS = Math.min(4, Math.max(availableParallelism() - 1, 1));
 
 // En dev, Vite se niega a servir JS de /public importado dinámicamente desde el código
 // ("can only be referenced via HTML tags"). Los módulos (WC Lit) se cargan en runtime con
@@ -196,6 +215,7 @@ export default defineConfig({
       'sync-modules.test.mjs',
       'vite.config.test.ts',
       'tests/playwright.config.test.ts',
+      'tests/bench-ports.test.ts',
     ],
     environment: 'node',
     // hub#1367 — these two are anti-hang BACKSTOPS, not assertions, and vitest's defaults
@@ -211,6 +231,8 @@ export default defineConfig({
     // Deliberately NOT `retry`: re-rolling the dice would hide the real flakes too.
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    // hub#1364 — see VITEST_MAX_WORKERS above.
+    maxWorkers: VITEST_MAX_WORKERS,
   },
   // Dev proxy (mismo origen → sin CORS). El runtime local (Axum :8787) no expone CORS y el Cloud
   // (erplora.com) tampoco para localhost; con VITE_RUNTIME_URL='' y VITE_CLOUD_API_URL='/cloud'

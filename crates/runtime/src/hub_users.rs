@@ -190,6 +190,14 @@ pub struct HubUserRow {
     /// para el personal **solo-local** (§2.9).
     pub cloud_user_id: Option<String>,
     pub is_active: bool,
+    /// **Esta fila es la del DUEÑO de la cuenta** (hub#1429). Marca **derivada**, no un rol: la
+    /// asienta `identity::seed_owner` en cada arranque desde `HUB_OWNER_EMAIL` (el env del
+    /// aprovisionamiento, ADR-0157) y ninguna puerta HTTP la escribe. No resucita el rol `owner`
+    /// que hub#349 retiró —lo que se PUEDE sigue siendo `is_admin_role`—: dice solo **quién es el
+    /// propietario**, que siempre fue del plano de la CUENTA. `false` en todas las filas de un hub
+    /// que aún no ha arrancado con el env: no hay dueño que nombrar, así que no hay fila que
+    /// proteger.
+    pub is_account_owner: bool,
     /// `true` si puede entrar con PIN local. El owner suele entrar por Cloud, así que es `false`.
     pub has_pin: bool,
     /// `true` si lleva una **placa** enrolada (hub#658). Hermana de `has_pin`: la pantalla enseña
@@ -484,7 +492,7 @@ async fn ensure_name_is_free(
 /// alta y en cada cambio de PIN: sin la segunda mitad, la primera es decorativa (se da de alta con
 /// un PIN libre y se edita acto seguido al del encargado). Ver
 /// [`identity::pin_is_taken`] para por qué no se puede resolver con una restricción de la BD.
-async fn ensure_pin_is_free(
+pub(crate) async fn ensure_pin_is_free(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     pin: &str,
@@ -716,6 +724,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
             // fila trae el email vacío, así que su BAJA nunca revocaba su membresía.
             "SELECT u.id AS id, u.name AS name, u.role AS role, u.cloud_user_id AS cloud_user_id, \
                     u.is_active AS is_active, u.created_at AS created_at, \
+                    u.is_account_owner AS is_account_owner, \
                     CASE WHEN u.pin_hash IS NULL OR u.pin_hash = '' THEN 0 ELSE 1 END AS has_pin, \
                     CASE WHEN u.badge_hash IS NULL OR u.badge_hash = '' THEN 0 ELSE 1 END \
                       AS has_badge, \
@@ -744,6 +753,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<HubUserR
                 role: r["role"].as_str().unwrap_or_default().to_string(),
                 cloud_user_id: r["cloud_user_id"].as_str().map(ToString::to_string),
                 is_active: truthy(&r["is_active"]),
+                is_account_owner: truthy(&r["is_account_owner"]),
                 has_pin: truthy(&r["has_pin"]),
                 has_badge: truthy(&r["has_badge"]),
                 created_at: r["created_at"].as_str().unwrap_or_default().to_string(),
@@ -1076,10 +1086,10 @@ pub async fn core_query(
         //
         // 🔴 The route comes from `certificate::route_of`, the SAME function `fiscal_profile::
         // go_live` decides the Anexo I with. It is NOT re-derived from `:has_certificate`, which
-        // is `can_sign` and answers «own OR delegated»: a hub holding only ERPlora's certificate
-        // says `true` there and is on the DELEGATED route. That deduction would be a second rule,
-        // and two rules is how a screen and a production gate end up disagreeing about the route
-        // a business is on.
+        // is `can_transmit` and answers «has this hub got a ROUTE?» (hub#1489): a hub enrolled on
+        // the cell says `true` there and is on the DELEGATED route, so that 0/1 cannot tell the
+        // two roads apart at all. That deduction would be a second rule, and two rules is how a
+        // screen and a production gate end up disagreeing about the route a business is on.
         //
         // The grant is served from the copy `_hub_fiscal_profile` MIRRORS (hub#836), never with a
         // trip to the control plane: whoever wants it refreshed opens Ajustes → Negocio, which is
@@ -1141,11 +1151,27 @@ pub async fn core_query(
                 .get("limit")
                 .and_then(|v| v.as_i64())
                 .unwrap_or(PRINT_JOBS_LIMIT);
-            Ok(whole(
+            // The stamp a person left on a job is back-office data, so WHO is asking decides how
+            // much of each job comes back (hub#1565). It is not a second gate: the query itself
+            // stays open to the counter, which is hub#987's audience for the alarm.
+            let audience = crate::print_queue::audience_of(ctx);
+            let jobs =
                 crate::print_queue::list(db, hub_id, role.as_deref(), status.as_deref(), limit)
-                    .await?
-                    .iter()
-                    .map(crate::print_queue::status_view)
+                    .await?;
+            // The stamp names a PERSON, not a row id. Resolved once for the page and only for the
+            // audience that gets the stamp at all: a counter read never pays for it, and neither
+            // does a page where nothing was retired (`ActorNames::of` looks before it asks).
+            let names = match audience {
+                crate::print_queue::QueueAudience::Admin => {
+                    crate::print_queue::ActorNames::of(db, hub_id, &jobs).await?
+                }
+                crate::print_queue::QueueAudience::Counter => {
+                    crate::print_queue::ActorNames::none()
+                }
+            };
+            Ok(whole(
+                jobs.iter()
+                    .map(|job| crate::print_queue::status_view(job, audience, &names))
                     .collect(),
             ))
         }

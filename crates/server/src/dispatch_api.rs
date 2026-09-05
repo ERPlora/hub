@@ -40,9 +40,6 @@ pub(crate) fn err_status_and_code(
         E::ModuleInactive { .. } => (StatusCode::NOT_FOUND, "module_inactive".into()),
         E::InvalidPayload { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_payload".into()),
         E::InvalidField { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "invalid_field".into()),
-        E::CertificateTypeMismatch { .. } => {
-            (StatusCode::CONFLICT, "certificate_type_mismatch".into())
-        }
         E::ManifestRejected { code, .. } => (StatusCode::UNPROCESSABLE_ENTITY, code.clone().into()),
         // hub#1088: `business_tax_id` refused with its own stable code per failure kind — the
         // same `422` as `invalid_payload` (what was sent does not validate) with the code the UI
@@ -63,6 +60,13 @@ pub(crate) fn err_status_and_code(
         // not send what it needs" — and fix the call instead of trusting a page that quietly held
         // the whole list.
         E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
+        // hub#1542: the third of the same family — a `range` bound the COLUMN cannot read. Same
+        // `422` (the request is well-formed but its payload does not hold up), with its own code
+        // so an integration can tell "that bound is not a number" from a database outage.
+        E::InvalidFilterBound { .. } => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_filter_bound".into(),
+        ),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
@@ -204,12 +208,12 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         | E::EventLoop
         | E::EventNotDeclared { .. }
         | E::InvalidPayload { .. }
-        // hub#1070 (#1185): the three shapes the core refuses a CONTRACT with — a field of a
-        // payload, a certificate whose declared type is not the one served, a manifest that
-        // breaks an installer rule. All three are authored by us for whoever has to fix them
-        // (a user, a module author), and all three carry their own stable code.
+        // hub#1070 (#1185): the two shapes the core refuses a CONTRACT with — a field of a
+        // payload and a manifest that breaks an installer rule. Both are authored by us for
+        // whoever has to fix them (a user, a module author), and both carry their own stable
+        // code. hub#1490 retired the third (a certificate whose declared type was not the one
+        // served) with the control plane's certificate delivery it belonged to.
         | E::InvalidField { .. }
-        | E::CertificateTypeMismatch { .. }
         | E::ManifestRejected { .. }
         | E::MissingRequiredParam { .. }
         // hub#1173: un filtro que la lista no declara es el descuido de QUIEN LLAMA, en la misma
@@ -218,6 +222,12 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         // rechazado y los aceptados. Redactarla dejaría a quien integra con un 400 y sin saber
         // qué parámetro escribió mal, que es peor que el bug que el error previene.
         | E::UnknownFilter { .. }
+        // hub#1542: un extremo de `range` que la columna no sabe leer es la misma familia — el
+        // descuido de quien llama, con la frase escrita por nosotros. Y es la frase la que
+        // arregla la llamada: nombra la lista, CUÁL de los dos extremos no se entendió y el
+        // valor que llegó (que es lo que quien llama acaba de escribir, no un dato del hub).
+        // Redactarla devolvería justo el mensaje genérico que esta issue viene a quitar.
+        | E::InvalidFilterBound { .. }
         | E::Notify(_)
         | E::Print(_)
         | E::Storage(_)
@@ -711,12 +721,12 @@ mod error_redaction_tests {
         );
     }
 
-    /// The three variants #1185 added while this branch was open (`InvalidField`,
-    /// `CertificateTypeMismatch`, `ManifestRejected`). The exhaustive `match` of
-    /// `may_reach_the_client` made the compiler ask which side of the door each stands on; this
-    /// pins the ANSWER, because «it compiles» only proves somebody chose, not that they chose
-    /// right. All three are authored by us for whoever has to fix them, and all three carry a
-    /// code and the offending element as data.
+    /// The variants #1185 added while this branch was open (`InvalidField`, `ManifestRejected`;
+    /// the third, `CertificateTypeMismatch`, was retired with its door in hub#1490). The
+    /// exhaustive `match` of `may_reach_the_client` made the compiler ask which side of the door
+    /// each stands on; this pins the ANSWER, because «it compiles» only proves somebody chose,
+    /// not that they chose right. Both are authored by us for whoever has to fix them, and both
+    /// carry a code and the offending element as data.
     #[test]
     fn the_contract_refusals_of_1185_reach_the_client_with_their_code_and_their_data() {
         let field = error_of(RuntimeError::InvalidField {
@@ -739,13 +749,6 @@ mod error_redaction_tests {
         assert_eq!(manifest["code"], "role_grants_admin");
         assert_eq!(manifest["at"], "roles[0]");
         assert_ne!(manifest["message"], REDACTED_MESSAGE);
-
-        let cert = error_of(RuntimeError::CertificateTypeMismatch {
-            declared: "seal".into(),
-            served: "representative".into(),
-        });
-        assert_eq!(cert["code"], "certificate_type_mismatch");
-        assert_ne!(cert["message"], REDACTED_MESSAGE);
     }
 
     /// …and the net still runs under them. `InvalidField.detail` is authored today, but the whole

@@ -1,5 +1,5 @@
-//! hub#319 — the certificate fallback `own` → `delegated`, and the THREE readers that have to
-//! agree about it (ADR-0202 §2.1, ADR-0203).
+//! hub#319 — «can this hub issue?» and the THREE readers that have to agree about it
+//! (ADR-0202 §2.1, ADR-0203).
 //!
 //! «Can this hub issue?» is asked in three places, and until hub#319 all three answered it by
 //! looking at the **own** slot:
@@ -8,16 +8,20 @@
 //! 2. the same gate on the paged-query path (`queries::execute_page`),
 //! 3. the ⛔ arm of the onboarding checklist (`hub.setup.status`, hub#370).
 //!
-//! While nothing could write a delegated certificate that was merely *strict*: a hub with no own
-//! certificate was refused by the dispatcher **and** shown ⛔, which is uniform, honest and fails
-//! closed. hub#317 made a delegated-only hub possible, and from that moment the three answers had
-//! to move together — **to `certificate::can_sign`, all at once**. Moving one alone is what starts
-//! the lie: a ⛔ that blocks a screen while the runtime accepts the sale, or a runtime that refuses
-//! while the checklist says everything is done.
+//! All three used to answer it by looking at the **own** slot directly, which was merely *strict*
+//! while nothing else could sign. hub#317 added a second slot (ERPlora's delegated certificate) and
+//! from that moment the three answers had to move together — **to one named function, all at
+//! once**. Moving one alone is what starts the lie: a ⛔ that blocks a screen while the runtime
+//! accepts the sale, or a runtime that refuses while the checklist says everything is done.
 //!
-//! So the test that matters here is not "the gate lets a delegated-only hub through". It is that
-//! the three answers are **the same answer**, in every one of the four states a hub's two slots can
-//! be in. That is what this file pins.
+//! **hub#1435 retired that second slot** and the hub is back to one — but the lesson is not: the
+//! question still has three askers and they still have to answer identically, which is precisely
+//! what a single named function makes structural. hub#1489 then renamed that function to what it
+//! actually decides (`certificate::can_transmit` — «has this hub got a ROUTE?», its own certificate
+//! or the enrolled cell identity), and the fourth reader parted company on purpose: the fiscal
+//! ENGINE gates on the OWN certificate, because on the cell road it signs nothing. So the test that
+//! matters here is not «which slot wins»; it is that the three core answers are **the same answer**,
+//! in both states this fixture can be in.
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, DatabaseAdapter, Params};
@@ -29,29 +33,14 @@ use serde_json::{json, Value as Json};
 /// The `hub.` namespace gate: every principal with a LOCAL session carries it.
 const SESSION: &str = "hub.users.view";
 
-/// The two slots a hub can hold, as the four states this test walks.
+/// The two states a hub's certificate can be in, as this test walks them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Slots {
     own: bool,
-    delegated: bool,
 }
 
-const NEITHER: Slots = Slots {
-    own: false,
-    delegated: false,
-};
-const OWN_ONLY: Slots = Slots {
-    own: true,
-    delegated: false,
-};
-const DELEGATED_ONLY: Slots = Slots {
-    own: false,
-    delegated: true,
-};
-const BOTH: Slots = Slots {
-    own: true,
-    delegated: true,
-};
+const NEITHER: Slots = Slots { own: false };
+const OWN_ONLY: Slots = Slots { own: true };
 
 fn ctx(hub_id: &str) -> RequestContext {
     RequestContext::new(
@@ -161,9 +150,6 @@ async fn hub(hub_id: &str, slots: Slots) -> Runtime {
     if slots.own {
         store_slot(rt.db(), hub_id, CertificateKind::Own).await;
     }
-    if slots.delegated {
-        store_slot(rt.db(), hub_id, CertificateKind::Delegated).await;
-    }
     rt
 }
 
@@ -202,8 +188,12 @@ async fn the_gate_accepts(rt: &Runtime, hub_id: &str) -> bool {
     }
 }
 
-/// Reader 4 — the fiscal ENGINE (`build_identity`, `crates/plugins/verifactu`). `true` = the module would
+/// Reader 4 — the fiscal ENGINE (`can_sign`, `crates/plugins/verifactu`). `true` = the module would
 /// go ahead and transmit to the AEAT.
+///
+/// It used to be named after `build_identity`, which hub#1529 deleted: since hub#1432 the only door
+/// that resolves a road is `resolve_route`, and `can_sign` is the own-road half of it. The rename is
+/// the whole of what changed here — the reader asks the same question of the same host.
 ///
 /// Asked through the runtime's REAL host (`DbHost`), not a hand-written stand-in: a twin host would
 /// be a second implementation of the very question under test, which is how the two readings of
@@ -240,8 +230,8 @@ async fn the_checklist_blocks(rt: &Runtime, hub_id: &str) -> bool {
     item["level"] == "legal"
 }
 
-/// **The property of hub#319: one hub, one answer.** Whatever the two slots hold, the dispatcher
-/// gate, the checklist and the fiscal engine say the same thing — and they say `can_sign`.
+/// **The property of hub#319: one hub, one answer.** Whatever the hub holds, the dispatcher gate,
+/// the checklist say the same thing — and they say `can_transmit`.
 ///
 /// This is the assertion the issue asks for explicitly, and the reason it is ONE test rather than
 /// three: the failure mode is not «a reader is wrong», it is «two readers stopped agreeing», and
@@ -250,72 +240,67 @@ async fn assert_the_readers_agree(slots: Slots, expected_can_issue: bool) {
     let hub_id = "hub-fallback";
     let rt = hub(hub_id, slots).await;
 
-    let can_sign = certificate::can_sign(rt.db(), hub_id).await.unwrap();
+    let can_transmit = certificate::can_transmit(rt.db(), hub_id).await.unwrap();
     let gate = the_gate_accepts(&rt, hub_id).await;
     let blocks = the_checklist_blocks(&rt, hub_id).await;
     let engine = the_engine_can_sign(&rt, hub_id).await;
 
     assert_eq!(
-        can_sign, expected_can_issue,
-        "{slots:?}: the core's own answer to «can this hub sign?»"
+        can_transmit, expected_can_issue,
+        "{slots:?}: the core's own answer to «has this hub got a route?»"
     );
     assert_eq!(
-        gate, can_sign,
-        "{slots:?}: the dispatcher gate disagrees with `can_sign`"
+        gate, can_transmit,
+        "{slots:?}: the dispatcher gate disagrees with `can_transmit`"
     );
     assert_eq!(
-        !blocks, can_sign,
-        "{slots:?}: the checklist ⛔ disagrees with `can_sign` — a ⛔ that does not block, or a \
+        !blocks, can_transmit,
+        "{slots:?}: the checklist ⛔ disagrees with `can_transmit` — a ⛔ that does not block, or a \
          rejection nobody warned about"
     );
+    // The ENGINE answers a narrower question and must keep answering it (hub#1489): «can *I* sign
+    // with a business certificate?», which is `can_sign`'s gate and only ever the own slot.
+    // On the cell road the engine signs NOTHING — the cell does, with ERPlora's Seal — so tying
+    // this to `can_transmit` would demand a certificate of the very hub that has no need of one.
     assert_eq!(
-        engine, can_sign,
-        "{slots:?}: `build_identity` disagrees with `can_sign` — the runtime would accept a sale \
-         the fiscal engine then refuses to register, or the reverse"
+        engine, slots.own,
+        "{slots:?}: `can_sign` must gate on the OWN certificate, no more and no less"
     );
 }
 
-/// **A hub whose ONLY certificate is the delegated one can issue** — the whole point of ADR-0202
-/// §2.1. Before hub#319 this hub was refused by the dispatcher and shown ⛔: strict, coherent, and
-/// wrong, because ERPlora's certificate signs perfectly well on its behalf.
-#[tokio::test]
-async fn a_delegated_only_hub_can_issue_and_nothing_shows_a_blocking_warning() {
-    assert_the_readers_agree(DELEGATED_ONLY, true).await;
-}
-
-/// The hub the fallback is a fallback FROM: its own certificate, exactly as before hub#316.
+/// The hub that has uploaded its own certificate: it issues, and all three readers say so.
 #[tokio::test]
 async fn a_hub_with_its_own_certificate_can_issue() {
     assert_the_readers_agree(OWN_ONLY, true).await;
 }
 
-/// Both slots full: still one answer, and it is still «yes».
-#[tokio::test]
-async fn a_hub_holding_both_certificates_can_issue() {
-    assert_the_readers_agree(BOTH, true).await;
-}
-
-/// **Neither slot: the hub still cannot issue.** The fallback widens what counts as a certificate,
-/// it does not remove the requirement — an empty hub keeps failing CLOSED, and the checklist keeps
-/// saying so.
+/// **No certificate AND nothing enrolled: the hub cannot issue, and the three still agree.** An
+/// empty hub fails CLOSED and the checklist says so — the honest, uniform answer.
+///
+/// ⚠️ «No certificate» is no longer the same thing as «no way out» (hub#1489): a hub on the fiscal
+/// cell's road (ADR-0320 §1) holds no certificate either and files perfectly well, so what puts a
+/// hub here is having NEITHER road. This fixture has no machine identity enrolled, which is what
+/// keeps it in this state — `crates/runtime/tests/fiscal_route_gate_hub1489.rs` walks the other
+/// one.
 #[tokio::test]
 async fn a_hub_with_no_certificate_at_all_still_cannot_issue() {
     assert_the_readers_agree(NEITHER, false).await;
 }
 
-/// **The own certificate WINS, and the fallback is not a preference.** Both slots full ⇒ the
-/// business's own certificate signs; delete it and the hub falls back to ERPlora's on the very next
-/// question, with nothing to reconfigure in between.
+/// **Deleting the certificate moves all three readers, on the very next question.** No cache, no
+/// setting, nothing to reconfigure: the answer is the row, read fresh — which is what lets a
+/// business swap its `.p12` mid-day without the checklist and the gate drifting apart for a while.
 #[tokio::test]
-async fn the_own_certificate_wins_and_deleting_it_falls_back_without_reconfiguring() {
+async fn deleting_the_certificate_moves_the_three_readers_at_once() {
     let hub_id = "hub-fallback-order";
-    let rt = hub(hub_id, BOTH).await;
+    let rt = hub(hub_id, OWN_ONLY).await;
 
     assert_eq!(
         certificate::active_kind(rt.db(), hub_id).await.unwrap(),
-        Some(CertificateKind::Own),
-        "with both slots full the business's own certificate signs"
+        Some(CertificateKind::Own)
     );
+    assert!(the_gate_accepts(&rt, hub_id).await);
+    assert!(!the_checklist_blocks(&rt, hub_id).await);
 
     certificate::delete(rt.db(), hub_id, CertificateKind::Own)
         .await
@@ -323,35 +308,9 @@ async fn the_own_certificate_wins_and_deleting_it_falls_back_without_reconfiguri
 
     assert_eq!(
         certificate::active_kind(rt.db(), hub_id).await.unwrap(),
-        Some(CertificateKind::Delegated),
-        "deleting your own certificate hands the hub to the delegated one"
-    );
-    // And the hub keeps INVOICING across that change — which is the difference between a fallback
-    // and a setting: nobody had to answer a question.
-    assert!(the_gate_accepts(&rt, hub_id).await);
-    assert!(!the_checklist_blocks(&rt, hub_id).await);
-}
-
-/// **The delegated certificate still never leaves the hub** (hub#316, `may_leave_the_hub`).
-///
-/// This is the invariant hub#319 could most easily break by accident: a hub that now counts as
-/// «has a certificate» must NOT start putting ERPlora's private key into a bundle. A bundle is
-/// downloaded, published to the catalogue and imported into somebody else's hub — one leak would
-/// compromise the whole fleet rather than one business.
-#[tokio::test]
-async fn a_delegated_only_hub_that_can_issue_still_exports_no_certificate() {
-    let hub_id = "hub-fallback-export";
-    let rt = hub(hub_id, DELEGATED_ONLY).await;
-
-    assert!(
-        certificate::can_sign(rt.db(), hub_id).await.unwrap(),
-        "precondition: this hub can issue"
-    );
-    assert_eq!(
-        certificate::exportable_der_bytes(rt.db(), hub_id)
-            .await
-            .unwrap(),
         None,
-        "the delegated certificate is ERPlora's private key: it never travels in an export"
+        "the hub holds nothing: there is no second slot to fall back to (hub#1435)"
     );
+    assert!(!the_gate_accepts(&rt, hub_id).await);
+    assert!(the_checklist_blocks(&rt, hub_id).await);
 }

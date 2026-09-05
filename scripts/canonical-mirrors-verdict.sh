@@ -183,7 +183,7 @@ EOF
 }
 
 is_gate_input() { # $1=path
-    printf '%s\n' "$GATE_INPUTS" | grep -qx -- "$1"
+    grep -qx -- "$1" <<<"$GATE_INPUTS"
 }
 
 pair_hint='the copy must change in the same step: declare `Depends-On: ERPlora/module-toolkit#N` in the PR body and merge the pair with `MERGE_PR_PAIR` (ERPlora/pm#181, pm#183)'
@@ -234,7 +234,12 @@ while read -r path; do
         continue
     fi
 
-    numstat=$(git -C "$hub" diff --numstat "$toolkit_blob" "$hub_blob" | head -n 1)
+    # `git diff --numstat` between two blobs prints one line, but the first line
+    # is taken with a parameter expansion and not with `| head -n 1`: this script
+    # runs under `set -e`, so an EPIPE on the producer would not return a wrong
+    # verdict — it would kill the run mid-verdict (hub#1552).
+    numstat=$(git -C "$hub" diff --numstat "$toolkit_blob" "$hub_blob")
+    numstat=${numstat%%$'\n'*}
     added=$(printf '%s' "$numstat" | cut -f1)
     removed=$(printf '%s' "$numstat" | cut -f2)
     case "$removed" in

@@ -68,7 +68,13 @@ workflow_step() { # $1 = substring of the step name
 
 # Line number of the first step whose name contains $1 (0 when absent).
 step_line() { # $1 = substring of the step name
-    grep -n '^      - name:' "$workflow" | grep -F "$1" | head -1 | cut -d: -f1
+    # The second grep reads a here-string, not a pipe, so `-m1` stops it without
+    # anything upstream to kill: `… | grep -F "$1" | head -1` would hand the
+    # pipeline the first grep's EPIPE and report "step absent" (hub#1552).
+    local names hit
+    names=$(grep -n '^      - name:' "$workflow")
+    hit=$(grep -F -m1 "$1" <<<"$names")
+    printf '%s\n' "${hit%%:*}"
 }
 
 echo "Lints Rust del hub — contrato del gate de clippy (hub#1242)"
@@ -79,16 +85,38 @@ clippy_lints=$(toml_table "$root_manifest" "workspace.lints.clippy")
 if [ -z "$clippy_lints" ]; then
     bad "Cargo.toml declara \`[workspace.lints.clippy]\`" \
         "no hay tabla \`[workspace.lints.clippy]\` en el manifest raíz: sin ella \`[lints] workspace = true\` de cada crate no hereda nada"
-elif ! printf '%s\n' "$clippy_lints" | grep -qE '^[[:space:]]*correctness[[:space:]]*=.*"deny"'; then
+elif ! grep -qE '^[[:space:]]*correctness[[:space:]]*=.*"deny"' <<<"$clippy_lints"; then
     bad "\`[workspace.lints.clippy]\` pone \`correctness\` en \`deny\`" \
         "\`correctness\` no está en \"deny\": es el grupo de los bugs de verdad (un \`unwrap()\` mal puesto tumba una caja), y en warn no para nada"
 else
     ok "Cargo.toml declara \`[workspace.lints.clippy]\` con \`correctness = deny\`"
 fi
 
+# ── 1b. rustc's own `unused_imports` is at DENY (hub#1501 → hub#1504) ──────────
+# The next notch of the ratchet, on the rustc side. Until hub#1501 the only guard
+# against an unused import was the warning itself, and hub#1501 is the proof that
+# a warning guards nothing: `DemoLock` went unused in `error_registry.rs` with the
+# merge of hub#1490 and nobody saw it until another worker tripped over it — by
+# then there were FOUR, not one. The level lives in `[workspace.lints.rust]`, not
+# in a `-D` flag of the workflow (assertion 4): that is where the ratchet is
+# operated, and the table is what EVERY member inherits — the two crates the CI
+# clippy step excludes (`erplora-tauri`, the Android plugin) included, which is
+# why the notch was measured on macOS before being raised (hub#1504).
+rust_lints=$(toml_table "$root_manifest" "workspace.lints.rust")
+
+if [ -z "$rust_lints" ]; then
+    bad "Cargo.toml declara \`[workspace.lints.rust]\`" \
+        "no hay tabla \`[workspace.lints.rust]\` en el manifest raíz: los lints del propio rustc (\`unused_imports\`, \`future_incompatible\`) no los hereda nadie"
+elif ! grep -qE '^[[:space:]]*unused_imports[[:space:]]*=.*"deny"' <<<"$rust_lints"; then
+    bad "\`[workspace.lints.rust]\` pone \`unused_imports\` en \`deny\` (hub#1501, hub#1504)" \
+        "\`unused_imports\` no está en \"deny\": un import sin usar vuelve a ser un warning permanente que se aprende a ignorar (hub#1501 se coló así con hub#1490 y llegó a cuatro)"
+else
+    ok "\`[workspace.lints.rust]\` pone \`unused_imports\` en \`deny\` (hub#1501, hub#1504)"
+fi
+
 # ── 2. The ratchet is documented WHERE it is operated ────────────────────────
 # A ratchet nobody knows how to turn stays at its first notch forever.
-if printf '%s\n' "$clippy_lints" | grep -qi 'ratchet'; then
+if grep -qi 'ratchet' <<<"$clippy_lints"; then
     ok "la tabla de lints explica el ratchet (cómo se promociona un grupo)"
 else
     bad "la tabla de lints explica el ratchet (cómo se promociona un grupo)" \
@@ -113,7 +141,7 @@ else
             missing="$missing $member(sin-manifest)"
             continue
         fi
-        if ! toml_table "$manifest" "lints" | grep -qE '^[[:space:]]*workspace[[:space:]]*=[[:space:]]*true'; then
+        if ! grep -qE '^[[:space:]]*workspace[[:space:]]*=[[:space:]]*true' <<<"$(toml_table "$manifest" "lints")"; then
             missing="$missing $member"
         fi
     done
@@ -128,7 +156,7 @@ fi
 # ── 4. The workflow actually runs clippy ─────────────────────────────────────
 clippy_step=$(workflow_step "clippy")
 
-if [ -z "$clippy_step" ] || ! printf '%s\n' "$clippy_step" | grep -q 'cargo clippy'; then
+if [ -z "$clippy_step" ] || ! grep -q 'cargo clippy' <<<"$clippy_step"; then
     bad ".github/workflows/test-hub.yml corre \`cargo clippy\`" \
         "ningún paso invoca \`cargo clippy\`: la tabla de lints no la comprueba nadie en CI"
 else
@@ -138,21 +166,21 @@ else
     # de brocha gorda: ese flag denegaría también los grupos que siguen sucios y el
     # gate nacería rojo. Lo que hay que asegurar aquí es que el paso no se traga su
     # propio fallo — con `|| true` o `continue-on-error` la tabla no serviría de nada.
-    if printf '%s\n' "$clippy_step" | grep -qE '\|\|[[:space:]]*true|continue-on-error'; then
+    if grep -qE '\|\|[[:space:]]*true|continue-on-error' <<<"$clippy_step"; then
         bad "el paso de clippy NO se traga su código de salida" \
             "lleva \`|| true\` o \`continue-on-error\`: un \`correctness\` denegado saldría igual en verde"
     else
         ok "el paso de clippy no se traga su código de salida"
     fi
 
-    if printf '%s\n' "$clippy_step" | grep -q -- '--all-targets'; then
+    if grep -q -- '--all-targets' <<<"$clippy_step"; then
         ok "el paso de clippy cubre \`--all-targets\` (tests y benches incluidos)"
     else
         bad "el paso de clippy cubre \`--all-targets\`" \
             "sin \`--all-targets\` no mira los tests, que es donde más código nuevo entra"
     fi
 
-    if printf '%s\n' "$clippy_step" | grep -q -- '--workspace'; then
+    if grep -q -- '--workspace' <<<"$clippy_step"; then
         ok "el paso de clippy cubre \`--workspace\`"
     else
         bad "el paso de clippy cubre \`--workspace\`" \
@@ -163,7 +191,7 @@ else
     #      del paso `cargo test --workspace`) ──────────────────────────────────
     missing_excl=""
     for crate in $EXCLUDED_CRATES; do
-        printf '%s\n' "$clippy_step" | grep -q -- "--exclude $crate" || missing_excl="$missing_excl $crate"
+        grep -q -- "--exclude $crate" <<<"$clippy_step" || missing_excl="$missing_excl $crate"
     done
     if [ -n "$missing_excl" ]; then
         bad "el paso de clippy repite las exclusiones del paso de tests" \

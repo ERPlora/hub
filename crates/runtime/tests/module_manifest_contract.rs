@@ -365,19 +365,9 @@ fn no_published_manifest_is_refused_by_the_contract() {
     }
     let root = erplora_runtime::modules_root();
     let mut loaded = 0;
-    for entry in std::fs::read_dir(&root)
-        .expect("modules root is readable")
-        .flatten()
-    {
-        let dir = entry.path();
-        if !dir.join("module.json").is_file() {
-            continue;
-        }
-        let module = dir
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+    // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
+    // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    for (module, dir) in erplora_runtime::published_module_dirs() {
         let manifest = erplora_runtime::Manifest::load(&dir)
             .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
         for warning in &manifest.warnings {
@@ -412,19 +402,9 @@ fn no_published_manifest_hides_an_event_it_emits() {
     let root = erplora_runtime::modules_root();
     let mut holes: Vec<String> = Vec::new();
     let mut loaded = 0;
-    for entry in std::fs::read_dir(&root)
-        .expect("modules root is readable")
-        .flatten()
-    {
-        let dir = entry.path();
-        if !dir.join("module.json").is_file() {
-            continue;
-        }
-        let module = dir
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+    // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
+    // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    for (module, dir) in erplora_runtime::published_module_dirs() {
         let manifest = erplora_runtime::Manifest::load(&dir)
             .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
         for warning in &manifest.warnings {

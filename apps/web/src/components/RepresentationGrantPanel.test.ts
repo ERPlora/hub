@@ -18,6 +18,7 @@ const postRepresentationGrant = vi.fn();
 const downloadRepresentationGrantModel = vi.fn();
 const saveDownload = vi.fn();
 const openExternal = vi.fn();
+const saasDoor = vi.fn(async (_path: string, fallback: string, _door: string) => fallback);
 const publishFiscalIdentity = vi.fn();
 
 // `vi.mock` se iza por encima de todo, así que la clase que la factoría devuelve tiene que existir
@@ -49,6 +50,12 @@ vi.mock('../lib/save-download', () => ({
   SaveDownloadError: class extends Error {},
 }));
 vi.mock('../lib/open-external', () => ({ openExternal: (...a: unknown[]) => openExternal(...a) }));
+// pm#196 — la puerta compartida al SaaS. Se moquea para poder afirmar que ESTA salida la usa: sin
+// el pase, dentro de la app instalada el cliente aterriza en un login antes de firmar el
+// apoderamiento, que es justo el trámite que no puede quedarse a medias.
+vi.mock('../lib/saas-door', () => ({
+  saasDoor: (path: string, fallback: string, door: string) => saasDoor(path, fallback, door),
+}));
 vi.mock('../lib/config', () => ({
   config: { hubId: 'hub-abc', cloudApiUrl: 'https://erplora.com' },
 }));
@@ -145,6 +152,8 @@ beforeEach(() => {
   saveDownload.mockResolvedValue(null);
   openExternal.mockReset();
   openExternal.mockResolvedValue(undefined);
+  saasDoor.mockReset();
+  saasDoor.mockImplementation(async (_path: string, fallback: string, _door: string) => fallback);
   publishFiscalIdentity.mockReset();
   publishFiscalIdentity.mockResolvedValue(undefined);
 });
@@ -454,5 +463,37 @@ describe('la salida al ordenador', () => {
 
     expect(openExternal).toHaveBeenCalledTimes(1);
     expect(vm(w).errorKey).toBe('grant.errors.identity_not_shared');
+  });
+
+  // 🔴 pm#196 — el apoderamiento se firma en erplora.com, y hasta aquí se llegaba SIN sesión desde
+  // la app instalada: login y segundo factor otra vez, en mitad de un trámite fiscal.
+  it('🔴 cruza con el pase de un solo uso, pidiéndolo con la RUTA', async () => {
+    saasDoor.mockResolvedValue('https://erplora.com/auth/handoff/code-xyz/?next=%2Fgrant');
+    const w = mountPanel();
+    await flushPromises();
+
+    await vm(w).openDashboard();
+
+    expect(saasDoor).toHaveBeenCalledTimes(1);
+    expect(saasDoor.mock.calls[0][0]).toBe(
+      '/dashboard/hubs/hub-abc/fiscal/representation-grant/',
+    );
+    expect(openExternal.mock.calls[0][0]).toBe(
+      'https://erplora.com/auth/handoff/code-xyz/?next=%2Fgrant',
+    );
+  });
+
+  it('si no hay pase, abre el enlace de siempre — el trámite no se queda sin puerta', async () => {
+    // Degradar es el contrato: el runtime niega el pase a una sesión de PIN a propósito, y eso no
+    // puede convertir el botón en uno muerto.
+    saasDoor.mockImplementation(async (_path: string, fallback: string, _door: string) => fallback);
+    const w = mountPanel();
+    await flushPromises();
+
+    await vm(w).openDashboard();
+
+    expect(openExternal.mock.calls[0][0]).toBe(
+      'https://erplora.com/dashboard/hubs/hub-abc/fiscal/representation-grant/',
+    );
   });
 });

@@ -6,6 +6,12 @@
 //! BEFORE the decoupling of `daily_usage` from `erplora_verifactu`
 //! (PendingObligation, hub#1406), and they must stay green after it: same
 //! state in, same bytes out.
+//!
+//! **`cert_version`/`cert_not_after` left the payload in hub#1435.** They reported which delegated
+//! certificate this hub held, and there is no delegated certificate: the SaaS dropped the four
+//! `reported_cert_*` columns in saas#1435 phase 2 and IGNORES the fields when an un-updated hub
+//! still sends them. Dropping them here is therefore safe in both directions — a new hub against an
+//! old SaaS writes two columns fewer, an old hub against the new SaaS is ignored.
 
 use erplora_server::daily_usage::{DailyUsageHeartbeat, PendingObligationFields};
 
@@ -15,8 +21,6 @@ fn base() -> DailyUsageHeartbeat {
         last_sale_at: Some("2026-09-01T10:00:00Z".to_string()),
         terminals: Some(2),
         last_user_activity_at: Some("2026-09-01T09:00:00Z".to_string()),
-        cert_version: Some(3),
-        cert_not_after: Some("2027-01-01".to_string()),
         hub_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![(
             "verifactu".to_string(),
@@ -35,8 +39,7 @@ fn base() -> DailyUsageHeartbeat {
 fn hub1406_full_heartbeat_serializes_byte_identically() {
     let expected = concat!(
         r#"{"orders_today":7,"last_sale_at":"2026-09-01T10:00:00Z","terminals":2,"#,
-        r#""last_user_activity_at":"2026-09-01T09:00:00Z","cert_version":3,"#,
-        r#""cert_not_after":"2027-01-01","hub_version":"1.2.3","#,
+        r#""last_user_activity_at":"2026-09-01T09:00:00Z","hub_version":"1.2.3","#,
         r#""verifactu_pending_depth":2,"verifactu_oldest_pending_at":"2026-08-30T08:00:00Z","#,
         r#""cpu_pct":1.5,"memory_used_mb":100.0,"memory_limit_mb":512.0,"memory_peak_mb":222.0,"#,
         r#""transmission_route":"delegated"}"#,
@@ -54,8 +57,6 @@ fn hub1406_an_empty_queue_is_a_zero_not_an_absence() {
         last_sale_at: None,
         terminals: None,
         last_user_activity_at: None,
-        cert_version: None,
-        cert_not_after: None,
         hub_version: "1.2.3".to_string(),
         pending: PendingObligationFields(vec![("verifactu".to_string(), 0, None)]),
         cpu_pct: None,
@@ -78,8 +79,6 @@ fn hub1406_an_unreadable_queue_is_absent() {
         last_sale_at: None,
         terminals: None,
         last_user_activity_at: None,
-        cert_version: None,
-        cert_not_after: None,
         hub_version: "1.2.3".to_string(),
         pending: PendingObligationFields::default(),
         cpu_pct: None,

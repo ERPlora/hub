@@ -19,8 +19,12 @@
 //     plate and the PIN are the same identity, and this module invents no second one);
 //   - only then is the previous token revoked, because a refused PIN must leave the till exactly as
 //     it was, not signed out of everything;
-//   - `logout()` is never called. It clears the cloud tokens, the assistant, the entitlement and
-//     the profile, and the shell bounces to `/login` — the very loss this feature exists to avoid;
+//   - `logout()` is never called. It tears the shell's world down — the assistant, the entitlement,
+//     the profile — and bounces to `/login`, the very loss this feature exists to avoid;
+//   - the **cloud credentials are cleared on their own** (hub#1538). They belong to the PERSON, not
+//     to the till, and until this they only ever left through `logout()` — i.e. never, here. That
+//     is the separation this module was missing: forgetting erplora.com and throwing somebody off
+//     the TPV used to be a single gesture, and only one of the two is wanted;
 //   - the per-user preferences (language, theme, avatar) are re-read for the person who just
 //     arrived, so the sidebar stops showing the face of the one who left.
 //
@@ -31,7 +35,7 @@ import { computed, ref } from 'vue';
 
 import { deviceMode, deviceTrusted, type DeviceMode } from './device-mode';
 import { asksForPin, pinPolicy, type PinPolicy } from './pin-policy';
-import { runtimeLogout, runtimePinLogin } from './cloud';
+import { clearTokens, runtimeLogout, runtimePinLogin } from './cloud';
 import { getHubSession, isAuthed, setHubSession, setUser } from './session';
 import { getUserProfile, resetUserProfile } from './user-profile';
 import { resetUserThemePreferences } from './theme';
@@ -91,16 +95,16 @@ export function closeUserSwitch(): void {
  * Throws whatever the runtime refused with (see {@link userSwitchRefusalKey}) and, when it does,
  * **nothing has changed**: the person who was signed in still is, with their session token intact.
  *
- * The order is the contract. Mint → adopt → revoke the old one → re-read the arriving person's
- * preferences. Revoking first would mean a mistyped digit costs the shift; revoking not at all
- * would leave a live, unattended session for whoever just walked away, which defeats the
- * attribution this whole gesture is for.
+ * The order is the contract. Mint → adopt → revoke the old one → forget erplora.com → re-read the
+ * arriving person's preferences. Revoking first would mean a mistyped digit costs the shift;
+ * revoking not at all would leave a live, unattended session for whoever just walked away, which
+ * defeats the attribution this whole gesture is for.
  */
 export async function switchUser(name: string, pin: string): Promise<void> {
   const previous = getHubSession();
   const session = await runtimePinLogin(name, pin);
 
-  setHubSession(session.token);
+  setHubSession(session.token, session.credential_kind);
   // A FRESH user, never a spread of the previous one: the old avatar must not survive the swap
   // (`applyProfile` keeps the session's current avatar when the arriving profile has none, and the
   // face in the sidebar is the one thing on screen that says whose sale this is). The e-mail is
@@ -116,6 +120,19 @@ export async function switchUser(name: string, pin: string): Promise<void> {
   // Best-effort and unawaited: the till must not wait on it, and a hub that cannot be reached still
   // expires the row by TTL. The guard keeps a re-entrant call from revoking the session just minted.
   if (previous && previous !== session.token) void runtimeLogout(previous);
+
+  // The pass to erplora.com goes with the person who leaves (hub#1538). A password login writes
+  // `erplora.access`/`erplora.refresh` into this box; the hand-over does not sign anybody out, so
+  // nothing used to take them out again — and the next cashier's whole shift then ran with the
+  // previous person's plan, invoices and payment methods sitting in `localStorage` of a till she
+  // does not own. Clearing the cloud plane is NOT signing out (ADR-0003: two planes, two
+  // credentials): the runtime session just minted, the screen and the route are untouched, and the
+  // day-to-day of the TPV never needed a JWT in the first place. Whoever wants erplora.com next
+  // types their own password, which is the only correct answer to «whose account is this».
+  //
+  // The runtime's `handoff_identity_mismatch` (`crates/server/src/auth_api.rs`, hub#1400) stays as
+  // it is: it guards the door, and the door is a different thing from not leaving keys behind.
+  clearTokens();
 
   // Language, theme and avatar are per-user rows. Cleared first so nothing of the previous cashier
   // is left standing if `/api/profile` never answers, then re-read for the one who just arrived.

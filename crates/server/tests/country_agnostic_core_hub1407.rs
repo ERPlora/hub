@@ -26,16 +26,11 @@ const TERMS: [&str; 4] = ["verifactu", "ticketbai", "agenciatributaria", "aeat"]
 /// knowledge, frozen at their 2026-09-02 values. The rule is a RATCHET: shrink freely
 /// (update the number down in the same PR), never grow — growth means country
 /// knowledge is leaking back into the base. A file not listed here has budget 0.
-const RATCHET: [(&str, usize, &str); 11] = [
+const RATCHET: [(&str, usize, &str); 10] = [
     (
         "crates/server/src/boot.rs",
         2,
         "composition root — the ONE authorised engine-mounting point (hub#1404)",
-    ),
-    (
-        "crates/runtime/src/errors.rs",
-        1,
-        "container-kind error message",
     ),
     (
         "crates/runtime/src/export.rs",
@@ -109,6 +104,13 @@ fn country_lines(path: &Path) -> Vec<(usize, String)> {
             continue;
         }
         if pending_cfg {
+            // Una PILA de atributos entre `#[cfg(test)]` y `mod` es corriente
+            // (`#[cfg(not(target_os = "android"))]` encima del módulo de tests) y NO puede
+            // desactivar el salto: si lo hiciera, este guard leería un módulo de tests como
+            // producción y avisaría de humo hasta que alguien aprendiese a ignorarlo.
+            if trimmed.starts_with("#[") {
+                continue;
+            }
             pending_cfg = false;
             if trimmed.starts_with("mod ") {
                 in_test = true;
@@ -226,7 +228,14 @@ fn hub1407_the_check_catches_a_seeded_violation() {
         "// aeat in a comment is history, not coupling\n\
          use erplora_verifactu::Engine;\n\
          #[cfg(test)]\n\
-         mod tests {\n    const ID: &str = \"ticketbai\";\n}\n",
+         mod tests {\n    const ID: &str = \"ticketbai\";\n}\n\
+         #[cfg(test)]\n\
+         #[cfg(not(target_os = \"android\"))]\n\
+         mod more_tests {\n    const OTHER: &str = \"verifactu\";\n}\n\
+         #[cfg(test)]\n\
+         #[derive(Debug)]\n\
+         struct NotAModule(&'static str);\n\
+         const LEAKED: &str = \"aeat\";\n",
     )
     .unwrap();
     fs::write(
@@ -239,10 +248,18 @@ fn hub1407_the_check_catches_a_seeded_violation() {
     let hits = found
         .get("crates/runtime/src/lib.rs")
         .expect("the seeded violation in crates/runtime MUST be caught");
+    // 🔴 hub#1457: una PILA de atributos (`#[cfg(test)]` + `#[cfg(not(target_os = …))]`) sobre
+    // `mod tests` desactivaba el salto, así que el guard leía un módulo de tests como producción y
+    // avisaba de humo. Y el error opuesto sería peor: que una pila de atributos que NO acaba en un
+    // `mod` esconda una línea de producción. Las dos formas viven aquí para que no vuelvan.
     assert_eq!(
         hits,
-        &vec![(2, "use erplora_verifactu::Engine;".to_string())],
-        "exactly the production line — never the comment nor the test fixture"
+        &vec![
+            (2, "use erplora_verifactu::Engine;".to_string()),
+            (15, "const LEAKED: &str = \"aeat\";".to_string()),
+        ],
+        "exactly the production lines — never the comment, the test fixtures nor the stacked-cfg \
+         test module; and never at the cost of missing production code after an attribute stack"
     );
     assert!(
         !found.contains_key("crates/plugins/fake/src/lib.rs"),

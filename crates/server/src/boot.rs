@@ -138,20 +138,39 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
         );
     }
 
-    // El mismo backend de ficheros sirve a TODOS los módulos: disco bajo `media/modules/` en
-    // Local y proxy Cloud→S3 en Cloud. Se inyecta antes de instalar para que cada manifest con
+    // El mismo backend de ficheros sirve a TODOS los módulos, con el mismo contrato lógico
+    // (`media/modules/<folder>/`). Se inyecta antes de instalar para que cada manifest con
     // `static_files.folder` materialice su carpeta al activarse.
     let machine_token_cell = cfg.machine_token_cell.take().unwrap_or_else(|| {
         std::sync::Arc::new(std::sync::RwLock::new(cfg.hub.cloud_api_token.clone()))
     });
-    // Backend de ficheros de módulos: proxy autenticado Hub→Cloud→Object Storage (ADR-0154), sin
-    // credenciales de almacenamiento en el Hub.
-    let module_storage = module_storage::ModuleMediaStorage::cloud(
-        cfg.hub.cloud_base_url.clone(),
-        cfg.hub.hub_id.clone(),
-        machine_token_cell.clone(),
-    );
-    runtime.set_module_storage(std::sync::Arc::new(module_storage));
+    // Cuál de los dos lo decide `backend_for`, con el MISMO interruptor que decide si se escanea
+    // `HUB_MODULES_DIR` (más abajo): si el hub instala módulos de disco, sus ficheros también van a
+    // disco. Este comentario prometía el backend de disco desde el principio y no existía
+    // (hub#1477) — y como `verifactu` es el único módulo del catálogo con `static_files`, era el
+    // único que no se podía instalar sin Cloud.
+    let module_storage: std::sync::Arc<dyn erplora_runtime::module_storage::ModuleStorage> =
+        match module_storage::backend_for(cfg.hub.dev_mode) {
+            module_storage::Backend::Disk => {
+                let media_dir = state::media_dir_from_env();
+                eprintln!(
+                    "módulos: ficheros de `static_files` en disco ({}/modules) — modo desarrollo",
+                    media_dir.display()
+                );
+                std::sync::Arc::new(module_storage::ModuleDiskStorage::new(media_dir))
+            }
+            // Producción: proxy autenticado Hub→Cloud→Object Storage (ADR-0154), sin credenciales
+            // de almacenamiento en el Hub. Sin token de máquina falla, y debe fallar: un hub real
+            // sin token tiene un problema de despliegue que caer a disco solo taparía.
+            module_storage::Backend::Cloud => {
+                std::sync::Arc::new(module_storage::ModuleMediaStorage::cloud(
+                    cfg.hub.cloud_base_url.clone(),
+                    cfg.hub.hub_id.clone(),
+                    machine_token_cell.clone(),
+                ))
+            }
+        };
+    runtime.set_module_storage(module_storage);
 
     // Plugins nativos first-party (ADR-0009): motores compliance-crítico horneados en el
     // runtime. Hoy solo `verifactu` (cadena fiscal + transmisión AEAT TLS-mutua).
@@ -806,17 +825,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // Primer tick al arrancar (siembra el estado cuanto antes). Sin token de máquina (dev/local
     // sin enrolar) el tick se salta SIN contar fallo → el gate queda fail-open, como hoy.
     //
-    // El heartbeat es además el **segundo disparador de refetch del certificado delegado**
-    // (ADR-0202 §2 punto 4): sube lo que este hub tiene instalado y baja la versión que sirve el
-    // plano de control, así que una rotación converge por la llamada que YA se hacía, sin canal de
-    // push ni scheduler nuevo. El presupuesto es compartido con los otros dos disparadores
-    // (`fiscal_certificate::RefetchBudget`) porque el Cloud cuenta un solo total por hub.
-    // Un solo presupuesto por proceso, y vive en `AppState` porque desde hub#817 hay un CUARTO
-    // disparador (firmar el Anexo I) que sale de una petición, no de estos bucles.
-    let certificate_budget = state.certificate_budget.clone();
+    // 🪦 El latido era además el **segundo disparador del refetch del certificado delegado**
+    // (ADR-0202 §2 punto 4): subía la versión instalada y bajaba la que servía el plano de control,
+    // de modo que una rotación central convergía por la llamada que ya se hacía. Se fue con el slot
+    // (hub#1435) — no hay clave que rotar: la celda fiscal transmite con un Sello que nunca sale de
+    // la plataforma (ADR-0320) — y el SaaS retiró su mitad en saas#1435 fase 2.
     {
         let st = state.clone();
-        let certificate_budget = certificate_budget.clone();
         let secs = entitlement::interval_secs(
             std::env::var("HUB_ENTITLEMENT_REVALIDATE_SECS")
                 .ok()
@@ -840,27 +855,13 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     // pregunta va al REGISTRO, no a un motor con nombre; mismo lock barato que
                     // el resto del snapshot.
                     let pending = runtime.pending_obligations().await;
-                    let mut usage = daily_usage::collect_daily_usage(
+                    daily_usage::collect_daily_usage(
                         runtime.db(),
                         runtime.hub_id(),
                         &now_iso,
                         &pending,
                     )
-                    .await;
-                    // Lo que este hub tiene del certificado DELEGADO (ADR-0202 §2.5). Mismo lock
-                    // que el resto del snapshot: es la lectura barata, y no puede sostenerse
-                    // durante la llamada de red de abajo.
-                    if let Some((version, not_after)) =
-                        fiscal_certificate::delegated_certificate_report(
-                            runtime.db(),
-                            runtime.hub_id(),
-                        )
-                        .await
-                    {
-                        usage.cert_version = Some(version);
-                        usage.cert_not_after = not_after;
-                    }
-                    usage
+                    .await
                 };
                 // ADR-0175: la actividad de usuario viaja en ESTE heartbeat, y solo si la hubo.
                 // Un hub encendido que nadie toca no manda la marca — que es exactamente lo que el
@@ -908,25 +909,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                 match heartbeat_result {
                     // Confirmar SOLO tras un envío correcto: si se diera por reportada una marca
                     // que no llegó, el Cloud seguiría contando días y adelantaría el apagado.
-                    Ok(response) => {
+                    Ok(_) => {
                         if let Some(ts) = pending_activity {
                             st.activity.mark_reported(ts);
                         }
-                        // Segundo disparador (ADR-0202 §2 punto 4): versión distinta ⇒ refetch. El
-                        // propio contrato lo hace pasar UNA vez — al instalarla, la local pasa a
-                        // ser la anunciada y el latido siguiente ya no pide nada.
-                        fiscal_certificate::refetch_once(
-                            fiscal_certificate::RefetchTrigger::Heartbeat {
-                                announced: response.cert_version,
-                            },
-                            &certificate_budget,
-                            &st.http,
-                            &st.config.cloud_base_url,
-                            &auth,
-                            &st.runtime,
-                            &st.hub_id(),
-                        )
-                        .await;
                     }
                     Err(error) => tracing::warn!(%error, "daily usage heartbeat failed"),
                 }
@@ -949,21 +935,18 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
     // no las lee. Lo vigila `tests/newborn_hub_is_empty.rs`, que arranca el hub de verdad con ellas
     // puestas y comprueba que no se le pide un solo blueprint al Cloud.
 
-    // Disparadores 1 y 3 del refetch del certificado delegado (ADR-0202 §2 punto 4): el de
-    // ARRANQUE y el del FALLO TLS contra la AEAT. (El 2 —el heartbeat— va en el tick de arriba.)
-    //
-    // 🔴 En su propia task, igual que el import de blueprint y por el mismo motivo: un plano de
-    // control inalcanzable tiene que dejar un hub que FUNCIONA, no un hub que no termina de
-    // arrancar. El seed de arriba sí aborta el boot, y es la excepción a propósito.
-    fiscal_certificate::spawn_refetch_service(&state, certificate_budget);
+    // hub#1457: el alta de la identidad de MÁQUINA converge sola. Mira un dato LOCAL en cada
+    // tick —clave sin certificado, o sea «alguien pidió el CSR en este hub»— y solo entonces
+    // gasta una llamada, así que una flota de hubs que firman con su propio certificado no le
+    // cuesta nada al plano de control ni llena de revisiones el escritorio del operador.
+    gateway_enrolment::spawn_enrolment_service(&state);
 
-    // Broker de la pasarela fiscal (hub#1432, hub#985 §1): el motor pide un acceso por la
-    // capability `fiscal_gateway_access` y ESTE broker es quien de verdad lo consigue — token
-    // corto del plano de control (cacheado; la cuota es 60/h) + identidad mTLS de la BD. El
-    // motor nunca ve el token de máquina, igual que con el refetch del certificado.
-    erplora_runtime::fiscal_gateway::GatewayBrokerCell::global().install(std::sync::Arc::new(
-        fiscal_gateway::HubGatewayBroker::new(&state),
-    ));
+    // «Llama a MI nube con MI credencial de máquina» (hub#1459): el primitivo genérico con el
+    // que un motor first-party pide algo al plano de control sin sostener jamás el `X-Hub-Token`.
+    // El host pone destino y credencial; el motor pone método, ruta y cuerpo — y qué significa la
+    // respuesta (caché, 409, reintento) es del motor, no del core.
+    erplora_runtime::cloud_call::CloudCallerCell::global()
+        .install(cloud_call::HubCloudCaller::installed(&state));
 
     // Router de API + (opcional) frontend estático en el MISMO origen (`cfg.web_dir`). En ECS/binario
     // lo vuelca `from_env` desde `HUB_WEB_DIR`; en Tauri (Hub Local, ADR-0050) lo fija el shell con la

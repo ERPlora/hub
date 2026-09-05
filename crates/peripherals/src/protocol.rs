@@ -6,7 +6,8 @@
 //! Cambios de superficie por la decisión red-only (§2.7) respecto al protocolo Python:
 //!   - **Eliminadas** las acciones/eventos de escáner y teclado virtual: `toggle_keyboard`,
 //!     evento `barcode`, evento `keyboard_toggled` (el escáner HID lo maneja el SO/navegador).
-//!   - `printer_id` queda siempre `network:{ip}:{port}` (sin `usb:` ni `bluetooth:`).
+//!   - `printer_id` nació `network:{ip}:{port}` a secas. Hoy son tres: `bluetooth:{mac}` volvió
+//!     con ADR-0204 (solo Android) y `usb:{queue}` con hub#1083 (solo escritorio).
 
 use serde::{Deserialize, Serialize};
 
@@ -69,10 +70,11 @@ pub enum Event {
 /// Info estandarizada de una impresora (espejo de `printer_info()` en Python).
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct PrinterInfo {
-    /// `network:{ip}:{port}`.
+    /// `network:{ip}:{port}`, `bluetooth:{mac}` (ADR-0204) o `usb:{queue}` (hub#1083).
     pub id: String,
     pub name: String,
-    /// Transporte. Siempre `"network"` en red-only.
+    /// Transporte: `"network"` | `"bluetooth"` | `"usb"` — el esquema de `id`, en un campo aparte
+    /// para que una pantalla pueda agrupar por cable sin parsear el id.
     #[serde(rename = "type")]
     pub kind: String,
     /// Familia de la impresora: `"a4"` | `"unknown"`.

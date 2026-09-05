@@ -3,8 +3,8 @@
 //! convenio 017 (pm#71); this file needs neither: no network, no real certificate material.
 //!
 //! **The property.** The certificate a hub signs with is a fact of the CORE
-//! (`_hub_certificate`, ADR-0202 §2.1) and can be rotated at any moment — the business
-//! re-uploads its own `.p12`, or ERPlora rotates the delegated one. The fiscal hash chain must
+//! (`_hub_certificate`, ADR-0202 §2.1) and can be rotated at any moment — the business re-uploads
+//! its own `.p12`, renews it, or replaces it with a different one. The fiscal hash chain must
 //! not care: `chain::alta_hash` (`crates/plugins/verifactu/src/chain.rs`) composes the AEAT fingerprint
 //! from `IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&TipoFactura&CuotaTotal&
 //! ImporteTotal&Huella&FechaHoraHusoGenRegistro` (Orden HAC/1177/2024) — the PREVIOUS record's
@@ -67,7 +67,7 @@ async fn runtime_with_verifactu(hub_id: &str) -> Runtime {
 /// Writes one slot straight into the core table, exactly like
 /// `crates/runtime/tests/certificate_fallback_e2e.rs::store_slot` — going through the real
 /// writers would need the process-global `HUB_SECRETS_KEY`, and everything this file reads (the
-/// dispatcher's `can_sign`, the engine's `has_certificate`) looks only at the PRESENCE of the
+/// dispatcher's `can_transmit`, the engine's `has_certificate`) looks only at the PRESENCE of the
 /// row, never at its content. `marker` stands in for "which physical certificate" purely for the
 /// test's own readability: cert A and cert B share nothing, on purpose.
 async fn store_cert(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKind, marker: &str) {
@@ -97,8 +97,8 @@ fn admin() -> RequestContext {
 
 /// `record_type: "anulacion"` — not `"alta"` — and NOT a simplification of the scenario.
 ///
-/// `records.create`'s own manifest schema (`schemas/record_create.json`) never accepts a
-/// `tax_breakdown`, so every call through this public command binds an EMPTY STRING to that
+/// This file's calls send no `tax_breakdown` (the schema has accepted one since verifactu#58, but
+/// a certificate rotation has no use for it), so every call here binds an EMPTY STRING to that
 /// column. On Postgres 18 that empty string trips a pre-existing bug in the sibling
 /// `ERPlora/verifactu` module (migration `013_arithmetic_integrity.sql` on its `main` — `011` is
 /// a permanent gap in that repo's numbering): its `alta`-only CHECK constraints call
@@ -202,12 +202,13 @@ async fn the_chain_does_not_break_when_the_certificate_changes_hub1270() {
     .await
     .expect("record 1 is created while cert A signs");
 
-    // Certificate ROTATION: cert A is gone, ERPlora's delegated cert (cert B) takes over — a
-    // completely different identity, sharing nothing with the one that signed record 1.
+    // Certificate ROTATION: cert A is gone and cert B takes its place — a completely different
+    // identity, sharing nothing with the one that signed record 1. Since hub#1435 retired the
+    // delegated slot this is the shape a rotation has: the business replaces its own `.p12`.
     certificate::delete(rt.db(), HUB, CertificateKind::Own)
         .await
         .expect("delete cert A");
-    store_cert(rt.db(), HUB, CertificateKind::Delegated, "cert-B").await;
+    store_cert(rt.db(), HUB, CertificateKind::Own, "cert-B").await;
     rt.execute_command(
         "verifactu.records.create",
         &record_payload("F-2026-000002"),

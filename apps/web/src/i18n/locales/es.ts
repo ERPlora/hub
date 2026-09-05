@@ -36,8 +36,11 @@ export default {
     appsEmpty: 'Aquí aparecerán tus apps. Pulsa Apps para añadir las que necesite tu negocio.',
     appsClose: 'Cerrar',
     assistant: 'Asistente',
-    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
-    // it crosses a product boundary, so it names the destination out loud.
+    // The way out to management (hub#364). It crosses a product boundary, so it names the
+    // destination: `manageShort` is what is READ on the button, `manage` is the whole sentence the
+    // accessible name reads out (hub#1400 — the entry used to be icon-only at the till). The short
+    // one is the BRAND, so it is the same word in every language.
+    manageShort: 'erplora.com',
     manage: 'Gestiona tu negocio en erplora.com',
     manageError: 'No se pudo abrir tu navegador. Entra en erplora.com para gestionar tu negocio.',
     notifications: 'Notificaciones',
@@ -70,6 +73,15 @@ export default {
       'Este dispositivo cerrará la sesión de este negocio y mostrará tu lista de negocios.',
     changeHubCancel: 'Cancelar',
     changeHubConfirm: 'Cambiar',
+  },
+  // hub#1518 — una pantalla cuyo código no llegó (se cortó la conexión, o el fichero se quedó
+  // viejo tras un despliegue). Dicho en cristiano: en un mostrador nadie sabe qué es un «chunk».
+  viewLoad: {
+    failedToast: 'No se ha podido abrir esa sección. Revisa la conexión y vuelve a intentarlo.',
+    blockedTitle: 'ERPlora no ha podido terminar de abrirse',
+    blockedBody:
+      'Se ha cortado la conexión mientras se cargaba esta pantalla. Revisa la conexión y vuelve a intentarlo.',
+    blockedAction: 'Reintentar',
   },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre
@@ -389,6 +401,16 @@ export default {
     manageLocal:
       'Esta identidad pertenece solo a este negocio. Aquí no se conocen ni se muestran otros negocios.',
     manageInSaas: 'Gestionar cuenta en erplora.com',
+    pinTitle: 'PIN',
+    pinDesc: 'El PIN con el que entras en la caja. Cámbialo cuando quieras — no hace falta que lo haga nadie más.',
+    pinSetupDesc: 'Todavía no tienes un PIN. Establece uno para poder entrar también desde la caja.',
+    currentPin: 'PIN actual',
+    newPin: 'PIN nuevo',
+    confirmPin: 'Repite el PIN nuevo',
+    changePin: 'Cambiar PIN',
+    setPin: 'Establecer PIN',
+    pinSaved: 'PIN actualizado',
+    pinMismatch: 'Los dos PIN no coinciden.',
   },
   // hub#358 — «este dispositivo»: si esta terminal pregunta quién la está usando. El texto dice la
   // CONSECUENCIA de cada modo, nunca su nombre técnico: el dueño de un bar tiene que poder deducir,
@@ -680,6 +702,7 @@ export default {
     declarationDesc:
       'La declaración que ERPlora firma para la versión del sistema que estás usando, y los datos identificativos que cada factura envía a Hacienda. Si alguna vez te los piden, esta es la pantalla que se enseña.',
     declarationRead: 'Leer la declaración firmada',
+    declarationTextVersion: 'Versión de la declaración',
     declarationDataTitle: 'Datos identificativos de este sistema',
     declarationPending:
       'Los datos identificativos de ERPlora todavía no han llegado. Llegan solos al minuto de estar el sistema en marcha; hasta entonces no se puede enviar ninguna factura a Hacienda.',
@@ -877,6 +900,7 @@ export default {
     deactivateTitle: 'Dar de baja',
     deactivateBody: 'Vas a dar de baja a «{name}». Perderá el acceso al Hub, pero su historial se conserva.',
     deactivateBlocked: 'No puedes darte de baja a ti mismo ni dejar el Hub sin ningún administrador.',
+    ownerRowBlocked: 'La ficha del dueño de la cuenta solo la cambia él. Para traspasar el negocio, transfiere la cuenta en ERPlora.',
     active: 'Activo',
     inactive: 'De baja',
   },
@@ -1021,10 +1045,12 @@ export default {
       account_role_not_grantable: 'A una cuenta de ERPlora solo se la puede invitar como admin, manager o employee. Los roles que añade un módulo son del personal local.',
       email_taken: 'Este hub ya conoce ese email. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de invitar una segunda identidad.',
       role_above_inviter: 'No puedes repartir un rol por encima del tuyo: administrar el hub solo lo concede quien ya lo administra.',
+      owner_row: 'Esta es la ficha del dueño de la cuenta y solo él puede cambiarla, PIN incluido. Para traspasar el negocio, transfiere la cuenta en ERPlora.',
       invalid_email: 'Introduce un email válido.',
       pin_length: 'El PIN debe tener {n} dígitos.',
       pin_too_simple: 'Ese PIN se adivina a la primera: evita los dígitos repetidos (1111) y las cuestas seguidas (1234).',
       pin_in_use: 'Ese PIN ya lo tiene otro usuario activo. El PIN dice quién está en la caja, así que no lo pueden compartir dos personas.',
+      pin_current_mismatch: 'Ese no es tu PIN actual. Escríbelo bien para poder fijar uno nuevo.',
       local_cannot_administer: 'Un usuario local no puede administrar el hub: administrar sale de una cuenta de ERPlora, nunca de un PIN.',
       local_has_email: 'Un usuario local no lleva email. Desmarca «Usuario local» para invitarlo como usuario de cuenta.',
       name_taken: 'Este hub ya conoce a alguien con ese nombre. Edita a ese usuario —reincorpóralo si estaba dado de baja— en vez de crear una segunda identidad.',
@@ -1514,6 +1540,8 @@ export default {
     textPlaceholder: 'Escribe aquí…',
     invalidFields: 'Revisa los campos marcados y vuelve a guardar.',
     fieldInvalid: 'Este valor no se admite.',
+    preview: 'Probar',
+    previewError: 'No se pudo hacer la prueba.',
   },
   modulePlan: {
     tab: 'Plan',

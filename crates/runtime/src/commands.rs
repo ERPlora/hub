@@ -171,12 +171,13 @@ pub(crate) async fn execute_at(
             .await
             .unwrap_or(Json::Null);
         let get = |k: &str| f.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-        // «Can this hub issue?» — the OWN certificate if the business uploaded one, otherwise the
-        // DELEGATED one ERPlora handed down (ADR-0202 §2.1, hub#319). One named function, shared
-        // with `queries::execute_page` and with the ⛔ arm of `setup_status`, because a gate and a
-        // checklist that disagree about this turn ⛔ into a lie in one direction or the other.
-        // Degrading to `false` on error keeps the gate failing CLOSED.
-        let has_cert = crate::certificate::can_sign(db, &ctx.hub_id)
+        // «Can this hub issue?» — its OWN certificate if the business uploaded one, otherwise the
+        // enrolled machine identity that opens the cell road (ADR-0320 §1, hub#319/hub#1489). One
+        // named function, shared with `queries::execute_page` and with the ⛔ arm of
+        // `setup_status`, because a gate and a checklist that disagree about this turn ⛔ into a
+        // lie in one direction or the other. Degrading to `false` on error keeps the gate failing
+        // CLOSED.
+        let has_cert = crate::certificate::can_transmit(db, &ctx.hub_id)
             .await
             .unwrap_or(false);
         // What this hub OWES right now (ADR-0273 D2/D4): the mode plus the events the provider
@@ -255,9 +256,57 @@ pub(crate) async fn execute_at(
         ctx
     };
 
-    let cmd = registry
-        .get_command(name)
-        .ok_or_else(|| RuntimeError::CommandNotFound(name.to_string()))?;
+    // Tres ausencias distintas para un mismo lookup fallido — mismo criterio que
+    // `queries::execute_page` (ADR-0127/0128, hub#1428): módulo NO instalado y módulo
+    // DESACTIVADO son ausencias que `commandOptional` perdona; un command inexistente en un
+    // módulo activo — o el namespace reservado del core, que nunca está "ausente" (ADR-0192,
+    // igual que exime `CORE_NAMESPACE_OWNER` en el SDK) — es un CONTRATO ROTO y explota.
+    let cmd = registry.get_command(name).ok_or_else(|| {
+        if name.starts_with(crate::hub_users::CORE_NAMESPACE) {
+            return RuntimeError::CommandNotFound(name.to_string());
+        }
+        let owner = name.split('.').next().unwrap_or("");
+        if owner.is_empty() || !registry.installed.iter().any(|m| m.id == owner) {
+            return RuntimeError::ModuleNotInstalled {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
+        }
+        if !registry.is_active(owner) {
+            return RuntimeError::ModuleInactive {
+                module: owner.to_string(),
+                operation: name.to_string(),
+            };
+        }
+        RuntimeError::CommandNotFound(name.to_string())
+    })?;
+
+    // ¿Puede este módulo hacer lo que declara que necesita? (ADR-0079, hub#1425). Se sella por
+    // módulo LLAMANTE y en cada dispatch —no con la identidad del hub, que es una propiedad del
+    // hub y se resuelve una sola vez—: un `ctx` heredado (un listener que corre a `depth > 0`,
+    // otro módulo) traería la respuesta del módulo anterior. Aquí, justo detrás del lookup, lo
+    // ven TODAS las ramas de abajo: el SQL declarativo, las operaciones de un handler y el gate
+    // nativo `capabilities::enforce`, que es la misma función que contesta esto.
+    //
+    // Degrada a `false` —en voz alta— si la lectura falla: `:capabilities_granted` existe para
+    // AVISAR, y de las dos lecturas equivocadas la cara es callar mientras el módulo no firma.
+    let capability_ctx;
+    let ctx = match crate::capabilities::all_granted(db, registry, &cmd.module_id, &ctx.hub_id)
+        .await
+    {
+        Ok(granted) => {
+            capability_ctx = ctx.clone().with_capabilities_granted(granted);
+            &capability_ctx
+        }
+        Err(e) => {
+            eprintln!(
+                "⚠ capabilities: no se pudo leer el estado de `{}` ({e}) → `:capabilities_granted` = 0",
+                cmd.module_id
+            );
+            capability_ctx = ctx.clone().with_capabilities_granted(false);
+            &capability_ctx
+        }
+    };
 
     // Gate de ORIGEN (hub#131, hub#145): un command interno (prefijo `_` en su último segmento,
     // o `internal: true` en el manifest) es invisible para un caller EXTERNO — ni el permiso ni

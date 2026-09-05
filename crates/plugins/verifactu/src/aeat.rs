@@ -880,16 +880,114 @@ pub fn stamp_contingency_incidence(xml: &str) -> String {
     if xml.contains("<sum1:Incidencia>") {
         return xml.to_string();
     }
-    // El anclaje es el cierre de `ObligadoEmision`, que es el único elemento OBLIGATORIO de la
-    // cabecera: `RemisionVoluntaria` va justo detrás en el `xs:sequence` (solo `Representante`
-    // puede colarse en medio, y este motor todavía no lo emite — hub#321).
+    // El anclaje es lo ÚLTIMO que puede precederla en el `xs:sequence` de `CabeceraType`:
+    // ObligadoEmision → Representante? → RemisionVoluntaria?. `ObligadoEmision` es el único
+    // obligatorio, pero desde hub#1460 el `Representante` SÍ se emite, y anclar siempre en el
+    // primero metería la incidencia por delante de él — fuera de secuencia, o sea un 4102 con el
+    // número de cadena ya gastado. Con los dos anclajes las dos marcas componen en cualquier
+    // orden.
+    let cut = ["</sum1:Representante>", "</sum1:ObligadoEmision>"]
+        .into_iter()
+        .find_map(|anchor| xml.find(anchor).map(|at| at + anchor.len()));
+    match cut {
+        Some(cut) => format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..]),
+        None => xml.to_string(),
+    }
+}
+
+/// **Quién presenta estos bytes ante la AEAT**, tal y como el plano de control lo FIRMÓ para esta
+/// transmisión (`presenter_nif`/`presenter_name` del token corto de la celda).
+///
+/// No es configuración del hub ni una constante del SaaS que el motor pueda leerse por su cuenta:
+/// el hub **nunca ve el Sello**, así que la única forma que tiene de saber quién va a presentar es
+/// que se lo digan firmado — y la celda contrasta ese mismo par contra el titular del Sello que
+/// realmente presenta, de modo que un Cloud que mintiera aquí se caza allí (ADR-0268 §4, saas
+/// `presenter_identity()`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Presenter<'a> {
+    pub nif: &'a str,
+    pub name: &'a str,
+}
+
+/// Deja el bloque `Cabecera/Representante` del sobre **describiendo quién lo presenta AHORA**:
+/// lo inserta, lo sustituye o lo quita (hub#985 §2 — hub#1460).
+///
+/// # Por qué se estampa aquí y no en [`build_soap`]
+///
+/// Por lo mismo que la incidencia, y de forma aún más literal: **la vía se resuelve después de
+/// construir el sobre**, y en un reintento el sobre ni siquiera se construye — se reutiliza el
+/// `xml_content` congelado del intento anterior, que se estampó para la vía que iba a tomar
+/// entonces. Un `Representante` horneado en el constructor describiría al presentador de hace tres
+/// días: si el negocio subió su propio certificado mientras el registro esperaba en la cola, sería
+/// una representación FALSA; si el presentador rotó, es el Fault **4112** que esta pieza viene a
+/// cerrar. Por eso **SET** y no «estampa si falta».
+///
+/// La `Cabecera` no entra en la huella (ADR-0202 §4.6), así que nada de esto toca la cadena ni
+/// obliga a regenerar el registro.
+///
+/// # La regla (ADR-0268 §4), y lo que NO es entrada de ella
+///
+/// Se emite **si el presentador difiere del `IDEmisorFactura`**, y con la identidad del
+/// presentador. Si coinciden no hay representación y no se emite **venga por la vía que venga**:
+/// el slot (`own`/`delegated`) dice de *quién* es el certificado, no *quién presenta*, y derivar
+/// de él es el cuarto defecto de frontera que hub#470 ya corrigió en la otra mitad del par.
+///
+/// `presenter: None` = vía **own**: firma el certificado del negocio, el titular ES el obligado y
+/// no se inventa representación.
+///
+/// Una identidad a medias (sin NIF o sin razón social) **no se estampa**: `PersonaFisicaJuridicaESType`
+/// exige los dos, y rellenar el que falta sería declarar a alguien que no es.
+pub fn set_representative(
+    xml: &str,
+    presenter: Option<Presenter<'_>>,
+    obligado_nif: &str,
+) -> String {
+    let block = presenter.and_then(|p| representative_block(p, obligado_nif));
+    let stripped = without_representative(xml);
+    let Some(block) = block else {
+        return stripped;
+    };
+    // Justo detrás del `ObligadoEmision`, que es donde lo pone el `xs:sequence` de `CabeceraType`.
+    // Un sobre sin esa marca no es un sobre nuestro: se devuelve intacto antes que corromperlo.
     const ANCHOR: &str = "</sum1:ObligadoEmision>";
-    match xml.find(ANCHOR) {
+    match stripped.find(ANCHOR) {
         Some(at) => {
             let cut = at + ANCHOR.len();
-            format!("{}{INCIDENCIA_BLOCK}{}", &xml[..cut], &xml[cut..])
+            format!("{}{block}{}", &stripped[..cut], &stripped[cut..])
         }
-        None => xml.to_string(),
+        None => stripped,
+    }
+}
+
+/// El bloque a emitir, o `None` cuando no hay representación que declarar.
+fn representative_block(presenter: Presenter<'_>, obligado_nif: &str) -> Option<String> {
+    let nif = presenter.nif.trim();
+    let name = presenter.name.trim();
+    if nif.is_empty() || name.is_empty() {
+        return None;
+    }
+    // Identidad, no tipografía: el plano de control puede devolver el NIF con espacios o en
+    // minúsculas, y tomarlo por otro inventaría una representación del obligado por sí mismo.
+    if nif.eq_ignore_ascii_case(obligado_nif.trim()) {
+        return None;
+    }
+    Some(format!(
+        "<sum1:Representante><sum1:NombreRazon>{name}</sum1:NombreRazon>\
+         <sum1:NIF>{nif}</sum1:NIF></sum1:Representante>",
+        name = esc(name),
+        nif = esc(nif),
+    ))
+}
+
+/// El sobre sin su `Representante`, byte a byte igual al original cuando no lo llevaba.
+fn without_representative(xml: &str) -> String {
+    const OPEN: &str = "<sum1:Representante>";
+    const CLOSE: &str = "</sum1:Representante>";
+    match (xml.find(OPEN), xml.find(CLOSE)) {
+        (Some(from), Some(to)) if to > from => {
+            format!("{}{}", &xml[..from], &xml[to + CLOSE.len()..])
+        }
+        _ => xml.to_string(),
     }
 }
 
@@ -1052,11 +1150,28 @@ pub struct ConsultRecord {
 ///
 /// `ObligadoEmisionConsultaType` exige **`NombreRazon` además del NIF**: sin él no se construye
 /// el sobre. Mandarlo incompleto solo produce otro 4102 DESPUÉS de haber hablado con Hacienda.
+///
+/// # `presenter` — quién consulta, que en la consulta NO es un bloque sino un FLAG
+///
+/// Por la celda consulta ERPlora con el Sello por cuenta del obligado (ADR-0320, hub#1436), y eso
+/// hay que declararlo o la AEAT devuelve el fault **4112** («el titular del certificado debe ser
+/// Obligado Emisión, Colaborador Social, Apoderado o Sucesor») en vez de la cadena del cliente.
+///
+/// ⚠️ Pero **no se declara como en el alta**. `CabeceraConsultaSf` no tiene `Representante`
+/// —ese bloque es de `CabeceraType`, el del alta (hub#1460)—: declara la secuencia
+/// `IDVersion → (ObligadoEmision | Destinatario) → IndicadorRepresentante?`, y la representación
+/// es un flag de un solo valor (`S`), sin identidad. Estampar aquí un `<sum1:Representante>` con
+/// [`set_representative`] sería otro 4102: el elemento no existe en este esquema.
+///
+/// La regla de cuándo levantarlo es la MISMA que la del bloque del alta (ADR-0268 §4): solo si el
+/// presentador **difiere** del obligado. `None` —la vía propia, donde firma el certificado del
+/// negocio— nunca lo levanta.
 pub fn build_consult_soap(
     issuer_nif: &str,
     issuer_name: &str,
     ejercicio: &str,
     periodo: &str,
+    presenter: Option<Presenter<'_>>,
 ) -> Result<String, VerifactuError> {
     if issuer_nif.trim().is_empty() {
         return Err(VerifactuError::Payload(
@@ -1078,6 +1193,15 @@ pub fn build_consult_soap(
         return Err(VerifactuError::MissingField("Periodo"));
     }
     let periodo_xml = format!("<sum1:Periodo>{}</sum1:Periodo>", esc(periodo));
+    // Cierra la `Cabecera` (`xs:sequence`: IDVersion → ObligadoEmision → IndicadorRepresentante?)
+    // y solo cuando hay representación de verdad. Del presentador viaja el HECHO, no la identidad:
+    // el esquema de consulta no tiene dónde ponerla.
+    let indicador = match presenter {
+        Some(p) if !p.nif.trim().eq_ignore_ascii_case(issuer_nif.trim()) => {
+            "<sum1:IndicadorRepresentante>S</sum1:IndicadorRepresentante>"
+        }
+        _ => "",
+    };
     Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
          <soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" \
@@ -1090,7 +1214,7 @@ pub fn build_consult_soap(
          <sum1:ObligadoEmision>\
          <sum1:NombreRazon>{name}</sum1:NombreRazon>\
          <sum1:NIF>{nif}</sum1:NIF>\
-         </sum1:ObligadoEmision>\
+         </sum1:ObligadoEmision>{indicador}\
          </con:Cabecera>\
          <con:FiltroConsulta>\
          <con:PeriodoImputacion>\
@@ -1342,12 +1466,13 @@ pub async fn post_soap(
 /// that gets its connection refused says none of these.
 const TLS_MARKERS: [&str; 4] = ["tls", "certificate", "handshake", "alert"];
 
-/// Did this transport failure come from the TLS layer? (ADR-0202 §2 point 4 — hub#318)
+/// Did this transport failure come from the TLS layer?
 ///
-/// **The third refetch trigger depends on this answer, so it has to be narrow in both directions.**
-/// A false positive spends the hub's refetch allowance on a network outage, and the allowance is
-/// what the hub needs when the certificate really is the problem. A false negative leaves a hub
-/// signing with a revoked certificate until somebody notices by hand.
+/// **Narrow in both directions, and it has to stay that way.** A false positive tells an operator to
+/// go renew a certificate that was never the problem; a false negative leaves a hub signing with a
+/// revoked one until somebody notices by hand, because every stranded record reads as «the network».
+/// (Until hub#1435 the stakes were higher still: this answer also decided whether the hub spent one
+/// of its six hourly refetches of the delegated certificate — a slot that no longer exists.)
 ///
 /// It reads the error's **causes and not the error itself**. `reqwest`'s own message is
 /// `error sending request for url (…)` — it carries the ENDPOINT, which is the one string in the
@@ -1366,8 +1491,8 @@ pub fn is_tls_failure(error: &(dyn std::error::Error + 'static)) -> bool {
     false
 }
 
-/// Turns a transport failure into the right [`VerifactuError`] variant, which is what decides
-/// whether the hub refetches its certificate (ADR-0202 §2 point 4 — hub#318).
+/// Turns a transport failure into the right [`VerifactuError`] variant — which is what tells the
+/// operator whether the certificate or the network is the thing to go and fix.
 ///
 /// A function of its own so the decision is testable without a live handshake against the AEAT:
 /// inside the `map_err` closure it would only be reachable through a real rejected certificate.
@@ -1447,7 +1572,7 @@ mod tls_classification_tests {
     /// to decide whether to ask for a new certificate. Tested here because inside `post_soap`'s
     /// `map_err` it would take a real rejected handshake against the AEAT to reach.
     #[test]
-    fn only_a_tls_failure_becomes_the_variant_that_triggers_a_refetch() {
+    fn only_a_tls_failure_becomes_the_certificate_variant() {
         let tls = chain(&["error sending request", "invalid peer certificate: Expired"]);
         assert!(matches!(
             super::transport_error(&tls, "conexión AEAT: …".into()),
@@ -1461,7 +1586,7 @@ mod tls_classification_tests {
         ));
     }
 
-    /// 🔒 **The AEAT being unreachable must NOT spend the refetch allowance.** These are the
+    /// 🔒 **The AEAT being unreachable must NOT read as a broken certificate.** These are the
     /// failures a hub sees on a bad day at the till, they arrive once per record the contingency
     /// queue drains, and none of them is fixed by downloading a private key again.
     #[test]

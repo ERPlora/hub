@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use crate::errors::{DemoLock, RuntimeError};
+use crate::errors::RuntimeError;
 
 /// Ventana de dedup local: si la misma huella se reportó hace menos de esto, se omite.
 const DEDUP_WINDOW: Duration = Duration::from_secs(30);
@@ -312,6 +312,14 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         | E::PermissionDenied(_)
         | E::CommandNotFound(_)
         | E::QueryNotFound(_)
+        // hub#1428: the OWNER module being absent is an expected absence, not a Hub fault. It is
+        // the very case `queryOptional`/`commandOptional` exist to make routine (`combos` writing
+        // into an `inventory` this hub does not have), and every dispatch failure travels to the
+        // Cloud through `error_sink` — filing that as an unexpected Hub bug is noise that buries
+        // the real ones. It matters more since hub#1428 moved COMMANDS onto these two variants:
+        // until then an absent module answered `CommandNotFound`, which was already USER here.
+        | E::ModuleNotInstalled { .. }
+        | E::ModuleInactive { .. }
         | E::InternalCommand(_)
         // hub#140: un `min_affected_rows` incumplido es un error esperable del llamador (recurso
         // inexistente / transición no aplicable), no un fallo inesperado del Hub.
@@ -354,6 +362,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // caller (a user, a module author) fixes — never a bug of the hub.
         | E::InvalidField { .. }
         | E::ManifestRejected { .. }
+        // hub#1542: a bound the column cannot read is the caller's to fix, exactly like a filter
+        // the query does not declare — never a fault of the hub.
+        | E::InvalidFilterBound { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -398,7 +409,6 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         E::Native(_) => "native",
         E::InvalidPayload { .. } => "invalid_payload",
         E::InvalidField { .. } => "invalid_field",
-        E::CertificateTypeMismatch { .. } => "certificate_type_mismatch",
         E::ManifestRejected { code, .. } => code.as_str(),
         // hub#1086: its own stable code, so a caller can tell "you did not send what the
         // query needs" from "what you sent does not validate".
@@ -407,6 +417,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // filter" from "you did not send what it needs" — and fix the call instead of trusting
         // a page that quietly held the whole list.
         E::UnknownFilter { .. } => "unknown_filter",
+        // hub#1542: its own stable code so the caller can tell "that bound is not a number" from
+        // `db` ("the hub could not reach its database"). One is fixed by changing the call, the
+        // other by nobody.
+        E::InvalidFilterBound { .. } => "invalid_filter_bound",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero
@@ -460,6 +474,11 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `DemoLock` solo lo nombran los tests: el camino de producción llegó a él por
+    // `RuntimeError::DemoLocked { lock }` y dejó de nombrar el tipo al retirarse
+    // `certificate_type_mismatch` (hub#1490), así que el `use` del módulo pasó a ser ruido
+    // permanente en cada compilación (hub#1501).
+    use crate::errors::DemoLock;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -632,6 +651,26 @@ mod tests {
         );
         assert_eq!(
             severity_of(&RuntimeError::NotImplemented("x")),
+            severity::USER
+        );
+        // hub#1428: la ausencia del MODULO dueño es una ausencia ESPERABLE, no un fallo del Hub.
+        // `commandOptional`/`queryOptional` existen precisamente para que sea rutina (`combos`
+        // escribiendo en un `inventory` que este hub no tiene). Sin estas dos lineas caian en el
+        // brazo `_ => UNEXPECTED` y cada integracion opcional ausente viajaba al Cloud
+        // (`error_sink`) como bug del Hub — con el agravante de que hub#1428 acababa de mover ahi
+        // los commands, que hasta entonces daban `CommandNotFound` (USER).
+        assert_eq!(
+            severity_of(&RuntimeError::ModuleNotInstalled {
+                module: "inventory".into(),
+                operation: "inventory.products.create".into()
+            }),
+            severity::USER
+        );
+        assert_eq!(
+            severity_of(&RuntimeError::ModuleInactive {
+                module: "inventory".into(),
+                operation: "inventory.products.create".into()
+            }),
             severity::USER
         );
         // Fallos no esperados.

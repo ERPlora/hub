@@ -230,7 +230,9 @@ pub(crate) async fn require_flows_capability(
     headers: &HeaderMap,
     rt: &erplora_runtime::Runtime,
 ) -> Result<(), Response> {
-    require_module_capability(headers, rt, CapabilityKind::ManageFlows).await
+    require_module_capability(headers, rt, CapabilityKind::ManageFlows)
+        .await
+        .map(|_| ())
 }
 
 /// The same gate for **any** capability a core door hangs on (hub#1108): if the request NAMES a
@@ -244,17 +246,24 @@ pub(crate) async fn require_flows_capability(
 /// may reach the printer" — for the same reason flows use `manage_flows`: without it, a typed SDK
 /// surface would hand every installed module the power to bin another module's tickets the moment
 /// an admin happens to be logged in.
+///
+/// **Hands back WHICH module walked through** (hub#1532), or `None` when the caller named none.
+/// The gate had to resolve it to check the grant and then dropped it, so the one layer that knows
+/// the answer to «which module did this?» was also the only one that never wrote it down. Returning
+/// it costs nothing and is the only honest source: it is the name the grant was checked against,
+/// not a second read of the header, which is what would let the two drift apart.
 pub(crate) async fn require_module_capability(
     headers: &HeaderMap,
     rt: &erplora_runtime::Runtime,
     kind: CapabilityKind,
-) -> Result<(), Response> {
+) -> Result<Option<String>, Response> {
     let Some(module) = calling_module(headers) else {
-        return Ok(());
+        return Ok(None);
     };
     rt.require_module_capability(&module, kind)
         .await
-        .map_err(crate::err_response)
+        .map_err(crate::err_response)?;
+    Ok(Some(module))
 }
 
 /// Resolves the admin session and hands back the runtime plus «who is doing this», already in the

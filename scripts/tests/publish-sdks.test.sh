@@ -95,14 +95,14 @@ else
 
     # `main`/`types` apuntan a `src/index.ts`: el paquete se consume como FUENTE TypeScript
     # (así lo transpilan vitest y esbuild), así que el tarball TIENE que llevar `src/`.
-    if ! printf '%s' "$files" | grep -q '"src"'; then
+    if ! grep -q '"src"' <<<"$files"; then
         bad "el tarball publicado incluye \`src/\`" \
             "\`files\` = ${files:-<sin declarar>} — \`main\` apunta a \`src/index.ts\`: sin \`src\` el paquete publicado no resuelve nada"
     else
         ok "\`files\` incluye \`src\` (el paquete se consume como fuente TS)"
     fi
 
-    if ! printf '%s' "$pkg_version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+    if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$pkg_version"; then
         bad "la versión del paquete es semver" "es '${pkg_version:-<vacía>}'"
     elif [ "$pkg_version" = "0.0.0" ]; then
         bad "la versión del paquete no es el hueco 0.0.0" \
@@ -114,7 +114,8 @@ fi
 
 # ── 2. The three carriers of the number agree in the COMMITTED tree ──────────
 core_version=$(cargo_section_version "$repo_root/Cargo.toml" workspace.package)
-ts_version=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sdk_version_ts" 2>/dev/null | head -1)
+ts_versions=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sdk_version_ts" 2>/dev/null)
+ts_version=${ts_versions%%$'\n'*}
 pkg_version=$(json_field "$sdk_package_json" version)
 
 if [ -z "$ts_version" ]; then
@@ -141,7 +142,8 @@ else
     if "$stamp" --root "$sandbox" --version 9.8.7 >/dev/null 2>&1; then
         stamped_cargo=$(cargo_section_version "$sandbox/Cargo.toml" workspace.package)
         stamped_pkg=$(json_field "$sandbox/packages/module-sdk/package.json" version)
-        stamped_ts=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sandbox/packages/module-sdk/src/version.ts" 2>/dev/null | head -1)
+        stamped_tss=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sandbox/packages/module-sdk/src/version.ts" 2>/dev/null)
+        stamped_ts=${stamped_tss%%$'\n'*}
         missed=""
         [ "$stamped_cargo" = "9.8.7" ] || missed="$missed Cargo.toml(='$stamped_cargo')"
         [ "$stamped_pkg" = "9.8.7" ]   || missed="$missed packages/module-sdk/package.json(='$stamped_pkg')"
@@ -199,7 +201,7 @@ else
     # `npm install @erplora/module-sdk` would pull the candidate. Same rule `image-tags.sh` already
     # enforces on the image: an rc NEVER moves `:latest`.
     if [ -n "$real_publish" ]; then
-        if ! printf '%s\n' "$real_publish" | grep -q -- '--tag'; then
+        if ! grep -q -- '--tag' <<<"$real_publish"; then
             bad "una prerelease (rc) no se publica como \`latest\`" \
                 "el \`npm publish\` real no lleva \`--tag\`: una \`X.Y.Z-rc.N\` movería \`latest\` en GitHub Packages, y \`npm install @erplora/module-sdk\` se llevaría la candidata"
         elif ! grep -qE '^[[:space:]]*\*-\*\)' "$build_workflow"; then

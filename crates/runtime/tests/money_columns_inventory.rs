@@ -95,25 +95,15 @@ fn tables_retired_by_published_contracts() -> BTreeMap<String, String> {
 /// Every table any published module migration CREATEs, as `table -> migration that creates it`.
 /// Reads the real catalogue under [`erplora_runtime::modules_root`].
 fn tables_created_by_the_catalogue() -> BTreeMap<String, String> {
-    let root = erplora_runtime::modules_root();
     let mut created = BTreeMap::new();
-    let entries = std::fs::read_dir(&root).unwrap_or_else(|e| {
-        panic!(
-            "cannot read the module catalogue at {}: {e}",
-            root.display()
-        )
-    });
-    for entry in entries.flatten() {
-        let module_dir = entry.path();
+    // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
+    // `modules-workspace/modules`, and a worktree carries the module's migrations too — so a bare
+    // sweep attributed the same `CREATE TABLE` to two different "modules" (hub#1448).
+    for (module, module_dir) in erplora_runtime::published_module_dirs() {
         let migrations = module_dir.join("migrations").join("postgres");
         if !migrations.is_dir() {
             continue;
         }
-        let module = module_dir
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
         let mut files: Vec<_> = std::fs::read_dir(&migrations)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", migrations.display()))
             .flatten()

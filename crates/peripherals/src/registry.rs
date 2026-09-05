@@ -114,12 +114,23 @@ pub fn normalize_mac(mac: &str) -> String {
         .join(":")
 }
 
-/// Identidad estable de un dispositivo en el registro.
+/// Transporte de una cola de impresión del SO en el registro (`Device::kind`).
+///
+/// El mismo esquema que su `printer_id` (`usb:{queue}`), en un campo aparte para que una pantalla
+/// pueda agrupar por cable sin parsear el id — igual que `"network"` y `"bluetooth"`.
+pub const KIND_USB: &str = "usb";
+
+/// Identidad estable de un dispositivo **con socket**: red y Bluetooth.
 ///
 /// La MAC normalizada cuando el sistema pudo resolverla por ARP; si no, el `printer_id`
 /// (`network:{ip}:{port}`). Sin este fallback, un dispositivo sin MAC no llegaba a registrarse y
 /// por tanto **no se le podía asignar un rol** (cocina/barra/caja) — que es justo lo que el módulo
 /// `printing` necesita. Ocurre siempre en Android y con VPN/contenedores/firewall en escritorio.
+///
+/// **No sirve para una cola del SO** (`usb:{queue}`, hub#1083): no tiene MAC que resolver ni
+/// `ip:port` al que caer, así que esta función le daría `network::0` a **todas** y la segunda cola
+/// registrada pisaría a la primera, con el rol que su dueño le hubiera puesto (hub#1536). Esa
+/// identidad la da [`DeviceRegistry::register_queue`], que usa el `printer_id` entero.
 pub fn device_key(mac: Option<&str>, ip: &str, port: u16) -> String {
     match mac {
         Some(m) if !m.trim().is_empty() => normalize_mac(m.trim()),
@@ -198,10 +209,13 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    /// Alta/actualización por [`device_key`]; preserva `first_seen` y `role`. Porta `register`.
+    /// Alta/actualización de un dispositivo **con socket** (red, Bluetooth) por [`device_key`];
+    /// preserva `first_seen` y `role`. Porta `register`.
     ///
     /// `mac` es `Option` a propósito: cuando ARP no la resuelve el dispositivo **igualmente se
     /// registra**, identificado por su `printer_id`. Antes se salía sin registrar nada.
+    ///
+    /// Una cola del SO no entra por aquí: su puerta es [`Self::register_queue`] (hub#1536).
     pub fn register(
         &self,
         mac: Option<&str>,
@@ -210,11 +224,63 @@ impl DeviceRegistry {
         name: &str,
         kind: &str,
     ) -> Result<Device> {
-        let key = device_key(mac, ip, port);
         let mac = mac
             .map(str::trim)
             .filter(|m| !m.is_empty())
             .map(normalize_mac);
+        // Neither a MAC nor a host: [`device_key`] answers `network::0` — the SAME key for every
+        // caller in that state, so the next one silently overwrites this entry and inherits the
+        // role its owner had assigned (hub#1536). A transport with no socket has its own door,
+        // [`Self::register_queue`]; anything else arriving here is a discovery that failed
+        // upstream, and it must say so instead of writing a shared ghost.
+        if mac.is_none() && ip.trim().is_empty() {
+            return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                "`{name}` has neither a MAC nor an address: it cannot be identified in the \
+                 registry (an OS print queue registers through its printer_id)"
+            )));
+        }
+        self.upsert(device_key(mac.as_deref(), ip, port), mac, ip, port, name, kind)
+    }
+
+    /// Alta/actualización de una **cola de impresión del SO** (`usb:{queue}`, hub#1083),
+    /// identificada por su `printer_id` entero (hub#1536).
+    ///
+    /// Una cola no tiene MAC que resolver por ARP ni `ip:port` al que caer, así que [`device_key`]
+    /// le daría `network::0` a todas y la segunda pisaría a la primera. Su `printer_id` **ya** es
+    /// único en la máquina —el nombre de destino de CUPS lo es— así que ES su identidad, y con ella
+    /// la cola entra en el registro como cualquier otra impresora: sale en `get_devices` y admite
+    /// rol (cocina/barra/caja), que es lo que el dueño espera poder decir de la impresora del
+    /// mostrador aunque esté por cable.
+    ///
+    /// El `printer_id` se valida con el MISMO parser que el camino de impresión
+    /// ([`crate::discovery::parse_print_target`]): un id sin cola detrás —o de otro transporte, que
+    /// tiene su propia identidad— crearía una entrada fantasma que la siguiente cola heredaría,
+    /// rol incluido.
+    pub fn register_queue(&self, printer_id: &str, name: &str) -> Result<Device> {
+        let printer_id = printer_id.trim();
+        match crate::discovery::parse_print_target(printer_id) {
+            Ok(crate::discovery::PrintTarget::Usb(_)) => {}
+            Ok(_) => {
+                return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                    "`{printer_id}` is not an OS print queue: a transport with a socket registers \
+                     by its MAC or its address"
+                )))
+            }
+            Err(exc) => return Err(exc),
+        }
+        self.upsert(printer_id.to_string(), None, "", 0, name, KIND_USB)
+    }
+
+    /// El alta en sí, una vez resuelta la identidad. Preserva `first_seen` y `role`.
+    fn upsert(
+        &self,
+        key: String,
+        mac: Option<String>,
+        ip: &str,
+        port: u16,
+        name: &str,
+        kind: &str,
+    ) -> Result<Device> {
         let now = now_iso();
 
         let device = {
@@ -296,9 +362,16 @@ impl DeviceRegistry {
     }
 
     /// Asigna el rol (`receipt`/`kitchen`/`bar`…). Acepta clave o MAC.
+    ///
+    /// A key the registry does not hold is an ERROR, not a no-op (hub#1083): the only way to get
+    /// here is a registration that failed upstream, and "your click did nothing" must not be how
+    /// the user finds out. Since hub#1536 a `usb:{queue}` is no longer among those keys — a
+    /// discovered queue is registered like any other printer and takes its role the same way.
     pub fn set_role(&self, key_or_mac: &str, role: &str) -> Result<()> {
         let Some(key) = self.resolve_key(key_or_mac) else {
-            return Ok(());
+            return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                "no registered device under `{key_or_mac}`; scan for printers again and retry"
+            )));
         };
         let mutated = {
             let mut map = self.devices.write().expect("registry lock envenenado");
@@ -802,6 +875,198 @@ mod tests {
     }
 
     // ── Datos ya persistidos en casa de clientes ────────────────────────────────────────────────
+
+    // ── hub#1083: a role on a printer the registry does not hold is an ERROR, not a no-op ──────
+    //
+    // A USB queue is discovered and prints, but never enters the registry (its identity is
+    // hub#1536). The printing settings screen still offers the role control and sends
+    // `usb:{queue}` as the key: answering `Ok` there is a click that does nothing, with no message —
+    // the silent failure the production-ready rule forbids.
+
+    #[test]
+    fn hub1083_a_role_on_a_usb_queue_is_refused_instead_of_silently_dropped() {
+        let (registry, _) = temp_registry("rol-cola-usb");
+
+        let err = registry
+            .set_role("usb:Star_TSP143", "kitchen")
+            .expect_err("a queue the registry cannot hold must not accept a role in silence");
+
+        assert!(matches!(err, crate::PeripheralError::InvalidPrinterId(_)), "got {err:?}");
+        assert!(registry.get_all().is_empty(), "nothing may have been written");
+    }
+
+    #[test]
+    fn a_role_on_a_device_the_registry_does_not_know_is_an_error_too() {
+        // Same rule for any unknown key: the only way to reach it is a registration that failed
+        // upstream, and "your click did nothing" must not be how the user finds out.
+        let (registry, _) = temp_registry("rol-desconocido");
+        registry.register(None, "10.0.0.7", 9100, "Cocina", "network").unwrap();
+
+        let err = registry
+            .set_role("network:10.0.0.99:9100", "bar")
+            .expect_err("an unknown key cannot take a role");
+
+        assert!(matches!(err, crate::PeripheralError::InvalidPrinterId(_)), "got {err:?}");
+        assert_eq!(registry.get_all().len(), 1, "the registered one is untouched");
+        assert_eq!(registry.get_all()[0].role, None, "and it did not receive the role by mistake");
+    }
+
+    // ── hub#1536: una cola del SO entra en el registro con identidad PROPIA ─────────────────────
+    //
+    // A USB queue has neither a MAC to resolve by ARP nor an `ip:port` to fall back on, so
+    // `device_key` answers `network::0` for EVERY one of them: the second queue registered would
+    // overwrite the first and the owner would end up with one entry for two printers. Its
+    // `printer_id` (`usb:{queue}`) IS its identity — a CUPS destination name is unique per machine.
+
+    #[test]
+    fn hub1536_two_usb_queues_are_two_devices_and_not_one() {
+        let (registry, _) = temp_registry("dos-colas-usb");
+
+        let star = registry
+            .register_queue("usb:Star_TSP143", "Star TSP143")
+            .expect("a discovered queue enters the registry");
+        let epson = registry
+            .register_queue("usb:EPSON_TM", "EPSON TM-T20III")
+            .expect("and so does the second one");
+
+        assert_eq!(star.key, "usb:Star_TSP143", "the printer_id IS the identity");
+        assert_eq!(epson.key, "usb:EPSON_TM");
+        assert_eq!(star.kind, "usb", "the transport travels in its own field");
+        assert_eq!(star.mac, None, "a cable has no MAC to invent");
+        assert_eq!(
+            registry.get_all().len(),
+            2,
+            "the second queue must not overwrite the first"
+        );
+    }
+
+    #[test]
+    fn hub1536_a_registered_usb_queue_takes_a_role_like_any_other_printer() {
+        // The point of the whole issue: "this one is the kitchen's" has to work over a cable.
+        let (registry, _) = temp_registry("rol-cola-usb-registrada");
+        registry
+            .register_queue("usb:Star_TSP143", "Star TSP143")
+            .unwrap();
+
+        registry.set_role("usb:Star_TSP143", "kitchen").unwrap();
+
+        assert_eq!(
+            registry.get("usb:Star_TSP143").unwrap().role.as_deref(),
+            Some("kitchen")
+        );
+    }
+
+    #[test]
+    fn hub1536_re_registering_a_queue_keeps_its_role_and_its_first_seen() {
+        // Every discovery re-registers what it finds. A queue that loses its role on the next scan
+        // is a role the owner has to set again every time they open the screen.
+        let (registry, _) = temp_registry("re-registra-cola-usb");
+        let first = registry
+            .register_queue("usb:Star_TSP143", "Star TSP143")
+            .unwrap();
+        registry.set_role("usb:Star_TSP143", "kitchen").unwrap();
+
+        let again = registry
+            .register_queue("usb:Star_TSP143", "Star TSP143 (barra)")
+            .unwrap();
+
+        assert_eq!(again.first_seen, first.first_seen, "first_seen no se pisa");
+        assert_eq!(again.role.as_deref(), Some("kitchen"), "the role survives");
+        assert_eq!(again.name, "Star TSP143 (barra)", "the name does refresh");
+        assert_eq!(registry.get_all().len(), 1, "no se duplica la entrada");
+    }
+
+    #[test]
+    fn hub1536_a_printer_id_that_is_not_a_usable_queue_is_refused() {
+        // Anything without a queue name behind `usb:` would be the collapsing key all over again:
+        // one ghost entry that every later queue inherits, roles included. Another transport's id
+        // is refused at this door too — it has its own, with its own identity.
+        let (registry, _) = temp_registry("cola-usb-invalida");
+
+        for bad in [
+            "",
+            "   ",
+            "usb:",
+            "usb:   ",
+            "network:10.0.0.5:9100",
+            "bluetooth:AA:BB:CC:DD:EE:F1",
+            "Star_TSP143",
+        ] {
+            let err = registry
+                .register_queue(bad, "Star TSP143")
+                .expect_err("must not enter the registry");
+            assert!(
+                matches!(err, crate::PeripheralError::InvalidPrinterId(_)),
+                "{bad:?} got {err:?}"
+            );
+        }
+        assert!(registry.get_all().is_empty(), "nothing may have been written");
+    }
+
+    #[test]
+    fn hub1536_a_device_with_neither_mac_nor_socket_is_refused_by_the_network_door() {
+        // `register(None, "", 0, …)` is what registering a queue through the NETWORK door looks
+        // like, and `device_key` answers `network::0` for every caller that does it. Refusing it
+        // is the guard that keeps the collision from coming back through another route — a silent
+        // overwrite of somebody else's role is the failure this issue is made of.
+        let (registry, _) = temp_registry("clave-colapsada");
+
+        let err = registry
+            .register(None, "", 0, "Star TSP143", "usb")
+            .expect_err("a device with no identity at all cannot be registered");
+
+        assert!(
+            matches!(err, crate::PeripheralError::InvalidPrinterId(_)),
+            "got {err:?}"
+        );
+        assert!(registry.get_all().is_empty(), "nothing may have been written");
+    }
+
+    #[test]
+    fn hub1536_a_bluetooth_printer_still_registers_with_no_ip_at_all() {
+        // The guard above must not catch the bonded-SPP path (ADR-0204), which registers with an
+        // empty ip on purpose: its MAC is its identity and the watchdog knows to leave it alone.
+        let (registry, _) = temp_registry("bluetooth-sin-ip");
+
+        let bt = registry
+            .register(Some("AA:BB:CC:DD:EE:F1"), "", 0, "Star SM-L200", "bluetooth")
+            .expect("a bonded printer has a MAC: that IS its identity");
+
+        assert_eq!(bt.key, "AA:BB:CC:DD:EE:F1");
+        assert_eq!(bt.kind, "bluetooth");
+    }
+
+    #[test]
+    fn hub1536_the_keys_already_on_disk_do_not_move_when_a_queue_is_added() {
+        // `devices.json` is user data. An entry whose key changed would lose the role its owner
+        // assigned — the migration of the old entries is that they DO NOT MOVE.
+        let (_, path) = temp_registry("claves-existentes");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"devices":{
+                 "AA:BB:CC:DD:EE:F5":{"key":"AA:BB:CC:DD:EE:F5","mac":"AA:BB:CC:DD:EE:F5",
+                   "ip":"10.0.0.12","port":9100,"name":"Cocina","role":"kitchen","type":"network",
+                   "first_seen":"2026-01-01T00:00:00","last_seen":"2026-01-01T00:00:00",
+                   "status":"online"},
+                 "network:10.0.0.13:9100":{"key":"network:10.0.0.13:9100","mac":null,
+                   "ip":"10.0.0.13","port":9100,"name":"Barra","role":"bar","type":"network",
+                   "first_seen":"2026-01-01T00:00:00","last_seen":"2026-01-01T00:00:00",
+                   "status":"online"}}}"#,
+        )
+        .unwrap();
+
+        let registry = DeviceRegistry::load(path);
+        registry
+            .register_queue("usb:Star_TSP143", "Star TSP143")
+            .unwrap();
+
+        let mac_keyed = registry.get("AA:BB:CC:DD:EE:F5").expect("still there");
+        assert_eq!(mac_keyed.role.as_deref(), Some("kitchen"), "role untouched");
+        let socket_keyed = registry.get("network:10.0.0.13:9100").expect("still there");
+        assert_eq!(socket_keyed.role.as_deref(), Some("bar"), "role untouched");
+        assert_eq!(registry.get_all().len(), 3, "the queue is an ADDITION");
+    }
 
     #[test]
     fn carga_un_devices_json_antiguo_sin_campo_key() {

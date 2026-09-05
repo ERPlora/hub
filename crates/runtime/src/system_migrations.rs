@@ -332,6 +332,10 @@ ALTER TABLE _hub_certificate DROP CONSTRAINT _hub_certificate_pkey;\
 ALTER TABLE _hub_certificate ADD PRIMARY KEY (hub_id, kind);",
     },
     // ── v16 — hub#317 / ADR-0202 §2: el certificado DELEGADO guarda la VERSIÓN con la que llegó ──
+    // 🪦 **Historia, no contrato.** hub#1435 retiró el slot delegado: `cert_version` ya no se
+    // escribe y queda NULL en toda fila nueva. La columna se queda porque una migración de sistema
+    // retira estructura dejándola en paz (ADR-0269). Lo de abajo explica por qué nació.
+    //
     // El plano de control reparte su `.p12` con un entero monótono (`DelegatedCertificate.version`,
     // saas#1124) y la convergencia de la flota entera se apoya en él: el heartbeat anuncia la
     // versión del plano de control, el hub la compara con la suya y refetchea si difieren (#318), y
@@ -494,7 +498,9 @@ UPDATE hub_user AS u SET email = TRIM(pr.email) \
                       AND COALESCE(TRIM(ru.email), '') = '');",
     },
     // ── v21 — hub#470 / ADR-0202 §2.1: QUÉ ES el certificado, que es lo que la AEAT segrega ──────
-    // `kind` (v14) dice de QUIÉN es el certificado — `own` del negocio, `delegated` del plano de
+    // ⚠️ `certificate_type` SIGUE VIVO y es hoy la única fuente del tipo (hub#1435 retiró el slot
+    // delegado, y con él la declaración del plano de control que se contrastaba con los bytes).
+    // `kind` (v14) decía de QUIÉN es el certificado — `own` del negocio, `delegated` del plano de
     // control—, y hub#320 lo usó para elegir la puerta de la AEAT como si dijera QUÉ es. No lo dice:
     // que el slot delegado contenga un Sello de Entidad era una premisa de ADR-0202 que nunca viajó
     // por la frontera, y el `.p12` con el que ERPlora factura hoy es de **representante**. Subido
@@ -1761,6 +1767,93 @@ CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
   ca_pem TEXT NOT NULL DEFAULT '', common_name TEXT NOT NULL, \
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, \
   PRIMARY KEY (hub_id));",
+    },
+
+    // ── v56 — hub#1429: WHICH row belongs to the owner of the account ────────────────────────────
+    // The hub is the only party that can police the owner's row: the runtime talks to the SaaS with
+    // the MACHINE credential, which `assert_can_manage_hub_member` treats as owner rank, so the SaaS
+    // cannot tell the administrator from the cashier (saas#1638/#1788). But until now the hub could
+    // not tell either — hub#349 retired the local `owner` ROLE on purpose, so in the business plane
+    // the owner and any administrator are the same word.
+    //
+    // This column is that missing fact, and it is **derived, never typed**: `identity::seed_owner`
+    // asserts it at every boot from `HUB_OWNER_EMAIL` (the provisioning env, ADR-0157 — the same
+    // source that decides who the creator is), and NO HTTP door writes it. It is not a role: what
+    // an administrator MAY do stays `is_admin_role`; this says only who OWNS the account, which has
+    // always belonged to the account plane.
+    //
+    // Additive with a default, so an existing hub gets `0` everywhere and the next boot marks the
+    // one row that matches the env. Until that boot the guard protects nothing — the direction that
+    // keeps today's behaviour rather than locking a row nobody can name.
+    SystemMigration {
+        version: 56,
+        name: "hub_user_account_owner",
+        kind: Kind::Expand,
+        postgres: "ALTER TABLE hub_user \
+          ADD COLUMN IF NOT EXISTS is_account_owner INTEGER NOT NULL DEFAULT 0;",
+    },
+
+    // ── v57 — hub#1435: the DELEGATED certificate slot is retired ────────────────────────────────
+    // ERPlora's `.p12` used to be handed down to every hub under a power of attorney (ADR-0202 §2)
+    // so the hub could sign before the AEAT on the taxpayer's behalf. ADR-0320 replaced that: the
+    // Hub builds the XML and the fiscal cell transmits it with a Seal that never leaves the
+    // platform. The SaaS shut its half in saas#1435 phase 2 — model, endpoint and columns gone — so
+    // no hub can be handed one again.
+    //
+    // 🔴 **The row has to go, not just the code.** A hub that was served the key before the
+    // retirement is holding somebody ELSE's private key, encrypted, in its own database — on a
+    // machine that has no reason to hold it and, after this change, no code that reads it. Leaving
+    // it would park the fleet's worst secret in every one of them and hand it to the next `pg_dump`.
+    // Deleting is what makes the retirement real; step 8 of ADR-0320 (revoking at the FNMT) is what
+    // closes it, because WAL and older pgBackRest backups still contain what was there.
+    //
+    // `backfill` and not `contract`: this is DML on our own table, which is where the guard puts a
+    // `DELETE FROM` — a `contract` retires STRUCTURE and is refused if it destroys rows. No column
+    // is dropped: `cert_version` numbered the central rotation and stays, unwritten and NULL, the
+    // way ADR-0269 retires structure (the previous binary keeps working against the same schema).
+    //
+    // ⚠️ It deletes ONE slot by name. The business's own certificate is the whole point of the
+    // table and is not touched, and `_hub_certificate` keeps its `(hub_id, kind)` key so a hub with
+    // both rows keeps the one that signs.
+    SystemMigration {
+        version: 57,
+        name: "retire_delegated_certificate_slot",
+        kind: Kind::Backfill,
+        postgres: "DELETE FROM _hub_certificate WHERE kind = 'delegated';",
+    },
+
+    // ── v58 — hub#1532: the recovery stamps name the MODULE that acted ───────────────────
+    // Retiring or re-firing a ticket is behind an admin session AND, when the caller names a module,
+    // the `printer` capability the owner granted it (hub#1108). The gate already resolves WHICH
+    // module is walking through and then drops the name: `_print_queue` kept `discarded_by =
+    // hub_user:<id>` and nothing else. An owner with two modules holding `printer` who finds
+    // tickets he did not bin reads "Ana retired it" — and Ana retired nothing.
+    //
+    // Four columns, one per half of the two gestures. `*_by_module` is `NOT NULL DEFAULT ''` like
+    // `discard_reason`, because "no module named itself" (the shell, `curl`) is a real, frequent
+    // answer and it must have ONE spelling: absent and `''` meaning the same thing is the rule
+    // `NewPrintJob::role` already states. The retry half is nullable where the discard half is
+    // (`*_at`/`*_by`), so a job that was never re-fired is NULL rather than pretending to a stamp.
+    //
+    // `Expand`, `ADD COLUMN IF NOT EXISTS`, re-runnable, and reversible by dropping the four
+    // columns — nothing is rewritten and no existing row changes meaning: a row discarded before
+    // this migration keeps its person and gets `''` for the module, which is what actually happened
+    // as far as the hub can know.
+    //
+    // 🔴 The number is the NEXT ONE ABOVE the maximum, never a gap: when it was written the
+    // maximum was v57 in `origin/develop`, in every remote branch and in every local worktree of
+    // the fleet. `apply` compares against the maximum applied and a version below it is skipped
+    // SILENTLY — the hub would boot believing it is up to date, without the columns and without a
+    // single log line.
+    SystemMigration {
+        version: 58,
+        name: "print_queue_acting_module",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_by_module TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_at TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NULL DEFAULT '';",
     },
 
 ];
@@ -3649,6 +3742,110 @@ mod kind_contract_tests {
         // el hub y no sale (solo viaja el CSR), cert + CA públicos. PROHIBIDA en bundles de
         // export. Al escribirla el máximo era la v54 en `origin/develop` y en TODAS las ramas
         // remotas.
-        assert_eq!(MIGRATIONS.len(), 52, "el catálogo cambió de tamaño");
+        // + `hub_user_account_owner` (v56, hub#1429): la columna que dice QUÉ fila es la del dueño
+        // de la cuenta. Marca derivada, no un rol: la asienta `identity::seed_owner` en cada
+        // arranque desde `HUB_OWNER_EMAIL` y ninguna puerta HTTP la escribe; sin ella el hub no
+        // podía distinguir al dueño de cualquier otro administrador (hub#349 le quitó el rol) y era
+        // el único que podía, porque al SaaS le habla la credencial de máquina. `ALTER … ADD COLUMN
+        // IF NOT EXISTS` con default, re-ejecutable. Al escribirla el máximo era la v55 en
+        // `origin/develop` y en las 57 ramas remotas, y ningún worktree local de la flota la pedía.
+        // + `retire_delegated_certificate_slot` (v57, hub#1435): el `DELETE` de la fila `delegated`
+        // de `_hub_certificate`. Es la ÚNICA `backfill` del catálogo y tiene que serlo: el guard
+        // manda el DML a `backfill` porque un `contract` retira ESTRUCTURA y se niega a destruir
+        // filas. Aquí las filas SON el problema — son la clave privada de ERPlora aparcada en la
+        // base de un cliente, con el slot ya retirado del código (ADR-0320 punto 8) — así que
+        // borrarlas es la migración, no un efecto suyo. No se toca ninguna columna: `cert_version`
+        // se queda sin escribir y en NULL, que es como ADR-0269 retira estructura. Al escribirla el
+        // máximo era la v56 en `origin/develop` y en TODAS las ramas remotas, y ningún worktree
+        // local de la flota pedía la v57.
+        // + `print_queue_acting_module` (v58, hub#1532): las recovery stamps de `_print_queue`
+        // dicen tambien QUE MODULO actuo, no solo qué persona tenía la sesión abierta
+        // (`discarded_by_module` + el sello del reintento `retried_at`/`retried_by`/
+        // `retried_by_module`). La puerta ya resolvía el módulo para comprobarle el permiso
+        // `printer` y tiraba el nombre. `ALTER … ADD COLUMN IF NOT EXISTS`, re-ejecutable. Al
+        // escribirla el máximo era la v57 en `origin/develop`, en TODAS las ramas remotas y en
+        // todos los worktrees locales de la flota.
+        assert_eq!(MIGRATIONS.len(), 55, "el catálogo cambió de tamaño");
+    }
+
+    /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO
+    /// necesitan montar: `hub_id` ya viene en el baseline v0 (`identity::ENSURE_TABLES`, la v42
+    /// solo la lleva a las bases que nacieron antes) y las dos de la **placa** (v48, hub#658) las
+    /// ejercitan los tests de integración, que sí arrancan el motor entero.
+    ///
+    /// Añadir aquí una columna es una decisión consciente: significa «ningún camino que estos unit
+    /// tests recorren la escribe ni la lee».
+    const HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED: &[&str] =
+        &["hub_id", "badge_index", "badge_hash"];
+
+    /// **Guardia del olvido de hub#1429.** Los unit tests de `identity` no pasan por `apply`: montan
+    /// el baseline v0 y le añaden a mano las columnas posteriores que necesitan
+    /// (`identity::UNIT_TEST_HUB_USER_COLUMNS`). Esa lista es la que se quedó atrás cuando la v56
+    /// añadió `is_account_owner`, y el precio fue tres panics `42703` de Postgres que había que
+    /// interpretar — en una suite que además solo los enseña si corres el `--lib` entero.
+    ///
+    /// Aquí eso se convierte en un fallo que NOMBRA la columna y el fichero donde falta, antes de
+    /// tocar ninguna base de datos. Es la forma mecánica de la regla: la incidencia deja un guardia,
+    /// no solo un parche.
+    #[test]
+    fn every_hub_user_column_a_migration_adds_is_in_the_identity_unit_test_fixture() {
+        let fixture = crate::identity::UNIT_TEST_HUB_USER_COLUMNS;
+        let mut missing = Vec::new();
+        for m in MIGRATIONS {
+            for column in hub_user_columns_added_by(m.postgres) {
+                if HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED.contains(&column.as_str())
+                    || fixture.contains(&format!("ADD COLUMN {column} "))
+                {
+                    continue;
+                }
+                missing.push(format!("{column} (v{}, {})", m.version, m.name));
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "`identity::UNIT_TEST_HUB_USER_COLUMNS` se quedó atrás: las migraciones añaden a \
+             `hub_user` columnas que la fixture de los unit tests no monta, así que todo test que \
+             escriba o lea esa columna morirá 42703 «column does not exist». Añádelas a la fixture \
+             (`crates/runtime/src/identity.rs`) o, si ningún unit test las toca, a \
+             `HUB_USER_COLUMNS_THE_IDENTITY_UNIT_TESTS_DO_NOT_NEED`. Faltan: {missing:?}"
+        );
+    }
+
+    /// Los nombres de columna que un SQL de migración añade a `hub_user`. Reconoce las dos formas
+    /// que usa el catálogo (`ADD COLUMN x` y `ADD COLUMN IF NOT EXISTS x`) y nada más: si algún día
+    /// aparece otra, esta función deja de verla y el guardia calla — por eso
+    /// [`the_parser_sees_the_column_the_catalogue_actually_adds`] comprueba que caza el positivo
+    /// contra el SQL REAL de la v56.
+    fn hub_user_columns_added_by(sql: &str) -> Vec<String> {
+        let mut found = Vec::new();
+        for statement in sql.split(';') {
+            let flat = statement.split_whitespace().collect::<Vec<_>>().join(" ");
+            let Some(rest) = flat.strip_prefix("ALTER TABLE hub_user ADD COLUMN ") else {
+                continue;
+            };
+            let rest = rest.strip_prefix("IF NOT EXISTS ").unwrap_or(rest);
+            if let Some(name) = rest.split_whitespace().next() {
+                found.push(name.to_string());
+            }
+        }
+        found
+    }
+
+    /// El control tiene que detectar el positivo (regla de la casa): el parser lee del catálogo REAL
+    /// la columna de la v56 —la que se olvidó— y una fixture sin ella se declara incompleta.
+    #[test]
+    fn the_parser_sees_the_column_the_catalogue_actually_adds() {
+        let v56 = MIGRATIONS
+            .iter()
+            .find(|m| m.name == "hub_user_account_owner")
+            .expect("la v56 sigue en el catálogo");
+        assert_eq!(
+            hub_user_columns_added_by(v56.postgres),
+            vec!["is_account_owner".to_string()],
+            "el parser dejó de reconocer la forma del `ALTER` del catálogo: el guardia quedaría mudo"
+        );
+        // Y una fixture a la que le falta esa columna NO cuela por el `contains`.
+        let incomplete = "ALTER TABLE hub_user ADD COLUMN email TEXT NOT NULL DEFAULT '';";
+        assert!(!incomplete.contains("ADD COLUMN is_account_owner "));
     }
 }

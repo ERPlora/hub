@@ -66,6 +66,11 @@ on:
       - 'scripts/ci/module-hub-batteries.sh'
       - 'scripts/ci/module-hub-batteries.txt'
       - 'scripts/tests/module-hub-batteries.test.sh'
+      # Y el CORREDOR que las ejecuta (hub#1381). Sus casos son herméticos —servidor falso,
+      # baterías falsas, admin de BD de mentira— y corren en segundos, así que no tienen por qué
+      # esperar a los 45 min del job de módulos: una PR que solo toque el corredor se entera aquí.
+      - 'scripts/ci/run-module-hub-batteries.sh'
+      - 'scripts/tests/run-module-hub-batteries.test.sh'
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
@@ -87,6 +92,22 @@ on:
       # Sin esta entrada, un slice de hub#1264 que borra el `.rs` y olvida el `.txt` no encuentra
       # NINGÚN guardia antes de mergear y tumba `develop` en el push — el rojo de hub#1354 (hub#1369).
       - 'crates/runtime/tests/**'
+      # scripts/tests/ wiring guard (hub#1392): a glob, not one entry per file, because the
+      # guard's own job is to sweep EVERY *.test.sh|mjs under scripts/tests/ — a PR that only
+      # adds or deletes one of them must still run it.
+      - 'scripts/tests/*.test.sh'
+      - 'scripts/tests/*.test.mjs'
+      # Hermetic unit tests for scripts/ci/n-minus-one.sh (hub#1282): lives outside `.github/`,
+      # so without this path a PR touching only the test would not run it.
+      - 'scripts/tests/n-minus-one.test.sh'
+      - 'scripts/ci/n-minus-one.sh'
+      # The short-circuiting-pipe scanner (hub#1534). Its contract test is already covered by
+      # the `scripts/tests/*.test.sh` glob above; this entry is for the SCANNER, which lives in
+      # `scripts/ci/` — and for the tree it sweeps: a PR that reintroduces the pattern in ANY
+      # shell script must find the red here. Hence `**/*.sh` and the hook itself, not a list.
+      - 'scripts/ci/no-short-circuit-pipes.sh'
+      - '**/*.sh'
+      - '.githooks/pre-push'
   workflow_dispatch:
 
 permissions:
@@ -245,6 +266,18 @@ jobs:
           set -euo pipefail
           bash ./scripts/tests/module-hub-batteries.test.sh
 
+      # ── Y el corredor que las EJECUTA (hub#1381) ─────────────────────────────────────
+      # La lista de arriba prueba que la batería ESTÁ; esta prueba que alguien la CORRE. Los casos
+      # son herméticos y cubren justo los modos de fallo que dejan un verde vacío: un hub por
+      # módulo (medido — compartirlo hace que las ventas de `cash_register` quemen números de
+      # ticket que `invoice` afirma), una batería que sale 0 imprimiendo `SKIPPED`, un módulo que
+      # no llegó a instalarse, una exención caducada, y un `docker exec -i` que se come la lista
+      # de trabajo y deja la pasada a medias diciendo que pasó.
+      - name: Corredor de baterías de módulo (hub#1381)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/run-module-hub-batteries.test.sh
+
       # ── El job que publica @erplora/module-sdk (hub#1308) ─────────────────────────────
       # El 403 de cada tag no era un permiso que faltara —el run imprime `Packages: write`—
       # sino la cuota de paquetes de la organización. Ese diagnóstico equivocado es justo el
@@ -269,3 +302,42 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/service-container-ports.test.sh
+
+      # ── Unit tests for scripts/ci/n-minus-one.sh (hub#1282) ───────────────────────────
+      # Every external dependency (git tags, docker, curl, building+booting the branch's own
+      # binary) is stubbed via the script's own seams, so these cases are hermetic and run in
+      # seconds — no need to wait for the daily/dispatch-only `n-minus-one.yml` job, which boots
+      # real Postgres and two real binaries. Discovered UNWIRED while building the guard below
+      # (hub#1392): the file existed and passed standalone, but no workflow ever ran it — only a
+      # comment in `n-minus-one.yml` named it, exactly the false-safety hub#1392 exists to catch.
+      - name: Contrato de scripts/ci/n-minus-one.sh (hub#1282)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/n-minus-one.test.sh
+
+      # ── Every scripts/tests/ contract test is invoked for real somewhere (hub#1392) ────
+      # A test in scripts/tests/ that no workflow (or `.githooks/pre-push`) actually EXECUTES
+      # is documentation nobody runs, and a missing wire leaves no red anywhere — the same
+      # defect hub#1381 closed one level up for the modules' batteries. This scan is
+      # discovery-based (glob over scripts/tests/*.test.sh|mjs, not a fixed list), so it also
+      # covers itself: deleting ITS OWN invocation is the one gap nothing here can catch,
+      # exactly as with every other self-referential guard in this file.
+      #
+      # pyyaml already installed by the test-hub-modules.yml contract step above.
+      - name: "Contrato: todo test de scripts/tests/ está invocado de verdad (hub#1392)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/scripts-tests-wiring.test.sh
+
+      # ── Ningún script canaliza hacia un lector que CORTA (hub#1534) ────────────────────
+      # `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO, y es una
+      # CARRERA: verde en macOS y en un runner ocioso, rojo en uno cargado. Por eso el sitio
+      # que manda es este, Linux — el 04/09 tumbó la PR de hub#1530 afirmando que el banco de
+      # Playwright no fijaba `HUB_CLOUD_API_URL` y llamaría a producción desde el runner, con
+      # esa línea puesta desde julio. La batería demuestra primero el mecanismo (bloque de
+      # 200 KB, más que el buffer del pipe) y solo después barre el árbol: un grep contra una
+      # cadena prohibida es un lint de estilo hasta que alguien enseña que la cadena hace daño.
+      - name: "Contrato: ningún script canaliza hacia un lector que corta (hub#1534)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/no-short-circuit-pipes.test.sh

@@ -1,0 +1,43 @@
+{
+  "id": "rangefix",
+  "name": "Range Filter Fixture",
+  "version": "1.0.0",
+  "permissions": [
+    "rangefix.read"
+  ],
+  "migrations": {
+    "postgres": [
+      "migrations/postgres/001_init.sql"
+    ]
+  },
+  "queries": {
+    "rangefix.events.list": {
+      "permission": "rangefix.read",
+      "sql": "queries/events_list.sql",
+      "list": {
+        "sort": [
+          "id",
+          "happened_at",
+          "priority"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "happened_at": {
+            "op": "range"
+          },
+          "logged_on": {
+            "op": "range"
+          },
+          "priority": {
+            "op": "range"
+          },
+          "tax_id": {
+            "op": "range"
+          }
+        },
+        "page_size": 50
+      }
+    }
+  }
+}

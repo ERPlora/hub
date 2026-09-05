@@ -1,4 +1,14 @@
 //! Serve configuration, CSP policy and DSN normalisation — split out of `lib.rs` verbatim (hub#1404).
+//!
+//! **`HUB_TRUSTED_HOSTS`** (hub#1464, ADR-0431 §2) no vive en esta struct a propósito: la lee
+//! `cloud-client` (`trusted::trusted_from_env`), que es donde se firma. Se documenta aquí porque
+//! es donde alguien busca «qué env consume el hub»: lista de hosts **de ERPlora**, separados por
+//! comas, con `*.sufijo` admitido (`*.erplora.com,*.pre.erplora.com`). `HUB_CLOUD_API_URL` es de
+//! confianza SIEMPRE y no hace falta repetirlo. Ausente = solo esa; a cualquier otro destino la
+//! petición sale **sin** `X-Hub-Token`/`X-Hub-Id`/Bearer/`X-Webhook-Secret` y se registra un aviso.
+//!
+//! ⚠️ Cuando aterrice hub#1470 esta variable pasa a ser **infraestructura fiscal**: sin el FQDN de
+//! la celda dentro, la ruta por la pasarela deja de transmitir.
 
 use crate::*;
 

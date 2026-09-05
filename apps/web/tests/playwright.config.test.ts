@@ -9,8 +9,25 @@
 // kind of wiring gap hub#1240's contract test (`test-web-workflow.test.sh`) exists to catch for
 // the workflow side.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createServer, type Server } from 'node:net';
+import { BENCH_WINDOW_FIRST, BENCH_WINDOW_LAST } from './bench-ports.ts';
 
-const ENV_KEYS = ['CI', 'HUB_UPDATE_BASELINES'] as const;
+// Every key the config READS or WRITES. The ports (hub#1517) matter twice over: the config
+// EXPORTS `HUB_RUNTIME_URL`/`HUB_WEB_URL`/`HUB_E2E_ASSISTANT_PORT` so the specs follow the bench,
+// so a second load inside this file would reuse the first bench — and the regression below would
+// pass while proving nothing.
+const ENV_KEYS = [
+  'CI',
+  'HUB_UPDATE_BASELINES',
+  'HUB_BIND',
+  'HUB_RUNTIME_URL',
+  'HUB_WEB_URL',
+  'HUB_E2E_ASSISTANT_PORT',
+  'GITHUB_RUN_ID',
+  'GITHUB_JOB',
+  'GITHUB_RUN_ATTEMPT',
+  'RUNNER_NAME',
+] as const;
 let saved: Record<string, string | undefined>;
 
 beforeEach(() => {
@@ -53,5 +70,100 @@ describe('playwright.config updateSnapshots (hub#1250)', () => {
   it('outside CI, a missing baseline is created without failing (authoring a new spec)', async () => {
     const cfg = await loadConfig();
     expect(cfg.updateSnapshots).toBe('missing');
+  });
+});
+
+// Regression test for ERPlora/hub#1517 — the config must not pin the bench to FIXED ports in CI.
+//
+// `bench-ports.test.ts` proves the allocator is correct on its own; this proves the config FILE
+// actually wires it, which is the half that was broken: `ci-runner-1` serves six runner slots on
+// one machine, so the second overlapping `e2e` job hit `http://127.0.0.1:8787/readyz is already
+// used` and died — dropping a red on a PR whose diff had nothing to do with it.
+const opened: Server[] = [];
+
+/** Occupies a port for real — a "the port is busy" test that never binds anything proves nothing. */
+function occupy(port: number): Promise<void> {
+  return new Promise((ok, fail) => {
+    const server = createServer();
+    opened.push(server);
+    server.once('error', fail);
+    server.listen(port, '127.0.0.1', () => ok());
+  });
+}
+
+afterEach(async () => {
+  await Promise.all(opened.splice(0).map((s) => new Promise<void>((ok) => s.close(() => ok()))));
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function runtimePortOf(cfg: any): number {
+  return Number(new URL(String(cfg.webServer[0].url)).port);
+}
+
+describe('playwright.config bench ports (hub#1517)', () => {
+  it('REGRESSION: a second bench on the same machine never asks for the port the first one holds', async () => {
+    process.env.CI = '1';
+    const first = await loadConfig();
+    const busy = runtimePortOf(first);
+    expect(busy).toBeGreaterThanOrEqual(BENCH_WINDOW_FIRST);
+    expect(busy).toBeLessThanOrEqual(BENCH_WINDOW_LAST);
+
+    // Exactly what the other `e2e` job on the runner does: it takes the port and keeps it.
+    await occupy(busy);
+
+    // The first load exported its own bench into the env; leaving that behind would make the
+    // second load REUSE it and the assertion below would hold for the wrong reason.
+    for (const key of ENV_KEYS) {
+      if (key !== 'CI') delete process.env[key];
+    }
+
+    const second = await loadConfig();
+    expect(runtimePortOf(second)).not.toBe(busy);
+    // Vite must be told the same port the config advertises, or the bench waits on a URL nothing
+    // is serving until it times out.
+    const webPort = new URL(String(second.use.baseURL)).port;
+    expect(second.webServer[1].command).toContain(`--port ${webPort}`);
+    expect(second.webServer[1].url).toBe(second.use.baseURL);
+  });
+
+  it('the config EXPORTS the bench into the env, which is how every spec finds it', async () => {
+    process.env.CI = '1';
+    const cfg = await loadConfig();
+
+    expect(cfg.webServer[0].url).toBe(`${process.env.HUB_RUNTIME_URL}/readyz`);
+    expect(process.env.HUB_WEB_URL).toBe(cfg.use.baseURL);
+    // `AssistantGrounded.spec.ts` starts a runtime of its own and reads this one.
+    expect(Number(process.env.HUB_E2E_ASSISTANT_PORT)).toBeGreaterThanOrEqual(BENCH_WINDOW_FIRST);
+    expect(Number(process.env.HUB_E2E_ASSISTANT_PORT)).not.toBe(runtimePortOf(cfg));
+  });
+
+  it('a WORKER reloading the config lands on the same bench, without sorting new ports', async () => {
+    // Playwright evaluates this config TWICE: once in the runner, once in every worker, and the
+    // worker inherits the runner's `process.env` (measured — the worker reads what the runner
+    // wrote). If the config did not export the whole bench, that second evaluation would draw a
+    // fresh runtime port nobody serves, and every spec reading HUB_RUNTIME_URL would be pointing
+    // at the bench of a process that no longer exists.
+    process.env.CI = '1';
+    const runner = await loadConfig();
+
+    // The runner has already STARTED the runtime by the time it forks a worker, so that port is
+    // busy on the second evaluation. Without it this test cannot fail: a config merely imported
+    // binds nothing, the allocator finds the same ports free again and agrees with itself by
+    // accident (checked — the assertions below all held with the export removed).
+    await occupy(runtimePortOf(runner));
+
+    const worker = await loadConfig(); // same env, exactly like the forked worker sees it
+
+    expect(worker.webServer[0].url).toBe(runner.webServer[0].url);
+    expect(worker.use.baseURL).toBe(runner.use.baseURL);
+    expect(worker.webServer[1].command).toBe(runner.webServer[1].command);
+    expect(worker.webServer[0].env.HUB_BIND).toBe(runner.webServer[0].env.HUB_BIND);
+  });
+
+  it('outside CI the bench keeps 8787/5173: reuseExistingServer has to find the developer`s `pnpm dev`', async () => {
+    const cfg = await loadConfig();
+    expect(cfg.webServer[0].url).toBe('http://127.0.0.1:8787/readyz');
+    expect(cfg.use.baseURL).toBe('http://localhost:5173');
+    expect(cfg.webServer[1].command).toContain('--port 5173');
   });
 });

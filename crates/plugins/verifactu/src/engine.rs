@@ -14,9 +14,15 @@ pub enum VerifactuError {
     /// El canal TLS con la AEAT falló: nuestro certificado de cliente fue rechazado, caducó, fue
     /// revocado, o el handshake no llegó a cerrarse (`aeat::is_tls_failure`).
     ///
-    /// Variante propia porque **es el tercer disparador de refetch** (ADR-0202 §2 punto 4): si el
-    /// certificado con el que nos identificamos dejó de valer, la respuesta es pedir el vigente al
-    /// plano de control, no reintentar el mismo. Un fallo de red se reintenta; este se **arregla**.
+    /// Variante propia porque **un fallo de red se reintenta y este se ARREGLA**: el registro se
+    /// encola igual en contingencia, pero lo que hay que hacer con él no es esperar — es renovar el
+    /// certificado. Distinguirlo es lo que deja que un operador lea «TLS» en el evento y sepa por
+    /// dónde empezar, en vez de ver un `Transmission` más entre timeouts.
+    ///
+    /// 🪦 Hasta hub#1435 además **disparaba el refetch** del certificado delegado (ADR-0202 §2
+    /// punto 4 — hub#318): ERPlora bajaba el suyo vigente del plano de control. Ese slot se retiró,
+    /// y con la vía propia no hay nada que ERPlora pueda refrescar — el `.p12` es del negocio y lo
+    /// renueva su dueño. La variante sigue por lo de arriba, NO para volver a disparar nada.
     #[error("transmisión AEAT (TLS): {0}")]
     Tls(String),
     /// La AEAT respondió a la **consulta** con un fallo (SOAP Fault). Es un error propio y no

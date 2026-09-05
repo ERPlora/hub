@@ -184,6 +184,34 @@ async fn an_undeclared_list_param_names_itself_instead_of_being_redacted() {
     assert_redacted(&body);
 }
 
+/// hub#1542 — the OTHER half of the same door, and the half this issue is about: a `range` bound
+/// the column cannot read comes back NAMING the bound, not as the generic "the request could not
+/// be completed".
+///
+/// This is the caller the bug actually hit — a flow, an assistant tool, an integration sends what
+/// it has at hand, which is text — and until this fix the answer was a `db` error: the same
+/// sentence a database outage produces, so nobody could tell "fix your call" from "wait". Placing
+/// the variant on the redacted side of `may_reach_the_client` would compile, pass every
+/// exhaustiveness guard, and hand that caller a 422 with nothing in it to act on.
+#[tokio::test]
+async fn an_unreadable_range_bound_names_itself_instead_of_being_redacted() {
+    let body = call(
+        "/api/query",
+        json!({ "name": "dberr.notes.paged", "params": { "f_weight_from": "heavy" } }),
+    )
+    .await;
+
+    assert_eq!(body["ok"], json!(false), "{body}");
+    assert_eq!(body["error"]["code"], json!("invalid_filter_bound"), "{body}");
+    let message = body["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("f_weight_from") && message.contains("heavy"),
+        "the bound and the value have to be named or the caller cannot find their mistake: {body}"
+    );
+    // The net underneath stays in place: travelling whole is not a licence to leak plumbing.
+    assert_redacted(&body);
+}
+
 /// The invariant behind all of the above, swept over the door instead of case by case (hub#1241).
 ///
 /// Every refusal `/api/command` and `/api/query` answer with carries a stable code a screen can

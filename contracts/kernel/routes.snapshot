@@ -9,6 +9,7 @@ POST    /api/assistant/report                          auth:any-credential
 POST    /api/auth/badge                                auth:none
 POST    /api/auth/cloud                                auth:none
 POST    /api/auth/courier                              auth:none
+POST    /api/auth/handoff                              auth:session
 POST    /api/auth/logout                               auth:none
 POST    /api/auth/pin                                  auth:none
 POST    /api/auth/set-pin                              auth:session
@@ -22,6 +23,7 @@ DELETE  /api/business/gateway-identity                 auth:admin
 GET     /api/business/gateway-identity                 auth:session
 PUT     /api/business/gateway-identity/certificate     auth:admin
 POST    /api/business/gateway-identity/csr             auth:admin
+POST    /api/business/gateway-identity/enrol           auth:admin
 POST    /api/command                                   auth:any-credential
 GET     /api/device/mode                               auth:none
 PUT     /api/device/mode                               auth:admin

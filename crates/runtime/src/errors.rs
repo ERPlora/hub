@@ -221,6 +221,24 @@ pub enum RuntimeError {
         param: String,
         accepted: Vec<String>,
     },
+    /// hub#1542 — a `range` bound (`f_<col>_from`/`f_<col>_to`) the COLUMN cannot read.
+    ///
+    /// Its own code, not a flavour of `db`: "you wrote a bound this column cannot compare" is
+    /// something the caller fixes by changing the call, while `db` means the hub could not reach
+    /// its database and there is nothing the caller can do. They used to be the same answer — a
+    /// text bound over a numeric column reached Postgres, which refused `bigint >= text` with
+    /// `42883`, and the caller got the generic "the request could not be completed".
+    ///
+    /// Only the bound the engine could not read is refused; a bound the column CAN read is
+    /// converted and compared, which is the other half of hub#1542.
+    #[error(
+        "the `{param}` bound of list `{query}` compares a numeric column, and `{value}` is not a number"
+    )]
+    InvalidFilterBound {
+        query: String,
+        param: String,
+        value: String,
+    },
     /// Fallo de la capacidad de host `host.notify` (ADR-0012): el transporte de un canal
     /// (email/sms/whatsapp) no pudo entregar. El relay del outbox lo trata como un listener
     /// fallido → reintento con backoff y, tras `MAX_ATTEMPTS`, dead-letter.
@@ -254,11 +272,6 @@ pub enum RuntimeError {
         reason: String,
         detail: String,
     },
-    /// The control plane declared one certificate type and served another (hub#470): not
-    /// installed, because the AEAT door is chosen by the TYPE and the wrong one rejects every
-    /// record, one by one.
-    #[error("el plano de control declara un certificado `{declared}` pero el contenedor que ha servido es `{served}` (hub#470): no se instala — la puerta de la AEAT la elige el TIPO, y con el equivocado la AEAT rechaza todos los registros, uno a uno")]
-    CertificateTypeMismatch { declared: String, served: String },
     /// A manifest the installer REFUSED on a contract rule (not a parse error — that is
     /// [`RuntimeError::Manifest`]): `code` names the rule (`role_grants_admin`,
     /// `system_table_write`…), `at` the offending element, `detail` the English explanation.

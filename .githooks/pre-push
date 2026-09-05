@@ -49,12 +49,11 @@
 #
 # On green it publishes a commit status on the pushed sha, and the CONTEXT says
 # which run it was (hub#1207): `local-gate/hub-tests` only for a real full
-# workspace run, `local-gate/hub-tests-scoped` for a scoped one. That matters
-# because `merge-pr.sh` reads the first as proof the WORKSPACE suite ran; a
-# scoped run posting it would answer a question it never tested. With its own
-# context, merge-pr.sh sees the full-suite one as absent and falls through to
-# the `cargo test --workspace` check Actions really did run — and still refuses
-# to merge when neither exists (pm#58/#60). The status is an ATTESTATION that
+# workspace run, `local-gate/hub-tests-scoped` for a scoped one. The seal always
+# names what really ran; `merge-pr.sh` accepts either as proof this push's Rust
+# was tested (pm#230 — before that it only took the full one, which is why the
+# policy default used to be `workspace`), and still refuses to merge when
+# neither exists or the seal is not green. The status is an ATTESTATION that
 # the run happened here — it is not an independent verification. It posts only AFTER a background step
 # verifies the remote ref really advanced to (or past) the pushed sha
 # (hub#574): a pre-push runs before the transfer and cannot know whether the
@@ -81,6 +80,7 @@
 #
 # Injection points, used by scripts/prepush-gate.test.sh:
 #   HUB_GATE_TEST_CMD · HUB_GATE_STATUS_CMD · HUB_GATE_STATE_DIR · HUB_GATE_LOCK_WAIT
+#   HUB_GATE_DEPTH (fast|full, hub#1466) · HUB_GATE_FAST_CMD
 #   (HUB_GATE_STATUS_CMD is invoked with $1 = sha, $2 = context, $3 = description)
 #   HUB_GATE_METADATA_CMD · HUB_GATE_BASE_REFS · HUB_GATE_EXCLUDES ·
 #   HUB_GATE_RUST_DIRS · HUB_GATE_NO_SELFHEAL (hub#1207: the scope resolver and
@@ -204,7 +204,7 @@ if [ -n "$base_sha" ]; then
 fi
 diff_touches() {   # $1 = exact path
     [ "$changed_known" = 1 ] || return 1
-    printf '%s\n' "$changed_files" | grep -qxF "$1"
+    grep -qxF "$1" <<<"$changed_files"
 }
 
 # ── hub#746: the copy that RUNS is whatever core.hooksPath points at ─────────
@@ -357,13 +357,15 @@ mkdir -p "$STATE_DIR"
 # scope with nothing catching it until the post-merge push. Note what is NOT
 # touched — the LOCK stays (hub#526: two suites at once melt the machine).
 #
-# ⚠️ Scoping is NOT a bypass: a scoped run publishes `local-gate/hub-tests-scoped`,
-# a context `merge-pr.sh` deliberately does not accept as workspace proof (see the
-# header). Only a real full run seals `local-gate/hub-tests`.
+# ⚠️ Scoping is NOT a bypass: a scoped run publishes `local-gate/hub-tests-scoped`
+# and NEVER `local-gate/hub-tests` — the seal always names what really ran.
+# `merge-pr.sh` accepts both since pm#230 (it did not until then, which is why the
+# default was `workspace`); what it still refuses is an ABSENT seal, or one that is
+# not `success`. Only a real full run seals `local-gate/hub-tests`.
 #
-# Ownership is asked of `cargo metadata`, never hand-mapped, by the SAME resolver
-# `test-hub.yml` runs (`scripts/ci/test-scope.py`), and it is
-# deliberately conservative in three places:
+# Ownership is asked of `cargo metadata`, never hand-mapped, by the canonical resolver
+# (`scripts/ci/test-scope.py`) — this gate is its only consumer since hub#1463 took the
+# unreachable scope step out of `test-hub.yml`. It is deliberately conservative in three places:
 #   · DEPENDENTS come along — touching `erplora-db` runs whoever builds on it,
 #     because that is the breakage a scoped gate would otherwise wave through;
 #   · anything TRANSVERSAL (Cargo.lock, the workspace manifest, the toolchain,
@@ -499,8 +501,8 @@ ensure_postgres() {
         fi
     fi
 
-    if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-        if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+    if ! grep -qx "$PG_CONTAINER" <<<"$(docker ps --format '{{.Names}}')"; then
+        if grep -qx "$PG_CONTAINER" <<<"$(docker ps -a --format '{{.Names}}')"; then
             docker start "$PG_CONTAINER" >/dev/null
         else
             # shellcheck disable=SC2086  # PG_ARGS is a deliberate list of -c flags.
@@ -581,8 +583,8 @@ ensure_e2e_databases() {
     elif [ "$gate_owns_web_cmd" = 1 ]; then
         local db
         for db in hub_e2e_web hub_e2e_assistant; do
-            docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null | grep -q 1 && continue
+            grep -q 1 <<<"$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null)" && continue
             if ! docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE $db;" >/dev/null 2>&1; then
                 echo "❌ pre-push: no pude crear la base '$db' en $PG_CONTAINER (la necesita el e2e de web)." >&2
                 return 1
@@ -699,7 +701,7 @@ unpublished_report() {
     echo "    commit  : $sha"
     echo "    reason  : $reason"
     if [ -n "$detail" ]; then
-        printf '    gh said : %s\n' "$(printf '%s' "$detail" | head -5)"
+        printf '    gh said : %s\n' "$(head -5 <<<"$detail")"
     fi
     echo "    the gh account it tried:"
     if command -v gh >/dev/null 2>&1; then
@@ -812,16 +814,40 @@ publish_status() {
     disown 2>/dev/null || true
 }
 
-# ── Política de alcance (Ioan, 2026-08-29) ───────────────────────────────────
-# `workspace` (defecto): una PR con Rust corre la suite ENTERA aquí. Es obligatorio desde que
-# Actions dejó de correrla en las PRs: `merge-pr.sh` autoriza el merge con la atestación de este
-# gate (pm#58/#60), y una pasada parcial dejaría el merge apoyado en menos de lo que promete.
-# `scoped`: el reparto de hub#1207 (local rápido + Actions completo). Volver a él es cambiar esta
-# variable, cuando la nube vuelva a correr la suite en las PRs.
-GATE_SCOPE_POLICY="${HUB_GATE_SCOPE_POLICY:-workspace}"
+# ── Política de alcance: la decide la REF EMPUJADA (Ioan, 2026-09-03 — hub#1451) ──
+#
+# Enmienda la decisión del 2026-08-29 (pm#197/hub#1346), que dejó el defecto en `workspace`. Aquel
+# defecto era correcto CON su premisa: Actions había dejado de correr la suite en las PRs y
+# `merge-pr.sh` solo aceptaba `local-gate/hub-tests`, así que una pasada acotada dejaba la PR
+# inmergeable. pm#230 quita esa premisa —el script acepta también `local-gate/hub-tests-scoped`—
+# y entonces pagar la suite entera en cada rama deja de comprar nada.
+#
+# Lo que compraba el defecto viejo, y dónde está ahora: el coste real no son los ~25-30 min, es que
+# el lock es de MÁQUINA ENTERA (hub#526, que NO se toca), así que con 4-6 workers el cuarto push
+# espera horas. La red completa no desaparece, se MUEVE a post-merge: `test-hub.yml`,
+# `test-web.yml` y `test-hub-modules.yml` corren `--workspace` + los e2e del catálogo publicado en
+# el `push` a develop/main (hub#572). Lo que una rama acotada puede colar —romper un paquete FUERA
+# de su alcance— se ve ahí, sobre el árbol que de verdad resulta del merge.
+#
+# La regla es la ref, no el diff, porque la pregunta que responde cada una es distinta:
+#   · rama de PR   → `scoped`   : «¿he roto lo que toco?» — el resolutor decide qué paquetes
+#   · develop/main → `workspace`: «¿está sano el árbol que se despliega?» — no se acota nunca
+#   · un tag, o una ref ilegible → `workspace`: el hub solo se despliega con un tag `v1.1.N`;
+#     firmar una release con una pasada parcial es justo lo que no puede pasar.
+#
+# Sobre esto siguen mandando dos cosas, y las dos tienen su caso en scripts/prepush-gate.test.sh:
+# el RESOLUTOR (un diff transversal —`schemas/`, `Cargo.lock`, el manifiesto, Rust sin dueño— se
+# ensancha al workspace aunque la política diga `scoped`, y con él vuelven las baterías de
+# módulos), y `HUB_GATE_SCOPE_POLICY`, que fuerza los dos modos a mano para depurar.
+case "$pushed_ref" in
+    refs/heads/develop | refs/heads/main) GATE_SCOPE_POLICY_DEFAULT=workspace ;;
+    refs/heads/*)                         GATE_SCOPE_POLICY_DEFAULT=scoped ;;
+    *)                                    GATE_SCOPE_POLICY_DEFAULT=workspace ;;
+esac
+GATE_SCOPE_POLICY="${HUB_GATE_SCOPE_POLICY:-$GATE_SCOPE_POLICY_DEFAULT}"
 if [ "$GATE_SCOPE_POLICY" = workspace ] && [ "$SCOPE_MODE" = packages ]; then
     SCOPE_MODE=workspace
-    SCOPE_REASON="$SCOPE_REASON — pero la política es correr el workspace entero (pm#58/#60)"
+    SCOPE_REASON="$SCOPE_REASON — pero la política de esta ref (${pushed_ref:-?}) es correr el workspace entero (hub#1451)"
 fi
 
 case "$SCOPE_MODE" in
@@ -876,9 +902,10 @@ export HUB_GATE_SCOPE_PACKAGES="$SCOPE_PACKAGES"
 # that is the question it asks ("did the thing that tests this run?"). A scoped
 # run publishing that context would answer yes to a question it did not test,
 # which is the same antipattern as a test asserting on prose. So a scoped run
-# gets its own context: merge-pr.sh then sees the full-suite one as ABSENT and
-# falls through to the `cargo test --workspace` check that Actions really did
-# run on the PR — and still refuses to merge if that check is missing or red.
+# gets its own context, `local-gate/hub-tests-scoped`, which merge-pr.sh accepts
+# as proof of THIS push's Rust since pm#230 — the full workspace net runs
+# post-merge on develop/main (hub#572). It still refuses to merge when neither
+# seal exists or the seal it finds is not green.
 # The description says the packages out loud, so the PR page shows the scope.
 GATE_CMD_LABEL="cargo test --workspace"
 if [ "$SCOPE_MODE" = packages ]; then
@@ -943,7 +970,7 @@ if [ "$head_tree" != "$tree" ] || [ -n "$wt_status" ]; then
         echo "     HEAD tree    : ${head_tree:0:12}"
         if [ -n "$wt_status" ]; then
             echo "     dirty files  :"
-            printf '%s\n' "$wt_status" | sed 's/^/       /' | head -10
+            head -10 <<<"$wt_status" | sed 's/^/       /'
         fi
         echo "   Push from a checkout sitting at that sha with a clean tree (commit or drop"
         echo "   local changes), or run the gate there first so the tree is proven green."
@@ -1170,6 +1197,92 @@ else
     else
         test_cmd="cargo test --workspace --no-fail-fast --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
     fi
+fi
+
+# ── hub#1468: que los scripts de este repo PARSEEN donde se ejecutan ─────────
+# Milisegundos, y va antes que cualquier cargo: el bug que lo motivó (un `case` dentro de
+# `$( … )`, que bash 3.2 no parsea) dejó la batería de ESTE hook sin poder ejecutarse entera
+# en la máquina donde vive el gate, y CI no lo vio nunca porque los runners son Ubuntu con
+# bash 5. En macOS `/bin/bash` es 3.2, así que aquí —y solo aquí— la comprobación es la de
+# verdad: `--require-legacy` impide que una máquina sin bash < 4 haga pasar un parseo de
+# bash 5 por el contrato del suelo. Fuera de macOS se comprueba igual, pero sin exigirlo.
+# Silencioso en verde: solo habla cuando algo no parsea. Contrato: scripts/tests/shell-syntax.test.sh.
+SHELL_SYNTAX="$(git rev-parse --show-toplevel)/scripts/ci/shell-syntax.sh"
+if [ -f "$SHELL_SYNTAX" ]; then
+    shell_syntax_args=""
+    [ "$(uname -s)" = Darwin ] && shell_syntax_args="--require-legacy"
+    if ! shell_syntax_out=$(bash "$SHELL_SYNTAX" $shell_syntax_args 2>&1); then
+        echo "" >&2
+        echo "$shell_syntax_out" >&2
+        echo "❌ pre-push: un script del repo no parsea con el bash de esta máquina → push ABORTADO." >&2
+        echo "   Verde en CI (Ubuntu, bash 5) y rojo aquí es el peor reparto posible: arréglalo antes de subir." >&2
+        exit 1
+    fi
+fi
+
+# ── hub#1534: que ningún script canalice hacia un lector que CORTA ──────────
+# `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO: `grep -q` sale en
+# el primer match y cierra el pipe, el productor muere con EPIPE (141) y `pipefail` le da a la
+# tubería el estado del PRODUCTOR. Es una carrera, así que sale verde en macOS y en un runner
+# ocioso y rojo en uno cargado — el 04/09 tumbó la PR de hub#1530 diciendo que faltaba una
+# línea que llevaba puesta desde julio. Aquí, por céntimos y antes de cualquier cargo, porque
+# el rojo del que estamos hablando es justamente el que llega 40 min tarde y en otra máquina.
+# Contrato: scripts/tests/no-short-circuit-pipes.test.sh.
+SHORT_CIRCUIT_PIPES="$(git rev-parse --show-toplevel)/scripts/ci/no-short-circuit-pipes.sh"
+if [ -f "$SHORT_CIRCUIT_PIPES" ]; then
+    if ! short_circuit_out=$(bash "$SHORT_CIRCUIT_PIPES" 2>&1); then
+        echo "" >&2
+        echo "$short_circuit_out" >&2
+        echo "❌ pre-push: un script canaliza hacia un lector que corta → push ABORTADO." >&2
+        echo "   Usa \`grep -q PATRÓN <<<\"\$bloque\"\`: el here-string no abre tubería (hub#1534)." >&2
+        exit 1
+    fi
+fi
+
+# ── hub#1466: la PROFUNDIDAD del gate — rápido aquí, pesado en la nube ───────
+# Medido el 2026-09-03 en este workspace: `cargo check` 84 s en frío y 3,6 s en caliente,
+# `clippy` 18-20 s → ~25 s en el caso que manda (rehacer un arreglo tras una revisión), contra
+# ~20 min de la suite. Solo lo que la CI exige: clippy con sus flags (hub#1472) y sin fmt (hub#1474). Y el problema no era la duración sino el LOCK: una
+# pasada cada 20 min para toda la máquina. En Actions corren 4 a la vez.
+#
+# Lo que el modo rápido SÍ protege: que una rama que no compila, no formatea o no pasa clippy
+# NO llegue a subir. Lo que NO hace, a propósito: ATESTIGUAR. La atestación es lo que
+# `merge-pr.sh` acepta como «la suite corrió sobre este sha»; firmarla tras un `cargo check`
+# sería responder que sí a una pregunta que no se probó. Sin sello, el merge lo autoriza el
+# check de `test-hub.yml`, que vuelve a correr en las PRs con este mismo cambio.
+case "${HUB_GATE_DEPTH:-fast}" in
+    fast|full) : ;;
+    *)
+        echo "❌ pre-push: HUB_GATE_DEPTH='${HUB_GATE_DEPTH}' no existe (valores: fast | full)." >&2
+        echo "   Un valor desconocido NO elige por su cuenta: eso degradaría la protección en silencio." >&2
+        exit 1 ;;
+esac
+
+if [ "${HUB_GATE_DEPTH:-fast}" = fast ]; then
+    fast_cmd="${HUB_GATE_FAST_CMD:-}"
+    if [ -z "$fast_cmd" ]; then
+        fast_cmd="cargo check --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+        # SIN `cargo fmt --check` (hub#1474): develop no está formateado con rustfmt (364 diffs el
+        # 03/09) y la CI no tiene paso de fmt. El gate rápido solo exige lo que la CI exige; fmt
+        # entra el día que la CI lo exija y develop esté formateado (PR mecánica aparte).
+        # Los MISMOS flags que el paso «cargo clippy --workspace» de test-hub.yml, y sin `-D warnings`:
+        # develop arrastra ~209 avisos (03/09) y la CI no es estricta; ser más estricto aquí bloqueó
+        # TODO push del hub nada más auto-instalarse el hook (hub#1472, cazado por la sonda de #1466).
+        # El día que la CI se ponga estricta, se cambian los dos a la vez.
+        fast_cmd="$fast_cmd && cargo clippy --workspace --all-targets --no-deps --exclude erplora-tauri --exclude tauri-plugin-erplora-android"
+    fi
+    echo "⚡ pre-push: gate RÁPIDO (check + clippy) — la suite pesada corre en la PR (test-hub.yml, hub#1466)…" >&2
+    if ! eval "$fast_cmd"; then
+        echo "" >&2
+        echo "❌ pre-push: el gate rápido es ROJO → push ABORTADO." >&2
+        echo "   Compila y pasa clippy (mismos flags que la CI) y reintenta. Para correr además la suite entera aquí:" >&2
+        echo "     HUB_GATE_DEPTH=full git push" >&2
+        exit 1
+    fi
+    # Sin sello y sin cachear el verde: no se ha probado nada que atestiguar.
+    echo "✅ pre-push: gate rápido verde → sube. La suite pesada la corre test-hub.yml en la PR," >&2
+    echo "   y es su check verde el que autoriza el merge (merge-pr.sh)." >&2
+    exit 0
 fi
 
 if [ "$SCOPE_MODE" = packages ]; then

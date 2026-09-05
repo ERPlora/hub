@@ -234,6 +234,7 @@ async fn register_module(
         let now = crate::registry::now_rfc3339();
         let mut declared: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
             std::collections::HashMap::new();
+        let mut placeholders: Vec<String> = Vec::new();
         for file in seed_files {
             let sql = loader::read_text(dir, file.file())?;
             // hub#842: la guarda `WHERE NOT EXISTS` con la que el seed se hace idempotente ES la
@@ -244,12 +245,27 @@ async fn register_module(
             for (table, keys) in crate::seed::declared_natural_keys(&sql) {
                 declared.entry(table).or_default().extend(keys);
             }
+            // hub#1535: la otra lectura de la MISMA guarda. Cuando el seed no declara clave
+            // porque siembra la tabla ENTERA (`WHERE hub_id = :hub_id`), lo que declara es que
+            // esas filas son un marcador de posición — y el import tiene que saberlo para que el
+            // horario que trae un blueprint sustituya a la semana genérica en vez de convivir con
+            // ella. Se lee aquí, del mismo texto que se ejecuta, por el mismo motivo que la clave.
+            for table in crate::seed::declared_placeholder_tables(&sql) {
+                if !placeholders.contains(&table) {
+                    placeholders.push(table);
+                }
+            }
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
         }
         if !declared.is_empty() {
             registry
                 .seed_natural_keys
                 .insert(manifest.id.clone(), declared);
+        }
+        if !placeholders.is_empty() {
+            registry
+                .seed_placeholder_tables
+                .insert(manifest.id.clone(), placeholders);
         }
     }
 
@@ -1951,19 +1967,7 @@ mod tests {
         }
         let root = crate::e2e_support::modules_root();
         let mut checked = 0;
-        for entry in std::fs::read_dir(&root)
-            .expect("modules root is readable")
-            .flatten()
-        {
-            let dir = entry.path();
-            if !dir.join("module.json").is_file() {
-                continue;
-            }
-            let module = dir
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
+        for (module, dir) in crate::e2e_support::published_module_dirs_in(&root) {
             let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
                 continue; // A manifest that does not parse is another test's business.
             };
@@ -1996,19 +2000,7 @@ mod tests {
         let root = crate::e2e_support::modules_root();
         let mut parsed = 0;
         let mut without_roles = 0;
-        for entry in std::fs::read_dir(&root)
-            .expect("modules root is readable")
-            .flatten()
-        {
-            let dir = entry.path();
-            if !dir.join("module.json").is_file() {
-                continue;
-            }
-            let module = dir
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
+        for (module, dir) in crate::e2e_support::published_module_dirs_in(&root) {
             match crate::manifest::Manifest::load(&dir) {
                 Ok(manifest) => {
                     // This used to assert `roles.is_empty()` for EVERY module, to show the block
@@ -2061,21 +2053,24 @@ mod tests {
     /// grandfather list is inside the set. Together they pin it to exactly the list.
     fn published_manifest_warnings() -> std::collections::BTreeSet<(String, String)> {
         let root = crate::e2e_support::modules_root();
+        let (found, parsed) = published_manifest_warnings_in(&root);
+        assert!(
+            parsed >= 20,
+            "expected the published catalogue (~27 modules), only {parsed} parsed in {}",
+            root.display()
+        );
+        found
+    }
+
+    /// [`published_manifest_warnings`] against an explicit root, and WITHOUT the floor: so the
+    /// sweep itself can be exercised over a fixture tree (hub#1448) instead of over the real
+    /// `modules-workspace`, whose contents are whatever the fleet happens to be doing.
+    fn published_manifest_warnings_in(
+        root: &std::path::Path,
+    ) -> (std::collections::BTreeSet<(String, String)>, usize) {
         let mut found = std::collections::BTreeSet::new();
         let mut parsed = 0;
-        for entry in std::fs::read_dir(&root)
-            .expect("modules root is readable")
-            .flatten()
-        {
-            let dir = entry.path();
-            if !dir.join("module.json").is_file() {
-                continue;
-            }
-            let module = dir
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
+        for (module, dir) in crate::e2e_support::published_module_dirs_in(root) {
             let Ok(manifest) = crate::manifest::Manifest::load(&dir) else {
                 continue; // A manifest that does not parse is another test's business.
             };
@@ -2084,12 +2079,54 @@ mod tests {
             }
             parsed += 1;
         }
-        assert!(
-            parsed >= 20,
-            "expected the published catalogue (~27 modules), only {parsed} parsed in {}",
-            root.display()
+        (found, parsed)
+    }
+
+    /// **hub#1448** — the sweep reads the module CHECKOUTS, never the fleet's worktrees, and it
+    /// still catches the warning it exists to catch.
+    ///
+    /// Both halves in one fixture on purpose. A filter that simply returned nothing would fix the
+    /// false red of hub#1448 and silently disarm hub#1243 at the same time — so the same tree
+    /// carries a real checkout whose manifest warns (must be REPORTED) and a worktree of that very
+    /// module carrying the identical manifest (must be INVISIBLE). Before the filter, the
+    /// worktree's warning came back under the directory name (`.wt-inventory-71`), which is not a
+    /// module id and is on nobody's grandfather list.
+    #[test]
+    fn the_sweep_reads_checkouts_not_the_fleets_worktrees_hub1448() {
+        let root = std::env::temp_dir().join(format!("erplora-warnsweep-{}", uuid::Uuid::new_v4()));
+        // `validates` is not a field this core reads, so loading warns instead of refusing
+        // (ADR-0286) — the exact shape the real `inventory` manifest carries.
+        let manifest = r#"{"id":"inventory","name":"Inventory","version":"1.0.0",
+            "commands":{"inventory.products.create":{"permission":"inventory.write","sql":[],
+                        "validates":{"name":"required"}}}}"#;
+        for (name, worktree) in [("inventory", false), (".wt-inventory-71", true)] {
+            let dir = root.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("module.json"), manifest).unwrap();
+            if worktree {
+                std::fs::write(dir.join(".git"), "gitdir: /elsewhere").unwrap();
+            } else {
+                std::fs::create_dir_all(dir.join(".git")).unwrap();
+            }
+        }
+
+        let (found, parsed) = published_manifest_warnings_in(&root);
+        std::fs::remove_dir_all(&root).ok();
+
+        assert_eq!(
+            parsed, 1,
+            "the worktree is the same module seen twice, not a second module"
         );
-        found
+        assert_eq!(
+            found,
+            [(
+                "inventory".to_string(),
+                "commands.inventory.products.create.validates".to_string()
+            )]
+            .into_iter()
+            .collect(),
+            "the checkout's warning must still surface — a filter that eats it disarms hub#1243"
+        );
     }
 
     /// **hub#1243** — a published module either warns about NOTHING, or about a path that is on

@@ -1,6 +1,7 @@
-//! Descubrimiento de impresoras en red + parseo de `printer_id`.
-//! Porta `bridge/ERPlora-Bridge-desktop/erplora_bridge/hardware/discovery.py`, **solo la rama
-//! de red** (USB/Bluetooth descartados, §2.7).
+//! Descubrimiento de impresoras en red + parseo de `printer_id` (**los tres transportes**).
+//! Porta `bridge/ERPlora-Bridge-desktop/erplora_bridge/hardware/discovery.py`, del que solo el
+//! descubrimiento **de red** vive aquí: las colas USB del SO las enumera [`crate::usb`]
+//! (hub#1083) y las Bluetooth emparejadas las lista el plugin Kotlin (ADR-0204).
 //!
 //! Métodos: escaneo de subred /24 al puerto 9100 + mDNS (`_pdl-datastream._tcp`,`_ipp._tcp`),
 //! deduplicado, y enriquecido con MAC/ARP para registrar en `registry::DeviceRegistry`.
@@ -55,13 +56,28 @@ impl NetworkTarget {
 /// Bluetooth Classic SPP print destination — Android only (ADR-0204, hub#388).
 ///
 /// The MAC is the whole identity: RFCOMM connects to a bonded device by address, there is no
-/// host/port. Desktop and iOS never produce nor accept this variant (iOS because of Apple's MFi
-/// restriction on Bluetooth Classic, desktop by the standing red-only decision of §2.7).
+/// host/port. Desktop and iOS never produce nor accept this variant — iOS because of Apple's MFi
+/// restriction on Bluetooth Classic, desktop because the cheap printer there arrives by cable and
+/// is served by the OS print queue instead ([`UsbTarget`], hub#1083).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BluetoothTarget {
     /// Normalized (`AA:BB:CC:DD:EE:FF`): the same spelling the device registry keys on and the
     /// Kotlin transport connects with — two spellings of one printer would be two devices.
     pub mac: String,
+}
+
+/// Raw print destination through the operating system's own print queue — desktop only (hub#1083).
+///
+/// The queue name is the whole identity. There is no host, no port and no MAC: the cable is the
+/// OS's business, and what we address is the spooler entry the user (or the vendor installer)
+/// created for the printer. That is deliberate — it is what lets us support USB *without shipping
+/// a driver per OS*, which is the thing the old red-only decision was actually protecting against.
+/// The vendor writes the driver; we keep emitting the same ESC/POS bytes we emit over TCP.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UsbTarget {
+    /// A CUPS destination name, already validated: non-empty, no SPACE/TAB/`/`/`#`, no leading
+    /// `-`, at most [`CUPS_MAX_QUEUE_NAME`] bytes. See [`parse_print_target`].
+    pub queue: String,
 }
 
 /// Where a print job goes, parsed from a `printer_id` (ADR-0204).
@@ -73,12 +89,32 @@ pub struct BluetoothTarget {
 pub enum PrintTarget {
     Network(NetworkTarget),
     Bluetooth(BluetoothTarget),
+    Usb(UsbTarget),
 }
 
-/// Parses a `printer_id` into the transport it names: `network:{ip}:{port}` or `bluetooth:{mac}`
-/// (ADR-0204). Anything else — `usb:`, a malformed MAC — is refused HERE, at the contract's edge,
-/// instead of travelling on to blow up inside a socket connect with a message nobody can map back
-/// to the id.
+/// The longest destination name `cupsd` will accept (`printer-name` is capped at 127 bytes).
+pub const CUPS_MAX_QUEUE_NAME: usize = 127;
+
+/// Whether `name` could be a CUPS destination at all.
+///
+/// CUPS forbids SPACE, TAB, `/` and `#` in a destination name, so anything carrying one names a
+/// queue that *cannot exist* — better said here than as an `lp` exit code nobody can trace back to
+/// the printer the cashier picked. The leading `-` is ours: `lp -d <queue>` would read it as a
+/// flag, and a job that quietly prints somewhere else is worse than one that fails.
+pub(crate) fn is_cups_queue_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= CUPS_MAX_QUEUE_NAME
+        && !name.starts_with('-')
+        && !name
+            .chars()
+            .any(|c| c == ' ' || c == '\t' || c == '/' || c == '#' || c.is_control())
+}
+
+/// Parses a `printer_id` into the transport it names: `network:{ip}:{port}`, `bluetooth:{mac}`
+/// (ADR-0204) or `usb:{queue}` (hub#1083). Anything else — an unknown scheme, a malformed MAC, a
+/// queue name the OS could never have — is refused HERE, at the contract's edge, instead of
+/// travelling on to blow up inside a socket connect or an `lp` exit code with a message nobody can
+/// map back to the id.
 pub fn parse_print_target(printer_id: &str) -> Result<PrintTarget> {
     match printer_id.split_once(':') {
         Some(("bluetooth", mac)) => {
@@ -91,15 +127,25 @@ pub fn parse_print_target(printer_id: &str) -> Result<PrintTarget> {
                 mac: crate::registry::normalize_mac(mac),
             }))
         }
+        Some(("usb", queue)) => {
+            if !is_cups_queue_name(queue) {
+                return Err(crate::PeripheralError::InvalidPrinterId(format!(
+                    "not a usable OS print queue name in: {printer_id}"
+                )));
+            }
+            Ok(PrintTarget::Usb(UsbTarget {
+                queue: queue.to_string(),
+            }))
+        }
         _ => parse_printer_id(printer_id).map(PrintTarget::Network),
     }
 }
 
 /// Parsea un `printer_id` `network:{ip}:{port}` → `NetworkTarget`.
 /// Porta `parse_printer_id`, restringido a la rama `network`: es el parser del camino TCP (cola
-/// de impresión, cajón, enriquecido del registro), así que rechaza `usb:` y también `bluetooth:` —
-/// esa variante solo llega al hardware por [`parse_print_target`] (transporte SPP de Android,
-/// ADR-0204).
+/// de impresión, cajón por socket, enriquecido del registro), así que rechaza `bluetooth:` y
+/// `usb:` — esas variantes solo llegan al hardware por [`parse_print_target`] (SPP de Android,
+/// ADR-0204; cola RAW del SO, hub#1083).
 pub fn parse_printer_id(printer_id: &str) -> Result<NetworkTarget> {
     // `split(':', 1)` de Python: separa el esquema del resto por el PRIMER ':'.
     let (scheme, rest) = match printer_id.split_once(':') {
@@ -109,15 +155,15 @@ pub fn parse_printer_id(printer_id: &str) -> Result<NetworkTarget> {
 
     if scheme != "network" {
         return Err(crate::PeripheralError::InvalidPrinterId(format!(
-            "tipo de impresora no soportado (red-only): {scheme}"
+            "not a network printer id (this is the TCP path only): {scheme}"
         )));
     }
 
-    // `rsplit(':', 1)` de Python: host puede contener ':' (p.ej. IPv6); el puerto es lo último.
+    // Python's `rsplit(':', 1)`: the host may contain ':' (IPv6), the port is always last.
     let (host, port) = match rest.rsplit_once(':') {
         Some((h, p)) => {
             let port = p.parse::<u16>().map_err(|_| {
-                crate::PeripheralError::InvalidPrinterId(format!("puerto inválido en: {printer_id}"))
+                crate::PeripheralError::InvalidPrinterId(format!("invalid port in: {printer_id}"))
             })?;
             (h.to_string(), port)
         }
@@ -126,7 +172,7 @@ pub fn parse_printer_id(printer_id: &str) -> Result<NetworkTarget> {
 
     if host.is_empty() {
         return Err(crate::PeripheralError::InvalidPrinterId(format!(
-            "host vacío en: {printer_id}"
+            "empty host in: {printer_id}"
         )));
     }
 
@@ -616,15 +662,59 @@ mod tests {
         }
     }
 
+    // ── hub#1083: `usb:{queue}` joins the printer_id contract on the desktop ────────────────
+    //
+    // This INVERTS the half of the old test that fixed `usb:` as an error, the same movement
+    // Bluetooth made in ADR-0204. The "red-only" premise refused USB because *drivers per OS do
+    // not scale* — and that is still true: what changed is that we no longer need one. The OS
+    // print queue IS the generic transport, the vendor writes the driver, and we keep emitting the
+    // ESC/POS we already emit. The USB thermal printer is the cheapest in the catalogue and the
+    // one a single-till bar or salon actually buys.
+
     #[test]
-    fn usb_stays_rejected_and_so_does_a_malformed_bluetooth_mac() {
-        // USB remains out (ADR-0204: drivers per OS do not scale). And a `bluetooth:` id whose
-        // rest is not a MAC must fail HERE, not travel to Kotlin to blow up inside the socket
-        // connect with a message nobody maps back to the id.
-        assert!(parse_print_target("usb:001:002").is_err());
+    fn hub1083_a_usb_printer_id_names_an_os_queue() {
+        match parse_print_target("usb:Star_TSP143") {
+            Ok(PrintTarget::Usb(t)) => assert_eq!(t.queue, "Star_TSP143"),
+            other => panic!("usb:{{queue}} must parse as a USB target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn hub1083_a_queue_name_the_os_could_never_have_is_refused_at_the_edge() {
+        // CUPS forbids SPACE, TAB, `/` and `#` in a destination name, so an id carrying one names
+        // a queue that cannot exist. Refusing it HERE keeps it from travelling on to come back as
+        // an `lp` exit code nobody can map to the printer the cashier picked.
+        assert!(parse_print_target("usb:").is_err(), "an empty queue names nothing");
+        assert!(parse_print_target("usb:Star TSP143").is_err(), "CUPS forbids spaces");
+        assert!(parse_print_target("usb:kitchen/star").is_err(), "CUPS forbids `/`");
+        assert!(parse_print_target("usb:star#1").is_err(), "CUPS forbids `#`");
+        assert!(parse_print_target("usb:star\tone").is_err(), "CUPS forbids TAB");
+    }
+
+    #[test]
+    fn hub1083_a_leading_dash_is_refused_so_a_queue_can_never_become_an_lp_flag() {
+        // `lp -d <queue>`: a destination that starts with `-` is an argument `lp` would read as a
+        // flag. There is no shell here (argv, never a string), so this is not an injection — it
+        // is a queue that would silently print somewhere else, which is worse than an error.
+        assert!(parse_print_target("usb:-oraw").is_err());
+        assert!(parse_print_target("usb:--help").is_err());
+    }
+
+    #[test]
+    fn a_malformed_bluetooth_mac_is_still_refused() {
+        // A `bluetooth:` id whose rest is not a MAC must fail HERE, not travel to Kotlin to blow
+        // up inside the socket connect with a message nobody maps back to the id.
         assert!(parse_print_target("bluetooth:not-a-mac").is_err());
         assert!(parse_print_target("bluetooth:").is_err());
         assert!(parse_print_target("bluetooth:AA:BB:CC:DD:EE").is_err(), "5 groups is not a MAC");
+    }
+
+    #[test]
+    fn the_network_only_parser_still_refuses_usb() {
+        // `parse_printer_id` is the NETWORK parser: the print queue (`PrintJob.target`), the
+        // drawer's socket path and the registry enrichment all feed TCP and cannot take a queue
+        // name. USB reaches hardware exclusively through `parse_print_target`'s USB arm.
+        assert!(parse_printer_id("usb:Star_TSP143").is_err());
     }
 
     #[test]

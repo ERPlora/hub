@@ -51,6 +51,8 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Value};
 
+use erplora_runtime::registry::FailedInstall;
+
 use crate::AppState;
 
 /// Estado de una parte, y del conjunto.
@@ -131,26 +133,67 @@ pub fn status_code(health: Health) -> StatusCode {
     }
 }
 
-/// Compara lo que `hub_module` dice que debería estar con lo que el `Registry` tiene cargado.
+/// Compara lo que `hub_module` dice que debería estar con lo que el `Registry` tiene cargado, y
+/// añade lo que **ni siquiera llegó a la BD** (hub#1477).
 ///
 /// Solo mira lo que **falta**. Lo que sobra no es un fallo: los plugins nativos horneados en el
 /// runtime (ADR-0009) están en el Registry sin estar en `hub_module`, y tratarlos como fallo
 /// dejaría todo hub `DOWN` para siempre.
-pub fn modules_check(expected: &[String], registered: &[String]) -> Check {
+///
+/// ## Por qué `hub_module` no bastaba
+///
+/// `hub_module` es el estado ANTERIOR, y con eso se cubre «no salgas peor de como entraste». Pero
+/// hay un hueco que esa comparación **no puede ver**: un módulo cuyo install falla no escribe su
+/// fila, así que no está en `expected`, y su ausencia sale con `missing: []`. Un hub incompleto se
+/// daba por sano — pasó con `verifactu`, el único módulo con `static_files`, que sin token de
+/// máquina no puede materializar su carpeta: el hub servía **sin el módulo fiscal** diciendo `UP`.
+///
+/// Por eso `failed` entra como tercera entrada y no como parte de `missing`: son dos causas
+/// distintas y llevan a sitios distintos. **`missing`** es «esto estaba y ya no carga» → se mira el
+/// módulo. **`failed`** es «esto se pidió instalar y no entró» → se mira el despliegue.
+pub fn modules_check(
+    expected: &[String],
+    registered: &[String],
+    failed: &[FailedInstall],
+) -> Check {
     let mut missing: Vec<&String> = expected
         .iter()
         .filter(|id| !registered.contains(id))
         .collect();
     missing.sort();
 
+    // Un fallo del que el hub se recuperó por otra puerta ya no es un fallo. El arranque tiene
+    // varias —escaneo de disco, re-hidratación desde caché, re-descarga del marketplace— y se
+    // prueban EN ORDEN: fallar en la primera y entrar por la segunda es un final feliz, no medio
+    // fallo. Sin este filtro ese hub se quedaría `DOWN` para siempre **con el módulo cargado**, que
+    // con el rollback de Swarm significa reiniciarlo en bucle.
+    //
+    // El motivo viaja con el id: sin él, quien lea la sonda tiene que entrar al contenedor a
+    // averiguar por qué — que es justo el viaje que la sonda existe para ahorrar.
+    let unrecovered: Vec<&FailedInstall> = failed
+        .iter()
+        .filter(|failure| !registered.contains(&failure.module_id))
+        .collect();
+    let failed_detail: Vec<Value> = unrecovered
+        .iter()
+        .map(|failure| {
+            json!({
+                "module_id": failure.module_id,
+                "source": failure.source,
+                "reason": failure.reason,
+            })
+        })
+        .collect();
+
     let detail = json!({
         "expected": expected.len(),
         "registered": registered.len(),
         "missing": missing,
+        "failed": failed_detail,
     });
 
     Check::with(
-        if missing.is_empty() {
+        if missing.is_empty() && unrecovered.is_empty() {
             Health::Up
         } else {
             Health::Down
@@ -282,7 +325,9 @@ pub async fn snapshot(st: &AppState) -> Checks {
                     .iter()
                     .map(|manifest| manifest.id.clone())
                     .collect();
-                modules_check(&expected, &registered)
+                // Lo que el runtime intentó instalar y no pudo (hub#1477). Sale del Registry y no
+                // de la BD a propósito: es justo lo que la BD no llegó a saber.
+                modules_check(&expected, &registered, &runtime.registry().failed_installs)
             }
             // No poder LEER la lista no es que falte un módulo: es no saberlo.
             Err(error) => Check::with(Health::Unknown, json!({ "error": error.to_string() })),
@@ -332,6 +377,14 @@ async fn expected_modules(
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn failure(module_id: &str, reason: &str) -> FailedInstall {
+        FailedInstall {
+            module_id: module_id.to_string(),
+            source: format!("/tmp/modules/{module_id}"),
+            reason: reason.to_string(),
+        }
+    }
 
     fn checks(pairs: &[(&str, Health)]) -> Checks {
         pairs
@@ -383,6 +436,7 @@ mod tests {
         let check = modules_check(
             &["sales".into(), "taxes".into()],
             &["taxes".into(), "sales".into()],
+            &[],
         );
 
         assert_eq!(check.status, Health::Up);
@@ -395,7 +449,7 @@ mod tests {
     /// módulo, sin listas de «críticos» que alguien tendría que mantener.
     #[test]
     fn a_module_that_should_be_there_and_is_not_is_down_and_named() {
-        let check = modules_check(&["sales".into(), "taxes".into()], &["taxes".into()]);
+        let check = modules_check(&["sales".into(), "taxes".into()], &["taxes".into()], &[]);
 
         assert_eq!(check.status, Health::Down);
         assert_eq!(check.detail["missing"], json!(["sales"]));
@@ -413,7 +467,7 @@ mod tests {
         let expected = vec!["sales".to_string()];
 
         for attempt in 1..=10 {
-            let check = modules_check(&expected, &[]);
+            let check = modules_check(&expected, &[], &[]);
             assert_eq!(
                 check.status,
                 Health::Down,
@@ -428,9 +482,95 @@ mod tests {
     /// `hub_module`; tratarlo como fallo dejaría todo hub `DOWN` para siempre.
     #[test]
     fn a_module_registered_but_not_expected_does_not_block() {
-        let check = modules_check(&["sales".into()], &["sales".into(), "printing".into()]);
+        let check = modules_check(&["sales".into()], &["sales".into(), "printing".into()], &[]);
 
         assert_eq!(check.status, Health::Up);
+    }
+
+    // ── Lo que NUNCA llegó a la BD (hub#1477) ────────────────────────────────────────
+
+    /// **El agujero que esto tapa.** `hub_module` es el estado ANTERIOR, y sirve para «no salgas
+    /// peor de como entraste». Pero un módulo que **nunca llegó a instalarse** no está en
+    /// `hub_module`: `install` falla antes de escribir la fila. Así que la comparación de arriba no
+    /// puede verlo — `expected` no lo contiene, `missing` sale vacío y el hub se da por sano.
+    ///
+    /// Es exactamente lo que pasaba con `verifactu`, el único módulo con `static_files`: sin token
+    /// de máquina su carpeta no se materializa, el install se cae, y el hub servía **sin el módulo
+    /// fiscal** publicando `UP` con `missing: []`.
+    #[test]
+    fn a_module_that_never_installed_is_down_even_though_it_never_reached_the_database() {
+        let failed = vec![failure("verifactu", "Hub Cloud sin token de máquina")];
+
+        let check = modules_check(&["sales".into()], &["sales".into()], &failed);
+
+        // Lo que la BD sabe está perfecto: por eso el fallo era invisible.
+        assert_eq!(check.detail["missing"], json!([]));
+        // Y aun así el hub NO está listo, porque le falta algo que se le pidió montar.
+        assert_eq!(check.status, Health::Down);
+    }
+
+    /// No basta con decir que algo falla: hay que decir **qué** y **por qué**, o el que lo lea
+    /// tiene que entrar al contenedor a averiguarlo — que es justo lo que la sonda evita.
+    #[test]
+    fn the_probe_names_the_module_and_the_reason_it_could_not_be_installed() {
+        let failed = vec![failure("verifactu", "Hub Cloud sin token de máquina")];
+
+        let check = modules_check(&[], &[], &failed);
+
+        assert_eq!(check.detail["failed"][0]["module_id"], "verifactu");
+        assert!(
+            check.detail["failed"][0]["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("sin token de máquina"),
+            "{}",
+            check.detail["failed"][0]["reason"]
+        );
+    }
+
+    /// Las dos causas son distintas y se cuentan por separado: **`missing`** es «estaba y ya no
+    /// carga»; **`failed`** es «se pidió instalarlo y no entró». Fundirlas mandaría a buscar la
+    /// causa equivocada — una se arregla mirando el módulo, la otra mirando el despliegue.
+    #[test]
+    fn a_module_that_regressed_and_one_that_never_installed_are_reported_apart() {
+        let failed = vec![failure("verifactu", "Hub Cloud sin token de máquina")];
+
+        let check = modules_check(&["sales".into()], &[], &failed);
+
+        assert_eq!(check.detail["missing"], json!(["sales"]));
+        assert_eq!(check.detail["failed"][0]["module_id"], "verifactu");
+        assert_eq!(check.status, Health::Down);
+    }
+
+    /// **Un fallo del que el hub se recuperó por otra vía NO lo deja tumbado.**
+    ///
+    /// El arranque tiene varias puertas: el escaneo de `HUB_MODULES_DIR` corre ANTES que la
+    /// re-hidratación desde caché y que la re-descarga del marketplace (`boot.rs`). Un módulo puede
+    /// perfectamente fallar en la primera y entrar por la segunda. Si el veredicto del escaneo
+    /// pesara igual, ese hub se quedaría `DOWN` para siempre **con el módulo cargado y funcionando**
+    /// — y `DOWN` para siempre es el rollback de Swarm en bucle.
+    ///
+    /// La regla es la misma que gobierna el resto de la sonda: lo que importa es el estado FINAL,
+    /// no por cuántos intentos pasó para llegar.
+    #[test]
+    fn a_failure_the_hub_recovered_from_by_another_route_does_not_keep_it_down() {
+        let failed = vec![failure("verifactu", "Hub Cloud sin token de máquina")];
+
+        // El escaneo no pudo, pero la re-hidratación sí: el módulo ESTÁ cargado.
+        let check = modules_check(&["verifactu".into()], &["verifactu".into()], &failed);
+
+        assert_eq!(check.status, Health::Up);
+        assert_eq!(check.detail["failed"], json!([]));
+    }
+
+    /// Sin fallos, la sonda dice lo mismo que decía: esto añade un motivo de `DOWN`, no cambia el
+    /// veredicto de un hub sano.
+    #[test]
+    fn nothing_failed_keeps_the_probe_exactly_as_it_was() {
+        let check = modules_check(&["sales".into()], &["sales".into()], &[]);
+
+        assert_eq!(check.status, Health::Up);
+        assert_eq!(check.detail["failed"], json!([]));
     }
 
     // ── Liveness ≠ readiness ─────────────────────────────────────────────────────────

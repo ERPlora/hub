@@ -127,7 +127,7 @@ async function exchangeCourier(code: string): Promise<boolean> {
   const device = await getDeviceContext();
   const result = await runtimeCourierSession(code, device?.id);
   setTokens(result.access, result.refresh);
-  setHubSession(result.token);
+  setHubSession(result.token, result.credential_kind);
   setUser({
     id: result.user.id,
     cloudUserId: result.cloud_user.id,

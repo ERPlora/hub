@@ -16,7 +16,6 @@ pub mod access_email;
 pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
-pub mod certificate_refetch;
 pub mod commands;
 pub mod device_mode;
 pub mod devices;
@@ -27,7 +26,7 @@ pub mod errors;
 pub mod event_shape;
 pub mod events;
 pub mod export;
-pub mod fiscal_gateway;
+pub mod cloud_call;
 pub mod fiscal_profile;
 pub mod flows;
 pub mod gateway_identity;
@@ -89,7 +88,9 @@ pub use registry::{
 // `modules_root` travels with the guard on purpose: a test that resolves module paths by hand
 // diverges from the guard and reintroduces hub#253 (the guard says "run", every path is wrong,
 // the test skips itself and still reports `ok`).
-pub use e2e_support::{modules_root, require_module_version, require_modules_workspace};
+pub use e2e_support::{
+    modules_root, published_module_dirs, require_module_version, require_modules_workspace,
+};
 
 /// One declared domain error code of an installed module (ADR-0398), as `/api/modules` exposes it.
 #[derive(Debug, Clone, serde::Serialize)]

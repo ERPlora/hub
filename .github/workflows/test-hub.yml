@@ -78,13 +78,19 @@ name: Hub tests (Rust · Postgres)
 # merge left it. Prevention at merge time (option 1) lives in pm's merge-pr.sh
 # (pm#74) — but that is `cargo check`, it does not EXECUTE; this run does.
 on:
-  # Sin `pull_request` desde el 2026-08-29 (decisión de Ioan): cargo test --workspace se ejecuta en el
-  # gate pre-push, en local, en cada push. Si está rojo el push se aborta y sin push no hay
-  # PR, así que la prueba no se pierde: cambia de sitio. La nube conserva `push` a
-  # develop/main, que es la red POST-MERGE de hub#572 (dos PRs verdes por separado pueden
-  # romper develop juntas, y eso solo se ve sobre el árbol resultante).
-  # `merge-pr.sh` autoriza el merge con la atestación `local-gate/hub-tests` (pm#197).
-  # Para volver a la nube: devolver este bloque `pull_request:` con sus `paths`.
+  # `pull_request` VOLVIÓ el 2026-09-03 (hub#1466). Estuvo fuera del 29/08 al 03/09 (pm#197): la
+  # suite corría en el gate pre-push local y `merge-pr.sh` aceptaba su atestación. Medido en la
+  # tanda R2 del 02/09: ese gate es UN lock para toda la máquina, ~20 min por pasada, y cada
+  # arreglo del revisor lo paga entero — 6 pasadas en serie fueron las 2 h de la tanda. Ahora el
+  # gate local se queda solo con check + fmt + clippy (sin atestación) y la suite pesada corre AQUÍ,
+  # en `ci-runner-1`, 4 PRs a la vez. Este check es el que autoriza el merge (`merge-pr.sh`).
+  # Con su filtro de borradores en cada job que cuesta minutos: medido el 29/08, la mitad de los
+  # minutos del runner se iban en runs cancelados por el re-push del revisor sobre PRs en borrador.
+  # `ready_for_review` está en `types` porque el filtro se salta `opened`/`synchronize` del borrador.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  # `push` a develop/main sigue: es la red POST-MERGE de hub#572 (dos PRs verdes por separado
+  # pueden romper develop juntas, y eso solo se ve sobre el árbol resultante).
   push:
     branches: [main, develop]
   workflow_dispatch:
@@ -105,15 +111,30 @@ permissions:
 
 jobs:
   test:
-    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
-    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
-    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: cargo test --workspace
+    # Borrador = 0 minutos de CI (hub#1466; medido 29/08). El revisor lo pone listo con `gh pr ready`.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     # Mismo interruptor que `build-hub.yml`: `CI_RUNNER_LABEL` o los runners de GitHub. Ojo: el
     # runner es UNA máquina, así que esta suite (la más larga) serializa con el build de la imagen.
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 40
+    # 🔴 Este número NO es el presupuesto de la suite: es el BACKSTOP del job (hub#1519).
+    # Un job que agota `timeout-minutes` lo marca GitHub como `cancelled`, indistinguible de una
+    # cancelación por concurrencia o por un push más nuevo: no nombra un test, no señala una línea,
+    # y `merge-pr.sh` lo lee como no-verde y se niega a mergear sin explicar por qué. Así murió el
+    # run 33787341170 a los 40m20s, con la suite entera en verde y los doc-tests como última línea
+    # del log: la cola bloqueada por un rojo que no era un rojo.
+    #
+    # Un PASO que agota SU `timeout-minutes` FALLA (el job queda en `failure`, no en `cancelled`),
+    # así que el presupuesto vive ahora en cada paso caro, y este de aquí solo cubre lo que queda
+    # FUERA de ellos (arranque del contenedor, checkout, caché). Por eso tiene que quedar
+    # ESTRICTAMENTE por encima de la suma de los presupuestos de los pasos — si no, el hachazo mudo
+    # del job vuelve a llegar primero. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+    #
+    # 70 medido, no elegido a ojo: las cinco pasadas verdes del 03/09 sobre este mismo runner
+    # duraron 33m07s, 33m09s, 32m32s, 33m37s y 32m46s (jobs de los runs 33815145661, 33811810476,
+    # 33811694999, 33802962820 y 33788925868). 70 deja >50% de margen sobre la peor. Mismo número
+    # que `test-hub-modules.yml`, que ya lo usa.
+    timeout-minutes: 70
     permissions:
       contents: read
       issues: write   # open/refresh the develop-broken alert issue (hub#572)
@@ -173,12 +194,11 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
+      # Sin `fetch-depth`: el default (1 commit) basta. Los dos commits que se pedían aquí eran
+      # para el `git diff HEAD^1 HEAD` del paso de alcance, y ese paso se fue con hub#1463 — nada
+      # más en este workflow lee historia.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # 2 = the PR merge commit AND its two parents: `git diff HEAD^1 HEAD` is exactly the PR's
-          # diff against its base at merge time, which is what the scope step below needs.
-          fetch-depth: 2
 
       # Contrato del cableado de lints (hub#1242): que la tabla `[workspace.lints]` exista, que
       # TODOS los miembros la hereden y que el paso de clippy de más abajo siga aquí y antes de la
@@ -187,11 +207,25 @@ jobs:
       - name: Contrato del gate de lints (hub#1242)
         run: bash scripts/tests/clippy-lints.test.sh
 
-      # Contrato del alcance (hub#1207 llevado a CI): el resolutor que decide qué paquetes corre
-      # una PR existe, respeta las reglas (dependientes, transversal, no reclamado) y este workflow
-      # está cableado a él. Mismo motivo que arriba: un cable suelto no da rojo por sí solo.
+      # Contrato del alcance (hub#1207): el resolutor que decide qué paquetes corre una pasada
+      # existe y respeta las reglas (dependientes, transversal, no reclamado). Quien lo CONSUME es
+      # el gate pre-push; aquí ya no se acota nada (hub#1463), y la batería incluye los casos que
+      # lo fijan. Se ejecuta desde este workflow porque una batería que no invoca nadie no deja
+      # rojo en ningún sitio (hub#1392). Mismo motivo que arriba: va antes de la suite.
       - name: Contrato del alcance de la suite (scripts/ci/test-scope.py)
         run: bash scripts/tests/test-scope.test.sh
+      - name: Contrato de test-hub.yml (scripts/tests/test-hub-workflow.test.sh)
+        run: bash scripts/tests/test-hub-workflow.test.sh
+
+      # Contrato del suelo de bash (hub#1468): que TODOS los scripts del repo —los de
+      # `scripts/`, y el hook `pre-push`— sigan parseando con el bash más viejo de la máquina.
+      # Este runner es Ubuntu con bash 5, así que aquí la comprobación es la genérica; la de
+      # verdad (bash 3.2, el de macOS) la hace el gate pre-push, que corre donde vive la flota.
+      # Aun así este paso corre AQUÍ porque una batería que no invoca nadie no deja rojo en
+      # ningún sitio (hub#1392) y porque su control portable —un error de sintaxis normal—
+      # prueba en cualquier máquina que el checker no está vacío. Bash puro, milisegundos.
+      - name: Contrato del suelo de bash (hub#1468)
+        run: bash scripts/tests/shell-syntax.test.sh
 
       # Contrato de publicación de los SDK (hub#1236): que `@erplora/module-sdk` siga siendo
       # publicable, que `erplora-guest-sdk` siga resolviendo en un clon por git tag y que
@@ -335,47 +369,7 @@ jobs:
       # the sources the job on the other slot is compiling from. That is what killed the Android
       # release build of v1.1.1 (hub#886); this workflow reaches the same registry, so it carries
       # the same guard. Long version in `test-shell.yml`.
-      # ── Alcance de la suite (hub#1207, ahora también en CI) ──────────────────────────────────
-      # En una PR se corren los paquetes que el diff puede alcanzar (dependientes incluidos, por
-      # `cargo metadata`); un push a develop/main corre el workspace entero. Medido el 29/08: la
-      # suite completa son 25 min de ranura y una PR se re-empuja 2-3 veces en revisión, así que la
-      # MITAD de los minutos del runner se iban en runs cancelados. Lo transversal (Cargo.lock,
-      # manifest, toolchain, schemas/) o un fichero Rust sin dueño ensanchan al workspace: el coste
-      # de un paquete olvidado es un develop rojo, y eso no se ahorra.
-      - name: Alcance de la suite (PR → paquetes alcanzados · develop/main → workspace)
-        id: scope
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "mode=workspace" >> "$GITHUB_OUTPUT"
-            echo "::notice::push a ${{ github.ref_name }}: suite completa"
-            exit 0
-          fi
-          # ⚠️ En una PR con Rust NO se acota. Este check se llama `cargo test --workspace` y es lo
-          # que AUTORIZA el merge (pm#58/#60): `merge-pr.sh` exige verlo en verde y NO acepta la
-          # atestación acotada del gate local como prueba de la suite completa. Acotarlo aquí
-          # dejaría el nombre mintiendo y devolvería el agujero de hub#572 (dos PRs verdes por
-          # separado que rompen develop juntas). Lo único que se ahorra es la PR SIN Rust, donde no
-          # hay nada que compilar y `merge-pr.sh` tampoco pide el check.
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed"
-          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/meta.json"
-          if ! python3 scripts/ci/test-scope.py "$RUNNER_TEMP/meta.json" erplora-tauri tauri-plugin-erplora-android \
-               < "$RUNNER_TEMP/changed" > "$RUNNER_TEMP/scope"; then
-            echo "::warning::el resolutor de alcance falló — se corre el workspace entero"
-            printf 'workspace\nresolver failed\n' > "$RUNNER_TEMP/scope"
-          fi
-          mode=$(sed -n 1p "$RUNNER_TEMP/scope"); reason=$(sed -n 2p "$RUNNER_TEMP/scope")
-          if [ "$mode" = packages ]; then
-            mode=workspace
-            reason="$reason — pero una PR con Rust corre el workspace entero (pm#58/#60)"
-          fi
-          select=$(sed -n '3,$p' "$RUNNER_TEMP/scope" | sed 's/^/-p /' | tr '\n' ' ')
-          echo "mode=$mode" >> "$GITHUB_OUTPUT"
-          echo "select=$select" >> "$GITHUB_OUTPUT"
-          echo "::notice::alcance: $mode — $reason ${select:+($select)}"
-
       - name: Rust cache
-        if: steps.scope.outputs.mode != 'none'
         uses: Swatinem/rust-cache@v2
         with:
           cache-bin: false
@@ -408,26 +402,89 @@ jobs:
       #
       # `--no-deps`: linta el workspace, no las ~600 cajas de terceros (sus avisos no los
       # arreglamos y solo ensucian el log).
+      #
+      # Presupuesto propio (hub#1519): medido en 2m33s el 03/09, 8 min es 3× ese reloj. El
+      # `timeout` de shell salta un minuto ANTES que el del paso para poder decir en voz alta que
+      # lo que se agotó fue el TIEMPO y no un lint — el `timeout-minutes` de abajo es la red por si
+      # el propio `timeout` no llegara a arrancar.
       - name: cargo clippy --workspace
-        if: steps.scope.outputs.mode != 'none'
+        id: clippy
+        timeout-minutes: 8
         run: |
-          cargo clippy --workspace --all-targets --no-deps \
+          set -uo pipefail
+          # 🔴 `set +e` NO sobra: Actions corre este bloque como `bash -e {0}` (este workflow no
+          # fija `shell:`) y `set -uo pipefail` NO apaga ese `-e`. Sin esta línea, el `timeout` al
+          # saltar abortaría el bloque en la línea de abajo y ni el `rc=$?`, ni el `overrun=true`,
+          # ni el `::error::` llegarían a ejecutarse: el paso saldría rojo MUDO, que es justo lo que
+          # hub#1519 viene a quitar. Lo fija `scripts/tests/test-hub-workflow.test.sh`.
+          set +e
+          timeout 7m cargo clippy --workspace --all-targets --no-deps \
             --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+          rc=$?
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (clippy)::clippy pasó de 7 min. NO es un lint roto: es el reloj (hub#1519)."
+          fi
+          exit "$rc"
 
-      - name: cargo test --workspace
-        if: steps.scope.outputs.mode == 'workspace'
+      # `--lib --bins --tests` = todo lo que EJECUTA menos los doc-tests, que se van al paso de
+      # abajo (hub#1519). El workspace no tiene ni un target `example`, así que la selección
+      # explícita no deja nada fuera respecto al `cargo test` pelado que había aquí.
+      #
+      # El presupuesto de 50 min sale del reloj real: este paso midió 29m49s el 03/09 (run
+      # 33811810476). El `timeout` de shell es el que manda porque es el único que puede EXPLICARSE:
+      # devuelve 124, y con eso el paso muere en rojo diciendo que se acabó el tiempo, en vez de
+      # dejar el `cancelled` mudo que bloqueaba la cola.
+      - name: cargo test --workspace (sin doc-tests)
         id: tests
-        run: cargo test --workspace --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+        timeout-minutes: 50
+        run: |
+          set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
+          timeout 48m cargo test --workspace --lib --bins --tests \
+            --exclude erplora-tauri --exclude tauri-plugin-erplora-android
+          rc=$?
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (suite)::La suite pasó de 48 min. NO hay ningún test roto: se acabó el presupuesto (hub#1519). Antes de re-lanzar, mira cuántos jobs comparten el runner."
+          fi
+          exit "$rc"
 
-      # Misma suite, acotada a lo que el diff alcanza. Hoy NADIE emite `packages` (una PR con Rust
-      # se ensancha arriba, y develop/main corren el workspace por definición): el paso se queda
-      # porque el resolutor sí sabe acotar y es lo que consumirá el gate local (hub#1347). Si algún
-      # día se decide acotar también en la PR, hay que cambiar ANTES `merge-pr.sh`, que exige ver
-      # `cargo test --workspace` en verde para autorizar el merge. `--exclude` solo existe con
-      # `--workspace`, por eso es un paso hermano y no una variable en el de arriba.
-      - name: cargo test (alcance de la PR)
-        if: steps.scope.outputs.mode == 'packages'
-        run: cargo test ${{ steps.scope.outputs.select }}
+      # Los doc-tests, en su propio paso y CONTADOS (hub#1519). Eran la última línea del log cuando
+      # cayó el hachazo del run 33787341170 y nada lo dijo; aquí un exceso de tiempo se lee como lo
+      # que es, y su resultado no queda escondido detrás de los 30 min de la suite.
+      #
+      # Se cuentan porque un paso de doc-tests que no ejecuta NINGUNO sale tan verde como uno que
+      # los pasa — el verde vacío que este repo ya se comió en hub#1216. Hoy son 4 (los de
+      # `erplora_guest_sdk`, medidos en el run 33811810476); si la selección de targets deja de
+      # coger nada, esto se pone rojo en vez de mentir.
+      - name: cargo test --doc (doc-tests, contados)
+        id: doctests
+        timeout-minutes: 8
+        run: |
+          set -uo pipefail
+          # `set +e` por lo mismo que en `clippy`: bajo el `bash -e` de Actions, el `timeout` al
+          # saltar abortaría aquí y el mensaje de abajo no se imprimiría nunca.
+          set +e
+          log="$RUNNER_TEMP/doctests.log"
+          timeout 7m cargo test --workspace --doc \
+            --exclude erplora-tauri --exclude tauri-plugin-erplora-android 2>&1 | tee "$log"
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            echo "overrun=true" >> "$GITHUB_OUTPUT"
+            echo "::error title=Presupuesto de tiempo agotado (doc-tests)::Los doc-tests pasaron de 7 min. NO es un test roto: es el reloj (hub#1519)."
+            exit "$rc"
+          fi
+          total=$(sed 's/\x1b\[[0-9;]*m//g' "$log" \
+                    | awk '/^test result: ok\./ { s += $4 } END { print s+0 }')
+          echo "doc-tests ejecutados: ${total}"
+          if [ "$rc" -eq 0 ] && [ "$total" -eq 0 ]; then
+            echo "::error title=Doc-tests vacíos::cargo test --doc salió verde sin ejecutar un solo doc-test (hub#1519): la selección de targets dejó de coger nada."
+            exit 1
+          fi
+          exit "$rc"
 
       # When the POST-MERGE run on develop goes red (hub#572), make it loud:
       # open (or refresh, idempotently — one open issue, never one per run) an
@@ -437,10 +494,17 @@ jobs:
       # outcome so an environmental failure (disk, service container) does not
       # fake a "develop is broken" verdict; a run cancelled by a newer merge
       # never triggers it (`failure()` excludes cancellation).
+      #
+      # Desde hub#1519 mira los DOS pasos de la suite (se partió en tests + doc-tests: un doc-test
+      # roto en develop tiene que abrir la alerta igual) y descarta explícitamente el exceso de
+      # presupuesto: un `timeout` deja el paso en `failure` igual que un test roto, y decir
+      # «develop está roto» porque el runner iba lento es exactamente el veredicto falso que este
+      # `if:` lleva desde el principio evitando.
       - name: Open or refresh the develop-broken alert issue (hub#572)
         if: >-
-          failure() && steps.tests.outcome == 'failure' &&
-          github.event_name == 'push' && github.ref == 'refs/heads/develop'
+          failure() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
+          (steps.tests.outcome == 'failure' || steps.doctests.outcome == 'failure') &&
+          steps.tests.outputs.overrun != 'true' && steps.doctests.outputs.overrun != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SHA: ${{ github.sha }}

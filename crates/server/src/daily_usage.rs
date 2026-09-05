@@ -15,7 +15,7 @@
 
 use erplora_db::{DatabaseAdapter, Params};
 use erplora_runtime::native::PendingObligation;
-use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
+use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -37,25 +37,6 @@ pub struct DailyUsageHeartbeat {
     pub last_user_activity_at: Option<String>,
     /// Version of the **delegated** certificate this hub holds (ADR-0202 §2.5 — hub#318).
     ///
-    /// Three states, and the Cloud stores all three differently, so they must not be conflated:
-    /// an explicit **`0`** is «I hold no delegated certificate» (a fresh hub, or one that was
-    /// reprovisioned and lost its `HUB_SECRETS_KEY`), a positive number is the version it really
-    /// holds, and **absent** is «I am not telling you» — which the Cloud leaves as `NULL`, its
-    /// «never reported» state.
-    ///
-    /// Absent is therefore reserved for a READ FAILURE, never for «no certificate»: the same rule
-    /// `orders_today` follows above. A fabricated `0` would show up in the fleet panel as a hub
-    /// that lost ERPlora's certificate, and would send somebody looking for a rotation that never
-    /// broke.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cert_version: Option<i64>,
-    /// `notAfter` of that same delegated container, `YYYY-MM-DD`. Absent when unknown — including
-    /// when `cert_version` is `0`, which is what clears a stale expiry on the Cloud side.
-    ///
-    /// The Cloud compares it against the `not_after` of the `.p12` IT custodies: same version and a
-    /// different date means the hub is not really running our certificate (ADR-0202 §2.5).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cert_not_after: Option<String>,
     /// The hub version this container is running, e.g. `1.0.0` (hub#515).
     ///
     /// Sin ella, «¿está este hub al día?» solo se puede contestar adivinando desde un digest — y un
@@ -64,7 +45,7 @@ pub struct DailyUsageHeartbeat {
     /// una llamada aparte sería una cosa más que se puede romper.
     ///
     /// **No es `Option`, y eso es el contrato.** En este body «ausente» significa *no pude leerlo*
-    /// (`orders_today`, `cert_version`…) y el Cloud lo guarda distinto; la versión va compilada
+    /// (`orders_today`…) y el Cloud lo guarda distinto; la versión va compilada
     /// dentro del binario, así que no existe el caso de «no la sé». Va **sin** el `v`: el prefijo
     /// es para leerlo en un panel, no para que el Cloud tenga que quitarlo antes de comparar.
     pub hub_version: String,
@@ -238,18 +219,13 @@ impl ResourceMetrics {
 
 /// What the control plane answered to a heartbeat (ADR-0202 §2.5 — hub#318).
 ///
-/// The heartbeat is the **downstream** half of the convergence contract: the response carries the
-/// version of the certificate the control plane currently serves, and a hub whose own version
-/// differs refetches. It is the cheap trigger — the call already happens, with the credential it
-/// already carries, so a rotation converges without a second scheduler or a push channel.
+/// The heartbeat used to be the **downstream** half of a convergence contract: the response carried
+/// the version of the delegated certificate the control plane served, and a hub whose own version
+/// differed refetched. That certificate is retired (hub#1435), and with it the announcement — the
+/// SaaS stopped sending `cert_version` in saas#1435 phase 2. What still rides the beat is the
+/// manufacturer's block, which is public data and needs no versioning.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HeartbeatResponse {
-    /// `cert_version` announced by the control plane, when it announced one at all.
-    ///
-    /// **`None` is «nothing was announced», not «zero»**: an older SaaS answers `{"ok": true}` and
-    /// a proxy can answer something that is not JSON at all. Reading either as `0` would be reading
-    /// «the control plane has no certificate» out of silence.
-    pub cert_version: Option<i64>,
     /// The manufacturer's half of `SistemaInformatico` (ADR-0202 §5.1 — hub#323), when the block
     /// came and was valid.
     ///
@@ -261,6 +237,16 @@ pub struct HeartbeatResponse {
     /// `None` again means «nothing was announced», and it is NOT a set of defaults: there are
     /// none for a legal declaration. The engine refuses to build an envelope it cannot fill.
     pub producer: Option<ProducerFacts>,
+    /// Which declaración responsable on the public archive covers the release this hub is
+    /// running (hub#1449, ERPlora/saas#1724 — art. 13.3 RRSIF), when the control plane could
+    /// compute one.
+    ///
+    /// Rides beside `producer`, never inside it: `producer` is the literal AEAT element set the
+    /// fleet emits verbatim into the XML, and this is a different kind of fact — where the signed
+    /// text lives, not something a record carries. `None` is «no news» (an older SaaS, or an
+    /// archive the control plane could not read), and the caller keeps linking the root of the
+    /// public archive, which already resolves to the declaration in force.
+    pub declaration: Option<DeclarationReference>,
 }
 
 impl HeartbeatResponse {
@@ -269,25 +255,21 @@ impl HeartbeatResponse {
     /// Deliberately forgiving, and it is not laziness. A 2xx heartbeat already did its real job
     /// (ADR-0175's activity clock, which is what decides whether a free hub gets switched off), so
     /// a body this hub cannot understand must not turn into an error that stops the clock. The
-    /// certificate announcement is an extra that rides along, and it degrades to «no news».
+    /// manufacturer's block is an extra that rides along, and it degrades to «no news».
+    ///
+    /// A body that still carries the retired `cert_version` is read as any other unknown field:
+    /// ignored. An older SaaS is not an error.
     pub fn parse(body: &str) -> Self {
         let Ok(body) = serde_json::from_str::<Value>(body) else {
             return Self::default();
         };
-        let announced = body
-            .get("cert_version")
-            .and_then(Value::as_i64)
-            // A negative version cannot exist (`DelegatedCertificate.version` starts at 0 and only
-            // grows). Treating it as an announcement would make the hub chase a version nobody can
-            // serve, once per heartbeat, against a budgeted endpoint.
-            .filter(|version| *version >= 0);
         // `ProducerFacts::parse` is the validation, and it is deliberately all-or-nothing: these
         // fields are identical across the fleet, so one bad character is AEAT error 1100 on every
         // record of every hub. A block that would be rejected is treated as no block, which keeps
         // whatever this hub already had.
         Self {
-            cert_version: announced,
             producer: body.get("producer").and_then(ProducerFacts::parse),
+            declaration: body.get("declaration").and_then(DeclarationReference::parse),
         }
     }
 }
@@ -345,11 +327,6 @@ pub async fn collect_daily_usage(
         // un atómico y la respalda en `_hub_activity` (hub#670). La rellena el llamador (`serve`)
         // y solo si hay algo nuevo que reportar.
         last_user_activity_at: None,
-        // El certificado delegado tampoco sale de aquí: lo rellena el llamador (`serve`) con
-        // `fiscal_certificate::delegated_certificate_report`, que sabe distinguir «no tengo» de
-        // «no he podido leerlo».
-        cert_version: None,
-        cert_not_after: None,
         // No sale de la BD ni la rellena el llamador: va compilada en el binario, así que el
         // único sitio honesto para leerla es aquí.
         hub_version: crate::version::HUB_VERSION.to_string(),
@@ -406,6 +383,12 @@ pub async fn send_heartbeat(
     // reads the cache through `NativeHost::producer_facts`.
     if let Some(facts) = answer.producer.clone() {
         ProducerFactsCache::global().store(facts);
+    }
+    // Same reasoning, same site (hub#1449): the reference travels on the same beat as the facts
+    // it is about, so it is installed in the same cache and by the same caller — no second place
+    // that could forget, no second cache that could fall behind.
+    if let Some(declaration) = answer.declaration.clone() {
+        ProducerFactsCache::global().store_declaration(declaration);
     }
     Ok(answer)
 }
@@ -523,8 +506,6 @@ mod tests {
             last_sale_at: Some("2026-07-27T11:30:00Z".into()),
             terminals: Some(3),
             last_user_activity_at: Some("2026-07-27T11:45:00Z".into()),
-            cert_version: Some(4),
-            cert_not_after: Some("2028-06-10".into()),
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields(vec![(
                 "verifactu".into(),
@@ -556,8 +537,6 @@ mod tests {
                 "last_sale_at": "2026-07-27T11:30:00Z",
                 "terminals": 3,
                 "last_user_activity_at": "2026-07-27T11:45:00Z",
-                "cert_version": 4,
-                "cert_not_after": "2028-06-10",
                 "hub_version": crate::version::HUB_VERSION,
                 // hub#326: the queue the SaaS alerts on travels under these exact names.
                 "verifactu_pending_depth": 2,
@@ -583,8 +562,6 @@ mod tests {
             last_sale_at: None,
             terminals: Some(0),
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -601,37 +578,11 @@ mod tests {
         );
     }
 
-    // ── The certificate the hub REPORTS (ADR-0202 §2.5 — hub#318) ─────────────────────────────
-
-    /// **`0` travels, silence does not.** The Cloud stores `NULL` (never reported) and `0` (holds
-    /// no delegated certificate) in different states, so a hub that genuinely has none must SAY
-    /// `0` — omitting it would leave the fleet panel showing a hub that never spoke, forever.
-    #[test]
-    fn a_hub_with_no_delegated_certificate_reports_an_explicit_zero() {
-        let usage = DailyUsageHeartbeat {
-            orders_today: None,
-            last_sale_at: None,
-            terminals: None,
-            last_user_activity_at: None,
-            cert_version: Some(0),
-            cert_not_after: None,
-            hub_version: crate::version::HUB_VERSION.to_string(),
-            pending: PendingObligationFields::default(),
-            cpu_pct: None,
-            memory_used_mb: None,
-            memory_limit_mb: None,
-            memory_peak_mb: None,
-            transmission_route: None,
-        };
-        let body = serde_json::to_value(&usage).unwrap();
-        assert_eq!(
-            body,
-            json!({"cert_version": 0, "hub_version": crate::version::HUB_VERSION})
-        );
-        // Y la caducidad NO viaja: es justo lo que borra en el Cloud la fecha vieja de un hub
-        // reprovisionado (§2.5, «el par se escribe entero»).
-        assert!(body.get("cert_not_after").is_none());
-    }
+    // 🪦 Aquí iba «el hub REPORTA qué certificado delegado tiene» (ADR-0202 §2.5 — hub#318): un
+    // `0` explícito que el Cloud distinguía de un `NULL`. Se fue con el slot (hub#1435) y el SaaS
+    // borró las cuatro columnas `reported_cert_*` en saas#1435 fase 2. La regla que lo motivaba
+    // —«ausente» significa *no pude leerlo*, nunca «no tengo»— sigue viva en `orders_today` y en
+    // `verifactu_pending_depth`, que es donde se comprueba.
 
     // ── Resource telemetry (hub#975): the cgroup metrics ride the same beat ────────────────────
 
@@ -649,8 +600,6 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -710,8 +659,6 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -756,8 +703,6 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -799,8 +744,6 @@ mod tests {
             last_sale_at: None,
             terminals: Some(1),
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,
@@ -817,37 +760,12 @@ mod tests {
         );
     }
 
-    // ── What the control plane announces back (ADR-0202 §2.5) ─────────────────────────────────
-
-    #[test]
-    fn the_announced_version_is_read_from_the_response() {
-        assert_eq!(
-            HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 4}"#),
-            HeartbeatResponse {
-                cert_version: Some(4),
-                producer: None,
-            }
-        );
-        // `0` es un anuncio de pleno derecho: «no he subido nada» (y el hub NO debe pedir el GET).
-        assert_eq!(
-            HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 0}"#).cert_version,
-            Some(0)
-        );
-    }
-
-    /// **Silence is not zero.** A SaaS from before saas#1126 answers `{"ok": true}`; reading that
-    /// as «the control plane has no certificate» would be inventing news out of an old deployment.
-    #[test]
-    fn an_older_control_plane_that_announces_nothing_is_not_read_as_zero() {
-        assert_eq!(
-            HeartbeatResponse::parse(r#"{"ok": true}"#).cert_version,
-            None
-        );
-        assert_eq!(
-            HeartbeatResponse::parse(r#"{"cert_version": null}"#).cert_version,
-            None
-        );
-    }
+    // ── What comes back on the beat ───────────────────────────────────────────────────────────
+    //
+    // 🪦 Here lived «the version the control plane announces» (ADR-0202 §2.5): the response carried
+    // `cert_version` and a hub whose own differed refetched the delegated certificate. Both halves
+    // are retired — the slot in hub#1435, the field in saas#1435 phase 2. What must NOT be retired
+    // is the forgiveness those tests also pinned, so it is asserted here on what still rides:
 
     /// **A body this hub cannot parse must not become an error.** The heartbeat already succeeded
     /// (2xx) and its real job is ADR-0175's activity clock: if an edge that answers HTML turned the
@@ -856,11 +774,21 @@ mod tests {
     #[test]
     fn a_body_that_is_not_json_degrades_to_no_news() {
         assert_eq!(
-            HeartbeatResponse::parse("<html>502</html>").cert_version,
-            None
+            HeartbeatResponse::parse("<html>502</html>"),
+            HeartbeatResponse::default()
         );
-        assert_eq!(HeartbeatResponse::parse("").cert_version, None);
-        assert_eq!(HeartbeatResponse::parse("[]").cert_version, None);
+        assert_eq!(HeartbeatResponse::parse(""), HeartbeatResponse::default());
+        assert_eq!(HeartbeatResponse::parse("[]"), HeartbeatResponse::default());
+    }
+
+    /// A SaaS that has not been redeployed still sends the retired `cert_version`. It is read like
+    /// any other unknown field — ignored — never as an error that would stop the activity clock.
+    #[test]
+    fn a_control_plane_still_announcing_the_retired_certificate_is_simply_ignored() {
+        assert_eq!(
+            HeartbeatResponse::parse(r#"{"ok": true, "cert_version": 4}"#),
+            HeartbeatResponse::default()
+        );
     }
 
     // ── The manufacturer's facts ride the beat (ADR-0202 §5.1 — hub#323) ─────────────────────
@@ -920,15 +848,50 @@ mod tests {
         assert!(HeartbeatResponse::parse(&broken).producer.is_none());
     }
 
-    /// A version that cannot exist is not an announcement. `DelegatedCertificate.version` starts at
-    /// `0` and only grows, so a negative would just make the hub chase a certificate nobody can
-    /// serve — once per heartbeat, against an endpoint that is budgeted at 20/h.
+    // ── Which declaration covers this version rides the same beat (hub#1449, saas#1724) ──────
+    //
+    // The panel used to compose the archive's ROOT by hand: correct only while a single
+    // declaración responsable is in force. `declaration` names the exact one that covers the
+    // running release, the same way `producer` names the manufacturer — sibling key, same cycle.
+
+    fn served_declaration_body() -> String {
+        r#"{"ok": true, "producer": {
+             "NombreRazon": "ERPLORA CLOUD SL", "NIF": "B27593136",
+             "NombreSistemaInformatico": "ERPlora Hub", "IdSistemaInformatico": "EC",
+             "TipoUsoPosibleSoloVerifactu": "S", "TipoUsoPosibleMultiOT": "S",
+             "IndicadorMultiplesOT": "S"},
+           "declaration": {"version": "v1",
+             "url": "https://erplora.com/legal/declaracion-responsable/v1/"}}"#
+            .to_string()
+    }
+
+    /// hub#1449: the exact reference the SaaS names — not a URL this hub composes — must be read
+    /// off the beat, at the same level as `producer` and not nested inside it (the `producer`
+    /// block is the literal AEAT element set; a stray key there would be an invented element).
     #[test]
-    fn a_negative_version_is_not_an_announcement() {
+    fn the_beat_carries_which_declaration_covers_this_release() {
+        let declaration = HeartbeatResponse::parse(&served_declaration_body())
+            .declaration
+            .expect("the reference the SaaS serves must be read");
+
+        assert_eq!(declaration.version, "v1");
         assert_eq!(
-            HeartbeatResponse::parse(r#"{"cert_version": -1}"#).cert_version,
-            None
+            declaration.url,
+            "https://erplora.com/legal/declaracion-responsable/v1/"
         );
+    }
+
+    /// A control plane that has nothing to say (an older SaaS, or an unreadable archive on its
+    /// side) sends no `declaration` key at all — the SaaS OMITS it, never an empty one — and that
+    /// is «no news», not an error: the panel falls back to the root of the public archive.
+    #[test]
+    fn a_beat_without_the_key_announces_no_declaration() {
+        assert!(HeartbeatResponse::parse(&served_producer_body())
+            .declaration
+            .is_none());
+        assert!(HeartbeatResponse::parse(r#"{"ok": true}"#)
+            .declaration
+            .is_none());
     }
 
     /// A 2xx whose body is unreadable is still a heartbeat that ARRIVED: it must come back `Ok`,
@@ -956,8 +919,6 @@ mod tests {
                 last_sale_at: None,
                 terminals: None,
                 last_user_activity_at: None,
-                cert_version: Some(0),
-                cert_not_after: None,
                 hub_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
@@ -969,7 +930,11 @@ mod tests {
         )
         .await
         .expect("un 2xx es un latido entregado, lo que traiga el cuerpo o no");
-        assert_eq!(response.cert_version, None);
+        assert_eq!(
+            response,
+            HeartbeatResponse::default(),
+            "sin cuerpo legible, sin noticias"
+        );
         server.abort();
     }
 
@@ -979,7 +944,7 @@ mod tests {
     /// Es el caso que un stub HTTP normal no puede montar, y es justo el que aparece de verdad —
     /// un reset a mitad de respuesta, un edge que se rinde. Si eso convirtiera el latido en un
     /// error, el hub dejaría de confirmar la marca de actividad de ADR-0175 y el Cloud acabaría
-    /// **apagando un hub que se usa a diario**. El anuncio del certificado es un extra que viaja
+    /// **apagando un hub que se usa a diario**. Los hechos del fabricante son un extra que viaja
     /// encima; el latido ya llegó.
     #[tokio::test]
     async fn a_body_that_cannot_even_be_read_still_counts_as_a_delivered_heartbeat() {
@@ -1012,8 +977,6 @@ mod tests {
                 last_sale_at: None,
                 terminals: None,
                 last_user_activity_at: None,
-                cert_version: Some(4),
-                cert_not_after: None,
                 hub_version: crate::version::HUB_VERSION.to_string(),
                 pending: PendingObligationFields::default(),
                 cpu_pct: None,
@@ -1026,7 +989,8 @@ mod tests {
         .await
         .expect("un 2xx entregado no puede deshacerse porque el cuerpo se corte");
         assert_eq!(
-            response.cert_version, None,
+            response,
+            HeartbeatResponse::default(),
             "sin cuerpo legible, sin noticias"
         );
         server.abort();
@@ -1049,8 +1013,6 @@ mod tests {
             last_sale_at: None,
             terminals: None,
             last_user_activity_at: None,
-            cert_version: None,
-            cert_not_after: None,
             hub_version: crate::version::HUB_VERSION.to_string(),
             pending: PendingObligationFields::default(),
             cpu_pct: None,

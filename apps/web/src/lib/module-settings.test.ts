@@ -8,6 +8,7 @@ import {
   settingValueForStorage,
   settingsFieldDescription,
   settingsFieldLabel,
+  settingsOptionLabel,
   settingsHeading,
   shellTabHeading,
   type ModuleSettingsLocale,
@@ -145,5 +146,38 @@ describe('hub#1094 · the labels of the generic settings form come from the modu
     expect(
       settingsHeading(locale, { schema: 's', get: 'g', set: 's', title: 'Kitchen' }, 'Comandas'),
     ).toBe('Cocina');
+  });
+});
+
+// ── hub#1427 ────────────────────────────────────────────────────────────────────────────────
+describe('hub#1427 · rótulo de una opción de `enum`', () => {
+  const locale: ModuleSettingsLocale = {
+    fields: {
+      default_order_type: {
+        label: 'Tipo de comanda por defecto',
+        options: { dine_in: 'En sala', takeaway: 'Para llevar' },
+      },
+    },
+  };
+
+  it('traduce la opción cuando el módulo la publica', () => {
+    expect(settingsOptionLabel(locale, 'default_order_type', 'dine_in')).toBe('En sala');
+  });
+
+  it('cae al valor CRUDO cuando no hay traducción (el último recurso, como `humanizeSettingKey`)', () => {
+    expect(settingsOptionLabel(locale, 'default_order_type', 'delivery')).toBe('delivery');
+    expect(settingsOptionLabel(locale, 'sound_tone', 'buzzer')).toBe('buzzer');
+    expect(settingsOptionLabel(undefined, 'default_order_type', 'dine_in')).toBe('dine_in');
+  });
+
+  it('trata «traducido pero en blanco» como ausente: pintar vacío es peor que pintar el valor', () => {
+    const blank: ModuleSettingsLocale = { fields: { tone: { options: { chime: '   ' } } } };
+    expect(settingsOptionLabel(blank, 'tone', 'chime')).toBe('chime');
+  });
+
+  it('traduce también un `enum` numérico, que se busca por su representación en texto', () => {
+    const numeric: ModuleSettingsLocale = { fields: { copies: { options: { '2': 'Dos copias' } } } };
+    expect(settingsOptionLabel(numeric, 'copies', 2)).toBe('Dos copias');
+    expect(settingsOptionLabel(numeric, 'copies', 3)).toBe('3');
   });
 });

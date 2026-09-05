@@ -539,6 +539,25 @@ fn value_looks_personal(s: &str) -> bool {
             return true;
         }
     }
+    // A UUID is a MACHINE identifier and it is never anybody's datum, so it is settled BEFORE the
+    // shape heuristics below — which both catch one by accident once the hyphens are gone (hub#1381):
+    //
+    //   · the IBAN branch reads `fb394e22-…` as two letters, two digits and alphanumerics — about
+    //     one id in eighteen, since a UUID's letters are `a`-`f`;
+    //   · and any UUID carrying eleven consecutive decimal digits reads as a card or a phone.
+    //
+    // The cost was not a flaky test. `sale_id`, `order_id` and `customer_id` are exactly what the
+    // flows picker exists to map (ADR-0283), and their example vanished for a share of the ids
+    // while the identical event next door showed it — which reads as «the field is sometimes
+    // empty», not as «we withheld it». Found by the battery runner (`run-module-hub-batteries.sh`)
+    // on its first complete pass.
+    //
+    // The carve-out cannot become a hole: no IBAN is 32 characters of pure hex — every IBAN opens
+    // with a two-letter country code, and the codes whose letters are both `a`-`f` (AD, AE, BA,
+    // BE, DE, EE) are 16 to 24 characters long — and no card or phone is written in hex.
+    if looks_like_a_uuid(trimmed) {
+        return false;
+    }
     let compact: String = trimmed
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '-' && *c != '.')
@@ -567,6 +586,26 @@ fn value_looks_personal(s: &str) -> bool {
         return true;
     }
     false
+}
+
+/// The canonical `8-4-4-4-12` hexadecimal form, and the same 32 characters without its hyphens.
+/// Case-insensitive: a hub writes them lower case and an imported payload may not.
+fn looks_like_a_uuid(s: &str) -> bool {
+    const GROUPS: [usize; 5] = [8, 4, 4, 4, 12];
+    let hex = |part: &str, len: usize| {
+        part.len() == len && part.bytes().all(|b| b.is_ascii_hexdigit())
+    };
+    if s.len() == 32 {
+        return hex(s, 32);
+    }
+    let mut parts = s.split('-');
+    for len in GROUPS {
+        match parts.next() {
+            Some(part) if hex(part, len) => {}
+            _ => return false,
+        }
+    }
+    parts.next().is_none()
 }
 
 #[cfg(test)]
@@ -831,5 +870,158 @@ mod tests {
         assert!(infer("sale.completed", &[deep])
             .iter()
             .all(|f| f.path.split('.').count() <= MAX_DEPTH));
+    }
+    /// A UUID is a MACHINE identifier and it must never be withheld as if it were somebody's bank
+    /// account. Found by the module battery runner (hub#1381) on its first complete pass:
+    /// `sales/tests/void.hub.test.py` asserts that the newest `sale.voided` names the sale it just
+    /// voided, and it failed reading `None` for one `sale_id` and passed for the next — the
+    /// difference was the random UUID, nothing else.
+    ///
+    /// Two of the heuristics catch one: strip the hyphens and a canonical UUID becomes 32
+    /// alphanumeric characters, so `fb394e22-…` reads as an IBAN (two letters `fb`, two digits
+    /// `39`, alphanumerics after) — roughly one id in eighteen — and any UUID that happens to
+    /// carry eleven consecutive decimal digits reads as a card or a phone.
+    ///
+    /// The cost was not the flaky test. `sale_id`, `order_id` and `customer_id` are exactly the
+    /// fields the flows picker exists to map (ADR-0283), and their example vanished at random for
+    /// a share of the ids while an identical event next door showed it — the kind of inconsistency
+    /// that reads as «the field is sometimes empty», not as «we withheld it».
+    #[test]
+    fn a_uuid_is_a_machine_id_and_keeps_its_example_hub1381() {
+        // Every one of these is a real UUID that the IBAN branch used to withhold: two letters,
+        // then two digits, then alphanumerics once the hyphens are gone.
+        for id in [
+            "fb394e22-03fe-4389-a3c4-471b78d12789",
+            "de964b46-77d6-4fa6-bcc3-b0b7387a834b",
+            "ab12cdef-1234-4567-89ab-cdef01234567",
+        ] {
+            let fields = shape(&[json!({ "sale_id": id })]);
+            let field = &fields["sale_id"];
+            assert!(
+                !field.redacted,
+                "{id} was withheld as if it were personal data"
+            );
+            assert_eq!(field.sample, Some(json!(id)), "{id} lost its example");
+        }
+
+        // Upper case and the un-hyphenated form of the same value are the same identifier.
+        for id in [
+            "FB394E22-03FE-4389-A3C4-471B78D12789",
+            "fb394e2203fe4389a3c4471b78d12789",
+        ] {
+            assert!(
+                !shape(&[json!({ "sale_id": id })])["sale_id"].redacted,
+                "{id} was withheld"
+            );
+        }
+
+        // And the carve-out is narrow: it must not become a hole for the values these rules were
+        // written for. An IBAN, a card and an email keep going.
+        for (path, value) in [
+            ("account", "ES91 2100 0418 4502 0005 1332"),
+            ("card", "4111 1111 1111 1111"),
+            ("contact", "someone@example.com"),
+        ] {
+            assert!(
+                shape(&[json!({ path: value })])[path].redacted,
+                "{value} was handed over"
+            );
+        }
+    }
+    /// Regression test for ERPlora/hub#1358 — the same defect from the side the issue measured it:
+    /// not «this id was withheld», but «**one identifier in nine** loses its example, at random».
+    ///
+    /// The test above pins three ids that happen to read as an IBAN. That is only HALF the defect,
+    /// and the smaller half. Measured with the issue's own script over 200 000 UUIDv4: **10.89 %**
+    /// withheld — 5.19 % by the IBAN shape and **5.69 % by the digit run**, which no hand-picked
+    /// IBAN-shaped example reaches. So this case does what the issue asks for: a thousand ids the
+    /// runtime really mints, and none of them may lose its example.
+    ///
+    /// Why the randomness is not flake. WITHOUT the fix, at ~10.9 % per id the chance that a
+    /// thousand of them are all clean is `0.891^1000` — zero for any practical purpose, so it
+    /// fails every run. WITH the fix, «a UUID is never withheld» is a property of the shape, not a
+    /// statistic: it passes deterministically. And a corpus that quietly stopped reaching the
+    /// traps would pass while proving nothing, so the traps are asserted to be IN it first.
+    #[test]
+    fn no_uuid_the_runtime_mints_ever_loses_its_example_hub1358() {
+        // The two rules exactly as they were before the carve-out, kept here as the POSITIVE
+        // CONTROL: they say which of the generated ids used to be withheld. If they ever stop
+        // matching anything, the corpus below is not exercising the defect and the assertion that
+        // follows is empty.
+        fn looked_like_an_iban(s: &str) -> bool {
+            let c: String = s.chars().filter(|ch| *ch != '-' && *ch != '.').collect();
+            let b = c.as_bytes();
+            (15..=34).contains(&c.len())
+                && b[..2].iter().all(u8::is_ascii_alphabetic)
+                && b[2..4].iter().all(u8::is_ascii_digit)
+                && b[4..].iter().all(u8::is_ascii_alphanumeric)
+        }
+        fn looked_like_a_phone(s: &str) -> bool {
+            let mut run = 0usize;
+            for ch in s.chars().filter(|ch| *ch != '-' && *ch != '.') {
+                run = if ch.is_ascii_digit() { run + 1 } else { 0 };
+                if run >= 11 {
+                    return true;
+                }
+            }
+            false
+        }
+
+        // The issue's own digit-run example, which is NOT IBAN-shaped: a twelve-digit run once the
+        // hyphens are gone. It is pinned by hand because it is the half a random corpus could in
+        // principle miss.
+        let digit_run = "31b4f647-8107-4081-9df6-9945729d0e82";
+        assert!(
+            looked_like_a_phone(digit_run) && !looked_like_an_iban(digit_run),
+            "the pinned example stopped being the digit-run case"
+        );
+        assert!(
+            !shape(&[json!({ "grant_id": digit_run })])["grant_id"].redacted,
+            "{digit_run} was withheld as a card or a phone number"
+        );
+
+        // A thousand ids as `context.new_ids` hands them out.
+        let ids: Vec<String> = (0..1_000)
+            .map(|_| uuid::Uuid::new_v4().to_string())
+            .collect();
+        let ibans = ids.iter().filter(|id| looked_like_an_iban(id)).count();
+        let phones = ids.iter().filter(|id| looked_like_a_phone(id)).count();
+        assert!(
+            ibans > 0 && phones > 0,
+            "the corpus reached neither trap ({ibans} IBAN-shaped, {phones} digit-run): it would \
+             pass without proving anything"
+        );
+
+        let withheld: Vec<&String> = ids
+            .iter()
+            .filter(|id| shape(&[json!({ "new_id": id })])["new_id"].redacted)
+            .collect();
+        assert!(
+            withheld.is_empty(),
+            "{} of {} identifiers lost their example ({:.2} %) — the picker of ADR-0283 shows the \
+             same field with an example in one hub and without it in the next. First: {:?}",
+            withheld.len(),
+            ids.len(),
+            withheld.len() as f64 * 100.0 / ids.len() as f64,
+            withheld.first(),
+        );
+
+        // And the memory of `record()` — «once withheld, always withheld» — is what made this
+        // permanent rather than intermittent: ONE old event carrying an unlucky id used to leave
+        // the field with no example in that hub for good, long after the events that show it fine.
+        let unlucky = ids
+            .iter()
+            .find(|id| looked_like_an_iban(id) || looked_like_a_phone(id))
+            .expect("the corpus was asserted to contain one");
+        let newest = "9c2f7a10-4d3b-4c8e-9f01-2a6b5c4d3e2f";
+        let fields = shape(&[
+            json!({ "sale_id": newest }),
+            json!({ "sale_id": unlucky }),
+        ]);
+        assert!(
+            !fields["sale_id"].redacted,
+            "an older event carrying {unlucky} still poisons the field for good"
+        );
+        assert_eq!(fields["sale_id"].sample, Some(json!(newest)));
     }
 }

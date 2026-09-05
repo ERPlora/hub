@@ -37,8 +37,11 @@ export default {
     appsEmpty: 'Your apps will show up here. Tap Apps to add the ones your business needs.',
     appsClose: 'Close',
     assistant: 'Assistant',
-    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
-    // it crosses a product boundary, so it names the destination out loud.
+    // The way out to management (hub#364). It crosses a product boundary, so it names the
+    // destination: `manageShort` is what is READ on the button, `manage` is the whole sentence the
+    // accessible name reads out (hub#1400 — the entry used to be icon-only at the till). The short
+    // one is the BRAND, so it is the same word in every language.
+    manageShort: 'erplora.com',
     manage: 'Manage your business at erplora.com',
     manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',
@@ -72,6 +75,15 @@ export default {
       'This device will sign out of this business and show your list of businesses.',
     changeHubCancel: 'Cancel',
     changeHubConfirm: 'Switch',
+  },
+  // hub#1518 — a screen whose code never arrived (the connection dropped, or the file went stale
+  // after a deploy). Said in plain words: nobody at a till knows what a "chunk" or a "module" is.
+  viewLoad: {
+    failedToast: 'That section could not be opened. Check your connection and try again.',
+    blockedTitle: 'ERPlora could not finish opening',
+    blockedBody:
+      'The connection dropped while this screen was loading. Check your connection and try again.',
+    blockedAction: 'Try again',
   },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and
@@ -414,6 +426,16 @@ export default {
     manageLocal:
       'This identity belongs to this business only. Other businesses are neither known nor shown here.',
     manageInSaas: 'Manage account at erplora.com',
+    pinTitle: 'PIN',
+    pinDesc: 'The PIN you use at the till. Change it whenever you want — nobody else needs to.',
+    pinSetupDesc: 'You do not have a PIN yet. Set one to be able to sign in at the till too.',
+    currentPin: 'Current PIN',
+    newPin: 'New PIN',
+    confirmPin: 'Repeat the new PIN',
+    changePin: 'Change PIN',
+    setPin: 'Set PIN',
+    pinSaved: 'PIN updated',
+    pinMismatch: 'The two PINs do not match.',
   },
   // hub#358 — «this device»: whether this terminal asks who is using it. The copy says the
   // CONSEQUENCE of each mode, never its technical name: the owner of a bar has to be able to tell,
@@ -727,6 +749,9 @@ export default {
     declarationDesc:
       'The declaration ERPlora signs for the version of the system you are running, and the identifying data every invoice sends to the tax agency. Show this screen if you are ever asked for it.',
     declarationRead: 'Read the signed declaration',
+    // WHICH signed text covers this release (`v1`, `v2`…), next to the link — hub#1510. Art. 13.3
+    // RRSIF lets several declarations coexist, so the link alone does not identify the text.
+    declarationTextVersion: 'Declaration version',
     declarationDataTitle: 'Identifying data of this system',
     declarationPending:
       'ERPlora’s identifying data has not arrived yet. It arrives on its own within a minute of the system coming online; until then no invoice can be sent to the tax agency.',
@@ -961,6 +986,7 @@ export default {
     deactivateTitle: 'Deactivate user',
     deactivateBody: 'You are about to deactivate “{name}”. They lose access to the Hub, but their history is kept.',
     deactivateBlocked: 'You cannot deactivate yourself or leave the Hub without an administrator.',
+    ownerRowBlocked: 'Only the account owner can change their own record. To hand the business over, transfer the account in ERPlora.',
     active: 'Active',
     inactive: 'Deactivated',
   },
@@ -1114,10 +1140,17 @@ export default {
       account_role_not_grantable: 'An ERPlora account can only be invited as admin, manager or employee. Roles a module adds belong to local staff.',
       email_taken: 'This hub already knows that email. Edit that user — reinstate them if they were deactivated — instead of inviting a second identity.',
       role_above_inviter: 'You cannot hand out a role above your own: only somebody who administers this hub can grant administration.',
+      // hub#1429 — the account owner's record is theirs alone. Every other administrator sees it,
+      // nobody else edits it, and ownership changes in the ERPlora account, not on this screen.
+      owner_row: 'This is the account owner’s record, and only they can change it — their PIN included. To hand the business over, transfer the account in ERPlora.',
       invalid_email: 'Enter a valid email.',
       pin_length: 'The PIN must be {n} digits.',
       pin_too_simple: 'That PIN is too easy to guess: avoid repeated digits (1111) and straight runs (1234).',
       pin_in_use: 'Another active user already has this PIN. A PIN says who is at the till, so no two people can share one.',
+      // hub#1430 — self-service rotate («Mi perfil»): the CURRENT PIN did not match. The remedy is
+      // the same «try again» a wrong password gets anywhere else, never a hint about what the
+      // current one actually is.
+      pin_current_mismatch: 'That is not your current PIN. Enter it correctly to set a new one.',
       local_cannot_administer: 'A local user cannot administer the hub: administration comes from an ERPlora account, never from a PIN.',
       local_has_email: 'A local user has no email. Turn off «Local user» to invite them as an account user.',
       name_taken: 'This hub already knows somebody by that name. Edit that user — reinstate them if they were deactivated — instead of creating a second identity.',
@@ -1661,6 +1694,8 @@ export default {
     textPlaceholder: 'Type here…',
     invalidFields: 'Check the fields marked below and save again.',
     fieldInvalid: 'This value is not accepted.',
+    preview: 'Test',
+    previewError: 'Could not run the test.',
   },
   modulePlan: {
     tab: 'Plan',

@@ -27,6 +27,10 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # base64: decodifica los bytes del .p12 (`certificate_pkcs12`) antes de pedírselos al host.
 base64 = "0.22"
 thiserror = "1"
+# Solo `sync`: el caché del token de pasarela sostiene su cerrojo DURANTE el mint (hub#1459), que
+# es lo que impide que una cola drenando N registros pida N tokens contra una cuota de 60/h. Un
+# `std::sync::Mutex` no se puede sostener a través de un `await`, y soltarlo devuelve esa estampida.
+tokio = { version = "1", default-features = false, features = ["sync"] }
 
 [dev-dependencies]
 # Runtime mínimo para los tests async de los handlers (validate_chain / recover_manual).

@@ -81,6 +81,9 @@ on:
   # limpio: 30 binarios, 1 365 tests, 0 fallos, 5m07s; la nota de «120 fallos» era anterior a
   # hub#1153, cuando el catálogo se leía de `modules-workspace`). Rojo = push abortado, y sin
   # push no hay PR: la prueba no se pierde, cambia de sitio.
+  # Si vuelve, vuelve CON su filtro de borradores: las PRs nacen en borrador y, medido el 29/08,
+  # la mitad de los minutos del runner se iban en runs cancelados por el re-push del revisor. El
+  # `if:` que lo aplicaba se retiró con el trigger (hub#1443): sin `pull_request` era constante.
   # `push` a develop/main se queda: es la red POST-MERGE (hub#572) y el sitio donde el
   # `repository_dispatch` de un módulo recién publicado sigue midiendo contra el kernel.
 
@@ -98,13 +101,18 @@ permissions:
 
 jobs:
   module-e2e:
-    # Borrador = sin CI. Las PRs nacen en borrador: se revisan y se corrigen SIN runs en marcha y la
-    # suite corre UNA vez, al marcarlas listas (ready_for_review). Medido el 29/08: la mitad de los
-    # minutos del runner se tiraban en runs cancelados por el re-push del revisor.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     name: e2e con módulos reales
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 45
+    # 45 → 70 con el corredor de baterías (hub#1381): levanta UN hub por módulo con el catálogo
+    # publicado entero, y eso son 11 arranques — las **26** baterías en 11 módulos desde que
+    # hub#1483 borró la última exención (`verifactu`: hub#1477 le dio el backend de disco para sus
+    # `static_files` y el módulo ya instala sin token de máquina). Medido el 2026-09-03 en local:
+    # **13 min 40 s** con 25 de ellas — el arranque de `verifactu` ya estaba en esa medición (la
+    # exenta también arrancaba su hub: así caducó la exención); la 26ª solo añade su batería. El
+    # techo se sube por encima de la suma y no se ajusta al minuto a propósito — un timeout que
+    # corta a mitad de la pasada no deja veredicto, deja un rojo sin causa, que es lo más caro de
+    # diagnosticar de este job.
+    timeout-minutes: 70
     permissions:
       contents: read
       issues: write   # abrir/refrescar la issue de alerta cuando esto falla (hub#1239)
@@ -260,9 +268,10 @@ jobs:
       # slice borra una línea allí y añade aquí la batería que hereda la cobertura, en la MISMA
       # PR. Ese par de ediciones es el acto revisable.
       #
-      # 🔴 Comprueba que la batería EXISTE, no que pase. Hoy NINGÚN gate corre
-      # `erplora test --against-hub` y hub#1381 sigue abierta para el corredor: un verde aquí se
-      # lee «la batería está donde dijeron», nunca «la batería pasa».
+      # 🔴 Comprueba que la batería EXISTE, no que pase: un verde aquí se lee «la batería está
+      # donde dijeron». Quien la EJECUTA es el paso `run-batteries` de más abajo (hub#1381), y son
+      # dos guardias distintas a propósito — una batería que se dejó de publicar y una que falla
+      # se arreglan en sitios distintos, y esta corre gratis mucho antes que aquella.
       - name: Las baterías de módulo cuadran con la lista revisada (hub#1381)
         id: batteries
         run: |
@@ -322,6 +331,11 @@ jobs:
           done
           [ -n "$ok" ] || { echo "::error::Postgres unreachable on localhost:${HOST_PORT}."; exit 1; }
           echo "DATABASE_URL=postgres://postgres:test@localhost:${HOST_PORT}/hub_test" >> "$GITHUB_ENV"
+          # El corredor de baterías (hub#1381) necesita crear una BD por módulo, y el runner no
+          # trae `psql` garantizado: se lo pide al MISMO contenedor por `docker exec`, que este
+          # paso ya usa arriba. Se exporta después del restart a propósito — el id no cambia, pero
+          # el puerto sí, y leerlo antes fue el bug de hub#898.
+          echo "PG_CONTAINER=${PG}" >> "$GITHUB_ENV"
 
       - name: Toolchain (rust-toolchain.toml)
         run: |
@@ -395,6 +409,103 @@ jobs:
           rc=${PIPESTATUS[0]}
           set -e
           exit "$rc"
+
+      # ── hub#1381 · y ahora las baterías se EJECUTAN, no solo se cuentan ──────────────────────
+      # El paso `batteries` de arriba prueba que la batería ESTÁ donde el slice prometió. Es medio
+      # guardia: una batería que no ejecuta nadie es documentación. `services/…/package_redeem.hub`
+      # heredó 391 líneas de cobertura el 30/08 y estuvo CUATRO DÍAS sin correr en ningún sitio,
+      # con las dos CI en verde — el gate del módulo la reporta como `⚠ … no se ha corrido` y pasa
+      # igual (`run-batteries.mjs`, `notRun`).
+      #
+      # Se corre contra el servidor compilado DE ESTE REF, no contra la imagen publicada. Es lo que
+      # hace que la pasada signifique lo que este workflow dice que mide: el kernel bajo prueba
+      # contra los módulos tal como se publican. Y `erplora test --against-hub` no sirve aquí por
+      # tres bloqueos MEDIDOS (instala UN módulo — module-toolkit#135; el toolkit es `private` con
+      # dependencias `file:`; y ningún secreto de este repo alcanza esos checkouts): el detalle
+      # completo, en la cabecera de `scripts/ci/run-module-hub-batteries.sh`.
+      #
+      # `!cancelled()` en los dos pasos: si `cargo test` se pone rojo, la pasada de baterías tiene
+      # que darse IGUAL. Lo contrario esconde media señal detrás de la otra, y son cosas distintas
+      # —el kernel contra sus e2e, y el kernel contra los módulos publicados—. Lo único que las
+      # salta es una cancelación.
+      - name: Compilar erplora-server para las baterías (hub#1381)
+        if: ${{ !cancelled() }}
+        run: cargo build -p erplora-server
+
+      - name: Las baterías de módulo pasan contra ESTE kernel (hub#1381)
+        id: run-batteries
+        if: ${{ !cancelled() }}
+        run: |
+          set -uo pipefail
+          # stdout es el detalle por batería y stderr el veredicto: separados para que la issue de
+          # alerta pueda CITAR el veredicto en vez de mandar al lector de vuelta al log.
+          rc=0
+          bash scripts/ci/run-module-hub-batteries.sh \
+            --catalogue "$ERPLORA_MODULES_DIR" \
+            --database-url "$DATABASE_URL" \
+            --pg-container "$PG_CONTAINER" \
+            --server target/debug/erplora-server \
+            > "$RUNNER_TEMP/run-batteries.out" \
+            2> "$RUNNER_TEMP/run-batteries.err" || rc=$?
+          cat "$RUNNER_TEMP/run-batteries.out"
+          cat "$RUNNER_TEMP/run-batteries.err" >&2
+          if [ "$rc" -ne 0 ]; then
+            # El `::error::` se pone AQUÍ y no dentro del script: es sintaxis de anotación de
+            # Actions, y el corredor se ejecuta también en local, donde solo sería ruido.
+            echo "::error::una batería \`*.hub.test.py|sh\` del catálogo PUBLICADO no pasa contra"
+            echo "::error::este kernel (el detalle, arriba en este mismo paso). Es el módulo y el"
+            echo "::error::kernel discrepando sobre el contrato entre ambos — ver hub#1381."
+            exit "$rc"
+          fi
+
+      # Mismo problema mudo que sus dos vecinos: una batería que se rompe en el cron o en el
+      # `module-published` de un módulo no la mira nadie.
+      - name: Alerta — las baterías de módulo no pasan (hub#1381)
+        if: >-
+          failure() && steps.run-batteries.outcome == 'failure' &&
+          (github.event_name == 'schedule' || github.event_name == 'repository_dispatch' ||
+           github.event_name == 'push')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          # `[ -s ]` primero: el corredor puede morir ANTES de escribir su veredicto (un
+          # `ERPLORA_MODULES_DIR` vacío sale por otra rama). `cat` sobre un fichero ausente mata
+          # este paso bajo `set -e` y la issue no se abriría — el rojo mudo que viene a abolir.
+          VERDICT="(el corredor no dejó veredicto: murió antes de escribirlo — mira el log del run)"
+          if [ -s "$RUNNER_TEMP/run-batteries.err" ]; then
+            VERDICT=$(head -c 3000 "$RUNNER_TEMP/run-batteries.err")
+          fi
+
+          title="Las baterías de módulo del catálogo publicado NO pasan contra el kernel"
+          body="Detectado por \`test-hub-modules.yml\` — disparo \`${GITHUB_EVENT_NAME}\` (hub#1381).
+
+          - rama probada: \`${GITHUB_REF_NAME}\` — commit \`${GITHUB_SHA}\`
+          - run que falló: ${RUN_URL}
+
+          **Veredicto del corredor:**
+
+          \`\`\`
+          ${VERDICT}
+          \`\`\`
+
+          Cada batería \`*.hub.test.py|sh\` afirma comportamiento de un MÓDULO que el hub afirmaba antes y ya no (hub#1264). Un rojo aquí es el módulo y el kernel discrepando sobre el contrato entre ambos: se arregla en el repo del módulo, o en el kernel si el que se movió fue el kernel.
+
+          Reproducirlo en local (una BD y un hub por módulo, igual que la CI):
+
+          \`\`\`
+          cargo build -p erplora-server
+          scripts/ci/run-module-hub-batteries.sh --catalogue <catálogo publicado> \\
+              --database-url postgres://postgres:test@localhost:5433/hub_test \\
+              --pg-container erplora-test-pg-5433
+          \`\`\`
+
+          Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando vuelvan a pasar."
+
+          TITLE="$title" MATCH=exact LABEL=area:ci-cd BODY="$body" \
+            ./scripts/ci/alert-issue.sh
 
       # Sin esto el fallo es MUDO: nadie mira un cron y hub#1215 aguantó un día entero en rojo con
       # Actions en verde. Mismo patrón idempotente que `test-hub.yml` (hub#572) e `image-freshness`
@@ -509,7 +620,7 @@ jobs:
 
           \`scripts/ci/module-hub-batteries.txt\` empareja cada e2e del kernel que hub#1264 retiró con la batería \`*.hub.test.py|sh\` que heredó su cobertura. Que no cuadre significa una de dos: un módulo publicó o retiró una batería sin que nadie tocara la lista, o un slice borró el e2e del hub apuntando a una batería que no está. Las dos se arreglan editando la lista **y** diciendo en la PR dónde quedó la cobertura.
 
-          🔴 Ojo con lo que este guard NO dice: comprueba que la batería EXISTE, no que pase. Hoy ningún gate corre \`erplora test --against-hub\` — hub#1381 sigue abierta para el corredor.
+          🔴 Ojo con lo que este guard NO dice: comprueba que la batería EXISTE, no que pase. Quien la ejecuta es el paso \`run-batteries\` de este mismo job (hub#1381), y tiene su propia alerta.
 
           Esta issue se REUTILIZA (un comentario por detección) mientras siga el rojo; ciérrala cuando la lista vuelva a cuadrar."
 

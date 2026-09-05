@@ -331,11 +331,36 @@ impl Runtime {
         access_email::unresolved(self.db.as_ref(), &self.hub_id).await
     }
 
-    /// Fija (o cambia) el PIN de un usuario existente por id (alta de PIN tras login cloud).
-    pub async fn set_pin(&self, user_id: &str, pin: &str) -> Result<()> {
+    /// Fija (o cambia) el PIN de un usuario existente por id. Dos llamadores, la misma puerta:
+    /// la alta de PIN tras el primer login cloud (§2.9, `current_pin: None`, nada que confirmar
+    /// todavía) y «Mi perfil» → cambiar mi PIN (hub#1430, self-service, sin pasar por la puerta de
+    /// Personal ni su permiso).
+    ///
+    /// Si el usuario YA tiene un PIN, `current_pin` es OBLIGATORIO y tiene que coincidir con el de
+    /// hoy — igual que cambiar cualquier otra contraseña propia. Sin esta comprobación, quien
+    /// encuentra la sesión desatendida (el mostrador, «Mi perfil» abierto) podría expulsar al
+    /// dueño reescribiéndole el PIN sin saberlo. Decisión de mercado (Zettle, el módulo
+    /// `pos_change_pin` de Odoo): piden el PIN actual antes del nuevo en el mismo gesto.
+    pub async fn set_pin(&self, user_id: &str, current_pin: Option<&str>, pin: &str) -> Result<()> {
+        let candidate = current_pin.unwrap_or_default();
+        if let Some(matches) =
+            identity::own_pin_matches(self.db.as_ref(), &self.hub_id, user_id, candidate).await?
+        {
+            if !matches {
+                return Err(RuntimeError::Domain {
+                    code: format!("{}users.pin_current_mismatch", hub_users::CORE_NAMESPACE),
+                    message: "the current PIN does not match".into(),
+                });
+            }
+        }
         // Same rules as Personal (hub#974): length, digits only, not guessable. This is the
-        // self-service door after the first account login and it used to hash whatever arrived.
+        // self-service door and it used to hash whatever arrived.
         let pin = hub_users::clean_pin(pin, self.pin_length().await?)?;
+        // And the SAME duplicate guard as Personal (hub#355): a PIN two people share misattributes
+        // the till, not just clashes. `ensure_pin_is_free` documents itself as running "on every PIN
+        // change" — this door skipped it; reachable any time now (not just once, at cloud login),
+        // that gap was worth closing alongside the current-PIN check above.
+        hub_users::ensure_pin_is_free(self.db.as_ref(), &self.hub_id, &pin, Some(user_id)).await?;
         identity::set_pin(self.db.as_ref(), &self.hub_id, user_id, &pin).await
     }
 
@@ -384,6 +409,17 @@ impl Runtime {
     /// Resuelve una sesión válida a su `hub_user` activo (o `None`).
     pub async fn resolve_session(&self, token: &str) -> Result<Option<identity::HubUser>> {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
+    }
+
+    /// Resolves a valid session to its `hub_user` **and to the credential it was opened with**.
+    ///
+    /// Used by the browser handoff door (pm#196): "can administer" and "typed their password" are
+    /// two different questions, and only the second one is answered by this column.
+    pub async fn resolve_session_with_credential(
+        &self,
+        token: &str,
+    ) -> Result<Option<(identity::HubUser, identity::Credential)>> {
+        identity::resolve_session_with_credential(self.db.as_ref(), &self.hub_id, token).await
     }
 
     /// Cierra una sesión (logout).
@@ -521,6 +557,19 @@ impl Runtime {
     /// porque alguien escribió su id.
     pub async fn rename_device(&self, device_id: &str, name: &str) -> Result<devices::Renamed> {
         devices::rename(self.db.as_ref(), &self.hub_id, device_id, name).await
+    }
+
+    /// Cómo llama el **negocio** a este dispositivo (hub#494), o `""` si no le puso nombre.
+    ///
+    /// Es lo mismo que muestra la lista de dispositivos, leído de una fila y no de todas: quien
+    /// necesita el nombre del dispositivo que tiene delante —el registro de impresión al darlo de
+    /// alta, hub#1560— no tiene por qué enumerar los de todo el negocio, que es una puerta de
+    /// administrador a propósito ([`Self::list_devices`]).
+    pub async fn device_name(&self, device_id: &str) -> Result<String> {
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => devices::name_of(self.db.as_ref(), hub_id, id).await,
+            None => Ok(String::new()), // nombrar al hub no nombra a ningún dispositivo (hub#454).
+        }
     }
 
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),

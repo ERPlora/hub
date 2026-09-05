@@ -18,9 +18,10 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde_json::{json, Map, Value};
 
-use erplora_runtime::producer_facts::{ProducerFacts, ProducerFactsCache};
+use erplora_runtime::producer_facts::{DeclarationReference, ProducerFacts, ProducerFactsCache};
 
 use crate::auth;
+use crate::gateway_enrolment;
 use crate::state::AppState;
 
 /// `401` para fallo de auth (sin sesión / sesión inválida / rol insuficiente).
@@ -377,6 +378,102 @@ pub async fn put_gateway_identity_certificate(
     }
 }
 
+/// POST /api/business/gateway-identity/enrol — **el alta, de punta a punta y sin operador**
+/// (hub#1457): presenta el CSR en el expediente legal del hub y recoge el certificado firmado.
+///
+/// Idempotente: repetirlo mientras la solicitud está pendiente no abre una segunda revisión (el
+/// plano de control deduplica los MISMOS bytes) y, una vez aprobada, instala. Auth = sesión admin:
+/// al otro lado viaja el `X-Hub-Token`, que es secreto del runtime (ADR-0003).
+///
+/// Un rechazo, un presupuesto agotado o una nube inalcanzable son **respuestas con código**
+/// (ADR-0055) — la pantalla del módulo programa contra el código, nunca contra la prosa.
+pub async fn post_gateway_identity_enrol(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let arc = match st.runtime_for(&st.hub_id()).await {
+        Ok(rt) => rt,
+        Err(e) => return crate::tenant_rejected(e),
+    };
+    let rt = arc.read().await;
+    if let Err(e) = auth::require_admin_session(&headers, &st.config, &rt).await {
+        return unauthorized(e);
+    }
+    let Some(machine) = auth::machine_auth(&st) else {
+        // Sin credencial de máquina el bootstrap no terminó: el hub no puede hablar con su nube.
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "code": "enrolment.no_machine_credential",
+                "detail": "este hub no tiene credencial de máquina: el bootstrap no ha terminado",
+            })),
+        )
+            .into_response();
+    };
+
+    let hub_id = st.hub_id();
+    let budget = gateway_enrolment::hourly_budget();
+    let outcome = gateway_enrolment::enrol_once(
+        &st.http,
+        &st.config.cloud_base_url,
+        &machine,
+        rt.db(),
+        &hub_id,
+        &budget,
+    )
+    .await;
+
+    let status = match erplora_runtime::gateway_identity::status(rt.db(), &hub_id).await {
+        Ok(s) => s,
+        Err(e) => return crate::err_response(e),
+    };
+    let mut body = json!({
+        "common_name": status.common_name,
+        "has_key": status.has_key,
+        "has_certificate": status.has_certificate,
+        "not_after": status.not_after,
+    });
+    match outcome {
+        Ok(outcome) => {
+            let (state, extra) = match outcome {
+                gateway_enrolment::EnrolmentOutcome::Filed { version } => {
+                    ("filed", json!({ "version": version }))
+                }
+                gateway_enrolment::EnrolmentOutcome::AwaitingReview { version } => {
+                    ("awaiting_review", json!({ "version": version }))
+                }
+                gateway_enrolment::EnrolmentOutcome::Installed { not_after } => {
+                    ("installed", json!({ "not_after": not_after }))
+                }
+                gateway_enrolment::EnrolmentOutcome::Rejected { version, reason } => (
+                    "rejected",
+                    json!({ "version": version, "rejected_reason": reason }),
+                ),
+                gateway_enrolment::EnrolmentOutcome::OutOfBudget => ("out_of_budget", json!({})),
+            };
+            body["state"] = json!(state);
+            if let (Some(target), Some(extra)) = (body.as_object_mut(), extra.as_object()) {
+                for (key, value) in extra {
+                    target.insert(key.clone(), value.clone());
+                }
+            }
+            Json(body).into_response()
+        }
+        Err(refusal) => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({
+                "ok": false,
+                "code": refusal.code,
+                "detail": refusal.detail,
+                "common_name": status.common_name,
+                "has_certificate": status.has_certificate,
+            })),
+        )
+            .into_response(),
+    }
+}
+
 /// DELETE /api/business/gateway-identity — olvida la identidad entera (clave incluida), el
 /// camino de rotación del operador. Auth = sesión admin.
 pub async fn delete_gateway_identity(State(st): State<AppState>, headers: HeaderMap) -> Response {
@@ -647,6 +744,7 @@ pub async fn get_responsible_declaration(
     }
     Json(declaration_payload(
         ProducerFactsCache::global().current().as_ref(),
+        ProducerFactsCache::global().current_declaration().as_ref(),
         crate::version::HUB_VERSION,
         &st.hub_id(),
         &st.config.cloud_base_url,
@@ -675,6 +773,7 @@ pub async fn get_responsible_declaration(
 /// so the block comes back `null` and the screen says so, instead of filling the gap.
 pub fn declaration_payload(
     facts: Option<&ProducerFacts>,
+    declaration: Option<&DeclarationReference>,
     version: &str,
     hub_id: &str,
     cloud_base_url: &str,
@@ -690,21 +789,46 @@ pub fn declaration_payload(
         }
         block
     });
-    json!({
+    // hub#1449 / art. 13.3 RRSIF: while a single declaration is in force, the archive's ROOT
+    // resolves to it and composing the root worked by coincidence. The day a second one is
+    // issued, a hub still running the release the first one covers must keep linking THAT text —
+    // only the control plane knows which one that is, and it names it on the heartbeat. The root
+    // is a FALLBACK for a control plane that has said nothing (an older SaaS, a hub that has never
+    // reached it, or an archive it could not read), never the answer once an exact one is known.
+    let declaration_url = match declaration {
+        Some(declaration) => declaration.url.clone(),
+        None => format!(
+            "{}/legal/declaracion-responsable/",
+            cloud_base_url.trim_end_matches('/')
+        ),
+    };
+    let mut payload = json!({
         // The two facts this hub owns travel at the top level too: they are what the screen can
         // always show, including on a hub the control plane has never spoken to.
         "version": version,
         "numeroInstalacion": hub_id,
-        // The signed text lives on the control plane THIS hub belongs to (a PRE hub must not send
-        // its owner to the production archive). No version in the path: the archive is versioned by
-        // DECLARATION (`v1`, `v2`…), not by release number, so the root resolves to the current one
-        // and lists every previous one (art. 13.3).
-        "declarationUrl": format!(
-            "{}/legal/declaracion-responsable/",
-            cloud_base_url.trim_end_matches('/')
-        ),
+        "declarationUrl": declaration_url,
         "sistemaInformatico": sistema_informatico,
-    })
+    });
+    // hub#1510 / art. 13.3 RRSIF: the link alone does not say WHICH text it points at, and several
+    // declarations coexist — one per range of versions. Naming the reference (`v1`, `v2`…) next to
+    // it is what lets an inspector standing at the till check that the text they are reading is the
+    // one covering this release, without following the URL and comparing folder names.
+    //
+    // It rides at the TOP level, beside `declarationUrl`: it is a property of the declaration, not
+    // one of the nine elements of `SistemaInformatico` that travel inside every record — and it is
+    // NOT the binary's `version`, which is the release this hub runs, not the text that covers it.
+    //
+    // ABSENT, never an empty string: without a reference the link falls back to the archive root,
+    // and the root has no version to name. A `""` on the wire would paint an empty label next to
+    // the link and read as «this declaration has no version», which is a different claim.
+    if let (Some(declaration), Some(fields)) = (declaration, payload.as_object_mut()) {
+        fields.insert(
+            "declarationVersion".into(),
+            Value::String(declaration.version.clone()),
+        );
+    }
+    payload
 }
 
 #[cfg(test)]

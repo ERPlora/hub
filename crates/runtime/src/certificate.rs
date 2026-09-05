@@ -5,29 +5,30 @@
 //! it if the `certificate` capability was granted (the dispatcher's gate demands it before the
 //! native handler); the private key never crosses into the WASM sandbox.
 //!
-//! # Two slots, and the own one wins (ADR-0202 §2.1 — hub#316)
+//! # ONE slot: the business's own certificate (hub#1435)
 //!
-//! Since VeriFactu phase 2 the table is no longer a singleton: a hub holds up to **two**
-//! certificates, one per [`CertificateKind`], and they coexist.
+//! A hub holds at most one certificate — [`Own`](CertificateKind::Own), the BUSINESS's, uploaded by
+//! its owner in Ajustes → Negocio (`PUT /api/business/certificate`). Renewing it is the customer's
+//! job, as it always was.
 //!
-//! - [`Own`](CertificateKind::Own) — the BUSINESS's certificate, uploaded by its owner in
-//!   Ajustes → Negocio (`PUT /api/business/certificate`). Renewing it was always the customer's job.
-//! - [`Delegated`](CertificateKind::Delegated) — ERPlora's certificate, handed down by the control
-//!   plane and rotated centrally, invisibly to the hub (saas#1124/#1125).
+//! **There used to be a second slot**, `delegated`: ERPlora's own `.p12`, handed down by the control
+//! plane so that we could sign before the AEAT on a hub's behalf (ADR-0202 §2, hub#316/#317). It is
+//! **retired** (ADR-0320 point 8). The key no longer travels: the Hub builds the XML and the fiscal
+//! cell transmits it with ERPlora's Seal, which never leaves the platform. The SaaS shut its half in
+//! saas#1435 phase 2 — model, endpoint and columns — and this is the hub half.
 //!
-//! **Selection is a fallback, never a setting**: [`active_kind`] answers «the own one if it was
-//! uploaded, otherwise the delegated one». There is no question to the user and no column to flip —
-//! it is the ORDER of [`SLOTS`] and nothing else.
+//! ⚠️ **`delegated` still names the transmission ROUTE, and that one is alive**: [`ROUTE_DELEGATED`]
+//! is «ERPlora files on the taxpayer's behalf, through the cell», which is where every hub with no
+//! own certificate goes (ADR-0320 §1). The slot is gone; the route is the point of ADR-0320. See
+//! `tests/delegated_certificate_slot_retired_hub1435.rs`, which fails if a cleanup takes both.
 //!
-//! # The delegated slot never leaves the hub
+//! # What may leave the hub
 //!
 //! [`exportable_der_bytes`] is the only door through which raw `.p12` bytes reach anything outside
 //! this module (the blueprint/backup export — `crates/server/src/export_import.rs`), and it hands
-//! out only the slots that [`CertificateKind::may_leave_the_hub`] allows. The delegated certificate
-//! is **ERPlora's private key, not the customer's**: the hub holds it to sign on their behalf under
-//! a power of attorney, and a bundle is a file that gets downloaded, published to the catalogue and
-//! imported into someone else's hub. One export carrying it would put the key that identifies
-//! ERPlora before the AEAT in the hands of whoever opens the zip.
+//! out only the slots that [`CertificateKind::may_leave_the_hub`] allows. A bundle is a file: it is
+//! downloaded, published to the catalogue and imported into hubs that are not this one, so the
+//! question «may this slot travel?» has to be answered per slot and not assumed.
 //!
 //! `pkcs12_b64`/`password` are encrypted at rest ([`crate::secret_box`], ERPlora/hub#114) with a
 //! master key that lives OUTSIDE the database (`HUB_SECRETS_KEY`, env) — whoever reads
@@ -43,21 +44,17 @@ use crate::errors::{Result, RuntimeError};
 use crate::registry::now_rfc3339;
 use crate::secret_box::{self, SecretsKey};
 
-/// Which of the hub's two certificates a row is (ADR-0202 §2.1 — hub#316).
+/// Which certificate a row is (ADR-0202 §2.1 — hub#316; one slot since hub#1435).
 ///
 /// A SLOT, not a preference: nothing reads this column to decide which certificate signs. That is
 /// [`active_kind`]'s job, and it answers from the order of [`SLOTS`].
+///
+/// ⚠️ Not to be confused with [`ROUTE_DELEGATED`]: that is the transmission ROUTE and it is alive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CertificateKind {
     /// The BUSINESS's own certificate — uploaded by its owner in Ajustes → Negocio (ADR-0079/0081,
     /// still in force). Theirs to renew, theirs to delete, and the only one their backup carries.
     Own,
-    /// ERPlora's certificate, delegated to this hub by the control plane (ADR-0202 §2, saas#1124).
-    /// The hub receives it and rotates it without the customer ever seeing it — and, being someone
-    /// else's private key, it never travels inside a bundle ([`may_leave_the_hub`]).
-    ///
-    /// [`may_leave_the_hub`]: CertificateKind::may_leave_the_hub
-    Delegated,
 }
 
 /// **What the certificate IS** — which is the axis the AEAT segregates its VERI\*FACTU service by
@@ -89,10 +86,9 @@ impl CertificateType {
         }
     }
 
-    /// Reads back what [`as_str`](Self::as_str) wrote. `None` for anything else — including a
-    /// spelling a NEWER control plane might invent. An unrecognised word is «this build cannot tell
-    /// what that is», never a guess, and [`resolve_certificate_type`] treats it as if nothing had
-    /// been declared.
+    /// Reads back what [`as_str`](Self::as_str) wrote. `None` for anything else. An unrecognised
+    /// word is «this build cannot tell what that is», never a guess, and it degrades to the holder's
+    /// AEAT entry point like every other container this hub cannot vouch for.
     pub fn parse(s: &str) -> Option<Self> {
         [Self::Seal, Self::Representative]
             .into_iter()
@@ -100,20 +96,19 @@ impl CertificateType {
     }
 }
 
-/// Every slot a hub can hold, **in selection order**: the own certificate first, the delegated one
-/// as the fallback behind it (ADR-0202 §2.1).
+/// Every slot a hub can hold, **in selection order**. One since hub#1435 retired the delegated
+/// certificate; it stays an array because it is the RULE, not a convenience.
 ///
-/// This array is the rule. [`active_kind`] walks it to pick the certificate that signs and
-/// [`exportable_der_bytes`] walks it to pick the certificate that may travel, so «which one wins»
-/// and «which one may leave» can never drift apart into two half-remembered lists.
-pub const SLOTS: [CertificateKind; 2] = [CertificateKind::Own, CertificateKind::Delegated];
+/// [`active_kind`] walks it to pick the certificate that signs and [`exportable_der_bytes`] walks it
+/// to pick the certificate that may travel, so «which one wins» and «which one may leave» can never
+/// drift apart into two half-remembered lists. A slot added here has to answer both questions.
+pub const SLOTS: [CertificateKind; 1] = [CertificateKind::Own];
 
 impl CertificateKind {
     /// Value stored in `_hub_certificate.kind`. Stable: it is a column of a deployed hub.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Own => "own",
-            Self::Delegated => "delegated",
         }
     }
 
@@ -129,18 +124,15 @@ impl CertificateKind {
     /// the catalogue and imported into hubs that are not this one (`architecture/hub/export-import.md`).
     /// The own certificate belongs to the business exporting itself, so carrying it is restoring
     /// your own backup — and it is already protected by its own password, which does not travel.
-    /// The delegated one belongs to **ERPlora**: it is the key that identifies us before the AEAT
-    /// for every hub under our power of attorney, so a single leaked bundle would compromise the
-    /// whole fleet, not one business.
     ///
-    /// An exhaustive `match` on purpose: a third slot invented later cannot inherit «travels» by
-    /// omission — whoever adds it has to answer this question.
+    /// **It survives the retirement of the second slot on purpose** (hub#1435). With one variant the
+    /// answer is always `true`, which looks like a predicate that has stopped deciding anything —
+    /// but this is the ONE path where getting it wrong publishes a private key to whoever opens the
+    /// zip, and the `match` is exhaustive so that a slot added later cannot inherit «travels» by
+    /// omission. The cost is six lines; the failure it prevents is the most expensive one here.
     pub const fn may_leave_the_hub(self) -> bool {
         match self {
             Self::Own => true,
-            // MUTATION CANARY (see `the_export_never_carries_the_delegated_certificate`): flipping
-            // this to `true` must turn the export tests red.
-            Self::Delegated => false,
         }
     }
 }
@@ -157,21 +149,14 @@ fn load_master_key() -> Result<Option<SecretsKey>> {
         .map_err(|e| certificate_error(&format!("{} inválida", secret_box::MASTER_KEY_ENV), e))
 }
 
-/// Stores/replaces the certificate of ONE slot (upsert on `(hub_id, kind)`), leaving the other slot
-/// untouched. `by` = `hub_user:<id>` for [`Own`](CertificateKind::Own), the control plane for
-/// [`Delegated`](CertificateKind::Delegated).
+/// Stores/replaces the certificate of ONE slot (upsert on `(hub_id, kind)`).
+/// `by` = `hub_user:<id>`, the owner who uploaded it.
 ///
-/// **`pub(crate)` on purpose (hub#317).** There are exactly TWO doors into this table and each pins
-/// its own slot: [`crate::Runtime::set_business_certificate`] pins [`Own`](CertificateKind::Own) and
-/// [`set_delegated`] pins [`Delegated`](CertificateKind::Delegated). Keeping the generic writer
-/// inside the crate is what makes «the slot is explicit» a fact rather than a doc comment — and it
-/// is what stops anybody writing delegated bytes without saying which `version` they are.
-///
-/// **`version` travels in the SAME upsert as the bytes.** `Some(v)` for the delegated slot, `None`
-/// for the own one (nobody rotates the business's certificate centrally, so it has no version). A
-/// second statement would open a window where the row holds new bytes under the old number, and a
-/// hub that reports a version it does not have is a hub the fleet panel calls up to date while it
-/// signs with a superseded — possibly revoked — key.
+/// **`pub(crate)` on purpose (hub#317).** There is exactly ONE door into this table and it pins its
+/// slot: [`crate::Runtime::set_business_certificate`] pins [`Own`](CertificateKind::Own). Keeping the
+/// generic writer inside the crate is what makes «the slot is explicit» a fact rather than a doc
+/// comment. The second door — the control plane's, which wrote the retired `delegated` slot — was
+/// removed with it in hub#1435.
 ///
 /// **`certificate_type` travels in the SAME upsert too**, and for the same reason (hub#470): it
 /// describes THESE bytes, so a row holding a new `.p12` under the previous container's type would
@@ -190,7 +175,6 @@ pub(crate) async fn set(
     pkcs12_b64: &str,
     password: &str,
     by: &str,
-    version: Option<i64>,
     certificate_type: Option<CertificateType>,
 ) -> Result<()> {
     let key = load_master_key()?.ok_or_else(|| {
@@ -212,121 +196,27 @@ pub(crate) async fn set(
     p.insert("password".into(), json!(password_enc));
     p.insert("uploaded_at".into(), json!(now_rfc3339()));
     p.insert("uploaded_by".into(), json!(by));
-    p.insert("cert_version".into(), json!(version));
     p.insert(
         "certificate_type".into(),
         json!(certificate_type.map(CertificateType::as_str).unwrap_or("")),
     );
     db.execute(
+        // `cert_version` is NOT written: it numbered the control plane's central ROTATION of the
+        // retired delegated certificate (ADR-0202 §2.5), and nothing rotates a certificate centrally
+        // any more. The column stays — a system migration retires structure by leaving it alone
+        // (ADR-0269) — and stays NULL for every row written from here on.
         "INSERT INTO _hub_certificate \
-           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, cert_version, \
-            certificate_type) \
+           (hub_id, kind, pkcs12_b64, password, uploaded_at, uploaded_by, certificate_type) \
          VALUES (:hub_id, :kind, :pkcs12_b64, :password, :uploaded_at, :uploaded_by, \
-                 :cert_version, :certificate_type) \
+                 :certificate_type) \
          ON CONFLICT (hub_id, kind) DO UPDATE SET \
            pkcs12_b64 = excluded.pkcs12_b64, password = excluded.password, \
            uploaded_at = excluded.uploaded_at, uploaded_by = excluded.uploaded_by, \
-           cert_version = excluded.cert_version, \
            certificate_type = excluded.certificate_type",
         &p,
     )
     .await?;
     Ok(())
-}
-
-/// **What the hub concludes a container is, from the two things that can say so** (hub#470).
-///
-/// `declared` is what the control plane put in the payload; `derived` is what the hub read out of
-/// the bytes it is about to store. The whole point of having both is that this function can catch
-/// them disagreeing — that is the failure this issue exists for, and it is the same shape as the
-/// three that came before it in this chain (#317 the wrong slot, #318 the wrong format, #319 who
-/// signed): one certificate fact crossing the border and meaning something different on each side.
-///
-/// | declared | derived | result |
-/// |---|---|---|
-/// | seal | seal | that type |
-/// | seal | representative | **`Err`** — contested |
-/// | seal | *(unclassifiable)* | the declaration stands |
-/// | *(none)* | representative | the bytes answer |
-/// | *(none)* | *(none)* | unknown → the holder's door |
-///
-/// **Contested is an error and not a "pick one" on purpose.** The caller ([`set_delegated`]) turns
-/// it into a refusal to install, so the hub keeps the certificate it already had — which is a
-/// certificate that WORKS — and the operator gets a loud line naming both values. Every other way
-/// out is worse: trusting the declaration can send the fleet to a door where every record is
-/// rejected (ADR-0189 — a rejection is not a link, so each one is corrected by hand), and trusting
-/// the derivation silently overrides the control plane with a heuristic.
-///
-/// **A declaration this build cannot spell is treated as no declaration**, not as an error: a newer
-/// control plane inventing a third word must not brick the hubs that have not been redeployed yet.
-/// It degrades to the derived value, and to the holder's door if there is none.
-pub(crate) fn resolve_certificate_type(
-    declared: Option<CertificateType>,
-    derived: Option<CertificateType>,
-) -> Result<Option<CertificateType>> {
-    match (declared, derived) {
-        // hub#470, asserted by shape since hub#1070: the two types travel as data.
-        (Some(d), Some(v)) if d != v => Err(RuntimeError::CertificateTypeMismatch {
-            declared: d.as_str().to_string(),
-            served: v.as_str().to_string(),
-        }),
-        (Some(d), _) => Ok(Some(d)),
-        (None, derived) => Ok(derived),
-    }
-}
-
-/// `uploaded_by` of the delegated slot. Not a user: nobody in this hub uploaded ERPlora's key — the
-/// control plane handed it down (ADR-0202 §2). It is what the read-only «signing with: ERPlora»
-/// surface shows, so it has to say so rather than borrow a human's id.
-pub const CONTROL_PLANE: &str = "cloud";
-
-/// Stores the certificate the CONTROL PLANE handed down, together with the `version` it was served
-/// under (ADR-0202 §2, saas#1125 — hub#317).
-///
-/// The one door into the [`Delegated`](CertificateKind::Delegated) slot, mirroring
-/// [`crate::Runtime::set_business_certificate`] for the own one: the slot and the provenance are
-/// pinned HERE, once, so no call site can land on the wrong one by passing a default. Encryption at
-/// rest and the fail-closed rule are [`set`]'s, unchanged — this is ERPlora's private key, and it
-/// gets exactly the same treatment as the customer's.
-///
-/// # `declared_type` is the border's word, and it gets checked (hub#470)
-///
-/// The control plane says what it is handing down (`certificate_type` in the payload); this function
-/// **derives the same fact from the container itself** and refuses to install when the two disagree
-/// (see [`resolve_certificate_type`]). Deriving alone would let a heuristic override the control
-/// plane; declaring alone is what hub#470 is about — the premise that the delegated slot holds a
-/// Sello de Entidad never travelled, and ERPlora's real `.p12` is a representative certificate.
-///
-/// A refusal leaves the hub exactly as it was, which is the recoverable failure: it keeps signing
-/// with the certificate it already had while the operator sees the line. Installing a container
-/// whose type nobody agrees on is the expensive one — every record POSTed to the wrong door comes
-/// back rejected, and a rejection is not a link in the chain (ADR-0189), so they are corrected one
-/// by one, by hand.
-///
-/// `None` = an older control plane that declares nothing. Then the bytes answer on their own; there
-/// is nothing to contradict.
-pub async fn set_delegated(
-    db: &dyn DatabaseAdapter,
-    hub_id: &str,
-    pkcs12_b64: &str,
-    password: &str,
-    version: i64,
-    declared_type: Option<&str>,
-) -> Result<()> {
-    let derived = derive_certificate_type(pkcs12_b64, password);
-    let certificate_type =
-        resolve_certificate_type(declared_type.and_then(CertificateType::parse), derived)?;
-    set(
-        db,
-        hub_id,
-        CertificateKind::Delegated,
-        pkcs12_b64,
-        password,
-        CONTROL_PLANE,
-        Some(version),
-        certificate_type,
-    )
-    .await
 }
 
 /// [`certificate_type_from_der`] over a base64 container, with **every failure collapsing into
@@ -346,32 +236,6 @@ pub(crate) fn derive_certificate_type(pkcs12_b64: &str, password: &str) -> Optio
         .decode(pkcs12_b64.trim())
         .ok()?;
     certificate_type_from_der(&der, password).ok().flatten()
-}
-
-/// The `version` of the delegated certificate this hub currently holds — what the heartbeat reports
-/// up as `cert_version` and compares against the one the control plane announces (ADR-0202 §2.5).
-///
-/// `None` means «this hub holds no delegated certificate», which the SaaS reads as `0` and NOT as
-/// «never reported» — the two are different states over there, so the caller must not conflate them.
-///
-/// Never touches `pkcs12_b64`/`password`: answering «which version do I have?» must not drag a
-/// private key through memory, let alone decrypt one.
-pub async fn delegated_version(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<i64>> {
-    let mut p = Params::new();
-    p.insert("hub_id".into(), json!(hub_id));
-    p.insert("kind".into(), json!(CertificateKind::Delegated.as_str()));
-    let res = db
-        .query(
-            "SELECT cert_version FROM _hub_certificate \
-             WHERE hub_id = :hub_id AND kind = :kind AND pkcs12_b64 <> '' LIMIT 1",
-            &p,
-        )
-        .await?;
-    Ok(res
-        .rows
-        .into_iter()
-        .next()
-        .and_then(|r| r.get("cert_version").and_then(|v| v.as_i64())))
 }
 
 /// The slots that actually HOLD a certificate, in [`SLOTS`] order (i.e. selection order), each with
@@ -442,17 +306,17 @@ pub async fn slot_status(
 /// per [`active_kind`]) — the «firmando con: certificado propio / ERPlora» the module shows
 /// (ADR-0202 §2.2). `null` when the hub has neither.
 ///
-/// # ⚠️ `present` is NOT «can this hub issue?» — that question is [`can_sign`] (hub#319)
+/// # ⚠️ `present` is NOT «can this hub issue?» — that question is [`can_transmit`] (hub#319)
 ///
 /// The two used to be the same read, and hub#316/#317 warned that they would have to part company.
 /// They did: `present` answers «did the owner upload a certificate?» and stays on the **own** slot,
 /// while «can this hub issue?» — the ADR-0203 gate on [`crate::commands::execute`] and
-/// [`crate::queries::execute_page`], and the ⛔ arm of [`crate::setup_status`] (hub#370) — now reads
-/// [`can_sign`], which accepts the delegated certificate too.
+/// [`crate::queries::execute_page`], and the ⛔ arm of [`crate::setup_status`] (hub#370) — reads
+/// [`can_transmit`], which accepts the cell road too.
 ///
-/// So a delegated-only hub reports `present: false` **and** invoices normally. That is not a
+/// So a hub on the cell road reports `present: false` **and** invoices normally. That is not a
 /// contradiction: nothing of the customer's is loaded (this screen has nothing to show and nothing
-/// to delete), and ERPlora signs on their behalf. What the module shows as «firmando con: ERPlora»
+/// to delete), and ERPlora files on their behalf. What the module shows as «firmando con: ERPlora»
 /// comes from `active`/`slots` below, never from `present`.
 pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     let occupied = occupied_slots(db, hub_id).await?;
@@ -471,10 +335,7 @@ pub async fn status(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Value> {
     if let Some(o) = out.as_object_mut() {
         o.insert(
             "slots".into(),
-            json!({
-                CertificateKind::Own.as_str(): own,
-                CertificateKind::Delegated.as_str(): of(CertificateKind::Delegated),
-            }),
+            json!({ CertificateKind::Own.as_str(): own }),
         );
         o.insert("active".into(), json!(active));
         // Which of the two EXCLUSIVE routes to the AEAT this hub is on (ADR-0320 §1 — hub#1314).
@@ -512,9 +373,10 @@ pub async fn delete(db: &dyn DatabaseAdapter, hub_id: &str, kind: CertificateKin
 /// next signature and deleting it hands the hub back to the delegated one — both directions, with
 /// nothing to reconfigure.
 ///
-/// **«Can this hub issue?» is this function's [`can_sign`] shape** — the dispatcher gate and the ⛔
-/// arm of the setup checklist both go through it (hub#319). Use `can_sign` when the question is
-/// *whether*, and this one when it is *which*.
+/// **«Can this hub issue?» is NOT this function** — that is [`can_transmit`], which the dispatcher
+/// gate and the ⛔ arm of the setup checklist both go through (hub#319, hub#1489) and which the
+/// cell road satisfies without any certificate at all. Use `can_transmit` when the question is
+/// *whether*, and this one when it is *which certificate*.
 pub async fn active_kind(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -542,13 +404,18 @@ pub const ROUTE_DELEGATED: &str = "delegated";
 /// same match. Two call sites deriving «is this the own one?» separately is how the screen and the
 /// go-live end up disagreeing about which route a business is on.
 ///
-/// **No certificate at all is [`ROUTE_DELEGATED`]**, deliberately: it is the route waiting for that
-/// hub the moment the control plane hands it the Sello, and the one the screen must offer by
-/// default. Answering `own` there would send somebody with no `.p12` to a form they cannot finish.
+/// **No certificate at all is [`ROUTE_DELEGATED`]**, deliberately: it is the route the fiscal cell
+/// serves (ADR-0320), and the one the screen must offer by default. Answering `own` there would send
+/// somebody with no `.p12` to a form they cannot finish.
+///
+/// 🔒 This is the function hub#1435 had to leave alone. The delegated SLOT was retired with it; the
+/// delegated ROUTE is what ADR-0320 put in its place, and collapsing the two would put every hub
+/// without a certificate on the `own` route — demanding a `.p12` they do not have and skipping the
+/// Anexo I the cell does require. `tests/delegated_certificate_slot_retired_hub1435.rs` pins it.
 pub const fn route_of(active: Option<CertificateKind>) -> &'static str {
     match active {
         Some(CertificateKind::Own) => ROUTE_OWN,
-        Some(CertificateKind::Delegated) | None => ROUTE_DELEGATED,
+        None => ROUTE_DELEGATED,
     }
 }
 
@@ -621,35 +488,90 @@ pub async fn slot_type(
     Ok(certificate_type_from_der(&der, &password).unwrap_or(None))
 }
 
-/// **«Can this hub issue?» — the one function that answers it** (ADR-0202 §2.1 — hub#319).
+/// **Whose is the certificate that signs today** (hub#1478), or `None` when this hub holds none —
+/// or holds one whose subject names no entity.
 ///
-/// `true` when [`active_kind`] finds a certificate to sign with, i.e. the business uploaded its own
-/// **or** the control plane handed one down. A hub holding only the delegated certificate can
-/// invoice: ERPlora signs on its behalf, which is the whole point of the delegated slot.
+/// No column stores this: unlike the type, nothing has ever written the holder down, so the answer
+/// is read from the container every time. That costs a decrypt plus a PKCS#12 parse, the same
+/// price [`identity`] already pays on the very same path — and the alternative, a stored column,
+/// would be one more place able to disagree with the bytes, which is the whole family of defects
+/// #317/#318/#319/#470 came from.
 ///
-/// # Why this is a function and not three copies of `active_kind(..).is_some()`
+/// Nothing about the key leaves the core: what crosses to a module is the pair of public fields of
+/// [`CertificateHolder`].
+pub async fn active_holder(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+) -> Result<Option<CertificateHolder>> {
+    let Some(kind) = active_kind(db, hub_id).await? else {
+        return Ok(None);
+    };
+    slot_holder(db, hub_id, kind).await
+}
+
+/// [`active_holder`] for ONE slot, whichever it is.
+pub async fn slot_holder(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    kind: CertificateKind,
+) -> Result<Option<CertificateHolder>> {
+    let Some((der, password)) = load_pkcs12(db, hub_id, kind).await? else {
+        return Ok(None);
+    };
+    holder_from_der(&der, &password)
+}
+
+/// **«Can this hub issue?» — the one function that answers it** (ADR-0203, ADR-0320 §1 — hub#319,
+/// hub#1489).
+///
+/// The question is **«has this hub got a ROUTE?»**, and ADR-0320 gave it two exclusive ones:
+///
+/// * [`ROUTE_OWN`] — the business uploaded its own `.p12` and files with it ([`active_kind`]); or
+/// * [`ROUTE_DELEGATED`] — ERPlora files on its behalf through the fiscal cell, which from this
+///   hub's side needs the enrolled machine identity of ADR-0419
+///   ([`crate::gateway_identity::is_enrolled`]).
+///
+/// # Why it is not «has it got a certificate?»
+///
+/// It used to be, and that was invisible while the delegated route ALSO meant holding a `.p12`:
+/// the control plane handed ERPlora's certificate down into a local slot, so a delegated hub
+/// answered `true` by accident. hub#1435 retired that slot — no private key of ERPlora's reaches
+/// the fleet any more — and the hole came out (hub#1489): a hub that transmits perfectly through
+/// the cell was refused its own sales, painted ⛔ on the checklist and never reached
+/// [`crate::fiscal_profile::FiscalStatus::Ready`], so its go-live died in `NOT_READY` with the
+/// Anexo I signed. Asking about the *certificate* answered a question nobody was asking; the route
+/// is what the gate is actually protecting.
+///
+/// **The own certificate is checked FIRST and short-circuits**, so a hub on the direct route never
+/// pays for the second read — and a deployment whose gateway table cannot be read does not lose
+/// the answer it already had.
+///
+/// # Why this is a function and not three copies of the same expression
 ///
 /// The question has three askers and they must never diverge:
 ///
 /// 1. [`crate::commands::execute`] and 2. [`crate::queries::execute_page`], which fill
 ///    [`RequestContext::has_certificate`] — the second arm of the ADR-0203 fiscal gate; and
-/// 3. [`crate::setup_status`], the ⛔ arm of the onboarding checklist (hub#370).
+/// 3. [`crate::setup_status`], the ⛔ arm of the onboarding checklist (hub#370), plus
+///    [`crate::fiscal_profile::refresh`], which computes `READY` from it.
 ///
 /// ⛔ *asserts that the dispatcher is going to refuse the operation*. If the checklist and the gate
 /// answer this differently, one of them is lying: either a ⛔ that blocks a screen while the sale
-/// goes through, or a rejection nobody warned about. They used to read
-/// `status(..)["present"]`, which describes the **own** slot only — correct while nothing could
-/// write a delegated certificate (hub#316), and wrong the moment hub#317 made that possible. Giving
-/// the question a NAME is what makes agreement structural instead of a comment asking three call
-/// sites to remember each other.
+/// goes through, or a rejection nobody warned about. Giving the question a NAME is what makes
+/// agreement structural instead of a comment asking four call sites to remember each other —
+/// which is also why this rename is the whole fix: the compiler visited every asker.
 ///
 /// **Not the same question as `status(..)["present"]`, which stays where it is.** That one describes
 /// what the owner uploaded in Ajustes → Negocio — what that screen shows and what its delete button
-/// removes — and it must keep saying `false` for a hub that only holds ERPlora's certificate.
+/// removes — and it must keep saying `false` for a hub that files through the cell. Nor is it
+/// [`transmission_route`], which answers *which* of the two roads, never *whether* there is one.
 ///
 /// [`RequestContext::has_certificate`]: crate::registry::RequestContext::has_certificate
-pub async fn can_sign(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
-    Ok(active_kind(db, hub_id).await?.is_some())
+pub async fn can_transmit(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    if active_kind(db, hub_id).await?.is_some() {
+        return Ok(true);
+    }
+    crate::gateway_identity::is_enrolled(db, hub_id).await
 }
 
 // ── Signing/identity MEDIATED by the host (ADR-0079) ──────────────────────────
@@ -949,8 +871,8 @@ const QC_TYPE_ESIGN_DER: [u8; 9] = [0x06, 0x07, 0x04, 0x00, 0x8E, 0x46, 0x01, 0x
 /// The `openssl` crate exposes typed accessors for a handful of extensions and no generic one, and
 /// `qcStatements` is not among them. Scanning for the 9-byte DER encoding of the OID is exact in the
 /// direction that matters: a false positive needs those nine bytes to appear verbatim somewhere else
-/// in the certificate, and a false NEGATIVE degrades to «cannot tell» — the safe side, and the side
-/// the control plane's declaration covers ([`resolve_certificate_type`]).
+/// in the certificate, and a false NEGATIVE degrades to «cannot tell» — the safe side, which routes
+/// to the holder's entry point.
 #[cfg(not(target_os = "android"))]
 fn certificate_type_of_x509(
     cert_der: &[u8],
@@ -991,6 +913,126 @@ fn subject_holds_a_natural_person(subject: &openssl::x509::X509NameRef) -> bool 
 #[cfg(not(target_os = "android"))]
 fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// **Whose** a certificate is: the tax id and the registered name of the entity it belongs to,
+/// read from the subject of the container the hub holds (hub#1478).
+///
+/// The companion of [`CertificateType`], and not a synonym: that one says *what* a certificate is,
+/// this one says *who* it belongs to. Both are answered by the core and cross to a module as data;
+/// neither drags the private key anywhere.
+///
+/// **Both fields or nothing.** A caller that has to declare an identity needs the pair, and
+/// completing the missing half with a guess declares somebody who is not there — which is why
+/// [`holder_from_der`] answers `None` rather than a half-filled struct.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CertificateHolder {
+    /// Normalised: upper case, and without the semantics prefix of ETSI EN 319 412-1 §5.1.4.
+    pub nif: String,
+    /// `organizationName` (`O`) of the subject — the registered name, as the certificate spells
+    /// it — or, for a natural person's own certificate (no `O`), `givenName` + `surname`
+    /// (hub#1497).
+    pub name: String,
+}
+
+/// [`CertificateHolder`] of a PKCS#12 in DER, or `None` when its subject names no entity.
+///
+/// `pub` for the same reason as its neighbours: the PKCS#12 crypto lives in the core, in ONE
+/// place, and a caller holding a container in memory asks here instead of growing its own parser.
+#[cfg(not(target_os = "android"))]
+pub fn holder_from_der(der: &[u8], password: &str) -> Result<Option<CertificateHolder>> {
+    ensure_legacy_provider();
+    let pkcs12 = openssl::pkcs12::Pkcs12::from_der(der)
+        .map_err(|e| RuntimeError::Certificate(format!("PKCS#12 inválido: {e}")))?;
+    let parsed = pkcs12.parse2(password).map_err(|e| {
+        RuntimeError::Certificate(format!("PKCS#12 (¿contraseña incorrecta?): {e}"))
+    })?;
+    Ok(parsed
+        .cert
+        .and_then(|cert| holder_of_x509(cert.subject_name())))
+}
+
+/// Stub Android: sin OpenSSL no se puede parsear el `.p12` (ver `Cargo.toml`). Mismo mutante
+/// equivalente conocido que sus gemelos — en esta plataforma la función no se compila.
+#[cfg(target_os = "android")]
+pub fn holder_from_der(_der: &[u8], _password: &str) -> Result<Option<CertificateHolder>> {
+    Ok(None)
+}
+
+/// The entity a subject names, or `None` when it names none.
+///
+/// # The order of the two identifiers is load-bearing
+///
+/// A qualified certificate issued to a person who REPRESENTS an entity carries both: the natural
+/// person's document in `serialNumber` (2.5.4.5) and the entity's tax id in
+/// `organizationIdentifier` (2.5.4.97). Reading `serialNumber` first would answer with a private
+/// individual's document for a certificate that belongs to a company — so the entity identifier
+/// wins, and `serialNumber` is only the fallback for containers that carry nothing else.
+///
+/// The same rule in the same order already guards the fiscal cell's own credential
+/// (`verifactu-gateway/src/certificate.rs::holder_nif_of`, `verifactu-gateway#8`). This is not a
+/// second answer to one question: it is the same rule where the other half of the pair needs it.
+#[cfg(not(target_os = "android"))]
+fn holder_of_x509(subject: &openssl::x509::X509NameRef) -> Option<CertificateHolder> {
+    let nif = organization_identifier(subject)
+        .or_else(|| subject_entry(subject, openssl::nid::Nid::SERIALNUMBER))
+        .map(|raw| normalise_holder_id(&raw))
+        .filter(|nif| !nif.is_empty())?;
+    // Half an identity is not an identity: a caller declaring a party needs both, and inventing
+    // the missing one would name somebody who is not there.
+    let name = subject_entry(subject, openssl::nid::Nid::ORGANIZATIONNAME)
+        .or_else(|| natural_person_name(subject))?;
+    Some(CertificateHolder { nif, name })
+}
+
+/// `givenName` + `surname` (hub#1497): the fallback for a natural person's OWN certificate, which
+/// carries no `organizationName` — the gap #1478 deliberately left out. Same clean pair
+/// [`subject_holds_a_natural_person`] already trusts to route a certificate to `www1`, composed
+/// rather than parsed out of `CN` (FNMT writes `"APELLIDOS NOMBRE - NIF 12345678Z"`, embedding the
+/// very NIF this function must not guess). Both fields or nothing, same rule as its neighbour.
+#[cfg(not(target_os = "android"))]
+fn natural_person_name(subject: &openssl::x509::X509NameRef) -> Option<String> {
+    let given = subject_entry(subject, openssl::nid::Nid::GIVENNAME)?;
+    let surname = subject_entry(subject, openssl::nid::Nid::SURNAME)?;
+    Some(format!("{given} {surname}"))
+}
+
+/// `organizationIdentifier` has no `Nid` constant in the binding, so it is matched by OID.
+#[cfg(not(target_os = "android"))]
+fn organization_identifier(subject: &openssl::x509::X509NameRef) -> Option<String> {
+    let wanted = openssl::asn1::Asn1Object::from_str("2.5.4.97").ok()?;
+    subject
+        .entries()
+        .find(|entry| entry.object().nid() == wanted.nid())
+        .map(|entry| String::from_utf8_lossy(entry.data().as_slice()).into_owned())
+        .filter(|value| !value.trim().is_empty())
+}
+
+#[cfg(not(target_os = "android"))]
+fn subject_entry(subject: &openssl::x509::X509NameRef, nid: openssl::nid::Nid) -> Option<String> {
+    subject
+        .entries_by_nid(nid)
+        .next()
+        .map(|entry| String::from_utf8_lossy(entry.data().as_slice()).into_owned())
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+/// ETSI EN 319 412-1 §5.1.4 semantics identifiers: a qualified certificate writes the number as
+/// `VATES-B27593136`, `NTRES-…`, `IDCES-…`, `PASES-…`, `PNOES-…` or `TINES-…`. The prefix says
+/// *which register the number comes from*, not which number it is, so it is stripped before
+/// anybody compares — and a bare identifier, which plenty of containers carry, compares the same
+/// either way.
+#[cfg(not(target_os = "android"))]
+fn normalise_holder_id(raw: &str) -> String {
+    const PREFIXES: [&str; 6] = ["VATES-", "NTRES-", "PASES-", "IDCES-", "PNOES-", "TINES-"];
+    let value = raw.trim().to_ascii_uppercase();
+    for prefix in PREFIXES {
+        if let Some(rest) = value.strip_prefix(prefix) {
+            return rest.trim().to_owned();
+        }
+    }
+    value
 }
 
 /// `notAfter` de un PKCS#12 en DER como **instante** RFC 3339 UTC (`2028-06-10T09:12:33Z`).
@@ -1226,7 +1268,6 @@ mod tests {
             "secret",
             "hub_user:admin",
             None,
-            None,
         )
         .await
         .unwrap();
@@ -1243,7 +1284,6 @@ mod tests {
             "TkVX",
             "p2",
             "hub_user:admin",
-            None,
             None,
         )
         .await
@@ -1276,7 +1316,6 @@ mod tests {
             "s3cr3t-p12-password",
             "hub_user:admin",
             None,
-            None,
         )
         .await
         .unwrap();
@@ -1290,33 +1329,6 @@ mod tests {
         // Formato versionado (`secret_box::PREFIX`).
         assert!(pkcs12_raw.starts_with("v1:"));
         assert!(password_raw.starts_with("v1:"));
-    }
-
-    /// The delegated certificate is somebody else's private key: it must be as unreadable from a
-    /// database dump as the business's own one.
-    #[tokio::test]
-    async fn the_delegated_certificate_is_encrypted_at_rest_too() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(7));
-        let db = db_ready().await;
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "erplora-pw",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let (pkcs12_raw, password_raw) = raw_row(&db, "hub-test", CertificateKind::Delegated).await;
-        assert!(!pkcs12_raw.contains(DELEGATED_B64));
-        assert!(!password_raw.contains("erplora-pw"));
-        assert!(pkcs12_raw.starts_with("v1:") && password_raw.starts_with("v1:"));
     }
 
     #[tokio::test]
@@ -1333,7 +1345,6 @@ mod tests {
             original_b64,
             "mi-contraseña-real",
             "hub_user:admin",
-            None,
             None,
         )
         .await
@@ -1363,7 +1374,6 @@ mod tests {
             OWN_B64,
             "no-debe-viajar",
             "hub_user:admin",
-            None,
             None,
         )
         .await
@@ -1422,7 +1432,6 @@ mod tests {
             "password",
             "hub_user:admin",
             None,
-            None,
         )
         .await
         .unwrap_err();
@@ -1452,7 +1461,6 @@ mod tests {
                 "password",
                 "hub_user:admin",
                 None,
-                None,
             )
             .await
             .unwrap();
@@ -1467,151 +1475,21 @@ mod tests {
         assert!(matches!(err, RuntimeError::Certificate(_)));
     }
 
-    // ── ADR-0202 §2.1 (hub#316): dos slots, y el propio gana ───────────────────────────────────
+    // ── ADR-0202 §2.1 (hub#316) · un solo slot desde hub#1435 ─────────────────────────────────
 
-    /// Storing one slot must never evict the other: the business's own certificate and ERPlora's
-    /// are two different keys with two different owners and two different renewal cycles.
-    #[tokio::test]
-    async fn the_two_slots_coexist_without_evicting_each_other() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(8));
-        let db = db_ready().await;
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(
-            slot_status(&db, "hub-test", CertificateKind::Own)
-                .await
-                .unwrap()["present"],
-            json!(true)
-        );
-        assert_eq!(
-            slot_status(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap()["present"],
-            json!(true)
-        );
-        // Y cada slot conserva SUS bytes (no se pisan).
-        let (own, _) = load_pkcs12(&db, "hub-test", CertificateKind::Own)
-            .await
-            .unwrap()
-            .unwrap();
-        let (del, _) = load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(own, decoded(OWN_B64));
-        assert_eq!(del, decoded(DELEGATED_B64));
-    }
-
-    /// The whole selection rule, in both directions and with nothing to configure: with no
-    /// certificate nothing signs; the delegated one covers a hub that has no own certificate;
-    /// uploading your own takes over; deleting it hands the hub back to the delegated one.
+    /// 🔒 **La VÍA por la que las facturas llegan a la AEAT, nombrada** (ADR-0320 §1 — hub#1314): o
+    /// la firma y remite el obligado con su certificado (`own`), o lo hace ERPlora en su nombre con
+    /// el Sello, por la celda (`delegated`). Son excluyentes, y quien decide cuál es si hay
+    /// certificado o no — nada más.
     ///
-    /// Desde hub#319 el recorrido comprueba también [`can_sign`] en cada paso: «con cuál firmo» y
-    /// «¿puedo facturar?» son la misma respuesta en dos formas, y aquí es donde se ve que no se
-    /// separan — borrar el certificado propio NO deja al hub sin poder facturar.
-    #[tokio::test]
-    async fn the_own_certificate_wins_and_the_delegated_one_is_the_fallback() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(9));
-        let db = db_ready().await;
-
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            None,
-            "sin certificado no firma nada"
-        );
-        assert!(
-            !can_sign(&db, "hub-test").await.unwrap(),
-            "…y por tanto no puede facturar"
-        );
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Delegated),
-            "sin certificado propio firma el delegado"
-        );
-        assert!(
-            can_sign(&db, "hub-test").await.unwrap(),
-            "y con el delegado el hub SÍ factura: ERPlora firma en su nombre (hub#319)"
-        );
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Own),
-            "el propio GANA en cuanto se sube — sin preguntar ni reconfigurar"
-        );
-        assert!(can_sign(&db, "hub-test").await.unwrap());
-
-        delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Delegated),
-            "y al borrarlo se vuelve al delegado: el hub no se queda sin poder facturar"
-        );
-        assert!(
-            can_sign(&db, "hub-test").await.unwrap(),
-            "borrar el propio no puede dejar al hub sin facturar"
-        );
-    }
-
-    /// **La VÍA por la que las facturas llegan a la AEAT, nombrada** (ADR-0320 §1 — hub#1314): o la
-    /// firma y remite el obligado con su certificado (`own`), o lo hace ERPlora en su nombre con el
-    /// Sello (`delegated`). Son excluyentes, y quien decide cuál es el slot activo — nada más.
+    /// Un hub SIN certificado es `delegated` **a propósito**: es la vía de la celda, la que le
+    /// atiende hoy (ADR-0320) y la que la pantalla tiene que ofrecerle por defecto. Decir `own` ahí
+    /// mandaría a alguien sin `.p12` a una pantalla que no puede completar.
     ///
-    /// Un hub SIN ningún certificado es `delegated` a propósito: es la vía que le espera en cuanto
-    /// el plano de control le reparta el Sello, y es la que la pantalla tiene que ofrecerle por
-    /// defecto. Decir `own` ahí mandaría a alguien sin `.p12` a una pantalla que no puede completar.
+    /// Este es el canario de hub#1435: retirado el SLOT delegado, la RUTA delegada sigue siendo la
+    /// de un hub sin certificado. Un «limpiar lo que sobra» que se llevase las dos rompería aquí.
     #[tokio::test]
-    async fn the_transmission_route_names_the_slot_that_signs() {
+    async fn the_transmission_route_says_whether_there_is_a_certificate() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(11));
         let db = db_ready().await;
@@ -1619,25 +1497,7 @@ mod tests {
         assert_eq!(
             transmission_route(&db, "hub-test").await.unwrap(),
             ROUTE_DELEGATED,
-            "sin certificado la vía que le espera es la de ERPlora, no la propia"
-        );
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            transmission_route(&db, "hub-test").await.unwrap(),
-            ROUTE_DELEGATED,
-            "el Sello de ERPlora remite EN NOMBRE del obligado: vía delegada"
+            "sin certificado la vía es la de la celda, no la propia"
         );
 
         set(
@@ -1647,7 +1507,6 @@ mod tests {
             OWN_B64,
             "pw-own",
             "hub_user:admin",
-            None,
             None,
         )
         .await
@@ -1672,38 +1531,25 @@ mod tests {
     }
 
     /// `GET /api/business/certificate` keeps meaning what it meant: `present` is the certificate the
-    /// owner uploaded. Offering to delete ERPlora's key would be a lie in a button.
+    /// owner uploaded, and `slots` describes the one slot there is.
     #[tokio::test]
     async fn status_reports_the_own_slot_and_says_which_one_signs() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(10));
         let db = db_ready().await;
 
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
         let st = status(&db, "hub-test").await.unwrap();
         assert_eq!(
             st["present"],
             json!(false),
             "el negocio no ha subido el suyo"
         );
-        assert_eq!(
-            st["active"],
-            json!("delegated"),
-            "pero el hub firma con el de ERPlora"
-        );
-        assert_eq!(st["slots"]["delegated"]["present"], json!(true));
+        assert_eq!(st["active"], json!(null), "y no hay nada más con que firmar");
         assert_eq!(st["slots"]["own"]["present"], json!(false));
+        assert!(
+            st["slots"].get("delegated").is_none(),
+            "el slot retirado no se ofrece: {st}"
+        );
 
         set(
             &db,
@@ -1712,7 +1558,6 @@ mod tests {
             OWN_B64,
             "pw-own",
             "hub_user:admin",
-            None,
             None,
         )
         .await
@@ -1722,98 +1567,8 @@ mod tests {
         assert_eq!(st["active"], json!("own"));
         // Ni el estado global ni el de cada slot filtran bytes o contraseñas.
         let dump = st.to_string();
-        assert!(!dump.contains(OWN_B64) && !dump.contains(DELEGATED_B64));
-        assert!(!dump.contains("pw-own") && !dump.contains("pw-del"));
-    }
-
-    /// **The rule of this issue**: the delegated `.p12` is not the customer's to export.
-    ///
-    /// Unit half of the guarantee (the end-to-end half runs over the real zip, in
-    /// `crates/server/tests/export_import_test.rs`). Flipping
-    /// `CertificateKind::Delegated => may_leave_the_hub() == true` must turn this red.
-    #[tokio::test]
-    async fn the_delegated_certificate_is_never_exportable() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(11));
-        let db = db_ready().await;
-
-        // Un hub que SOLO tiene el delegado no exporta certificado alguno.
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            exportable_der_bytes(&db, "hub-test").await.unwrap(),
-            None,
-            "la clave privada de ERPlora no sale del hub"
-        );
-
-        // Con los dos, sale el PROPIO — nunca el delegado.
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        let der = exportable_der_bytes(&db, "hub-test")
-            .await
-            .unwrap()
-            .expect("el propio sí viaja");
-        assert_eq!(der, decoded(OWN_B64));
-        assert_ne!(der, decoded(DELEGATED_B64));
-    }
-
-    /// The selection rule and the export rule are DIFFERENT questions, and this is the case that
-    /// proves it: the hub signs with the delegated certificate, and still exports none.
-    ///
-    /// hub#319 is the change that could most easily blur the two — once this hub counts as «has a
-    /// certificate» ([`can_sign`]) for the dispatcher and the checklist, it must NOT start putting
-    /// ERPlora's private key into a bundle that travels to other people's hubs.
-    #[tokio::test]
-    async fn signing_with_the_delegated_certificate_does_not_make_it_exportable() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(12));
-        let db = db_ready().await;
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Delegated,
-            DELEGATED_B64,
-            "pw-del",
-            "cloud",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Delegated)
-        );
-        assert!(
-            can_sign(&db, "hub-test").await.unwrap(),
-            "este hub SÍ puede facturar…"
-        );
-        assert_eq!(
-            exportable_der_bytes(&db, "hub-test").await.unwrap(),
-            None,
-            "…y aun así no exporta certificado alguno"
-        );
+        assert!(!dump.contains(OWN_B64));
+        assert!(!dump.contains("pw-own"));
     }
 
     #[test]
@@ -1826,323 +1581,6 @@ mod tests {
     }
 
     // ── The control plane's door: `set_delegated` (ADR-0202 §2, hub#317) ──────────────────────
-
-    /// 🔒 **What the control plane hands down is stored ENCRYPTED, like everything in this table.**
-    /// This is ERPlora's private key: whoever reads `_hub_certificate` directly — a `pg_dump`, a
-    /// pgBackRest archive, a restored standby — must not come away able to sign as ERPlora before
-    /// the AEAT for the whole fleet.
-    #[tokio::test]
-    async fn the_delegated_certificate_is_stored_encrypted_at_rest() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(13));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-
-        let (stored_b64, stored_password) =
-            raw_row(&db, "hub-test", CertificateKind::Delegated).await;
-        assert!(
-            secret_box::is_encrypted(&stored_b64),
-            "el .p12 delegado está en claro en la BD: {stored_b64}"
-        );
-        assert!(
-            secret_box::is_encrypted(&stored_password),
-            "la contraseña delegada está en claro en la BD: {stored_password}"
-        );
-        assert!(!stored_b64.contains(DELEGATED_B64));
-        assert!(!stored_password.contains("pw-del"));
-        // Y se lee de vuelta intacto: cifrar no puede significar corromper.
-        assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap(),
-            Some((decoded(DELEGATED_B64), "pw-del".to_string()))
-        );
-    }
-
-    /// 🔒 **Fail-closed, same as the own slot.** Without the master key nothing is written — the
-    /// hub does NOT fall back to storing the control plane's key in the clear, and it does not
-    /// leave a half-written row either.
-    #[tokio::test]
-    async fn without_the_master_key_the_delegated_certificate_is_not_stored_at_all() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::unset();
-        let db = db_ready().await;
-
-        let err = set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap_err();
-        assert!(
-            err.to_string().contains(secret_box::MASTER_KEY_ENV),
-            "el error debería nombrar la clave que falta: {err}"
-        );
-        assert_eq!(
-            slot_status(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap()["present"],
-            json!(false)
-        );
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), None);
-    }
-
-    /// **The version stored is the version served.** It is the whole basis of the convergence
-    /// contract (§2.5): the hub compares this number with the one the heartbeat announces, and
-    /// reports it back so the fleet panel can say «987/1000 en v4». A number that drifted from the
-    /// bytes would make a hub claim it is up to date while signing with a superseded key.
-    #[tokio::test]
-    async fn the_stored_version_is_the_one_that_was_served() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(14));
-        let db = db_ready().await;
-
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), None);
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(4));
-
-        // Una rotación reemplaza bytes Y número a la vez: nunca queda el número viejo sobre los
-        // bytes nuevos (ni al revés), que es justo lo que rompería la convergencia.
-        set_delegated(&db, "hub-test", OWN_B64, "pw-rotated", 5, None)
-            .await
-            .unwrap();
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(5));
-        assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap(),
-            Some((decoded(OWN_B64), "pw-rotated".to_string()))
-        );
-    }
-
-    /// **«Which version do I have?» and «do I have one?» must never disagree.** A row whose bytes
-    /// were cleared counts as an EMPTY slot everywhere else (`occupied_slots` filters on
-    /// `pkcs12_b64 <> ''`), so it must report no version either. Otherwise the hub would announce a
-    /// `cert_version` for a certificate it cannot sign with, and the fleet panel would count it as
-    /// up to date (ADR-0202 §2.5).
-    #[tokio::test]
-    async fn a_delegated_row_without_bytes_reports_no_version() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(19));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-        let mut p = Params::new();
-        p.insert("hub_id".into(), json!("hub-test"));
-        db.execute(
-            "UPDATE _hub_certificate SET pkcs12_b64 = '' WHERE hub_id = :hub_id AND kind = 'delegated'",
-            &p,
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(
-            slot_status(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap()["present"],
-            json!(false)
-        );
-        assert_eq!(
-            delegated_version(&db, "hub-test").await.unwrap(),
-            None,
-            "un slot vacío no puede seguir anunciando una versión"
-        );
-    }
-
-    /// The version belongs to the DELEGATED row and to no other. The business's own certificate has
-    /// no version — its owner uploads it, nobody rotates it centrally — so uploading one must not
-    /// invent a version, and must not overwrite the delegated one's.
-    #[tokio::test]
-    async fn the_own_certificate_has_no_version_and_does_not_disturb_the_delegated_one() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(15));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 7, None)
-            .await
-            .unwrap();
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(7));
-        // Los dos slots siguen ahí y el propio manda (la regla de selección de hub#316, intacta).
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Own)
-        );
-        assert_eq!(
-            load_pkcs12(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap(),
-            Some((decoded(DELEGATED_B64), "pw-del".to_string()))
-        );
-    }
-
-    /// 🔒 **The guard of hub#316 survives the new writer.** `set_delegated` is a NEW door into the
-    /// delegated slot, so the export rule has to be re-proven through it: a hub whose delegated
-    /// certificate arrived from the control plane exports no certificate at all.
-    ///
-    /// MUTATION CANARY: flipping `CertificateKind::Delegated => may_leave_the_hub() == true` turns
-    /// this red too, not just the tests written by hub#316.
-    #[tokio::test]
-    async fn a_certificate_handed_down_by_the_control_plane_still_never_leaves_the_hub() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(16));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-        assert_eq!(
-            exportable_der_bytes(&db, "hub-test").await.unwrap(),
-            None,
-            "la clave privada de ERPlora no sale del hub ni llegando por el plano de control"
-        );
-
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            exportable_der_bytes(&db, "hub-test").await.unwrap(),
-            Some(decoded(OWN_B64))
-        );
-    }
-
-    /// **Provenance stays honest**: the delegated row says the control plane put it there, never a
-    /// user id. `uploaded_by` is what the read-only «firmando con» surface shows, and claiming a
-    /// human uploaded ERPlora's key would be a lie in the one field that exists to answer «who».
-    #[tokio::test]
-    async fn the_delegated_row_is_attributed_to_the_control_plane() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(17));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-        let st = slot_status(&db, "hub-test", CertificateKind::Delegated)
-            .await
-            .unwrap();
-        assert_eq!(st["uploaded_by"], json!(CONTROL_PLANE));
-        assert!(!st["uploaded_by"].as_str().unwrap().contains("hub_user"));
-    }
-
-    /// **The expiry the hub REPORTS is the delegated slot's, even when the own one is signing.**
-    ///
-    /// The heartbeat's `reported_cert_not_after` describes the delegated slot and only that
-    /// (ADR-0202 §2.5: «un hub con certificado `own` puesto sigue reportando su slot delegado»), and
-    /// the control plane compares it against the `not_after` of the `.p12` IT custodies to catch a
-    /// hub that is not really running our certificate. Answering with the active slot's date would
-    /// make every hub that has its own certificate report a date that has nothing to do with
-    /// ERPlora's — and the mismatch alarm would fire on the whole healthy half of the fleet.
-    ///
-    /// The two certificates here are deliberately asymmetric: the delegated one is a REAL PKCS#12
-    /// (so it has a readable date) and the own one is not (so it has none). That is what makes the
-    /// difference between «read the active slot» and «read the delegated slot» visible at all.
-    #[tokio::test]
-    async fn the_delegated_expiry_is_reported_even_when_the_own_certificate_signs() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(20));
-        let db = db_ready().await;
-
-        let (delegated_b64, delegated_pw, expected_date) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None)
-            .await
-            .unwrap();
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            OWN_B64,
-            "pw-own",
-            "hub_user:admin",
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        // El propio MANDA para firmar (regla de hub#316) y no es un `.p12` legible, así que la
-        // caducidad "activa" no se sabe (`.ok().flatten()` = lo que el llamador observa).
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Own)
-        );
-        assert_eq!(expiry(&db, "hub-test").await.ok().flatten(), None);
-        // ...pero la del slot delegado sí, y es la que se reporta.
-        assert_eq!(
-            slot_expiry(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap(),
-            Some(expected_date)
-        );
-    }
-
-    /// **The reported instant and the displayed day describe the SAME moment.** `slot_expiry` is
-    /// what a person reads and `slot_expiry_instant` is what the control plane compares by
-    /// equality, so the day has to be the instant's prefix — over a real container, not only over
-    /// the string parser.
-    #[tokio::test]
-    async fn the_reported_instant_and_the_displayed_day_agree_on_the_same_slot() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(21));
-        let db = db_ready().await;
-
-        let (delegated_b64, delegated_pw, expected_day) = real_pkcs12(365);
-        set_delegated(&db, "hub-test", &delegated_b64, &delegated_pw, 4, None)
-            .await
-            .unwrap();
-
-        let instant = slot_expiry_instant(&db, "hub-test", CertificateKind::Delegated)
-            .await
-            .unwrap()
-            .expect("el instante del contenedor");
-        assert!(
-            instant.starts_with(&expected_day),
-            "el instante {instant} no empieza por el día {expected_day}"
-        );
-        assert!(
-            instant.ends_with('Z'),
-            "el instante tiene que ser UTC: {instant}"
-        );
-        // Y lleva la HORA: si fuese la fecha truncada, el panel de flota lo leería como medianoche.
-        assert!(
-            instant.len() > expected_day.len() + 1,
-            "sin hora: {instant}"
-        );
-
-        // Un slot vacío no inventa fecha.
-        assert_eq!(
-            slot_expiry_instant(&db, "hub-test", CertificateKind::Own)
-                .await
-                .unwrap(),
-            None
-        );
-    }
 
     /// A self-signed PKCS#12 that really parses, so a test can assert a DATE and not just a `None`.
     /// Returns `(base64 of the container, password, expected ISO notAfter)`.
@@ -2190,75 +1628,49 @@ mod tests {
         )
     }
 
-    /// **A hub whose only certificate is the delegated one CAN sign — and the screen that shows the
-    /// business's own certificate still says there is none** (ADR-0202 §2.1 — hub#319).
-    ///
-    /// This replaces the pin hub#316 left standing here
-    /// (`until_hub319_a_delegated_only_hub_still_reports_no_certificate`), and the edit is the point
-    /// of the issue rather than a side effect. Until now the three readers of «can this hub issue?»
-    /// looked at `status()["present"]`, i.e. the OWN slot, so a delegated-only hub was refused by
-    /// the dispatcher AND shown ⛔: they agreed, so nothing lied — the runtime was simply stricter
-    /// than the ADR, and failed closed.
-    ///
-    /// The two questions are now told apart by NAME, which is what stops them drifting again:
-    ///
-    /// * [`can_sign`] — «can this hub issue?». Own **or** delegated. Moved, all three readers at once.
-    /// * `status()["present"]` — «did the owner upload a certificate in Ajustes → Negocio?». Own
-    ///   only, deliberately unchanged: that screen shows it and its delete button removes it, so
-    ///   answering `true` would offer the customer a certificate they cannot see and a button that
-    ///   deletes a key that is not theirs.
-    #[tokio::test]
-    async fn a_delegated_only_hub_can_sign_while_the_own_slot_stays_empty() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(18));
-        let db = db_ready().await;
-
-        set_delegated(&db, "hub-test", DELEGATED_B64, "pw-del", 4, None)
-            .await
-            .unwrap();
-
-        assert!(
-            can_sign(&db, "hub-test").await.unwrap(),
-            "ERPlora's certificate signs on the hub's behalf: this hub can invoice"
+    /// Plants the enrolled machine identity — the three fields
+    /// [`crate::gateway_identity::client_identity`] demands before the cell road exists on this
+    /// side. Written raw because what is read here is the PRESENCE of the material, never its
+    /// contents.
+    async fn enrol_machine_identity(db: &dyn DatabaseAdapter, hub_id: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        p.insert(
+            "common_name".into(),
+            json!(crate::gateway_identity::common_name(hub_id)),
         );
-        assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Delegated)
-        );
-
-        let st = status(&db, "hub-test").await.unwrap();
-        assert_eq!(
-            st["present"],
-            json!(false),
-            "Ajustes → Negocio still has nothing of the customer's to show or delete"
-        );
-        assert_eq!(
-            st["active"],
-            json!("delegated"),
-            "…but the hub knows what it signs with"
-        );
+        db.execute(
+            "INSERT INTO _hub_gateway_identity \
+             (hub_id, private_key_pem, certificate_pem, ca_pem, common_name, created_at, updated_at) \
+             VALUES (:hub_id, 'v1:ciphertext', 'cert', 'ca', :common_name, \
+                     '2026-09-03T09:00:00Z', '2026-09-03T09:00:00Z')",
+            &p,
+        )
+        .await
+        .expect("the machine identity is enrolled");
     }
 
-    /// **`can_sign` is `active_kind` and can never be anything else.** The two are one answer split
-    /// in two shapes («whether» and «which»), and every state of the two slots has to agree — a hub
-    /// that «can sign» with nothing selected, or one that has a selection but «cannot sign», is the
-    /// contradiction the three readers would then propagate.
+    /// **`can_transmit` is «has this hub got a ROUTE?», in all four states** (hub#1489). Own
+    /// certificate and enrolled cell identity are the two roads of ADR-0320 §1 and either of them
+    /// is enough; only a hub with NEITHER has no way out. Walking all four in one test is the
+    /// point: the failure this pins is not «one state is wrong», it is «the two roads stopped
+    /// being interchangeable».
     #[tokio::test]
-    async fn can_sign_and_active_kind_agree_in_every_state_of_the_two_slots() {
+    async fn can_transmit_answers_either_road_in_every_state() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(24));
         let db = db_ready().await;
 
-        for (own, delegated, expected) in [
-            (false, false, None),
-            (true, false, Some(CertificateKind::Own)),
-            (false, true, Some(CertificateKind::Delegated)),
-            (true, true, Some(CertificateKind::Own)),
-        ] {
+        for (own, enrolled) in [(false, false), (true, false), (false, true), (true, true)] {
             delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
-            delete(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap();
+            let mut p = Params::new();
+            p.insert("hub_id".into(), json!("hub-test"));
+            db.execute(
+                "DELETE FROM _hub_gateway_identity WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await
+            .unwrap();
             if own {
                 set(
                     &db,
@@ -2268,28 +1680,73 @@ mod tests {
                     "pw",
                     "hub_user:a",
                     None,
-                    None,
                 )
                 .await
                 .unwrap();
             }
-            if delegated {
-                set_delegated(&db, "hub-test", DELEGATED_B64, "pw", 4, None)
-                    .await
-                    .unwrap();
+            if enrolled {
+                enrol_machine_identity(&db, "hub-test").await;
             }
 
-            let kind = active_kind(&db, "hub-test").await.unwrap();
-            assert_eq!(kind, expected, "own={own} delegated={delegated}");
             assert_eq!(
-                can_sign(&db, "hub-test").await.unwrap(),
-                kind.is_some(),
-                "own={own} delegated={delegated}: «whether» and «which» must be the same answer"
+                can_transmit(&db, "hub-test").await.unwrap(),
+                own || enrolled,
+                "own={own} enrolled={enrolled}: either road is a way out; neither is not"
             );
         }
     }
 
-    // ── hub#470: what the certificate IS, declared at the border and checked against the bytes ───
+    /// **`active_kind` still answers «WHICH», and only about the own slot.** It is the half
+    /// `can_transmit` must never absorb: `route_of` picks the AEAT road with it and
+    /// `status(..)["present"]` shows the owner what they uploaded, and an enrolled cell identity is
+    /// neither of those things — it is not the customer's certificate and there is nothing on that
+    /// screen to delete.
+    #[tokio::test]
+    async fn an_enrolled_cell_identity_is_not_a_certificate() {
+        let _lock = env_lock();
+        let _guard = EnvVarGuard::set(&test_key_b64(24));
+        let db = db_ready().await;
+        enrol_machine_identity(&db, "hub-test").await;
+
+        assert_eq!(
+            active_kind(&db, "hub-test").await.unwrap(),
+            None,
+            "the cell identity is ERPlora's road, not a certificate of the business's"
+        );
+        assert_eq!(
+            status(&db, "hub-test").await.unwrap()["present"],
+            json!(false),
+            "Ajustes → Negocio has nothing to show and nothing to delete"
+        );
+        assert_eq!(
+            transmission_route(&db, "hub-test").await.unwrap(),
+            ROUTE_DELEGATED,
+            "no own certificate is the cell road (ADR-0320 §1)"
+        );
+        assert!(
+            can_transmit(&db, "hub-test").await.unwrap(),
+            "…and that road is a way out: this hub files"
+        );
+    }
+
+    // ── hub#470: what the certificate IS, read out of the bytes it was stored from ─────────────
+
+    /// Stores a container in the hub's one slot through the writer the product uses, with the type
+    /// DERIVED from the bytes — which since hub#1435 is the only source there is. Before it, the
+    /// control plane also DECLARED a type and `resolve_certificate_type` reconciled the two; with
+    /// the delegated slot gone there is no second opinion, so the container answers alone.
+    async fn store_own(db: &dyn DatabaseAdapter, b64: &str, password: &str) -> Result<()> {
+        set(
+            db,
+            "hub-test",
+            CertificateKind::Own,
+            b64,
+            password,
+            "hub_user:admin",
+            derive_certificate_type(b64, password),
+        )
+        .await
+    }
 
     /// What a test certificate should look like. Named rather than a pile of booleans because each
     /// shape stands for a real certificate that exists in the wild.
@@ -2486,84 +1943,39 @@ mod tests {
         );
     }
 
-    /// 🔴 **The bug hub#470 closes, at the door the control plane writes through.** A REPRESENTATIVE
-    /// container installed in the DELEGATED slot — precisely what would happen the day ERPlora's own
-    /// `.p12` (`…_R_…`) were uploaded to the control plane — must not make the hub behave like a
-    /// seal. Before this the slot WAS the answer, so every delegated hub would have POSTed to
-    /// `www10` and had all of its records rejected, one by one (ADR-0189).
+    /// 🔴 **The bug hub#470 closes.** A REPRESENTATIVE container must not make the hub behave like a
+    /// seal. Before this the SLOT was the answer, so a whole fleet would have POSTed to `www10` and
+    /// had all of its records rejected, one by one (ADR-0189). The slot that made the mistake
+    /// reachable is retired (hub#1435); the rule it forced — the TYPE decides — is what routes the
+    /// fiscal cell today, so it stays pinned.
     #[tokio::test]
-    async fn a_representative_container_in_the_delegated_slot_is_not_a_seal() {
+    async fn a_representative_container_is_not_a_seal() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(20));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
 
-        set_delegated(&db, "hub-test", &b64, &pw, 4, None)
+        store_own(&db, &b64, &pw)
             .await
             .unwrap();
 
         assert_eq!(
-            active_kind(&db, "hub-test").await.unwrap(),
-            Some(CertificateKind::Delegated),
-            "the slot is unchanged: it still says whose the certificate is"
-        );
-        assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Representative),
-            "and the TYPE comes from the container, not from the slot"
+            "the TYPE comes from the container"
         );
     }
 
-    /// The other half: a real seal in that slot IS a seal, so hub#320's fix survives.
+    /// The other half: a real seal IS a seal, so hub#320's fix survives.
     #[tokio::test]
-    async fn a_seal_in_the_delegated_slot_is_a_seal() {
+    async fn an_entity_seal_container_is_a_seal() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(21));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
+        store_own(&db, &b64, &pw)
             .await
             .unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Seal)
-        );
-    }
-
-    /// 🔒 **A declaration that contradicts the container is refused, and the hub keeps what it had.**
-    ///
-    /// This is the loud, recoverable failure of hub#470: the hub goes on signing with a certificate
-    /// that WORKS while the operator gets the line naming both values. Installing it instead would
-    /// route every record to the wrong door, and a rejection is not a link in the chain (ADR-0189),
-    /// so each one is corrected by hand.
-    #[tokio::test]
-    async fn a_declaration_that_contradicts_the_container_is_refused() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(22));
-        let db = db_ready().await;
-        let (good_b64, good_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &good_b64, &good_pw, 4, Some("seal"))
-            .await
-            .unwrap();
-
-        let (bad_b64, bad_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
-        let err = set_delegated(&db, "hub-test", &bad_b64, &bad_pw, 5, Some("seal"))
-            .await
-            .unwrap_err();
-        assert!(
-            matches!(
-                &err,
-                RuntimeError::CertificateTypeMismatch { declared, served }
-                    if declared == "seal" && served == "representative"
-            ),
-            "{err}"
-        );
-
-        assert_eq!(
-            delegated_version(&db, "hub-test").await.unwrap(),
-            Some(4),
-            "the refused install must not have touched the certificate the hub was using"
-        );
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
@@ -2578,75 +1990,13 @@ mod tests {
         let _guard = EnvVarGuard::set(&test_key_b64(23));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, None)
+        store_own(&db, &b64, &pw)
             .await
             .unwrap();
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
         );
-    }
-
-    /// **When the hub cannot classify the container, the border's word stands.** This is what keeps
-    /// a REAL Sello de Entidad working on a build whose classifier does not recognise it: the
-    /// declaration can only ever be contradicted by a positive reading, never by silence.
-    #[tokio::test]
-    async fn a_declaration_stands_when_the_hub_cannot_classify_the_container() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(24));
-        let db = db_ready().await;
-        let (b64, pw) = pkcs12_shaped(Shape::Anonymous);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
-            .await
-            .unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Seal)
-        );
-    }
-
-    /// **A word this build does not know is treated as no declaration, not as an error.** A newer
-    /// control plane inventing a third type must not brick the hubs that have not been redeployed.
-    #[tokio::test]
-    async fn a_declaration_this_build_cannot_spell_degrades_to_the_container() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(25));
-        let db = db_ready().await;
-        let (b64, pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("qualified-eseal-v2"))
-            .await
-            .unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Representative)
-        );
-    }
-
-    /// The resolution table, on its own, including the branch no `set_delegated` test can reach
-    /// twice over: agreement.
-    #[test]
-    fn the_resolution_table_is_exactly_these_five_answers() {
-        use CertificateType::{Representative, Seal};
-        assert_eq!(
-            resolve_certificate_type(Some(Seal), Some(Seal)).unwrap(),
-            Some(Seal)
-        );
-        assert_eq!(
-            resolve_certificate_type(Some(Representative), Some(Representative)).unwrap(),
-            Some(Representative)
-        );
-        assert_eq!(
-            resolve_certificate_type(Some(Representative), None).unwrap(),
-            Some(Representative)
-        );
-        assert_eq!(
-            resolve_certificate_type(None, Some(Seal)).unwrap(),
-            Some(Seal)
-        );
-        assert_eq!(resolve_certificate_type(None, None).unwrap(), None);
-        // Contested, in BOTH directions: neither side gets to be the one that wins by default.
-        assert!(resolve_certificate_type(Some(Seal), Some(Representative)).is_err());
-        assert!(resolve_certificate_type(Some(Representative), Some(Seal)).is_err());
     }
 
     /// **The business's own certificate gets its type from its own bytes too**, so a business that
@@ -2665,7 +2015,6 @@ mod tests {
             &seal_b64,
             &seal_pw,
             "hub_user:admin",
-            None,
             derive_certificate_type(&seal_b64, &seal_pw),
         )
         .await
@@ -2673,50 +2022,6 @@ mod tests {
         assert_eq!(
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Seal)
-        );
-    }
-
-    /// **The type follows the slot that SIGNS.** Uploading the business's own certificate takes over
-    /// from the delegated one on the next signature (ADR-0202 §2.1), and the entry point has to move
-    /// with it — otherwise a hub would present one certificate at the door of another.
-    #[tokio::test]
-    async fn the_type_reported_is_the_one_of_the_certificate_that_signs() {
-        let _lock = env_lock();
-        let _guard = EnvVarGuard::set(&test_key_b64(27));
-        let db = db_ready().await;
-        let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal"))
-            .await
-            .unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Seal)
-        );
-
-        let (own_b64, own_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
-        set(
-            &db,
-            "hub-test",
-            CertificateKind::Own,
-            &own_b64,
-            &own_pw,
-            "hub_user:admin",
-            None,
-            derive_certificate_type(&own_b64, &own_pw),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Representative),
-            "the own certificate wins the fallback, so its type is the one that picks the door"
-        );
-
-        delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
-        assert_eq!(
-            active_type(&db, "hub-test").await.unwrap(),
-            Some(CertificateType::Seal),
-            "and deleting it hands the hub back to the delegated one, door included"
         );
     }
 
@@ -2728,9 +2033,7 @@ mod tests {
         let db = db_ready().await;
         assert_eq!(active_type(&db, "hub-test").await.unwrap(), None);
         assert_eq!(
-            slot_type(&db, "hub-test", CertificateKind::Delegated)
-                .await
-                .unwrap(),
+            slot_type(&db, "hub-test", CertificateKind::Own).await.unwrap(),
             None
         );
     }
@@ -2739,14 +2042,14 @@ mod tests {
     /// already deployed have `certificate_type = ''` and nothing backfills it (that would be
     /// guessing what somebody's certificate is — the trap v19/hub#436 walked around). Parsing the
     /// container the row actually holds is a reading, and it is what keeps those hubs on the right
-    /// door until their next upload or refetch writes the column.
+    /// door until their next upload writes the column.
     #[tokio::test]
     async fn a_row_without_a_stored_type_is_classified_from_its_own_container() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(29));
         let db = db_ready().await;
         let (b64, pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &b64, &pw, 4, Some("seal"))
+        store_own(&db, &b64, &pw)
             .await
             .unwrap();
 
@@ -2767,28 +2070,21 @@ mod tests {
         );
     }
 
-    /// **The type is written in the SAME upsert as the bytes** (like `cert_version`, v16). A
-    /// rotation that replaced the container but left the previous type behind would pick the AEAT
-    /// door of a certificate the hub no longer holds.
+    /// **The type is written in the SAME upsert as the bytes** (v21). A rotation that replaced the
+    /// container but left the previous type behind would pick the AEAT door of a certificate the hub
+    /// no longer holds.
     #[tokio::test]
     async fn replacing_the_container_replaces_its_type_in_the_same_write() {
         let _lock = env_lock();
         let _guard = EnvVarGuard::set(&test_key_b64(30));
         let db = db_ready().await;
         let (seal_b64, seal_pw) = pkcs12_shaped(Shape::EntitySeal);
-        set_delegated(&db, "hub-test", &seal_b64, &seal_pw, 4, Some("seal"))
+        store_own(&db, &seal_b64, &seal_pw)
             .await
             .unwrap();
 
         let (rep_b64, rep_pw) = pkcs12_shaped(Shape::QualifiedRepresentative);
-        set_delegated(
-            &db,
-            "hub-test",
-            &rep_b64,
-            &rep_pw,
-            5,
-            Some("representative"),
-        )
+        store_own(&db, &rep_b64, &rep_pw)
         .await
         .unwrap();
 
@@ -2796,7 +2092,11 @@ mod tests {
             active_type(&db, "hub-test").await.unwrap(),
             Some(CertificateType::Representative)
         );
-        assert_eq!(delegated_version(&db, "hub-test").await.unwrap(), Some(5));
+
+        // And deleting it leaves NO type: there is no second slot to fall back to (hub#1435), so a
+        // hub that removes its certificate is a hub with nothing to route.
+        delete(&db, "hub-test", CertificateKind::Own).await.unwrap();
+        assert_eq!(active_type(&db, "hub-test").await.unwrap(), None);
     }
 
     /// The two words are a CONTRACT (a column of a deployed hub and a field of the control plane's

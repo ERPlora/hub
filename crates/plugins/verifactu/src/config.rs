@@ -5,20 +5,21 @@ use crate::*;
 /// Lee la config VeriFactu del hub (fila singleton; `None` si no se ha guardado nunca).
 ///
 /// **Certificado (ADR-0079/0081, ADR-0202 §2.1):** el PKCS#12 vive en el core (`_hub_certificate`),
-/// NO en `verifactu_config`, y el hub tiene DOS slots — el `own` del negocio (subido en Ajustes →
-/// Negocio) y el `delegated` de ERPlora, que el plano de control reparte y rota. Aquí solo se marca
-/// **qué dice el core**: `certificate_source = "core"` (hay con qué firmar) y `certificate_kind`
-/// (con cuál). **Los bytes del `.p12` y la contraseña NUNCA se copian a la config del módulo** —
+/// NO en `verifactu_config`, y desde hub#1435 hay UN slot: el `own` del negocio, subido en Ajustes →
+/// Negocio. Aquí solo se marca **qué dice el core**: `certificate_source = "core"` (hay con qué
+/// firmar) y `certificate_type` (qué es, que es lo que decide la puerta de la AEAT). Un hub sin
+/// certificado no queda sin vía: transmite por la celda (ADR-0320, [`resolve_route`]).
+/// **Los bytes del `.p12` y la contraseña NUNCA se copian a la config del módulo** —
 /// ni se consultan siquiera: la firma/transmisión usa la capability opaca
-/// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). El acceso está
+/// `certificate_identity(hub_id)` (el core hace la cripto; ver [`resolve_route`]). El acceso está
 /// gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
 /// así que llegar aquí implica que el usuario la concedió.
 ///
 /// **Quién firma lo decide el CORE, no este módulo** (hub#319). Antes se sondeaba
 /// `SELECT pkcs12_b64, password FROM _hub_certificate … LIMIT 1`: sin `kind` (con dos filas, la que
 /// devolviese la BD), contando filas que el core se niega a seleccionar, y arrastrando la contraseña
-/// del certificado a la memoria del módulo solo para comprobar que no estaba vacía. La regla de
-/// selección (`own` si está, si no `delegated`) tiene un dueño y no se reimplementa aquí.
+/// del certificado a la memoria del módulo solo para comprobar que no estaba vacía. Qué certificado
+/// firma lo decide el core (`certificate::active_kind`) y no se reimplementa aquí.
 pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<Option<Json>> {
     let rows = host
         .read(
@@ -29,18 +30,19 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
     let mut config = rows.into_iter().next();
 
     // Tolerante: un host sin la capacidad (o un hub sin la migración de sistema) responde `None` y
-    // el módulo se queda sin marcador — que es «no puedo transmitir», el lado seguro.
-    if let Some(kind) = host
+    // el módulo se queda sin marcador — que aquí significa «sin certificado del core», o sea la vía
+    // de la celda ([`resolve_route`]), no un fallo.
+    if host
         .certificate_signing_kind(hub_id)
         .await
         .unwrap_or_default()
+        .is_some()
     {
-        // **Y QUÉ es**, que es otra pregunta (hub#470): el slot dice de quién es el certificado, el
-        // tipo dice por qué puerta de la AEAT entra. Se lee del MISMO sitio y en la misma pasada que
-        // el slot —el core— para que no haya dos lecturas de «con qué firmo» que puedan contestar
-        // distinto: ese desdoblamiento es exactamente cómo se estropearon #317, #318 y #319.
-        // `None` (el core no puede jurarlo, o un host sin la capacidad) deja el marcador vacío, que
-        // es la puerta del titular.
+        // **Y QUÉ es**, que es la otra pregunta (hub#470): tener certificado no dice por qué puerta
+        // de la AEAT se entra. Se lee del MISMO sitio y en la misma pasada —el core— para que no
+        // haya dos lecturas de «con qué firmo» que puedan contestar distinto: ese desdoblamiento es
+        // exactamente cómo se estropearon #317, #318 y #319. `None` (el core no puede jurarlo, o un
+        // host sin la capacidad) deja el marcador vacío, que es la puerta del titular.
         let certificate_type = host
             .certificate_signing_type(hub_id)
             .await
@@ -49,7 +51,9 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
         let obj = config.get_or_insert_with(|| json!({}));
         if let Some(m) = obj.as_object_mut() {
             m.insert("certificate_source".into(), json!("core"));
-            m.insert("certificate_kind".into(), json!(kind));
+            // 🪦 Aquí iba `certificate_kind` («¿own o delegated?»). Con un solo slot (hub#1435) su
+            // respuesta era siempre la misma que `certificate_source`, así que era un segundo
+            // marcador de la misma pregunta — justo el desdoblamiento que #317/#318/#319 costaron.
             m.insert("certificate_type".into(), json!(certificate_type));
         }
     }
@@ -71,47 +75,54 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
     Ok(config)
 }
 
-/// Construye la **Identity mTLS** para firmar/transmitir a la AEAT.
-///
-/// El certificado fiscal (.p12) es un recurso del NEGOCIO/hub (ADR-0079/0081) y desde ADR-0202 §2.1
-/// hay dos: el **propio** del negocio y el **delegado** de ERPlora. `host.certificate_identity`
-/// resuelve el fallback (`own` si está subido, si no `delegated`) y hace TODA la cripto PKCS#12;
-/// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**.
-///
-/// Error **solo si no hay ninguno de los dos** (hub#319): un hub cuyo único certificado es el
-/// delegado transmite perfectamente — ERPlora firma en su nombre.
-pub(crate) async fn build_identity(
-    host: &dyn NativeHost,
-    hub_id: &str,
-    config: &Json,
-) -> Result<reqwest::Identity> {
-    if !has_certificate(config) {
-        return Err(VerifactuError::Certificate(
-            "no hay certificado con el que firmar: ni el del negocio (súbelo en Ajustes → Negocio) \
-             ni uno delegado de ERPlora"
-                .into(),
-        )
-        .into());
-    }
-    host.certificate_identity(hub_id).await
-}
-
-/// ¿Hay un certificado del core con el que transmitir — propio **o** delegado? Gate barato que NO
-/// carga los bytes del `.p12`: basta el marcador `certificate_source` que `read_config` pone con lo
-/// que respondió el core.
+/// ¿Hay un certificado del core con el que transmitir? Gate barato que NO carga los bytes del
+/// `.p12`: basta el marcador `certificate_source` que `read_config` pone con lo que respondió el
+/// core. Sin él, la vía es la celda ([`resolve_route`]), no un fallo.
 pub(crate) fn has_certificate(config: &Json) -> bool {
     str_field(config, "certificate_source") == "core"
 }
 
 /// The two roads of ADR-0320, resolved in ONE place (hub#1432 — the hub#319/#320 lesson: one
 /// question, one owner). The core's certificate WINS: a business that uploaded its own signs
-/// with its own, direct to the AEAT, exactly as today. Without one, the gateway — the host's
-/// broker answers with a [`GatewayAccess`] when the machine identity is enrolled and the control
-/// plane authorises. Without EITHER, the same visible error as always: the record stays pending,
+/// with its own, direct to the AEAT, exactly as today. Without one, the gateway —
+/// [`crate::gateway::resolve_access`] answers when the machine identity the host lends is enrolled and
+/// the control plane authorises (hub#1459: the core no longer brokers this, it only lends the
+/// identity and the call). Without EITHER, the same visible error as always: the record stays pending,
 /// never a panic, never a silent skip.
 pub(crate) enum TransmitRoute {
-    Direct(reqwest::Identity),
-    Gateway(erplora_runtime::fiscal_gateway::GatewayAccess),
+    Direct {
+        identity: reqwest::Identity,
+        /// Whose the signing container is, read from its subject by the core (hub#1478). `None`
+        /// = it names no entity, which leaves the caller exactly where it was before: no
+        /// representation declared.
+        holder: Option<erplora_runtime::certificate::CertificateHolder>,
+    },
+    Gateway(crate::gateway::GatewayAccess),
+}
+
+impl TransmitRoute {
+    /// **Who presents these bytes**, for the road that carried them — the ONE input ADR-0268 §4
+    /// allows for the `Representante` block and for the consult's representation flag.
+    ///
+    /// Both roads answer the same question with the certificate that actually signs, and each
+    /// reads it from the only place it can: through the cell the hub never sees the Sello, so the
+    /// pair comes SIGNED in the token; on the own road the container is the hub's own, so its
+    /// subject is read. The slot is not an input to either — that is the fourth border defect of
+    /// hub#470, written down as a rule.
+    ///
+    /// `None` is «nobody to declare», never «the obligado»: the rule «presenter == obligado ⇒ no
+    /// block» lives inside [`crate::aeat::set_representative`] and is not duplicated here.
+    pub(crate) fn presenter(&self) -> Option<crate::aeat::Presenter<'_>> {
+        match self {
+            TransmitRoute::Gateway(access) => Some(access.presenter()),
+            TransmitRoute::Direct { holder, .. } => {
+                holder.as_ref().map(|holder| crate::aeat::Presenter {
+                    nif: &holder.nif,
+                    name: &holder.name,
+                })
+            }
+        }
+    }
 }
 
 pub(crate) async fn resolve_route(
@@ -120,11 +131,14 @@ pub(crate) async fn resolve_route(
     config: &Json,
 ) -> Result<TransmitRoute> {
     if has_certificate(config) {
-        return Ok(TransmitRoute::Direct(
-            host.certificate_identity(hub_id).await?,
-        ));
+        return Ok(TransmitRoute::Direct {
+            identity: host.certificate_identity(hub_id).await?,
+            // Read HERE, with the identity and from the same container, so the two halves of
+            // «this hub signs with X» cannot drift apart the way #317/#318/#319/#470 did.
+            holder: host.certificate_holder(hub_id).await?,
+        });
     }
-    match host.fiscal_gateway_access(hub_id).await? {
+    match crate::gateway::resolve_access(host, hub_id).await? {
         Some(access) => Ok(TransmitRoute::Gateway(access)),
         None => Err(VerifactuError::Certificate(
             "no hay vía de transmisión: ni certificado del negocio (súbelo en Ajustes → Negocio) \
@@ -146,11 +160,11 @@ pub(crate) async fn can_transmit(
     if has_certificate(config) {
         return Ok(true);
     }
-    Ok(host.fiscal_gateway_access(hub_id).await?.is_some())
+    Ok(crate::gateway::resolve_access(host, hub_id).await?.is_some())
 }
 
 /// **¿Puede este motor firmar por `hub_id` ahora mismo?** — exactamente el predicado con el que
-/// [`build_identity`] deja pasar o rechaza.
+/// [`resolve_route`] elige la vía propia en vez de la celda.
 ///
 /// `pub` a propósito (hub#319): «¿puede este hub facturar?» la contestan TRES sitios —el gate fiscal
 /// del dispatcher (ADR-0203), el brazo ⛔ de la checklist (hub#370) y este motor— y tienen que
@@ -165,29 +179,13 @@ pub async fn can_sign(host: &dyn NativeHost, hub_id: &str) -> Result<bool> {
         .is_some_and(has_certificate))
 }
 
-/// Con **cuál** de los dos se firma: `"own"`, `"delegated"`, o `""` si no hay ninguno
-/// (ADR-0202 §2.1 — hub#319).
-///
-/// ⚠️ **Esta es la respuesta que lee el endpoint AEAT (`www1` vs `www10`, hub#320) y la que tiene
-/// que leer [hub#321] (bloque `Representante`), NO una segunda consulta a `_hub_certificate`.** La
-/// selección arrastra el endpoint y el `Representante`, así que resolverla otra vez por su cuenta
-/// es cómo vuelve el defecto que hub#317 y hub#318 ya arreglaron dos veces: dos lecturas de la
-/// misma pregunta que pueden contestar distinto. Hasta que hub#321 aterrice, un hub que firme con
-/// el delegado transmite por el endpoint correcto pero **sin `Representante`**.
-///
-/// [hub#321]: https://github.com/ERPlora/hub/issues/321
-pub(crate) fn signing_kind(config: &Json) -> String {
-    str_field(config, "certificate_kind")
-}
-
 /// **QUÉ es** el certificado que firma: `"seal"`, `"representative"`, o `""` si el core no puede
 /// jurarlo (ADR-0202 §2.1 — hub#470).
 ///
-/// El gemelo de [`signing_kind`], y la distinción es el fondo de hub#470: el slot dice **de quién**
-/// es el certificado —lo que decide el fallback y lo que necesitará el bloque `Representante` de
-/// hub#321— y el tipo dice **qué** es, que es lo único por lo que la AEAT segrega la puerta. Leer
-/// el slot como si fuera el tipo mandaba a `www10` a cualquier certificado repartido por el plano
-/// de control, fuese un sello o no.
+/// La distinción es el fondo de hub#470: el SLOT decía **de quién** es el certificado —el fallback,
+/// y nada más— y el tipo dice **qué** es, que es lo único por lo que la AEAT segrega la puerta. Leer
+/// el slot como si fuera el tipo mandaba a `www10` a cualquier certificado repartido por el plano de
+/// control, fuese un sello o no. El slot se retiró (hub#1435); el tipo es el que decidía y sigue.
 ///
 /// Lo pone [`read_config`] con lo que contestó el core. El motor no vuelve a preguntar a
 /// `_hub_certificate`: una sola lectura, un solo dueño.
@@ -209,10 +207,11 @@ pub(crate) fn signing_type(config: &Json) -> String {
 /// que se presenta en el handshake TLS, así que un registro que lleva días en contingencia se
 /// transmite por la puerta del certificado que firma **hoy**, no por la del que firmaba cuando se
 /// generó: presentar el sello de ERPlora en `www1` falla siempre, diga lo que diga el XML
-/// archivado. ⚠️ La otra mitad de esa pareja —el `Representante`, que sí viaja DENTRO del
-/// `xml_content` congelado del reintento— es de [hub#321](https://github.com/ERPlora/hub/issues/321):
-/// si el hub cambió de certificado mientras el registro esperaba en la cola, ese XML describe al
-/// firmante anterior y habrá que reconstruirlo.
+/// archivado. La otra mitad de esa pareja —el `Representante`, que sí viaja DENTRO del
+/// `xml_content` congelado del reintento— la cerró hub#1460 con la misma regla: no se hornea en el
+/// constructor, se **estampa** sobre el sobre resuelto justo antes de validarlo y archivarlo
+/// ([`aeat::set_representative`]), así que un registro que esperó días en la cola declara a quien
+/// lo presenta HOY sin regenerar nada. La `Cabecera` no entra en la huella (ADR-0202 §4.6).
 pub(crate) fn transmission_endpoint(config: &Json) -> &'static str {
     aeat::endpoint(&environment_of(config), &signing_type(config))
 }
@@ -233,13 +232,6 @@ pub async fn transmission_endpoint_for(
         .await?
         .unwrap_or_else(|| json!({}));
     Ok(transmission_endpoint(&config))
-}
-
-/// El endpoint de **consulta** de este hub ahora mismo. Es el mismo que el de alta (el WSDL publica
-/// las dos operaciones en `VerifactuSOAP`, hub#287) y por eso se deriva igual, con los dos ejes de
-/// la misma lectura: recuperar la cadena tiene que hablar con la misma puerta que la emitió.
-pub(crate) fn consult_endpoint_of(config: &Json) -> &'static str {
-    aeat::consult_endpoint(&environment_of(config), &signing_type(config))
 }
 
 /// **Where ONE record's transmission is going** — resolved once and then shared by the POST, by
@@ -323,49 +315,12 @@ pub(crate) fn destination_of(
     })
 }
 
-/// **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4 — hub#318): un fallo del
-/// canal TLS contra la AEAT pide al plano de control el certificado vigente.
-///
-/// El motor **no descarga nada**. No tiene la credencial de máquina del hub y no debe tenerla: la
-/// clave privada delegada es de ERPlora y su única puerta de entrada vive en el server
-/// (`erplora-server::fiscal_certificate`). Aquí solo se levanta la señal; quién la sirve, cuándo, y
-/// con cuánto presupuesto, es decisión del server.
-///
-/// Solo el TLS. Un timeout o un DNS caído se reintentan por la cola de contingencia (5/10/20/40/60
-/// min) y **no** se arreglan bajando otra vez una clave privada: pedirla en cada registro varado
-/// agotaría el presupuesto de 20/h del endpoint justo cuando el hub más lo necesita.
-///
-/// **Y solo si quien se identificó fue el certificado DELEGADO** (`signing_kind`, hub#319). El
-/// refetch baja el de ERPlora; si el handshake lo rompió el certificado **propio** del negocio
-/// —caducado, revocado, contraseña cambiada—, bajar el delegado no arregla nada, porque el propio
-/// sigue ganando el fallback (ADR-0202 §2.1) y el intento siguiente falla igual. Lo único que
-/// lograría es gastar el cupo del hub en algo que no puede funcionar, y dejar sin él al disparador
-/// del latido —el que sí instala una rotación real— justo cuando llegue.
-///
-/// El `signal` es un parámetro —y no el global directamente— para que esto sea comprobable sin
-/// tocar estado de proceso compartido entre tests.
-pub(crate) fn request_certificate_refetch_on_tls(
-    error: &VerifactuError,
-    signing_kind: &str,
-    signal: &RefetchSignal,
-) {
-    if matches!(error, VerifactuError::Tls(_)) && signing_kind == DELEGATED_SLOT {
-        signal.request();
-    }
-}
-
-/// Nombre del slot delegado tal y como lo devuelve el core
-/// (`certificate::CertificateKind::as_str`). Constante para que la comparación no se escriba a mano
-/// en cada sitio y pueda equivocarse en uno.
-pub(crate) const DELEGATED_SLOT: &str = "delegated";
-
 /// Nombre del tipo **sello de entidad** tal y como lo devuelve el core
 /// (`certificate::CertificateType::as_str`). El ÚNICO valor que abre la puerta `www10` de la AEAT
 /// (`aeat::endpoint`); todo lo demás cae a la del titular.
 ///
-/// ⚠️ Es una constante distinta de [`DELEGATED_SLOT`] a propósito, y no un alias suyo: son las dos
-/// palabras que hub#470 separó —de quién es el certificado vs. qué es— y colapsarlas otra vez
-/// devuelve el defecto.
+/// ⚠️ Es el TIPO, no el slot: son las dos palabras que hub#470 separó —de quién es el certificado
+/// vs. qué es— y colapsarlas otra vez devuelve el defecto.
 pub(crate) const SEAL_TYPE: &str = "seal";
 
 // ── create_record (issue verifactu#2) ────────────────────────────────────────
@@ -397,7 +352,7 @@ mod cert_source_tests {
     /// ADR-0079/0081: el `.p12` del negocio es del CORE. `read_config` debe **marcar** su presencia
     /// (`certificate_source = "core"`) pero NUNCA copiar los bytes del `.p12` ni la contraseña a la
     /// config del módulo — se quedan en el core; la firma usa la capability opaca
-    /// `certificate_identity(hub_id)` (ver `build_identity`), no `certificate_identity_from`.
+    /// `certificate_identity(hub_id)` (ver [`resolve_route`]), no `certificate_identity_from`.
     #[tokio::test]
     async fn read_config_marks_core_cert_without_leaking_bytes() {
         let cfg = read_config(&CoreCertHost, "h1").await.unwrap().unwrap();
@@ -479,39 +434,25 @@ mod cert_source_tests {
         }
     }
 
-    /// **A hub whose only certificate is the DELEGATED one can transmit** (ADR-0202 §2.1 — hub#319).
-    ///
-    /// `build_identity` used to demand the business's own certificate and send the user to
-    /// «Ajustes → Negocio». ERPlora's certificate signs on their behalf, so the engine has to accept
-    /// it — and it learns that from the core, which owns the fallback.
+    /// The engine transmits with the certificate the CORE picked — it does not re-derive who signs.
     #[tokio::test]
-    async fn a_delegated_only_hub_can_transmit() {
-        let host = SlotHost::new(Some("delegated"), vec![]);
-        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
-        assert!(
-            has_certificate(&cfg),
-            "con el delegado el motor SÍ puede transmitir"
-        );
-        assert_eq!(signing_kind(&cfg), "delegated");
-    }
-
-    /// The own certificate wins — the fallback is an ORDER, not a preference, and the engine reports
-    /// the slot the core actually picked.
-    #[tokio::test]
-    async fn the_own_certificate_is_the_one_reported_when_both_slots_are_full() {
+    async fn a_hub_whose_core_holds_a_certificate_can_transmit_directly() {
         let host = SlotHost::new(Some("own"), vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
         assert!(has_certificate(&cfg));
-        assert_eq!(signing_kind(&cfg), "own");
     }
 
-    /// No slot at all ⇒ nothing to sign with. The engine keeps failing CLOSED.
+    /// **No certificate is not «cannot transmit»** (ADR-0320 — hub#1435 retired the delegated slot).
+    ///
+    /// It used to be: the fallback was ERPlora's `.p12` in the second slot, and a hub with neither
+    /// failed closed. Now the road without a certificate is the fiscal CELL, so this marker only
+    /// says «no direct mTLS» — [`resolve_route`] is what turns that into the gateway, and
+    /// [`can_transmit`] is the predicate that answers «is there ANY road».
     #[tokio::test]
-    async fn a_hub_with_neither_slot_cannot_transmit() {
+    async fn a_hub_without_a_certificate_reports_no_direct_road() {
         let host = SlotHost::new(None, vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
         assert!(!has_certificate(&cfg));
-        assert_eq!(signing_kind(&cfg), "");
     }
 
     /// **The AEAT entry point follows what the certificate IS, as the CORE read it**
@@ -524,13 +465,10 @@ mod cert_source_tests {
     /// chain (ADR-0189).
     #[tokio::test]
     async fn the_entry_point_follows_what_the_certificate_is() {
-        let seal = read_config(
-            &SlotHost::new(Some("delegated"), vec![]).holding("seal"),
-            "h1",
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        let seal = read_config(&SlotHost::new(Some("own"), vec![]).holding("seal"), "h1")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(
             transmission_endpoint(&seal),
             "https://prewww10.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP"
@@ -549,32 +487,26 @@ mod cert_source_tests {
         );
     }
 
-    /// 🔴 **The bug hub#470 closes, through the whole seam.** A hub whose DELEGATED slot holds a
-    /// *representative* container — which is exactly what would happen the day ERPlora's own
-    /// `.p12` (`…_R_…`) were uploaded to the control plane — must transmit through the holder's
-    /// door. Routing on the slot sent it to `www10`, where the AEAT would have rejected every
-    /// record of every delegated hub, one at a time and with nothing to warn anybody.
+    /// 🔴 **The bug hub#470 closes, through the whole seam.** What routes to the AEAT is what the
+    /// container IS, never which slot it came out of: a *representative* certificate goes to the
+    /// holder's door and an entity *seal* to `www10`, and reading the slot instead sent a whole
+    /// fleet to `www10`, where every record was rejected one at a time with nothing to warn anybody.
     ///
-    /// And the mirror: a business that uploads its OWN entity seal reaches the seal's door. The
-    /// slot no longer decides in either direction.
+    /// With one slot left (hub#1435) the mistake is no longer reachable through the slot — but the
+    /// axis it established is exactly what the fiscal cell now depends on, so it stays pinned here.
     #[tokio::test]
-    async fn the_slot_does_not_decide_the_entry_point_in_either_direction() {
-        let delegated_representative = read_config(
-            &SlotHost::new(Some("delegated"), vec![]).holding("representative"),
+    async fn the_type_and_not_the_slot_decides_the_entry_point() {
+        let own_representative = read_config(
+            &SlotHost::new(Some("own"), vec![]).holding("representative"),
             "h1",
         )
         .await
         .unwrap()
         .unwrap();
         assert_eq!(
-            signing_kind(&delegated_representative),
-            "delegated",
-            "the slot is still reported — it is what picks the fallback and the `Representante`"
-        );
-        assert_eq!(
-            transmission_endpoint(&delegated_representative),
+            transmission_endpoint(&own_representative),
             "https://prewww1.aeat.es/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP",
-            "a representative certificate goes to the holder's door even from the delegated slot"
+            "a representative certificate goes to the holder's door"
         );
 
         let own_seal = read_config(&SlotHost::new(Some("own"), vec![]).holding("seal"), "h1")
@@ -666,8 +598,13 @@ mod cert_source_tests {
                     "environment": environment,
                     "certificate_type": certificate_type,
                 });
+                // Los dos ejes que `run_consult_via` usa para la consulta, contra los que
+                // `transmission_endpoint` usa para el alta. El helper `consult_endpoint_of` que
+                // vivía aquí se retiró con hub#1436: la consulta ya no pregunta siempre por el
+                // entorno de la config —una consulta en nombre de UN registro pregunta por el
+                // suyo (guarda R4)—, así que el entorno es un parámetro y no una derivación.
                 assert_eq!(
-                    consult_endpoint_of(&cfg),
+                    aeat::consult_endpoint(&environment_of(&cfg), &signing_type(&cfg)),
                     transmission_endpoint(&cfg),
                     "({environment}, {certificate_type})"
                 );
@@ -762,10 +699,13 @@ mod cert_source_tests {
             cfg.get("certificate_source").is_none(),
             "y no se marca un certificado que no hay"
         );
-        assert!(build_identity(&BareHost, "h1", &cfg).await.is_err());
+        // Y la puerta viva dice lo mismo: sin certificado y sin identidad de máquina que enrolar,
+        // `resolve_route` no resuelve NINGUNA vía (hub#1529 — antes esto se preguntaba a un gate
+        // que solo miraba el `.p12` y que ya no existe).
+        assert!(resolve_route(&BareHost, "h1", &cfg).await.is_err());
     }
 
-    /// **`can_sign` IS `build_identity`'s gate, and it is pinned here too.**
+    /// **`can_sign` IS the own-road gate of [`resolve_route`], and it is pinned here too.**
     ///
     /// Its only consumer is the coherence e2e of hub#319, which lives in the `erplora-runtime`
     /// package — so a mutation run scoped to THIS package leaves it alive with nothing to say. That
@@ -773,7 +713,7 @@ mod cert_source_tests {
     /// transmits to the AEAT has to be pinned where it is defined, so it survives whatever the
     /// cross-package test does later.
     #[tokio::test]
-    async fn can_sign_answers_exactly_what_build_identity_gates_on() {
+    async fn can_sign_answers_exactly_what_the_own_road_gates_on() {
         for (signing, expected) in [
             (Some("delegated"), true),
             (Some("own"), true),
@@ -791,137 +731,43 @@ mod cert_source_tests {
             assert_eq!(
                 can_sign(&host, "h1").await.unwrap(),
                 has_certificate(&cfg),
-                "can_sign y el gate de build_identity tienen que ser la MISMA respuesta ({signing:?})"
+                "can_sign y el gate de la vía propia tienen que ser la MISMA respuesta ({signing:?})"
             );
         }
     }
 
-    /// **The error names the real cause.** «Súbelo en Ajustes → Negocio» is only half the story once
-    /// a delegated certificate exists: reaching here means the business uploaded none **and** the
-    /// control plane never handed one down. Telling the user only about their half sends them to a
-    /// screen that cannot fix an ERPlora-side gap.
+    /// 🔒 **hub#1529 — la mitad ACCIONABLE del error, que se quedó sin dueño al borrar
+    /// `build_identity`.**
+    ///
+    /// The test that pinned it (`the_error_without_any_certificate_names_both_halves`) was hers and
+    /// went with her. What survives on the live door —
+    /// `transmission::tests::a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire`—
+    /// demands «vía de transmisión» + «pasarela»: the two halves of the DIAGNOSIS, and neither of
+    /// them tells the business WHERE to fix its own. Without this guard, dropping «súbelo en
+    /// Ajustes → Negocio» from the message breaks nothing, and the only thing left standing is the
+    /// name of a service the business cannot touch — the very defect hub#1531 removes from the
+    /// diagnostic, one door over.
+    ///
+    /// The wording is NOT copied from the retired test: that one also demanded «uno delegado de
+    /// ERPlora», a slot retired in hub#1435. The ERPlora half is asked for as what it is TODAY, the
+    /// gateway.
     #[tokio::test]
-    async fn the_error_without_any_certificate_names_both_halves() {
+    async fn the_no_road_error_still_says_where_the_business_fixes_its_half_hub1529() {
         let host = SlotHost::new(None, vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
-        let err = build_identity(&host, "h1", &cfg)
+        let err = resolve_route(&host, "h1", &cfg)
             .await
-            .unwrap_err()
+            .err()
+            .expect("no certificate and no gateway is an error, never a silent direct road")
             .to_string();
         assert!(
             err.contains("Ajustes → Negocio"),
-            "sigue diciendo dónde subir el propio: {err}"
+            "the half the business can act on names the screen where it acts: {err}"
         );
         assert!(
-            err.to_lowercase().contains("erplora"),
-            "y que ERPlora tampoco entregó uno delegado: {err}"
+            err.contains("pasarela"),
+            "and ERPlora's half is named as what it is today, the gateway: {err}"
         );
     }
 }
 
-#[cfg(test)]
-mod certificate_refetch_trigger_tests {
-    use super::{request_certificate_refetch_on_tls, VerifactuError};
-    use erplora_runtime::certificate_refetch::RefetchSignal;
-
-    /// El slot que firmaba cuando falló el handshake (ver `signing_kind`).
-    const DELEGATED: &str = "delegated";
-    const OWN: &str = "own";
-
-    /// 🔒 The failure IS the trigger (ADR-0202 §2 point 4). A rejected client certificate is the
-    /// one transport failure that a retry cannot fix and a refetch can.
-    #[test]
-    fn a_tls_failure_asks_for_the_certificate_to_be_refetched() {
-        let signal = RefetchSignal::new();
-        request_certificate_refetch_on_tls(
-            &VerifactuError::Tls("conexión AEAT: invalid peer certificate".into()),
-            DELEGATED,
-            &signal,
-        );
-        assert!(
-            signal.take(),
-            "un rechazo del certificado tiene que pedir el vigente"
-        );
-    }
-
-    /// 🔒 **El certificado que falló tiene que ser el DELEGADO** (hub#319).
-    ///
-    /// El refetch baja el certificado de ERPlora. Si quien se identificó ante la AEAT fue el
-    /// certificado **propio** del negocio —caducado, revocado, con la contraseña cambiada—, pedir el
-    /// delegado no arregla nada: el propio sigue ganando el fallback (ADR-0202 §2.1) y el siguiente
-    /// intento vuelve a fallar igual. Lo único que consigue es **gastar el presupuesto**: la cola de
-    /// contingencia reintenta cada 5/10/20/40/60 min, así que un certificado propio roto se comería
-    /// las 6/h del hub y dejaría sin cupo al disparador que sí sirve —el del latido— justo cuando el
-    /// plano de control rote de verdad.
-    ///
-    /// Mismo defecto de frontera que hub#317 y hub#318 arreglaron dos veces: una señal que describe
-    /// el slot delegado levantada desde un contexto que podía estar hablando del propio.
-    #[test]
-    fn a_tls_failure_of_the_businesss_own_certificate_asks_for_nothing() {
-        let signal = RefetchSignal::new();
-        request_certificate_refetch_on_tls(
-            &VerifactuError::Tls("conexión AEAT: received fatal alert: CertificateExpired".into()),
-            OWN,
-            &signal,
-        );
-        assert!(
-            !signal.take(),
-            "el certificado del negocio no se arregla bajando el de ERPlora — y gastaría el cupo"
-        );
-    }
-
-    /// Sin certificado no se llega a abrir el canal, pero si se llegase tampoco se pide nada: el
-    /// cupo no se gasta en una pregunta cuya respuesta ya se sabe que no se está usando.
-    #[test]
-    fn a_tls_failure_without_a_known_signer_asks_for_nothing() {
-        let signal = RefetchSignal::new();
-        request_certificate_refetch_on_tls(
-            &VerifactuError::Tls("conexión AEAT: invalid peer certificate".into()),
-            "",
-            &signal,
-        );
-        assert!(!signal.take());
-    }
-
-    /// 🔒 **The AEAT being down does not make the hub ask for a private key.** These arrive once
-    /// per record the contingency queue drains, and asking on each one would spend the control
-    /// plane's 20/h allowance on an outage that a refetch cannot fix.
-    #[test]
-    fn a_network_failure_does_not() {
-        let signal = RefetchSignal::new();
-        for error in [
-            VerifactuError::Transmission("conexión AEAT: operation timed out".into()),
-            VerifactuError::Transmission("AEAT HTTP 503: servicio no disponible".into()),
-            VerifactuError::Certificate("certificado del negocio no configurado".into()),
-            VerifactuError::Consult("SOAP Fault".into()),
-        ] {
-            request_certificate_refetch_on_tls(&error, DELEGATED, &signal);
-        }
-        assert!(
-            !signal.take(),
-            "solo el fallo del canal TLS dispara el refetch; los demás se reintentan por la cola \
-             de contingencia"
-        );
-    }
-
-    /// Many stranded records, one broken certificate, ONE refetch: the signal coalesces, which is
-    /// what keeps a queue drain from emptying the hourly allowance in a single pass.
-    #[test]
-    fn a_whole_queue_drain_failing_the_same_handshake_asks_once() {
-        let signal = RefetchSignal::new();
-        for _ in 0..200 {
-            request_certificate_refetch_on_tls(
-                &VerifactuError::Tls(
-                    "conexión AEAT: received fatal alert: CertificateRevoked".into(),
-                ),
-                DELEGATED,
-                &signal,
-            );
-        }
-        assert!(signal.take());
-        assert!(
-            !signal.take(),
-            "200 registros varados piden UN refetch, no 200"
-        );
-    }
-}

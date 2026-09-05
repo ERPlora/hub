@@ -15,7 +15,7 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 target_dir="${CARGO_TARGET_DIR:-${here}/handler/target}"
 
-rustup target list --installed | grep -qx wasm32-unknown-unknown || {
+grep -qx wasm32-unknown-unknown <<<"$(rustup target list --installed)" || {
   echo "missing target: rustup target add wasm32-unknown-unknown" >&2
   exit 1
 }

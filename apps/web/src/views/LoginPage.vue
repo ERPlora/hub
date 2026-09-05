@@ -562,7 +562,7 @@ async function finalizeCloudLogin(result: LoginResult): Promise<void> {
   // Abre la sesión LOCAL del runtime a partir del JWT (autoridad de permisos local, §2.9).
   // El `name` se reusa para el login por PIN (el runtime resuelve el usuario por nombre).
   const sess = await runtimeCloudSession(result.access, result.user.name, result.user.email);
-  setHubSession(sess.token);
+  setHubSession(sess.token, sess.credential_kind);
 
   setUser({
     id: sess.user.id,
@@ -829,7 +829,7 @@ async function checkPin(pin: string): Promise<void> {
     // Login local por PIN contra el runtime (§2.9): verifica el PIN y abre sesión server-side.
     const u = pinUser.value;
     const sess = await runtimePinLogin(u.name, pin);
-    setHubSession(sess.token);
+    setHubSession(sess.token, sess.credential_kind);
     // Rol LOCAL del runtime (mismo que el gate del backend) → gatea la UI admin (pestaña API keys).
     setUser({
       id: sess.user.id,
@@ -873,7 +873,7 @@ async function signInWithBadge(badge: string): Promise<void> {
   pinError.value = false;
   try {
     const sess = await runtimeBadgeLogin(badge);
-    setHubSession(sess.token);
+    setHubSession(sess.token, sess.credential_kind);
     setUser({
       id: sess.user.id,
       name: sess.user.name,

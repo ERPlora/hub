@@ -1,5 +1,5 @@
-//! `erplora-peripherals` — lógica de hardware POS reutilizable, **solo red** (ESC/POS sobre
-//! TCP, puerto 9100). ARQUITECTURA.md §2.7.
+//! `erplora-peripherals` — lógica de hardware POS reutilizable. Renderiza **ESC/POS** y lo
+//! entrega por el transporte que nombre el `printer_id`. ARQUITECTURA.md §2.7.
 //!
 //! Este crate concentra lo que era el Bridge Python (`bridge/ERPlora-Bridge-desktop`) en una
 //! librería sin I/O de UI ni servidor WebSocket — el consumidor monta su propio transporte. Desde
@@ -7,12 +7,22 @@
 //! este crate **in-process** por `invoke`. El standalone `apps/bridge`, que lo servía por un
 //! WebSocket en `localhost:12321`, ya no existe: no hay puerto local, ni token de emparejamiento.
 //!
-//! Decisión red-only (§2.7): USB/Bluetooth se descartan; el escáner por HID lo maneja el
-//! SO/navegador como teclado. Por eso aquí **no** hay `usb`/`bluetooth`/`scanner`.
+//! **Tres transportes**, y el renderizado es el mismo para los tres — lo único que cambia es por
+//! dónde salen los bytes:
+//!   - `network:{ip}:{port}` — ESC/POS por TCP al 9100. La vía original y la única con cola y
+//!     reintentos (`queue`).
+//!   - `bluetooth:{mac}` — SPP, **solo Android**: el shell pasa los bytes ya renderizados al
+//!     transporte Kotlin (ADR-0204, hub#388). Aquí no hay módulo: el transporte vive en el plugin.
+//!   - `usb:{queue}` — la cola RAW del SO, **solo escritorio** (`usb`, hub#1083). No es un driver
+//!     nuestro: es `lp -o raw`, y el driver lo pone el fabricante. Eso es lo que permite soportar
+//!     USB sin caer en el «un driver por SO no escala» que protegía la decisión red-only.
+//!
+//! El escáner por HID lo sigue manejando el SO/navegador como teclado: por eso **no** hay
+//! `scanner` ni `keyboard`.
 //!
 //! Estado: **implementado** — render ESC/POS (`escpos`), descubrimiento (`discovery`), registro +
-//! watchdog (`registry`), cajón (`drawer`) y cola con reintentos (`queue`). El mapeo Python→Rust
-//! por módulo está en `README.md`.
+//! watchdog (`registry`), cajón (`drawer`), cola con reintentos (`queue`) y cola RAW del SO
+//! (`usb`). El mapeo Python→Rust por módulo está en `README.md`.
 //!
 //! Hubo además un `printer` con una capa de traits (`Printer`/`CashDrawer`) y **su propia**
 //! política de reintentos: nunca tuvo consumidor —la app encola por `queue` y abre el cajón por
@@ -25,6 +35,7 @@ pub mod escpos;
 pub mod protocol;
 pub mod queue;
 pub mod registry;
+pub mod usb;
 
 #[cfg(test)]
 mod test_support;

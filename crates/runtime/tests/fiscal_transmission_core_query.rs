@@ -10,10 +10,10 @@
 //! Three properties this query owes its callers, one test each:
 //!
 //! 1. **The route comes from `certificate::route_of`, never re-derived.** `:has_certificate` is
-//!    `can_sign`, which answers «own OR delegated»: a hub whose only certificate is ERPlora's
-//!    answers `1` there and is on the DELEGATED route. Deducing the route from that 0/1 would be
-//!    a second rule, and two rules is how the screen and `go_live` end up disagreeing about which
-//!    route a business is on.
+//!    `can_transmit`, which answers «has this hub got a ROUTE?» (hub#1489): a hub enrolled on the
+//!    cell answers `1` there and is on the DELEGATED route, so that 0/1 cannot tell the two roads
+//!    apart. Deducing the route from it would be a second rule, and two rules is how the screen
+//!    and `go_live` end up disagreeing about which route a business is on.
 //! 2. **The grant is served from the MIRRORED copy** (`_hub_fiscal_profile`, hub#836), with no
 //!    trip to the control plane. Whoever wants it refreshed opens Ajustes → Negocio, which is
 //!    where the `GET` lives; a screen that fetched on every open would put a network call behind
@@ -72,30 +72,8 @@ async fn occupy_slot(rt: &Runtime, kind: &str) {
         .unwrap();
 }
 
-/// 🔴 **The regression the issue asks for.** A hub whose ONLY occupied slot is the delegated one
-/// is on the `delegated` route — and `can_sign` says `true` for it, so a route deduced from
-/// «does this hub have a certificate?» would answer `own` and take the grant panel away from the
-/// only business that actually needs one.
-#[tokio::test]
-async fn hub1416_a_delegated_only_hub_is_on_the_delegated_route() {
-    let rt = runtime().await;
-    occupy_slot(&rt, "delegated").await;
-
-    assert!(
-        erplora_runtime::certificate::can_sign(rt.db(), HUB)
-            .await
-            .unwrap(),
-        "premise of this test: `can_sign` is TRUE here — that is why it cannot be the source"
-    );
-    assert_eq!(
-        transmission(&rt).await["transmission_route"],
-        json!("delegated"),
-        "ERPlora files ON BEHALF of this taxpayer: the route is the delegated one"
-    );
-}
-
-/// The owner's own `.p12` wins the moment it is uploaded — same fallback rule as `active_kind`,
-/// nothing to reconfigure — and with it the Anexo I stops applying.
+/// The owner's own `.p12` puts the hub on its own road the moment it is uploaded — nothing to
+/// reconfigure — and with it the Anexo I stops applying.
 #[tokio::test]
 async fn hub1416_an_own_certificate_puts_the_hub_on_its_own_route() {
     let rt = runtime().await;
@@ -104,9 +82,15 @@ async fn hub1416_an_own_certificate_puts_the_hub_on_its_own_route() {
     assert_eq!(transmission(&rt).await["transmission_route"], json!("own"));
 }
 
-/// A hub with NEITHER certificate reads `delegated`: it is the route waiting for it the moment
-/// the control plane hands it the Sello, and the one a screen has to offer by default. Answering
-/// `own` there would send somebody with no certificate to a form they cannot finish.
+/// 🔴 **The regression the issue asks for.** A hub with NO certificate reads `delegated`: it is the
+/// road the fiscal cell serves (ADR-0320) and the one a screen has to offer by default. Answering
+/// `own` there would send somebody with no certificate to a form they cannot finish, and take the
+/// Anexo I panel away from the only business that actually needs one.
+///
+/// Since hub#1435 this is also the ONLY way to be on the delegated route: the slot that used to
+/// hold ERPlora's `.p12` is retired, so «no certificate» and «the cell files for me» are the same
+/// state. The route must NOT be re-derived from `can_transmit` — since hub#1489 that answers «has
+/// a ROUTE», which an enrolled hub on this very road says `true` to.
 #[tokio::test]
 async fn hub1416_a_hub_with_no_certificate_at_all_reads_delegated() {
     let rt = runtime().await;

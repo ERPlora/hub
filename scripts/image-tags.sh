@@ -131,7 +131,7 @@ elif [ "$channel" = "develop" ] || [ "$channel" = "branch" ]; then
         describe=$(git -C "$(dirname -- "$manifest")" describe --tags --long --match 'v*' 2>/dev/null || true)
     fi
     # vX.Y.Z-<n>-g<sha>  →  X.Y.Z-dev.<n>+g<sha>   (semver 2.0: prerelease + build metadata)
-    if ! printf '%s' "$describe" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]+$'; then
+    if ! grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]+$' <<<"$describe"; then
         echo "❌ image-tags: no hay un \`git describe --tags --long --match 'v*'\` utilizable para $ref" >&2
         echo "   (salida: '${describe:-<vacía>}'). Sin él la imagen serviría el hueco del Cargo.toml —" >&2
         echo "   exactamente el bug de hub#1170. ¿El checkout trae los tags? (fetch-depth: 0)" >&2
@@ -162,12 +162,12 @@ fi
 
 # Núcleo X.Y.Z de la versión (sin prerelease ni metadatos): lo que se compara y lo que da `:X.Y`/`:X`.
 core="${version%%[-+]*}"
-if ! printf '%s' "$core" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$core"; then
     echo "❌ image-tags: '$version' no es semver X.Y.Z (viene de $source_of_version)." >&2
     echo "   El criterio de qué es MAJOR/MINOR/PATCH: architecture/hub/versioning.md" >&2
     exit 1
 fi
-if [ "$channel" = "rc" ] && ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'; then
+if [ "$channel" = "rc" ] && ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$' <<<"$version"; then
     echo "❌ image-tags: '$version' no es una candidata \`X.Y.Z-rc.N\` (viene de $source_of_version)." >&2
     echo "   Solo las \`-rc.N\` tienen canal (canary); cualquier otra prerelease en un tag es un error." >&2
     exit 1
@@ -192,7 +192,7 @@ minor="${core%.*}"   # X.Y.Z → X.Y
 # El registro es la fuente que importa (es donde se publica) y el workflow ya se ha autenticado
 # contra él con el `docker login` del paso anterior, así que basta el mismo `GITHUB_TOKEN`.
 registry_tags() { # $1 = <owner>/<package>
-    local repo="$1" base token url headers body
+    local repo="$1" base token url headers body next_urls
     base="${IMAGE_TAGS_REGISTRY_BASE:-https://ghcr.io}"
     token=$(curl -fsS --max-time 30 -u "${GITHUB_ACTOR:-github-actions}:${GH_TOKEN:-}" \
         "$base/token?service=ghcr.io&scope=repository:${repo}:pull" 2>/dev/null |
@@ -211,8 +211,13 @@ registry_tags() { # $1 = <owner>/<package>
             return 1
         fi
         jq -r '.tags[]?' < "$body" 2>/dev/null
-        # Link: <...>; rel="next"  → ruta relativa al registro.
-        url=$(sed -n 's/.*[Ll]ink:[[:space:]]*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' "$headers" | head -1)
+        # Link: <...>; rel="next"  → a registry-relative path.
+        # First match by parameter expansion, not `| head -1`: under `pipefail`
+        # the producer's EPIPE would fail the pagination, the published-tag list
+        # would come back short, and the guard would let a tag be republished on
+        # top of the one already in production (hub#1552).
+        next_urls=$(sed -n 's/.*[Ll]ink:[[:space:]]*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' "$headers")
+        url=${next_urls%%$'\n'*}
         [ -n "$url" ] && url="$base$url"
     done
     rm -f "$headers" "$body"
@@ -241,7 +246,7 @@ if [ "$is_release" -eq 1 ] || [ "$channel" = "rc" ]; then
     published=$(printf '%s\n' "$published" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$' || true)
     published_final=$(printf '%s\n' "$published" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)
 
-    if printf '%s\n' "$published" | grep -qxF "$version"; then
+    if grep -qxF "$version" <<<"$published"; then
         echo "❌ image-tags: '$image:$version' YA está publicado." >&2
         # `${version}` con llaves a propósito: pegado a `»` (un byte alto), bash se come el primer
         # byte del carácter como parte del nombre y `set -u` mata el script con «unbound variable»

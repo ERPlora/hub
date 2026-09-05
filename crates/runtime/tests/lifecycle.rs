@@ -40,7 +40,9 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
 
     rt.deactivate("inventory").await.unwrap();
 
-    // inactivo → sin menú, query/command devuelven NotFound (no existen para el caller)
+    // inactivo → sin menú, query/command devuelven su propia ausencia (ModuleInactive), no un
+    // NotFound genérico (hub#1428: `commands::execute_at` distingue ahora las mismas tres
+    // ausencias que `queries::execute_page` ya distinguía).
     assert_eq!(rt.modules()[0].status, ModuleStatus::Inactive);
     assert_eq!(
         rt.navigation().len(),
@@ -56,6 +58,9 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
             .unwrap_err(),
         RuntimeError::ModuleInactive { .. }
     ));
+    // hub#1428: antes de este fix, un command contra un módulo desactivado era indistinguible de
+    // un command inexistente — ambos daban `CommandNotFound`, y `commandOptional` no habría
+    // tenido nada que perdonar. Mismo error propio que la query de arriba.
     assert!(matches!(
         rt.execute_command(
             "inventory.products.create",
@@ -64,7 +69,7 @@ async fn deactivate_hides_menu_and_blocks_capabilities() {
         )
         .await
         .unwrap_err(),
-        RuntimeError::CommandNotFound(_)
+        RuntimeError::ModuleInactive { .. }
     ));
 
     // reactivar → vuelve a estar disponible

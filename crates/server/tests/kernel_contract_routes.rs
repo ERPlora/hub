@@ -62,7 +62,15 @@ const PRIMITIVES: &[(&str, &str)] = &[
 /// token to delete it and answers the same with or without one, so reading alone is not a gate;
 /// and `require_*_session` inside `auth.rs` resolve without the qualified read, so this rule does
 /// not leak `session` into every route through the call graph.
-const SESSION_BY_HAND: (&str, &str) = ("auth::session_token(", ".resolve_session(");
+const SESSION_BY_HAND_READ: &str = "auth::session_token(";
+
+/// The resolvers that turn that token into a person. Written as a PREFIX and not as the closing
+/// parenthesis (hub#1400): `resolve_session_with_credential` is the same gate — it resolves the
+/// same row and additionally answers WITH WHAT the identity was proved — and the literal
+/// `.resolve_session(` missed it precisely at the `(`, so `/api/auth/handoff` generated
+/// `auth:none`. In this file `none` does not mean "unclassified", it means **open**, so a resolver
+/// this rule fails to recognise does not degrade the snapshot: it inverts it.
+const SESSION_BY_HAND_RESOLVE: &str = ".resolve_session";
 
 /// How far a gate may sit from the handler. Six is past the fixed point measured on `develop`
 /// (handler → local helper → macro → `auth::…` closes at four), so it is a guard against a cycle,
@@ -110,6 +118,32 @@ fn a_session_resolved_by_hand_is_a_session_gate_hub1235() {
         classes_of(logout).is_empty(),
         "leer el token sin resolverlo no es una puerta: {:?}",
         classes_of(logout)
+    );
+}
+
+/// 🔴 hub#1400 — the SAME gate, resolved through the variant that also returns the credential.
+///
+/// `/api/auth/handoff` reads the session and resolves it with `resolve_session_with_credential`,
+/// because it has to know whether the person typed a password or a shift PIN. That is a session
+/// gate by every measure — and it read `auth:none`, because the pattern this rule matched was the
+/// literal `.resolve_session(` and `_with_credential` breaks it right at the parenthesis.
+///
+/// `none` in this file does not mean "unclassified", it means **open to anybody who reaches the
+/// hub**. Committing that line for a door that demands a session, `hub.administer` and a JWT
+/// naming the same person would put the exact opposite of the truth into the artefact a reviewer
+/// reads to FIND open doors — the same defect the review of hub#1252 caught on
+/// `/api/assistant/checkout`.
+#[test]
+fn a_session_resolved_with_its_credential_is_still_a_session_gate_hub1400() {
+    let body = "{ let Some(session) = auth::session_token(&headers) else { return unauthorized(); };                 match rt.resolve_session_with_credential(&session).await { Ok(Some((user, credential))) => (user, credential), _ => return unauthorized() } }";
+    assert_eq!(classes_of(body), BTreeSet::from(["session".to_string()]));
+    // The half that must NOT change: reading without resolving is still not a gate, whichever
+    // resolver is in scope.
+    let read_only = "{ if let Some(token) = auth::session_token(&headers) { let _ = rt.touch(&token).await; } ok() }";
+    assert!(
+        classes_of(read_only).is_empty(),
+        "leer el token sin resolverlo sigue sin ser una puerta: {:?}",
+        classes_of(read_only)
     );
 }
 
@@ -321,7 +355,7 @@ fn class_map(
                 direct.insert((*class).to_string());
             }
         }
-        if body.contains(SESSION_BY_HAND.0) && body.contains(SESSION_BY_HAND.1) {
+        if body.contains(SESSION_BY_HAND_READ) && body.contains(SESSION_BY_HAND_RESOLVE) {
             direct.insert("session".to_string());
         }
         classes.insert(key.clone(), direct);

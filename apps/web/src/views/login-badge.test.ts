@@ -141,6 +141,9 @@ describe('signing in with a badge', () => {
     seedCounterTill();
     runtimeBadgeLogin.mockResolvedValue({
       token: 'sess-badge',
+      // hub#1400 — `auth_badge` writes `Credential::badge(...)`, never `cloud`: a badge swipe must
+      // NOT open the door to erplora.com. A fixture missing this field hid that distinction.
+      credential_kind: 'badge',
       user: { id: 'u1', name: 'Marta Ruiz', role: 'employee' },
       permissions: ['till.add_sale'],
     });
@@ -152,7 +155,7 @@ describe('signing in with a badge', () => {
     await flushPromises();
 
     expect(runtimeBadgeLogin).toHaveBeenCalledWith(ANA_BADGE);
-    expect(setHubSession).toHaveBeenCalledWith('sess-badge');
+    expect(setHubSession).toHaveBeenCalledWith('sess-badge', 'badge');
     expect(setUser).toHaveBeenCalledWith(expect.objectContaining({ id: 'u1', name: 'Marta Ruiz' }));
     expect(replace).toHaveBeenCalled();
   });

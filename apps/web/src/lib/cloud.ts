@@ -88,13 +88,21 @@ export interface CloudMarketplaceModule {
 // Bearer). Persistimos el access+refresh del login en localStorage.
 const TOKENS = { access: 'erplora.access', refresh: 'erplora.refresh' };
 
+// Bumped on every write to the store. A refresh that was already in flight when the store changed
+// under it — the PIN hand-over took the previous person's credentials away (hub#1538), or another
+// login replaced them — belongs to a login that no longer exists, and must not write its rotated
+// pair back: that would silently undo the hand-over.
+let tokenEpoch = 0;
+
 export function setTokens(access: string, refresh: string): void {
+  tokenEpoch += 1;
   try {
     localStorage.setItem(TOKENS.access, access);
     localStorage.setItem(TOKENS.refresh, refresh);
   } catch { /* ignore */ }
 }
 export function clearTokens(): void {
+  tokenEpoch += 1;
   try {
     localStorage.removeItem(TOKENS.access);
     localStorage.removeItem(TOKENS.refresh);
@@ -184,6 +192,7 @@ async function refreshTokens(): Promise<string | null> {
   refreshing = (async () => {
     const refresh = getRefreshToken();
     if (!refresh) return null;
+    const epoch = tokenEpoch;
     try {
       await cloudApiUrlReady();
       const res = await fetch(`${config.cloudApiUrl}/api/v1/auth/refresh/`, {
@@ -194,7 +203,11 @@ async function refreshTokens(): Promise<string | null> {
       if (!res.ok) return null;
       const data = (await res.json()) as { access?: string; refresh?: string };
       if (!data.access) return null;
-      // Rota ambos: el access nuevo y el refresh nuevo (rotating refresh tokens del Cloud).
+      // The store changed while the SaaS was answering (hub#1538): the rotated pair is the
+      // previous person's and stays out. Whatever the store holds NOW is the answer — null after a
+      // hand-over, the newcomer's own token after a fresh login.
+      if (epoch !== tokenEpoch) return getAccessToken();
+      // Rotates both: the new access and the new refresh (the Cloud's rotating refresh tokens).
       setTokens(data.access, data.refresh ?? refresh);
       return data.access;
     } catch {
@@ -337,6 +350,15 @@ export interface HubSessionResult {
   token: string;
   user: { id: string; name: string; role: string };
   permissions: string[];
+  /**
+   * **What whoever just signed in proved their identity WITH**: `cloud` (email + password), `pin`,
+   * `badge` (hub#658). The runtime writes it on the `hub_session` row and returns it here because
+   * the shell has to decide what to paint before anybody presses anything — the door to erplora.com
+   * is offered only to a password login (hub#1400).
+   *
+   * Optional in the type: an answer that does not carry it leaves the session shut, not open.
+   */
+  credential_kind?: string;
 }
 
 export interface CourierSessionResult extends HubSessionResult {
@@ -379,11 +401,20 @@ async function runtimePost<T>(path: string, body: unknown, headers: Record<strin
     });
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
-      error?: string;
+      // Two shapes share this door: the hand-built ones in this file (`too_many_attempts`,
+      // `device_untrusted`…) put `error` as plain prose with `code` alongside it at the top; a
+      // `RuntimeError` the dispatcher's generic `err_response` turns into JSON (hub#1430's
+      // `pin_current_mismatch`, or any `InvalidField`/`Domain`) nests both under `error` instead.
+      error?: string | { code?: string; message?: string };
       code?: string;
     } & T;
     if (!res.ok || data.ok === false) {
-      throw new RuntimeError(data.error ?? `runtime ${path} → ${res.status}`, data.code);
+      const nested = typeof data.error === 'object' && data.error !== null ? data.error : undefined;
+      const message =
+        nested?.message ??
+        (typeof data.error === 'string' ? data.error : undefined) ??
+        `runtime ${path} → ${res.status}`;
+      throw new RuntimeError(message, data.code ?? nested?.code);
     }
     return data;
   } finally {
@@ -455,9 +486,55 @@ export async function runtimeBadgeLogin(badge: string): Promise<HubSessionResult
   );
 }
 
-/** Fija el PIN del usuario de la sesión actual (alta de PIN tras el primer login cloud). */
-export async function runtimeSetPin(pin: string, sessionToken: string): Promise<void> {
-  await runtimePost<{ ok: boolean }>('/api/auth/set-pin', { pin }, { 'X-Hub-Session': sessionToken });
+/**
+ * Fija (o cambia) el PIN del usuario de la sesión actual. Dos llamadores: la alta de PIN tras el
+ * primer login cloud (`currentPin` ausente, nada que confirmar) y «Mi perfil» → cambiar mi PIN
+ * (hub#1430, `currentPin` obligatorio si ya hay uno — el runtime rechaza con
+ * `hub.users.pin_current_mismatch` si no coincide).
+ */
+export async function runtimeSetPin(pin: string, sessionToken: string, currentPin?: string): Promise<void> {
+  await runtimePost<{ ok: boolean }>(
+    '/api/auth/set-pin',
+    currentPin ? { pin, current_pin: currentPin } : { pin },
+    { 'X-Hub-Session': sessionToken },
+  );
+}
+
+/**
+ * **Trades the till's session for a one-time SaaS address** (pm#196, hub#1400) —
+ * `POST /api/auth/handoff`.
+ *
+ * The link to erplora.com opens in the system browser, which does **not share the cookie jar** with
+ * the installed app's webview: until now it landed signed out, and the owner typed her password and
+ * second factor again right before paying. The runtime trades the hub session for a one-time pass
+ * and returns the address that spends it.
+ *
+ * It goes through the runtime and not straight to the SaaS because the SaaS **cannot see** what is
+ * checked here: whether the person standing there typed their password or a shift PIN is something
+ * only `credential_kind` says (hub#658). The two credentials it needs —`X-Hub-Session` and the
+ * user's Bearer— are put in by `runtimeHeaders`, the same door the rest of the shell already uses.
+ *
+ * `next` is a **relative** route of the SaaS; the runtime validates it and rejects anything leaving
+ * it. Throws `RuntimeError` with its code (`handoff_requires_cloud_login`, `handoff_unavailable`…)
+ * when the door refuses: the caller decides whether to degrade to the link of always.
+ *
+ * **A stale Bearer is refreshed ONCE and asked again.** The access token lives one hour
+ * (`SIMPLE_JWT.ACCESS_TOKEN_LIFETIME`) and the till session lives the whole day; the runtime
+ * verifies `exp` before naming the person, so from the second hour on it answers
+ * `handoff_user_token_invalid`. Left alone, that degrades to the plain link — the login form, the
+ * issue's own symptom, four hours late. Same single retry `cloudFetch` and `runtimeGet` do.
+ */
+export async function runtimeBrowserHandoff(next: string): Promise<string> {
+  const { runtimeHeaders } = await import('./runtime');
+  const ask = () =>
+    runtimePost<{ url?: string }>('/api/auth/handoff', { next }, runtimeHeaders());
+  try {
+    return (await ask()).url ?? '';
+  } catch (error) {
+    const stale = error instanceof RuntimeError && error.code === 'handoff_user_token_invalid';
+    if (!stale || !(await refreshTokens())) throw error;
+    return (await ask()).url ?? '';
+  }
 }
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */

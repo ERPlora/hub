@@ -186,11 +186,26 @@ pub struct PrintJob {
     pub attempts: i64,
     pub created_at: String,
     pub last_error: String,
+    /// The stamp a person left on this job, or empty strings when nobody touched it (hub#1108,
+    /// hub#1532). It is read from the row like everything else here — the queue is the only place
+    /// it is stored, and [`status_view`] decides who gets to see it.
+    ///
+    /// `discarded_at`/`discarded_by`/`retried_at`/`retried_by` are nullable in the table and arrive
+    /// here as `""` when NULL, which is the same "nothing to say" the other halves already spell.
+    pub discarded_at: String,
+    pub discarded_by: String,
+    pub discarded_by_module: String,
+    pub discard_reason: String,
+    pub retried_at: String,
+    pub retried_by: String,
+    pub retried_by_module: String,
 }
 
 /// Columns every read of the queue returns, in the order [`row_to_job`] expects.
-const JOB_COLUMNS: &str =
-    "job_id, role, document_type, document, format, status, attempts, created_at, last_error";
+const JOB_COLUMNS: &str = "job_id, role, document_type, document, format, status, attempts, \
+                           created_at, last_error, discarded_at, discarded_by, \
+                           discarded_by_module, discard_reason, retried_at, retried_by, \
+                           retried_by_module";
 
 /// Rejection of a malformed job, before it reaches the database.
 fn invalid(detail: impl Into<String>) -> RuntimeError {
@@ -479,8 +494,18 @@ pub async fn list(
         p.insert("status".into(), json!(status));
         where_sql.push_str(" AND status = :status");
     }
-    let sql =
-        format!("SELECT {JOB_COLUMNS} FROM _print_queue WHERE {where_sql} ORDER BY seq LIMIT :lim");
+    // **A CLOSED bucket is read from the other end** (hub#1565). `seq` ascending is hand-out order,
+    // and for a LIVE bucket that is the right end: the ticket that has waited longest is the one on
+    // fire. `discarded` and `done` never leave the table, so on a hub with a year of history the
+    // same ordering would page forever through its first hundred rows and never reach the ticket
+    // somebody is actually asking about — which is always one of the last ones.
+    let order = match status {
+        Some(STATUS_DISCARDED | STATUS_DONE) => "seq DESC",
+        _ => "seq",
+    };
+    let sql = format!(
+        "SELECT {JOB_COLUMNS} FROM _print_queue WHERE {where_sql} ORDER BY {order} LIMIT :lim"
+    );
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.iter().map(row_to_job).collect())
 }
@@ -496,18 +521,157 @@ pub async fn list(
 /// is waiting" is exactly what a screen showing a stuck queue has to say — while `document` is the
 /// ticket itself (names, lines, totals, the fiscal QR) and only ever leaves through the drain, past
 /// both of its guards (hub#343).
-pub fn status_view(job: &PrintJob) -> serde_json::Value {
-    json!({
-        "jobId": job.job_id,
-        "role": job.role,
-        "documentType": job.document_type,
-        "format": job.format,
-        "status": job.status,
-        "attempts": job.attempts,
-        "createdAt": job.created_at,
-        "lastError": job.last_error,
-    })
+pub fn status_view(
+    job: &PrintJob,
+    audience: QueueAudience,
+    names: &ActorNames,
+) -> serde_json::Value {
+    let mut view = serde_json::Map::new();
+    let mut put = |key: &str, value: serde_json::Value| {
+        view.insert(key.to_string(), value);
+    };
+    put("jobId", json!(job.job_id));
+    put("role", json!(job.role));
+    put("documentType", json!(job.document_type));
+    put("format", json!(job.format));
+    put("status", json!(job.status));
+    put("attempts", json!(job.attempts));
+    put("createdAt", json!(job.created_at));
+    put("lastError", json!(job.last_error));
+    if audience == QueueAudience::Admin {
+        // Only when the gesture actually HAPPENED. A `pending` job carries empty stamp columns,
+        // and answering `discardedBy: ""` on it would have every screen render "retired by —" on a
+        // ticket that is simply waiting its turn.
+        if !job.discarded_at.is_empty() {
+            put("discardedAt", json!(job.discarded_at));
+            put("discardedBy", json!(job.discarded_by));
+            put("discardedByName", json!(names.label(&job.discarded_by)));
+            put("discardedByModule", json!(job.discarded_by_module));
+            put("discardReason", json!(job.discard_reason));
+        }
+        if !job.retried_at.is_empty() {
+            put("retriedAt", json!(job.retried_at));
+            put("retriedBy", json!(job.retried_by));
+            put("retriedByName", json!(names.label(&job.retried_by)));
+            put("retriedByModule", json!(job.retried_by_module));
+        }
+    }
+    serde_json::Value::Object(view)
 }
+
+/// **Who is asking the queue what it is doing**, and therefore how much of a job's history comes
+/// back (hub#1565).
+///
+/// The queue's STATE and the STAMP a person left on a job are two different facts with two
+/// different audiences, and this is what keeps them travelling through one door instead of two:
+///
+///  - The state is the counter's. hub#987 decided that on purpose — a queue nobody is draining
+///    needs whoever is standing next to the printer, not whoever can administer the hub.
+///  - The stamp («binned by Ana, because X», «re-fired by Ana») is the back office's. That is the
+///    market's answer, not ours: Square's comp & void report needs the `reports` permission, Toast's
+///    Voided Orders is a Toast Web report, Lightspeed's Cancellations and Corrections report is Back
+///    Office, Odoo's cancelled-orders report is the PoS Manager group. The reason is the same
+///    everywhere and it is not privacy for its own sake — the report exists to spot till fraud, so
+///    the population it watches cannot be its audience.
+///
+/// Two hand-written views would have been the other way to do it, and it is exactly what
+/// [`status_view`] exists to prevent (hub#1107): the field that drifts first is the one that must
+/// not appear.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueueAudience {
+    /// Any local session — the state of the queue, and nothing about who touched it.
+    Counter,
+    /// A session that administers the hub — the state **plus** the stamp.
+    Admin,
+}
+
+/// The audience a request context belongs to.
+///
+/// One definition for the two doors (`GET /api/print/jobs` and the core query `hub.print.jobs`),
+/// for the same reason [`status_view`] is one definition: two copies of "is this the back office?"
+/// would drift, and the one that drifts open is the one nobody notices.
+///
+/// It reads the permission with [`crate::permissions::has`] and not `check`, because this FILTERS
+/// instead of rejecting: not being an admin is a smaller answer, never a refusal — the cashier's
+/// listing must not turn into a `403`.
+pub fn audience_of(ctx: &crate::registry::RequestContext) -> QueueAudience {
+    if crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION) {
+        QueueAudience::Admin
+    } else {
+        QueueAudience::Counter
+    }
+}
+
+/// **The name behind each `hub_user:<id>` a stamp names.**
+///
+/// The stamp stores the principal the door resolved from the session, because that is the only
+/// identity that cannot be forged from a request body — and it is also unreadable. «Retirado por
+/// hub_user:018f3c…» leaves the owner exactly where the missing stamp left them, which is the
+/// whole complaint of hub#1565.
+///
+/// This repo has learned it twice already: `hub.approvals.list` resolves both of its ids against
+/// `hub_user` for the stated reason that otherwise "the screen shows UUIDs and nobody uses it", and
+/// hub#1560 is the identical fix for the device that prints. Both facts travel — `discardedBy` is
+/// the stable id support quotes, `discardedByName` is what a screen prints.
+#[derive(Debug, Clone, Default)]
+pub struct ActorNames(std::collections::HashMap<String, String>);
+
+impl ActorNames {
+    /// Nobody resolved: every principal is its own label. What a counter read uses, where no stamp
+    /// travels at all, and what a unit test that is not asking about names passes.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// One read of this hub's people, keyed by the principal their gestures are stamped with.
+    ///
+    /// **Skipped entirely when no job in `jobs` carries a stamp**, which is the ordinary state of a
+    /// live queue: the pending/printing/dead buckets a till polls every 30 s must not pay for a
+    /// second query to answer a question nobody asked. `hub_user` is a handful of rows on any hub,
+    /// so the ones that DO carry a stamp are resolved in a single pass instead of one lookup per
+    /// row.
+    pub async fn of(db: &dyn DatabaseAdapter, hub_id: &str, jobs: &[PrintJob]) -> Result<Self> {
+        let stamped = jobs
+            .iter()
+            .any(|j| !j.discarded_by.is_empty() || !j.retried_by.is_empty());
+        if !stamped {
+            return Ok(Self::default());
+        }
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        let res = db
+            .query(
+                "SELECT id, name FROM hub_user WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await?;
+        let mut by_principal = std::collections::HashMap::new();
+        for row in &res.rows {
+            let id = row["id"].as_str().unwrap_or_default();
+            let name = row["name"].as_str().unwrap_or_default().trim();
+            if id.is_empty() || name.is_empty() {
+                continue;
+            }
+            by_principal.insert(format!("{USER_PRINCIPAL_PREFIX}{id}"), name.to_string());
+        }
+        Ok(Self(by_principal))
+    }
+
+    /// The name to print for `principal`, **falling back to the principal itself**.
+    ///
+    /// Never an empty label: an employee this hub no longer knows (identity is per deployment and
+    /// has no soft-delete) must not turn an audit row into «retired by ——». The id is a poor
+    /// answer; no answer at all is the bug hub#1565 is about.
+    pub fn label<'a>(&'a self, principal: &'a str) -> &'a str {
+        self.0
+            .get(principal)
+            .map(String::as_str)
+            .unwrap_or(principal)
+    }
+}
+
+/// How a person's id travels in a stamp — the shape `server::print` writes from the session.
+const USER_PRINCIPAL_PREFIX: &str = "hub_user:";
 
 /// Which printer role a job belongs to, or `None` when **this hub** has no such job.
 ///
@@ -549,8 +713,9 @@ pub async fn role_of(
 /// What [`requeue`] did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RequeueOutcome {
-    /// The job is `pending` again, with its full budget of hand-outs back.
-    Requeued,
+    /// The job is `pending` again, with its full budget of hand-outs back — and this is the stamp
+    /// the row now carries (hub#1532).
+    Requeued(RetryStamp),
     /// No job with that `job_id` **in this hub** (never existed, or another tenant's — the two are
     /// indistinguishable on purpose).
     NotFound,
@@ -577,7 +742,35 @@ pub struct DiscardStamp {
     pub job_id: String,
     pub discarded_at: String,
     pub discarded_by: String,
+    /// **Which module asked for it** (hub#1532), or `""` when nobody but the person did — the
+    /// shell, `curl`. Resolved at the door from `X-Erplora-Module` and already checked against the
+    /// `printer` capability the owner granted, so it is a module the owner chose, not a claim.
+    ///
+    /// It does not replace [`discarded_by`](Self::discarded_by): the two answer different
+    /// questions, and the useful one — «Ana did not bin this, WHAT did?» — has no answer without
+    /// both. `""` and absent are one spelling of one meaning, the rule
+    /// [`NewPrintJob::role`](crate::print_queue::NewPrintJob::role) already states.
+    pub discarded_by_module: String,
     pub discard_reason: String,
+}
+
+/// The stamp a retry leaves (hub#1532). Same two halves as [`DiscardStamp`] minus the reason: the
+/// hub knows why a `dead` job is being re-fired — because it died — so there is nothing only the
+/// person could tell it.
+///
+/// **It is the LAST re-fire, not a history.** A job can be re-fired, die and be re-fired again, and
+/// each one overwrites the previous stamp. Keeping every one of them is an audit log, which is a
+/// different table and a different decision; what this answers is the question a stuck queue
+/// actually raises — «this came out twice, who asked for it?».
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetryStamp {
+    pub job_id: String,
+    pub retried_at: String,
+    pub retried_by: String,
+    /// Which module asked for the re-fire, or `""` when nobody but the person did. Same contract as
+    /// [`DiscardStamp::discarded_by_module`].
+    pub retried_by_module: String,
 }
 
 /// The status of `job_id` **in this hub**, or `None` when there is no such job here.
@@ -615,10 +808,17 @@ async fn status_of(db: &dyn DatabaseAdapter, hub_id: &str, job_id: &str) -> Resu
 ///
 /// If the cause is still there the job simply dies again and is listed again; the queue is
 /// self-healing, not magic.
+///
+/// `retried_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`) and
+/// `retried_by_module` the module that named itself at the door, or `""` — never anything a body
+/// carried (hub#1532). Both are written even though the job goes back to a NON-terminal state: a
+/// ticket that comes out of the printer a second time is exactly the one somebody asks about.
 pub async fn requeue(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     job_id: &str,
+    retried_by: &str,
+    retried_by_module: &str,
 ) -> Result<RequeueOutcome> {
     // Read the state FIRST: after the UPDATE a refusal and a missing row are both `affected = 0`,
     // and the two must not collapse into one answer.
@@ -628,18 +828,28 @@ pub async fn requeue(
     if status != STATUS_DEAD {
         return Ok(RequeueOutcome::NotRequeueable { status });
     }
+    let stamp = RetryStamp {
+        job_id: job_id.to_string(),
+        retried_at: now_rfc3339(),
+        retried_by: retried_by.to_string(),
+        retried_by_module: retried_by_module.to_string(),
+    };
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
     p.insert("job_id".into(), json!(job_id));
     p.insert("dead".into(), json!(STATUS_DEAD));
+    p.insert("now".into(), json!(stamp.retried_at));
+    p.insert("by".into(), json!(stamp.retried_by));
+    p.insert("by_module".into(), json!(stamp.retried_by_module));
     let sql = format!(
         "UPDATE _print_queue \
          SET status = '{STATUS_PENDING}', attempts = 0, last_error = '', claimed_by = '', \
-             lease_expires_at = '', completed_at = NULL \
+             lease_expires_at = '', completed_at = NULL, \
+             retried_at = :now, retried_by = :by, retried_by_module = :by_module \
          WHERE hub_id = :hub_id AND job_id = :job_id AND status = :dead"
     );
     Ok(if db.execute(&sql, &p).await?.affected > 0 {
-        RequeueOutcome::Requeued
+        RequeueOutcome::Requeued(stamp)
     } else {
         // Somebody moved the row between the read and the write. Not a silent success.
         RequeueOutcome::NotFound
@@ -659,8 +869,10 @@ pub async fn requeue(
 /// the host that died (it returns to `pending`, and THEN it can be retired); binning it while a real
 /// host is rendering it would be the silent loss this queue exists to prevent. `done` came out.
 ///
-/// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`), never
-/// anything the caller sent. `reason`, on the other hand, IS the caller's — it is the one half of
+/// `discarded_by` is the identity the HTTP layer resolved from the session (`hub_user:<id>`) and
+/// `discarded_by_module` the module that named itself at the door and was checked against the
+/// `printer` capability (hub#1532) — `""` when none did. Neither is ever anything the caller sent.
+/// `reason`, on the other hand, IS the caller's — it is the one half of
 /// the stamp only the person closing the row knows — and it is stored trimmed and capped by
 /// [`crate::outbox::clamp_discard_reason`]: one implementation for the hub's two durable queues, so
 /// what a tray renders and what a row holds cannot drift apart. Leaving it empty stays a legitimate
@@ -670,6 +882,7 @@ pub async fn discard(
     hub_id: &str,
     job_id: &str,
     discarded_by: &str,
+    discarded_by_module: &str,
     reason: &str,
 ) -> Result<DiscardOutcome> {
     let Some(status) = status_of(db, hub_id, job_id).await? else {
@@ -682,6 +895,7 @@ pub async fn discard(
         job_id: job_id.to_string(),
         discarded_at: now_rfc3339(),
         discarded_by: discarded_by.to_string(),
+        discarded_by_module: discarded_by_module.to_string(),
         discard_reason: crate::outbox::clamp_discard_reason(reason),
     };
     let mut p = Params::new();
@@ -691,9 +905,11 @@ pub async fn discard(
     p.insert("discarded".into(), json!(STATUS_DISCARDED));
     p.insert("now".into(), json!(stamp.discarded_at));
     p.insert("by".into(), json!(stamp.discarded_by));
+    p.insert("by_module".into(), json!(stamp.discarded_by_module));
     p.insert("reason".into(), json!(stamp.discard_reason));
     let sql = "UPDATE _print_queue \
                SET status = :discarded, discarded_at = :now, discarded_by = :by, \
+                   discarded_by_module = :by_module, \
                    discard_reason = :reason, claimed_by = '', lease_expires_at = '' \
                WHERE hub_id = :hub_id AND job_id = :job_id AND status = :status";
     Ok(if db.execute(sql, &p).await?.affected > 0 {
@@ -721,6 +937,13 @@ fn row_to_job(row: &serde_json::Value) -> PrintJob {
         attempts: row["attempts"].as_i64().unwrap_or(0),
         created_at: s("created_at"),
         last_error: s("last_error"),
+        discarded_at: s("discarded_at"),
+        discarded_by: s("discarded_by"),
+        discarded_by_module: s("discarded_by_module"),
+        discard_reason: s("discard_reason"),
+        retried_at: s("retried_at"),
+        retried_by: s("retried_by"),
+        retried_by_module: s("retried_by_module"),
     }
 }
 

@@ -178,6 +178,35 @@ pub async fn enforce(
     Ok(())
 }
 
+/// **La misma pregunta que [`enforce`], contestada en vez de aplicada** (hub#1425): ¿están
+/// CONCEDIDAS todas las capabilities que este módulo declara?
+///
+/// Existe para que el módulo pueda decirlo en SU pantalla —donde está el dueño cuando enciende la
+/// función que las necesita— sin leer `_module_capability_grants`, que es tabla de sistema y el
+/// `migration_guard` le veda. El runtime la sirve como el system param `:capabilities_granted`
+/// (0/1), mismo patrón que `:has_certificate`/`:is_demo_hub`.
+///
+/// **Llama a [`enforce`]; no re-deriva nada**, y eso es el contrato, no un detalle: una pantalla y
+/// un gate que se hacen la pregunta por separado acaban discrepando, y la discrepancia no se ve
+/// hasta que muere una factura. De ahí salen gratis las dos propiedades que importan: el
+/// cortocircuito de «no declara ninguna» (ni una consulta a la BD para la inmensa mayoría de los
+/// módulos) y el todo-o-nada (media capability concedida sigue siendo «no»).
+///
+/// Un fallo de LECTURA se propaga, no se convierte en `false`: quien lo llama decide qué hacer con
+/// «no he podido preguntarlo», que no es lo mismo que «te lo han denegado».
+pub async fn all_granted(
+    db: &dyn DatabaseAdapter,
+    registry: &Registry,
+    module_id: &str,
+    hub_id: &str,
+) -> Result<bool> {
+    match enforce(db, registry, module_id, hub_id).await {
+        Ok(()) => Ok(true),
+        Err(RuntimeError::CapabilityDenied { .. }) => Ok(false),
+        Err(other) => Err(other),
+    }
+}
+
 /// **Gate de UNA capability concreta** (default-deny): el módulo tiene que **declararla** en su
 /// `module.json` **y** tenerla **concedida**. Es el gate que se aplica en el punto donde el host
 /// ejerce el primitivo, no donde arranca el módulo.
@@ -318,6 +347,52 @@ mod tests {
         let mut r = Registry::new();
         r.installed.push(m);
         r
+    }
+
+    /// hub#1425 — the READ side of the very same gate: `:capabilities_granted`.
+    ///
+    /// A module could not tell whether the owner had granted what it declares, so its own screen
+    /// could not warn («VeriFactu is on and cannot sign a thing»). It answers by CALLING
+    /// [`enforce`], never by re-deriving the question: a screen and a gate that ask it separately
+    /// end up disagreeing, and the disagreement is invisible until an invoice dies.
+    #[tokio::test]
+    async fn all_granted_answers_the_same_question_the_gate_asks_hub1425() {
+        let db = db_with_migrations().await;
+        let reg = registry_with(manifest(
+            r#"{"id":"verifactu","name":"VeriFactu","version":"1.0.0",
+                "capabilities":{"certificate":{"purpose":"fiscal-sign"},"network":{"allow":["https://x"]}}}"#,
+        ));
+        let (hub, mid) = ("hub-test", "verifactu");
+
+        // Default-deny: the gate refuses, so the screen must read «not granted».
+        assert!(enforce(&db, &reg, mid, hub).await.is_err());
+        assert!(!all_granted(&db, &reg, mid, hub).await.unwrap());
+
+        // Half of them granted is still «not granted» — the same all-or-nothing the gate applies.
+        set_grant(&db, &reg, hub, mid, "network", true, "hub_user:admin")
+            .await
+            .unwrap();
+        assert!(!all_granted(&db, &reg, mid, hub).await.unwrap());
+
+        // And the two answers flip together, which is the whole point.
+        set_grant(&db, &reg, hub, mid, "certificate", true, "hub_user:admin")
+            .await
+            .unwrap();
+        assert!(enforce(&db, &reg, mid, hub).await.is_ok());
+        assert!(all_granted(&db, &reg, mid, hub).await.unwrap());
+    }
+
+    /// A module that declares NOTHING has nothing to be granted: it reads `true`, and asks the
+    /// database nothing at all (`enforce` short-circuits on an empty declaration).
+    #[tokio::test]
+    async fn a_module_that_declares_no_capability_is_granted_hub1425() {
+        let db = db_with_migrations().await;
+        let reg = registry_with(manifest(
+            r#"{"id":"kitchen","name":"Kitchen","version":"1.0.0"}"#,
+        ));
+        assert!(all_granted(&db, &reg, "kitchen", "hub-test").await.unwrap());
+        // Same for a module that is not installed here: it declares nothing, so nothing is missing.
+        assert!(all_granted(&db, &reg, "nope", "hub-test").await.unwrap());
     }
 
     #[tokio::test]

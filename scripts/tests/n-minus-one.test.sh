@@ -213,7 +213,7 @@ make_tagged_repo v1.1.9 v1.1.10 v1.1.11
 FAKE_DOCKER_PULL_FAILS=0 FAKE_READYZ_DOWN=0 FAKE_FAIL_QUERY="" run
 [ "$status" -eq 0 ] || fail "case 6 precondition: a healthy run must be GREEN, got $status: $(cat "$tmp_dir/out")"
 n1_run=$(grep '^docker run' "$docker_log")
-printf '%s' "$n1_run" | grep -qE -- '-e HUB_CLOUD_API_URL=http://127\.0\.0\.1:[0-9]+' \
+grep -qE -- '-e HUB_CLOUD_API_URL=http://127\.0\.0\.1:[0-9]+' <<<"$n1_run" \
     || fail "N-1 must be started with an explicit loopback HUB_CLOUD_API_URL (never the production default): $n1_run"
 grep -qF 'erplora.com' "$docker_log" && fail "N-1 must never be pointed at erplora.com: $(cat "$docker_log")"
 grep -qE '^HUB_CLOUD_API_URL=http://127\.0\.0\.1:[0-9]+$' "$apply_log" \

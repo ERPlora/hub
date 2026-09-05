@@ -187,6 +187,7 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
         &name,
         &now.format("%Y").to_string(),
         &now.format("%m").to_string(),
+        None,
     )
     .expect("envelope de consulta");
     let body = aeat::post_soap(
@@ -263,6 +264,7 @@ async fn ciclo_2007_rechain_reintento_contra_preproduccion() {
             &name,
             &now.format("%Y").to_string(),
             &now.format("%m").to_string(),
+            None,
         )
         .unwrap(),
     )

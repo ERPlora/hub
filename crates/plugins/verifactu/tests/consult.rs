@@ -76,7 +76,7 @@ fn the_consult_endpoint_no_longer_carries_the_invented_path() {
 // ── 2. El envelope ────────────────────────────────────────────────────────────────────────
 
 fn envelope() -> String {
-    aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08").expect("envelope")
+    aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08", None).expect("envelope")
 }
 
 #[test]
@@ -127,13 +127,13 @@ fn el_envoltorio_va_en_consultalr() {
 /// produce otro 4102 DESPUÉS de haber hablado con Hacienda: mejor negarse antes.
 #[test]
 fn sin_razon_social_del_obligado_no_se_construye_el_envelope() {
-    assert!(aeat::build_consult_soap("B27593136", "", "2026", "08").is_err());
-    assert!(aeat::build_consult_soap("B27593136", "   ", "2026", "08").is_err());
+    assert!(aeat::build_consult_soap("B27593136", "", "2026", "08", None).is_err());
+    assert!(aeat::build_consult_soap("B27593136", "   ", "2026", "08", None).is_err());
 }
 
 #[test]
 fn sin_nif_del_obligado_no_se_construye_el_envelope() {
-    assert!(aeat::build_consult_soap("", "ERPLORA CLOUD SL", "2026", "08").is_err());
+    assert!(aeat::build_consult_soap("", "ERPLORA CLOUD SL", "2026", "08", None).is_err());
 }
 
 // NOTA — aquí vivía `sin_periodo_no_se_emite_el_elemento_vacio`, que afirmaba que sin periodo
@@ -293,7 +293,7 @@ fn sobrevive_a_un_registro_sin_marca_temporal() {
 /// Un sobre así se rechaza DESPUÉS de haber hablado con Hacienda, así que se corta antes.
 #[test]
 fn el_sobre_de_consulta_sin_periodo_no_se_construye() {
-    let err = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "")
+    let err = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "", None)
         .expect_err("sin Periodo la AEAT responde 4102: no se manda");
     assert!(
         matches!(&err, VerifactuError::MissingField(field) if *field == "Periodo"),
@@ -303,7 +303,7 @@ fn el_sobre_de_consulta_sin_periodo_no_se_construye() {
 
 #[test]
 fn el_sobre_de_consulta_con_periodo_lo_incluye() {
-    let xml = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08")
+    let xml = aeat::build_consult_soap("B27593136", "ERPLORA CLOUD SL", "2026", "08", None)
         .expect("con periodo se construye");
     assert!(xml.contains("<sum1:Periodo>08</sum1:Periodo>"), "{xml}");
     assert!(

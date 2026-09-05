@@ -125,8 +125,15 @@ log() { printf '%s\n' "$*"; }
 # `git tag -l | sort`/`tail -1` ranks "v1.1.9" above "v1.1.10" as TEXT. `--sort=-v:refname` is
 # git's own version-aware sort (the same field `git tag` uses for `--sort=v:refname` elsewhere in
 # the codebase) and gets X.Y.Z right without hand-rolled numeric parsing.
+# The list is read whole and cut with a parameter expansion, not with
+# `| head -1`: it is the one list here that grows without a ceiling (a line per
+# release), and under `pipefail` the tag command would take EPIPE and hand the
+# pipeline 141 — "no tag published yet" on a repo full of them (hub#1552).
 resolve_last_tag() {
-    "$git_cmd" -C "$repo_dir" tag -l 'v*' --sort=-v:refname | head -1
+    local tags
+    tags=$("$git_cmd" -C "$repo_dir" tag -l 'v*' --sort=-v:refname) || return 1
+    [ -n "$tags" ] || return 0
+    printf '%s\n' "${tags%%$'\n'*}"
 }
 
 resolve_tag_sha() { # $1 = tag
@@ -210,7 +217,7 @@ run_core_query() { # $1 = query name → 0 if {"ok":true}, 1 otherwise
     body=$("$curl_cmd" -sS -X POST "${base_url}/api/query" \
         -H 'content-type: application/json' \
         -d "{\"name\":\"$1\",\"params\":{}}" 2>/dev/null)
-    printf '%s' "$body" | grep -q '"ok":true'
+    grep -q '"ok":true' <<<"$body"
 }
 
 main() {

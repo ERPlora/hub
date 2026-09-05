@@ -167,6 +167,27 @@ pub(crate) async fn transmit_one(
         Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
     };
 
+    // La vía se resuelve AQUÍ, antes de validar y archivar, porque el `Representante` viaja DENTRO
+    // del sobre (hub#1460): quién presenta estos bytes es un hecho de la vía, y el XML que se
+    // valida, se archiva y cuyo sha256 compara el canario (hub#1461) tiene que ser el que sale por
+    // el cable — no una versión anterior a estamparlo.
+    //
+    // **Su error se difiere a propósito.** Antes de hub#1460 la ruta se resolvía después de la
+    // validación, así que un sobre que no cumple el esquema se marcaba `rejected` LOCALMENTE aun
+    // sin vía. Propagar aquí ese error invertiría el orden: el registro volvería a la cola a
+    // reintentarse para siempre con un XML que no puede validar nunca. Se resuelve ahora, se
+    // estampa, y el `?` se cobra más abajo, exactamente donde estaba.
+    let route = resolve_route(host, &ctx.hub_id, config).await;
+    let obligado_nif = str_field(record, "issuer_nif");
+    // Quién presenta ESTOS bytes, preguntado a la ruta que los va a llevar (ADR-0268 §4): por la
+    // celda es el par FIRMADO del token —el hub no ve ese Sello—, por la vía propia es el titular
+    // del `.p12` que el hub sí tiene puesto (hub#1478: una gestoría factura por su cliente y el
+    // titular NO es el obligado). Sin ruta no hay presentador, y `set_representative` además
+    // LIMPIA: un sobre congelado en la cola pudo estamparse cuando el hub iba por otra vía, y
+    // re-presentarlo con la identidad de entonces sería una representación falsa.
+    let presenter = route.as_ref().ok().and_then(TransmitRoute::presenter);
+    let xml = aeat::set_representative(&xml, presenter, &obligado_nif);
+
     // Validación contra el esquema ANTES de tocar la red (`xsd::validate_registro`). Cuando la
     // AEAT contesta 4102 el número de cadena ya está gastado, así que un XML que no cumple no
     // puede llegar a salir. No corta el proceso: marca el registro como rechazado LOCALMENTE con
@@ -176,7 +197,17 @@ pub(crate) async fn transmit_one(
         let reason = e.to_string();
         return Ok((
             vec![
-                apply_transmission(&record_id, "rejected", "XSD", &reason, "", &xml, "", 0),
+                apply_transmission(
+                    &record_id,
+                    "rejected",
+                    "XSD",
+                    &reason,
+                    "",
+                    &xml,
+                    "",
+                    &record_id,
+                    0,
+                ),
                 op(
                     "verifactu._insert_event",
                     json!({
@@ -212,25 +243,28 @@ pub(crate) async fn transmit_one(
     // directo a la AEAT, como siempre; sin certificado → la pasarela fiscal transmite LOS MISMOS
     // bytes con el Sello como canal (hub#1432). Aguas abajo nadie distingue el camino: las dos
     // devuelven el SOAP crudo de la AEAT y la cadena parse/classify/persistencia es una.
-    let route = resolve_route(host, &ctx.hub_id, config).await?;
-    let via_gateway = matches!(route, TransmitRoute::Gateway(_));
+    //
+    // Aquí se cobra el error diferido de arriba: sin vía, el registro se queda como siempre.
+    let route = route?;
     let transport = match &route {
-        TransmitRoute::Direct(identity) => {
+        TransmitRoute::Direct { identity, .. } => {
             aeat::post_soap(destination.endpoint, identity.clone(), &xml).await
         }
-        TransmitRoute::Gateway(access) => crate::gateway::transmit_via_gateway(
-            host,
-            &ctx.hub_id,
-            access,
-            &crate::gateway::GatewayEnvelope {
-                hub_id: &ctx.hub_id,
-                obligado_nif: &str_field(record, "issuer_nif"),
-                environment: &destination.environment,
-                transmission_id: &record_id,
-                xml: &xml,
-            },
-        )
-        .await,
+        TransmitRoute::Gateway(access) => {
+            crate::gateway::transmit_via_gateway(
+                host,
+                &ctx.hub_id,
+                access,
+                &crate::gateway::GatewayEnvelope {
+                    hub_id: &ctx.hub_id,
+                    obligado_nif: &str_field(record, "issuer_nif"),
+                    environment: &destination.environment,
+                    transmission_id: &record_id,
+                    xml: &xml,
+                },
+            )
+            .await
+        }
     };
 
     // Un cuerpo entregado que NO es un veredicto (un SOAP Fault de la AEAT, o HTML de un
@@ -267,12 +301,13 @@ pub(crate) async fn transmit_one(
             // **con aviso**: la cadena sigue desde él, que es lo que la AEAT tiene por último.
             // Re-anclar ANTES de emitir sigue siendo una acción explícita (`recover_from_aeat`).
             let verdict = aeat::classify(&resp);
-            // El auto-rechain consulta a la AEAT DIRECTO con la identity del core; en la vía
-            // gateway no existe esa identity, así que se salta limpiamente y el rechazo original
-            // se registra tal cual (la recuperación explícita `recover_from_aeat` sigue siendo
-            // la puerta manual). Consultar vía la celda es issue aparte.
-            if !via_gateway
-                && verdict.should_retransmit()
+            // Las DOS vías recuperan (hub#1436). El auto-rechain se saltaba en la vía gateway
+            // porque consultaba a la AEAT con la identity del core, que un hub sin certificado no
+            // tiene; desde hub#1436 la consulta viaja por la misma vía que la transmisión, así que
+            // un hub por la celda que restaura un backup se re-ancla como cualquier otro. Se le
+            // pasa la vía YA RESUELTA: consultar por una puerta y re-transmitir por otra anclaría
+            // la cadena desde una puerta que no la emitió (guarda R4).
+            if verdict.should_retransmit()
                 && aeat::is_chaining_rejection(&resp.codigo_error, &resp.descripcion_error)
                 && !recovery_id.is_empty()
             {
@@ -281,6 +316,7 @@ pub(crate) async fn transmit_one(
                     ctx,
                     record,
                     config,
+                    &route,
                     &destination,
                     &resp,
                     recovery_id,
@@ -305,6 +341,7 @@ pub(crate) async fn transmit_one(
                             &xml_storage_path,
                             event_id,
                             &ctx.now,
+                            &record_id,
                             Some(&format!("recuperación automática fallida: {e}")),
                         ))
                     }
@@ -319,21 +356,22 @@ pub(crate) async fn transmit_one(
                 &xml_storage_path,
                 event_id,
                 &ctx.now,
+                &record_id,
                 None,
             ))
         }
         Err(err) => {
-            // **Tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4): si lo que
-            // falló fue el canal TLS, el certificado con el que nos identificamos es el sospechoso
-            // y hay que pedirle al plano de control el vigente. El motor no lo baja —no tiene
-            // credencial de máquina ni debe tenerla—: lo PIDE, y el servicio de refetch del server
-            // decide. Va justo aquí, encolando la contingencia, porque el fallo ES el disparador:
-            // así se converge sin polling.
-            request_certificate_refetch_on_tls(
-                &err,
-                &signing_kind(config),
-                RefetchSignal::global(),
-            );
+            // 🪦 Aquí iba el **tercer disparador de refetch del certificado** (ADR-0202 §2 punto 4,
+            // hub#318): un fallo TLS pedía al plano de control el certificado DELEGADO vigente. Se
+            // fue con el slot que bajaba (hub#1435) y no se sustituye por nada, a propósito.
+            //
+            // Solo disparaba cuando quien se identificó era el certificado de ERPlora, porque bajar
+            // el delegado no arregla un `own` roto: el propio gana el fallback y el intento
+            // siguiente falla igual. Sin slot delegado no queda ningún caso — un fallo TLS por aquí
+            // es siempre del certificado del NEGOCIO, y ese no lo puede refrescar ERPlora: lo
+            // renueva su dueño. Lo que sí queda es lo que ya hacía la línea de abajo, y es lo
+            // correcto: el registro se encola en contingencia con backoff y el error se ve.
+            //
             // Fallo de conexión/transporte → contingencia con backoff (WASM-TODO §5).
             let reason = err.to_string();
             let retry = enqueue_retry(host, ctx, &record_id, queue_id, config, &reason).await?;
@@ -348,6 +386,7 @@ pub(crate) async fn transmit_one(
                     "",
                     &xml,
                     &xml_storage_path,
+                    &record_id,
                     1,
                 ),
                 op(
@@ -603,6 +642,7 @@ pub(crate) fn response_ops(
     xml_storage_path: &str,
     event_id: &str,
     now: &str,
+    transmission_id: &str,
     note: Option<&str>,
 ) -> (Vec<Operation>, Vec<Event>, bool) {
     let record_id = &str_field(record, "id");
@@ -638,6 +678,7 @@ pub(crate) fn response_ops(
             &resp.csv,
             xml,
             xml_storage_path,
+            transmission_id,
             0,
         ),
         op(
@@ -739,6 +780,11 @@ pub(crate) async fn auto_rechain_and_retry(
     ctx: &Ctx,
     record: &Json,
     config: &Json,
+    // The road the rejected send took. Passed in for the same reason as the destination: the
+    // consult that recovers the anchor and the retry that uses it must go through the SAME door
+    // that issued the chain, and re-resolving would be the second reading of one question
+    // (hub#317/#318/#319/#470).
+    route: &TransmitRoute,
     // Passed in, never recomputed: resolving the destination twice is how the endpoint got out
     // of step with the record in the first place (hub#320's rule, hub#471's bug).
     destination: &Destination,
@@ -753,11 +799,12 @@ pub(crate) async fn auto_rechain_and_retry(
     // Both legs of the recovery go to the record's OWN destination (hub#471): asking the wrong
     // tax agency for the anchor would re-chain this record onto a link from the other chain,
     // which is precisely the crossing that guard R4 exists to prevent.
-    let records = run_consult(
+    let records = run_consult_via(
         host,
         &ctx.hub_id,
         config,
-        destination.endpoint,
+        route,
+        &destination.environment,
         &issuer_nif,
         &ctx.now,
     )
@@ -804,9 +851,40 @@ pub(crate) async fn auto_rechain_and_retry(
         Remission::Punctual => xml,
         Remission::FromContingency => aeat::stamp_contingency_incidence(&xml),
     };
+    // Quién presenta ESTOS bytes, con la misma regla que el envío que los provocó (hub#1460): el
+    // sobre se acaba de reconstruir con `build_soap`, así que no trae `Representante` ninguno y
+    // sin estamparlo la celda lo mandaría con el Sello de ERPlora declarando que presenta el
+    // cliente — el fault 4112 medido contra prewww el 2026-09-02.
+    let xml = aeat::set_representative(&xml, route.presenter(), &issuer_nif);
     let xml_storage_path = archive_transmission_xml(host, &record_id, &xml).await?;
-    let identity = build_identity(host, &ctx.hub_id, config).await?;
-    let body = aeat::post_soap(destination.endpoint, identity, &xml).await?;
+    // Se calcula UNA vez y se usa dos: en el sobre que ve la celda y en la fila que lo recuerda.
+    // Derivarlo dos veces es cómo el registro acabaría diciendo que salió bajo una clave que la
+    // celda nunca vio (verifactu#75).
+    let delivery_id = rechain_delivery_id(&record_id, &anchor_hash);
+    let body = match route {
+        TransmitRoute::Direct { identity, .. } => {
+            aeat::post_soap(destination.endpoint, identity.clone(), &xml).await?
+        }
+        // El id de correlación NO es el del registro: el re-anclado manda bytes DISTINTOS para el
+        // mismo registro, y reutilizar la clave es justo el `409 transmission_digest_mismatch`
+        // que la celda tiene reservado. Lleva el ancla dentro, que es lo que cambió: mismo ancla
+        // ⇒ mismos bytes ⇒ misma clave, que es la idempotencia que sí se quiere.
+        TransmitRoute::Gateway(access) => {
+            crate::gateway::transmit_via_gateway(
+                host,
+                &ctx.hub_id,
+                access,
+                &crate::gateway::GatewayEnvelope {
+                    hub_id: &ctx.hub_id,
+                    obligado_nif: &issuer_nif,
+                    environment: &destination.environment,
+                    transmission_id: &delivery_id,
+                    xml: &xml,
+                },
+            )
+            .await?
+        }
+    };
     let resp = aeat::parse_response(&body);
 
     let note = format!(
@@ -827,6 +905,7 @@ pub(crate) async fn auto_rechain_and_retry(
         &xml_storage_path,
         event_id,
         &ctx.now,
+        &delivery_id,
         Some(&note),
     );
     // El ancla y el re-encadenado se aplican ANTES del resultado del reintento (orden del Output).
@@ -859,7 +938,23 @@ pub(crate) async fn archive_transmission_xml(
     .await
 }
 
+/// El id con el que se presenta UNA entrega re-anclada.
+///
+/// No es el del registro, y esa diferencia es el motivo de que la columna `transmission_id` no
+/// sea redundante con `id` (verifactu#75): el re-anclado manda bytes DISTINTOS para el mismo
+/// registro, así que reutilizar la clave sería el `409 transmission_digest_mismatch` que la celda
+/// tiene reservado. Lleva el ancla dentro, que es lo que cambió — mismo ancla ⇒ mismos bytes ⇒
+/// misma clave, que es la idempotencia que sí se quiere.
+pub(crate) fn rechain_delivery_id(record_id: &str, anchor_hash: &str) -> String {
+    format!("{record_id}-rechain-{}", short(anchor_hash))
+}
+
 /// Intención UPDATE del registro tras un intento de transmisión.
+///
+/// `transmission_id` es el id con el que salió ESTA entrega — la `Idempotency-Key` por la que
+/// indexa la celda fiscal cuando la vía es la pasarela. Se persiste junto al digest de los bytes
+/// que se archivan aquí mismo, que es lo que permite a un lector posterior decidir si el XML
+/// guardado sigue siendo el que viajó (verifactu#75).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_transmission(
     record_id: &str,
@@ -869,6 +964,7 @@ pub(crate) fn apply_transmission(
     csv: &str,
     xml: &str,
     xml_storage_path: &str,
+    transmission_id: &str,
     retry_increment: i64,
 ) -> Operation {
     op(
@@ -881,6 +977,11 @@ pub(crate) fn apply_transmission(
             "aeat_csv": csv,
             "xml_content": xml,
             "xml_storage_path": xml_storage_path,
+            // La huella de la entrega. El digest sale de la MISMA función que el sobre del
+            // gateway, así que lo que la fila guarda y lo que la celda tiene que devolver como
+            // `request_sha256` no pueden ser dos números distintos.
+            "xml_sha256": crate::gateway::xml_sha256(xml),
+            "transmission_id": transmission_id,
             "retry_increment": retry_increment,
         }),
     )
@@ -996,7 +1097,7 @@ pub(crate) async fn process_contingency_queue(
 // ── run_diagnostics: prueba en vivo (cert + huella + QR + envío AEAT) ──────────
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::{archive_transmission_xml, derive_tax_rate, fault_reason, NativeHost, Params, Result};
     use serde_json::Value as Json;
     use std::sync::Mutex;
@@ -1037,7 +1138,8 @@ mod tests {
     // ── the two roads of ADR-0320, resolved in one place (hub#1432) ───────────────────────────
 
     /// A throwaway mTLS identity so a fake host can answer the capability like the real broker.
-    fn throwaway_identity() -> reqwest::Identity {
+    /// `pub(crate)`: `diagnostics::tests` builds routes with it too — one helper, not two.
+    pub(crate) fn throwaway_identity() -> reqwest::Identity {
         use openssl::asn1::Asn1Time;
         use openssl::hash::MessageDigest;
         use openssl::nid::Nid;
@@ -1076,36 +1178,58 @@ mod tests {
         }
     }
 
-    /// A host whose broker answers with a gateway access — the enrolled, certless hub.
+    /// The common name the enrolled test hub is issued for. It has to match what the fake
+    /// control plane mints, or the cross-check refuses the token — which is the point of it.
+    const GATEWAY_CN: &str = "hub-gateway-test.fiscal.erplora.internal";
+
+    /// A host that lends what hub#1459 says a host lends: an identity of its own, and a call to
+    /// its own cloud. The enrolled, certless hub — the one that goes through the cell.
     struct GatewayHost;
     #[async_trait::async_trait]
     impl NativeHost for GatewayHost {
         async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
             Ok(vec![])
         }
-        async fn fiscal_gateway_access(
+        async fn machine_identity(
             &self,
             _hub_id: &str,
-        ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
-            Ok(Some(erplora_runtime::fiscal_gateway::GatewayAccess {
-                url: "https://cell.internal.example".into(),
-                token: "bearer".into(),
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
                 identity: throwaway_identity(),
                 ca_pem: b"irrelevant-here".to_vec(),
+                common_name: GATEWAY_CN.to_owned(),
+            }))
+        }
+        async fn cloud_call(
+            &self,
+            _request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                status: 200,
+                body: serde_json::json!({
+                    "token": "bearer",
+                    "expires_in": 300,
+                    "gateway_url": "https://cell.internal.example",
+                    "obligado_nif": "B12345678",
+                    "presenter_nif": "B27593136",
+                    "presenter_name": "ERPLORA CLOUD SL",
+                    "mtls_common_name": GATEWAY_CN,
+                })
+                .to_string(),
             }))
         }
     }
 
     /// 🔒 REGRESIÓN (hub#1432, lo que la tarea exige): un hub sin certificado Y sin pasarela no
-    /// llega a ningún cable — ni a la AEAT directa (hoy lo garantizaba `build_identity`) ni a la
-    /// celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola deja los
-    /// registros `pending` en vez de quemar reintentos.
+    /// llega a ningún cable — ni a la AEAT directa (antes lo garantizaba el gate del certificado
+    /// propio) ni a la celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola
+    /// deja los registros `pending` en vez de quemar reintentos.
     #[tokio::test]
     async fn a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire() {
         let host = NoRoadHost;
         let config = serde_json::json!({ "environment": "testing" });
 
-        let err = crate::config::resolve_route(&host, "hub-1", &config)
+        let err = crate::config::resolve_route(&host, "hub-no-road", &config)
             .await
             .err()
             .expect("no road = a visible error, never a silent direct");
@@ -1114,10 +1238,69 @@ mod tests {
         assert!(message.contains("pasarela"), "{message}");
 
         assert!(
-            !crate::config::can_transmit(&host, "hub-1", &config)
+            !crate::config::can_transmit(&host, "hub-no-road", &config)
                 .await
                 .unwrap(),
             "the contingency gate must leave the queue untouched"
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#1460): `resolve_route` sube por DELANTE de la validación —para estampar
+    /// el `Representante` en el XML que se valida y archiva— pero su error se DIFIERE: un sobre
+    /// que no cumple el esquema se marca `rejected` LOCALMENTE aunque además no haya vía.
+    /// Propagar el error de la vía primero devolvería este registro a la cola a reintentarse para
+    /// siempre con un XML que no puede validar nunca — el caso real es la carrera en la que
+    /// `can_transmit` pasó y el acuñado del token falló un instante después.
+    #[tokio::test]
+    async fn an_invalid_envelope_is_rejected_locally_even_when_no_route_resolves() {
+        let record = serde_json::json!({
+            "id": "rec-xsd-no-road",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "is_first_record": 1,
+            "sequence_number": 1,
+            // Frozen from a previous attempt, and it can never validate: no Cabecera at all.
+            "xml_content": "<sum:RegFactuSistemaFacturacion></sum:RegFactuSistemaFacturacion>",
+        });
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-no-road".to_owned(),
+            now: "2026-09-03T10:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let config = serde_json::json!({ "environment": "testing" });
+
+        let (ops, events, success) = super::transmit_one(
+            &NoRoadHost,
+            &ctx,
+            &record,
+            &config,
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("an invalid envelope is a local outcome, never the route's error");
+
+        assert!(!success);
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("the record must be marked rejected, not sent back to the queue");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("rejected"))
+        );
+        assert_eq!(
+            applied.params.get("aeat_response_code"),
+            Some(&serde_json::json!("XSD"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.name == crate::events::EVENT_RECORD_REJECTED),
+            "the rejection must be visible as an event"
         );
     }
 
@@ -1128,13 +1311,176 @@ mod tests {
         let host = GatewayHost;
         let config = serde_json::json!({ "environment": "testing" });
 
-        let route = crate::config::resolve_route(&host, "hub-1", &config)
+        let route = crate::config::resolve_route(&host, "hub-route-gateway", &config)
             .await
             .unwrap();
         assert!(matches!(route, crate::config::TransmitRoute::Gateway(_)));
-        assert!(crate::config::can_transmit(&host, "hub-1", &config)
+        assert!(
+            crate::config::can_transmit(&host, "hub-route-gateway", &config)
+                .await
+                .unwrap()
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#985 §2 — hub#1460): la vía por la celda lleva encima **quién presenta**,
+    /// y ese par sale del token FIRMADO por el plano de control, no de la config del hub ni del
+    /// slot del certificado.
+    ///
+    /// Es la mitad que el guard de `tests/representative_from_signed_identity.rs` no puede ver:
+    /// allí se comprueba la REGLA (presentador ≠ obligado ⇒ bloque), aquí que el dato que la
+    /// alimenta llega de verdad desde el token y no se pierde por el camino — que es como
+    /// `resolve_access` lo trataba hasta ahora, leyéndolo del JSON y tirándolo al construir el
+    /// acceso.
+    #[tokio::test]
+    async fn the_gateway_route_carries_the_signed_presenter_into_the_envelope() {
+        let config = serde_json::json!({ "environment": "testing" });
+        let route = crate::config::resolve_route(&GatewayHost, "hub-presenter", &config)
             .await
-            .unwrap());
+            .unwrap();
+
+        let crate::config::TransmitRoute::Gateway(access) = route else {
+            panic!("a certless enrolled hub goes through the cell");
+        };
+        let presenter = access.presenter();
+        // Exactly what the fake control plane signed above — not a constant of this module.
+        assert_eq!(presenter.nif, "B27593136");
+        assert_eq!(presenter.name, "ERPLORA CLOUD SL");
+
+        // And it reaches the envelope: the obligado of the mocked token is another NIF, so this is
+        // a representation and the block is emitted with the SIGNED identity.
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>CLIENTE SL\
+             </sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, Some(presenter), "B12345678");
+        assert!(
+            stamped.contains(
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>"
+            ),
+            "{stamped}"
+        );
+    }
+
+    /// 🔴 **REGRESIÓN hub#1478 — la gestoría.** Por la vía propia el titular del certificado NO
+    /// siempre es el obligado: una gestoría sube **su** certificado para facturar por su cliente.
+    /// ADR-0268 §4 exige entonces el bloque `Representante` con la identidad **del titular**, y
+    /// hasta hub#1478 no había de dónde leerla: la ruta pasaba `None` fijo y el sobre salía
+    /// declarando que el cliente se presenta a sí mismo — el fault **4112** medido contra prewww.
+    ///
+    /// Es la gemela de `the_gateway_route_carries_the_signed_presenter_into_the_envelope`: allí el
+    /// par sale del token firmado porque el hub no ve el Sello; aquí sale del `.p12` que el hub SÍ
+    /// tiene puesto, leído por el primitivo del core. La regla («difieren ⇒ bloque») es la misma y
+    /// vive en un solo sitio.
+    #[tokio::test]
+    async fn the_own_route_carries_the_certificate_holder_into_the_envelope_hub1478() {
+        /// The gestoría's own container: it signs, and it belongs to somebody who is not the
+        /// client whose invoice this is.
+        struct GestoriaHost;
+        #[async_trait::async_trait]
+        impl NativeHost for GestoriaHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+            async fn certificate_holder(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::certificate::CertificateHolder>> {
+                Ok(Some(erplora_runtime::certificate::CertificateHolder {
+                    nif: "B99999999".to_owned(),
+                    name: "GESTORIA MARTINEZ SL".to_owned(),
+                }))
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&GestoriaHost, "hub-gestoria", &config)
+            .await
+            .unwrap();
+        assert!(matches!(route, crate::config::TransmitRoute::Direct { .. }));
+
+        let presenter = route
+            .presenter()
+            .expect("the own road knows who holds the certificate that signs");
+        assert_eq!(presenter.nif, "B99999999");
+        assert_eq!(presenter.name, "GESTORIA MARTINEZ SL");
+
+        // And it reaches the envelope: the client is another NIF, so this IS a representation.
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>CLIENTE SL\
+             </sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, Some(presenter), "B12345678");
+        assert!(
+            stamped.contains(
+                "<sum1:Representante><sum1:NombreRazon>GESTORIA MARTINEZ SL</sum1:NombreRazon>\
+                 <sum1:NIF>B99999999</sum1:NIF></sum1:Representante>"
+            ),
+            "{stamped}"
+        );
+    }
+
+    /// 🔒 El caso NORMAL no cambia: el negocio que sube su propio certificado ES el obligado, los
+    /// dos NIF coinciden y no se inventa representación (ADR-0268 §4). El primitivo nuevo no puede
+    /// convertir a nadie en representante de sí mismo.
+    #[tokio::test]
+    async fn a_business_that_holds_its_own_certificate_declares_no_representante_hub1478() {
+        struct OwnerHost;
+        #[async_trait::async_trait]
+        impl NativeHost for OwnerHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+            async fn certificate_holder(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::certificate::CertificateHolder>> {
+                Ok(Some(erplora_runtime::certificate::CertificateHolder {
+                    nif: "B12345678".to_owned(),
+                    name: "PELUQUERIA LA MODERNA SL".to_owned(),
+                }))
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&OwnerHost, "hub-owner", &config)
+            .await
+            .unwrap();
+        let envelope = "<sum:Cabecera><sum1:ObligadoEmision><sum1:NombreRazon>PELUQUERIA LA \
+             MODERNA SL</sum1:NombreRazon><sum1:NIF>B12345678</sum1:NIF>\
+             </sum1:ObligadoEmision></sum:Cabecera>";
+        let stamped = crate::aeat::set_representative(envelope, route.presenter(), "B12345678");
+        assert!(
+            !stamped.contains("Representante"),
+            "holder == obligado: no representation to declare: {stamped}"
+        );
+    }
+
+    /// 🔒 Un contenedor cuyo sujeto no nombra entidad deja la vía propia EXACTAMENTE como estaba
+    /// antes de hub#1478: sin bloque. La ausencia no concluye nada, y adivinar un titular sería
+    /// declarar a alguien que no es.
+    #[tokio::test]
+    async fn a_certificate_that_names_no_holder_leaves_the_envelope_as_it_was_hub1478() {
+        struct AnonymousCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for AnonymousCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+        }
+
+        let config = serde_json::json!({ "environment": "testing", "certificate_source": "core" });
+        let route = crate::config::resolve_route(&AnonymousCertHost, "hub-anon", &config)
+            .await
+            .unwrap();
+        assert!(route.presenter().is_none(), "absence concludes nothing");
     }
 
     /// El certificado del core GANA: un negocio con su propio `.p12` sigue firmando y
@@ -1150,11 +1496,17 @@ mod tests {
             async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
                 Ok(throwaway_identity())
             }
-            async fn fiscal_gateway_access(
+            async fn machine_identity(
                 &self,
                 _hub_id: &str,
-            ) -> Result<Option<erplora_runtime::fiscal_gateway::GatewayAccess>> {
-                panic!("the broker must not be consulted when the core certificate signs");
+            ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+                panic!("the gateway road must not be resolved when the core certificate signs");
+            }
+            async fn cloud_call(
+                &self,
+                _request: erplora_runtime::cloud_call::CloudRequest,
+            ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+                panic!("the control plane must not be asked when the core certificate signs");
             }
         }
 
@@ -1162,7 +1514,581 @@ mod tests {
         let route = crate::config::resolve_route(&CertHost, "hub-1", &config)
             .await
             .unwrap();
-        assert!(matches!(route, crate::config::TransmitRoute::Direct(_)));
+        assert!(matches!(route, crate::config::TransmitRoute::Direct { .. }));
+    }
+
+    /// 🔒 REGRESIÓN de punta a punta (hub#985 §2 — hub#1460): **los bytes que salen por el cable**
+    /// hacia la celda llevan el `Representante` de la identidad FIRMADA.
+    ///
+    /// Los dos guards anteriores miran una mitad cada uno —la regla (`tests/`) y el dato que la
+    /// alimenta (`resolve_route`)—, y las dos pueden estar verdes con el estampado desconectado
+    /// del camino real. Esto conduce `transmit_one` entero contra una celda de mentira, decodifica
+    /// el `xml_b64` que recibió y mira el sobre que de verdad viajó: es el mismo que se archiva y
+    /// el mismo cuyo sha256 comparará el canario de hub#1461.
+    #[tokio::test]
+    async fn the_bytes_that_leave_for_the_cell_carry_the_signed_representante() {
+        use base64::Engine as _;
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        /// The obligado is the CLIENT; the presenter the fake control plane signs is ERPlora.
+        const OBLIGADO_NIF: &str = "B12345678";
+
+        // A cell that records what it was handed and answers a receipt echoing the AEAT.
+        let seen: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let recorder = Arc::clone(&seen);
+        tokio::spawn(async move {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            let mut buffer = Vec::new();
+            let mut chunk = [0u8; 8192];
+            // Read until the JSON body is complete — the envelope is bigger than one chunk.
+            while let Ok(n) = socket.read(&mut chunk).await {
+                if n == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..n]);
+                if buffer.windows(2).any(|w| w == b"\r\n") && buffer.ends_with(b"}") {
+                    break;
+                }
+            }
+            let raw = String::from_utf8_lossy(&buffer).into_owned();
+            *recorder.lock().unwrap() = Some(raw.clone());
+            // Like the REAL cell: the digest is recomputed over the bytes IT decoded, never
+            // copied from the envelope. That way the canary of hub#1461 compares two independent
+            // computations of the same fact — if the hub digested anything else, this goes red.
+            let request_sha256 = raw
+                .split("\r\n\r\n")
+                .nth(1)
+                .and_then(|body| serde_json::from_str::<Json>(body).ok())
+                .and_then(|envelope| {
+                    let b64 = envelope["xml_b64"].as_str()?.to_owned();
+                    base64::engine::general_purpose::STANDARD.decode(b64).ok()
+                })
+                .map(|xml| {
+                    use sha2::Digest as _;
+                    sha2::Sha256::digest(&xml)
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<String>()
+                })
+                // With no digest the delivery is refused upstream, which is what should happen
+                // if this fake cell ever stops resembling the real one.
+                .unwrap_or_default();
+            let receipt = serde_json::json!({
+                "schema_version": 1,
+                "transmission_id": "record-1460",
+                "request_sha256": request_sha256,
+                "aeat_http_status": 200,
+                "aeat_response_b64": base64::engine::general_purpose::STANDARD.encode(
+                    "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+                     <EstadoRegistro>Correcto</EstadoRegistro></soapenv:Envelope>",
+                ),
+                "aeat_response_sha256": "00".repeat(32),
+                "received_at": "2026-09-03T04:00:00Z",
+            })
+            .to_string();
+            let answer = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{receipt}",
+                receipt.len()
+            );
+            let _ = socket.write_all(answer.as_bytes()).await;
+            let _ = socket.shutdown().await;
+        });
+
+        /// The enrolled certless hub: it lends its machine identity and its cloud call, and the
+        /// fake control plane points it at the cell above.
+        struct CellHost {
+            url: String,
+            archived: Mutex<Vec<String>>,
+        }
+        #[async_trait::async_trait]
+        impl NativeHost for CellHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn write_static_file(
+                &self,
+                relative_path: &str,
+                bytes: &[u8],
+                _content_type: &str,
+            ) -> Result<String> {
+                self.archived
+                    .lock()
+                    .unwrap()
+                    .push(String::from_utf8_lossy(bytes).into_owned());
+                Ok(format!("modules/verifactu/{relative_path}"))
+            }
+            async fn machine_identity(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+                Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
+                    identity: throwaway_identity(),
+                    ca_pem: b"unused-over-plain-http".to_vec(),
+                    common_name: GATEWAY_CN.to_owned(),
+                }))
+            }
+            async fn cloud_call(
+                &self,
+                _request: erplora_runtime::cloud_call::CloudRequest,
+            ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+                Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                    status: 200,
+                    body: serde_json::json!({
+                        "token": "bearer",
+                        "expires_in": 300,
+                        "gateway_url": self.url,
+                        "obligado_nif": OBLIGADO_NIF,
+                        "presenter_nif": "B27593136",
+                        "presenter_name": "ERPLORA CLOUD SL",
+                        "mtls_common_name": GATEWAY_CN,
+                    })
+                    .to_string(),
+                }))
+            }
+        }
+
+        let host = CellHost {
+            url: url.clone(),
+            archived: Mutex::new(Vec::new()),
+        };
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-1460".to_owned(),
+            now: "2026-09-03T04:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let hash = crate::chain::alta_hash(
+            OBLIGADO_NIF,
+            "A-1",
+            "2026-09-03",
+            "F2",
+            21.0,
+            121.0,
+            "",
+            "2026-09-03T04:00:00Z",
+        );
+        let record = serde_json::json!({
+            "id": "record-1460",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": OBLIGADO_NIF,
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "A-1",
+            "invoice_date": "2026-09-03",
+            "invoice_type": "F2",
+            "description": "Servicio",
+            "base_amount": 10000,
+            "tax_rate": 21.0,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "sequence_number": 1,
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-03T04:00:00Z",
+            "record_hash": hash,
+        });
+        let config = serde_json::json!({
+            "environment": "testing",
+            "producer_facts": {
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            },
+        });
+
+        let (ops, _events, success) = super::transmit_one(
+            &host,
+            &ctx,
+            &record,
+            &config,
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("the cell answered a receipt");
+
+        let request = seen.lock().unwrap().clone().expect("the cell was called");
+        let body = request.split("\r\n\r\n").nth(1).expect("a JSON body");
+        let envelope: Json = serde_json::from_str(body).expect("the envelope is JSON");
+        let xml = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(envelope["xml_b64"].as_str().expect("xml_b64"))
+                .expect("base64"),
+        )
+        .expect("utf8");
+
+        assert!(
+            xml.contains(
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>"
+            ),
+            "the bytes on the wire must declare the signed presenter: {xml}"
+        );
+        // And the archive holds the SAME bytes — the canary of hub#1461 compares this sha256.
+        assert_eq!(
+            host.archived.lock().unwrap().as_slice(),
+            std::slice::from_ref(&xml),
+            "what was archived is what was transmitted"
+        );
+
+        // 🔒 POSITIVE CONTROL for the canary (hub#1461). The cell above recomputes the digest
+        // exactly like the real one, so this road is the HONEST one: the delivery must reach a
+        // verdict. Without this half, a canary that refused EVERY receipt would leave the test
+        // green — `transmit_one` returns `Ok` when it queues contingency too — and the whole
+        // fleet would stop filing invoices with nobody noticing.
+        assert!(success, "the honest delivery must be filed, not queued");
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("the AEAT verdict must reach the record");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("accepted")),
+            "the receipt held up, so the verdict is filed"
+        );
+        assert!(
+            !ops.iter()
+                .any(|o| o.command == "verifactu._enqueue_contingency"),
+            "a receipt whose digest matches is NOT a transmission failure"
+        );
+    }
+
+    /// 🔒 REGRESIÓN de punta a punta (hub#1436): **por la celda también se recupera la cadena.**
+    ///
+    /// Es el caso que la vía gateway no cubría: un hub sin certificado restaura un backup, su
+    /// cadena local retrocede, la AEAT rechaza el envío por encadenamiento (2007) y hasta ahora el
+    /// motor se saltaba el auto-rechain a propósito —consultaba con la identity del core, que ese
+    /// hub no tiene— dejando el rechazo registrado y **ninguna** recuperación disponible: la
+    /// manual (`recover_from_aeat`) consulta por el mismo sitio y fallaba igual.
+    ///
+    /// Conduce `transmit_one` entero contra una celda de mentira que atiende las TRES llamadas de
+    /// la secuencia —alta rechazada → consulta → reenvío re-anclado— y mira los bytes de cada una.
+    /// Lo que clava, y que ningún test de XML suelto puede ver:
+    ///
+    /// 1. la consulta **viaja por la celda** y lleva el `IndicadorRepresentante` (sin él la AEAT
+    ///    devuelve un 4112 en vez de la cadena del cliente), y **no** un bloque `Representante`,
+    ///    que su esquema no admite;
+    /// 2. el reenvío re-anclado lleva el `Representante` de la identidad FIRMADA — el sobre se
+    ///    reconstruye con `build_soap` y sale sin él si nadie lo estampa;
+    /// 3. las tres llamadas pasan el canario del digest (hub#1461), porque la celda de mentira
+    ///    recalcula el sha256 sobre lo que decodifica, como la real;
+    /// 4. y el DESENLACE: `transmit_one` devuelve `Ok` también cuando encola contingencia, así que
+    ///    se afirma el ancla, el re-encadenado y el veredicto aceptado — no solo que no explotó.
+    #[tokio::test]
+    async fn a_certless_hub_recovers_its_chain_through_the_cell() {
+        use base64::Engine as _;
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        const OBLIGADO_NIF: &str = "B12345678";
+        // La huella que la AEAT dice tener por último eslabón: el ancla de la recuperación.
+        const ANCHOR_HASH: &str =
+            "3056799E8B154276ED2F71108D8570168FD8FE345428C5270459C90AEFBF3696";
+
+        // Rechazo de encadenamiento tal como llega: `Incorrecto` + 2007.
+        let chaining_rejection = "<soapenv:Envelope><EstadoEnvio>Incorrecto</EstadoEnvio>\
+             <EstadoRegistro>Incorrecto</EstadoRegistro>\
+             <CodigoErrorRegistro>2007</CodigoErrorRegistro>\
+             <DescripcionErrorRegistro>No debe informarse como primer registro, existen \
+             facturas emitidas con el obligado emisión y el sistema informático actual.\
+             </DescripcionErrorRegistro></soapenv:Envelope>"
+            .to_owned();
+        // Un registro en la respuesta de consulta, con la forma que el parser agrupa POR
+        // registro (`RegistroRespuestaConsultaFactuSistemaFacturacion`).
+        let consult_answer = format!(
+            "<env:Envelope><env:Body><tikLRRC:RespuestaConsultaFactuSistemaFacturacion>\
+             <tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+             <tikLRRC:IDFactura><tik:IDEmisorFactura>{OBLIGADO_NIF}</tik:IDEmisorFactura>\
+             <tik:NumSerieFactura>PREVIA-9</tik:NumSerieFactura>\
+             <tik:FechaExpedicionFactura>02-09-2026</tik:FechaExpedicionFactura></tikLRRC:IDFactura>\
+             <tikLRRC:DatosRegistroFacturacion>\
+             <tikLRRC:FechaHoraHusoGenRegistro>2026-09-02T10:00:00Z</tikLRRC:FechaHoraHusoGenRegistro>\
+             <tikLRRC:Huella>{ANCHOR_HASH}</tikLRRC:Huella></tikLRRC:DatosRegistroFacturacion>\
+             <tikLRRC:EstadoRegistro><tikLRRC:EstadoRegistro>Correcto</tikLRRC:EstadoRegistro>\
+             </tikLRRC:EstadoRegistro>\
+             </tikLRRC:RegistroRespuestaConsultaFactuSistemaFacturacion>\
+             </tikLRRC:RespuestaConsultaFactuSistemaFacturacion></env:Body></env:Envelope>"
+        );
+        let accepted = "<soapenv:Envelope><EstadoEnvio>Correcto</EstadoEnvio>\
+             <EstadoRegistro>Correcto</EstadoRegistro><CSV>CSV-RECHAINED</CSV></soapenv:Envelope>"
+            .to_owned();
+
+        // The cell: answers the queued AEAT bodies in order and records every envelope it got.
+        let seen: Arc<Mutex<Vec<Json>>> = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let recorder = Arc::clone(&seen);
+        let answers = vec![chaining_rejection, consult_answer, accepted];
+        tokio::spawn(async move {
+            for aeat_body in answers {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    return;
+                };
+                let mut buffer = Vec::new();
+                let mut chunk = [0u8; 8192];
+                while let Ok(n) = socket.read(&mut chunk).await {
+                    if n == 0 {
+                        break;
+                    }
+                    buffer.extend_from_slice(&chunk[..n]);
+                    if buffer.windows(2).any(|w| w == b"\r\n") && buffer.ends_with(b"}") {
+                        break;
+                    }
+                }
+                let raw = String::from_utf8_lossy(&buffer).into_owned();
+                let envelope: Json = raw
+                    .split("\r\n\r\n")
+                    .nth(1)
+                    .and_then(|body| serde_json::from_str(body).ok())
+                    .unwrap_or(Json::Null);
+                recorder.lock().unwrap().push(envelope.clone());
+                // Like the real cell: the digest is recomputed over what IT decoded.
+                let request_sha256 = envelope["xml_b64"]
+                    .as_str()
+                    .and_then(|b64| base64::engine::general_purpose::STANDARD.decode(b64).ok())
+                    .map(|xml| {
+                        use sha2::Digest as _;
+                        sha2::Sha256::digest(&xml)
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default();
+                let receipt = serde_json::json!({
+                    "schema_version": 1,
+                    "request_sha256": request_sha256,
+                    "aeat_http_status": 200,
+                    "aeat_response_b64":
+                        base64::engine::general_purpose::STANDARD.encode(&aeat_body),
+                })
+                .to_string();
+                let answer = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{receipt}",
+                    receipt.len()
+                );
+                let _ = socket.write_all(answer.as_bytes()).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+
+        struct CellHost {
+            url: String,
+        }
+        #[async_trait::async_trait]
+        impl NativeHost for CellHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![])
+            }
+            async fn write_static_file(
+                &self,
+                relative_path: &str,
+                _bytes: &[u8],
+                _content_type: &str,
+            ) -> Result<String> {
+                Ok(format!("modules/verifactu/{relative_path}"))
+            }
+            async fn machine_identity(
+                &self,
+                _hub_id: &str,
+            ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+                Ok(Some(erplora_runtime::gateway_identity::MachineIdentity {
+                    identity: throwaway_identity(),
+                    ca_pem: b"unused-over-plain-http".to_vec(),
+                    common_name: GATEWAY_CN.to_owned(),
+                }))
+            }
+            async fn cloud_call(
+                &self,
+                _request: erplora_runtime::cloud_call::CloudRequest,
+            ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+                Ok(Some(erplora_runtime::cloud_call::CloudResponse {
+                    status: 200,
+                    body: serde_json::json!({
+                        "token": "bearer",
+                        "expires_in": 300,
+                        "gateway_url": self.url,
+                        "obligado_nif": OBLIGADO_NIF,
+                        "presenter_nif": "B27593136",
+                        "presenter_name": "ERPLORA CLOUD SL",
+                        "mtls_common_name": GATEWAY_CN,
+                    })
+                    .to_string(),
+                }))
+            }
+        }
+
+        let host = CellHost { url };
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-1436".to_owned(),
+            now: "2026-09-03T06:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let hash = crate::chain::alta_hash(
+            OBLIGADO_NIF,
+            "A-1",
+            "2026-09-03",
+            "F2",
+            21.0,
+            121.0,
+            "",
+            "2026-09-03T06:00:00Z",
+        );
+        let record = serde_json::json!({
+            "id": "record-1436",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": OBLIGADO_NIF,
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "A-1",
+            "invoice_date": "2026-09-03",
+            "invoice_type": "F2",
+            "description": "Servicio",
+            "base_amount": 10000,
+            "tax_rate": 21.0,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "sequence_number": 1,
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-03T06:00:00Z",
+            "record_hash": hash,
+        });
+        let config = serde_json::json!({
+            "environment": "testing",
+            "issuer_nif": OBLIGADO_NIF,
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "producer_facts": {
+                "NombreRazon": "ERPLORA CLOUD SL",
+                "NIF": "B27593136",
+                "NombreSistemaInformatico": "ERPlora Hub",
+                "IdSistemaInformatico": "EC",
+                "TipoUsoPosibleSoloVerifactu": "S",
+                "TipoUsoPosibleMultiOT": "S",
+                "IndicadorMultiplesOT": "N",
+            },
+        });
+
+        let (ops, _events, success) = super::transmit_one(
+            &host,
+            &ctx,
+            &record,
+            &config,
+            "event-1436",
+            "queue-1436",
+            "recovery-1436",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("the cell answered every leg");
+
+        let envelopes = seen.lock().unwrap().clone();
+        assert_eq!(
+            envelopes.len(),
+            3,
+            "alta rechazada → consulta → reenvío re-anclado: {envelopes:?}"
+        );
+        let xml_of = |envelope: &Json| -> String {
+            String::from_utf8(
+                base64::engine::general_purpose::STANDARD
+                    .decode(envelope["xml_b64"].as_str().expect("xml_b64"))
+                    .expect("base64"),
+            )
+            .expect("utf8")
+        };
+
+        // ── 1. La consulta salió POR LA CELDA, con el flag y sin el bloque ────────────────
+        let consult = xml_of(&envelopes[1]);
+        assert!(
+            consult.contains("<con:ConsultaFactuSistemaFacturacion>"),
+            "la segunda llamada tiene que ser la consulta: {consult}"
+        );
+        assert!(
+            consult.contains("<sum1:IndicadorRepresentante>S</sum1:IndicadorRepresentante>"),
+            "sin el flag la AEAT devuelve un 4112, no la cadena del cliente: {consult}"
+        );
+        assert!(
+            !consult.contains("<sum1:Representante>"),
+            "CabeceraConsultaSf no admite el bloque del alta: {consult}"
+        );
+        // Y su clave de correlación NO es la del registro: una consulta no se puede servir de
+        // una caché de idempotencia.
+        assert_ne!(
+            envelopes[1]["transmission_id"], envelopes[0]["transmission_id"],
+            "la consulta lleva su propia clave: {envelopes:?}"
+        );
+
+        // ── 2. El reenvío re-anclado declara al presentador FIRMADO ──────────────────────
+        let retry = xml_of(&envelopes[2]);
+        assert!(
+            retry.contains(
+                "<sum1:Representante><sum1:NombreRazon>ERPLORA CLOUD SL</sum1:NombreRazon>\
+                 <sum1:NIF>B27593136</sum1:NIF></sum1:Representante>"
+            ),
+            "el sobre re-anclado se reconstruye desde cero y sale sin Representante si nadie lo \
+             estampa: {retry}"
+        );
+        assert!(
+            retry.contains(ANCHOR_HASH),
+            "el reenvío encadena desde la huella que dio la AEAT: {retry}"
+        );
+        // Bytes distintos para el mismo registro ⇒ clave de correlación distinta, o el 409
+        // `transmission_digest_mismatch` que la celda tiene reservado lo rechazaría para siempre.
+        assert_ne!(
+            envelopes[2]["transmission_id"], envelopes[0]["transmission_id"],
+            "el re-anclado manda otros bytes: {envelopes:?}"
+        );
+
+        // ── 3. El DESENLACE: ancla + re-encadenado + veredicto aceptado ──────────────────
+        assert!(success, "el reenvío re-anclado fue aceptado");
+        assert!(
+            ops.iter()
+                .any(|o| o.command == "verifactu._insert_recovery"),
+            "el ancla recuperada tiene que persistirse: {:?}",
+            ops.iter().map(|o| &o.command).collect::<Vec<_>>()
+        );
+        assert!(
+            ops.iter()
+                .any(|o| o.command == "verifactu._rechain_record"),
+            "el registro tiene que quedar re-encadenado: {:?}",
+            ops.iter().map(|o| &o.command).collect::<Vec<_>>()
+        );
+        let applied = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("el veredicto llega al registro");
+        assert_eq!(
+            applied.params.get("status"),
+            Some(&serde_json::json!("accepted")),
+            "tras re-anclar, la AEAT aceptó: {:?}",
+            applied.params
+        );
+        // verifactu#75: what the row keeps is what the CELL saw — the key and the digest of the
+        // re-anchored envelope, not the record's. This pins the wiring of the call site in
+        // `auto_rechain_and_retry`, which the builder-level tests on `response_ops` cannot see.
+        assert_eq!(
+            applied.params.get("transmission_id").and_then(Json::as_str),
+            envelopes[2]["transmission_id"].as_str(),
+            "the row has to remember the key the re-anchored delivery went out under: {:?}",
+            applied.params
+        );
+        assert_eq!(
+            applied.params.get("xml_sha256").and_then(Json::as_str),
+            Some(crate::gateway::xml_sha256(&xml_of(&envelopes[2])).as_str()),
+            "the row has to remember the digest of the bytes the cell saw"
+        );
+        assert!(
+            !ops.iter()
+                .any(|o| o.command == "verifactu._enqueue_contingency"),
+            "una recuperación que funciona NO deja el registro en la cola"
+        );
     }
 
     #[derive(Default)]
@@ -1336,11 +2262,6 @@ mod environment_chain_tests {
         /// Contingency entries, so a batch drain can be driven end to end (hub#471).
         queue: Vec<Json>,
         has_core_certificate: bool,
-        /// Which slot the core reports as signing when `has_core_certificate` is set. Defaults to
-        /// `"own"` (unchanged behaviour for every existing test) — mutated directly by tests that
-        /// simulate a certificate ROTATION between two calls (hub#1270): the label the core
-        /// reports has no bearing on the hash chain, which is exactly the property under test.
-        signing_kind: &'static str,
         reads: Mutex<Vec<(String, Params)>>,
         /// Every XML this engine archived, in order.
         ///
@@ -1358,7 +2279,6 @@ mod environment_chain_tests {
                 records,
                 queue: Vec::new(),
                 has_core_certificate: false,
-                signing_kind: "own",
                 reads: Mutex::new(Vec::new()),
                 archived: Mutex::new(Vec::new()),
             }
@@ -1433,13 +2353,10 @@ mod environment_chain_tests {
         }
 
         /// The certificate question is the CORE's to answer (hub#319) — the engine no longer
-        /// queries `_hub_certificate`, so the fixture stops pretending to be that table.
-        /// `signing_kind` defaults to `"own"`, because most of these tests are about the CHAIN
-        /// and not about which certificate signs; the rotation test overrides it.
+        /// queries `_hub_certificate`, so the fixture stops pretending to be that table. One slot
+        /// since hub#1435, so the answer is «the business's own certificate» or nothing at all.
         async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
-            Ok(self
-                .has_core_certificate
-                .then(|| self.signing_kind.to_string()))
+            Ok(self.has_core_certificate.then(|| "own".to_string()))
         }
 
         /// The manufacturer's facts as the control plane serves them (hub#323). Without them no
@@ -1716,7 +2633,7 @@ mod environment_chain_tests {
     //
     // ⚠️ Coverage boundary, unchanged since hub#320: the four call sites that live BEHIND the
     // socket (`post_soap`/`run_consult` inside `transmit_one` and `auto_rechain_and_retry`) are
-    // not reachable from a unit test — `build_identity` needs a real mTLS identity, and driving
+    // not reachable from a unit test — `resolve_route` needs a real mTLS identity, and driving
     // them further would mean opening a connection to Hacienda from `cargo test`. What is pinned
     // here is the VALUE those call sites are handed; that they keep being handed it is review.
     const PREPRODUCTION_HOLDER: &str =
@@ -1793,16 +2710,14 @@ mod environment_chain_tests {
             "preproduction because of the RECORD, the seal door because of TODAY's certificate"
         );
 
-        // And the SLOT alone moves nothing: a delegated container that is not a seal keeps the
-        // holder's door, on the very same record.
-        let mut slot_only = config_row("production");
-        slot_only["certificate_kind"] = json!("delegated");
+        // And a config that says nothing about the TYPE keeps the holder's door, on the very same
+        // record: «cannot tell» is never a reason to knock on the seal's (hub#470).
         assert_eq!(
-            destination_of(&queued_testing_record(), &slot_only)
+            destination_of(&queued_testing_record(), &config_row("production"))
                 .expect("a record that carries its environment resolves")
                 .endpoint,
             PREPRODUCTION_HOLDER,
-            "the slot is not the door axis (hub#470)"
+            "an unknown certificate type routes to the holder's door (hub#470)"
         );
     }
 
@@ -2070,6 +2985,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             Some("re-anclado automáticamente tras 4102"),
         );
 
@@ -2089,6 +3005,120 @@ mod environment_chain_tests {
         assert!(
             message.contains("remitido a «testing»"),
             "and so must the drift note: {message}"
+        );
+    }
+
+    /// 🔴 verifactu#75. A filed record kept the XML and nothing that PINS IT DOWN. The digest of
+    /// the bytes that travelled was computed over the outgoing envelope and thrown away, so if
+    /// `xml_content` — or the archived object behind `xml_storage_path` — moved afterwards,
+    /// nothing noticed: a retry recomputed the digest over whatever was there and transmitted
+    /// DIFFERENT bytes believing they were the same ones.
+    #[test]
+    fn a_filed_transmission_stamps_the_digest_of_the_bytes_that_travelled() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            "<sf:RegistroFactura>QA</sf:RegistroFactura>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            "rec-2",
+            None,
+        );
+
+        let apply = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("filing a verdict updates the record");
+        assert_eq!(
+            apply.params.get("xml_sha256").and_then(Json::as_str),
+            Some(crate::gateway::xml_sha256("<sf:RegistroFactura>QA</sf:RegistroFactura>").as_str()),
+            "the row has to keep the digest of the bytes it is storing"
+        );
+    }
+
+    /// The digest that is PERSISTED and the digest the cell is asked to echo back as
+    /// `request_sha256` must be the same number, and the only way to guarantee that is for both to
+    /// come out of the SAME function. If they ever diverge, the canary of ADR-0320 §2 starts
+    /// comparing one thing and the audit trail recording another.
+    #[test]
+    fn the_persisted_digest_is_the_one_the_cell_is_asked_to_echo() {
+        let xml = "<sf:RegistroFactura>QA</sf:RegistroFactura>";
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            xml,
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            "rec-2",
+            None,
+        );
+        let persisted = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .and_then(|o| o.params.get("xml_sha256"))
+            .and_then(Json::as_str)
+            .expect("the record keeps a digest")
+            .to_string();
+
+        let envelope = crate::gateway::GatewayEnvelope {
+            hub_id: "hub-1",
+            obligado_nif: "12345678Z",
+            environment: "testing",
+            transmission_id: "rec-2",
+            xml,
+        };
+        assert_eq!(
+            persisted,
+            envelope.xml_sha256(),
+            "what the row keeps and what the cell is asked to echo have to be ONE number"
+        );
+    }
+
+    /// 🔴 verifactu#75. The id the delivery went out under is the `Idempotency-Key` the fiscal
+    /// cell indexes on, and it is NOT always the record id: the automatic re-anchor presents the
+    /// SAME record under `{id}-rechain-{anchor}` because the bytes changed. Without the column
+    /// there is no way to cross a hub record with the cell's log line.
+    #[test]
+    fn a_filed_transmission_stamps_the_id_it_went_out_under() {
+        let destination = destination_of(&queued_testing_record(), &config_row("testing"))
+            .expect("a record that carries its environment resolves");
+
+        let rechained = rechain_delivery_id("rec-2", HASH_TESTING_2);
+        let (ops, ..) = response_ops(
+            &queued_testing_record(),
+            &accepted_response(),
+            &destination,
+            "<xml/>",
+            "modules/verifactu/xml/rec-2.xml",
+            "id-evt",
+            "2026-09-03T10:00:00+02:00",
+            &rechained,
+            Some("re-anclado automáticamente tras 4102"),
+        );
+
+        let apply = ops
+            .iter()
+            .find(|o| o.command == "verifactu._apply_transmission")
+            .expect("filing a verdict updates the record");
+        assert_eq!(
+            apply.params.get("transmission_id").and_then(Json::as_str),
+            Some(rechained.as_str()),
+            "the row has to keep the key the cell actually saw, not the record id"
+        );
+        assert_ne!(
+            rechained, "rec-2",
+            "a re-anchored retry never goes out under the record id — that is the whole reason \
+             the column is not redundant with `id`"
         );
     }
 
@@ -2115,6 +3145,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2150,6 +3181,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2224,6 +3256,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2293,6 +3326,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2328,6 +3362,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2377,6 +3412,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2408,6 +3444,7 @@ mod environment_chain_tests {
             "modules/verifactu/xml/rec-2.xml",
             "id-evt",
             "2026-08-06T10:00:00+02:00",
+            "rec-2",
             None,
         );
 
@@ -2498,8 +3535,8 @@ mod environment_chain_tests {
     /// half stays blocked on the FNMT seal, pm#73).
     ///
     /// The certificate a hub signs with is a fact of the CORE (`_hub_certificate`, ADR-0202
-    /// §2.1) and can be rotated at any moment — the business re-uploads its own `.p12`, or
-    /// ERPlora rotates the delegated one. `alta_hash` (chain.rs) never takes it as an input: its
+    /// §2.1) and can be rotated at any moment — the business re-uploads its own `.p12`, or deletes
+    /// it and the hub falls to the fiscal cell. `alta_hash` (chain.rs) never takes it as an input: its
     /// formula is exactly the AEAT's (`IDEmisorFactura&NumSerieFactura&FechaExpedicionFactura&
     /// TipoFactura&CuotaTotal&ImporteTotal&Huella&FechaHoraHusoGenRegistro`, Orden HAC/1177/2024)
     /// — the PREVIOUS record's own fingerprint, never who signed it. So a rotation between two
@@ -2507,10 +3544,9 @@ mod environment_chain_tests {
     /// same recompute this engine runs to audit its own chain — must still walk it and accept it.
     #[tokio::test]
     async fn the_chain_does_not_break_when_the_certificate_changes_hub1270() {
-        // Record 1, signed while the core reports the OWN certificate (cert A).
+        // Record 1, signed while the core holds the business's own certificate.
         let mut host_a = ChainHost::new(config_row("testing"), vec![]);
         host_a.has_core_certificate = true;
-        host_a.signing_kind = "own";
         let out1 = create_record(&create_input(), &host_a).await.unwrap();
         let insert1 = find_op(&out1, "verifactu._insert_record");
         assert_eq!(
@@ -2526,12 +3562,12 @@ mod environment_chain_tests {
             .to_string();
         let record1 = persisted(insert1, "accepted");
 
-        // Certificate ROTATION: the core now reports the DELEGATED slot signing — a different
-        // identity entirely, with nothing shared with the one that signed record 1. Same issuer,
-        // same environment, only the certificate changed.
+        // Certificate ROTATION, in the shape it takes since hub#1435 retired the delegated slot:
+        // the business's certificate is gone from the core and this hub is now on the CELL's road
+        // (ADR-0320) — a different identity entirely, with nothing shared with the one that signed
+        // record 1. Same issuer, same environment, only the certificate changed.
         let mut host_b = ChainHost::new(config_row("testing"), vec![record1.clone()]);
-        host_b.has_core_certificate = true;
-        host_b.signing_kind = "delegated";
+        host_b.has_core_certificate = false;
         let mut input2 = create_input();
         input2["payload"]["invoice_number"] = json!("F-2026-000124");
         let out2 = create_record(&input2, &host_b).await.unwrap();

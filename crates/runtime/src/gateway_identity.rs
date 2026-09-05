@@ -94,6 +94,45 @@ async fn load_private_key_pem(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<
     Ok(Some(pem))
 }
 
+/// The internal CA already stored for this hub, if any — **public material**, unlike everything
+/// else this module guards.
+///
+/// Its reader is the enrolment door (hub#1457): the yearly renewal brings back a new certificate
+/// for the SAME key, signed by the SAME authority, so an issued certificate that arrives without
+/// its CA is installable as long as this hub already knows the CA. Without this the renewal of
+/// every hub in the fleet would stop on a technicality that has nothing to do with the identity.
+pub async fn stored_ca_pem(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Option<String>> {
+    let Some((_, _, ca_pem, _)) = load_row(db, hub_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some(ca_pem).filter(|pem| !pem.trim().is_empty()))
+}
+
+/// **Who this machine is on the wire**, as the host lends it to an engine (hub#1459).
+///
+/// The three public facts of the enrolled identity and nothing else: the mTLS client identity
+/// (built from a private key that never leaves the hub), the CA that anchors the PEER's server
+/// certificate, and the common name the control plane knows this machine by — which is what lets
+/// an engine notice that the credential it was handed was minted for somebody else.
+///
+/// **No URL and no bearer.** A destination belongs to the engine (the hub does not block
+/// destinations, it decorates the call with an identity), and a bearer is not an identity.
+pub struct MachineIdentity {
+    pub identity: reqwest::Identity,
+    pub ca_pem: Vec<u8>,
+    pub common_name: String,
+}
+
+impl std::fmt::Debug for MachineIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `reqwest::Identity` wraps a private key. The name is what identifies the value in a log.
+        f.debug_struct("MachineIdentity")
+            .field("common_name", &self.common_name)
+            .field("ca_pem_bytes", &self.ca_pem.len())
+            .finish_non_exhaustive()
+    }
+}
+
 /// mTLS material for one connection to the cell: the client identity plus the CA that anchors
 /// the cell's SERVER certificate (same internal CA). `None` while the operator has not installed
 /// the signed certificate yet — the caller treats that as "route not available", never a panic.
@@ -114,6 +153,37 @@ pub async fn client_identity(
     let identity = reqwest::Identity::from_pem(bundle.as_bytes())
         .map_err(|e| identity_error("montando la identidad mTLS", e))?;
     Ok(Some((identity, ca_pem.into_bytes())))
+}
+
+/// **Is the cell road open from THIS side?** — the local half of «can this hub file?» (hub#1489).
+///
+/// `true` when the three things [`client_identity`] demands are installed: the private key
+/// generated on this hub, the certificate the operator signed for it, and the internal CA that
+/// anchors the cell's server certificate. It is deliberately the SAME triple, read from the same
+/// row: a presence check that accepted less would promise a road that
+/// `reqwest::Identity::from_pem` then refuses to build.
+///
+/// # Why the core asks this instead of asking the engine
+///
+/// The engine's own answer (`config::can_transmit`) is the live one and it is worth more — it
+/// mints a token against the control plane and learns whether this hub is routed through the cell
+/// at all. It is also a NETWORK call, and the three readers of [`crate::certificate::can_transmit`]
+/// are the dispatcher gate, the onboarding checklist and the boot-time profile refresh. A hub with
+/// no connectivity would fail every sale, and that is precisely the direction ADR-0203 must not
+/// fail in: the gate exists to stop a sale nobody can file, not to stop a sale nobody can phone
+/// home about.
+///
+/// So this is the offline predicate: **has this hub got something to present at the ingress?**
+/// Everything downstream of the handshake (the token, the grant, the quota) is refused by the
+/// cell with its own code on the record, where it is visible and recoverable — a contingency, not
+/// a rejected sale.
+///
+/// Never decrypts: presence of the ciphertext is presence of the key.
+pub async fn is_enrolled(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<bool> {
+    let Some((private_key_pem, certificate_pem, ca_pem, _)) = load_row(db, hub_id).await? else {
+        return Ok(false);
+    };
+    Ok(!private_key_pem.is_empty() && !certificate_pem.is_empty() && !ca_pem.is_empty())
 }
 
 /// What exists, without touching key material beyond its presence.
@@ -459,6 +529,70 @@ mod tests {
         )
     }
 
+    /// The CA is remembered so a renewal that brings only the certificate can still be installed
+    /// (hub#1457). Empty is `None`, never an empty PEM somebody would try to parse.
+    #[tokio::test]
+    async fn the_stored_ca_is_readable_only_once_one_has_been_installed() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(47));
+        let db = db_ready().await;
+
+        assert_eq!(stored_ca_pem(&db, HUB).await.unwrap(), None, "sin fila, nada");
+
+        let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
+        assert_eq!(
+            stored_ca_pem(&db, HUB).await.unwrap(),
+            None,
+            "con clave pero sin certificado, la columna está vacía y eso NO es una CA"
+        );
+
+        let (cert, ca) = sign_with_test_ca(&csr, None, 365);
+        install_certificate(&db, HUB, &cert, &ca).await.unwrap();
+        assert_eq!(stored_ca_pem(&db, HUB).await.unwrap(), Some(ca));
+    }
+
+    /// 🔒 **A filed CSR is NOT a route** (hub#1489). Between `ensure_key_and_csr` and the operator
+    /// approving it a hub holds a private key and nothing else, and that gap is days long. Reading
+    /// it as «enrolled» would let `certificate::can_transmit` open the fiscal gate for a hub that
+    /// cannot complete a single mTLS handshake: every sale accepted, every record unfilable. So the
+    /// answer walks the real lifecycle — nothing, key only, fully installed — and only the last one
+    /// is a road.
+    #[tokio::test]
+    async fn only_a_fully_installed_identity_counts_as_enrolled() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(53));
+        let db = db_ready().await;
+
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "sin fila no hay nada que presentar en el ingress"
+        );
+
+        let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "con la clave generada y el CSR presentado todavía no hay certificado: no es una vía"
+        );
+
+        let (cert, ca) = sign_with_test_ca(&csr, None, 365);
+        install_certificate(&db, HUB, &cert, &ca).await.unwrap();
+        assert!(
+            is_enrolled(&db, HUB).await.unwrap(),
+            "clave + certificado + CA: exactamente lo que `client_identity` monta"
+        );
+        assert!(
+            client_identity(&db, HUB).await.unwrap().is_some(),
+            "y la respuesta tiene que ser la MISMA que la del constructor real, o `is_enrolled` \
+             estaría prometiendo una conexión que no se puede abrir"
+        );
+
+        delete(&db, HUB).await.unwrap();
+        assert!(
+            !is_enrolled(&db, HUB).await.unwrap(),
+            "rotar la clave cierra la vía hasta que se re-enrola"
+        );
+    }
+
     #[tokio::test]
     async fn the_csr_carries_the_hub_common_name_and_the_key_never_leaves() {
         let _lock = env_lock();
@@ -583,5 +717,43 @@ mod tests {
         delete(&db, HUB).await.unwrap();
         assert!(client_identity(&db, HUB).await.unwrap().is_none());
         assert!(!status(&db, HUB).await.unwrap().has_key);
+    }
+
+    /// hub#1459: the host lends the identity through a GENERIC method — «who this machine is» —
+    /// carrying the common name and NO destination. A host that answered `None` for an enrolled
+    /// hub would silently take the engine off the wire, so the enrolled case is the assertion.
+    #[tokio::test]
+    async fn the_host_lends_the_machine_identity_with_its_common_name() {
+        let _lock = env_lock();
+        let _key = EnvVarGuard::set(&test_key_b64(47));
+        let db = db_ready().await;
+        let host = crate::native::DbHost {
+            db: &db,
+            storage: None,
+            hub_id: HUB,
+            module_id: "testregime",
+            static_folder: None,
+        };
+
+        assert!(
+            crate::native::NativeHost::machine_identity(&host, HUB)
+                .await
+                .unwrap()
+                .is_none(),
+            "nothing enrolled yet"
+        );
+
+        let csr = ensure_key_and_csr(&db, HUB).await.unwrap();
+        let (cert, ca) = sign_with_test_ca(&csr, None, 365);
+        install_certificate(&db, HUB, &cert, &ca).await.unwrap();
+
+        let lent = crate::native::NativeHost::machine_identity(&host, HUB)
+            .await
+            .unwrap()
+            .expect("an enrolled hub has an identity to lend");
+        assert_eq!(lent.common_name, common_name(HUB));
+        assert!(!lent.ca_pem.is_empty());
+        let printed = format!("{lent:?}");
+        assert!(printed.contains(&common_name(HUB)), "{printed}");
     }
 }

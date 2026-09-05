@@ -64,10 +64,10 @@ pub trait NativeHost: Send + Sync {
     /// hub holds no certificate or holds one it cannot vouch for (ADR-0202 §2.1 — hub#470).
     ///
     /// The companion of [`certificate_signing_kind`](Self::certificate_signing_kind), and NOT a
-    /// synonym: that one says **whose** the certificate is (which is what picks the fallback and
-    /// what the `Representante` block of hub#321 hangs off), this one says **what** it is, which is
-    /// the axis the AEAT segregates its entry point by. Reading the slot as if it were the type is
-    /// the defect hub#470 closes.
+    /// synonym: that one says **whose** the certificate is (which is what picks the fallback, and
+    /// nothing else — the `Representante` hangs off WHO PRESENTS, not off the slot: ADR-0268 §4,
+    /// hub#1460), this one says **what** it is, which is the axis the AEAT segregates its entry
+    /// point by. Reading the slot as if it were the type is the defect hub#470 closes.
     ///
     /// **The core answers, and the module does not re-derive it.** Same rule as the slot: one
     /// question, one owner. `verifactu` never touches `_hub_certificate` — the private key does not
@@ -75,6 +75,29 @@ pub trait NativeHost: Send + Sync {
     ///
     /// Default: `Ok(None)` — «cannot tell», which routes to the holder's entry point.
     async fn certificate_signing_type(&self, _hub_id: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
+
+    /// **Whose the signing certificate is** — the tax id and the registered name of the entity
+    /// that holds it, read from the container's subject (hub#1478).
+    ///
+    /// The third question of the same family, and independent of the other two:
+    /// [`certificate_signing_kind`](Self::certificate_signing_kind) says which SLOT signs,
+    /// [`certificate_signing_type`](Self::certificate_signing_type) says WHAT the certificate is,
+    /// and this one says WHO it belongs to. A caller that has to declare who is acting for whom
+    /// needs this one and cannot derive it from either of the others — deriving it from the slot
+    /// is the fourth border defect hub#470 closed, written down as a rule in ADR-0268 §4.
+    ///
+    /// Same rule as its siblings: the core answers and the module does not re-derive it. The
+    /// PKCS#12 crypto stays here; what crosses is the pair of public fields of
+    /// [`CertificateHolder`](crate::certificate::CertificateHolder).
+    ///
+    /// Default: `Ok(None)` — «cannot tell». Absence concludes nothing: a caller reading it is
+    /// left exactly where it was before the primitive existed.
+    async fn certificate_holder(
+        &self,
+        _hub_id: &str,
+    ) -> Result<Option<crate::certificate::CertificateHolder>> {
         Ok(None)
     }
 
@@ -116,25 +139,42 @@ pub trait NativeHost: Send + Sync {
         Ok(None)
     }
 
-    /// **Capability `fiscal_gateway`** (hub#1432, hub#985 §1): everything ONE transmission
-    /// through the fiscal cell needs — URL, short-lived Bearer, the hub's mTLS identity and the
-    /// CA root — obtained by the broker the server installs (`GatewayBrokerCell`). The engine
-    /// never sees the machine credential; same split as `certificate_identity`.
+    /// **Who this machine is on the wire** (hub#1459) — the hub's enrolled mTLS identity, the CA
+    /// that anchors the peer's server certificate and the common name it was issued for.
     ///
-    /// Default: `Ok(None)` — no broker installed (a test host, an embedded runtime) or the route
-    /// simply not available for this hub (no identity enrolled yet). The engine leaves the
-    /// record queued with a visible reason; it never panics and never falls back to going
-    /// direct without a certificate.
-    async fn fiscal_gateway_access(
+    /// A GENERIC primitive, not a door per use case: the host lends an identity and the engine
+    /// picks the destination it presents it to, exactly as `certificate_identity` already works
+    /// for the business certificate. The difference is only WHOSE identity it is — the machine's
+    /// (born on this hub, `gateway_identity.rs`) instead of the business's — and, as there, the
+    /// private key never crosses into the engine.
+    ///
+    /// Default: `Ok(None)` — nothing enrolled. The engine treats it as «this road is not open»
+    /// and leaves its work queued with a visible reason; it never panics.
+    async fn machine_identity(
         &self,
         _hub_id: &str,
-    ) -> Result<Option<crate::fiscal_gateway::GatewayAccess>> {
+    ) -> Result<Option<crate::gateway_identity::MachineIdentity>> {
         Ok(None)
     }
 
-    /// The cell refused the Bearer in flight (401): drop any cached token so the next
-    /// [`fiscal_gateway_access`](Self::fiscal_gateway_access) fetches a fresh one.
-    async fn fiscal_gateway_invalidate(&self) {}
+    /// **Call MY cloud with MY machine credential** (hub#1459) — the host puts the DESTINATION
+    /// (this hub's control plane) and the CREDENTIAL (`X-Hub-Token`, a runtime secret the engine
+    /// must never hold, ADR-0003); the engine puts the method, the path and the body.
+    ///
+    /// The one constraint of the primitive, and the reason it exists: a credential handed to a
+    /// destination the CALLER chooses is a credential leaked, so this destination is fixed. It is
+    /// not a URL allowlist — with [`machine_identity`](Self::machine_identity) no key travels and
+    /// the engine keeps choosing where it connects.
+    ///
+    /// Default: `Ok(None)` — no caller installed (a test host, an embedded runtime) or no machine
+    /// credential. `Ok(Some(_))` = the cloud answered, whatever the status: a 404 or a 409 is an
+    /// ANSWER, and what it means belongs to the engine that asked.
+    async fn cloud_call(
+        &self,
+        _request: crate::cloud_call::CloudRequest,
+    ) -> Result<Option<crate::cloud_call::CloudResponse>> {
+        Ok(None)
+    }
 
     /// Escribe dentro de la carpeta `static_files` declarada por el módulo. La implementación real
     /// conoce el módulo que está ejecutándose y media el backend Local/Cloud; el plugin solo aporta
@@ -201,7 +241,7 @@ pub trait NativeHandler: Send + Sync + std::fmt::Debug {
 ///
 /// `pub` para que un test pueda preguntarle a un motor nativo lo mismo que le pregunta el
 /// dispatcher, **con el host de verdad**: la coherencia de hub#319 (el gate fiscal, el ⛔ de la
-/// checklist y el `build_identity` del motor contestan lo mismo) no se puede comprobar contra un
+/// checklist y el `can_sign` del motor contestan lo mismo) no se puede comprobar contra un
 /// host de mentira, porque un gemelo escrito a mano es justo la forma en que dos lecturas de la
 /// misma pregunta empiezan a divergir.
 pub struct DbHost<'a> {
@@ -243,25 +283,42 @@ impl NativeHost for DbHost<'_> {
             .map(|t| t.as_str().to_string()))
     }
 
+    async fn certificate_holder(
+        &self,
+        hub_id: &str,
+    ) -> Result<Option<crate::certificate::CertificateHolder>> {
+        crate::certificate::active_holder(self.db, hub_id).await
+    }
+
     async fn producer_facts(&self) -> Result<Option<Json>> {
         Ok(crate::producer_facts::ProducerFactsCache::global()
             .current()
             .map(|facts| facts.to_json()))
     }
 
-    async fn fiscal_gateway_access(
+    async fn machine_identity(
         &self,
         hub_id: &str,
-    ) -> Result<Option<crate::fiscal_gateway::GatewayAccess>> {
-        match crate::fiscal_gateway::GatewayBrokerCell::global().current() {
-            Some(broker) => broker.access(hub_id).await,
-            None => Ok(None),
-        }
+    ) -> Result<Option<crate::gateway_identity::MachineIdentity>> {
+        Ok(crate::gateway_identity::client_identity(self.db, hub_id)
+            .await?
+            .map(|(identity, ca_pem)| crate::gateway_identity::MachineIdentity {
+                identity,
+                ca_pem,
+                common_name: crate::gateway_identity::common_name(hub_id),
+            }))
     }
 
-    async fn fiscal_gateway_invalidate(&self) {
-        if let Some(broker) = crate::fiscal_gateway::GatewayBrokerCell::global().current() {
-            broker.invalidate_token().await;
+    async fn cloud_call(
+        &self,
+        request: crate::cloud_call::CloudRequest,
+    ) -> Result<Option<crate::cloud_call::CloudResponse>> {
+        // The path is checked HERE, before any caller exists to be trusted with it: the check is
+        // the primitive's security property, not the server's private business.
+        crate::cloud_call::check_path(&request.path)?;
+        match crate::cloud_call::CloudCallerCell::global().current() {
+            Some(caller) => caller.call(request).await,
+            None => Ok(None),
         }
     }
 

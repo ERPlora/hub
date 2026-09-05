@@ -917,6 +917,31 @@ async fn apply_section(
     let seed_declared = (!same_hub).then(|| rt.registry());
     let keys = natural_keys_for_sql(rt.db(), seed_declared, &sql).await;
     let sql = remap_section_ids(&sql, target_hub_id, &keys);
+    // 🌱 hub#1548: la foto de lo que hay AHORA en cada tabla de objeto único, ANTES de aplicar.
+    // Lo que la sección meta encima sustituye a esto, no convive con ello — y comparar las dos
+    // fotos es además la única forma honesta de saber si la sección llegó a entrar EN ESTA TABLA
+    // (`applied` cuenta la sección entera). Se toma aquí, no después, por razones obvias, y falla
+    // ANTES de tocar nada: sin la foto no se puede retirar sin arriesgarse a dejar al hub sin
+    // horario, y un import que no se puede deshacer bien es peor que uno que no se hace.
+    let mut previous: Vec<(String, Vec<String>)> = Vec::new();
+    for table in keys.keys() {
+        if !rt.registry().seeds_placeholder_table(table) {
+            continue;
+        }
+        match crate::reset::live_row_ids(rt.db(), target_hub_id, table).await {
+            Ok(ids) => previous.push((table.clone(), ids)),
+            Err(e) => {
+                return (
+                    SectionStatus::Failed(format!(
+                        "no se pudo leer lo que {table} tenía antes de importar, así que la \
+                         sección no se aplica: {e}"
+                    )),
+                    discarded,
+                )
+            }
+        }
+    }
+
     // Con lote abierto, el import REGISTRA qué filas inserta (ADR-0170): así esta importación
     // se puede deshacer después sin tocar lo que el usuario cree más tarde. Sin lote (llamadas
     // heredadas), se aplica igual que siempre. Ambas rutas pasan por la MISMA validación.
@@ -926,6 +951,40 @@ async fn apply_section(
             .map(|n| n as usize),
         None => crate::import_sql::apply(rt.db(), &sql, &scope).await,
     };
+    // 🌱 hub#1535 · hub#1548: los datos del negocio ya están dentro; ahora se retira lo que la
+    // tabla tenía ANTES, que es lo que el bundle acaba de sustituir. Solo en las tablas que el
+    // módulo declaró como marcador (guarda de tabla entera en su seed) y solo si de verdad aterrizó
+    // algo ahí — el detalle y los cierres, en `reset::retire_replaced_placeholder`.
+    //
+    // DESPUÉS de aplicar, no antes: si la sección falla a medias, el hub se queda con la semana
+    // que tenía en vez de sin horario. Y sin filtrar por `same_hub` (a diferencia de la clave de
+    // hub#842, que sí lo hace): el hub que restaura su copia sobre una instalación NUEVA, que es el
+    // camino de recuperación ante desastre, llega aquí con la semana sembrada por delante y
+    // necesita esto tanto como el que adopta una plantilla ajena.
+    if applied.is_ok() {
+        for (table, before) in &previous {
+            if let Err(e) = crate::reset::retire_replaced_placeholder(
+                rt,
+                batch_id,
+                target_hub_id,
+                table,
+                before,
+            )
+            .await
+            {
+                // El fallo no puede quedar mudo: sin retirar el marcador, la sección deja DOS
+                // horarios vivos y «¿estamos abiertos?» contesta según la fila que le toque. Se
+                // dice qué pasó exactamente, porque las filas del bundle sí entraron.
+                return (
+                    SectionStatus::Failed(format!(
+                        "los datos se aplicaron, pero no se pudo retirar lo que {table} tenía \
+                         antes y quedan duplicados: {e}"
+                    )),
+                    discarded,
+                );
+            }
+        }
+    }
     match applied {
         // Applied — but say so honestly when part of it was left out on purpose (hub#405).
         Ok(_) if discarded > 0 => (
@@ -1499,7 +1558,7 @@ fn natural_key_guards(
 /// (`created_by = 'system'`, ver [`crate::export::is_module_seeded`]) — el marcador que separa lo
 /// que planta el módulo de lo que crea una persona (hub#842).
 const SEEDED_ROW_MARKER_COLUMN: &str = "created_by";
-const SEEDED_ROW_MARKER: &str = "system";
+const SEEDED_ROW_MARKER: &str = crate::seed::SEEDED_BY;
 
 /// Claves naturales de cada tabla que toca `sql`, leídas del catálogo del hub DESTINO.
 ///

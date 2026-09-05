@@ -24,23 +24,63 @@ impl Runtime {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
     }
 
-    /// **Puts a dead print job back in front of the hosts** (hub#1108), with its hand-outs reset.
-    /// Scoped to the deployment's `hub_id`, like every other read and write here: another tenant's
-    /// `jobId` is simply not a job as far as this hub is concerned.
-    pub async fn retry_print_job(&self, job_id: &str) -> Result<print_queue::RequeueOutcome> {
-        print_queue::requeue(self.db.as_ref(), &self.hub_id, job_id).await
+    /// The names behind the stamps in `jobs`, for the door that is allowed to read them.
+    ///
+    /// Kept next to [`Runtime::print_queue`] because the HTTP listing has no database handle of its
+    /// own: the shape it serves and the shape the dispatcher serves must resolve the same way, or
+    /// the module's screen and the shell's would disagree about who binned a ticket.
+    pub async fn print_queue_actor_names(
+        &self,
+        jobs: &[print_queue::PrintJob],
+    ) -> Result<print_queue::ActorNames> {
+        print_queue::ActorNames::of(self.db.as_ref(), &self.hub_id, jobs).await
     }
 
-    /// **Retires a print job nobody is ever going to print** (hub#1108), stamping who, when and why.
-    /// Never a delete — see [`print_queue::discard`]. `discarded_by` is resolved by the caller from
-    /// the session, never taken from a request body.
+    /// **Puts a dead print job back in front of the hosts** (hub#1108), with its hand-outs reset,
+    /// stamping who asked for it and — since hub#1532 — through which module.
+    /// Scoped to the deployment's `hub_id`, like every other read and write here: another tenant's
+    /// `jobId` is simply not a job as far as this hub is concerned.
+    ///
+    /// `retried_by` and `retried_by_module` are resolved by the caller at the door (the session and
+    /// `X-Erplora-Module`), never taken from a request body. `retried_by_module` is `""` when the
+    /// caller named no module.
+    pub async fn retry_print_job(
+        &self,
+        job_id: &str,
+        retried_by: &str,
+        retried_by_module: &str,
+    ) -> Result<print_queue::RequeueOutcome> {
+        print_queue::requeue(
+            self.db.as_ref(),
+            &self.hub_id,
+            job_id,
+            retried_by,
+            retried_by_module,
+        )
+        .await
+    }
+
+    /// **Retires a print job nobody is ever going to print** (hub#1108), stamping who, through which
+    /// module (hub#1532), when and why.
+    /// Never a delete — see [`print_queue::discard`]. `discarded_by` and `discarded_by_module` are
+    /// resolved by the caller from the session and `X-Erplora-Module`, never taken from a request
+    /// body; `discarded_by_module` is `""` when the caller named no module.
     pub async fn discard_print_job(
         &self,
         job_id: &str,
         discarded_by: &str,
+        discarded_by_module: &str,
         reason: &str,
     ) -> Result<print_queue::DiscardOutcome> {
-        print_queue::discard(self.db.as_ref(), &self.hub_id, job_id, discarded_by, reason).await
+        print_queue::discard(
+            self.db.as_ref(),
+            &self.hub_id,
+            job_id,
+            discarded_by,
+            discarded_by_module,
+            reason,
+        )
+        .await
     }
 
     // ── Print stations: the destinations themselves, as rows (hub#457) ─────────────────────────

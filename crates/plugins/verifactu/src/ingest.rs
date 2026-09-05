@@ -778,6 +778,114 @@ mod ingest_integrity_tests {
         );
     }
 
+    // ── hub#1391 · la puerta MANUAL también tiene que saber cuántas líneas se agregaron ──────
+
+    /// Payload de `verifactu.records.create` que además declara cuántas líneas de factura agrega
+    /// su desglose — el dato que `ingest_invoice` sí tiene (lo cuenta en su lectura acotada) y que
+    /// por esta puerta lo pone el llamante.
+    fn create_payload_with_lines(
+        invoice_type: &str,
+        base: i64,
+        rate: f64,
+        tax: i64,
+        total: i64,
+        breakdown: &str,
+        line_count: i64,
+    ) -> Json {
+        let mut input = create_payload(invoice_type, base, rate, tax, total, breakdown);
+        input["payload"]["line_count"] = json!(line_count);
+        input
+    }
+
+    /// El caso canónico del redondeo por línea, por la puerta MANUAL: 4 líneas de 0,50 € al 21 %
+    /// (`round_half_up(10,5) = 11` cuatro veces) → desglose agregado `base 200 / cuota 44`, donde
+    /// el tipo justifica 42. Es el MISMO tique que `a_ticket_of_several_lines_at_the_same_rate_is_sealed`
+    /// sella por el listener, y que la restricción de tabla (`015`) acepta.
+    ///
+    /// Hasta hub#1391 esta puerta lo rechazaba con `quota_rate_mismatch`: `create_record` fijaba
+    /// `line_count: None` —cierto mientras el esquema no admitía desglose, falso desde
+    /// verifactu#58— y con él la tolerancia caía a 1,5 céntimos sobre una desviación de 2. El
+    /// motor era MÁS ESTRICTO que la tabla justo en el caso que la tabla se molestó en dejar pasar.
+    #[tokio::test]
+    async fn the_manual_door_seals_a_breakdown_that_declares_its_line_count() {
+        let input = create_payload_with_lines(
+            "F2",
+            200,
+            21.0,
+            44,
+            244,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            4,
+        );
+        create_record(&input, &GateHost).await.expect(
+            "4 líneas de 0,50 € al 21 % son un tique legítimo también por la puerta manual",
+        );
+    }
+
+    /// …y sin el dato se sigue juzgando como una factura de UNA línea, que es el lado seguro:
+    /// quien no dice cuántas líneas agrega no compra tolerancia.
+    #[tokio::test]
+    async fn without_a_line_count_the_manual_door_still_judges_it_as_one_line() {
+        let input = create_payload(
+            "F2",
+            200,
+            21.0,
+            44,
+            244,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
+    }
+
+    /// 🔒 El techo de verifactu#53 no se puede comprar con un `line_count` inventado. El llamante
+    /// manual escribe ese número, así que la tolerancia por líneas es un dato NO CONFIABLE; lo que
+    /// la acota es el segundo techo (`|expected| + 1`, el que también mide la tabla en `015`).
+    /// Con un millón de líneas declaradas, 99,99 € de cuota sobre una base de 5,45 € al 21 % sigue
+    /// muriendo aquí — y por tanto este motor sigue sin ser más laxo que el `CHECK`.
+    #[tokio::test]
+    async fn a_declared_line_count_cannot_buy_its_way_past_the_ceiling() {
+        let input = create_payload_with_lines(
+            "F1",
+            545,
+            21.0,
+            9999,
+            10544,
+            r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":545,"quota":9999}]"#,
+            1_000_000,
+        );
+        let err = error_of(create_record(&input, &GateHost).await);
+        assert!(
+            err.contains("quota_rate_mismatch"),
+            "código esperado, llegó: {err}"
+        );
+    }
+
+    /// Un `line_count` absurdo (cero, negativo, o un texto que no es un número) no puede hacer que
+    /// la puerta se comporte de forma distinta a no declararlo: cae a la factura de una línea.
+    #[tokio::test]
+    async fn a_nonsensical_line_count_falls_back_to_one_line() {
+        for bogus in [json!(0), json!(-4), json!("cuatro"), json!(null)] {
+            let mut input = create_payload(
+                "F2",
+                200,
+                21.0,
+                44,
+                244,
+                r#"[{"tax":"vat","regime":"01","class":"subject","rate":21.0,"base":200,"quota":44}]"#,
+            );
+            input["payload"]["line_count"] = bogus.clone();
+            let err = error_of(create_record(&input, &GateHost).await);
+            assert!(
+                err.contains("quota_rate_mismatch"),
+                "`line_count` = {bogus} no puede comprar tolerancia, llegó: {err}"
+            );
+        }
+    }
+
     // ── hub#1104 · la degradación no puede ser muda ─────────────────────────────────────────
 
     /// Una F1 sin NIF de destinatario se sigue degradando a F2 —sin eso la AEAT responde 1189 con
