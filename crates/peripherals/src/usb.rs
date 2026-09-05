@@ -86,13 +86,22 @@ const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// `lp` exiting 0 means the spooler wrote the job down, which is as far as it can see. The OS
 /// only learns that the paper ran out or the cable is gone WHILE it is running a job, so at
 /// submit time the fault the pre-flight of hub#1541 looks for does not exist yet: it appears
-/// seconds later, by which point the till has already said "printed". Five seconds is far beyond
-/// a thermal receipt down a USB cable — a few kilobytes, under a second even counting the backend
-/// opening the device — and still short enough that the cashier learns the truth while the
-/// customer is standing there, which is the whole point.
-pub const JOB_COMPLETION_WINDOW: Duration = Duration::from_secs(5);
+/// seconds later, by which point the till has already said "printed".
+///
+/// The budget is set by CUPS' own USB backend, not by the receipt: after the LAST byte is written
+/// it still holds the job while it waits for its read thread — `WAIT_EOF_DELAY` = 7 s plus a 1 s
+/// abort grace in both `backend/usb-libusb.c` (Linux) and `backend/usb-darwin.c` (macOS) — and
+/// on Linux that thread sits in a 60 s bulk read on any bidirectional printer with nothing to say
+/// (Epson TM 04b8:0202, Bixolon, Citizen; Star is quirked `unidir` and skips it). A ticket that
+/// already came out is therefore "not completed" for ~8 s more. A window under that would cancel
+/// it and tell the cashier it did not print — the duplicate receipt this transport must never
+/// cause. 8 s of tail + a few seconds for a long kitchen ticket on a 100 mm/s printer = 15 s,
+/// still far inside the hub's 90 s lease on the job. On the happy path none of it is waited for:
+/// the job leaves the queue and the wait ends with it (165 ms measured against a queue that does
+/// not hold).
+pub const JOB_COMPLETION_WINDOW: Duration = Duration::from_secs(15);
 
-/// How often the OS queue is re-read while waiting for the job to leave it. Twenty polls across
+/// How often the OS queue is re-read while waiting for the job to leave it. Sixty polls across
 /// [`JOB_COMPLETION_WINDOW`]: cheap enough not to matter, tight enough that a receipt that came
 /// out in 300 ms does not keep the cashier waiting for a whole second.
 const JOB_POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -1655,4 +1664,57 @@ mod tests {
         assert!(!job_is_queued("", &id));
     }
 
+    #[test]
+    fn hub1564_the_window_outlasts_the_backends_own_wait_after_the_last_byte() {
+        // CUPS' USB backend does not release a job when the last byte is written. On Linux
+        // (`backend/usb-libusb.c`) it signals its read thread and waits `WAIT_EOF_DELAY` = 7 s for
+        // it, then one more second — and that thread is sitting in a 60 s bulk read on a printer
+        // that has nothing to say, which is every bidirectional receipt printer without the
+        // `unidir` quirk (Epson TM 04b8:0202, Bixolon, Citizen; Star is quirked `unidir`). macOS
+        // (`backend/usb-darwin.c`) waits the same 7 + 1 s. So a ticket that already came out of
+        // the printer is still "not completed" ~8 s later, and a window under that cancels it and
+        // tells the cashier it did not print: the duplicate receipt this transport must never
+        // cause. The hub is shipped on Linux (AppImage/deb), so this is not a hypothetical till.
+        const CUPS_USB_POST_WRITE_TAIL: Duration = Duration::from_secs(8);
+        // ...plus the print itself: a long kitchen ticket or a receipt with a logo on a 100 mm/s
+        // printer is a few seconds of the backend blocked on the printer's buffer.
+        const A_LONG_RECEIPT: Duration = Duration::from_secs(5);
+
+        assert!(
+            JOB_COMPLETION_WINDOW >= CUPS_USB_POST_WRITE_TAIL + A_LONG_RECEIPT,
+            "{JOB_COMPLETION_WINDOW:?} is shorter than the backend's own tail after the last byte \
+             plus a long receipt: a printed ticket would be cancelled and reported failed"
+        );
+        // And still far inside the hub's 90 s lease on the job (`print_queue::DEFAULT_LEASE_SECONDS`):
+        // a host that blocks past the lease is a ticket printed twice by another host.
+        assert!(JOB_COMPLETION_WINDOW < Duration::from_secs(45), "{JOB_COMPLETION_WINDOW:?}");
+    }
+
+    #[test]
+    fn hub1564_a_low_roll_reported_while_the_ticket_prints_does_not_cancel_it() {
+        // The false positive the issue names outright: a thermal roll running low reports
+        // `media-low-warning` for hours while printing perfectly. It is there at the pre-flight,
+        // it is there while the backend runs the job, and neither may turn a ticket that LEAVES the
+        // queue into a cancelled one. Only a ticket that never leaves is a failure — the reason is
+        // read then, and only then.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec![
+                "printer-is-accepting-jobs=true printer-state=3 \
+                 printer-state-reasons=media-low-warning",
+                "printer-is-accepting-jobs=true printer-state=4 \
+                 printer-state-reasons=media-low-warning,cups-waiting-for-job-completed",
+            ],
+            vec!["Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026", ""],
+        );
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("a low roll still prints, and this one did");
+
+        let calls = cups.calls.borrow();
+        assert!(
+            !calls.iter().any(|(program, _, _)| program == CUPS_CANCEL),
+            "a warning must not cancel a ticket that came out: {calls:?}"
+        );
+        assert!(calls.iter().any(|(program, _, _)| program == CUPS_LP), "it must submit");
+    }
 }
