@@ -399,6 +399,14 @@ pub struct Registry {
     /// Vive en el Registry, y no en disco ni en `hub_module`, por lo mismo que el resto de lo que
     /// aporta un módulo: su vida ES la del módulo instalado.
     pub(crate) seed_natural_keys: HashMap<String, HashMap<String, Vec<crate::export::NaturalKey>>>,
+    /// **Las tablas que el seed de cada módulo siembra como MARCADOR DE POSICIÓN** (hub#1535):
+    /// `module_id → tablas`. Las lee [`crate::seed::declared_placeholder_tables`] del mismo texto
+    /// que se siembra, en el mismo sitio y con la misma vida que [`Self::seed_natural_keys`].
+    ///
+    /// Una tabla está aquí cuando la guarda de su seed es el hub entero (`WHERE hub_id = :hub_id`):
+    /// el módulo declara así que planta un objeto completo y solo mientras el hub no tenga nada
+    /// suyo. El import lo lee para retirar el marcador cuando llegan los datos del negocio.
+    pub(crate) seed_placeholder_tables: HashMap<String, Vec<String>>,
 }
 
 impl Registry {
@@ -438,6 +446,18 @@ impl Registry {
             .flatten()
             .cloned()
             .collect()
+    }
+
+    /// ¿Algún módulo instalado siembra `table` como MARCADOR DE POSICIÓN de tabla entera
+    /// (hub#1535)?
+    ///
+    /// Por tabla y no por módulo, por lo mismo que [`Self::seed_natural_keys_for`]: una tabla
+    /// tiene un único dueño (hub#633 lo valida al instalar) y el import trabaja sobre el SQL de
+    /// una sección, no siempre sobre un módulo.
+    pub(crate) fn seeds_placeholder_table(&self, table: &str) -> bool {
+        self.seed_placeholder_tables
+            .values()
+            .any(|tables| tables.iter().any(|t| t == table))
     }
 
     /// ¿Está el módulo instalado **y** activo?
@@ -752,6 +772,7 @@ impl Registry {
         self.navigation.retain(|n| n.module_id != module_id);
         self.locales.remove(module_id);
         self.seed_natural_keys.remove(module_id);
+        self.seed_placeholder_tables.remove(module_id);
         for cmds in self.listeners.values_mut() {
             cmds.retain(|name| self.commands.contains_key(name));
         }
@@ -798,6 +819,11 @@ impl Registry {
                 .get(module_id)
                 .cloned()
                 .unwrap_or_default(),
+            seed_placeholder_tables: self
+                .seed_placeholder_tables
+                .get(module_id)
+                .cloned()
+                .unwrap_or_default(),
             // A listener belongs to the module that owns the command it fires (hub#659 makes that
             // the only shape a manifest can declare), so this is exactly the module's own share of
             // the map — the same rule `remove_module` uses to prune it.
@@ -840,6 +866,10 @@ impl Registry {
             self.seed_natural_keys
                 .insert(module_id.clone(), snapshot.seed_natural_keys);
         }
+        if !snapshot.seed_placeholder_tables.is_empty() {
+            self.seed_placeholder_tables
+                .insert(module_id.clone(), snapshot.seed_placeholder_tables);
+        }
         for (event, command) in snapshot.listeners {
             let listeners = self.listeners.entry(event).or_default();
             if !listeners.contains(&command) {
@@ -863,6 +893,8 @@ pub struct ModuleSnapshot {
     listeners: Vec<(String, String)>,
     /// The natural keys the module's seed declares, per table (hub#842).
     seed_natural_keys: HashMap<String, Vec<crate::export::NaturalKey>>,
+    /// The tables the module's seed plants as a whole-table placeholder (hub#1535).
+    seed_placeholder_tables: Vec<String>,
 }
 
 impl ModuleSnapshot {

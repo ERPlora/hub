@@ -740,6 +740,8 @@ const ENSURE_BATCH_TABLES: &str = "\
 CREATE TABLE IF NOT EXISTS _hub_import_batch (\
  id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);\
 CREATE TABLE IF NOT EXISTS _hub_import_row (\
+ batch_id TEXT NOT NULL, table_name TEXT NOT NULL, row_id TEXT NOT NULL);\
+CREATE TABLE IF NOT EXISTS _hub_import_retired_row (\
  batch_id TEXT NOT NULL, table_name TEXT NOT NULL, row_id TEXT NOT NULL);";
 
 /// Crea las tablas de trazabilidad de lotes si faltan (idempotente).
@@ -850,6 +852,136 @@ pub async fn apply_tracked_into(
         applied += 1;
     }
     Ok(applied)
+}
+
+/// Retira el MARCADOR DE POSICIÓN que el seed de un módulo plantó en `table`, ahora que el import
+/// acaba de escribir ahí los datos de verdad del negocio (hub#1535).
+///
+/// El caso que lo motiva: un hub recién montado instala `schedules`, cuyo seed siembra una semana
+/// genérica (Mon–Fri 09:00–18:00, fin de semana cerrado) para que «sin horario configurado» deje de
+/// ser un estado alcanzable (schedules#36). Después llega el blueprint del sector con el horario
+/// REAL, y las dos semanas conviven: el sábado sale abierto de 09:30 a 14:00 **y** cerrado, y
+/// «¿estamos abiertos?» contesta según la fila que le toque. Ninguna de las dos guardas de
+/// idempotencia puede evitarlo — no hay índice único (`schedules#8` lo retiró: una jornada partida
+/// son varias filas por día) y el seed no declara clave (su guarda es la tabla entera) —, así que
+/// la guarda queda solo por `id` y los ids nunca coinciden.
+///
+/// La regla que aplica es la que el catálogo starter ya escribe a mano en SQL
+/// (ERPlora/blueprints#24): **una fila firmada por el instalador es provisional y cede**. Aquí vive
+/// en el importador, que es genérico y sirve a los 27 módulos.
+///
+/// Tres cierres, y los tres importan:
+///
+/// * **Solo tablas que el módulo declaró como marcador** (`Registry::seeds_placeholder_table`), o
+///   sea aquellas cuyo seed se guarda por el hub entero. Las categorías fiscales canónicas de
+///   `taxes` o las unidades de `inventory` NO entran: su seed declara clave por fila, van por la
+///   vía de hub#842 y borrarlas se llevaría por delante datos de referencia que otros módulos
+///   resuelven por clave (`tax_category_key`).
+/// * **Solo si los datos de verdad están YA ahí.** Se exige una fila viva no sembrada antes de
+///   retirar nada: si la sección no llegó a insertar (guarda que la saltó, índice único que la
+///   rechazó), retirar el marcador dejaría al hub sin horario — exactamente el estado que
+///   schedules#36 hizo inalcanzable. Por eso se llama DESPUÉS de aplicar, no antes.
+/// * **Soft-delete, y apuntado en el lote.** La fila se marca `is_deleted = 1` como manda el
+///   contrato de fila, y su id queda registrado para que [`undo_import`] la devuelva. Sin eso,
+///   deshacer la importación borraría el horario importado y dejaría el marcador enterrado: la
+///   guarda del seed no filtra `is_deleted`, así que el módulo NO lo replantaría nunca y el hub se
+///   quedaría sin horas para siempre.
+///
+/// Devuelve cuántas filas retiró. Es best-effort como el resto del camino del import: una tabla sin
+/// las columnas del contrato de fila no se toca.
+pub(crate) async fn retire_seeded_placeholder(
+    rt: &Runtime,
+    batch_id: Option<&str>,
+    hub_id: &str,
+    table: &str,
+) -> crate::Result<usize> {
+    let db = rt.db();
+    if !safe_ident(table) {
+        return Ok(0);
+    }
+    // Sin estas dos columnas no se puede ni reconocer el marcador ni retirarlo sin borrar: se deja
+    // como estaba, igual que hace el resto del import ante una tabla que no entiende.
+    if !has_column(db, table, "created_by").await || !has_column(db, table, "is_deleted").await {
+        return Ok(0);
+    }
+    let mut p = hub_params(hub_id);
+    p.insert("marker".into(), serde_json::json!(crate::seed::SEEDED_BY));
+
+    // ¿Aterrizaron los datos del negocio? Si no, no hay nada que sustituya al marcador.
+    let real = db
+        .query(
+            &format!(
+                "SELECT id FROM {table} \
+                 WHERE hub_id = :hub_id AND is_deleted = 0 \
+                 AND (created_by IS NULL OR created_by <> :marker) LIMIT 1"
+            ),
+            &p,
+        )
+        .await
+        .map_err(|e| {
+            crate::RuntimeError::Other(format!("import: leer las filas del negocio en {table}: {e}"))
+        })?;
+    if real.rows.is_empty() {
+        return Ok(0);
+    }
+
+    let seeded = db
+        .query(
+            &format!(
+                "SELECT id FROM {table} \
+                 WHERE hub_id = :hub_id AND is_deleted = 0 AND created_by = :marker"
+            ),
+            &p,
+        )
+        .await
+        .map_err(|e| {
+            crate::RuntimeError::Other(format!("import: leer el marcador sembrado en {table}: {e}"))
+        })?;
+    let ids: Vec<String> = seeded
+        .rows
+        .iter()
+        .filter_map(|r| r.get("id").and_then(|v| v.as_str()).map(str::to_string))
+        .collect();
+    if ids.is_empty() {
+        return Ok(0);
+    }
+
+    // Literales seguros: los ids salen de una consulta nuestra y se escapan igual que en el undo.
+    let list = ids
+        .iter()
+        .map(|id| format!("'{}'", id.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let now = crate::registry::now_rfc3339();
+    let mut sets = format!("is_deleted = 1, updated_at = '{now}'");
+    if has_column(db, table, "deleted_at").await {
+        sets.push_str(&format!(", deleted_at = '{now}'"));
+    }
+    let mut ops: Vec<(String, erplora_db::Params)> = vec![(
+        format!("UPDATE {table} SET {sets} WHERE id IN ({list})"),
+        erplora_db::Params::new(),
+    )];
+    // El registro va en la MISMA transacción que el soft-delete: un marcador retirado que el lote
+    // no apuntara sería un horario que `undo_import` no sabría devolver.
+    if let Some(batch) = batch_id {
+        ensure_batch_tables(db).await?;
+        for id in &ids {
+            let mut rp = erplora_db::Params::new();
+            rp.insert("batch_id".into(), serde_json::json!(batch));
+            rp.insert("table_name".into(), serde_json::json!(table));
+            rp.insert("row_id".into(), serde_json::json!(id));
+            ops.push((
+                "INSERT INTO _hub_import_retired_row (batch_id, table_name, row_id) \
+                 VALUES (:batch_id, :table_name, :row_id)"
+                    .into(),
+                rp,
+            ));
+        }
+    }
+    db.execute_tx(&ops).await.map_err(|e| {
+        crate::RuntimeError::Other(format!("import: retirar el marcador sembrado de {table}: {e}"))
+    })?;
+    Ok(ids.len())
 }
 
 /// Tabla destino de un `INSERT INTO <tabla> …`, o `None` si la sentencia no lo es.
@@ -1046,6 +1178,19 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
         )
         .await
         .map_err(|e| crate::RuntimeError::Other(format!("reset: leer filas del lote: {e}")))?;
+    // hub#1535: y los marcadores que este lote RETIRÓ, que vuelven. Deshacer un import tiene que
+    // dejar el hub como estaba, y como estaba era con la semana genérica que el módulo sembró al
+    // instalarse — no sin horario. El seed no la replantaría: su guarda no filtra `is_deleted`, así
+    // que ve la fila enterrada y no hace nada. Si no la devolvemos aquí, no la devuelve nadie.
+    let retired = db
+        .query(
+            "SELECT table_name, row_id FROM _hub_import_retired_row WHERE batch_id = :batch",
+            &p,
+        )
+        .await
+        .map_err(|e| {
+            crate::RuntimeError::Other(format!("reset: leer marcadores retirados del lote: {e}"))
+        })?;
 
     // Agrupado por tabla, y las tablas en orden inverso de FK (igual que el reset por secciones).
     let mut by_table: Vec<(String, Vec<String>)> = Vec::new();
@@ -1084,6 +1229,42 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
     }
     // El registro del lote se consume en la MISMA transacción: si el borrado revierte, el lote
     // sigue ahí y se puede reintentar (y si no, deshacer otra vez es un no-op limpio).
+    // Los marcadores vuelven ANTES de consumir el registro del lote, y en la misma transacción
+    // que los borrados: o el hub vuelve entero a como estaba, o no se mueve nada.
+    let mut retired_by_table: Vec<(String, Vec<String>)> = Vec::new();
+    for r in &retired.rows {
+        let (Some(t), Some(id)) = (r["table_name"].as_str(), r["row_id"].as_str()) else {
+            continue;
+        };
+        if !safe_ident(t) {
+            continue;
+        }
+        match retired_by_table.iter_mut().find(|(name, _)| name == t) {
+            Some((_, ids)) => ids.push(id.to_string()),
+            None => retired_by_table.push((t.to_string(), vec![id.to_string()])),
+        }
+    }
+    for (table, ids) in &retired_by_table {
+        let list = ids
+            .iter()
+            .map(|id| format!("'{}'", id.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        // Misma comprobación que al retirar: `deleted_at` es opcional en el contrato de fila, y
+        // nombrarla donde no existe tumbaría la transacción ENTERA del undo.
+        let mut sets = String::from("is_deleted = 0");
+        if has_column(db, table, "deleted_at").await {
+            sets.push_str(", deleted_at = NULL");
+        }
+        ops.push((
+            format!("UPDATE {table} SET {sets} WHERE id IN ({list})"),
+            erplora_db::Params::new(),
+        ));
+    }
+    ops.push((
+        "DELETE FROM _hub_import_retired_row WHERE batch_id = :batch".into(),
+        p.clone(),
+    ));
     ops.push((
         "DELETE FROM _hub_import_row WHERE batch_id = :batch".into(),
         p.clone(),
