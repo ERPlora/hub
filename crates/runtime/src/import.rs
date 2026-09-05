@@ -926,6 +926,38 @@ async fn apply_section(
             .map(|n| n as usize),
         None => crate::import_sql::apply(rt.db(), &sql, &scope).await,
     };
+    // 🌱 hub#1535: los datos del negocio ya están dentro; ahora se retira el MARCADOR que el seed
+    // del módulo había dejado en su sitio. Solo en las tablas que el módulo declaró como marcador
+    // (guarda de tabla entera en su seed) y solo si de verdad aterrizó algo — el detalle y los
+    // cierres, en `reset::retire_seeded_placeholder`.
+    //
+    // DESPUÉS de aplicar, no antes: si la sección falla a medias, el hub se queda con la semana
+    // genérica en vez de sin horario. Y sin filtrar por `same_hub` (a diferencia de la clave de
+    // hub#842, que sí lo hace): una fila `created_by = 'system'` nunca la escribió una persona, así
+    // que retirarla no puede perder nada de nadie — y el hub que restaura su copia sobre una
+    // instalación NUEVA, que es el camino de recuperación ante desastre, llega aquí con la semana
+    // sembrada por delante y necesita esto tanto como el que adopta una plantilla ajena.
+    if applied.is_ok() {
+        for table in keys.keys() {
+            if !rt.registry().seeds_placeholder_table(table) {
+                continue;
+            }
+            if let Err(e) =
+                crate::reset::retire_seeded_placeholder(rt, batch_id, target_hub_id, table).await
+            {
+                // El fallo no puede quedar mudo: sin retirar el marcador, la sección deja DOS
+                // horarios vivos y «¿estamos abiertos?» contesta según la fila que le toque. Se
+                // dice qué pasó exactamente, porque las filas del bundle sí entraron.
+                return (
+                    SectionStatus::Failed(format!(
+                        "los datos se aplicaron, pero no se pudo retirar lo que el módulo había \
+                         sembrado en {table} y quedan duplicados: {e}"
+                    )),
+                    discarded,
+                );
+            }
+        }
+    }
     match applied {
         // Applied — but say so honestly when part of it was left out on purpose (hub#405).
         Ok(_) if discarded > 0 => (
@@ -1499,7 +1531,7 @@ fn natural_key_guards(
 /// (`created_by = 'system'`, ver [`crate::export::is_module_seeded`]) — el marcador que separa lo
 /// que planta el módulo de lo que crea una persona (hub#842).
 const SEEDED_ROW_MARKER_COLUMN: &str = "created_by";
-const SEEDED_ROW_MARKER: &str = "system";
+const SEEDED_ROW_MARKER: &str = crate::seed::SEEDED_BY;
 
 /// Claves naturales de cada tabla que toca `sql`, leídas del catálogo del hub DESTINO.
 ///

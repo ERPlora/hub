@@ -234,6 +234,7 @@ async fn register_module(
         let now = crate::registry::now_rfc3339();
         let mut declared: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
             std::collections::HashMap::new();
+        let mut placeholders: Vec<String> = Vec::new();
         for file in seed_files {
             let sql = loader::read_text(dir, file.file())?;
             // hub#842: la guarda `WHERE NOT EXISTS` con la que el seed se hace idempotente ES la
@@ -244,12 +245,27 @@ async fn register_module(
             for (table, keys) in crate::seed::declared_natural_keys(&sql) {
                 declared.entry(table).or_default().extend(keys);
             }
+            // hub#1535: la otra lectura de la MISMA guarda. Cuando el seed no declara clave
+            // porque siembra la tabla ENTERA (`WHERE hub_id = :hub_id`), lo que declara es que
+            // esas filas son un marcador de posición — y el import tiene que saberlo para que el
+            // horario que trae un blueprint sustituya a la semana genérica en vez de convivir con
+            // ella. Se lee aquí, del mismo texto que se ejecuta, por el mismo motivo que la clave.
+            for table in crate::seed::declared_placeholder_tables(&sql) {
+                if !placeholders.contains(&table) {
+                    placeholders.push(table);
+                }
+            }
             crate::seed::apply_module_seed(db, &sql, hub_id, &now).await?;
         }
         if !declared.is_empty() {
             registry
                 .seed_natural_keys
                 .insert(manifest.id.clone(), declared);
+        }
+        if !placeholders.is_empty() {
+            registry
+                .seed_placeholder_tables
+                .insert(manifest.id.clone(), placeholders);
         }
     }
 

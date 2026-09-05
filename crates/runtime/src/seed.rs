@@ -57,6 +57,14 @@ pub async fn apply(db: &dyn DatabaseAdapter, sql: &str, hub_id: &str) -> Result<
 /// natural), no este código: reinstalar un módulo vuelve a ejecutarlo y no debe duplicar.
 ///
 /// Se aplica DESPUÉS de las migraciones — la semilla escribe en tablas que acaban de crearse.
+/// Con quién firma el instalador TODA fila que siembra un módulo (`created_by`).
+///
+/// Es el marcador que separa lo que plantamos nosotros de lo que crea una persona, y es UNIFORME
+/// para los 27 módulos. Lo leen [`crate::export::is_module_seeded`] (para que lo sembrado no viaje
+/// en un bundle) y el import (para que el marcador ceda cuando llegan los datos del negocio,
+/// hub#1535), así que vive junto a quien lo escribe: si esto cambiara, las tres puntas cambian a la vez.
+pub(crate) const SEEDED_BY: &str = "system";
+
 pub async fn apply_module_seed(
     db: &dyn DatabaseAdapter,
     sql: &str,
@@ -67,7 +75,7 @@ pub async fn apply_module_seed(
     params.insert("hub_id".into(), serde_json::json!(hub_id));
     params.insert("now".into(), serde_json::json!(now));
     // La semilla la escribe el sistema, no un usuario: la auditoría queda a nombre del instalador.
-    params.insert("current_user_id".into(), serde_json::json!("system"));
+    params.insert("current_user_id".into(), serde_json::json!(SEEDED_BY));
 
     let stmts = split_statements(sql);
     let mut applied = 0usize;
@@ -392,7 +400,7 @@ pub(crate) fn declared_natural_keys(
     let mut out: std::collections::HashMap<String, Vec<crate::export::NaturalKey>> =
         std::collections::HashMap::new();
     for stmt in split_statements(sql) {
-        let Some((table, key)) = parse_seed_guard(&stmt) else {
+        let Some((table, SeedGuard::Key(key))) = parse_seed_guard(&stmt) else {
             continue;
         };
         let keys = out.entry(table).or_default();
@@ -408,13 +416,52 @@ pub(crate) fn declared_natural_keys(
     out
 }
 
+/// Tablas que el seed de un módulo siembra como **marcador de posición de tabla entera**
+/// (hub#1535): las que declaran [`SeedGuard::WholeTable`].
+///
+/// Es la lectura complementaria de [`declared_natural_keys`] sobre el MISMO texto, y por el mismo
+/// motivo — la guarda con la que el seed se hace idempotente es la única declaración que existe de
+/// lo que el módulo considera suyo. Aquí dice algo más fuerte que una clave: que esas filas son
+/// nuestras solo mientras el negocio no haya puesto las suyas.
+pub(crate) fn declared_placeholder_tables(sql: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for stmt in split_statements(sql) {
+        let Some((table, SeedGuard::WholeTable)) = parse_seed_guard(&stmt) else {
+            continue;
+        };
+        if !out.contains(&table) {
+            out.push(table);
+        }
+    }
+    out
+}
+
+/// Lo que la guarda `WHERE NOT EXISTS` de una sentencia de seed declara sobre lo que planta.
+///
+/// Las dos formas son declaraciones distintas del módulo, y el import las necesita a las dos:
+///
+/// * [`SeedGuard::Key`] — «no plantes si ya existe LA MISMA fila»: el seed reparte filas de
+///   REFERENCIA, una por hueco (`(hub_id, type)` en `sales`, `(hub_id, code)` en `inventory`,
+///   `(hub_id, key)` en `taxes`). Es la clave de hub#842, y hace que la fila entrante equivalente
+///   se salte.
+/// * [`SeedGuard::WholeTable`] — «no plantes si el hub tiene YA algo aquí»: la guarda es
+///   `WHERE hub_id = :hub_id` y nada más, así que el seed no reparte filas independientes: planta
+///   UN objeto —la semana de apertura de `schedules`, siete filas que solo significan algo
+///   juntas— y solo mientras el hub esté virgen. Eso lo convierte en un MARCADOR DE POSICIÓN, no
+///   en datos: cuando llegan los de verdad, cede (hub#1535).
+#[derive(Debug, Clone)]
+enum SeedGuard {
+    Key(crate::export::NaturalKey),
+    WholeTable,
+}
+
 /// Traduce la guarda de UNA sentencia de seed a la clave natural que declara, o `None`.
 ///
 /// Forma aceptada, que es la que escriben los tres seeds del repo:
 /// `INSERT INTO <t> (…) SELECT … WHERE NOT EXISTS (SELECT 1 FROM <t> WHERE <cond> [AND <cond>]…)`,
 /// donde cada `<cond>` es `columna = <lo que sea>` (el valor lo pondrá la fila del bundle, no el
 /// seed) o `columna IS NULL`.
-fn parse_seed_guard(stmt: &str) -> Option<(String, crate::export::NaturalKey)> {
+fn parse_seed_guard(stmt: &str) -> Option<(String, SeedGuard)> {
     let table = stmt
         .trim()
         .strip_prefix("INSERT INTO ")?
@@ -457,19 +504,24 @@ fn parse_seed_guard(stmt: &str) -> Option<(String, crate::export::NaturalKey)> {
         }
         cols.push(col.to_string());
     }
-    // `hub_id` a secas no es una clave: es «esta tabla, en este hub». Con ella la guarda saltaría
-    // TODA fila entrante en cuanto el módulo hubiera sembrado una sola.
+    // `hub_id` a secas no es una clave: es «esta tabla, en este hub». Como CLAVE saltaría TODA
+    // fila entrante en cuanto el módulo hubiera sembrado una sola — por eso no lo es. Lo que sí
+    // es, y hub#1535 necesita, es la otra mitad de la declaración: el módulo dice que siembra
+    // esta tabla como UN objeto y solo cuando el hub no tiene nada suyo. Ver [`SeedGuard`].
+    if cols == ["hub_id"] && predicate.is_empty() {
+        return Some((table.to_string(), SeedGuard::WholeTable));
+    }
     if cols.iter().all(|c| c == "hub_id") {
         return None;
     }
     Some((
         table.to_string(),
-        crate::export::NaturalKey {
+        SeedGuard::Key(crate::export::NaturalKey {
             cols,
             predicate,
             nulls_not_distinct: false,
             seeded_only: true,
-        },
+        }),
     ))
 }
 
@@ -757,6 +809,87 @@ WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND 
         assert!(
             declared_natural_keys(sql).is_empty(),
             "«toda la tabla» no es una clave"
+        );
+    }
+
+    /// …pero SÍ declara la otra cosa (hub#1535): que lo sembrado en esa tabla es un marcador de
+    /// posición. Es la misma guarda leída para lo que de verdad dice.
+    #[test]
+    fn una_guarda_que_solo_mira_el_hub_declara_un_marcador_de_tabla_entera() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id);";
+        assert_eq!(declared_placeholder_tables(sql), vec!["t".to_string()]);
+    }
+
+    /// Y una guarda POR FILA no lo es: son datos de referencia (`inventory_unit`, `taxes_category`)
+    /// que otros módulos resuelven por clave. Retirarlos sería mucho peor que el duplicado que
+    /// hub#1535 arregla, así que las dos lecturas de la guarda son excluyentes.
+    #[test]
+    fn una_guarda_por_fila_no_declara_marcador() {
+        let sql = "INSERT INTO t (id, hub_id, code) SELECT 'x', :hub_id, 'ud' \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id AND code = 'ud');";
+        assert!(
+            declared_placeholder_tables(sql).is_empty(),
+            "una clave por fila describe datos de referencia, no un marcador"
+        );
+        assert_eq!(declared_natural_keys(sql)["t"][0].cols, vec!["hub_id", "code"]);
+    }
+
+    /// El marcador se declara una vez por tabla aunque el seed la siembre en varias sentencias.
+    #[test]
+    fn el_marcador_no_se_repite_por_tabla() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id);\
+                   INSERT INTO t (id, hub_id) SELECT 'y', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id);";
+        assert_eq!(declared_placeholder_tables(sql), vec!["t".to_string()]);
+    }
+
+    /// Una guarda que además de `hub_id` mira otra cosa NO se lee como tabla entera: en la duda se
+    /// deja como estaba (fail-open, igual que el resto de este parser).
+    #[test]
+    fn una_guarda_con_hub_id_y_algo_mas_no_es_marcador_de_tabla_entera() {
+        let sql = "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+                   WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = :hub_id AND parent_id IS NULL);";
+        assert!(declared_placeholder_tables(sql).is_empty());
+    }
+
+    /// Las guardas que el parser descarta por ambiguas tampoco declaran marcador: un `)` dentro del
+    /// cuerpo significa que no vimos la guarda entera, y retirar filas por una lectura a medias es
+    /// exactamente lo que no se puede hacer.
+    #[test]
+    fn una_guarda_ambigua_no_declara_marcador() {
+        for sql in [
+            "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+             WHERE NOT EXISTS (SELECT 1 FROM t WHERE hub_id = upper(:hub_id));",
+            "INSERT INTO t (id, hub_id) SELECT 'x', :hub_id \
+             WHERE NOT EXISTS (SELECT 1 FROM b WHERE hub_id = :hub_id);",
+            "INSERT INTO t (id, hub_id) VALUES ('x', :hub_id);",
+        ] {
+            assert!(
+                declared_placeholder_tables(sql).is_empty(),
+                "guarda ambigua leída como marcador: {sql}"
+            );
+        }
+    }
+
+    /// El seed REAL de `schedules`, leído del repo hermano: la semana de apertura es el marcador
+    /// que hub#1535 tiene que hacer ceder, y esta afirmación es sobre ESE fichero.
+    #[test]
+    fn el_seed_real_de_schedules_declara_su_semana_como_marcador() {
+        let path = crate::e2e_support::modules_root().join("schedules/seed/install.postgres.sql");
+        let Ok(sql) = std::fs::read_to_string(&path) else {
+            println!("⏭  SKIP: sin modules-workspace en {}", path.display());
+            return;
+        };
+        assert_eq!(
+            declared_placeholder_tables(&sql),
+            vec!["schedules_business_hours".to_string()],
+            "la guarda del seed de schedules es la tabla entera:\n{sql}"
+        );
+        assert!(
+            !declared_natural_keys(&sql).contains_key("schedules_business_hours"),
+            "y NO declara clave natural: si la declarara, el import descartaría el horario real"
         );
     }
 
