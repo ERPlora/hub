@@ -1640,4 +1640,48 @@ mod tests {
         assert_eq!(details["cert_ok"], json!(true), "{details}");
         assert!(details["cert_reason"].is_null(), "{details}");
     }
+
+    /// 🔒 The other half of the map: a sample the engine cannot wrap while the producer facts ARE
+    /// present is this hub's own record, not a missing heartbeat — the two ask opposite things of
+    /// the reader. Without this positive, «always `producer_facts_missing`» survived the suite, and
+    /// a business would have been told to wait for a sync that fixes nothing.
+    #[test]
+    fn a_sample_the_engine_cannot_wrap_with_facts_present_is_its_own_code_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        // The diagnostic's own sample with the ONE thing `build_soap` refuses before the schema
+        // ever sees it (hub#324): a total nobody wrote.
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-05",
+            "invoice_date": "2026-09-05",
+            "invoice_type": "F2",
+            "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-05T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("a record with no total cannot be wrapped");
+
+        assert_eq!(reason.code, "sample_envelope_invalid", "{reason:?}");
+        assert!(
+            reason.facts["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("total_amount")),
+            "the reason has to keep naming what to fix: {reason:?}"
+        );
+    }
 }
