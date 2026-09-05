@@ -20,8 +20,12 @@
 //!
 //! | Endpoint | Auth | Contract |
 //! |----------|------|----------|
-//! | `POST /api/print/jobs/{jobId}/retry` | **admin** (+ `printer` if a module names itself) | A `dead` job back to `pending`, `attempts = 0`. `409` naming the state otherwise. |
+//! | `POST /api/print/jobs/{jobId}/retry` | **admin** (+ `printer` if a module names itself) | A `dead` job back to `pending`, `attempts = 0`, stamped with who re-fired it. `409` naming the state otherwise. |
 //! | `POST /api/print/jobs/{jobId}/discard` | **admin** (+ `printer`) | Retires a `pending`/`dead` job, stamped with who, when and why. **Never a delete.** |
+//!
+//! Both stamps name **the module that acted as well as the person** (hub#1532): the gate already
+//! resolves which module is walking through in order to check its grant, and a stamp that keeps
+//! only the human answers «Ana retired it» about a ticket Ana never touched.
 //!
 //! **Writing to the queue is admin, reading it is any session, and that asymmetry is the point**:
 //! hub#987 decided the reader is whoever is standing next to the printer; binning a ticket is the
@@ -267,27 +271,45 @@ fn wrong_state(code: &str, status: String, message: &str) -> Response {
         .into_response()
 }
 
-/// Resolves the admin session AND the module capability, in that order. Returns who is doing this,
-/// already in the `hub_user:<id>` form the audit columns store.
+/// **Who is doing this**, both halves of it (hub#1532).
+///
+/// A recovery gesture is asked for by a PERSON — the admin whose session it is — and, most of the
+/// time, *through* a module the owner granted `printer`. Stamping only the person is what makes
+/// «Ana retired it» the answer when Ana retired nothing: a module acted while her session was open.
+/// The two are not alternatives and neither replaces the other, so both travel to the row.
+struct PrintActor {
+    /// The person, already in the `hub_user:<id>` form the audit columns store.
+    who: String,
+    /// The module that named itself at the door and was checked against the grant, or `""` — the
+    /// shell and `curl` name none. Empty rather than `Option` on purpose: absent and `""` mean the
+    /// same thing, and the column that stores it is `NOT NULL DEFAULT ''`.
+    module: String,
+}
+
+/// Resolves the admin session AND the module capability, in that order — and keeps both names.
 async fn admin_and_printer_capability(
     headers: &HeaderMap,
     st: &AppState,
     rt: &erplora_runtime::Runtime,
-) -> Result<String, Response> {
+) -> Result<PrintActor, Response> {
     let admin = auth::require_admin_session(headers, &st.config, rt)
         .await
         .map_err(admin_rejected)?;
-    crate::flows_api::require_module_capability(
+    let module = crate::flows_api::require_module_capability(
         headers,
         rt,
         erplora_runtime::manifest::CapabilityKind::Printer,
     )
     .await?;
-    Ok(format!("hub_user:{}", admin.id))
+    Ok(PrintActor {
+        who: format!("hub_user:{}", admin.id),
+        module: module.unwrap_or_default(),
+    })
 }
 
 /// POST /api/print/jobs/{jobId}/retry — put a dead job back in front of the print hosts, with its
-/// hand-outs reset. Auth = **admin** session (+ `printer` if a module names itself).
+/// hand-outs reset, stamped with who asked and through which module (hub#1532). Auth = **admin**
+/// session (+ `printer` if a module names itself).
 ///
 /// `409` when the job is not `dead`, naming the state it IS in: a `pending` one is already waiting,
 /// a `printing` one is in a host's hands (and the lease already covers a host that died), a `done`
@@ -303,13 +325,25 @@ pub async fn retry_job(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    if let Err(response) = admin_and_printer_capability(&headers, &st, &rt).await {
-        return response;
-    }
-    match rt.retry_print_job(&job_id).await {
-        Ok(RequeueOutcome::Requeued) => Json(json!({
+    let actor = match admin_and_printer_capability(&headers, &st, &rt).await {
+        Ok(actor) => actor,
+        Err(response) => return response,
+    };
+    match rt
+        .retry_print_job(&job_id, &actor.who, &actor.module)
+        .await
+    {
+        // The stamp travels back for the same reason the discard's does: what the caller reads is
+        // what was STORED, so a screen showing "re-fired by" cannot drift from the row.
+        Ok(RequeueOutcome::Requeued(stamp)) => Json(json!({
             "ok": true,
-            "data": { "jobId": job_id, "status": print_queue::STATUS_PENDING }
+            "data": {
+                "jobId": job_id,
+                "status": print_queue::STATUS_PENDING,
+                "retriedAt": stamp.retried_at,
+                "retriedBy": stamp.retried_by,
+                "retriedByModule": stamp.retried_by_module,
+            }
         }))
         .into_response(),
         Ok(RequeueOutcome::NotFound) => no_such_job(),
@@ -325,7 +359,8 @@ pub async fn retry_job(
 /// Body of `POST …/discard`: **one field**, the reason (same shape as the outbox's, hub#955).
 ///
 /// Everything else in the stamp comes from inside — `discardedAt` from the clock, `discardedBy` from
-/// the resolved session — so this body has no more surface than the reason needs. It is optional:
+/// the resolved session, `discardedByModule` from the capability check the door already ran — so
+/// this body has no more surface than the reason needs. It is optional:
 /// demanding an explanation to close a row is how a recovery queue stops being drained.
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct DiscardReq {
@@ -335,8 +370,8 @@ pub struct DiscardReq {
 /// POST /api/print/jobs/{jobId}/discard — retire a job nobody is ever going to print. Auth =
 /// **admin** session (+ `printer` if a module names itself).
 ///
-/// **Never a delete**: the row survives, stamped with `discardedAt`, `discardedBy` and
-/// `discardReason`, and no print host is handed it again. `409` for a `printing` job — the lease
+/// **Never a delete**: the row survives, stamped with `discardedAt`, `discardedBy`,
+/// `discardedByModule` and `discardReason`, and no print host is handed it again. `409` for a `printing` job — the lease
 /// already covers the host that died, and binning a ticket a live host is rendering would be the
 /// silent loss this queue exists to prevent.
 pub async fn discard_job(
@@ -351,14 +386,18 @@ pub async fn discard_job(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    let who = match admin_and_printer_capability(&headers, &st, &rt).await {
-        Ok(who) => who,
+    let actor = match admin_and_printer_capability(&headers, &st, &rt).await {
+        Ok(actor) => actor,
         Err(response) => return response,
     };
-    // The audit half comes from the SESSION, never from the body: `DiscardReq` has no
-    // `discardedBy` field, so a payload carrying one changes nothing.
+    // The audit half comes from the SESSION and the door's own capability check, never from the
+    // body: `DiscardReq` has no `discardedBy` or `discardedByModule` field, so a payload carrying
+    // one changes nothing.
     let reason = body.and_then(|Json(b)| b.reason).unwrap_or_default();
-    match rt.discard_print_job(&job_id, &who, &reason).await {
+    match rt
+        .discard_print_job(&job_id, &actor.who, &actor.module, &reason)
+        .await
+    {
         Ok(DiscardOutcome::Discarded(stamp)) => {
             Json(json!({ "ok": true, "data": stamp })).into_response()
         }

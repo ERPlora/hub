@@ -1822,6 +1822,40 @@ CREATE TABLE IF NOT EXISTS _hub_gateway_identity (\
         postgres: "DELETE FROM _hub_certificate WHERE kind = 'delegated';",
     },
 
+    // ── v58 — hub#1532: the recovery stamps name the MODULE that acted ───────────────────
+    // Retiring or re-firing a ticket is behind an admin session AND, when the caller names a module,
+    // the `printer` capability the owner granted it (hub#1108). The gate already resolves WHICH
+    // module is walking through and then drops the name: `_print_queue` kept `discarded_by =
+    // hub_user:<id>` and nothing else. An owner with two modules holding `printer` who finds
+    // tickets he did not bin reads "Ana retired it" — and Ana retired nothing.
+    //
+    // Four columns, one per half of the two gestures. `*_by_module` is `NOT NULL DEFAULT ''` like
+    // `discard_reason`, because "no module named itself" (the shell, `curl`) is a real, frequent
+    // answer and it must have ONE spelling: absent and `''` meaning the same thing is the rule
+    // `NewPrintJob::role` already states. The retry half is nullable where the discard half is
+    // (`*_at`/`*_by`), so a job that was never re-fired is NULL rather than pretending to a stamp.
+    //
+    // `Expand`, `ADD COLUMN IF NOT EXISTS`, re-runnable, and reversible by dropping the four
+    // columns — nothing is rewritten and no existing row changes meaning: a row discarded before
+    // this migration keeps its person and gets `''` for the module, which is what actually happened
+    // as far as the hub can know.
+    //
+    // 🔴 The number is the NEXT ONE ABOVE the maximum, never a gap: when it was written the
+    // maximum was v57 in `origin/develop`, in every remote branch and in every local worktree of
+    // the fleet. `apply` compares against the maximum applied and a version below it is skipped
+    // SILENTLY — the hub would boot believing it is up to date, without the columns and without a
+    // single log line.
+    SystemMigration {
+        version: 58,
+        name: "print_queue_acting_module",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS discarded_by_module TEXT NOT NULL DEFAULT '';\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_at TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by TEXT;\
+ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NULL DEFAULT '';",
+    },
+
 ];
 
 /// Crea la tabla de control de migraciones de sistema (idempotente).
@@ -3724,7 +3758,14 @@ mod kind_contract_tests {
         // se queda sin escribir y en NULL, que es como ADR-0269 retira estructura. Al escribirla el
         // máximo era la v56 en `origin/develop` y en TODAS las ramas remotas, y ningún worktree
         // local de la flota pedía la v57.
-        assert_eq!(MIGRATIONS.len(), 54, "el catálogo cambió de tamaño");
+        // + `print_queue_acting_module` (v58, hub#1532): las recovery stamps de `_print_queue`
+        // dicen tambien QUE MODULO actuo, no solo qué persona tenía la sesión abierta
+        // (`discarded_by_module` + el sello del reintento `retried_at`/`retried_by`/
+        // `retried_by_module`). La puerta ya resolvía el módulo para comprobarle el permiso
+        // `printer` y tiraba el nombre. `ALTER … ADD COLUMN IF NOT EXISTS`, re-ejecutable. Al
+        // escribirla el máximo era la v57 en `origin/develop`, en TODAS las ramas remotas y en
+        // todos los worktrees locales de la flota.
+        assert_eq!(MIGRATIONS.len(), 55, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

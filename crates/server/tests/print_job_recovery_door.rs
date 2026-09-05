@@ -404,3 +404,94 @@ async fn a_refusal_says_which_one_it_is() {
     );
     let _ = std::fs::remove_dir_all(&f.temp);
 }
+
+// ── hub#1532 — the stamp names the MODULE that acted, not only the person ─────────────────────
+//
+// The gate above already knows which module is walking through (`X-Erplora-Module`, checked
+// against what the owner granted), and then throws that name away: the row kept `hub_user:<id>`
+// and nothing else. So an owner with two modules holding `printer` who finds tickets he did not
+// bin reads "Ana retired it" — and Ana retired nothing; a module acted while her session was open,
+// and there was no way to tell which. The name is already resolved at the door: it just has to be
+// written down.
+//
+// `""` is the honest value for "no module named itself" — the shell, `curl` — and not a second
+// spelling of it: absent and empty mean the same thing here, the same rule `NewPrintJob::role`
+// states next door.
+
+/// Both gestures stamp the module the owner granted, alongside the person whose session it was.
+#[tokio::test]
+async fn hub1532_the_stamp_names_the_module_that_acted() {
+    let f = fixture(true).await;
+
+    let retried = send(
+        &f.router,
+        post(
+            &format!("/api/print/jobs/{JOB_RETRY}/retry"),
+            Some(&f.admin),
+            Some(PRINTING),
+        ),
+    )
+    .await;
+    assert_eq!(retried.status(), StatusCode::OK);
+    let body = body_json(retried).await;
+    assert_eq!(
+        body["data"]["retriedByModule"],
+        json!(PRINTING),
+        "a re-fire asked for by a module says so: {body}"
+    );
+    assert!(
+        body["data"]["retriedBy"]
+            .as_str()
+            .is_some_and(|s| s.starts_with("hub_user:")),
+        "and the person is still there — the module is EXTRA, not a replacement: {body}"
+    );
+
+    let discarded = send(
+        &f.router,
+        post(
+            &format!("/api/print/jobs/{JOB_DISCARD}/discard"),
+            Some(&f.admin),
+            Some(PRINTING),
+        ),
+    )
+    .await;
+    assert_eq!(discarded.status(), StatusCode::OK);
+    let body = body_json(discarded).await;
+    assert_eq!(
+        body["data"]["discardedByModule"],
+        json!(PRINTING),
+        "the question «which module binned my ticket?» has an answer: {body}"
+    );
+    assert!(
+        body["data"]["discardedBy"]
+            .as_str()
+            .is_some_and(|s| s.starts_with("hub_user:")),
+        "the person the session belongs to is still stamped: {body}"
+    );
+    let _ = std::fs::remove_dir_all(&f.temp);
+}
+
+/// A person acting through the shell names no module, and the stamp says exactly that — empty, not
+/// a made-up module and not the string `"null"`.
+#[tokio::test]
+async fn hub1532_a_person_acting_through_the_shell_stamps_no_module() {
+    let f = fixture(false).await;
+
+    let discarded = send(
+        &f.router,
+        post(
+            &format!("/api/print/jobs/{JOB_DISCARD}/discard"),
+            Some(&f.admin),
+            None,
+        ),
+    )
+    .await;
+    assert_eq!(discarded.status(), StatusCode::OK);
+    let body = body_json(discarded).await;
+    assert_eq!(
+        body["data"]["discardedByModule"],
+        json!(""),
+        "nobody but the person acted, and that is what the row must say: {body}"
+    );
+    let _ = std::fs::remove_dir_all(&f.temp);
+}
