@@ -21,7 +21,9 @@ fn main() {
         Ok(found) => {
             println!("{} USB print queue(s):", found.len());
             for p in &found {
-                println!("  {}  ->  {}", p.id, p.name);
+                // The state comes from CUPS itself (hub#1541), so a queue with no paper reads
+                // `stopped` here instead of the `ready` this listing used to print for every cable.
+                println!("  {}  ->  {}  [{}]", p.id, p.name, p.status);
             }
         }
         Err(e) => {

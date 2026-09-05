@@ -34,6 +34,32 @@ use crate::{PeripheralError, Result};
 pub const CUPS_LP: &str = "lp";
 /// The CUPS client that lists destinations and their device URIs.
 pub const CUPS_LPSTAT: &str = "lpstat";
+/// The CUPS client that prints a destination's attributes as `key=value` (hub#1541).
+///
+/// Same package as [`CUPS_LP`] and [`CUPS_LPSTAT`] (`cups-client`; macOS ships it), so asking it
+/// costs the transport no dependency it did not already have. It is asked instead of `lpstat -p`
+/// because `lpstat` answers in a SENTENCE and CUPS translates that sentence; `lpoptions` answers
+/// with the IPP attributes themselves, and an enum is an enum in every language.
+pub const CUPS_LPOPTIONS: &str = "lpoptions";
+
+/// `PrinterInfo.status` for a queue that will print the next job.
+pub const QUEUE_STATUS_READY: &str = "ready";
+/// `PrinterInfo.status` for a queue that would take the job and HOLD it — no paper, cover open,
+/// cable pulled, paused.
+pub const QUEUE_STATUS_STOPPED: &str = "stopped";
+/// `PrinterInfo.status` for a queue whose state the OS did not tell us. Not a verdict: it is the
+/// absence of one, and it is what "ready" used to be hiding.
+pub const QUEUE_STATUS_UNKNOWN: &str = "unknown";
+
+/// IPP `printer-state` (RFC 8011 §5.4.11), the whole set — there is no fourth value.
+const IPP_STATE_IDLE: &str = "3";
+const IPP_STATE_PROCESSING: &str = "4";
+const IPP_STATE_STOPPED: &str = "5";
+
+/// The IPP severity suffix that means "this printer cannot print now" (RFC 8011 §5.4.12).
+/// `-warning` and `-report` are the other two, and they must NOT stop a till: a thermal roll
+/// running low reports `media-low-warning` for hours while printing perfectly.
+const REASON_ERROR_SUFFIX: &str = "-error";
 
 /// How long a CUPS client gets before we give up on it.
 ///
@@ -49,6 +75,10 @@ const POLL_INTERVAL: Duration = Duration::from_millis(20);
 /// Job title, so a stuck ticket is identifiable in the OS queue window instead of being an
 /// anonymous "Untitled" the user cannot connect to the till.
 const JOB_TITLE: &str = "ERPlora";
+
+/// The `printer_id` prefix a queue is addressed by (`usb:{queue}`), and the way back from the id
+/// to the queue name the OS knows.
+const USB_PRINTER_ID_PREFIX: &str = "usb:";
 
 /// The device-URI scheme the CUPS USB backend uses. Queues on any other scheme are network
 /// printers the sweep already finds, and listing them twice would turn one printer into two.
@@ -86,6 +116,100 @@ pub fn lp_args(queue: &str) -> Vec<&str> {
     vec!["-d", queue, "-t", JOB_TITLE, "-o", "raw"]
 }
 
+/// What the OS says about a print queue, in IPP's own vocabulary — never in its prose.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueueState {
+    /// Idle or printing, and taking work: a submit reaches the paper.
+    Ready,
+    /// The spooler would accept the job and HOLD it. `reason` carries the attributes that decided
+    /// it, verbatim and untranslated, because that is what tells the cashier WHICH fault to fix.
+    NotReady { reason: String },
+    /// We could not ask. Deliberately not a refusal — see [`send_raw`].
+    Unknown,
+}
+
+/// Reads [`QueueState`] out of one `lpoptions -p <queue>` line.
+///
+/// The line is `key=value` pairs separated by spaces, with single quotes around any value that has
+/// a space in it (`printer-info='Brother HL-3150CDW series'`). Only three keys are looked at, and
+/// none of their values can contain a space, so splitting on whitespace and matching whole keys is
+/// enough — a quoted fragment never looks like one of them.
+///
+/// `printer-state` missing is [`QueueState::Unknown`], not a fault: `lpoptions` against a
+/// destination CUPS does not know exits 0 and prints uninitialised bytes with no attribute in them
+/// (measured on macOS 2026-09-05).
+pub fn parse_queue_state(options: &str) -> QueueState {
+    let value_of = |key: &str| {
+        options
+            .split_whitespace()
+            .find_map(|pair| pair.strip_prefix(key)?.strip_prefix('='))
+    };
+    let Some(state) = value_of("printer-state") else {
+        return QueueState::Unknown;
+    };
+    let reasons = value_of("printer-state-reasons").unwrap_or("none");
+    let accepting = value_of("printer-is-accepting-jobs").unwrap_or("true");
+
+    let stopped = state == IPP_STATE_STOPPED;
+    let faulted = reasons
+        .split(',')
+        .any(|reason| reason.trim().ends_with(REASON_ERROR_SUFFIX));
+    let refusing = accepting == "false";
+    if !(stopped || faulted || refusing) {
+        return QueueState::Ready;
+    }
+
+    // Every signal that fired goes in: one fixed fault out of two is still no ticket.
+    let mut reported = Vec::new();
+    if stopped {
+        reported.push(format!("printer-state={}", state_name(state)));
+    }
+    if (stopped || faulted) && reasons != "none" {
+        reported.push(format!("printer-state-reasons={reasons}"));
+    }
+    if refusing {
+        reported.push("printer-is-accepting-jobs=false".to_string());
+    }
+    QueueState::NotReady { reason: reported.join(" ") }
+}
+
+/// The IPP enum as a word, so the error a cashier's manager reads is not a bare `5`. An
+/// unforeseen value is passed through as it came rather than guessed at.
+fn state_name(state: &str) -> &str {
+    match state {
+        IPP_STATE_IDLE => "idle",
+        IPP_STATE_PROCESSING => "processing",
+        IPP_STATE_STOPPED => "stopped",
+        other => other,
+    }
+}
+
+/// Asks CUPS how `queue` is doing. One client spawn, bounded by [`CUPS_TIMEOUT`] like every other.
+///
+/// A failure is [`QueueState::Unknown`], logged, never an error: this is a guard in front of
+/// printing, and a guard that fails closed on a machine whose CUPS answers something we did not
+/// foresee would take USB printing away from a till that had it working.
+fn ask_queue_state(client: &dyn CupsClient, queue: &str) -> QueueState {
+    match client.run(CUPS_LPOPTIONS, &["-p", queue], &[]) {
+        Ok(out) if out.success => parse_queue_state(&out.stdout),
+        Ok(out) => {
+            tracing::warn!(
+                "usb: `{CUPS_LPOPTIONS} -p {queue}` failed ({}); printing without knowing the \
+                 printer's state",
+                first_meaningful_line(&out.stderr).unwrap_or("no reason given")
+            );
+            QueueState::Unknown
+        }
+        Err(e) => {
+            tracing::warn!(
+                "usb: could not ask CUPS about the queue `{queue}` ({e}); printing without knowing \
+                 the printer's state"
+            );
+            QueueState::Unknown
+        }
+    }
+}
+
 /// Sends already-rendered ESC/POS to the printer behind an OS print queue.
 ///
 /// Direct, not queued — the same phase-1 shape Bluetooth has (ADR-0204). [`crate::queue`] is the
@@ -94,12 +218,24 @@ pub fn lp_args(queue: &str) -> Vec<&str> {
 /// that already works, so it is not smuggled in here. The failure stays visible either way: the
 /// error comes straight back to the caller and the print host reports the job `failed`.
 ///
-/// `Ok` means the SPOOLER took the job, which is as far as `lp` can see. A printer that is out of
-/// paper, unplugged or paused keeps the job held in the OS queue — under the title `ERPlora`, so it
-/// can be told apart there — and `lp` still exits 0. What does come back as an error is the spooler
-/// refusing: a queue that does not exist, is disabled or is rejecting jobs, with `lp`'s own sentence
+/// `lp` exits 0 the moment the SPOOLER takes the job, which is as far as it can see: a printer
+/// that is out of paper, unplugged or paused still has a spooler, and it keeps the job HELD in the
+/// OS queue — under the title `ERPlora`, so it can be told apart there. So the state is asked for
+/// FIRST (hub#1541): a queue that would hold the ticket is refused here, with the IPP attributes
+/// that decided it, and the print host reports the job `failed` while the customer is still
+/// standing there instead of the receipt surfacing an hour later when someone reloads the paper.
+///
+/// The guard never fails closed: a state we could not read ([`QueueState::Unknown`]) submits
+/// anyway and leaves the verdict to `lp`, which is already the one that reports the spooler
+/// refusing — a queue that does not exist, is disabled or is rejecting jobs, with its own sentence
 /// in it.
 pub fn send_raw(client: &dyn CupsClient, target: &UsbTarget, payload: &[u8]) -> Result<()> {
+    if let QueueState::NotReady { reason } = ask_queue_state(client, &target.queue) {
+        return Err(PeripheralError::Unreachable(format!(
+            "the printer on the OS print queue `{}` is not ready ({reason}); the job was NOT sent",
+            target.queue
+        )));
+    }
     let out = client.run(CUPS_LP, &lp_args(&target.queue), payload)?;
     if out.success {
         return Ok(());
@@ -161,13 +297,16 @@ pub fn parse_usb_queues(destinations: &str, devices: &str) -> Vec<PrinterInfo> {
                 return None;
             }
             Some(PrinterInfo {
-                id: format!("usb:{queue}"),
+                id: format!("{USB_PRINTER_ID_PREFIX}{queue}"),
                 name: device_name(uri).unwrap_or_else(|| queue.to_string()),
                 kind: "usb".into(),
                 // A USB port says "bytes go through", not "this speaks ESC/POS": an A4 inkjet
                 // plugs into the very same cable. Same honesty rule as the 9100 sweep and SPP.
                 category: default_printer_category(),
-                status: "ready".into(),
+                // `lpstat` carries no printer state at all, so this listing cannot know one.
+                // [`discover_usb_printers`] asks and fills it in; on its own, the parser says so
+                // rather than answering "ready" and having the till act on it (hub#1541).
+                status: QUEUE_STATUS_UNKNOWN.into(),
                 paper_width: DEFAULT_PAPER_WIDTH,
                 mac: None,
             })
@@ -210,7 +349,24 @@ fn queue_named_in<'a>(before_uri: &'a str, names: &HashSet<&str>) -> Option<&'a 
 pub fn discover_usb_printers(client: &dyn CupsClient) -> Result<Vec<PrinterInfo>> {
     let destinations = lpstat(client, "-e")?;
     let devices = lpstat(client, "-v")?;
-    Ok(parse_usb_queues(&destinations, &devices))
+    let mut queues = parse_usb_queues(&destinations, &devices);
+    // One more question per USB queue — a till has one or two, and the answer is the difference
+    // between a screen that says "lista" next to a printer with no paper and one that does not
+    // (hub#1541). Network printers are not asked: they never came from CUPS.
+    for printer in &mut queues {
+        let queue = printer
+            .id
+            .strip_prefix(USB_PRINTER_ID_PREFIX)
+            .unwrap_or(&printer.id)
+            .to_string();
+        printer.status = match ask_queue_state(client, &queue) {
+            QueueState::Ready => QUEUE_STATUS_READY,
+            QueueState::NotReady { .. } => QUEUE_STATUS_STOPPED,
+            QueueState::Unknown => QUEUE_STATUS_UNKNOWN,
+        }
+        .into();
+    }
+    Ok(queues)
 }
 
 /// One `lpstat` listing, or why it could not be had.
@@ -402,6 +558,23 @@ mod tests {
                 stderr: String::new(),
             })
         }
+        /// A CUPS whose `lpoptions -p <queue>` answers `state` and whose `lp` accepts the job.
+        /// The pre-flight of hub#1541 asks the first question before it dares the second.
+        fn queue_state(queue: &'static str, state: &str) -> Self {
+            let ok = |stdout: &str| CupsOutput {
+                success: true,
+                stdout: stdout.into(),
+                stderr: String::new(),
+            };
+            Self {
+                answers: vec![
+                    (vec!["-p", queue], ok(state)),
+                    (Vec::new(), ok("request id is Star_TSP143-7 (1 file(s))")),
+                ],
+                calls: RefCell::new(Vec::new()),
+            }
+        }
+
         /// A healthy CUPS whose `lpstat -e` prints `destinations` and whose `lpstat -v` prints
         /// `devices`.
         fn listing(destinations: &str, devices: &str) -> Self {
@@ -441,6 +614,11 @@ mod tests {
         UsbTarget { queue: "Star_TSP143".into() }
     }
 
+    /// A successful CUPS answer carrying `stdout`.
+    fn cups_said(stdout: &str) -> CupsOutput {
+        CupsOutput { success: true, stdout: stdout.into(), stderr: String::new() }
+    }
+
     #[test]
     fn hub1083_a_raw_cups_queue_receives_the_escpos_bytes() {
         let cups = FakeCups::ok();
@@ -450,8 +628,9 @@ mod tests {
         send_raw(&cups, &a_queue(), &payload).expect("a healthy queue accepts the job");
 
         let calls = cups.calls.borrow();
-        assert_eq!(calls.len(), 1, "exactly one submit per document");
-        let (program, args, stdin) = &calls[0];
+        let submits: Vec<_> = calls.iter().filter(|(program, _, _)| program == CUPS_LP).collect();
+        assert_eq!(submits.len(), 1, "exactly one submit per document");
+        let (program, args, stdin) = submits[0];
         assert_eq!(program, CUPS_LP);
         assert_eq!(stdin, &payload, "the ESC/POS must reach the spooler untouched");
         assert!(
@@ -507,7 +686,10 @@ mod tests {
         // Same honesty rule as the port-9100 sweep and SPP: a USB cable says "bytes go through",
         // not "this speaks ESC/POS" — an A4 inkjet plugs into the same port.
         assert_eq!(star.category, default_printer_category());
-        assert_eq!(star.status, "ready");
+        // hub#1541: `lpstat` carries no printer state at all, so the parser cannot know. It used
+        // to answer "ready" anyway, and that word on screen next to a printer with no paper is
+        // the lie the till acts on. What the listing does not say, the listing does not claim.
+        assert_eq!(star.status, QUEUE_STATUS_UNKNOWN);
         assert_eq!(star.mac, None, "a queue has no MAC; its name is its identity");
     }
 
@@ -659,7 +841,12 @@ mod tests {
             calls.iter().map(|(program, args, _)| (program.as_str(), args.as_slice())).collect();
         assert_eq!(
             asked,
-            vec![(CUPS_LPSTAT, &["-e".to_string()][..]), (CUPS_LPSTAT, &["-v".to_string()][..])],
+            vec![
+                (CUPS_LPSTAT, &["-e".to_string()][..]),
+                (CUPS_LPSTAT, &["-v".to_string()][..]),
+                // hub#1541: and then, for the USB ones only, how each of them is doing.
+                (CUPS_LPOPTIONS, &["-p".to_string(), "Star_TSP143".to_string()][..]),
+            ],
             "`-e` is the names (never translated); `-v` is what prints the device URI, without \
              which there is no way to tell a cable from a LAN"
         );
@@ -692,5 +879,239 @@ mod tests {
         assert!(parse_usb_queues("", "").is_empty());
         assert!(parse_usb_queues("", "lpstat: No destinations added.\n").is_empty());
         assert!(discover_usb_printers(&FakeCups::listing("", "")).expect("empty is fine").is_empty());
+    }
+
+    // ── hub#1541 · the pre-flight ────────────────────────────────────────────────────────────
+    //
+    // `lp` exits 0 the moment the SPOOLER takes the job, and a printer that is out of paper,
+    // paused or unplugged still has a spooler. Measured on macOS 2026-09-05 against a real CUPS
+    // queue (`cupsdisable -r "out of paper"`): `lp -d … -o raw` answered `request id is …-9` with
+    // exit 0 and the ticket sat in the OS queue. So the state has to be ASKED for, before.
+
+    /// A CUPS answer for a queue that is idle and taking work.
+    const LPOPTIONS_IDLE: &str =
+        "printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none";
+
+    #[test]
+    fn hub1541_a_stopped_queue_is_refused_instead_of_letting_the_os_hold_the_ticket() {
+        // The bug itself: paper out, cover open or the cable pulled leaves the queue stopped, `lp`
+        // says yes, and the cashier watches a ticket that never comes. Refusing here is what turns
+        // it into a `failed` job the print host reports while the customer is still standing there.
+        let cups = FakeCups::queue_state(
+            "Star_TSP143",
+            "printer-is-accepting-jobs=true printer-state=5 printer-state-reasons=media-empty-error",
+        );
+
+        let err = send_raw(&cups, &a_queue(), b"ticket")
+            .expect_err("a printer with no paper has not printed anything");
+
+        let shown = err.to_string();
+        assert!(shown.contains("Star_TSP143"), "must name the queue, got: {shown}");
+        assert!(
+            shown.contains("media-empty-error"),
+            "the IPP keyword is the reason, untranslated — it is what says WHY, got: {shown}"
+        );
+        assert!(shown.contains("stopped"), "the state has to be readable, got: {shown}");
+        assert!(
+            !cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP),
+            "the whole point is that the job never reaches the spooler: {:?}",
+            cups.calls.borrow()
+        );
+    }
+
+    #[test]
+    fn hub1541_a_queue_that_is_not_accepting_jobs_is_refused_before_the_submit() {
+        // `lp` would refuse this one too, in the system's language. Catching it here gives the same
+        // machine-readable answer as every other not-ready case instead of two different shapes.
+        let cups = FakeCups::queue_state(
+            "Star_TSP143",
+            "printer-is-accepting-jobs=false printer-state=3 printer-state-reasons=none",
+        );
+
+        let err = send_raw(&cups, &a_queue(), b"ticket").expect_err("a rejecting queue has not printed");
+
+        let shown = err.to_string();
+        assert!(
+            shown.contains("printer-is-accepting-jobs=false"),
+            "must carry the attribute that decided it, got: {shown}"
+        );
+        assert!(!cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP));
+    }
+
+    #[test]
+    fn hub1541_an_error_severity_reason_blocks_even_while_the_queue_still_reads_idle() {
+        // A backend can flag the fault before cupsd stops the queue. The `-error` suffix is the
+        // IPP severity that means "this printer cannot print now" (RFC 8011 §5.4.12), and it is a
+        // keyword, so it says the same thing on a Spanish Mac as on an English one.
+        let cups = FakeCups::queue_state(
+            "Star_TSP143",
+            "printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=cover-open-error",
+        );
+
+        let err = send_raw(&cups, &a_queue(), b"ticket").expect_err("an open cover prints nothing");
+
+        assert!(err.to_string().contains("cover-open-error"), "got: {err}");
+        assert!(!cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP));
+    }
+
+    #[test]
+    fn hub1541_a_warning_or_a_report_does_not_stop_a_printer_that_still_prints() {
+        // The other half of the severity rule, and the one that decides whether this guard is
+        // usable at all: a till whose thermal roll is running low must keep printing. Blocking on
+        // every reason would turn a healthy printer into a dead one, which is worse than the bug.
+        let cups = FakeCups::queue_state(
+            "Star_TSP143",
+            "printer-is-accepting-jobs=true printer-state=3 \
+             printer-state-reasons=media-low-warning,toner-low-warning,cups-waiting-for-job-completed",
+        );
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("a low roll still prints");
+
+        assert!(cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP), "it must submit");
+    }
+
+    #[test]
+    fn hub1541_a_queue_in_the_middle_of_a_job_is_not_mistaken_for_a_stopped_one() {
+        // `printer-state=4` is "processing": the printer is working. Two tickets in a row is the
+        // normal case at a till, so reading it as not-ready would refuse every second receipt.
+        let cups = FakeCups::queue_state(
+            "Star_TSP143",
+            "printer-is-accepting-jobs=true printer-state=4 printer-state-reasons=none",
+        );
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("a busy printer takes the next ticket");
+
+        assert!(cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP));
+    }
+
+    #[test]
+    fn hub1541_a_state_we_could_not_read_still_gets_the_ticket() {
+        // `lpoptions -p <queue>` against a destination CUPS does not know exits 0 and prints
+        // uninitialised bytes with no attribute in them (measured on macOS 2026-09-05). "We could
+        // not ask" is not "it is broken": turning it into a refusal would take USB printing away
+        // from every till whose CUPS answers something we did not foresee. It submits, and `lp`
+        // remains the one that decides — it is the one that already reports a queue that is gone.
+        for unreadable in ["", "Ph\u{fffd}\u{fffd}", "copies=1 number-up=1"] {
+            let cups = FakeCups::queue_state("Star_TSP143", unreadable);
+
+            send_raw(&cups, &a_queue(), b"ticket")
+                .unwrap_or_else(|e| panic!("an unreadable state must not block the till: {e}"));
+
+            assert!(
+                cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_LP),
+                "no submit for {unreadable:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn hub1541_the_preflight_asks_lpoptions_about_that_one_queue() {
+        // Pinned because the WHICH matters: `lpoptions` is in `cups-client`, the same package as
+        // `lp` and `lpstat`, so the guard adds no dependency the transport did not already have —
+        // and its answer is `key=value`, which is the only reason this is not another prose parser.
+        let cups = FakeCups::queue_state("Star_TSP143", LPOPTIONS_IDLE);
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("an idle queue prints");
+
+        let calls = cups.calls.borrow();
+        let asked = &calls[0];
+        assert_eq!(asked.0, CUPS_LPOPTIONS, "the state is asked for FIRST, got {calls:?}");
+        assert_eq!(asked.1, vec!["-p".to_string(), "Star_TSP143".to_string()]);
+    }
+
+    #[test]
+    fn hub1541_the_real_lpoptions_output_of_this_machine_parses() {
+        // Both captured verbatim on macOS (2026-09-05): the first from the Mac's own printer, the
+        // second from a scratch CUPS queue stopped with `cupsdisable -r "out of paper"`. Pinning
+        // REAL output is what keeps the parser honest about the shape CUPS emits — note the
+        // single-quoted values with spaces (`printer-info='Brother HL-3150CDW series'`), which a
+        // hand-written fixture would not have thought of.
+        let idle = "copies=1 device-uri=dnssd://Brother%20HL-3150CDW%20series._ipp._tcp.local./?uuid=e3248000-80ce-11db-8000-3c2af45a10ef finishings=3 job-cancel-after=10800 job-hold-until=no-hold job-priority=50 job-sheets=none,none marker-change-time=1786119370 marker-high-levels=100,100,100,100 marker-levels=100,50,50,100 marker-low-levels=10,10,10,10 marker-types=toner,toner,toner,toner number-up=1 printer-commands=none printer-info='Brother HL-3150CDW series' printer-is-accepting-jobs=true printer-is-shared=false printer-is-temporary=false printer-location printer-make-and-model='Brother HL-3150CDW series-AirPrint' printer-state=3 printer-state-change-time=1786120244 printer-state-reasons=none printer-type=2134044 printer-uri-supported=ipp://localhost/printers/Brother_HL_3150CDW_series";
+        let stopped = "copies=1 device-uri=file:///dev/null finishings=3 job-cancel-after=10800 job-hold-until=no-hold job-priority=50 job-sheets=none,none marker-change-time=0 number-up=1 printer-commands=AutoConfigure,Clean,PrintSelfTestPage printer-info=erplora_probe_1541 printer-is-accepting-jobs=true printer-is-shared=true printer-is-temporary=false printer-location printer-make-and-model='Generic PostScript Printer' printer-state=5 printer-state-change-time=1788609721 printer-state-reasons=paused printer-type=8400972 printer-uri-supported=ipp://localhost/printers/erplora_probe_1541";
+
+        assert_eq!(parse_queue_state(idle), QueueState::Ready);
+        assert_eq!(
+            parse_queue_state(stopped),
+            QueueState::NotReady {
+                reason: "printer-state=stopped printer-state-reasons=paused".into()
+            },
+            "a stopped queue holds the ticket, whatever the OS says in prose"
+        );
+    }
+
+    #[test]
+    fn hub1541_the_state_is_read_as_keywords_never_as_the_sentence_lpstat_prints() {
+        // The trap this transport keeps walking into: `lpstat -p` says "printer X is idle" in
+        // English, «la impresora X está inactiva» in Spanish, and macOS picks that language from
+        // `AppleLanguages`, so `LC_ALL=C` does not help (measured in hub#1537). `lpoptions` prints
+        // the IPP attributes as `key=value` — the enum and the keywords are the same in every
+        // language, which is the whole reason it is the one being asked.
+        assert_eq!(
+            parse_queue_state("printer-is-accepting-jobs=true printer-state=5 printer-state-reasons=media-empty-error,cover-open-error"),
+            QueueState::NotReady {
+                reason: "printer-state=stopped printer-state-reasons=media-empty-error,cover-open-error".into()
+            },
+            "every reason has to reach the cashier: one fixed fault out of two is still no ticket"
+        );
+        assert_eq!(parse_queue_state("printer-state=3"), QueueState::Ready);
+        assert_eq!(parse_queue_state("printer-state-reasons=none"), QueueState::Unknown);
+        assert_eq!(parse_queue_state(""), QueueState::Unknown);
+    }
+
+    // ── hub#1541 · the list ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn hub1541_the_list_shows_each_usb_queues_real_state_instead_of_a_fixed_ready() {
+        // "Lista" next to a printer with no paper is the same lie as the accepted job, one screen
+        // earlier: it is what makes the cashier pick that printer in the first place.
+        let cups = FakeCups {
+            answers: vec![
+                (vec!["-e"], cups_said("Star_TSP143\nEPSON_TM\n")),
+                (
+                    vec!["-v"],
+                    cups_said(
+                        "device for Star_TSP143: usb://Star/TSP143\n\
+                         device for EPSON_TM: usb://EPSON/TM-T20III\n",
+                    ),
+                ),
+                (vec!["-p", "Star_TSP143"], cups_said(LPOPTIONS_IDLE)),
+                (
+                    vec!["-p", "EPSON_TM"],
+                    cups_said("printer-is-accepting-jobs=true printer-state=5 printer-state-reasons=media-empty-error"),
+                ),
+            ],
+            calls: RefCell::new(Vec::new()),
+        };
+
+        let found = discover_usb_printers(&cups).expect("a healthy CUPS answers");
+
+        let shown: Vec<(&str, &str)> =
+            found.iter().map(|p| (p.id.as_str(), p.status.as_str())).collect();
+        assert_eq!(
+            shown,
+            vec![
+                ("usb:Star_TSP143", QUEUE_STATUS_READY),
+                ("usb:EPSON_TM", QUEUE_STATUS_STOPPED)
+            ]
+        );
+    }
+
+    #[test]
+    fn hub1541_a_queue_whose_state_could_not_be_asked_is_listed_unknown_not_ready() {
+        // Same rule as the submit: "we could not ask" is its own answer. Printing it as `ready`
+        // is the bug; hiding the printer would take away the one the till actually has.
+        let cups = FakeCups {
+            answers: vec![
+                (vec!["-e"], cups_said("Star_TSP143\n")),
+                (vec!["-v"], cups_said("device for Star_TSP143: usb://Star/TSP143\n")),
+                // Nothing scripted for `-p`: the fake answers a failure, like a CUPS that cannot.
+            ],
+            calls: RefCell::new(Vec::new()),
+        };
+
+        let found = discover_usb_printers(&cups).expect("the listing itself worked");
+
+        assert_eq!(found.len(), 1, "the printer is there, we just could not ask how it is");
+        assert_eq!(found[0].status, QUEUE_STATUS_UNKNOWN);
     }
 }
