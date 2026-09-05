@@ -192,7 +192,7 @@ minor="${core%.*}"   # X.Y.Z → X.Y
 # El registro es la fuente que importa (es donde se publica) y el workflow ya se ha autenticado
 # contra él con el `docker login` del paso anterior, así que basta el mismo `GITHUB_TOKEN`.
 registry_tags() { # $1 = <owner>/<package>
-    local repo="$1" base token url headers body
+    local repo="$1" base token url headers body next_urls
     base="${IMAGE_TAGS_REGISTRY_BASE:-https://ghcr.io}"
     token=$(curl -fsS --max-time 30 -u "${GITHUB_ACTOR:-github-actions}:${GH_TOKEN:-}" \
         "$base/token?service=ghcr.io&scope=repository:${repo}:pull" 2>/dev/null |
@@ -211,8 +211,13 @@ registry_tags() { # $1 = <owner>/<package>
             return 1
         fi
         jq -r '.tags[]?' < "$body" 2>/dev/null
-        # Link: <...>; rel="next"  → ruta relativa al registro.
-        url=$(sed -n 's/.*[Ll]ink:[[:space:]]*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' "$headers" | head -1)
+        # Link: <...>; rel="next"  → a registry-relative path.
+        # First match by parameter expansion, not `| head -1`: under `pipefail`
+        # the producer's EPIPE would fail the pagination, the published-tag list
+        # would come back short, and the guard would let a tag be republished on
+        # top of the one already in production (hub#1552).
+        next_urls=$(sed -n 's/.*[Ll]ink:[[:space:]]*<\([^>]*\)>;[[:space:]]*rel="next".*/\1/p' "$headers")
+        url=${next_urls%%$'\n'*}
         [ -n "$url" ] && url="$base$url"
     done
     rm -f "$headers" "$body"

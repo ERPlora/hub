@@ -569,7 +569,7 @@ grep -qi 'without checks\|no checks' <<<"$out"   || errs="$errs no-symptom"
 log="$repo/.state/publish-status.log"
 [ -s "$log" ] && grep -q 'HTTP 404' "$log" \
     && ok "unpublishable status: the reason is recorded in publish-status.log" \
-    || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(cat "$log" 2>/dev/null | head -3)"
+    || bad "unpublishable status: the reason is recorded in publish-status.log" "log=$(head -3 "$log" 2>/dev/null)"
 
 # ── 16. `gh` not installed at all is the same silent hole ─────────────────────
 repo=$(make_repo)
@@ -1973,8 +1973,11 @@ grep -q 'raising Postgres lock limits' "$repo/.out" \
     || bad "hub#1375: un push solo-web no escupe 'raise_lock_limits: command not found'" "$errs out=$(tr '\n' ' ' < "$repo/.out" | tail -c 300)"
 
 # (b) El orden, sobre el fichero: definida POR ENCIMA de su primera llamada.
-def_line=$(grep -n '^raise_lock_limits() {' "$HOOK" | head -1 | cut -d: -f1)
-call_line=$(grep -n '^[[:space:]]\+raise_lock_limits[[:space:]]*$' "$HOOK" | head -1 | cut -d: -f1)
+# `-m1` on the grep, not `| head -1`: here grep reads the FILE, so stopping at
+# the first match leaves no producer on the other side of a pipe to kill — and
+# `cut` reads all of its output (hub#1552).
+def_line=$(grep -n -m1 '^raise_lock_limits() {' "$HOOK" | cut -d: -f1)
+call_line=$(grep -n -m1 '^[[:space:]]\+raise_lock_limits[[:space:]]*$' "$HOOK" | cut -d: -f1)
 errs=""
 [ -n "$def_line" ]  || errs="$errs no-encuentro-la-definicion"
 [ -n "$call_line" ] || errs="$errs no-encuentro-la-llamada"

@@ -34,7 +34,9 @@ bad() { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$2"; fail=$((fail + 1)
 
 # A scalar field of the $p preset hashtable, e.g. `OutName = "erplora-app.msix"`.
 ps_field() {
-    sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$PS1" | head -1
+    local matches
+    matches=$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$PS1")
+    printf '%s\n' "${matches%%$'\n'*}"
 }
 
 # The quoted entries of `ExeCandidates = @( ... )`, repo-relative.
@@ -60,8 +62,10 @@ manifest_tokens() {
 
 # `path:` of the workflow step that uploads the MSIX artifact.
 msix_upload_path() {
-    grep -A3 'name: app-msix' "$WORKFLOW" \
-        | sed -n 's/^[[:space:]]*path:[[:space:]]*//p' | head -1
+    local paths
+    paths=$(grep -A3 'name: app-msix' "$WORKFLOW" \
+        | sed -n 's/^[[:space:]]*path:[[:space:]]*//p')
+    printf '%s\n' "${paths%%$'\n'*}"
 }
 
 json_field() { python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get(sys.argv[2],''))" "$1" "$2"; }
@@ -99,7 +103,8 @@ upload_path="$(msix_upload_path)"
 # runner here, so the packer must locate BOTH names — it stages the file as
 # `ExeName` either way, so being right does not depend on knowing the answer.
 product_name="$(json_field "$TAURI_CONF" productName)"
-cargo_bin="$(sed -n 's/^name = "\(.*\)"/\1/p' "$CARGO_TOML" | head -1)"
+cargo_bins="$(sed -n 's/^name = "\(.*\)"/\1/p' "$CARGO_TOML")"
+cargo_bin="${cargo_bins%%$'\n'*}"
 candidates="$(exe_candidates)"
 missing=""
 for want in "$product_name.exe" "$cargo_bin.exe"; do
@@ -121,7 +126,10 @@ done
 # ── 5. The manifest launches the file the packer actually stages ─────────────
 # The exe is staged under `ExeName`, and MSIX refuses to install if
 # Application/@Executable names a file that is not in the package.
-declared_exe="$(grep -o 'Executable="[^"]*"' "$manifest_path" | head -1 | sed 's/Executable="//;s/"//')"
+declared_exes="$(grep -o 'Executable="[^"]*"' "$manifest_path")"
+declared_exe="${declared_exes%%$'\n'*}"
+declared_exe="${declared_exe#Executable=\"}"
+declared_exe="${declared_exe%\"}"
 [ -n "$exe_name" ] && [ "$declared_exe" = "$exe_name" ] \
     && ok "the manifest launches the staged exe ($exe_name)" \
     || bad "the manifest launches the staged exe" \

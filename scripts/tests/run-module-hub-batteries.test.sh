@@ -328,7 +328,7 @@ INSTALLED=alpha,beta RUNNER_BASH="$strict_bash" run_runner
 ok
 grep -q 'unbound variable' <<<"$err" \
     && fail "10: the runner leaked a shell error into its verdict channel under $strict_bash:
-$(printf '%s' "$err" | grep -n 'unbound variable' | head -3)"
+$(grep -n -m3 'unbound variable' <<<"$err")"
 ok
 ran=$(grep -c . "$tmp_dir/battery.log")
 [ "$ran" -eq 3 ] || fail "10: $ran of 3 batteries ran under $strict_bash"

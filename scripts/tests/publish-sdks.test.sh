@@ -114,7 +114,8 @@ fi
 
 # ── 2. The three carriers of the number agree in the COMMITTED tree ──────────
 core_version=$(cargo_section_version "$repo_root/Cargo.toml" workspace.package)
-ts_version=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sdk_version_ts" 2>/dev/null | head -1)
+ts_versions=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sdk_version_ts" 2>/dev/null)
+ts_version=${ts_versions%%$'\n'*}
 pkg_version=$(json_field "$sdk_package_json" version)
 
 if [ -z "$ts_version" ]; then
@@ -141,7 +142,8 @@ else
     if "$stamp" --root "$sandbox" --version 9.8.7 >/dev/null 2>&1; then
         stamped_cargo=$(cargo_section_version "$sandbox/Cargo.toml" workspace.package)
         stamped_pkg=$(json_field "$sandbox/packages/module-sdk/package.json" version)
-        stamped_ts=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sandbox/packages/module-sdk/src/version.ts" 2>/dev/null | head -1)
+        stamped_tss=$(sed -n "s/^export const SDK_VERSION = '\([^']*\)'.*/\1/p" "$sandbox/packages/module-sdk/src/version.ts" 2>/dev/null)
+        stamped_ts=${stamped_tss%%$'\n'*}
         missed=""
         [ "$stamped_cargo" = "9.8.7" ] || missed="$missed Cargo.toml(='$stamped_cargo')"
         [ "$stamped_pkg" = "9.8.7" ]   || missed="$missed packages/module-sdk/package.json(='$stamped_pkg')"

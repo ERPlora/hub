@@ -234,7 +234,12 @@ while read -r path; do
         continue
     fi
 
-    numstat=$(git -C "$hub" diff --numstat "$toolkit_blob" "$hub_blob" | head -n 1)
+    # `git diff --numstat` between two blobs prints one line, but the first line
+    # is taken with a parameter expansion and not with `| head -n 1`: this script
+    # runs under `set -e`, so an EPIPE on the producer would not return a wrong
+    # verdict — it would kill the run mid-verdict (hub#1552).
+    numstat=$(git -C "$hub" diff --numstat "$toolkit_blob" "$hub_blob")
+    numstat=${numstat%%$'\n'*}
     added=$(printf '%s' "$numstat" | cut -f1)
     removed=$(printf '%s' "$numstat" | cut -f2)
     case "$removed" in

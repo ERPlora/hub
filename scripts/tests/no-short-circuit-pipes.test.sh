@@ -33,6 +33,11 @@
 #     (`--quiet`, `--silent`, `--max-count=N`) and the pipeline split over two
 #     lines, each with its own fixture, because a guard whose regex silently
 #     stops matching is the same lie one level up (hub#1327, hub#1359);
+#   · the SAME two halves for `| head` (hub#1552), the slower-fusing twin: its
+#     mechanism proven, every argument shape caught (`-1`, `-n N`, `-c N`,
+#     `--lines=N`, and no argument at all), and `tail`, `head` reading a file,
+#     `head` as the PRODUCER of a pipe and any `head*` command left alone —
+#     `tail` never short-circuits, so forbidding it would be unsatisfiable;
 #   · it does NOT fire on the fix (`grep -q P <<<"$b"`), on prose that merely
 #     TALKS about the pattern, on `||` (the OR operator is not a pipe — and the
 #     pre-push gate would abort that push), or on the line tagged `sigpipe-demo`;
@@ -85,6 +90,33 @@ elif [ "$herestring_verdict" != present ]; then
         "\`grep -q … <<<\"\$bloque\"\` también dijo «ausente» sobre un bloque que SÍ contiene el patrón: el arreglo de hub#1534 no vale en esta plataforma"
 else
     ok "el patrón \`printf … | grep -q\` miente bajo pipefail y el here-string no (hub#1534)"
+fi
+
+
+# ── 1b. The `head` mechanism, proven too — not assumed (hub#1552) ────────────
+# `| head -N` is the same short-circuit with a longer fuse: head exits at the
+# Nth line and closes the pipe, the producer takes EPIPE and dies with 141, and
+# `pipefail` hands THAT to the pipeline. What it loses is not the ANSWER (head's
+# own output is complete) but the STATUS: `set -e` aborts the script, and any
+# `if`/`||` reading the pipeline takes the error branch on a run where nothing
+# went wrong. It needs more output than `grep -q` before it bites — head reads N
+# lines before cutting — which is why it is still latent and not an outage. The
+# sites are release scripts (the image tag, the mirrors verdict, the `v*` tag
+# list that grows with every release), where a false red is a release that does
+# not happen.
+head_piped=0;      printf '%s' "$sigpipe_block" | head -1 >/dev/null || head_piped=$? # sigpipe-demo
+head_herestring=0; head -1 <<<"$sigpipe_block" >/dev/null            || head_herestring=$?
+
+if [ "$head_piped" -eq 0 ]; then
+    # NOT a pass, same as above: the race went the other way here, so the new
+    # pattern of the guard is unproven on this box.
+    bad "el patrón \`productor | head -N\` también miente bajo pipefail (hub#1552)" \
+        "esta plataforma NO reprodujo el SIGPIPE (el productor ganó la carrera): reprodúcelo en Linux antes de fiarte de este verde"
+elif [ "$head_herestring" -ne 0 ]; then
+    bad "el here-string sobrevive donde la tubería muere, también con \`head\`" \
+        "\`head -1 <<<\"\$bloque\"\` salió $head_herestring sobre un bloque perfectamente legible: el arreglo de hub#1552 no vale en esta plataforma"
+else
+    ok "el patrón \`productor | head -N\` sale $head_piped bajo pipefail y el here-string 0 (hub#1552)"
 fi
 
 if [ ! -x "$scanner" ]; then
@@ -177,6 +209,96 @@ else
     ok "un \`||\` antes en la línea no tapa la tubería real que viene después"
 fi
 
+
+# ── 3b. Positive control: `| head` in every shape this repo writes ──────────
+# One fixture per shape (hub#1552). `-1` and `-n 1` are the two spellings the
+# sixteen swept lines used; `-c N` cuts by bytes and short-circuits the same;
+# `--lines=N` is the GNU long form, which is what a Linux runner accepts and a
+# guard that only knows `-1` would wave through; and NO argument at all is
+# `-n 10`, the shape that looks harmless and cuts at the tenth line.
+HEAD=head
+dirty_head() { # $1 = the head arguments (may be empty) → one offending line
+    if [ -n "$1" ]; then
+        printf "printf '%%s\\\\n' \"\$block\" | %s %s\n" "$HEAD" "$1"
+    else
+        printf "printf '%%s\\\\n' \"\$block\" | %s\n" "$HEAD"
+    fi
+}
+j=0
+for hargs in "-1" "-n 1" "-n1" "-5" "-c 200" "--lines=1" ""; do
+    j=$((j + 1))
+    fixture "poshead$j" dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+$(dirty_head "$hargs")
+FIXTURE
+    label=${hargs:-«sin argumentos» (= -n 10)}
+    out=$("$scanner" --root "$tmp_dir/poshead$j" 2>&1)
+    code=$?
+    if [ "$code" -eq 0 ]; then
+        bad "el guard caza \`head $label\` detrás de una tubería" \
+            "salió 0 sobre un fichero que SÍ tiene el patrón — una reintroducción con \`head $label\` pasaría entera (hub#1552)"
+    elif ! grep -qE 'dirty\.sh:4' <<<"$out"; then
+        bad "el guard nombra fichero y línea al cazar \`head $label\`" \
+            "se esperaba \`dirty.sh:4\` (la línea ofensora): out=$(flat "$out")"
+    else
+        ok "caza \`head $label\` detrás de una tubería, con fichero y línea"
+    fi
+done
+
+# The split pipeline again, now for the head form: same pipe, and the line to
+# name is still the READER's.
+fixture poshead-eol dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+printf '%s\n' "\$block" |
+
+    # the reader, two lines below the pipe
+    $HEAD -1
+FIXTURE
+out=$("$scanner" --root "$tmp_dir/poshead-eol" 2>&1)
+code=$?
+if [ "$code" -eq 0 ] || ! grep -qE 'dirty\.sh:7' <<<"$out"; then
+    bad "el guard caza la tubería partida en dos líneas con \`head\` en la siguiente" \
+        "exit=$code out=$(flat "$out")"
+else
+    ok "caza la tubería partida en dos líneas con \`head\` y nombra la línea del lector"
+fi
+
+# ── 3c. `head` glued to what follows it — `)`, `>`, `;`, `|` ────────────────
+# `$(… | head)`, `| head>/dev/null`, `| head; …` and `| head| wc -l` are the
+# bare form with nothing between `head` and the next token. A boundary spelled
+# "a space or the end of the line" waves all four through; the boundary that
+# holds is "not a character a command NAME can continue with" — which still
+# leaves `headers_of`, `head_of_queue` and a `head.sh` alone (hub#1552, review).
+k=0
+for glued in ')' '>/dev/null' '; :' '| wc -l'; do
+    k=$((k + 1))
+    case "$glued" in
+        (')') line="first=\$(printf '%s\\n' \"\$block\" | $HEAD)" ;;
+        (*)   line="printf '%s\\n' \"\$block\" | $HEAD$glued" ;;
+    esac
+    fixture "posglued$k" dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+$line
+FIXTURE
+    out=$("$scanner" --root "$tmp_dir/posglued$k" 2>&1)
+    code=$?
+    if [ "$code" -eq 0 ]; then
+        bad "el guard caza \`| head\` pegado a \`$glued\`" \
+            "salió 0 sobre un fichero que SÍ tiene el patrón — \`| head${glued}\` pasaría entero (hub#1552)"
+    elif ! grep -qE 'dirty\.sh:4' <<<"$out"; then
+        bad "el guard nombra fichero y línea al cazar \`| head\` pegado a \`$glued\`" \
+            "se esperaba \`dirty.sh:4\`: out=$(flat "$out")"
+    else
+        ok "caza \`| head\` pegado a \`$glued\`, con fichero y línea"
+    fi
+done
+
 # ── 4. Negative control: the FIX, prose about the pattern, and the opt-out ──
 # A guard that also fires on the fix is a guard nobody can satisfy; one that
 # fires on a comment explaining the trap punishes writing the explanation down.
@@ -199,6 +321,38 @@ if [ "$code" -ne 0 ]; then
         "exit=$code out=$(flat "$out")"
 else
     ok "no fira sobre el here-string, la prosa entre backticks, un \`||\` (entero o partido) ni \`sigpipe-demo\`"
+fi
+
+
+# ── 4b. Negative control for the head form: the fixes, and the lookalikes ───
+# `tail` is the one that matters: it reads its input to the END, so it can never
+# send SIGPIPE upstream and forbidding it would be a rule nobody can satisfy.
+# `head` as the PRODUCER of a pipe is fine for the same reason. And a command
+# whose name merely BEGINS with "head" is not head — a guard without that word
+# boundary would fire on every `headers_of`, and a guard that cries wolf is the
+# defect of hub#1534 one level up.
+fixture neghead clean.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+$HEAD -1 <<<"\$block"
+first=\$(${HEAD} -n 1 "\$file")
+printf '%s\n' "\$block" | tail -1
+${HEAD} -1 "\$file" | $GREP -F NEEDLE
+printf '%s\n' "\$block" | headers_of "\$file"
+printf '%s\n' "\$block" | head_of_queue
+[ -n "\$block" ] || $HEAD -1 <<<"\$block"
+# Never \`printf '%s\n' "\$block" | $HEAD -1\`: the pipeline lies under pipefail.
+echo "el patrón \\\`productor | $HEAD -N\\\` miente bajo pipefail"
+$(dirty_head "-1") # sigpipe-demo
+FIXTURE
+out=$("$scanner" --root "$tmp_dir/neghead" 2>&1)
+code=$?
+if [ "$code" -ne 0 ]; then
+    bad "el guard NO fira sobre \`head\` legítimo: here-string, fichero, productor, \`tail\`, \`head*\` que no es head, prosa ni \`sigpipe-demo\`" \
+        "exit=$code out=$(flat "$out")"
+else
+    ok "no fira sobre \`head <<<\`, \`head fichero\`, \`head\` como productor, \`| tail\`, \`headers_of\`/\`head_of_queue\`, la prosa ni \`sigpipe-demo\`"
 fi
 
 # ── 5. Discovery is the whole repo, hook included ───────────────────────────
@@ -227,6 +381,39 @@ code=$?
     && ok "ningún script del repo canaliza hacia un lector que corta (hub#1534)" \
     || bad "ningún script del repo canaliza hacia un lector que corta (hub#1534)" \
            "exit=$code — usa \`grep -q PATRÓN <<<\"\$bloque\"\`: $(flat "$out")"
+
+# ── 6b. `--help` prints the WHOLE header, usage included ────────────────────
+# It used to be a hard line range, and it started cutting the usage off the
+# moment the header grew for hub#1552 — silently, because nothing read it.
+help_out=$("$scanner" --help 2>&1)
+help_missing=""
+for want in "Usage:" "--root DIR" "--list" "Exit: 0 clean"; do
+    # `--` because the wanted strings ARE flags, and `${want}` braced because a
+    # `$VAR` glued to a multibyte character is read as part of the NAME (the same
+    # trap hub#1375 hit in the gate) — with `set -u` that is fatal, not a warning.
+    grep -qF -- "$want" <<<"$help_out" || help_missing="$help_missing «${want}»"
+done
+[ -z "$help_missing" ] \
+    && ok "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
+    || bad "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
+           "faltan:$help_missing — el corte va anclado al cierre del bloque, no a un número de línea (hub#1552)"
+
+
+# And it STOPS at the closing rule — in any locale. `─` is one character under
+# UTF-8 and three bytes under C/POSIX, so a quantifier written on it applies to
+# its LAST byte only and the closing rule never matches: `sed '2,/re/p'` then
+# runs to EOF and `--help` prints the whole script, code included (measured:
+# 215 lines instead of 68). The wanted-strings check above cannot see that — the
+# whole script contains them all — so the body is asserted ABSENT, twice.
+help_c=$(LC_ALL=C LANG=C "$scanner" --help 2>&1)
+help_leak=""
+grep -qF 'self_dir=' <<<"$help_out" && help_leak="$help_leak UTF-8"
+grep -qF 'self_dir=' <<<"$help_c"   && help_leak="$help_leak C"
+grep -qF -- '--root DIR' <<<"$help_c" || help_leak="$help_leak C-sin-uso"
+[ -z "$help_leak" ] \
+    && ok "\`--help\` se detiene en el cierre de la cabecera, también bajo LC_ALL=C" \
+    || bad "\`--help\` se detiene en el cierre de la cabecera, también bajo LC_ALL=C" \
+           "el cuerpo del script se cuela en la ayuda bajo:$help_leak — el ancla del cierre lleva un cuantificador sobre un carácter multibyte (hub#1552)"
 
 # ── 7. Wiring: something actually RUNS both halves ──────────────────────────
 # `scripts-tests-wiring.test.sh` already refuses a contract test no workflow
