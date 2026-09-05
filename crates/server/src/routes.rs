@@ -424,6 +424,10 @@ pub fn app(state: AppState) -> Router {
         .route("/api/auth/cloud", post(auth_cloud))
         .route("/api/auth/courier", post(auth_courier))
         .route("/api/auth/logout", post(auth_logout))
+        // The door to erplora.com from the till (pm#196, hub#1400): trades the hub session for a
+        // one-time address that opens the SaaS session in the system browser. Only for whoever
+        // typed their password, not for a shift PIN — see `auth_handoff`.
+        .route("/api/auth/handoff", post(auth_handoff))
         // ── Gestión de usuarios-login del Hub (identidad, ADR-0157 §7 / checklist core #2) ──────
         // Alta/baja/listado de quién puede ENTRAR en el hub. Gate owner/admin (sesión, NO api key).
         // Cada alta/baja crea/desactiva el `hub_user` local Y notifica al SaaS (`members`). NO es

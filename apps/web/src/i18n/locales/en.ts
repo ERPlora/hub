@@ -37,8 +37,11 @@ export default {
     appsEmpty: 'Your apps will show up here. Tap Apps to add the ones your business needs.',
     appsClose: 'Close',
     assistant: 'Assistant',
-    // The way out to management (hub#364). It is the only affordance an icon-only action has, and
-    // it crosses a product boundary, so it names the destination out loud.
+    // The way out to management (hub#364). It crosses a product boundary, so it names the
+    // destination: `manageShort` is what is READ on the button, `manage` is the whole sentence the
+    // accessible name reads out (hub#1400 — the entry used to be icon-only at the till). The short
+    // one is the BRAND, so it is the same word in every language.
+    manageShort: 'erplora.com',
     manage: 'Manage your business at erplora.com',
     manageError: 'We could not open your browser. Go to erplora.com to manage your business.',
     notifications: 'Notifications',

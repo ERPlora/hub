@@ -411,6 +411,17 @@ impl Runtime {
         identity::resolve_session(self.db.as_ref(), &self.hub_id, token).await
     }
 
+    /// Resolves a valid session to its `hub_user` **and to the credential it was opened with**.
+    ///
+    /// Used by the browser handoff door (pm#196): "can administer" and "typed their password" are
+    /// two different questions, and only the second one is answered by this column.
+    pub async fn resolve_session_with_credential(
+        &self,
+        token: &str,
+    ) -> Result<Option<(identity::HubUser, identity::Credential)>> {
+        identity::resolve_session_with_credential(self.db.as_ref(), &self.hub_id, token).await
+    }
+
     /// Cierra una sesión (logout).
     pub async fn delete_session(&self, token: &str) -> Result<()> {
         identity::delete_session(self.db.as_ref(), &self.hub_id, token).await

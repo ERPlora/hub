@@ -1502,6 +1502,49 @@ pub async fn resolve_session(
     Ok(res.rows.first().map(row_to_user))
 }
 
+/// [`resolve_session`], also saying **what the identity was proved with** when the session opened.
+///
+/// The column has existed since hub#658 as a trace ("who opened THIS session, and with what?"), and
+/// since pm#196 it also **decides**: handing the browser a SaaS session is allowed only when the
+/// person standing there typed their password, never from a shift PIN (ADR-0226 — the local user's
+/// credential is never administrative). The role's permission is not enough to answer that
+/// question, because the role says what they may do and not how they proved it.
+///
+/// The same two sides of the `JOIN` bounded by `hub_id` as [`resolve_session`]: a session from
+/// another hub of the same database does not resolve here (hub#497).
+pub async fn resolve_session_with_credential(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    token: &str,
+) -> Result<Option<(HubUser, Credential)>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("token".into(), json!(token));
+    p.insert("now".into(), json!(now_rfc3339()));
+    let res = db
+        .query(
+            "SELECT u.id, u.name, u.role, u.cloud_user_id, u.is_active, \
+                    s.credential_kind, s.credential_ref \
+              FROM hub_session s JOIN hub_user u ON u.id = s.user_id AND u.hub_id = s.hub_id \
+              WHERE s.hub_id = :hub_id AND s.token = :token \
+                AND s.expires_at > :now AND u.is_active = 1",
+            &p,
+        )
+        .await?;
+    Ok(res.rows.first().map(|row| {
+        (
+            row_to_user(row),
+            Credential {
+                kind: row["credential_kind"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                reference: row["credential_ref"].as_str().unwrap_or_default().to_string(),
+            },
+        )
+    }))
+}
+
 /// Cierra una sesión (logout).
 pub async fn delete_session(db: &dyn DatabaseAdapter, hub_id: &str, token: &str) -> Result<()> {
     let mut p = Params::new();

@@ -337,6 +337,15 @@ export interface HubSessionResult {
   token: string;
   user: { id: string; name: string; role: string };
   permissions: string[];
+  /**
+   * **What whoever just signed in proved their identity WITH**: `cloud` (email + password), `pin`,
+   * `badge` (hub#658). The runtime writes it on the `hub_session` row and returns it here because
+   * the shell has to decide what to paint before anybody presses anything — the door to erplora.com
+   * is offered only to a password login (hub#1400).
+   *
+   * Optional in the type: an answer that does not carry it leaves the session shut, not open.
+   */
+  credential_kind?: string;
 }
 
 export interface CourierSessionResult extends HubSessionResult {
@@ -476,6 +485,43 @@ export async function runtimeSetPin(pin: string, sessionToken: string, currentPi
     currentPin ? { pin, current_pin: currentPin } : { pin },
     { 'X-Hub-Session': sessionToken },
   );
+}
+
+/**
+ * **Trades the till's session for a one-time SaaS address** (pm#196, hub#1400) —
+ * `POST /api/auth/handoff`.
+ *
+ * The link to erplora.com opens in the system browser, which does **not share the cookie jar** with
+ * the installed app's webview: until now it landed signed out, and the owner typed her password and
+ * second factor again right before paying. The runtime trades the hub session for a one-time pass
+ * and returns the address that spends it.
+ *
+ * It goes through the runtime and not straight to the SaaS because the SaaS **cannot see** what is
+ * checked here: whether the person standing there typed their password or a shift PIN is something
+ * only `credential_kind` says (hub#658). The two credentials it needs —`X-Hub-Session` and the
+ * user's Bearer— are put in by `runtimeHeaders`, the same door the rest of the shell already uses.
+ *
+ * `next` is a **relative** route of the SaaS; the runtime validates it and rejects anything leaving
+ * it. Throws `RuntimeError` with its code (`handoff_requires_cloud_login`, `handoff_unavailable`…)
+ * when the door refuses: the caller decides whether to degrade to the link of always.
+ *
+ * **A stale Bearer is refreshed ONCE and asked again.** The access token lives one hour
+ * (`SIMPLE_JWT.ACCESS_TOKEN_LIFETIME`) and the till session lives the whole day; the runtime
+ * verifies `exp` before naming the person, so from the second hour on it answers
+ * `handoff_user_token_invalid`. Left alone, that degrades to the plain link — the login form, the
+ * issue's own symptom, four hours late. Same single retry `cloudFetch` and `runtimeGet` do.
+ */
+export async function runtimeBrowserHandoff(next: string): Promise<string> {
+  const { runtimeHeaders } = await import('./runtime');
+  const ask = () =>
+    runtimePost<{ url?: string }>('/api/auth/handoff', { next }, runtimeHeaders());
+  try {
+    return (await ask()).url ?? '';
+  } catch (error) {
+    const stale = error instanceof RuntimeError && error.code === 'handoff_user_token_invalid';
+    if (!stale || !(await refreshTokens())) throw error;
+    return (await ask()).url ?? '';
+  }
 }
 
 /** Revoca la sesión server-side del runtime (logout). Best-effort: no lanza si el runtime falla. */

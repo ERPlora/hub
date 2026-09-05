@@ -548,6 +548,26 @@ impl CloudClient {
         )
     }
 
+    /// **A one-time pass to open this person's session in the browser** (pm#196) —
+    /// `POST /api/v1/auth/handoff/issue/` with the **user's JWT**.
+    ///
+    /// It is the Hub→SaaS half of the e-mail ADR-0157 §8 already has in the opposite direction: the
+    /// till links to erplora.com for everything it deliberately does not sell (the plan, the
+    /// invoices, the module checkout), and inside the installed app the system browser is a
+    /// different cookie jar, so until now that link landed **signed out**.
+    ///
+    /// 🔒 It is signed with [`Auth::UserJwt`] **on purpose, never with the machine token**: what is
+    /// being asked for is a browser session *for one specific person*, and the machine token names
+    /// nobody. Signing it with that one would turn a leaked deployment secret into the key to the
+    /// billing of any member of the hub.
+    pub fn browser_handoff_issue(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/auth/handoff/issue/", self.base_url),
+            auth,
+        )
+    }
+
     /// **Refresh del JWT de usuario** contra el Cloud (hub#15, §2.3) — `POST /api/v1/auth/refresh/`
     /// (verificado: `cloud/apps/auth/users/api/urls.py` → `RotatingTokenRefreshView`, rota el
     /// refresh). Es un endpoint **público** en cuanto a cabeceras: NO lleva `Authorization` ni
