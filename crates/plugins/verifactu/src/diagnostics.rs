@@ -277,13 +277,13 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     let details = json!({
         "cert_ok": cert_ok,
         "cert_message": cert_message,
-        // El motivo detrás del guion, como CÓDIGO + hechos (hub#1575), para que el catálogo del
-        // módulo lo diga en el idioma del negocio en vez de interpolar prosa castellana dentro de
-        // una frase inglesa. `null` cuando no hay motivo que dar: la prueba pasó, o el veredicto se
-        // basta solo (hub#1531 dejó el del NIF sin motivo a propósito).
+        // The reason behind the dash, as a CODE + facts (hub#1575), so the module's catalogue can
+        // say it in the language of the business instead of interpolating Spanish prose inside an
+        // English sentence. `null` when there is no reason to give: the test passed, or the verdict
+        // stands on its own (hub#1531 left the NIF one reasonless on purpose).
         "cert_reason": cert_reason.as_ref().map_or(Json::Null, CertReason::as_details),
-        // Por dónde sale este hub (hub#1485). Las palabras son las del core
-        // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) porque la pantalla programa contra ellas.
+        // Which road this hub files on (hub#1485). The words are the core's own
+        // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) because the screen programs against them.
         "route": road,
         "issuer_nif": issuer_nif,
         "invoice_type": invoice_type,
@@ -397,24 +397,24 @@ fn sample_envelope(
     Ok(xml)
 }
 
-/// Por qué falló la prueba, como **código estable + hechos** — y la prosa castellana que hasta
-/// hub#1575 era la respuesta entera (hub#1575).
+/// Why the test failed, as a **stable code + facts** — plus the Spanish prose that was the whole
+/// answer until hub#1575.
 ///
-/// El veredicto ya viajaba como clave (`message_key`, hub#1178) y el módulo lo traducía; el MOTIVO
-/// que va detrás del guion no, así que un negocio en inglés leía «…does not produce a valid test
-/// record — faltan los hechos del productor…»: media frase en un idioma que no eligió, y justo la
-/// mitad que dice qué arreglar.
+/// The verdict already travelled as a key (`message_key`, hub#1178) and the module translated it;
+/// the REASON behind the dash did not, so a business running in English read «…does not produce a
+/// valid test record — faltan los hechos del productor…»: half a sentence in a language it did not
+/// choose, and it was the half that says what to fix.
 ///
-/// `prose` **no se retira**: es el respaldo que pinta un hub cuyo módulo todavía no conoce el
-/// código, exactamente el contrato que `message` tiene desde hub#1178. Quitarla el día que aterriza
-/// el código dejaría a esos hubs con media frase vacía, que es peor que la castellana.
+/// `prose` is **not** withdrawn: it is the fallback painted by a hub whose module does not know the
+/// code yet, exactly the contract `message` has had since hub#1178. Dropping it the day the code
+/// lands would leave those hubs with half an empty sentence, which is worse than a Spanish one.
 #[derive(Debug)]
 pub(crate) struct CertReason {
-    /// Estable: es lo que el catálogo del módulo indexa. No se renombra sin traducir el catálogo.
+    /// Stable: it is what the module's catalogue indexes. Never renamed without translating it.
     code: &'static str,
-    /// Los datos que la frase necesita, ya separados de ella. Objeto siempre.
+    /// The data the sentence needs, already split out of it. Always an object.
     facts: Json,
-    /// La frase castellana del motor, tal cual se venía escribiendo.
+    /// The engine's own Spanish sentence, exactly as it has always been written.
     prose: String,
 }
 
@@ -427,7 +427,7 @@ impl CertReason {
         }
     }
 
-    /// `{"code": …}` con los hechos al lado — la forma que `details` publica y que el módulo lee.
+    /// `{"code": …}` with the facts beside it — the shape `details` publishes and the module reads.
     fn as_details(&self) -> Json {
         let mut out = json!({ "code": self.code });
         if let (Some(target), Some(source)) = (out.as_object_mut(), self.facts.as_object()) {
@@ -439,12 +439,12 @@ impl CertReason {
     }
 }
 
-/// La celda contestó y dijo que no. Cuál de las dos formas es depende de si dijo POR QUÉ: una
-/// celda que da motivo lleva su frase con él; una que no lo da —una celda vieja, la página de
-/// error de un intermediario— lleva una frase que se basta sola.
+/// The cell answered and said no. Which of the two shapes it takes depends on whether it said WHY:
+/// a cell that gives a reason carries it in its sentence; one that does not — an older cell, an
+/// intermediary's error page — carries a sentence that stands on its own.
 ///
-/// Son dos códigos y no uno con el hueco vacío porque un `{detail}` que se pinta en blanco se lee
-/// como un fallo de la pantalla, no como un servicio que se quedó callado.
+/// Two codes and not one with an empty hole, because a `{detail}` painted blank reads as a broken
+/// screen rather than as a service that kept quiet.
 fn gateway_not_ready_reason(readiness: &crate::gateway::GatewayReadiness) -> CertReason {
     let detail = if readiness.reason.is_empty() {
         readiness.status.clone()
@@ -1339,6 +1339,42 @@ mod tests {
             details["cert_reason"]["code"],
             json!("producer_facts_missing"),
             "the reason has to be a code the module can translate, not prose: {details}"
+        );
+        // …and the FACTS travel with it. The catalogue sentences interpolate them by name, so a
+        // code that arrives bare prints `{error}` braces and all on a fiscal screen — the one
+        // shape worse than the Spanish it replaces. Caught by mutation: publishing only the code
+        // left all 208 tests green.
+        assert!(
+            details["cert_reason"]["error"]
+                .as_str()
+                .is_some_and(|e| !e.is_empty()),
+            "the facts the module's sentence needs have to travel with the code: {details}"
+        );
+    }
+
+    /// 🔒 The publisher itself, on its own: every fact goes out BESIDE the code, at the top level
+    /// of `cert_reason`, which is where the module reads them from.
+    ///
+    /// Nested or dropped, the catalogue would print its placeholders raw. This is the control that
+    /// caught it — the end-to-end test above only ever looked at `code`, so an `as_details` that
+    /// published nothing else passed the whole suite.
+    #[test]
+    fn the_published_reason_carries_its_facts_beside_the_code_hub1575() {
+        let reason = CertReason::new(
+            "gateway_not_ready",
+            json!({ "status": "expired", "reason": "", "detail": "expired" }),
+            "prose",
+        );
+
+        assert_eq!(
+            reason.as_details(),
+            json!({
+                "code": "gateway_not_ready",
+                "status": "expired",
+                "reason": "",
+                "detail": "expired",
+            }),
+            "the module reads the facts from the top level, next to the code"
         );
     }
 
