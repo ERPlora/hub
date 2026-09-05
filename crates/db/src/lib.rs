@@ -13,6 +13,7 @@
 //!   (Postgres). The module never sees the positional placeholder.
 //! - Rows are returned as `serde_json::Value` inside [`QueryResult`], ready for the SDK.
 
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
@@ -21,7 +22,7 @@ use async_trait::async_trait;
 use serde_json::{Map, Value as Json};
 use sqlx::encode::IsNull;
 use sqlx::error::BoxDynError;
-use sqlx::{Column, Connection, Encode, Row, Type, TypeInfo, ValueRef};
+use sqlx::{Column, Connection, Encode, Executor, Row, Type, TypeInfo, ValueRef};
 
 mod migration_lock;
 pub use migration_lock::{MigrationLock, MigrationLockError};
@@ -108,6 +109,40 @@ pub struct RowGate {
     pub min: u64,
 }
 
+/// What a column of a SELECT holds, boiled down to the only distinction the list engine's `range`
+/// filter needs (ERPlora/hub#1542): does `>=` compare NUMBERS or does it compare STRINGS?
+///
+/// A `range` bound is the one place a caller's raw value meets a column with `>=`/`<=`, and a
+/// caller that is not a screen — a flow, an assistant tool, an integration — sends what it has at
+/// hand, which is text. Postgres has no `bigint >= text` operator, so that bound used to fail the
+/// whole page with `42883`. The engine cannot decide from the VALUE either: the published
+/// catalogue declares `range` over TEXT columns whose values are all digits
+/// (`customers.list.f_tax_id`), so "looks like a number ⇒ compare as a number" would trade this
+/// failure for a regression on a filter that works today. Only the column knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColumnKind {
+    /// Any of the numeric families — `int2`/`int4`/`int8`, `float4`/`float8`, `numeric`. A TEXT
+    /// bound has to be read as a number before it can be compared.
+    Numeric,
+    /// Everything else, and the answer whenever the type is not known. TEXT above all: the row
+    /// contract stores dates and instants as ISO-8601 TEXT (ADR-0007), and those already compare
+    /// correctly as strings.
+    Other,
+}
+
+impl ColumnKind {
+    /// Maps the type NAME sqlx reports for a column (`INT8`, `TEXT`, `NUMERIC`, …).
+    ///
+    /// Unknown names answer [`Other`](Self::Other) on purpose: not knowing has to leave the bound
+    /// exactly as the caller wrote it, never guess a conversion.
+    pub fn of(type_name: &str) -> Self {
+        match type_name.to_ascii_uppercase().as_str() {
+            "INT2" | "INT4" | "INT8" | "FLOAT4" | "FLOAT8" | "NUMERIC" => Self::Numeric,
+            _ => Self::Other,
+        }
+    }
+}
+
 /// Common contract for the backend. The runtime only knows this trait; it does not know the
 /// concrete pool sitting underneath. One contract, one Postgres implementation (ADR-0154).
 #[async_trait]
@@ -153,6 +188,20 @@ pub trait DatabaseAdapter: Send + Sync {
 
     /// Runs a query and returns the rows as JSON objects.
     async fn query(&self, sql: &str, params: &Params) -> Result<QueryResult, DbError>;
+
+    /// The [`ColumnKind`] of every column the SELECT `sql` returns, as the SERVER resolves it
+    /// (ERPlora/hub#1542).
+    ///
+    /// The list engine asks for this when a `range` bound arrives as TEXT: only the column knows
+    /// whether `>=` has to compare numbers or strings, and guessing from the value is what turns
+    /// one bug into another (an all-digit tax id is a TEXT bound that looks like a number).
+    ///
+    /// The default answers "I do not know" (an empty map), which reads as [`ColumnKind::Other`]
+    /// everywhere and leaves the bound exactly as the caller wrote it. The hub is Postgres-only
+    /// (ADR-0154); the in-memory doubles of the test suite have no column types to report.
+    async fn column_kinds(&self, _sql: &str) -> Result<BTreeMap<String, ColumnKind>, DbError> {
+        Ok(BTreeMap::new())
+    }
 
     /// Toma el lock que serializa **el arranque que migra** de este hub (hub#539).
     ///
@@ -679,6 +728,36 @@ impl DatabaseAdapter for PgAdapter {
         let rows = q.fetch_all(&self.pool).await?;
         let out = rows.iter().map(pg_row_to_json).collect();
         Ok(QueryResult::new(out))
+    }
+
+    /// One `Parse`+`Describe` of the SELECT with the parameter types left for the server to
+    /// infer, read back off the prepared statement.
+    ///
+    /// It goes through sqlx's per-connection statement cache (unlike the queries themselves, which
+    /// opt out of it — see `build_query!`), so the SHAPE of a static SELECT is resolved once per
+    /// connection; what still travels on every call is the connection check of `acquire`.
+    /// Measured in the review of hub#1567 (Postgres 18 in Docker, loopback, one connection):
+    /// 0.33 ms warm, 0.49 ms cold, against 0.58 ms for the simplest `query()`.
+    ///
+    /// That cache is the one hub#1348 keeps `query()` out of, and it bites here too: sqlx keys it
+    /// on the TEXT and `get_or_prepare` reads it BEFORE it honours `.persistent(false)`, so a text
+    /// described here must never be one `query()` executes — the cached statement would pin the
+    /// server-inferred parameter types onto that execution (a FLOAT8 bound decoded as INT8: the
+    /// row vanishes, silently). The marker below makes the described text unique to this door;
+    /// Postgres ignores the comment.
+    async fn column_kinds(&self, sql: &str) -> Result<BTreeMap<String, ColumnKind>, DbError> {
+        use sqlx::{SqlSafeStr, Statement};
+        let (tsql, _names) = translate(sql);
+        let described = format!("{tsql}\n/* column_kinds: described, never executed (hub#1348) */");
+        let mut conn = self.pool.acquire().await?;
+        let stmt = (&mut *conn)
+            .prepare_with(sqlx::AssertSqlSafe(described).into_sql_str(), &[])
+            .await?;
+        Ok(stmt
+            .columns()
+            .iter()
+            .map(|c| (c.name().to_string(), ColumnKind::of(c.type_info().name())))
+            .collect())
     }
 
     async fn migration_lock(
@@ -1615,6 +1694,120 @@ mod tests {
         assert_eq!(r["uid"], json!("00000000-0000-0000-0000-000000000001"));
         // JSONB → parsed value, verbatim.
         assert_eq!(r["meta"], json!({"a": 1}));
+    }
+
+    // ── the column, not the value, decides how a `range` bound compares (hub#1542) ────────────
+
+    /// `column_kinds` reports what the SERVER resolved for every column a SELECT returns, which is
+    /// the only thing that can tell a numeric `range` filter from a text one.
+    ///
+    /// It has to answer for a plain column, for a computed one (an aggregate — `inventory
+    /// .categories.list.product_count` is a `COUNT(*)`), and it has to keep an all-digit TEXT
+    /// column TEXT: that is the regression the "parse the bound as a number" shortcut would cause
+    /// on `customers.list.f_tax_id`.
+    #[tokio::test]
+    async fn column_kinds_reports_what_the_server_resolved() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE erplora_kinds (n BIGINT NOT NULL, r REAL NOT NULL, \
+             m NUMERIC NOT NULL, t TEXT NOT NULL, d DATE NOT NULL);",
+        )
+        .await
+        .unwrap();
+
+        let kinds = db
+            .column_kinds(
+                "SELECT n, r, m, t, d, COUNT(*) OVER() AS c FROM erplora_kinds WHERE t <> :skip",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(kinds.get("n"), Some(&ColumnKind::Numeric));
+        assert_eq!(kinds.get("r"), Some(&ColumnKind::Numeric));
+        assert_eq!(kinds.get("m"), Some(&ColumnKind::Numeric));
+        assert_eq!(kinds.get("c"), Some(&ColumnKind::Numeric), "a computed count is numeric too");
+        assert_eq!(
+            kinds.get("t"),
+            Some(&ColumnKind::Other),
+            "a TEXT column stays TEXT however numeric its values look"
+        );
+        assert_eq!(
+            kinds.get("d"),
+            Some(&ColumnKind::Other),
+            "a native DATE is not a number: its bounds are written as text"
+        );
+    }
+
+    /// The SQL shape the engine emits for a numeric `range` bound: the bound stays a TEXT bind and
+    /// the CAST is written into the statement, so a `NUMERIC` money column keeps its exact
+    /// precision instead of going through an `f64`.
+    #[tokio::test]
+    async fn a_text_bound_cast_to_numeric_compares_by_number() {
+        let db = fresh_db().await;
+        db.execute_batch(
+            "CREATE TABLE erplora_cast (n BIGINT NOT NULL, m NUMERIC NOT NULL); \
+             INSERT INTO erplora_cast (n, m) VALUES (10, 12345.67), (100, 0.01);",
+        )
+        .await
+        .unwrap();
+
+        // `'100' <= '20'` is TRUE as text and FALSE as a number — the row that catches a fix that
+        // compared both sides as strings.
+        let q = db
+            .query(
+                "SELECT n FROM erplora_cast WHERE n >= CAST(:lo AS NUMERIC) \
+                 AND n <= CAST(:hi AS NUMERIC) ORDER BY n",
+                &params(json!({"lo": "10", "hi": "20"})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.iter().map(|r| r["n"].clone()).collect::<Vec<_>>(), vec![json!(10)]);
+
+        // Exact decimal, no float rounding: `12345.67` is not representable in binary.
+        let q = db
+            .query(
+                "SELECT n FROM erplora_cast WHERE m >= CAST(:lo AS NUMERIC) ORDER BY n",
+                &params(json!({"lo": "12345.67"})),
+            )
+            .await
+            .unwrap();
+        assert_eq!(q.rows.len(), 1, "the exact decimal bound matches its own row: {:?}", q.rows);
+    }
+
+    /// hub#1542 × hub#1348 — DESCRIBING a text must never pin the parameter types of RUNNING
+    /// that same text. sqlx's statement cache is keyed on the SQL text alone and `get_or_prepare`
+    /// reads it BEFORE it honours `.persistent(false)`, so a `column_kinds` that left the
+    /// server-inferred types in that cache would hand them to the next `query()` of the same text
+    /// on that connection. Reproduced in the review of hub#1567: after the describe, a `5.0`
+    /// bound (FLOAT8) was decoded with the cached `INT8` and the row a fresh connection answers
+    /// went missing — silently, the exact shape of corruption hub#1348 closed. One connection on
+    /// purpose: a pool is what would otherwise hide it.
+    #[tokio::test]
+    async fn describing_a_text_never_pins_the_parameter_types_of_running_it() {
+        let test_db = crate::testutil::TestDb::new().await;
+        let db = test_db.adapter_with_max_connections(1).await;
+        db.execute_batch(
+            "CREATE TABLE erplora_pin (n INTEGER NOT NULL); INSERT INTO erplora_pin (n) VALUES (5);",
+        )
+        .await
+        .unwrap();
+        let sql = "SELECT n FROM erplora_pin WHERE n = :v";
+
+        let kinds = db.column_kinds(sql).await.unwrap();
+        assert_eq!(kinds.get("n"), Some(&ColumnKind::Numeric));
+
+        // `5.0` binds as FLOAT8 and `n = 5.0` is TRUE for the row. Decoded with the parameter
+        // type the describe left behind, the same eight bytes are another number: the row vanishes.
+        let q = db
+            .query(sql, &params(json!({"v": 5.0})))
+            .await
+            .expect("running the text just described must bind by its OWN parameter types");
+        assert_eq!(
+            q.rows.len(),
+            1,
+            "the row a fresh connection answers must not vanish after a describe: {:?}",
+            q.rows
+        );
     }
 
     // ── JSON boolean → INTEGER 0/1 (hub#208 / ADR-0154) ───────────────────────────────────────

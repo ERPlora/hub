@@ -17,7 +17,8 @@
       "list": {
         "sort": [
           "id",
-          "happened_at"
+          "happened_at",
+          "priority"
         ],
         "default_sort": "id",
         "default_dir": "asc",
@@ -26,6 +27,12 @@
             "op": "range"
           },
           "logged_on": {
+            "op": "range"
+          },
+          "priority": {
+            "op": "range"
+          },
+          "tax_id": {
             "op": "range"
           }
         },

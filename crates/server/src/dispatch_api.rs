@@ -60,6 +60,13 @@ pub(crate) fn err_status_and_code(
         // not send what it needs" — and fix the call instead of trusting a page that quietly held
         // the whole list.
         E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
+        // hub#1542: the third of the same family — a `range` bound the COLUMN cannot read. Same
+        // `422` (the request is well-formed but its payload does not hold up), with its own code
+        // so an integration can tell "that bound is not a number" from a database outage.
+        E::InvalidFilterBound { .. } => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_filter_bound".into(),
+        ),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
@@ -215,6 +222,12 @@ pub(crate) fn may_reach_the_client(e: &erplora_runtime::RuntimeError) -> bool {
         // rechazado y los aceptados. Redactarla dejaría a quien integra con un 400 y sin saber
         // qué parámetro escribió mal, que es peor que el bug que el error previene.
         | E::UnknownFilter { .. }
+        // hub#1542: un extremo de `range` que la columna no sabe leer es la misma familia — el
+        // descuido de quien llama, con la frase escrita por nosotros. Y es la frase la que
+        // arregla la llamada: nombra la lista, CUÁL de los dos extremos no se entendió y el
+        // valor que llegó (que es lo que quien llama acaba de escribir, no un dato del hub).
+        // Redactarla devolvería justo el mensaje genérico que esta issue viene a quitar.
+        | E::InvalidFilterBound { .. }
         | E::Notify(_)
         | E::Print(_)
         | E::Storage(_)
