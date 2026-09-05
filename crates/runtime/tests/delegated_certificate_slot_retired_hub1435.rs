@@ -80,16 +80,50 @@ async fn retirement_is_registered(db: &dyn DatabaseAdapter) -> bool {
     !res.rows.is_empty()
 }
 
+/// The highest system migration this hub has registered.
+async fn max_applied(db: &dyn DatabaseAdapter) -> i64 {
+    let res = db
+        .query(
+            "SELECT MAX(version) AS v FROM _hub_system_migrations",
+            &Params::new(),
+        )
+        .await
+        .unwrap();
+    res.rows
+        .first()
+        .and_then(|r| r.get("v").and_then(|v| v.as_i64()))
+        .unwrap_or_default()
+}
+
 /// Rewinds this hub to the state of one that was deployed BEFORE the retirement.
+///
+/// 🔴 **`>=`, not `=`, and that is the whole fixture.** Un-registering ONLY the retirement leaves a
+/// hub claiming to have applied everything ABOVE it while missing it — which is not "one version
+/// behind", it is the incoherent schema `apply` refuses by design (hub#573), so the test would die
+/// on that refusal instead of exercising the deletion. It happened to work only while the
+/// retirement was the LAST entry in the catalogue, and it stopped the day the next migration
+/// landed. Every other rewind in this tree already uses `>=` for exactly this reason
+/// (`access_email_backfill`, `boot_over_pre_hub_scoped_identity`, the unit tests in
+/// `system_migrations`).
 async fn unapply_the_retirement(db: &dyn DatabaseAdapter) {
+    let version = retirement_version(db).await;
     let mut p = Params::new();
-    p.insert("version".into(), json!(retirement_version(db).await));
+    p.insert("version".into(), json!(version));
     db.execute(
-        "DELETE FROM _hub_system_migrations WHERE version = :version",
+        "DELETE FROM _hub_system_migrations WHERE version >= :version",
         &p,
     )
     .await
     .unwrap();
+
+    // The guard that keeps this fixture honest as the catalogue grows: what it built has to BE a
+    // hub from before the retirement. Without it, a rewind that stops being a rewind surfaces as
+    // `apply`'s coherence error three lines later, which reads like a bug in the migration.
+    assert!(
+        max_applied(db).await < version,
+        "the fixture must leave the hub BEHIND the retirement (v{version}), not holding a schema \
+         that claims versions above it: `apply` refuses that, and rightly so"
+    );
 }
 
 async fn kinds_held(db: &dyn DatabaseAdapter, hub_id: &str) -> Vec<String> {
