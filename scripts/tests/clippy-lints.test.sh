@@ -68,7 +68,13 @@ workflow_step() { # $1 = substring of the step name
 
 # Line number of the first step whose name contains $1 (0 when absent).
 step_line() { # $1 = substring of the step name
-    grep -n '^      - name:' "$workflow" | grep -F "$1" | head -1 | cut -d: -f1
+    # The second grep reads a here-string, not a pipe, so `-m1` stops it without
+    # anything upstream to kill: `… | grep -F "$1" | head -1` would hand the
+    # pipeline the first grep's EPIPE and report "step absent" (hub#1552).
+    local names hit
+    names=$(grep -n '^      - name:' "$workflow")
+    hit=$(grep -F -m1 "$1" <<<"$names")
+    printf '%s\n' "${hit%%:*}"
 }
 
 echo "Lints Rust del hub — contrato del gate de clippy (hub#1242)"

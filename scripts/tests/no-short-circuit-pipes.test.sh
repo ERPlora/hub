@@ -350,6 +350,22 @@ code=$?
     || bad "ningún script del repo canaliza hacia un lector que corta (hub#1534)" \
            "exit=$code — usa \`grep -q PATRÓN <<<\"\$bloque\"\`: $(flat "$out")"
 
+# ── 6b. `--help` prints the WHOLE header, usage included ────────────────────
+# It used to be a hard line range, and it started cutting the usage off the
+# moment the header grew for hub#1552 — silently, because nothing read it.
+help_out=$("$scanner" --help 2>&1)
+help_missing=""
+for want in "Usage:" "--root DIR" "--list" "Exit: 0 clean"; do
+    # `--` because the wanted strings ARE flags, and `${want}` braced because a
+    # `$VAR` glued to a multibyte character is read as part of the NAME (the same
+    # trap hub#1375 hit in the gate) — with `set -u` that is fatal, not a warning.
+    grep -qF -- "$want" <<<"$help_out" || help_missing="$help_missing «${want}»"
+done
+[ -z "$help_missing" ] \
+    && ok "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
+    || bad "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
+           "faltan:$help_missing — el corte va anclado al cierre del bloque, no a un número de línea (hub#1552)"
+
 # ── 7. Wiring: something actually RUNS both halves ──────────────────────────
 # `scripts-tests-wiring.test.sh` already refuses a contract test no workflow
 # executes; this pins the OTHER half — the scanner itself in the pre-push gate,

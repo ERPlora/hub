@@ -701,7 +701,7 @@ unpublished_report() {
     echo "    commit  : $sha"
     echo "    reason  : $reason"
     if [ -n "$detail" ]; then
-        printf '    gh said : %s\n' "$(printf '%s' "$detail" | head -5)"
+        printf '    gh said : %s\n' "$(head -5 <<<"$detail")"
     fi
     echo "    the gh account it tried:"
     if command -v gh >/dev/null 2>&1; then
@@ -970,7 +970,7 @@ if [ "$head_tree" != "$tree" ] || [ -n "$wt_status" ]; then
         echo "     HEAD tree    : ${head_tree:0:12}"
         if [ -n "$wt_status" ]; then
             echo "     dirty files  :"
-            printf '%s\n' "$wt_status" | sed 's/^/       /' | head -10
+            head -10 <<<"$wt_status" | sed 's/^/       /'
         fi
         echo "   Push from a checkout sitting at that sha with a clean tree (commit or drop"
         echo "   local changes), or run the gate there first so the tree is proven green."

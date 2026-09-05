@@ -21,10 +21,23 @@
 #     grep -qx "$x" <<<"$(some_command)"   instead of   some_command | grep -qx "$x"
 #
 # What counts as short-circuiting here: `grep` with `-q` / `--quiet` / `--silent`
-# (exits at the first match) or with `-m N` / `--max-count=N` (exits at the Nth).
-# `| head -N` is the same mechanism and is NOT scanned yet — hub#1552 has the
-# sixteen live occurrences; adding it here before they are swept would be a
-# guard born red.
+# (exits at the first match) or with `-m N` / `--max-count=N` (exits at the Nth),
+# and `head` in ANY shape — `-1`, `-n N`, `-c N`, `--lines=N`, or no argument at
+# all, which is `-n 10` (hub#1552). `head` is the same mechanism with a longer
+# fuse: it reads N lines before cutting, so it needs more output before it wins
+# the race, and what it loses is the STATUS, not the answer. Under `set -e` that
+# is not a wrong verdict, it is a dead script — and the two worst sites were the
+# image-tag calculation and the mirrors verdict, i.e. a release.
+#
+# `| tail` is NOT scanned and must not be: `tail` reads its input to the END, so
+# it can never send SIGPIPE upstream. Nor is `head` reading a FILE, or `head` as
+# the PRODUCER of a pipe. The word boundary matters too — `| headers_of` is not
+# `head`, and a guard that fired on it would be the false red it exists to stop.
+#
+# The fixes, both with no pipe at all:
+#
+#     head -N <<<"$block"                  instead of   printf '%s' "$block" | head -N
+#     x=$(producer); x=${x%%$'\n'*}        instead of   x=$(producer | head -1)
 #
 # A pipeline split over two lines (`producer |` at the end of one line, the
 # reader on the next — bash allows blank lines and comments in between) is the
@@ -69,7 +82,10 @@ while [ $# -gt 0 ]; do
             root=$2; shift 2 ;;
         (--list) list_only=1; shift ;;
         (-h | --help)
-            sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+            # Bounded by the closing rule of the header block, not by a line
+            # number: the previous `2,45p` silently started cutting the usage
+            # off the moment the header grew (hub#1552).
+            sed -n '2,/^# ─\{5,\}/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         (*) die "unknown argument: $1" ;;
     esac
 done
@@ -121,16 +137,28 @@ fi
 pipe_then_grep='[|][[:space:]]*grep([[:space:]]+-[A-Za-z-]+)*[[:space:]]+'
 quiet_flag="${pipe_then_grep}(-[A-Za-z]*q|--quiet|--silent)"
 max_count_flag="${pipe_then_grep}(-m[[:space:]]*[0-9]|--max-count(=|[[:space:]]+)[0-9])"
+# No flag to enumerate here: EVERY shape of `head` cuts, the bare one included.
+# What the pattern must not lose is the word boundary — without the trailing
+# `([[:space:]]|$)` it would also claim `| headers_of` and `| head_of_queue`.
+pipe_then_head='[|][[:space:]]*head([[:space:]]|$)'
 
 failed=0
 offenders=0
 while IFS= read -r rel; do
     [ -n "$rel" ] || continue
-    hits=$(awk -v q="$quiet_flag" -v m="$max_count_flag" '
+    hits=$(awk -v q="$quiet_flag" -v m="$max_count_flag" -v h="$pipe_then_head" '
         # `carry` = the previous code line ended in a bare `|`: bash lets the reader
         # start on the next line, past any blank lines and comments, so those do not
         # reset it. The reader line is scanned as if the pipe were on it.
-        BEGIN             { carry = 0 }
+        # The patterns live in an array so adding a form is one line here and one
+        # fixture in the contract test, not a rewrite of the search below.
+        BEGIN {
+            carry = 0
+            np = 0
+            if (q != "") pat[++np] = q
+            if (m != "") pat[++np] = m
+            if (h != "") pat[++np] = h
+        }
         /^[[:space:]]*#/  { next }
         /^[[:space:]]*$/  { next }
         /sigpipe-demo/    { carry = 0; next }
@@ -140,10 +168,16 @@ while IFS= read -r rel; do
             carry = (line ~ /(^|[^|])[|][[:space:]]*$/)
             rest = line; offset = 0
             while (1) {
-                rq = match(rest, q) ? RSTART : 0
-                rm = match(rest, m) ? RSTART : 0
-                if (!rq && !rm) break
-                start = offset + ((rq && (!rm || rq < rm)) ? rq : rm)
+                # The LEFTMOST match across every pattern: taking any other one
+                # would test the backtick rule at the wrong column and let a real
+                # offender through behind a mention of another form.
+                first = 0
+                for (p = 1; p <= np; p++) {
+                    r = match(rest, pat[p]) ? RSTART : 0
+                    if (r && (!first || r < first)) first = r
+                }
+                if (!first) break
+                start = offset + first
                 # `||` is the OR operator, not a pipe — but the line may still
                 # hold a real one further right, so keep scanning after it.
                 if (start > 1 && substr(line, start - 1, 1) == "|") {
@@ -175,7 +209,8 @@ EOF
 if [ "$failed" -gt 0 ]; then
     printf '\033[31mFAIL\033[0m: %d líneas en %d de %d scripts canalizan hacia un lector que corta\n' \
         "$offenders" "$failed" "$count" >&2
-    printf '       bajo `pipefail` un MATCH se reporta como FALLO. Usa `grep -q PATRÓN <<<"$bloque"` (hub#1534).\n' >&2
+    printf '       bajo `pipefail` el productor muere con EPIPE y su 141 se le da a la tubería.\n' >&2
+    printf '       Usa `grep -q PATRÓN <<<"$bloque"` (hub#1534) o `head -N <<<"$bloque"` (hub#1552).\n' >&2
     exit 1
 fi
 printf '\033[32mOK\033[0m: %d scripts, ninguno canaliza hacia un lector que corta (hub#1534)\n' "$count"
