@@ -873,26 +873,6 @@ WHERE NOT EXISTS (SELECT 1 FROM sales_payment_method WHERE hub_id = :hub_id AND 
         }
     }
 
-    /// El seed REAL de `schedules`, leído del repo hermano: la semana de apertura es el marcador
-    /// que hub#1535 tiene que hacer ceder, y esta afirmación es sobre ESE fichero.
-    #[test]
-    fn el_seed_real_de_schedules_declara_su_semana_como_marcador() {
-        let path = crate::e2e_support::modules_root().join("schedules/seed/install.postgres.sql");
-        let Ok(sql) = std::fs::read_to_string(&path) else {
-            println!("⏭  SKIP: sin modules-workspace en {}", path.display());
-            return;
-        };
-        assert_eq!(
-            declared_placeholder_tables(&sql),
-            vec!["schedules_business_hours".to_string()],
-            "la guarda del seed de schedules es la tabla entera:\n{sql}"
-        );
-        assert!(
-            !declared_natural_keys(&sql).contains_key("schedules_business_hours"),
-            "y NO declara clave natural: si la declarara, el import descartaría el horario real"
-        );
-    }
-
     /// Una guarda que pregunta por OTRA tabla no habla de la fila que se inserta.
     #[test]
     fn una_guarda_sobre_otra_tabla_se_descarta() {

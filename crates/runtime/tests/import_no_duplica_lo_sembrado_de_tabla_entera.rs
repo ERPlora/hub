@@ -38,6 +38,7 @@ use std::path::{Path, PathBuf};
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
+use erplora_runtime::reset::undo_import;
 use erplora_runtime::Runtime;
 
 /// A throwaway module directory, unique per call so tests running in parallel never share one.
@@ -135,6 +136,45 @@ fn modulo_con_datos_de_referencia() -> PathBuf {
     dir
 }
 
+/// A third shape, the one that keeps the fix from being CATASTROPHIC: a whole-table seed guard
+/// **plus a UNIQUE index** on the slot. The seed still says «placeholder», but the unique key makes
+/// hub#842 skip every incoming row — the bundle lands nothing — so retiring the placeholder here
+/// would leave the hub with no hours at all.
+fn modulo_con_marcador_y_clave_unica() -> PathBuf {
+    let dir = fixture_dir("gridplan");
+    manifest(&dir, "gridplan");
+    write(
+        &dir,
+        "migrations/postgres/001_init.sql",
+        "CREATE TABLE IF NOT EXISTS gridplan_hours (\
+             id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, day_of_week INTEGER NOT NULL, \
+             position INTEGER NOT NULL DEFAULT 0, open_time TEXT NOT NULL, \
+             close_time TEXT NOT NULL, is_closed INTEGER NOT NULL DEFAULT 0, \
+             is_deleted INTEGER NOT NULL DEFAULT 0, deleted_at TEXT, created_by TEXT, \
+             created_at TEXT NOT NULL, updated_by TEXT, updated_at TEXT);\n\
+         CREATE UNIQUE INDEX IF NOT EXISTS uq_gridplan_hours_hub_day \
+             ON gridplan_hours (hub_id, day_of_week);",
+    );
+    write(
+        &dir,
+        "seed/install.postgres.sql",
+        "INSERT INTO gridplan_hours \
+           (id, hub_id, day_of_week, position, open_time, close_time, is_closed, \
+            is_deleted, created_by, created_at, updated_by, updated_at) \
+         SELECT (:hub_id || '|gp|' || d.day_of_week), :hub_id, d.day_of_week, 0, \
+                d.open_time, d.close_time, d.is_closed, 0, :current_user_id, :now, \
+                :current_user_id, :now \
+         FROM (VALUES (0, '09:00', '18:00', 0), (1, '09:00', '18:00', 0), \
+                      (2, '09:00', '18:00', 0), (3, '09:00', '18:00', 0), \
+                      (4, '09:00', '18:00', 0), (5, '00:00', '00:00', 1), \
+                      (6, '00:00', '00:00', 1)) \
+              AS d(day_of_week, open_time, close_time, is_closed) \
+         WHERE NOT EXISTS (SELECT 1 FROM gridplan_hours WHERE hub_id = :hub_id);",
+    )
+    ;
+    dir
+}
+
 async fn hub_con(hub_id: &str, dirs: &[&Path]) -> Runtime {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), hub_id);
@@ -146,10 +186,18 @@ async fn hub_con(hub_id: &str, dirs: &[&Path]) -> Runtime {
 
 /// The live week, as the «are we open?» reader sees it: `(day, open, close, is_closed, created_by)`.
 async fn semana(rt: &Runtime, hub_id: &str) -> Vec<(i64, String, String, i64, String)> {
+    semana_en(rt, hub_id, "weekplan_hours").await
+}
+
+async fn semana_en(
+    rt: &Runtime,
+    hub_id: &str,
+    table: &str,
+) -> Vec<(i64, String, String, i64, String)> {
     let sql = format!(
         "SELECT day_of_week, open_time, close_time, is_closed, \
                 COALESCE(created_by, '') AS created_by \
-         FROM weekplan_hours WHERE hub_id = '{hub_id}' AND is_deleted = 0 \
+         FROM {table} WHERE hub_id = '{hub_id}' AND is_deleted = 0 \
          ORDER BY day_of_week, position, open_time"
     );
     let res = rt.db().query(&sql, &Params::new()).await.expect("semana");
@@ -189,6 +237,10 @@ async fn unidades(rt: &Runtime, hub_id: &str) -> Vec<String> {
 /// about the business (`created_by` = a user, not `system`). That is what makes it TRAVEL —
 /// `export::is_module_seeded` keeps the module's own placeholder out of every bundle.
 async fn owner_sets_hours(rt: &Runtime, hub_id: &str) {
+    owner_sets_hours_en(rt, hub_id, "weekplan_hours").await
+}
+
+async fn owner_sets_hours_en(rt: &Runtime, hub_id: &str, table: &str) {
     for (day, open, close, closed) in [
         (0, "09:30", "20:00", 0),
         (1, "09:30", "20:00", 0),
@@ -200,7 +252,7 @@ async fn owner_sets_hours(rt: &Runtime, hub_id: &str) {
         (6, "00:00", "00:00", 1),
     ] {
         let sql = format!(
-            "UPDATE weekplan_hours \
+            "UPDATE {table} \
              SET open_time = '{open}', close_time = '{close}', is_closed = {closed}, \
                  created_by = 'u-owner', updated_by = 'u-owner', \
                  updated_at = '2026-08-15T10:00:00Z' \
@@ -413,5 +465,168 @@ async fn reimportar_la_misma_plantilla_sigue_siendo_idempotente() {
         semana(&destino, "h2").await,
         tras_el_primero,
         "re-importar el mismo bundle no puede añadir filas"
+    );
+}
+
+/// 🔴 The other end of the same rule, and the one that makes retiring the placeholder SAFE:
+/// **undoing the import puts the seeded week back.**
+///
+/// This is the path ADR-0170 exists for — «I import the demo, I look at it, I take it off cleanly».
+/// If the undo only deleted the imported rows, the hub would be left with NO hours at all: the
+/// placeholder is soft-deleted, and the module's seed guard (`WHERE NOT EXISTS … hub_id = :hub_id`)
+/// does not filter `is_deleted`, so it sees the buried row and never plants the week again. The
+/// business would come out of «undo» worse than it went in, and silently — «are we open?» would
+/// answer nothing at all, which is exactly the state ERPlora/schedules#36 made unreachable.
+#[tokio::test]
+async fn deshacer_la_importacion_devuelve_el_horario_que_el_modulo_habia_sembrado() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&origen, "h1").await;
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let sembrada = semana(&destino, "h2").await;
+    assert_eq!(sembrada.len(), 7, "precondición: la semana sembrada — {sembrada:?}");
+
+    let report = import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report
+        .batch_id
+        .clone()
+        .expect("el import abre un lote (ADR-0170) — sin él no hay nada que deshacer");
+    let importada = semana(&destino, "h2").await;
+    assert_eq!(
+        importada.len(),
+        7,
+        "precondición: tras importar queda SOLO la semana del negocio — {importada:?}"
+    );
+    assert!(
+        importada.iter().all(|r| r.4 != "system"),
+        "precondición: el marcador ya se retiró — {importada:?}"
+    );
+
+    undo_import(&destino, "h2", &batch)
+        .await
+        .expect("deshacer la importación");
+
+    let tras_deshacer = semana(&destino, "h2").await;
+    assert_eq!(
+        tras_deshacer, sembrada,
+        "deshacer tiene que dejar el hub COMO ESTABA: con la semana genérica que el módulo sembró \
+         al instalarse, no sin horario — {tras_deshacer:?}"
+    );
+}
+
+/// Y deshacer dos veces no rompe ni resucita nada: el segundo pase no encuentra lote y es un no-op
+/// limpio, igual que para las filas importadas (`reset_undo_test`).
+#[tokio::test]
+async fn deshacer_dos_veces_deja_la_semana_sembrada_igual() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&origen, "h1").await;
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let sembrada = semana(&destino, "h2").await;
+    let report = import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report.batch_id.clone().expect("lote del import");
+
+    undo_import(&destino, "h2", &batch).await.expect("deshacer");
+    undo_import(&destino, "h2", &batch)
+        .await
+        .expect("deshacer otra vez es un no-op limpio");
+
+    assert_eq!(
+        semana(&destino, "h2").await,
+        sembrada,
+        "el segundo deshacer no puede duplicar ni volver a enterrar la semana sembrada"
+    );
+}
+
+/// 🔴 The close that stops this fix from being worse than the bug it fixes: **the placeholder is
+/// only retired once the real data is actually IN.**
+///
+/// A module can perfectly well seed a whole-table placeholder AND keep a unique index on the slot.
+/// When it does, hub#842 skips every incoming row of the bundle (an equivalent row is already
+/// there), so the section applies without landing anything. Retiring the placeholder on the way out
+/// would then leave the business with **no hours at all** — the state ERPlora/schedules#36 exists to
+/// make unreachable — and it would happen quietly, right after a screen that said the import went
+/// fine. Keeping the generic week is the bad-but-honest outcome; zero rows is the unacceptable one.
+#[tokio::test]
+async fn si_la_plantilla_no_llega_a_entrar_el_hub_conserva_su_semana() {
+    let gp = modulo_con_marcador_y_clave_unica();
+    let origen = hub_con("h1", &[&gp]).await;
+    owner_sets_hours_en(&origen, "h1", "gridplan_hours").await;
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["gridplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let mut destino = hub_con("h2", &[&gp]).await;
+    let sembrada = semana_en(&destino, "h2", "gridplan_hours").await;
+    assert_eq!(
+        sembrada.len(),
+        7,
+        "precondición: instalar el módulo siembra la semana genérica — {sembrada:?}"
+    );
+
+    import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["gridplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+
+    let tras = semana_en(&destino, "h2", "gridplan_hours").await;
+    assert!(
+        !tras.is_empty(),
+        "el import no puede dejar al negocio SIN HORARIO: si la plantilla no llegó a entrar, el \
+         marcador se queda — {tras:?}"
+    );
+    assert_eq!(
+        tras, sembrada,
+        "y se queda tal cual estaba, sin retirar ni duplicar nada — {tras:?}"
     );
 }
