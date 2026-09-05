@@ -362,6 +362,9 @@ pub fn severity_of(err: &RuntimeError) -> &'static str {
         // caller (a user, a module author) fixes — never a bug of the hub.
         | E::InvalidField { .. }
         | E::ManifestRejected { .. }
+        // hub#1542: a bound the column cannot read is the caller's to fix, exactly like a filter
+        // the query does not declare — never a fault of the hub.
+        | E::InvalidFilterBound { .. }
         | E::NotImplemented(_) => severity::USER,
         _ => severity::UNEXPECTED,
     }
@@ -414,6 +417,10 @@ pub fn error_code_of(err: &RuntimeError) -> std::borrow::Cow<'_, str> {
         // filter" from "you did not send what it needs" — and fix the call instead of trusting
         // a page that quietly held the whole list.
         E::UnknownFilter { .. } => "unknown_filter",
+        // hub#1542: its own stable code so the caller can tell "that bound is not a number" from
+        // `db` ("the hub could not reach its database"). One is fixed by changing the call, the
+        // other by nobody.
+        E::InvalidFilterBound { .. } => "invalid_filter_bound",
         E::Schema { .. } => "schema",
         E::Notify(_) => "notify",
         // hub#957: su propio código, no un sabor de `notify`. Las dos son capacidades de host, pero

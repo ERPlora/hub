@@ -60,6 +60,13 @@ pub(crate) fn err_status_and_code(
         // not send what it needs" — and fix the call instead of trusting a page that quietly held
         // the whole list.
         E::UnknownFilter { .. } => (StatusCode::UNPROCESSABLE_ENTITY, "unknown_filter".into()),
+        // hub#1542: the third of the same family — a `range` bound the COLUMN cannot read. Same
+        // `422` (the request is well-formed but its payload does not hold up), with its own code
+        // so an integration can tell "that bound is not a number" from a database outage.
+        E::InvalidFilterBound { .. } => (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_filter_bound".into(),
+        ),
         // hub#139: a business rejection is NOT a generic WASM failure. The namespaced code
         // travels verbatim so the UI can translate it, and `queryOptional` never swallows it.
         // `409`: the request is well-formed, it conflicts with the current business state.
