@@ -7,10 +7,11 @@
 // the text lives (the manifest declares that the code EXISTS; `locales/<lang>.json` says what it
 // SAYS) and which `erplora validate` already forces to carry both `en` and `es` (ADR-0055).
 //
-// Nobody read it. 18 modules ship 176 of these sentences and there was not one consumer: the SDK
-// handed the screen the server's `message` verbatim, and every screen does the ordinary
-// `this.error = e.message`. Fixing it in a screen fixes it once and misses the other 26, so it
-// belongs here — the same reasoning as the PLATFORM half (hub#1102), one layer down.
+// The SDK never read it. 21 modules ship 197 of these sentences (2026-09-05) and the SDK handed
+// the screen the server's `message` verbatim; ten modules had written their own by-code lookup to
+// cope, every other screen does the ordinary `this.error = e.message`. Fixing it in a screen fixes
+// it once and misses the rest, so it belongs here — the same reasoning as the PLATFORM half
+// (hub#1102), one layer down.
 //
 // Two rules that hold from hub#1102 and are re-asserted below: a PLATFORM code still wins (its
 // sentence is written for a person who has no module to blame), and a code nobody translated keeps
@@ -295,4 +296,58 @@ test('hub#1570: no PLATFORM code is domain-shaped — which is WHY a module can 
         'failure, and the sentence written for someone with no app to blame would be lost',
     );
   }
+});
+
+test('hub#1570: a CORE namespace with two segments (`flow.*`, `hub.*`, `fiscal.*`) is never a module\'s to rewrite', async () => {
+  // `flow.grant_denied`, `hub.migration_lock_timeout` and `fiscal.hub_closed` are codes the core
+  // itself emits (`crates/runtime/src/flows`, `dispatch.rs`, `fiscal_profile.rs`). They are shaped
+  // exactly like a module code — two snake segments — so the SHAPE guard alone would let a stray
+  // catalogue key answer for them. The core's namespaces are refused by NAME on the way in: no
+  // module is called `hub`, `flow` or `fiscal`, and none gets to speak for the core (§8.5).
+  const rogue: Record<string, unknown> = {
+    es: {
+      errors: {
+        'flow.grant_denied': 'Un módulo opinando sobre el permiso de un flujo',
+        'hub.migration_lock_timeout': 'Un módulo opinando sobre la migración del núcleo',
+        'fiscal.hub_closed': 'Un módulo opinando sobre el cierre fiscal',
+      },
+    },
+  };
+  const cases: Array<[string, string]> = [
+    ['flow.grant_denied', 'the flow sentence'],
+    ['hub.migration_lock_timeout', 'the migration sentence'],
+    ['fiscal.hub_closed', 'the fiscal sentence'],
+  ];
+  for (const [code, message] of cases) {
+    await inLocale('es', async () => {
+      const client = clientRefusing({ code, message });
+      client.t(rogue, 'errors.x');
+
+      await assert.rejects(
+        () => client.command('hub.flows.run', {}),
+        (e: unknown) => {
+          assert.ok(e instanceof ErploraError);
+          assert.equal(e.message, message, `${code}: the core's own sentence must survive a rogue catalogue`);
+          return true;
+        },
+      );
+    });
+  }
+});
+
+test('hub#1570: a catalogue that carries the code in `es` only, on a hub in another language, keeps the server sentence', async () => {
+  // `erplora validate` forces `en` + `es`, so this catalogue is hand-made — the chain still has to
+  // hold: `locale → en → nothing`, and «nothing» is the sentence that arrived, never a crash.
+  const esOnly: Record<string, unknown> = {
+    es: { errors: { 'tables.table_occupied': 'Esa mesa está ocupada.' } },
+  };
+  await inLocale('fr', async () => {
+    const client = clientRefusing({ code: 'tables.table_occupied', message: 'table 4 is occupied' });
+    client.t(esOnly, 'errors.x');
+
+    await assert.rejects(
+      () => client.command('tables.seat', {}),
+      (e: unknown) => e instanceof ErploraError && e.message === 'table 4 is occupied',
+    );
+  });
 });

@@ -736,10 +736,17 @@ function activeLocale(): string {
 // keeps `name`/`navigation`/`setup` and nothing else), so the sentence only ever exists inside the
 // module's own Web Component bundle.
 //
-// Which is why nobody read it: 18 modules ship 176 translated refusals and there was not one
-// consumer. The screens do the ordinary `this.error = e.message`, and `message` is whatever the
-// handler or `expect_rows.error` wrote — English, on a Spanish till. Fixing it in a screen fixes
-// it once and misses the other 26 (the same reasoning that put the PLATFORM half here, hub#1102).
+// Which is why the SDK never read it: 21 modules ship 197 translated refusals (2026-09-05) and the
+// SDK had no consumer — ten modules had each grown a by-code lookup of their own instead
+// (`services`, `staff`, `tables`, `sales`, `pricing`, `appointments`, `invoice`, `kitchen`,
+// `reservations`, `schedules`): the same fix, written ten times. Every other screen does the
+// ordinary `this.error = e.message`, and `message` is whatever the handler or `expect_rows.error`
+// wrote — English, on a Spanish till. Fixing it in a screen fixes it once and misses the rest (the
+// same reasoning that put the PLATFORM half here, hub#1102).
+//
+// Five modules (`customers`, `online_booking`, `tasks`, `tickets`, `whatsapp_inbox`) still keep the
+// pre-ADR-0398 NESTED shape, `errors.<module>.<name>`. That is not the contract and it is not read
+// here: they stay on the server sentence until they migrate (their issues say so).
 //
 // The catalogue reaches us through the door every module already uses: `erplora.t(CATALOG, …)`,
 // which each Web Component calls to render its own labels. Nothing to add in the 27 module repos —
@@ -753,10 +760,26 @@ const INDEXED_CATALOGS = new WeakSet<object>();
  * A DOMAIN code and nothing else (ADR-0205): `<module>.<snake_case>`, exactly two segments.
  *
  * The guard is on the way IN, not on the way out: it keeps a catalogue with a stray key from ever
- * being able to answer for a core refusal (`not_found`, `permission_denied`) or for the core's own
- * three-segment namespaces (`hub.fiscal.*`, `flow.*`) — a module does not get to rewrite those.
+ * being able to answer for a core refusal (`not_found`, `permission_denied`) or for the core's
+ * three-segment namespaces (`hub.fiscal.*`, `hub.elevation.*`) — a module does not get to rewrite
+ * those. The core ALSO refuses in two-segment namespaces, which this shape cannot tell from a
+ * module's: those are refused by name, {@link CORE_NAMESPACES}.
  */
 const DOMAIN_CODE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+
+/**
+ * Namespaces the CORE emits refusals in with the very shape of a module code: `flow.grant_denied`
+ * (`crates/runtime/src/flows`), `hub.migration_lock_timeout` (`dispatch.rs`), `fiscal.hub_closed`
+ * (`fiscal_profile.rs`), `print.not_ready` (`print_ws.rs`). No module is called any of these, and
+ * none gets to speak for the core (interop-contract §8.5) — so a catalogue key in one of them is a
+ * stray, and is never indexed.
+ */
+const CORE_NAMESPACES: ReadonlySet<string> = new Set(['hub', 'flow', 'fiscal', 'print']);
+
+/** Is `code` a code some MODULE owns — the only kind a module catalogue may put words to? */
+function isModuleCode(code: string): boolean {
+  return DOMAIN_CODE.test(code) && !CORE_NAMESPACES.has(code.slice(0, code.indexOf('.')));
+}
 
 /**
  * Index the `errors` block of a module locale catalogue, in every language it carries — not only
@@ -769,7 +792,7 @@ function rememberRefusalTexts(catalog: Record<string, unknown>): void {
     const errors = (dict as { errors?: unknown } | null)?.errors;
     if (!errors || typeof errors !== 'object') continue;
     for (const [code, text] of Object.entries(errors as Record<string, unknown>)) {
-      if (typeof text !== 'string' || !text || !DOMAIN_CODE.test(code)) continue;
+      if (typeof text !== 'string' || !text || !isModuleCode(code)) continue;
       const byLang = REFUSAL_TEXTS.get(code) ?? {};
       byLang[lang] = text;
       REFUSAL_TEXTS.set(code, byLang);
