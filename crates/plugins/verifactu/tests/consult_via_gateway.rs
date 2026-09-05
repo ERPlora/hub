@@ -3,7 +3,7 @@
 //! La consulta es la única vía por la que el Hub recupera su cadena de lo que la AEAT ya tiene
 //! (`recover_from_aeat`, `query_aeat_records` y el auto-rechain de un rechazo de encadenamiento).
 //! Hasta hub#1436 esa consulta se hacía SIEMPRE con la identity del core, así que en la vía
-//! gateway —la del hub sin certificado, ADR-0320— no podía hacerse: `build_identity` se negaba
+//! gateway —la del hub sin certificado, ADR-0320— no podía hacerse: el motor se negaba
 //! con «no hay certificado con el que firmar», el auto-rechain se saltaba a propósito y un hub
 //! que restaurase un backup se quedaba con la cadena rota y **sin ninguna recuperación**, ni
 //! automática ni manual.
