@@ -210,7 +210,7 @@ run_core_query() { # $1 = query name → 0 if {"ok":true}, 1 otherwise
     body=$("$curl_cmd" -sS -X POST "${base_url}/api/query" \
         -H 'content-type: application/json' \
         -d "{\"name\":\"$1\",\"params\":{}}" 2>/dev/null)
-    printf '%s' "$body" | grep -q '"ok":true'
+    grep -q '"ok":true' <<<"$body"
 }
 
 main() {

@@ -2441,6 +2441,64 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     && ok "hub#1468: sin el checker en el checkout, el gate sigue su camino" \
     || bad "hub#1468: sin el checker en el checkout, el gate sigue su camino" "exit=$code"
 
+# ── hub#1534: un script que canaliza hacia un lector que CORTA aborta el push ──
+#    `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO, y es una
+#    carrera: verde en macOS y en un runner ocioso, rojo en uno cargado. El 04/09 tumbó la PR
+#    de hub#1530 diciendo que faltaba una línea puesta desde julio. Aquí se comprueba que el
+#    cable BITE —no que exista—, igual que el de hub#1468 justo arriba. El banco copia los DOS
+#    scripts reales porque el scanner delega el descubrimiento en `shell-syntax.sh`.
+#    La línea ofensora se CONSTRUYE, nunca se escribe literal: así este fichero sigue limpio
+#    bajo el guard que está probando.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cp "$(dirname "$0")/ci/no-short-circuit-pipes.sh" "$repo/scripts/ci/no-short-circuit-pipes.sh"
+{
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -uo pipefail\n'
+    printf 'block=NEEDLE\n'
+    printf "printf '%%s' \"\$block\" | %s -q NEEDLE\n" grep
+} > "$repo/scripts/ci/short-circuit.sh"
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="touch $repo/RAN")
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 1 ]                          || errs="$errs exit=$code(want 1)"
+grep -q 'short-circuit.sh' <<<"$out"     || errs="$errs no-file-named"
+grep -q 'lector que corta' <<<"$out"     || errs="$errs no-verdict"
+[ ! -f "$repo/RAN" ]                     || errs="$errs ran-the-suite-anyway"
+[ -z "$errs" ] \
+    && ok "hub#1534: un script que canaliza hacia un lector que corta aborta el push" \
+    || bad "hub#1534: un script que canaliza hacia un lector que corta aborta el push" "$errs"
+
+# …y con el mismo banco LIMPIO (here-string en vez de tubería) el gate deja pasar: un guard que
+# no se puede satisfacer es un guard que se acaba desactivando.
+repo=$(make_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/scripts/ci"
+cp "$(dirname "$0")/ci/shell-syntax.sh" "$repo/scripts/ci/shell-syntax.sh"
+cp "$(dirname "$0")/ci/no-short-circuit-pipes.sh" "$repo/scripts/ci/no-short-circuit-pipes.sh"
+{
+    printf '#!/usr/bin/env bash\n'
+    printf 'set -uo pipefail\n'
+    printf 'block=NEEDLE\n'
+    printf '%s -q NEEDLE <<<"$block"\n' grep
+} > "$repo/scripts/ci/clean.sh"
+git -C "$repo" add scripts
+git -C "$repo" commit -qm scripts
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
+    HUB_GATE_STATE_DIR="$repo/.state" \
+    HUB_GATE_DEPTH=fast HUB_GATE_FAST_CMD="true")
+[ "$code" = 0 ] \
+    && ok "hub#1534: el arreglo con here-string pasa el gate" \
+    || bad "hub#1534: el arreglo con here-string pasa el gate" "exit=$code out=$(cat "$repo/.out" 2>/dev/null)"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

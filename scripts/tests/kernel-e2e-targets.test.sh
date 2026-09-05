@@ -131,10 +131,10 @@ ok
 pagination_e2e
 reads_e2e" ] || fail "hub#1359: stdout must carry the sorted targets, got: $out"
 ok
-printf '%s' "$out" | grep -q "plain_unit_e2e" \
+grep -q "plain_unit_e2e" <<<"$out" \
     && fail "hub#1359: a target that does not call require_modules_workspace() must stay out"
 ok
-printf '%s' "$out" | grep -q "helper" \
+grep -q "helper" <<<"$out" \
     && fail "hub#1359: a nested fixture file is not a cargo target and must stay out"
 ok
 
@@ -144,11 +144,11 @@ rm -f "$tree/pagination_e2e.rs"
 run_guard "$tree" "$manifest"
 [ "$status" -ne 0 ] || fail "hub#1359: a target deleted without editing the list must FAIL"
 ok
-printf '%s' "$err" | grep -q "pagination_e2e" \
+grep -q "pagination_e2e" <<<"$err" \
     || fail "hub#1359: the failure must NAME the missing target, got: $err"
 ok
 # A guard that fails without saying what to do gets "fixed" by deleting the guard.
-printf '%s' "$err" | grep -q "kernel-e2e-targets.txt" \
+grep -q "kernel-e2e-targets.txt" <<<"$err" \
     || fail "hub#1359: the failure must name the manifest to edit, got: $err"
 ok
 
@@ -160,7 +160,7 @@ make_manifest "$manifest" module_seed_e2e pagination_e2e reads_e2e
 run_guard "$tree" "$manifest"
 [ "$status" -ne 0 ] || fail "hub#1359: a target present in the tree but not in the list must FAIL"
 ok
-printf '%s' "$err" | grep -q "brand_new_e2e" \
+grep -q "brand_new_e2e" <<<"$err" \
     || fail "hub#1359: the failure must NAME the undeclared target, got: $err"
 ok
 
@@ -173,7 +173,7 @@ run_guard "$tree" "$manifest"
 [ "$status" -ne 0 ] || fail "hub#1359: a tree and list that disagree both ways must FAIL"
 ok
 for expected in module_seed_e2e pagination_e2e brand_new_e2e; do
-    printf '%s' "$err" | grep -q "$expected" \
+    grep -q "$expected" <<<"$err" \
         || fail "hub#1359: both directions must be reported in one pass, missing $expected: $err"
 done
 ok
@@ -202,7 +202,7 @@ make_manifest "$manifest" reads_e2e pagination_e2e reads_e2e
 run_guard "$tree" "$manifest"
 [ "$status" -ne 0 ] || fail "hub#1359: a duplicated manifest entry must FAIL"
 ok
-printf '%s' "$err" | grep -q "reads_e2e" \
+grep -q "reads_e2e" <<<"$err" \
     || fail "hub#1359: the duplicate failure must name the entry, got: $err"
 ok
 

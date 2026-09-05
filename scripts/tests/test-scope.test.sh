@@ -98,7 +98,7 @@ echo "reaching every testable package collapses to workspace"
 [ "$(mode crates/db/src/lib.rs crates/tools/src/lib.rs)" = workspace ] && ok "db + tools (= all testable) → workspace" || bad "expected workspace" "$(resolve crates/db/src/lib.rs crates/tools/src/lib.rs)"
 
 echo "the reason line is human-readable"
-resolve crates/server/src/main.rs | sed -n 2p | grep -qE 'of [0-9]+ packages reachable' && ok "reason names the count" || bad "reason line missing"
+grep -qE 'of [0-9]+ packages reachable' <<<"$(resolve crates/server/src/main.rs | sed -n 2p)" && ok "reason names the count" || bad "reason line missing"
 
 # ── hub#1463: en CI la suite NO se acota, y eso se AFIRMA en vez de suponerse ────────────────
 # Lo que había aquí eran cinco aserciones sobre un contrato imposible: pinaban el paso `scope` de

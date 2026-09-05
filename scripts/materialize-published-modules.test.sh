@@ -260,7 +260,7 @@ errs=""
 n=$(find "$base/dest" -mindepth 2 -maxdepth 2 -name module.json 2>/dev/null | wc -l | tr -d ' ')
 [ "$n" = 26 ] || errs="$errs manifests=$n(want 26)"
 # Nothing named `._*` may be treated as a module…
-ls -A "$base/dest" 2>/dev/null | grep -q '^\._' && errs="$errs applelDouble-was-materialised-as-a-module"
+grep -q '^\._' <<<"$(ls -A "$base/dest" 2>/dev/null)" && errs="$errs applelDouble-was-materialised-as-a-module"
 # `── ._mod…` is the per-module failure header: it can only appear if a sidecar
 # reached the clone loop. The names themselves DO appear in the "ignored" notice,
 # on purpose, so a bare grep for `._mod` would be wrong here.

@@ -228,7 +228,7 @@ for m in body.get("data", []) or []:
 # A battery that exits 0 without testing is the green this whole file exists to remove. WIDER than
 # the toolkit's own `looksSkipped` (`/^SKIPPED:/`), which misses `SKIPPED (SQL half):` — ten
 # `customers` batteries printed exactly that and read as green (module-toolkit#137).
-looks_skipped() { printf '%s' "$1" | grep -qE '^[[:space:]]*SKIPPED'; }
+looks_skipped() { grep -qE '^[[:space:]]*SKIPPED' <<<"$1"; }
 
 dsn_for() { # $1=database name → the admin DSN with its database swapped
     python3 - "$database_url" "$1" <<'PY'
@@ -346,7 +346,7 @@ $(tail -20 "$server_log" 2> /dev/null | sed 's/^/      /')"
     # on) and /readyz counts only what reached the database, so a module that never installed is
     # invisible from both ends. That is how `verifactu` came up missing with `missing: []`.
     installed=$(http_get "$base_url" /api/modules < /dev/null | installed_ids)
-    if printf '%s\n' "$installed" | grep -qx "$module"; then
+    if grep -qx "$module" <<<"$installed"; then
         module_installed=1
     else
         module_installed=0

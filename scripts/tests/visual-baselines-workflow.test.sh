@@ -64,13 +64,13 @@ on_block() {
 on=$(on_block)
 if [ -z "$on" ]; then
     bad "visual-baselines.yml declara on:" "no hay bloque \`on:\`"
-elif ! printf '%s' "$on" | grep -q 'workflow_dispatch'; then
+elif ! grep -q 'workflow_dispatch' <<<"$on"; then
     bad "visual-baselines.yml se dispara por workflow_dispatch" \
         "sin \`workflow_dispatch\` no hay forma de lanzarlo a mano"
-elif printf '%s' "$on" | grep -qE '^\s*push:'; then
+elif grep -qE '^\s*push:' <<<"$on"; then
     bad "visual-baselines.yml NO se dispara en push" \
         "un \`push:\` automático puede sobrescribir baselines que nadie ha revisado"
-elif printf '%s' "$on" | grep -qE '^\s*pull_request:'; then
+elif grep -qE '^\s*pull_request:' <<<"$on"; then
     bad "visual-baselines.yml NO se dispara en pull_request" \
         "un \`pull_request:\` automático puede sobrescribir baselines que nadie ha revisado"
 else
@@ -101,10 +101,10 @@ if [ -z "$concurrency_block" ]; then
     bad "visual-baselines.yml declara concurrency:" "no hay bloque \`concurrency:\`"
 elif [ -z "$group_line" ]; then
     bad "concurrency declara group:" "no se encontró una línea \`group:\` dentro del bloque"
-elif ! printf '%s' "$group_line" | grep -q 'run_id'; then
+elif ! grep -q 'run_id' <<<"$group_line"; then
     bad "el grupo de concurrencia es único por run (contiene run_id)" \
         "el valor de \`group:\` ('$group_line') no lleva \`run_id\`: puede coincidir con el de otra corrida y una la cancelaría — justo el bug que esto arregla (run 33130949827)"
-elif ! printf '%s' "$concurrency_block" | grep -q 'cancel-in-progress: false'; then
+elif ! grep -q 'cancel-in-progress: false' <<<"$concurrency_block"; then
     bad "cancel-in-progress: false" \
         "sin él, un futuro cambio que reintroduzca un grupo compartido volvería a cancelar la regeneración"
 else
@@ -136,10 +136,10 @@ if ! grep -q 'HUB_UPDATE_BASELINES: "1"' "$workflow"; then
 elif [ -z "$playwright_run_line" ]; then
     bad "hay un paso que invoca playwright test -c tests/playwright.config.ts" \
         "no se encontró ninguna línea \`run:\` con esa invocación"
-elif ! printf '%s' "$playwright_run_line" | grep -q -- '--update-snapshots=all'; then
+elif ! grep -q -- '--update-snapshots=all' <<<"$playwright_run_line"; then
     bad "el paso de Playwright usa --update-snapshots=all" \
         "la invocación real ('$playwright_run_line') no lleva \`--update-snapshots=all\`: sin el modo explícito, Playwright no reescribe lo que ya exista y una baseline desfasada seguiría desfasada"
-elif ! printf '%s' "$playwright_run_line" | grep -qE '\bVisual\b'; then
+elif ! grep -qE '\bVisual\b' <<<"$playwright_run_line"; then
     bad "el paso de Playwright filtra a los specs *Visual.spec.ts" \
         "la invocación real ('$playwright_run_line') no lleva el filtro \`Visual\`: correría también AssistantGrounded.spec.ts, que necesita una segunda base de datos que este workflow no crea"
 elif ! grep -q 'upload-artifact' "$workflow"; then

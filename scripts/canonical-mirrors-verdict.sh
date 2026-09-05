@@ -183,7 +183,7 @@ EOF
 }
 
 is_gate_input() { # $1=path
-    printf '%s\n' "$GATE_INPUTS" | grep -qx -- "$1"
+    grep -qx -- "$1" <<<"$GATE_INPUTS"
 }
 
 pair_hint='the copy must change in the same step: declare `Depends-On: ERPlora/module-toolkit#N` in the PR body and merge the pair with `MERGE_PR_PAIR` (ERPlora/pm#181, pm#183)'
