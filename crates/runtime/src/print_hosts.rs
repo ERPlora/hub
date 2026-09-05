@@ -127,6 +127,20 @@ pub struct RoleCoverage {
     /// reconnect or never fire at all. The oldest and not the newest, because the question the
     /// merchant is really asking is "how long has somebody been waiting for their ticket".
     pub waiting_seconds: i64,
+    /// **Who** is printing this station's work: the name of every host counted in [`Self::live_hosts`],
+    /// sorted, empty when nobody is live (hub#1527).
+    ///
+    /// The count alone answers the alarm ("nobody is taking the kitchen's tickets") but not the
+    /// healthy state, which is the one an owner looks at every day: with a till and a tablet,
+    /// *"2 devices active"* leaves them to go and try which of the two is doing it. The HTTP route
+    /// `GET /api/print/hosts` (still alive: the shell's Settings card reads it) carries these names
+    /// and that screen says *"Printing from: Counter till"*; the module's screen lost them when it
+    /// moved to the dispatcher (printing#30, hub#1107), because the hub knew the answer and it did
+    /// not cross.
+    ///
+    /// A host that registered without a name is listed by its `device_id`: an empty string in this
+    /// list would paint *"Printing from: "* and read as a bug.
+    pub live_host_labels: Vec<String>,
 }
 
 /// How long work must have been waiting, with nobody draining it, before it becomes an alarm
@@ -176,6 +190,11 @@ pub fn coverage_view(c: &RoleCoverage) -> serde_json::Value {
         "role": c.role,
         "waiting": c.waiting,
         "liveHosts": c.live_hosts,
+        // The names AND the count (hub#1527). Both, because they answer different questions: the
+        // count is what a badge counts and what `undrained` is derived from, the names are what
+        // the owner reads in the healthy state. A screen that only had the number could not name
+        // the till; one that only had the names would have to count them to draw a badge.
+        "liveHostLabels": c.live_host_labels,
         "waitingSeconds": c.waiting_seconds,
         "undrained": is_undrained(c),
     })
@@ -360,9 +379,15 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<PrintHos
 /// Only `pending` counts as waiting: a job a host already claimed is not waiting for one. If that
 /// host dies, `print_queue::reclaim_expired` returns the job to `pending` and it shows up here.
 pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<RoleCoverage>> {
+    // **One instant for both reads.** The count below and the names in [`live_host_labels`] are
+    // the same question asked of the same table, and a host that was live for one and not for the
+    // other would put a name on a station the count calls uncovered — or the reverse. Sharing the
+    // cutoff value (rather than each read taking its own `now`) is what makes them one answer.
+    let cutoff = live_cutoff();
+    let labels = live_host_labels(db, hub_id, &cutoff).await?;
     let mut p = Params::new();
     p.insert("hub_id".into(), json!(hub_id));
-    p.insert("cutoff".into(), json!(live_cutoff()));
+    p.insert("cutoff".into(), json!(cutoff));
     p.insert("pending".into(), json!(crate::print_queue::STATUS_PENDING));
     // A `UNION ALL` of the two sides and one `GROUP BY` rather than a join: a role can exist on
     // either side alone — work with nobody to take it (the alarm) and a host with nothing to do
@@ -386,13 +411,66 @@ pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Role
     Ok(res
         .rows
         .iter()
-        .map(|row| RoleCoverage {
-            role: row["role"].as_str().unwrap_or_default().to_string(),
-            waiting: row["waiting"].as_i64().unwrap_or(0),
-            live_hosts: row["live_hosts"].as_i64().unwrap_or(0),
-            waiting_seconds: waited_seconds(row["oldest"].as_str(), now),
+        .map(|row| {
+            let role = row["role"].as_str().unwrap_or_default().to_string();
+            RoleCoverage {
+                waiting: row["waiting"].as_i64().unwrap_or(0),
+                live_hosts: row["live_hosts"].as_i64().unwrap_or(0),
+                waiting_seconds: waited_seconds(row["oldest"].as_str(), now),
+                live_host_labels: labels.get(&role).cloned().unwrap_or_default(),
+                role,
+            }
         })
         .collect())
+}
+
+/// The name of every host that is live as of `cutoff`, per station.
+///
+/// A second read of `_print_host` and not a column of the aggregate above, because collapsing
+/// strings into one row is `group_concat` in SQLite and `string_agg` in Postgres — two dialects for
+/// one answer, and a label carrying the separator would come back as two devices. The table holds
+/// one row per (device, role) of one hub: reading it whole costs nothing and cannot be ambiguous.
+///
+/// `cutoff` is the caller's, on purpose: it is the same value [`LIVE_EXPR`] compares against in the
+/// same statement's sibling, so "live" means the same instant for the count and for the names.
+///
+/// The name falls back to the `device_id` when the host registered without a label — the same
+/// fallback the shell's Settings card applies over `GET /api/print/hosts`, and the reason is
+/// unchanged: an empty entry in this list would paint a dangling "Printing from:".
+async fn live_host_labels(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    cutoff: &str,
+) -> Result<std::collections::HashMap<String, Vec<String>>> {
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("cutoff".into(), json!(cutoff));
+    let res = db
+        .query(
+            "SELECT role, device_id, label FROM _print_host \
+             WHERE hub_id = :hub_id AND last_seen_at >= :cutoff",
+            &p,
+        )
+        .await?;
+
+    let mut by_role: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for row in &res.rows {
+        let role = row["role"].as_str().unwrap_or_default().to_string();
+        let label = row["label"].as_str().unwrap_or_default().trim();
+        let name = if label.is_empty() {
+            row["device_id"].as_str().unwrap_or_default().trim()
+        } else {
+            label
+        };
+        by_role.entry(role).or_default().push(name.to_string());
+    }
+    // Sorted by the name the owner actually reads: the list is rendered as one sentence, and an
+    // order that changed between two reads of the same screen would look like the devices moved.
+    for names in by_role.values_mut() {
+        names.sort();
+    }
+    Ok(by_role)
 }
 
 /// Seconds between `queued_at` (RFC-3339 as the queue stores it) and `now`, floored at `0`.
@@ -1242,6 +1320,165 @@ mod tests {
         assert_eq!(hosts[0].device_id, "till-1");
         assert_eq!(hosts[0].role, "kitchen");
         assert_eq!(hosts[0].label, "Counter");
+    }
+
+    // ── hub#1527: coverage NAMES the devices that are printing, it does not only count them ────
+    //
+    // `GET /api/print/hosts` (still alive: the shell's Settings card reads it) hands its caller a
+    // `hosts[]` with every registration's label, and the module's Printers screen said "Printing
+    // from: Counter till" while it read that route. Moving it to the dispatcher (printing#30,
+    // hub#1107) left it with a COUNT — so in the healthy state, the one an owner looks at daily,
+    // the screen went from naming the till to saying "2 devices". With one till and one tablet,
+    // that is the difference between knowing and having to go and try.
+
+    #[tokio::test]
+    async fn hub1527_coverage_names_the_live_hosts_and_not_only_their_number() {
+        let db = hosts_db().await;
+        // Registered back to front on purpose. The list is read as ONE sentence, so it comes out
+        // in the order of the NAMES and not in whatever order the rows happen to sit in: an order
+        // that changed between two reads of the same screen would look like the devices moved.
+        register(&db, "h1", "tablet-1", "kitchen", "Floor tablet", "u1")
+            .await
+            .unwrap();
+        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
+            .await
+            .unwrap();
+        register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
+            .await
+            .unwrap();
+
+        let cov = coverage(&db, "h1").await.unwrap();
+
+        let kitchen = of_role(&cov, "kitchen").expect("a covered role is reported");
+        assert_eq!(kitchen.live_hosts, 2);
+        assert_eq!(
+            kitchen.live_host_labels,
+            ["Counter till", "Floor tablet"],
+            "the owner reads the names, not the number"
+        );
+        assert_eq!(
+            of_role(&cov, "receipt").unwrap().live_host_labels,
+            ["Counter till"],
+            "a device that hosts two roles is named under each of them, once"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub1527_a_host_that_went_quiet_is_not_named_as_printing() {
+        // The count and the names have to be ONE answer: naming a till that `live_hosts` already
+        // gave up on would tell the owner their tickets are coming out of a switched-off machine.
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
+            .await
+            .unwrap();
+        register(&db, "h1", "till-2", "kitchen", "Back till", "u1")
+            .await
+            .unwrap();
+        last_seen_seconds_ago(&db, "till-2", HOST_TTL_SECONDS + 5).await;
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .unwrap();
+
+        assert_eq!(kitchen.live_hosts, 1);
+        assert_eq!(kitchen.live_host_labels, ["Counter till"]);
+        assert_eq!(
+            kitchen.live_host_labels.len() as i64,
+            kitchen.live_hosts,
+            "the count and the names are the same answer, read at the same instant"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub1527_the_names_answer_to_the_cutoff_their_caller_hands_down() {
+        // The guarantee above rests on `coverage` resolving "live" ONCE and handing the same
+        // instant to both reads. If the names took a second `now` of their own, the two would
+        // disagree over any host sitting on the TTL boundary — the screen naming a till the badge
+        // had already given up on. That is a sub-millisecond race no wall-clock test can catch, so
+        // the contract is pinned where it can be: the cutoff is the CALLER'S, and a cutoff nobody
+        // could have reported since answers nobody.
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
+            .await
+            .unwrap();
+
+        let now = live_host_labels(&db, "h1", &live_cutoff()).await.unwrap();
+        assert_eq!(now.get("kitchen").map(Vec::as_slice), Some(&["Counter till".to_string()][..]));
+
+        let unreachable = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let none = live_host_labels(&db, "h1", &unreachable).await.unwrap();
+        assert!(
+            none.is_empty(),
+            "the caller's cutoff decides who is live, not a clock read a second time: {none:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub1527_a_host_that_never_sent_a_name_is_listed_by_its_device_id() {
+        // `label` is optional on the wire, so a lean client registers without one. An empty string
+        // in the list would paint "Printing from: " and read as a bug; its id is at least
+        // something the owner can match against the device in front of them — and it is what the
+        // shell's Settings card already falls back to over `GET /api/print/hosts`.
+        let db = hosts_db().await;
+        register(&db, "h1", "till-9", "kitchen", "", "u1").await.unwrap();
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .unwrap();
+
+        assert_eq!(kitchen.live_host_labels, ["till-9"]);
+    }
+
+    #[tokio::test]
+    async fn hub1527_a_role_with_work_and_nobody_live_names_nobody() {
+        let db = hosts_db().await;
+        queue(&db, "h1", "j1", "kitchen").await;
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .unwrap();
+
+        assert_eq!(kitchen.waiting, 1);
+        assert!(
+            kitchen.live_host_labels.is_empty(),
+            "an empty list is the honest answer when nothing is going to print"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub1527_another_hubs_host_is_never_named_in_this_hubs_coverage() {
+        // The labels are a second read of `_print_host`, so they are a second chance to leak: a
+        // hub that named another's till would be reporting itself covered by a device it does not
+        // own — and would be putting somebody else's device name on this owner's screen.
+        let db = hosts_db().await;
+        crate::system_migrations::apply(&db, "h2").await.unwrap();
+        register(&db, "h2", "till-2", "kitchen", "Other hub till", "u1")
+            .await
+            .unwrap();
+        queue(&db, "h1", "j1", "kitchen").await;
+
+        let kitchen = of_role(&coverage(&db, "h1").await.unwrap(), "kitchen")
+            .cloned()
+            .unwrap();
+
+        assert_eq!(kitchen.live_hosts, 0);
+        assert!(kitchen.live_host_labels.is_empty());
+    }
+
+    #[test]
+    fn hub1527_the_coverage_view_carries_the_live_host_labels() {
+        // The shape is shared by `GET /api/print/hosts` and the core query `hub.print.coverage`
+        // (hub#1107), so this is the ONE place the names have to appear for both to have them.
+        let view = coverage_view(&RoleCoverage {
+            role: "kitchen".into(),
+            waiting: 0,
+            live_hosts: 1,
+            waiting_seconds: 0,
+            live_host_labels: vec!["Counter till".into()],
+        });
+
+        assert_eq!(view["liveHostLabels"], json!(["Counter till"]));
+        assert_eq!(view["liveHosts"], json!(1), "the count stays: a screen may want either");
     }
 
     /// The queue and the registry agree on the role spelling: a host registered for `kitchen`

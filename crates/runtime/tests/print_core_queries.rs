@@ -87,6 +87,41 @@ async fn a_module_reads_the_coverage_of_every_station() {
     );
 }
 
+/// hub#1527 — the coverage a module reads NAMES the devices that are printing.
+///
+/// The count is the alarm; the names are the healthy state, which is the one the owner opens every
+/// day. This is the door the Printers screen reads through, so if the names do not cross HERE the
+/// screen can only ever say "2 devices active" and the owner has to go and try which till it is.
+#[tokio::test]
+async fn a_module_reads_which_devices_are_printing_and_not_only_how_many() {
+    let rt = runtime("hub-cov-names").await;
+    rt.register_print_host("till-1", "kitchen", "Counter till", "u1")
+        .await
+        .expect("the till registers as the kitchen's host");
+    rt.register_print_host("tablet-1", "kitchen", "Floor tablet", "u1")
+        .await
+        .expect("and so does the tablet");
+
+    let rows = query(
+        &rt,
+        "hub.print.coverage",
+        Params::new(),
+        &ctx("hub-cov-names", &[SESSION]),
+    )
+    .await;
+
+    let kitchen = rows
+        .iter()
+        .find(|r| r["role"] == "kitchen")
+        .unwrap_or_else(|| panic!("a covered station is reported too: {rows:?}"));
+    assert_eq!(kitchen["liveHosts"], 2);
+    assert_eq!(
+        kitchen["liveHostLabels"],
+        json!(["Counter till", "Floor tablet"]),
+        "the module can name them: {kitchen:?}"
+    );
+}
+
 /// The queue itself, in hand-out order, as a STATUS view.
 #[tokio::test]
 async fn a_module_reads_the_queue_in_hand_out_order() {
