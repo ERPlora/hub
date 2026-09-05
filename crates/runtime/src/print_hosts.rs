@@ -132,10 +132,11 @@ pub struct RoleCoverage {
     ///
     /// The count alone answers the alarm ("nobody is taking the kitchen's tickets") but not the
     /// healthy state, which is the one an owner looks at every day: with a till and a tablet,
-    /// *"2 devices active"* leaves them to go and try which of the two is doing it. The retired
-    /// `GET /api/print/hosts` route carried these names and the screen said *"Printing from:
-    /// Counter till"*; reading the queue through the dispatcher (hub#1107) lost them, because the
-    /// hub knew the answer and it did not cross.
+    /// *"2 devices active"* leaves them to go and try which of the two is doing it. The HTTP route
+    /// `GET /api/print/hosts` (still alive: the shell's Settings card reads it) carries these names
+    /// and that screen says *"Printing from: Counter till"*; the module's screen lost them when it
+    /// moved to the dispatcher (printing#30, hub#1107), because the hub knew the answer and it did
+    /// not cross.
     ///
     /// A host that registered without a name is listed by its `device_id`: an empty string in this
     /// list would paint *"Printing from: "* and read as a bug.
@@ -434,8 +435,8 @@ pub async fn coverage(db: &dyn DatabaseAdapter, hub_id: &str) -> Result<Vec<Role
 /// same statement's sibling, so "live" means the same instant for the count and for the names.
 ///
 /// The name falls back to the `device_id` when the host registered without a label — the same
-/// fallback the retired `GET /api/print/hosts` screen applied, and the reason is unchanged: an
-/// empty entry in this list would paint a dangling "Printing from:".
+/// fallback the shell's Settings card applies over `GET /api/print/hosts`, and the reason is
+/// unchanged: an empty entry in this list would paint a dangling "Printing from:".
 async fn live_host_labels(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
@@ -1323,11 +1324,12 @@ mod tests {
 
     // ── hub#1527: coverage NAMES the devices that are printing, it does not only count them ────
     //
-    // The retired `GET /api/print/hosts` handed the screen a `hosts[]` with every registration's
-    // label, and the Printers screen said "Printing from: Counter till". Reading the queue through
-    // the dispatcher (hub#1107) left it with a COUNT — so in the healthy state, the one an owner
-    // looks at daily, the screen went from naming the till to saying "2 devices". With one till
-    // and one tablet, that is the difference between knowing and having to go and try.
+    // `GET /api/print/hosts` (still alive: the shell's Settings card reads it) hands its caller a
+    // `hosts[]` with every registration's label, and the module's Printers screen said "Printing
+    // from: Counter till" while it read that route. Moving it to the dispatcher (printing#30,
+    // hub#1107) left it with a COUNT — so in the healthy state, the one an owner looks at daily,
+    // the screen went from naming the till to saying "2 devices". With one till and one tablet,
+    // that is the difference between knowing and having to go and try.
 
     #[tokio::test]
     async fn hub1527_coverage_names_the_live_hosts_and_not_only_their_number() {
@@ -1416,7 +1418,7 @@ mod tests {
         // `label` is optional on the wire, so a lean client registers without one. An empty string
         // in the list would paint "Printing from: " and read as a bug; its id is at least
         // something the owner can match against the device in front of them — and it is what the
-        // retired HTTP route's screen already fell back to.
+        // shell's Settings card already falls back to over `GET /api/print/hosts`.
         let db = hosts_db().await;
         register(&db, "h1", "till-9", "kitchen", "", "u1").await.unwrap();
 
