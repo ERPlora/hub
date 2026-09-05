@@ -306,8 +306,8 @@ pub(crate) fn accepted_params(
     out
 }
 
-/// Rechaza el primer parámetro FUERA del namespace `f_` que la query de lista no declara
-/// (hub#1173).
+/// Rechaza el primer parámetro que la query de lista no declara — con prefijo `f_` o sin él
+/// (hub#1173 + hub#1182).
 ///
 /// El fallo que cierra es el «éxito silencioso»: un parámetro que la query no tiene se ignoraba y
 /// la página respondía `200 ok` **con la lista entera**, indistinguible de un filtro que corrió y
@@ -315,7 +315,7 @@ pub(crate) fn accepted_params(
 /// `{"status": "active"}` en vez de `{"f_status": "active"}` — y lo que hacía el QA que abrió la
 /// issue.
 ///
-/// # Por qué RECHAZAR, y por qué solo fuera de `f_`
+/// # Por qué RECHAZAR
 ///
 /// Barrido de los 27 repos de módulo (`origin/main`, 25/08/2026): **dos** llamadas en el catálogo
 /// entero mandaban un parámetro sin prefijo fuera de vocabulario, y las dos eran este mismo fallo
@@ -323,14 +323,27 @@ pub(crate) fn accepted_params(
 /// el cajero veía los métodos de pago DESACTIVADOS) y `services.services.list` con `page_size` (el
 /// param que el propio SDK documenta como inexistente). Cero llamadores legítimos a los que romper.
 ///
-/// `f_*` es distinto y por eso queda FUERA de esta puerta, de momento. Es el namespace del propio
-/// motor, y el SDK aplana `filters` a `f_<col>` diga lo que diga el manifest — así que una columna
-/// que la tabla de una pantalla declara `filterable` pero el manifest no declara como filtro llega
-/// aquí bien prefijada. Ese caso EXISTE: el mismo barrido encuentra 5 componentes así, entre ellos
-/// la tabla de productos de `inventory` (`name`/`sku` son `search`, no `filters`). Hoy ese filtro
-/// no filtra; rechazarlo cambiaría «el filtro no hace nada» por «la tabla revienta», que no es
-/// arreglarlo. Lo que lo arregla es declarar el filtro que falta en esos manifests — hub#1182, con
-/// la lista medida — y solo entonces esta puerta puede cubrir también `f_*`.
+/// # Por qué `f_*` entró DESPUÉS, y no el mismo día
+///
+/// `f_*` es el namespace del propio motor, y el SDK aplana `filters` a `f_<col>` diga lo que diga
+/// el manifest — así que una columna que la tabla de una pantalla declara `filterable` pero el
+/// manifest no declara como filtro llegaba aquí bien prefijada. Ese caso EXISTÍA: el barrido del
+/// 25/08 encontró 5 componentes así, entre ellos la tabla de productos de `inventory` (`name`/`sku`
+/// eran `search`, no `filters`). Rechazarlos entonces habría cambiado «el filtro no hace nada» por
+/// «la tabla revienta», que no es arreglarlo. Por eso hub#1173 dejó `f_*` fuera y hub#1182 se abrió
+/// para la otra mitad.
+///
+/// Lo que lo arregló fue declarar el filtro que faltaba, módulo a módulo —`inventory`, `taxes`,
+/// `verifactu`, `pricing`, `sales`, `tables`, `schedules` y `reservations`, cada uno con su guarda
+/// permanente en su propio repo—. Rebarrido el 05/09/2026 contra `origin/main` de los 27:
+/// **55 tablas de lista de servidor y CERO `f_*` que su manifest no acepte**. Sin pantalla viva
+/// que romper, la puerta cubre ya el namespace entero.
+///
+/// El caso que solo existe aquí dentro es el **borde de rango**: `buildListParams` decide la forma
+/// por el VALOR, no por el manifest, así que un `{from, to}` viaja como `f_<col>_from` /
+/// `f_<col>_to`. Una columna pintada con un control de dos topes sobre un filtro declarado `eq` o
+/// `like` manda un nombre que la query no tiene — el mismo éxito silencioso, alcanzado desde la
+/// forma del control en vez de desde una declaración que falta.
 ///
 /// Se rechaza UNO, el primero en orden estable: un error nombra el parámetro que hay que
 /// arreglar, no una lista que hay que leer entera. Mismo contrato que su gemelo
@@ -346,12 +359,6 @@ pub(crate) fn reject_undeclared_params(
     let mut sent: Vec<&String> = params.keys().collect();
     sent.sort();
     for name in sent {
-        // `f_*` es el namespace del motor: un filtro que no casa con ninguno declarado se sigue
-        // descartando como siempre (ver la nota de arriba, hub#1182). Aquí se defiende el espacio
-        // SIN prefijo, que es donde el descuido de quien llama se vuelve «he filtrado» sin serlo.
-        if name.starts_with("f_") {
-            continue;
-        }
         if !accepted.iter().any(|a| a == name) {
             return Err(RuntimeError::UnknownFilter {
                 query: query.to_string(),
