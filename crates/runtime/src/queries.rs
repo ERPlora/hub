@@ -485,8 +485,9 @@ pub(crate) async fn run_list(
     // nube es Postgres (estricto: `integer = text` da error). Comparar como texto en ambos lados
     // hace que un `'1'` de un <select> case con una columna entera en SQLite **y** Postgres.
     // `range` NO puede hacer eso: comparar `>=`/`<=` como texto rompería el orden numérico
-    // ('100' va DEBAJO de '20'). Compara con el tipo real de la columna, y cuando el extremo
-    // llega como texto sobre una columna numérica lo castea a NUMERIC — ver `range_bound_expr`.
+    // ('100' va DEBAJO de '20'). Compara con el tipo REAL de la columna y coloca ahí el extremo,
+    // venga escrito como venga — texto sobre columna numérica (hub#1542) o número sobre columna
+    // que no lo es (hub#1566). Ver `range_bound_expr`.
     if !spec.search.is_empty() && has(&p, "search") {
         let likes: Vec<String> = spec
             .search
@@ -542,11 +543,14 @@ pub(crate) async fn run_list(
                 }
             }
             FilterOp::Range => {
-                let numeric =
-                    column_kinds.get(col.as_str()).copied() == Some(ColumnKind::Numeric);
+                // `None` = el servidor no supo decirlo (o no se le preguntó). NO es lo mismo que
+                // `Other`: no saber deja el extremo tal cual lo escribió quien llama, mientras
+                // que saber que la columna no es numérica es lo que autoriza a escribir un
+                // extremo numérico como texto (hub#1566).
+                let kind = column_kinds.get(col.as_str()).copied();
                 let from_key = format!("f_{col}_from");
                 if has(&p, &from_key) {
-                    let expr = range_bound_expr(query, &from_key, &p, numeric)?;
+                    let expr = range_bound_expr(query, &from_key, &p, kind)?;
                     conds.push(format!("sub.{col} >= {expr}"));
                 }
                 if has(&p, &format!("f_{col}_to")) {
@@ -563,8 +567,11 @@ pub(crate) async fn run_list(
                     // Una columna NUMÉRICA no entra aquí: un número no es una fecha desnuda, así
                     // que no hay día que ensanchar — solo el cast del extremo.
                     let to_key = format!("f_{col}_to");
-                    let expr = range_bound_expr(query, &to_key, &p, numeric)?;
-                    let next = if numeric {
+                    let expr = range_bound_expr(query, &to_key, &p, kind)?;
+                    // Solo un extremo de TEXTO con forma `YYYY-MM-DD` es una fecha desnuda: un
+                    // extremo numérico no lo es (`as_str()` ya devuelve `None`), y sobre una
+                    // columna numérica no hay día que ensanchar.
+                    let next = if kind == Some(ColumnKind::Numeric) {
                         None
                     } else {
                         p.get(&to_key).and_then(|v| v.as_str()).and_then(next_day)
@@ -816,39 +823,56 @@ fn is_ident(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-/// `"2026-01-15"` → `Some("2026-01-16")`. `None` for anything that is not EXACTLY a bare
-/// `YYYY-MM-DD` calendar date — in particular a full ISO-8601 instant (`…T14:23:11+02:00`),
-/// which already means what it says and is left untouched (verifactu#70).
-/// ¿Hay algún extremo de `range` escrito como TEXTO? Es la única pregunta que obliga a
-/// consultar el tipo de las columnas (hub#1542): con los extremos ya numéricos —lo que manda la
-/// tabla de una pantalla, que convierte antes de enviar— la comparación ya es correcta y no se
-/// gasta un viaje al servidor.
+/// ¿Hay algún extremo de `range` que haya que colocar contra el tipo de su columna? Lo son los
+/// DOS: el escrito como TEXTO sobre una columna numérica (hub#1542) y el escrito como NÚMERO
+/// sobre una que no lo es (hub#1566). Ninguna de las dos direcciones se puede resolver mirando
+/// el valor —un NIF de solo dígitos es un extremo de texto legítimo—, así que la pregunta se le
+/// hace al servidor.
+///
+/// Sigue sin hacerse por costumbre: una lista sin filtro `range` —o con los extremos ausentes—
+/// no gasta el viaje. Un extremo que no es ni texto ni número (un booleano, un array) tampoco
+/// tiene conversión que elegir y se liga tal cual, como antes.
 fn needs_column_kinds(spec: &ListSpec, p: &Params) -> bool {
     spec.filters
         .iter()
         .filter(|(_, f)| f.op == FilterOp::Range)
         .flat_map(|(col, _)| [format!("f_{col}_from"), format!("f_{col}_to")])
-        .any(|k| p.get(&k).is_some_and(serde_json::Value::is_string))
+        .any(|k| p.get(&k).is_some_and(|v| v.is_string() || v.is_number()))
 }
 
 /// La expresión SQL con la que se compara un extremo de `range`, y la puerta que rechaza el que
-/// la columna no puede leer (hub#1542).
+/// la columna no puede leer (hub#1542, hub#1566).
 ///
-/// Sobre una columna que NO es numérica —y sobre cualquier extremo que ya llega como número— el
-/// extremo se compara tal cual: es lo que ya funcionaba (las fechas y los instantes viven como
-/// TEXT ISO-8601, ADR-0007, y ahí `>=` sobre texto es exactamente el orden que toca).
+/// El cast va SIEMPRE en el SQL y el bind se queda como lo escribió quien llama: así quien
+/// convierte es Postgres, con el tipo de la columna delante. Convertir aquí en Rust sería lo
+/// cómodo y perdería precisión en la primera columna de dinero (`NUMERIC` guarda `12345.67`
+/// exacto y un `f64` no).
 ///
-/// Sobre una columna numérica con el extremo escrito como TEXTO, el cast va en el SQL y el bind
-/// sigue siendo la cadena. Convertirla aquí a `f64` sería lo cómodo y perdería precisión en la
-/// primera columna de dinero (`NUMERIC` guarda `12345.67` exacto y un `f64` no); dejándola en
-/// texto, quien convierte es Postgres con el tipo de la columna delante.
+/// Dos diagonales, una por sentido, y las dos hacen falta porque el valor NO dice de qué tipo es
+/// la columna (un NIF de solo dígitos es un extremo de texto legítimo):
 ///
-/// Y lo que no sea un número se RECHAZA con su propio código, en vez de llegar a Postgres y
-/// volver como el `db` genérico: la puerta se abre para convertir, no para comparar cualquier
-/// cosa con cualquier cosa.
-fn range_bound_expr(query: &str, key: &str, p: &Params, numeric: bool) -> Result<String> {
-    let raw = match p.get(key) {
-        Some(serde_json::Value::String(s)) if numeric => s,
+/// * Extremo TEXTO sobre columna NUMÉRICA → `CAST(... AS NUMERIC)`. Y lo que no sea un número se
+///   RECHAZA con su propio código, en vez de llegar a Postgres y volver como el `db` genérico:
+///   la puerta se abre para convertir, no para comparar cualquier cosa con cualquier cosa.
+/// * Extremo NÚMERO sobre columna que el servidor dice que NO es numérica → `CAST(... AS TEXT)`,
+///   que es donde de verdad cae ese extremo (las fechas y los instantes viven como TEXT ISO-8601,
+///   ADR-0007, y ahí `>=` sobre texto es exactamente el orden que toca). Cualquier número tiene
+///   su forma escrita, así que por este lado no hay extremo que rechazar.
+///
+/// Cualquier otra combinación —incluida la columna cuyo tipo NO se pudo resolver (`kind` a
+/// `None`)— liga el extremo tal cual: no saber tiene que dejarlo exactamente como venía, nunca
+/// inventarse una conversión.
+fn range_bound_expr(
+    query: &str,
+    key: &str,
+    p: &Params,
+    kind: Option<ColumnKind>,
+) -> Result<String> {
+    let raw = match (p.get(key), kind) {
+        (Some(serde_json::Value::String(s)), Some(ColumnKind::Numeric)) => s,
+        (Some(serde_json::Value::Number(_)), Some(ColumnKind::Other)) => {
+            return Ok(format!("CAST(:{key} AS TEXT)"))
+        }
         _ => return Ok(format!(":{key}")),
     };
     // `is_finite` deja fuera `inf`/`NaN`/`1e400`: se parsean como `f64` y no son extremos de un
@@ -863,6 +887,9 @@ fn range_bound_expr(query: &str, key: &str, p: &Params, numeric: bool) -> Result
     Ok(format!("CAST(:{key} AS NUMERIC)"))
 }
 
+/// `"2026-01-15"` → `Some("2026-01-16")`. `None` for anything that is not EXACTLY a bare
+/// `YYYY-MM-DD` calendar date — in particular a full ISO-8601 instant (`…T14:23:11+02:00`),
+/// which already means what it says and is left untouched (verifactu#70).
 fn next_day(s: &str) -> Option<String> {
     let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()?;
     Some(date.succ_opt()?.format("%Y-%m-%d").to_string())
@@ -953,5 +980,120 @@ mod tests {
     fn garbage_is_not_a_date() {
         assert_eq!(next_day("not-a-date"), None);
         assert_eq!(next_day(""), None);
+    }
+
+    // ── hub#1566: la puerta de conversión de un extremo de `range`, por dentro ────────────────
+    // Los e2e de `list_range_filter_typed_bounds_e2e.rs` cubren las dos diagonales contra
+    // Postgres real. Lo que NO se puede montar contra Postgres real es el tercer estado —el
+    // servidor no supo resolver el tipo de la columna—, porque contra Postgres siempre lo
+    // resuelve; y es justo el estado que el arreglo no puede confundir con `Other`: hacerlo
+    // reescribiría como texto un extremo numérico sobre una columna numérica y devolvería el
+    // fallo de hub#1542 por la puerta de atrás.
+
+    use super::{needs_column_kinds, range_bound_expr};
+    use crate::manifest::{FilterOp, FilterSpec, ListSpec};
+    use erplora_db::{ColumnKind, Params};
+    use serde_json::json;
+
+    fn bound(value: serde_json::Value) -> Params {
+        let mut p = Params::new();
+        p.insert("f_c_from".into(), value);
+        p
+    }
+
+    fn range_spec() -> ListSpec {
+        serde_json::from_value(json!({ "filters": { "c": { "op": "range" } } }))
+            .expect("a list spec with one range filter")
+    }
+
+    #[test]
+    fn a_text_bound_over_a_numeric_column_is_read_as_a_number() {
+        assert_eq!(
+            range_bound_expr(
+                "q",
+                "f_c_from",
+                &bound(json!("10")),
+                Some(ColumnKind::Numeric)
+            )
+            .unwrap(),
+            "CAST(:f_c_from AS NUMERIC)"
+        );
+    }
+
+    #[test]
+    fn a_numeric_bound_over_a_non_numeric_column_is_written_as_text() {
+        assert_eq!(
+            range_bound_expr("q", "f_c_from", &bound(json!(10)), Some(ColumnKind::Other)).unwrap(),
+            "CAST(:f_c_from AS TEXT)"
+        );
+    }
+
+    #[test]
+    fn a_bound_already_in_the_column_s_own_shape_is_bound_as_written() {
+        for (value, kind) in [
+            (json!(10), Some(ColumnKind::Numeric)),
+            (json!("2026-01-15"), Some(ColumnKind::Other)),
+        ] {
+            assert_eq!(
+                range_bound_expr("q", "f_c_from", &bound(value.clone()), kind).unwrap(),
+                ":f_c_from",
+                "{value} needs no conversion over {kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unresolved_column_type_leaves_every_bound_exactly_as_it_came() {
+        // El estado que no se puede confundir con `Other`. Un extremo NUMÉRICO sobre una columna
+        // sin tipo resuelto se liga como número: si se escribiera como texto, una columna
+        // numérica volvería a fallar con `numeric >= text` justo cuando el servidor no puede
+        // decir que lo es — degradar tiene que devolver lo de ayer, no un fallo nuevo.
+        for value in [json!(10), json!("10"), json!("abc")] {
+            assert_eq!(
+                range_bound_expr("q", "f_c_from", &bound(value.clone()), None).unwrap(),
+                ":f_c_from",
+                "{value} sin tipo de columna se liga tal cual"
+            );
+        }
+    }
+
+    #[test]
+    fn both_bound_shapes_ask_for_the_column_types() {
+        let spec = range_spec();
+        for value in [json!("10"), json!(10)] {
+            assert!(
+                needs_column_kinds(&spec, &bound(value.clone())),
+                "{value} puede necesitar conversión: hay que preguntar el tipo de la columna"
+            );
+        }
+    }
+
+    #[test]
+    fn a_list_with_nothing_to_convert_does_not_ask_the_server() {
+        let spec = range_spec();
+        assert!(
+            !needs_column_kinds(&spec, &Params::new()),
+            "sin extremos no hay nada que colocar"
+        );
+        assert!(
+            !needs_column_kinds(&spec, &bound(json!(null))),
+            "un extremo nulo no genera condición: tampoco se pregunta"
+        );
+        assert!(
+            !needs_column_kinds(&spec, &bound(json!(true))),
+            "un extremo que no es ni texto ni número no tiene conversión que elegir"
+        );
+
+        let eq_only: ListSpec =
+            serde_json::from_value(json!({ "filters": { "c": { "op": "eq" } } })).unwrap();
+        assert!(
+            !needs_column_kinds(&eq_only, &bound(json!(10))),
+            "solo `range` compara con `>=`/`<=`: `eq` ya castea los dos lados a TEXT"
+        );
+        // El filtro declarado es el que manda: `FilterSpec`/`FilterOp` entran aquí desde el
+        // manifest, no desde el llamador.
+        let _ = FilterSpec {
+            op: FilterOp::Range,
+        };
     }
 }
