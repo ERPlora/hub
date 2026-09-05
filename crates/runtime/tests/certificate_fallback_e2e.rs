@@ -191,6 +191,10 @@ async fn the_gate_accepts(rt: &Runtime, hub_id: &str) -> bool {
 /// Reader 4 — the fiscal ENGINE (`can_sign`, `crates/plugins/verifactu`). `true` = the module would
 /// go ahead and transmit to the AEAT.
 ///
+/// It used to be named after `build_identity`, which hub#1529 deleted: since hub#1432 the only door
+/// that resolves a road is `resolve_route`, and `can_sign` is the own-road half of it. The rename is
+/// the whole of what changed here — the reader asks the same question of the same host.
+///
 /// Asked through the runtime's REAL host (`DbHost`), not a hand-written stand-in: a twin host would
 /// be a second implementation of the very question under test, which is how the two readings of
 /// «which certificate?» drifted apart twice already (hub#317, hub#318).
