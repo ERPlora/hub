@@ -1197,6 +1197,21 @@ mod tests {
                 }),
             ),
             (
+                // The RECORD's own ordering rule. It is the one refusal that does NOT go through
+                // `named`: it has been `VerifactuError::OutOfOrder` since hub#1070, and the code
+                // is put on it by `as_reason`. Without this case the mapping of that variant could
+                // be deleted and the whole table would still pass — measured, it survived.
+                "a record whose elements break the xs:sequence",
+                swap(
+                    "<sum1:CuotaTotal>21.00</sum1:CuotaTotal>\
+             <sum1:ImporteTotal>121.00</sum1:ImporteTotal>",
+                    "<sum1:ImporteTotal>121.00</sum1:ImporteTotal>\
+             <sum1:CuotaTotal>21.00</sum1:CuotaTotal>",
+                ),
+                "schema_element_out_of_order",
+                json!({ "element": "CuotaTotal", "sequence": ORDER_ALTA.join(" → ") }),
+            ),
+            (
                 "an envelope carrying neither an alta nor an anulacion",
                 swap("<sum1:RegistroAlta>", "<sum1:RegistroOtro>")
                     .replace("</sum1:RegistroAlta>", "</sum1:RegistroOtro>"),
