@@ -42,6 +42,14 @@ pub const CUPS_LPSTAT: &str = "lpstat";
 /// with the IPP attributes themselves, and an enum is an enum in every language.
 pub const CUPS_LPOPTIONS: &str = "lpoptions";
 
+/// The CUPS client that takes a job back out of a queue (hub#1564).
+///
+/// Same package as the other three (`cups-client`), so it costs the transport no dependency it
+/// did not already have. It is used only when a ticket did NOT come out: a job left behind is not
+/// harmless paperwork, it is a receipt that prints by surprise hours later when someone reloads
+/// the roll — with a number the till already reported as failed, next to a customer who left.
+pub const CUPS_CANCEL: &str = "cancel";
+
 /// `PrinterInfo.status` for a queue that will print the next job.
 pub const QUEUE_STATUS_READY: &str = "ready";
 /// `PrinterInfo.status` for a queue that would take the job and HOLD it — no paper, cover open,
@@ -71,6 +79,23 @@ pub const CUPS_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// How often the wait wakes up to check on the child.
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+/// How long a job the spooler ACCEPTED gets to leave the queue before the till calls it failed
+/// (hub#1564).
+///
+/// `lp` exiting 0 means the spooler wrote the job down, which is as far as it can see. The OS
+/// only learns that the paper ran out or the cable is gone WHILE it is running a job, so at
+/// submit time the fault the pre-flight of hub#1541 looks for does not exist yet: it appears
+/// seconds later, by which point the till has already said "printed". Five seconds is far beyond
+/// a thermal receipt down a USB cable — a few kilobytes, under a second even counting the backend
+/// opening the device — and still short enough that the cashier learns the truth while the
+/// customer is standing there, which is the whole point.
+pub const JOB_COMPLETION_WINDOW: Duration = Duration::from_secs(5);
+
+/// How often the OS queue is re-read while waiting for the job to leave it. Twenty polls across
+/// [`JOB_COMPLETION_WINDOW`]: cheap enough not to matter, tight enough that a receipt that came
+/// out in 300 ms does not keep the cashier waiting for a whole second.
+const JOB_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Job title, so a stuck ticket is identifiable in the OS queue window instead of being an
 /// anonymous "Untitled" the user cannot connect to the till.
@@ -139,16 +164,11 @@ pub enum QueueState {
 /// destination CUPS does not know exits 0 and prints uninitialised bytes with no attribute in them
 /// (measured on macOS 2026-09-05).
 pub fn parse_queue_state(options: &str) -> QueueState {
-    let value_of = |key: &str| {
-        options
-            .split_whitespace()
-            .find_map(|pair| pair.strip_prefix(key)?.strip_prefix('='))
-    };
-    let Some(state) = value_of("printer-state") else {
+    let Some(state) = attribute(options, "printer-state") else {
         return QueueState::Unknown;
     };
-    let reasons = value_of("printer-state-reasons").unwrap_or("none");
-    let accepting = value_of("printer-is-accepting-jobs").unwrap_or("true");
+    let reasons = attribute(options, "printer-state-reasons").unwrap_or("none");
+    let accepting = attribute(options, "printer-is-accepting-jobs").unwrap_or("true");
 
     let stopped = state == IPP_STATE_STOPPED;
     let faulted = reasons
@@ -182,6 +202,84 @@ fn state_name(state: &str) -> &str {
         IPP_STATE_STOPPED => "stopped",
         other => other,
     }
+}
+
+/// One `key=value` out of an `lpoptions -p` line.
+///
+/// Whole keys only: `printer-state` must not match `printer-state-reasons`, which is why the `=`
+/// is required right after the key rather than the prefix being enough. Values with a space in
+/// them are single-quoted by `lpoptions` (`printer-info='Brother HL-3150CDW series'`), and no key
+/// read here has one, so splitting on whitespace cannot be fooled by a quoted fragment.
+fn attribute<'a>(options: &'a str, key: &str) -> Option<&'a str> {
+    options
+        .split_whitespace()
+        .find_map(|pair| pair.strip_prefix(key)?.strip_prefix('='))
+}
+
+/// The `printer-state*` attributes as they read RIGHT NOW, whatever their severity (hub#1564).
+///
+/// A different question from [`parse_queue_state`]'s, so deliberately a different rule: that one
+/// asks "may we print?" and must ignore anything below `-error`, because a thermal roll running
+/// low reports `media-low-warning` for hours while printing perfectly. This one asks "why did the
+/// ticket that we already sent not come out?", and the answer is precisely the reasons the other
+/// has to ignore: a USB backend never emits an `-error` reason at all — CUPS' `backend/runloop.c`
+/// reports no paper as `media-empty-warning` and a pulled cable as `offline-report`, and it only
+/// emits them WHILE it is running a job. Before the submit they are stale or absent; after the
+/// wait they are the fault that ate the receipt.
+pub fn parse_state_report(options: &str) -> Option<String> {
+    let state = attribute(options, "printer-state")?;
+    let mut reported = vec![format!("printer-state={}", state_name(state))];
+    match attribute(options, "printer-state-reasons") {
+        Some(reasons) if reasons != "none" => {
+            reported.push(format!("printer-state-reasons={reasons}"))
+        }
+        _ => {}
+    }
+    if attribute(options, "printer-is-accepting-jobs") == Some("false") {
+        reported.push("printer-is-accepting-jobs=false".to_string());
+    }
+    Some(reported.join(" "))
+}
+
+/// The job id `lp` answered with, taken out of its line WITHOUT reading a word of it.
+///
+/// `lp` prints `request id is <queue>-<n> (1 file(s))`, and that sentence is one of CUPS'
+/// translatable strings (`_cupsLangPrintf` in `lp.c`), so on a Spanish Mac it is «el identificador
+/// de la solicitud es …». Anchoring on the English prefix would find no id on exactly the tills
+/// this transport exists for — the same trap `lpstat -v` already set (hub#1083). What no
+/// translation moves is the id itself: the queue's own name, a dash, and a number.
+pub fn parse_request_id(stdout: &str, queue: &str) -> Option<String> {
+    let prefix = format!("{queue}-");
+    stdout.split_whitespace().find_map(|token| {
+        let rest = token.strip_prefix(&prefix)?;
+        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+        if digits.is_empty() {
+            return None;
+        }
+        // A number that runs straight into more of the token is part of something else, not a job
+        // id — and cancelling on a guess would take away a job that is not ours. Punctuation after
+        // it is fine: CUPS puts the file count in brackets right behind.
+        let tail = &rest[digits.len()..];
+        if tail.starts_with(|c: char| c.is_alphanumeric() || c == '-' || c == '_') {
+            return None;
+        }
+        Some(format!("{prefix}{digits}"))
+    })
+}
+
+/// The argv that lists the jobs `queue` has NOT finished yet.
+fn lpstat_queue_args(queue: &str) -> Vec<&str> {
+    vec!["-W", "not-completed", "-o", queue]
+}
+
+/// Whether `job_id` is still sitting in an `lpstat -o` listing.
+///
+/// Matched on the FIRST COLUMN and nothing else. The rest of the line is the owner, the size and
+/// a date — and the date is written in the system's language and format (`Sat Sep  5 17:17:50
+/// 2026` on this Mac, `s\u{e1}b  5 sep 17:17:50 2026` on a Spanish one), so it is the one field a
+/// parser must never touch. The id is what CUPS never translates.
+pub fn job_is_queued(listing: &str, job_id: &str) -> bool {
+    listing.lines().any(|line| line.split_whitespace().next() == Some(job_id))
 }
 
 /// Asks CUPS how `queue` is doing. One client spawn, bounded by [`CUPS_TIMEOUT`] like every other.
@@ -229,7 +327,27 @@ fn ask_queue_state(client: &dyn CupsClient, queue: &str) -> QueueState {
 /// anyway and leaves the verdict to `lp`, which is already the one that reports the spooler
 /// refusing — a queue that does not exist, is disabled or is rejecting jobs, with its own sentence
 /// in it.
+///
+/// And asking first is not enough on its own (hub#1564): the pre-flight can only report a fault
+/// the OS already knows about, and with the queue at rest it does not know. A USB backend finds
+/// out that the roll ran out or the cable is gone only while it is *running* a job, so the FIRST
+/// ticket after the paper runs out passes the guard, is accepted by `lp`, and is held. So the job
+/// is also followed AFTERWARDS: it has [`JOB_COMPLETION_WINDOW`] to leave the queue, and if it is
+/// still there it is cancelled and reported failed with whatever the backend is reporting by
+/// then. That second half is what makes a USB printer behave like the network one — the till says
+/// the ticket did not come out, instead of saying it did.
 pub fn send_raw(client: &dyn CupsClient, target: &UsbTarget, payload: &[u8]) -> Result<()> {
+    send_raw_within(client, target, payload, JOB_COMPLETION_WINDOW)
+}
+
+/// [`send_raw`] with the wait spelled out, so a test can exercise the timeout without spending
+/// [`JOB_COMPLETION_WINDOW`] of real seconds on it.
+fn send_raw_within(
+    client: &dyn CupsClient,
+    target: &UsbTarget,
+    payload: &[u8],
+    window: Duration,
+) -> Result<()> {
     if let QueueState::NotReady { reason } = ask_queue_state(client, &target.queue) {
         return Err(PeripheralError::Unreachable(format!(
             "the printer on the OS print queue `{}` is not ready ({reason}); the job was NOT sent",
@@ -237,17 +355,102 @@ pub fn send_raw(client: &dyn CupsClient, target: &UsbTarget, payload: &[u8]) -> 
         )));
     }
     let out = client.run(CUPS_LP, &lp_args(&target.queue), payload)?;
-    if out.success {
-        return Ok(());
+    if !out.success {
+        // `lp` says WHY on stderr ("paper out", "printer disabled", "does not exist"). Dropping it
+        // would leave the cashier with a ticket that never printed and no way to know it.
+        let reason = first_meaningful_line(&out.stderr)
+            .or_else(|| first_meaningful_line(&out.stdout))
+            .unwrap_or("no reason given");
+        return Err(PeripheralError::Unreachable(format!(
+            "the OS print queue `{}` refused the job: {reason}",
+            target.queue
+        )));
     }
-    // `lp` says WHY on stderr ("paper out", "printer disabled", "does not exist"). Dropping it
-    // would leave the cashier with a ticket that never printed and no way to know it.
-    let reason = first_meaningful_line(&out.stderr)
-        .or_else(|| first_meaningful_line(&out.stdout))
-        .unwrap_or("no reason given");
+    let Some(job_id) = parse_request_id(&out.stdout, &target.queue) else {
+        // Same rule as the pre-flight, one step later: an answer we could not read is not a
+        // verdict. Without the id there is nothing to follow and nothing safe to cancel, so the
+        // job stands as sent and the reason is logged rather than swallowed.
+        tracing::warn!(
+            "usb: `{CUPS_LP}` took the job for `{}` without an id we could read ({:?}); it counts \
+             as sent without confirming the ticket came out",
+            target.queue,
+            first_meaningful_line(&out.stdout).unwrap_or("nothing on stdout")
+        );
+        return Ok(());
+    };
+    confirm_job_left_queue(client, &target.queue, &job_id, window)
+}
+
+/// Waits for a job the spooler already ACCEPTED to actually leave the queue, and reports it failed
+/// — after taking it back out — if it does not (hub#1564).
+///
+/// Being unable to ask is never a failure, for the same reason the pre-flight submits on
+/// [`QueueState::Unknown`]: this runs on every ticket, and turning "we could not read the queue"
+/// into "your receipt did not print" would cancel perfectly good tickets on every machine whose
+/// CUPS answers something we did not foresee.
+fn confirm_job_left_queue(
+    client: &dyn CupsClient,
+    queue: &str,
+    job_id: &str,
+    window: Duration,
+) -> Result<()> {
+    let deadline = Instant::now() + window;
+    loop {
+        match client.run(CUPS_LPSTAT, &lpstat_queue_args(queue), &[]) {
+            Ok(out) if out.success => {
+                if !job_is_queued(&out.stdout, job_id) {
+                    return Ok(());
+                }
+            }
+            Ok(out) => {
+                tracing::warn!(
+                    "usb: `{CUPS_LPSTAT} -o {queue}` failed ({}); `{job_id}` counts as sent \
+                     without confirming the ticket came out",
+                    first_meaningful_line(&out.stderr).unwrap_or("no reason given")
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "usb: could not read the queue `{queue}` ({e}); `{job_id}` counts as sent \
+                     without confirming the ticket came out"
+                );
+                return Ok(());
+            }
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        std::thread::sleep(JOB_POLL_INTERVAL.min(left));
+    }
+
+    // The reason is read BEFORE the job is cancelled, and that order is load-bearing: the backend
+    // clears `media-empty-warning` / `offline-report` as it is torn down, so cancelling first
+    // would leave the cashier with "the ticket did not print" and not a word about the paper.
+    let reason = match client.run(CUPS_LPOPTIONS, &["-p", queue], &[]) {
+        Ok(out) if out.success => parse_state_report(&out.stdout),
+        _ => None,
+    }
+    .unwrap_or_else(|| "no reason given".to_string());
+
+    match client.run(CUPS_CANCEL, &[job_id], &[]) {
+        Ok(out) if out.success => {}
+        Ok(out) => tracing::warn!(
+            "usb: `{CUPS_CANCEL} {job_id}` failed ({}); the ticket the till just reported as \
+             failed may still print later",
+            first_meaningful_line(&out.stderr).unwrap_or("no reason given")
+        ),
+        Err(e) => tracing::warn!(
+            "usb: could not cancel `{job_id}` ({e}); the ticket the till just reported as failed \
+             may still print later"
+        ),
+    }
+
     Err(PeripheralError::Unreachable(format!(
-        "the OS print queue `{}` refused the job: {reason}",
-        target.queue
+        "the printer on the OS print queue `{queue}` still had the ticket {}s after it was sent \
+         ({reason}); it was cancelled, so it did NOT come out and will not appear later",
+        window.as_secs()
     )))
 }
 
@@ -539,17 +742,38 @@ mod tests {
     use super::*;
     use std::cell::RefCell;
 
+    /// `(program, args, stdin)` of every call the fake was asked to make.
+    type RecordedCalls = Vec<(String, Vec<String>, Vec<u8>)>;
+
+    /// `(args, answers)` for an argv asked more than once — see [`FakeCups::sequenced`].
+    type ScriptedSequence = Vec<(Vec<&'static str>, Vec<CupsOutput>)>;
+
     /// Records what would have been run, and answers whatever the test wants it to — per argv,
     /// so a discovery that asks two questions (`-e`, then `-v`) can be given two answers.
     struct FakeCups {
         /// `(args, answer)`; an empty `args` answers any call.
         answers: Vec<(Vec<&'static str>, CupsOutput)>,
-        calls: RefCell<Vec<(String, Vec<String>, Vec<u8>)>>,
+        /// `(args, answers)` for an argv that is asked MORE THAN ONCE and has to answer
+        /// differently each time — the shape hub#1564 needs, where the queue listing must change
+        /// between polls for the wait to be provably a wait and not a single look. Consumed in
+        /// order, the last one keeps answering, and it is checked before [`FakeCups::answers`].
+        sequenced: RefCell<ScriptedSequence>,
+        calls: RefCell<RecordedCalls>,
+    }
+
+    impl Default for FakeCups {
+        fn default() -> Self {
+            Self {
+                answers: Vec::new(),
+                sequenced: RefCell::new(Vec::new()),
+                calls: RefCell::new(Vec::new()),
+            }
+        }
     }
 
     impl FakeCups {
         fn answering(answer: CupsOutput) -> Self {
-            Self { answers: vec![(Vec::new(), answer)], calls: RefCell::new(Vec::new()) }
+            Self { answers: vec![(Vec::new(), answer)], ..Default::default() }
         }
         fn ok() -> Self {
             Self::answering(CupsOutput {
@@ -569,9 +793,41 @@ mod tests {
             Self {
                 answers: vec![
                     (vec!["-p", queue], ok(state)),
+                    // hub#1564: and the job leaves the queue, which is what "it printed" means.
+                    (vec!["-W", "not-completed", "-o", queue], ok("")),
                     (Vec::new(), ok("request id is Star_TSP143-7 (1 file(s))")),
                 ],
-                calls: RefCell::new(Vec::new()),
+                ..Default::default()
+            }
+        }
+
+        /// The whole hub#1564 conversation for one submit: `lpoptions -p <queue>` answers `states`
+        /// in order (idle at the pre-flight, then whatever the backend reports once it has *tried*
+        /// to print), `lp` accepts the job as `<queue>-7`, and
+        /// `lpstat -W not-completed -o <queue>` answers `listings` in order, one per poll. The
+        /// last of each keeps answering, so a listing that never clears is a job that never left.
+        fn spooling(
+            queue: &'static str,
+            states: Vec<&'static str>,
+            listings: Vec<&'static str>,
+        ) -> Self {
+            let ok = |stdout: &str| CupsOutput {
+                success: true,
+                stdout: stdout.into(),
+                stderr: String::new(),
+            };
+            let sequence =
+                |outs: Vec<&'static str>| outs.into_iter().map(ok).collect::<Vec<_>>();
+            Self {
+                answers: vec![(
+                    Vec::new(),
+                    ok(&format!("request id is {queue}-7 (1 file(s))")),
+                )],
+                sequenced: RefCell::new(vec![
+                    (vec!["-p", queue], sequence(states)),
+                    (vec!["-W", "not-completed", "-o", queue], sequence(listings)),
+                ]),
+                ..Default::default()
             }
         }
 
@@ -585,7 +841,7 @@ mod tests {
             };
             Self {
                 answers: vec![(vec!["-e"], ok(destinations)), (vec!["-v"], ok(devices))],
-                calls: RefCell::new(Vec::new()),
+                ..Default::default()
             }
         }
     }
@@ -597,6 +853,18 @@ mod tests {
                 args.iter().map(|a| a.to_string()).collect(),
                 stdin.to_vec(),
             ));
+            if let Some((_, queued)) = self
+                .sequenced
+                .borrow_mut()
+                .iter_mut()
+                .find(|(for_args, _)| for_args.as_slice() == args)
+            {
+                let answer = queued.first().cloned().expect("a sequence answers at least once");
+                if queued.len() > 1 {
+                    queued.remove(0);
+                }
+                return Ok(answer);
+            }
             let scripted = self
                 .answers
                 .iter()
@@ -1080,7 +1348,7 @@ mod tests {
                     cups_said("printer-is-accepting-jobs=true printer-state=5 printer-state-reasons=media-empty-error"),
                 ),
             ],
-            calls: RefCell::new(Vec::new()),
+            ..Default::default()
         };
 
         let found = discover_usb_printers(&cups).expect("a healthy CUPS answers");
@@ -1106,7 +1374,7 @@ mod tests {
                 (vec!["-v"], cups_said("device for Star_TSP143: usb://Star/TSP143\n")),
                 // Nothing scripted for `-p`: the fake answers a failure, like a CUPS that cannot.
             ],
-            calls: RefCell::new(Vec::new()),
+            ..Default::default()
         };
 
         let found = discover_usb_printers(&cups).expect("the listing itself worked");
@@ -1114,4 +1382,277 @@ mod tests {
         assert_eq!(found.len(), 1, "the printer is there, we just could not ask how it is");
         assert_eq!(found[0].status, QUEUE_STATUS_UNKNOWN);
     }
+
+    // ── hub#1564 · the ticket has to LEAVE the queue ─────────────────────────────────────────
+
+    #[test]
+    fn hub1564_a_ticket_the_os_queue_still_holds_is_not_reported_as_printed() {
+        // The bug: the OS only finds out that the paper ran out WHILE it is running a job, so at
+        // submit time the pre-flight of hub#1541 sees an idle queue and says yes. `lp` exits 0,
+        // the till says "printed", and the ticket sits in the OS queue until someone reloads the
+        // roll hours later and it prints by surprise.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec![
+                "printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none",
+                "printer-is-accepting-jobs=true printer-state=4 \
+                 printer-state-reasons=media-empty-warning",
+            ],
+            vec!["Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026"],
+        );
+
+        let err = send_raw_within(&cups, &a_queue(), b"ticket", Duration::ZERO)
+            .expect_err("a ticket still sitting in the queue has not come out of the printer");
+
+        let shown = err.to_string();
+        assert!(shown.contains("Star_TSP143"), "must name the queue, got: {shown}");
+        assert!(
+            shown.contains("media-empty-warning"),
+            "the reason the backend is reporting NOW is what says WHY, got: {shown}"
+        );
+        // And the held job is taken back out: leaving it there is a receipt that prints hours
+        // later, with a number the till already reported as failed.
+        assert!(
+            cups.calls
+                .borrow()
+                .iter()
+                .any(|(program, args, _)| program == CUPS_CANCEL && args == &["Star_TSP143-7"]),
+            "the held job must be cancelled, got {:?}",
+            cups.calls.borrow()
+        );
+    }
+
+    #[test]
+    fn hub1564_a_pulled_cable_is_named_by_the_reason_the_backend_reports_while_it_tries() {
+        // The other reason a USB backend emits (CUPS `backend/runloop.c`), and the other half of
+        // why the pre-flight cannot catch this: `offline-report` is severity *report*, so refusing
+        // on it up front would fail closed — the backend only clears it while running a job, so a
+        // till with the cable already back in would never print again.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec![
+                "printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none",
+                "printer-is-accepting-jobs=true printer-state=4 \
+                 printer-state-reasons=offline-report,connecting-to-device",
+            ],
+            vec!["Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026"],
+        );
+
+        let err = send_raw_within(&cups, &a_queue(), b"ticket", Duration::ZERO)
+            .expect_err("an unplugged printer prints nothing");
+
+        assert!(err.to_string().contains("offline-report"), "got: {err}");
+    }
+
+    #[test]
+    fn hub1564_a_ticket_that_leaves_the_queue_is_a_printed_ticket() {
+        // The healthy path, and the one that decides whether this is usable at all: a receipt that
+        // came out must not be cancelled, reported failed, or reprinted.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec!["printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none"],
+            vec![""],
+        );
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("the job left the queue: it printed");
+
+        assert!(
+            !cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_CANCEL),
+            "a printed ticket must never be cancelled: {:?}",
+            cups.calls.borrow()
+        );
+    }
+
+    #[test]
+    fn hub1564_the_wait_keeps_looking_until_the_ticket_is_gone() {
+        // A receipt is not out of the queue the instant `lp` returns; the backend still has to
+        // open the device and push the bytes. Looking once and giving up would report every
+        // ticket failed and cancel it mid-print, which is worse than the bug. This one goes
+        // through `send_raw` itself, so the real `JOB_COMPLETION_WINDOW` wiring is exercised too.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec!["printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none"],
+            vec!["Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026", ""],
+        );
+
+        send_raw(&cups, &a_queue(), b"ticket").expect("the second look found it gone");
+
+        let looks = cups
+            .calls
+            .borrow()
+            .iter()
+            .filter(|(program, args, _)| program == CUPS_LPSTAT && args.contains(&"-o".to_string()))
+            .count();
+        assert!(looks >= 2, "it has to keep asking, it only asked {looks} time(s)");
+        assert!(!cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_CANCEL));
+    }
+
+    #[test]
+    fn hub1564_the_fault_is_read_before_the_job_is_taken_out_of_the_queue() {
+        // Load-bearing order: the backend clears `media-empty-warning` as it is torn down, so
+        // cancelling first would leave the cashier with "it did not print" and no word about the
+        // paper — which is the one thing they need to fix it.
+        let cups = FakeCups::spooling(
+            "Star_TSP143",
+            vec![
+                "printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none",
+                "printer-is-accepting-jobs=true printer-state=4 \
+                 printer-state-reasons=media-empty-warning",
+            ],
+            vec!["Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026"],
+        );
+
+        send_raw_within(&cups, &a_queue(), b"ticket", Duration::ZERO).expect_err("held");
+
+        let calls = cups.calls.borrow();
+        let asked = calls.iter().rposition(|(program, _, _)| program == CUPS_LPOPTIONS);
+        let cancelled = calls.iter().position(|(program, _, _)| program == CUPS_CANCEL);
+        assert!(
+            asked < cancelled,
+            "the reason has to be read while the backend is still reporting it: {calls:?}"
+        );
+    }
+
+    #[test]
+    fn hub1564_a_queue_we_could_not_read_does_not_turn_a_printed_ticket_into_a_failure() {
+        // This runs on EVERY ticket, so "we could not ask" must not become "your receipt did not
+        // print": that would cancel good jobs on every machine whose CUPS answers something we
+        // did not foresee — the same rule the pre-flight follows one step earlier.
+        let cups = FakeCups {
+            answers: vec![
+                (
+                    vec!["-p", "Star_TSP143"],
+                    cups_said("printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none"),
+                ),
+                (vec!["-d", "Star_TSP143", "-t", JOB_TITLE, "-o", "raw"], cups_said("request id is Star_TSP143-7 (1 file(s))")),
+                // Nothing scripted for the listing: the fake answers a failure, like a CUPS that
+                // cannot be asked.
+            ],
+            ..Default::default()
+        };
+
+        send_raw_within(&cups, &a_queue(), b"ticket", Duration::ZERO)
+            .expect("an unreadable queue must not fail a ticket that probably printed");
+
+        assert!(!cups.calls.borrow().iter().any(|(program, _, _)| program == CUPS_CANCEL));
+    }
+
+    #[test]
+    fn hub1564_an_answer_from_lp_without_an_id_we_can_read_still_counts_as_sent() {
+        // Without the id there is nothing to follow and nothing safe to cancel — cancelling on a
+        // guess would take out a job that is not ours. It stands as sent, and the log says why.
+        let cups = FakeCups {
+            answers: vec![
+                (
+                    vec!["-p", "Star_TSP143"],
+                    cups_said("printer-is-accepting-jobs=true printer-state=3 printer-state-reasons=none"),
+                ),
+                (Vec::new(), cups_said("")),
+            ],
+            ..Default::default()
+        };
+
+        send_raw_within(&cups, &a_queue(), b"ticket", Duration::ZERO).expect("nothing to follow");
+
+        let calls = cups.calls.borrow();
+        assert!(
+            !calls.iter().any(|(program, args, _)| program == CUPS_LPSTAT
+                || program == CUPS_CANCEL
+                || args.contains(&"not-completed".to_string())),
+            "there is no job to look for: {calls:?}"
+        );
+    }
+
+    #[test]
+    fn hub1564_the_job_id_is_found_whatever_language_lp_answers_in() {
+        // `request id is %s-%d (%d file(s))` is a translatable CUPS string (`_cupsLangPrintf` in
+        // `lp.c`), so a parser anchored on the English words finds no id on a Spanish till — the
+        // exact trap `lpstat -v` set in hub#1083. The id itself is never translated.
+        for answer in [
+            "request id is Star_TSP143-7 (1 file(s))",
+            "el identificador de la solicitud es Star_TSP143-7 (1 archivo(s))",
+            "l\u{2019}identifiant de la requ\u{ea}te est Star_TSP143-7 (1 fichier(s))",
+            "\u{30ea}\u{30af}\u{30a8}\u{30b9}\u{30c8} ID \u{306f} Star_TSP143-7 (1 \u{30d5}\u{30a1}\u{30a4}\u{30eb})",
+        ] {
+            assert_eq!(
+                parse_request_id(answer, "Star_TSP143").as_deref(),
+                Some("Star_TSP143-7"),
+                "no id in {answer:?}"
+            );
+        }
+        // Nothing to follow rather than a guess: a wrong id would cancel someone else's job.
+        assert_eq!(parse_request_id("", "Star_TSP143"), None);
+        assert_eq!(parse_request_id("lp: accepted", "Star_TSP143"), None);
+        assert_eq!(parse_request_id("request id is Star_TSP143-", "Star_TSP143"), None);
+        assert_eq!(parse_request_id("about Star_TSP143-7b", "Star_TSP143"), None);
+        // A queue whose own name ends in a number still yields its id, not a truncation of it.
+        assert_eq!(
+            parse_request_id("request id is Bar-2-31 (1 file(s))", "Bar-2").as_deref(),
+            Some("Bar-2-31")
+        );
+    }
+
+    #[test]
+    fn hub1564_the_queue_listing_is_matched_on_the_id_never_on_the_translated_date() {
+        // The listing is `<id> <owner> <size> <date>`, and only the date is written in the
+        // system's language and format. Matching anywhere but the first column is how this parser
+        // would start lying on a Spanish Mac.
+        let english = "Star_TSP143-7 cashier 1024 Sat Sep  5 17:17:50 2026\n";
+        let spanish = "Star_TSP143-7 cajera 1024 s\u{e1}b  5 sep 17:17:50 2026\n";
+        for listing in [english, spanish] {
+            assert!(job_is_queued(listing, "Star_TSP143-7"), "not found in {listing:?}");
+        }
+        assert!(!job_is_queued("", "Star_TSP143-7"), "an empty queue holds nothing");
+        // Another till's job on the same queue is not ours, and a prefix is not an id.
+        assert!(!job_is_queued("Star_TSP143-8 cashier 1024 Sat Sep  5 17:17:50 2026\n", "Star_TSP143-7"));
+        assert!(!job_is_queued("Star_TSP143-70 cashier 1024 Sat Sep  5 17:17:50 2026\n", "Star_TSP143-7"));
+        // The id has to be the FIRST column: naming it anywhere else is not being in the queue.
+        assert!(!job_is_queued("cancelled Star_TSP143-7 by cashier\n", "Star_TSP143-7"));
+    }
+
+    #[test]
+    fn hub1564_the_report_carries_exactly_the_reasons_the_pre_flight_has_to_ignore() {
+        // The two rules are deliberately different, and this is the pair that shows why: the same
+        // attributes mean "keep printing" before the submit and "this is what ate the ticket"
+        // after the wait. A USB backend emits no `-error` reason at all, so a post-mortem written
+        // with the pre-flight's rule would report every held ticket as "no reason given".
+        let printing_with_no_paper =
+            "printer-is-accepting-jobs=true printer-state=4 printer-state-reasons=media-empty-warning";
+
+        assert_eq!(
+            parse_queue_state(printing_with_no_paper),
+            QueueState::Ready,
+            "a warning must never stop a till before it has even tried"
+        );
+        assert_eq!(
+            parse_state_report(printing_with_no_paper).as_deref(),
+            Some("printer-state=processing printer-state-reasons=media-empty-warning")
+        );
+        assert_eq!(
+            parse_state_report("printer-is-accepting-jobs=false printer-state=5 printer-state-reasons=none").as_deref(),
+            Some("printer-state=stopped printer-is-accepting-jobs=false")
+        );
+        // Nothing to report is not "everything is fine": it is the absence of an answer, and the
+        // caller says "no reason given" rather than inventing one.
+        assert_eq!(parse_state_report("copies=1 number-up=1"), None);
+        assert_eq!(parse_state_report(""), None);
+    }
+
+    #[test]
+    fn hub1564_the_real_lp_and_lpstat_output_of_this_machine_parse() {
+        // Captured verbatim on macOS (2026-09-05) against the Mac's own CUPS queue, with a job
+        // parked by `lp -H hold` and then removed with `cancel`. Pinning REAL output is what keeps
+        // these parsers honest about the shape CUPS emits — the double space in `Sep  5` and the
+        // `(1 file(s))` tail are the kind of detail a hand-written fixture does not think of.
+        let accepted = "request id is Brother_HL_3150CDW_series-10 (1 file(s))\n";
+        let listing = "Brother_HL_3150CDW_series-10 ioan.beilic       1024   Sat Sep  5 17:17:50 2026\n";
+
+        let id = parse_request_id(accepted, "Brother_HL_3150CDW_series")
+            .expect("`lp` names the job it just took");
+        assert_eq!(id, "Brother_HL_3150CDW_series-10");
+        assert!(job_is_queued(listing, &id), "the job it just took is the one in the queue");
+        // `cancel` empties it; `lpstat` then prints nothing at all and exits 0 (measured).
+        assert!(!job_is_queued("", &id));
+    }
+
 }
