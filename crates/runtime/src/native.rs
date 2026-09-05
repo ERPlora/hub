@@ -241,7 +241,7 @@ pub trait NativeHandler: Send + Sync + std::fmt::Debug {
 ///
 /// `pub` para que un test pueda preguntarle a un motor nativo lo mismo que le pregunta el
 /// dispatcher, **con el host de verdad**: la coherencia de hub#319 (el gate fiscal, el ⛔ de la
-/// checklist y el `build_identity` del motor contestan lo mismo) no se puede comprobar contra un
+/// checklist y el `can_sign` del motor contestan lo mismo) no se puede comprobar contra un
 /// host de mentira, porque un gemelo escrito a mano es justo la forma en que dos lecturas de la
 /// misma pregunta empiezan a divergir.
 pub struct DbHost<'a> {

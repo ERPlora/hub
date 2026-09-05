@@ -902,6 +902,69 @@ mod audit_message_keys {
     /// The command every audit row goes through.
     const INSERT_EVENT: &str = "\"verifactu._insert_event\"";
 
+    /// El PRIMER argumento de una llamada, desde justo detrás de su `(`: hasta la coma de nivel
+    /// cero o, si solo lleva uno, hasta el `)` que la cierra. Salta los literales para que una coma
+    /// dentro de una cadena no parta el argumento por la mitad.
+    fn first_argument(rest: &str) -> Option<&str> {
+        let mut depth = 0i32;
+        let mut in_string = false;
+        let mut escaped = false;
+        for (i, c) in rest.char_indices() {
+            if in_string {
+                match c {
+                    _ if escaped => escaped = false,
+                    '\\' => escaped = true,
+                    '"' => in_string = false,
+                    _ => {}
+                }
+                continue;
+            }
+            match c {
+                '"' => in_string = true,
+                '{' | '(' | '[' => depth += 1,
+                '}' | ']' => depth -= 1,
+                ')' if depth == 0 => return Some(&rest[..i]),
+                ')' => depth -= 1,
+                ',' if depth == 0 => return Some(&rest[..i]),
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Los literales entrecomillados de un tramo, en orden.
+    fn quoted_in(mut slice: &str) -> Vec<&str> {
+        let mut found = Vec::new();
+        while let Some(open) = slice.find('"') {
+            let after = &slice[open + 1..];
+            let close = match after.find('"') {
+                Some(i) => i,
+                None => break,
+            };
+            found.push(&after[..close]);
+            slice = &after[close + 1..];
+        }
+        found
+    }
+
+    /// El cuerpo de `let <name> = …;` — la sentencia entera, incluidas las ramas de un `if`/`match`
+    /// que elija entre varias claves. Acaba en el `;` que cierra la sentencia, no en el primero que
+    /// aparezca: un `match` mete llaves por medio y cortar ahí perdería las últimas ramas.
+    fn binding_of<'a>(source: &'a str, name: &str) -> Option<&'a str> {
+        let at = source.find(&format!("let {name} = "))?;
+        let rest = &source[at..];
+        let mut depth = 0i32;
+        for (i, c) in rest.char_indices() {
+            match c {
+                '{' | '(' | '[' => depth += 1,
+                '}' | ')' | ']' => depth -= 1,
+                ';' if depth == 0 => return Some(&rest[..i]),
+                _ => {}
+            }
+        }
+        None
+    }
+
     #[test]
     fn every_verifactu_event_carries_a_stable_message_key_hub1178() {
         let source = engine_source();
@@ -945,25 +1008,44 @@ mod audit_message_keys {
         let source = engine_source();
         let mut keys: Vec<&str> = Vec::new();
         for (at, _) in source.match_indices(needle.as_str()) {
-            let rest = &source[at + needle.len()..];
-            // El primer argumento acaba donde empieza el segundo: o el `json!` de los datos, o la
-            // variable `details` que dos de los sitios ya tenían construida. Se toma el que llegue
-            // antes; sin ninguno, un tramo corto acotado.
-            let arg_end = [rest.find("json!"), rest.find("details,")]
-                .into_iter()
-                .flatten()
-                .min()
-                .unwrap_or(rest.len().min(400));
-            let mut slice = &rest[..arg_end];
-            while let Some(open) = slice.find('"') {
-                let after = &slice[open + 1..];
-                let close = match after.find('"') {
-                    Some(i) => i,
-                    None => break,
-                };
-                keys.push(&after[..close]);
-                slice = &after[close + 1..];
+            // La DEFINICIÓN de la función no es un sitio que escriba claves: su «primer argumento»
+            // es el parámetro `message_key: &str`. Se descarta por lo que la precede, que es la
+            // única forma de distinguirla de una llamada.
+            if source[..at].trim_end().ends_with("fn") {
+                continue;
             }
+            let rest = &source[at + needle.len()..];
+            // El primer argumento acaba en su PROPIA coma —la de nivel cero—, no donde empiece a
+            // parecerse al segundo. La versión anterior lo buscaba por `json!`/`details,`, y un
+            // sitio que no llevara ninguno de los dos se comía el resto del fichero hasta el
+            // siguiente que sí (hub#1531): daba por clave lo primero entrecomillado que pillase.
+            let slice = match first_argument(rest) {
+                Some(slice) => slice,
+                None => continue,
+            };
+            // 🔎 hub#1531: el sitio puede pasar la clave por VARIABLE en vez de por literal, que
+            // es lo que hace el diagnóstico desde que la MISMA decisión alimenta además la frase
+            // del evento. Sin esta rama el barrido leería el tramo siguiente y daría por clave lo
+            // que pillase —`timestamp`—, así que se resuelve el `let` y se leen SUS literales.
+            //
+            // ⚠️ Y por eso este comentario no escribe el nombre de la función seguido de su
+            // paréntesis: el barrido incluye ESTE fichero, así que una mención literal se contaría
+            // como un sitio más (por eso la aguja se compone en tiempo de ejecución). Costó una
+            // corrida entera de mutantes descubrirlo.
+            let literals = if slice.contains('"') {
+                slice
+            } else {
+                let name = slice.trim();
+                binding_of(&source, name).unwrap_or_else(|| {
+                    panic!(
+                        "`details_{}({name}, …)` pasa la clave por variable y no se encuentra su \
+                         `let {name} = …;`: el barrido se quedaría SIN mirar ese evento, que es un \
+                         agujero mudo en el control",
+                        "for"
+                    )
+                })
+            };
+            keys.extend(quoted_in(literals));
         }
         assert!(keys.len() >= 12, "solo {} claves encontradas", keys.len());
         for key in keys {

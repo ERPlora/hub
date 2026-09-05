@@ -11,7 +11,7 @@ use crate::*;
 /// certificado no queda sin vía: transmite por la celda (ADR-0320, [`resolve_route`]).
 /// **Los bytes del `.p12` y la contraseña NUNCA se copian a la config del módulo** —
 /// ni se consultan siquiera: la firma/transmisión usa la capability opaca
-/// `certificate_identity(hub_id)` (el core hace la cripto; ver `build_identity`). El acceso está
+/// `certificate_identity(hub_id)` (el core hace la cripto; ver [`resolve_route`]). El acceso está
 /// gateado por la capability `certificate` (el dispatcher la exige antes del handler nativo),
 /// así que llegar aquí implica que el usuario la concedió.
 ///
@@ -73,31 +73,6 @@ pub(crate) async fn read_config(host: &dyn NativeHost, hub_id: &str) -> Result<O
         }
     }
     Ok(config)
-}
-
-/// Construye la **Identity mTLS** para firmar/transmitir a la AEAT.
-///
-/// El certificado fiscal (.p12) es un recurso del NEGOCIO/hub (ADR-0079/0081) y desde ADR-0202 §2.1
-/// hay dos: el **propio** del negocio y el **delegado** de ERPlora. `host.certificate_identity`
-/// resuelve el fallback (`own` si está subido, si no `delegated`) y hace TODA la cripto PKCS#12;
-/// **los bytes del `.p12` y la contraseña NUNCA entran al módulo**.
-///
-/// Error **solo si no hay ninguno de los dos** (hub#319): un hub cuyo único certificado es el
-/// delegado transmite perfectamente — ERPlora firma en su nombre.
-pub(crate) async fn build_identity(
-    host: &dyn NativeHost,
-    hub_id: &str,
-    config: &Json,
-) -> Result<reqwest::Identity> {
-    if !has_certificate(config) {
-        return Err(VerifactuError::Certificate(
-            "no hay certificado con el que firmar: ni el del negocio (súbelo en Ajustes → Negocio) \
-             ni uno delegado de ERPlora"
-                .into(),
-        )
-        .into());
-    }
-    host.certificate_identity(hub_id).await
 }
 
 /// ¿Hay un certificado del core con el que transmitir? Gate barato que NO carga los bytes del
@@ -189,7 +164,7 @@ pub(crate) async fn can_transmit(
 }
 
 /// **¿Puede este motor firmar por `hub_id` ahora mismo?** — exactamente el predicado con el que
-/// [`build_identity`] deja pasar o rechaza.
+/// [`resolve_route`] elige la vía propia en vez de la celda.
 ///
 /// `pub` a propósito (hub#319): «¿puede este hub facturar?» la contestan TRES sitios —el gate fiscal
 /// del dispatcher (ADR-0203), el brazo ⛔ de la checklist (hub#370) y este motor— y tienen que
@@ -377,7 +352,7 @@ mod cert_source_tests {
     /// ADR-0079/0081: el `.p12` del negocio es del CORE. `read_config` debe **marcar** su presencia
     /// (`certificate_source = "core"`) pero NUNCA copiar los bytes del `.p12` ni la contraseña a la
     /// config del módulo — se quedan en el core; la firma usa la capability opaca
-    /// `certificate_identity(hub_id)` (ver `build_identity`), no `certificate_identity_from`.
+    /// `certificate_identity(hub_id)` (ver [`resolve_route`]), no `certificate_identity_from`.
     #[tokio::test]
     async fn read_config_marks_core_cert_without_leaking_bytes() {
         let cfg = read_config(&CoreCertHost, "h1").await.unwrap().unwrap();
@@ -724,10 +699,13 @@ mod cert_source_tests {
             cfg.get("certificate_source").is_none(),
             "y no se marca un certificado que no hay"
         );
-        assert!(build_identity(&BareHost, "h1", &cfg).await.is_err());
+        // Y la puerta viva dice lo mismo: sin certificado y sin identidad de máquina que enrolar,
+        // `resolve_route` no resuelve NINGUNA vía (hub#1529 — antes esto se preguntaba a un gate
+        // que solo miraba el `.p12` y que ya no existe).
+        assert!(resolve_route(&BareHost, "h1", &cfg).await.is_err());
     }
 
-    /// **`can_sign` IS `build_identity`'s gate, and it is pinned here too.**
+    /// **`can_sign` IS the own-road gate of [`resolve_route`], and it is pinned here too.**
     ///
     /// Its only consumer is the coherence e2e of hub#319, which lives in the `erplora-runtime`
     /// package — so a mutation run scoped to THIS package leaves it alive with nothing to say. That
@@ -735,7 +713,7 @@ mod cert_source_tests {
     /// transmits to the AEAT has to be pinned where it is defined, so it survives whatever the
     /// cross-package test does later.
     #[tokio::test]
-    async fn can_sign_answers_exactly_what_build_identity_gates_on() {
+    async fn can_sign_answers_exactly_what_the_own_road_gates_on() {
         for (signing, expected) in [
             (Some("delegated"), true),
             (Some("own"), true),
@@ -753,30 +731,42 @@ mod cert_source_tests {
             assert_eq!(
                 can_sign(&host, "h1").await.unwrap(),
                 has_certificate(&cfg),
-                "can_sign y el gate de build_identity tienen que ser la MISMA respuesta ({signing:?})"
+                "can_sign y el gate de la vía propia tienen que ser la MISMA respuesta ({signing:?})"
             );
         }
     }
 
-    /// **The error names the real cause.** «Súbelo en Ajustes → Negocio» is only half the story once
-    /// a delegated certificate exists: reaching here means the business uploaded none **and** the
-    /// control plane never handed one down. Telling the user only about their half sends them to a
-    /// screen that cannot fix an ERPlora-side gap.
+    /// 🔒 **hub#1529 — la mitad ACCIONABLE del error, que se quedó sin dueño al borrar
+    /// `build_identity`.**
+    ///
+    /// The test that pinned it (`the_error_without_any_certificate_names_both_halves`) was hers and
+    /// went with her. What survives on the live door —
+    /// `transmission::tests::a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire`—
+    /// demands «vía de transmisión» + «pasarela»: the two halves of the DIAGNOSIS, and neither of
+    /// them tells the business WHERE to fix its own. Without this guard, dropping «súbelo en
+    /// Ajustes → Negocio» from the message breaks nothing, and the only thing left standing is the
+    /// name of a service the business cannot touch — the very defect hub#1531 removes from the
+    /// diagnostic, one door over.
+    ///
+    /// The wording is NOT copied from the retired test: that one also demanded «uno delegado de
+    /// ERPlora», a slot retired in hub#1435. The ERPlora half is asked for as what it is TODAY, the
+    /// gateway.
     #[tokio::test]
-    async fn the_error_without_any_certificate_names_both_halves() {
+    async fn the_no_road_error_still_says_where_the_business_fixes_its_half_hub1529() {
         let host = SlotHost::new(None, vec![]);
         let cfg = read_config(&host, "h1").await.unwrap().unwrap();
-        let err = build_identity(&host, "h1", &cfg)
+        let err = resolve_route(&host, "h1", &cfg)
             .await
-            .unwrap_err()
+            .err()
+            .expect("no certificate and no gateway is an error, never a silent direct road")
             .to_string();
         assert!(
             err.contains("Ajustes → Negocio"),
-            "sigue diciendo dónde subir el propio: {err}"
+            "the half the business can act on names the screen where it acts: {err}"
         );
         assert!(
-            err.to_lowercase().contains("erplora"),
-            "y que ERPlora tampoco entregó uno delegado: {err}"
+            err.contains("pasarela"),
+            "and ERPlora's half is named as what it is today, the gateway: {err}"
         );
     }
 }

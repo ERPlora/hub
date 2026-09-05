@@ -110,6 +110,10 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     let cert_message;
     let mut aeat = Json::Null;
     let mut gateway = Json::Null;
+    // Whether the test stopped on a field of THIS hub instead of on the road (hub#1531). It is a
+    // fact of its own because the two ask for opposite things from whoever reads the event: one is
+    // a form to fill, the other a service to wait for.
+    let mut missing_issuer_nif = false;
 
     // ── ¿POR DÓNDE sale este hub? (hub#1485) ─────────────────────────────────────────────────
     // Which road this hub is ON, in the CORE's words (`certificate::route_of`), so the screen
@@ -123,10 +127,10 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     };
 
     // La MISMA puerta que la transmisión y la consulta (`resolve_route`, hub#1432). Antes era
-    // `build_identity`, que solo sabe del `.p12` del negocio: por la celda (ADR-0320) contestaba
-    // «no hay certificado» a un hub que transmite perfectamente, y el botón «probar conexión»
-    // informaba de un fallo de certificado a un hub sano (hub#1485). Un diagnóstico que miente
-    // sobre el camino sano es peor que no tenerlo.
+    // el gate del certificado propio, que solo sabe del `.p12` del negocio: por la celda
+    // (ADR-0320) contestaba «no hay certificado» a un hub que transmite perfectamente, y el botón
+    // «probar conexión» informaba de un fallo de certificado a un hub sano (hub#1485). Un
+    // diagnóstico que miente sobre el camino sano es peor que no tenerlo.
     match resolve_route(host, &ctx.hub_id, &config).await {
         Ok(TransmitRoute::Direct { identity, holder }) => {
             let route = TransmitRoute::Direct { identity, holder };
@@ -181,7 +185,45 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             let TransmitRoute::Gateway(ref access) = route else {
                 unreachable!("this arm matched Gateway")
             };
+
+            // 🔎 La celda se sondea SIEMPRE y PRIMERO (hub#1531). `/readyz` no necesita nada de la
+            // config de este hub, así que no hay motivo para dejar el bloque `gateway` a null:
+            // contar «la pasarela no está disponible» sin haberla preguntado es justo cómo el
+            // diagnóstico acabó culpando a un servicio sano de un campo que el negocio no había
+            // rellenado. Un bloque vacío se lee igual que un sondeo que nadie hizo.
+            let cell = match crate::gateway::probe_readiness(access).await {
+                Ok(readiness) => {
+                    gateway = json!({
+                        "ok": readiness.ready,
+                        "status": readiness.status,
+                        "reason": readiness.reason,
+                        "transmission_enabled": readiness.transmission_enabled,
+                        "holder_nif": readiness.holder_nif,
+                    });
+                    if readiness.ready {
+                        Ok(())
+                    } else {
+                        Err(format!(
+                            "La pasarela fiscal no puede transmitir ahora mismo ({}).",
+                            if readiness.reason.is_empty() {
+                                readiness.status.clone()
+                            } else {
+                                readiness.reason.clone()
+                            }
+                        ))
+                    }
+                }
+                Err(e) => {
+                    gateway = json!({ "ok": false, "error": e.to_string() });
+                    Err(format!("No se pudo contactar con la pasarela fiscal: {e}"))
+                }
+            };
+
+            // Y lo que le falta a ESTE hub manda sobre lo que conteste la celda: es la mitad que el
+            // negocio puede arreglar, en la misma pantalla que está mirando. Nombrar la pasarela en
+            // su lugar lo manda a vigilar un servicio que no puede tocar (hub#1531).
             if issuer_nif.is_empty() {
+                missing_issuer_nif = true;
                 cert_message = "Configura el NIF del obligado tributario (emisor) antes de probar la conexión.".into();
             } else if let Err(error) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
             {
@@ -190,33 +232,12 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 // tiene que salir — solo que sin dárselo a Hacienda para que lo diga ella.
                 cert_message = error;
             } else {
-                match crate::gateway::probe_readiness(access).await {
-                    Ok(readiness) => {
-                        cert_ok = readiness.ready;
-                        cert_message = if readiness.ready {
-                            "Pasarela fiscal disponible: ERPlora presenta por ti.".into()
-                        } else {
-                            format!(
-                                "La pasarela fiscal no puede transmitir ahora mismo ({}).",
-                                if readiness.reason.is_empty() {
-                                    readiness.status.clone()
-                                } else {
-                                    readiness.reason.clone()
-                                }
-                            )
-                        };
-                        gateway = json!({
-                            "ok": readiness.ready,
-                            "status": readiness.status,
-                            "reason": readiness.reason,
-                            "transmission_enabled": readiness.transmission_enabled,
-                            "holder_nif": readiness.holder_nif,
-                        });
+                match cell {
+                    Ok(()) => {
+                        cert_ok = true;
+                        cert_message = "Pasarela fiscal disponible: ERPlora presenta por ti.".into();
                     }
-                    Err(e) => {
-                        cert_message = format!("No se pudo contactar con la pasarela fiscal: {e}");
-                        gateway = json!({ "ok": false, "error": e.to_string() });
-                    }
+                    Err(message) => cert_message = message,
                 }
             }
         }
@@ -248,6 +269,26 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
         "aeat": aeat,
         "gateway": gateway,
     });
+    // hub#1178: dos hechos distintos, dos claves — «la prueba corrió» y «el certificado no vale»
+    // piden cosas distintas de quien lo lee. Desde hub#1485 hay un tercero: por la vía delegada lo
+    // que falla NO es un certificado que el negocio pueda arreglar, sino la pasarela — mandarle a
+    // renovar un `.p12` que no tiene es el defecto original. Y desde hub#1531 un cuarto: cuando lo
+    // que falta es un dato SUYO, culpar a la pasarela lo manda a vigilar un servicio que no puede
+    // tocar en vez de rellenar el campo que tiene delante.
+    //
+    // Por la vía propia el mismo hueco ya se cuenta bien sin clave nueva: el certificado carga
+    // (`cert_ok`) y el bloque `aeat` lleva el «configura el NIF antes de enviar» que la pantalla
+    // pinta en rojo, así que ahí la clave sigue siendo la de la prueba que corrió.
+    let message_key = if missing_issuer_nif {
+        "verifactu.diagnostic_issuer_nif_missing"
+    } else if cert_ok {
+        "verifactu.diagnostic_ran"
+    } else if road == erplora_runtime::certificate::ROUTE_OWN {
+        "verifactu.diagnostic_certificate_invalid"
+    } else {
+        "verifactu.diagnostic_gateway_unavailable"
+    };
+
     Ok(Output::new().with_operation(op(
         "verifactu._insert_event",
         json!({
@@ -255,27 +296,20 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             "record_id": Json::Null,
             "event_type": "diagnostic",
             "severity": if cert_ok { "info" } else { "warning" },
-            "message": if cert_ok {
-                format!("Prueba VeriFactu ejecutada ({environment})")
-            } else if road == erplora_runtime::certificate::ROUTE_OWN {
-                "Prueba VeriFactu: certificado no válido".to_string()
-            } else {
-                "Prueba VeriFactu: la pasarela fiscal no está disponible".to_string()
+            // La prosa acompaña a la CLAVE, no a la vía: es el fallback que el módulo pinta
+            // mientras su catálogo no traduzca la clave (verifactu#63), así que tiene que decir lo
+            // mismo que ella.
+            "message": match message_key {
+                "verifactu.diagnostic_ran" => format!("Prueba VeriFactu ejecutada ({environment})"),
+                "verifactu.diagnostic_issuer_nif_missing" => {
+                    "Prueba VeriFactu: falta el NIF del obligado tributario".to_string()
+                }
+                "verifactu.diagnostic_certificate_invalid" => {
+                    "Prueba VeriFactu: certificado no válido".to_string()
+                }
+                _ => "Prueba VeriFactu: la pasarela fiscal no está disponible".to_string(),
             },
-            // hub#1178: dos hechos distintos, dos claves — «la prueba corrió» y «el certificado no
-            // vale» piden cosas distintas de quien lo lee. Y desde hub#1485 hay un tercero: por la
-            // vía delegada lo que falla NO es un certificado que el negocio pueda arreglar, sino
-            // la pasarela — mandarle a renovar un `.p12` que no tiene es el defecto original.
-            "details": details_for(
-                match (cert_ok, road) {
-                    (true, _) => "verifactu.diagnostic_ran",
-                    (false, erplora_runtime::certificate::ROUTE_OWN) => {
-                        "verifactu.diagnostic_certificate_invalid"
-                    }
-                    (false, _) => "verifactu.diagnostic_gateway_unavailable",
-                },
-                details,
-            ),
+            "details": details_for(message_key, details),
             "timestamp": ctx.now,
         }),
     )))
@@ -673,7 +707,8 @@ mod tests {
 
     /// 🔴 **RED de hub#1485.** A hub on the cell road is transmitting perfectly, and the «test
     /// connection» button tells it its CERTIFICATE is broken — because `run_diagnostics` asked
-    /// `build_identity` instead of `resolve_route`, the one door hub#1432 left for this question.
+    /// for the business `.p12` instead of `resolve_route`, the one door hub#1432 left for this
+    /// question.
     /// A diagnostic that lies about the healthy road is worse than no diagnostic.
     #[tokio::test]
     async fn the_cell_road_is_never_diagnosed_as_a_broken_certificate_hub1485() {
@@ -902,6 +937,98 @@ mod tests {
         assert!(
             !xml.contains("<sum1:Representante>"),
             "and somebody filing their own records declares nobody: {xml}"
+        );
+    }
+
+    /// The same enrolled, certless hub as [`CellHost`] — except the business never filled in its
+    /// own obligado NIF. Everything about the cell is identical, so any difference in the verdict
+    /// is about the MISSING FIELD and nothing else.
+    struct CellHostWithoutIssuerNif;
+
+    #[async_trait::async_trait]
+    impl NativeHost for CellHostWithoutIssuerNif {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![json!({
+                "id": "cfg-1",
+                "enabled": 1,
+                "environment": "testing",
+                "issuer_nif": "",
+                "issuer_name": "",
+            })])
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            CellHost.producer_facts().await
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            CellHost.machine_identity(hub_id).await
+        }
+        async fn cloud_call(
+            &self,
+            request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            CellHost.cloud_call(request).await
+        }
+    }
+
+    /// 🔴 **RED de hub#1531.** A hub on the cell road that never filled in its obligado NIF is told
+    /// THE GATEWAY is unavailable — a service it cannot touch, and most likely perfectly healthy —
+    /// when the only thing missing is a field on the screen it is already looking at. It is the
+    /// hub#1485 defect one box further in: the diagnostic blames the road for what the business
+    /// owns, and sends it to watch a status page instead of typing its own tax ID.
+    #[tokio::test]
+    async fn a_missing_issuer_nif_is_never_reported_as_an_unavailable_gateway_hub1531() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-nif"),
+            &CellHostWithoutIssuerNif,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["message_key"],
+            json!("verifactu.diagnostic_issuer_nif_missing"),
+            "the field this hub is missing is its own verdict, not a gateway fault: {details}"
+        );
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("NIF"),
+            "and the sentence names the field the business has to fill: {details}"
+        );
+    }
+
+    /// 🔒 The other half of hub#1531: `/readyz` needs NOTHING from this hub's config, so there is
+    /// no reason to leave the cell unprobed and its block at `null`. Reporting on a road nobody
+    /// walked is exactly how the screen came to call a healthy gateway unavailable — and an empty
+    /// block reads the same as a probe that was never made.
+    #[tokio::test]
+    async fn the_cell_is_still_probed_when_the_issuer_nif_is_missing_hub1531() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-nif"),
+            &CellHostWithoutIssuerNif,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert!(
+            !details["gateway"].is_null(),
+            "the cell answers without the NIF, so its state is knowable and belongs in the report: \
+             {details}"
+        );
+        // The cell of this test is unreachable by construction (`.example` never resolves), so the
+        // block has to carry THAT — a probe that failed, never a probe that was skipped.
+        assert_eq!(details["gateway"]["ok"], json!(false), "{details}");
+        assert!(
+            details["gateway"]["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("pasarela")),
+            "the failure has to name the leg that failed: {details}"
         );
     }
 }

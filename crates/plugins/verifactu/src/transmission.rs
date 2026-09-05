@@ -1221,9 +1221,9 @@ pub(crate) mod tests {
     }
 
     /// 🔒 REGRESIÓN (hub#1432, lo que la tarea exige): un hub sin certificado Y sin pasarela no
-    /// llega a ningún cable — ni a la AEAT directa (hoy lo garantizaba `build_identity`) ni a la
-    /// celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola deja los
-    /// registros `pending` en vez de quemar reintentos.
+    /// llega a ningún cable — ni a la AEAT directa (antes lo garantizaba el gate del certificado
+    /// propio) ni a la celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola
+    /// deja los registros `pending` en vez de quemar reintentos.
     #[tokio::test]
     async fn a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire() {
         let host = NoRoadHost;
@@ -2633,7 +2633,7 @@ mod environment_chain_tests {
     //
     // ⚠️ Coverage boundary, unchanged since hub#320: the four call sites that live BEHIND the
     // socket (`post_soap`/`run_consult` inside `transmit_one` and `auto_rechain_and_retry`) are
-    // not reachable from a unit test — `build_identity` needs a real mTLS identity, and driving
+    // not reachable from a unit test — `resolve_route` needs a real mTLS identity, and driving
     // them further would mean opening a connection to Hacienda from `cargo test`. What is pinned
     // here is the VALUE those call sites are handed; that they keep being handed it is review.
     const PREPRODUCTION_HOLDER: &str =

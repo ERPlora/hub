@@ -188,8 +188,12 @@ async fn the_gate_accepts(rt: &Runtime, hub_id: &str) -> bool {
     }
 }
 
-/// Reader 4 — the fiscal ENGINE (`build_identity`, `crates/plugins/verifactu`). `true` = the module would
+/// Reader 4 — the fiscal ENGINE (`can_sign`, `crates/plugins/verifactu`). `true` = the module would
 /// go ahead and transmit to the AEAT.
+///
+/// It used to be named after `build_identity`, which hub#1529 deleted: since hub#1432 the only door
+/// that resolves a road is `resolve_route`, and `can_sign` is the own-road half of it. The rename is
+/// the whole of what changed here — the reader asks the same question of the same host.
 ///
 /// Asked through the runtime's REAL host (`DbHost`), not a hand-written stand-in: a twin host would
 /// be a second implementation of the very question under test, which is how the two readings of
@@ -255,12 +259,12 @@ async fn assert_the_readers_agree(slots: Slots, expected_can_issue: bool) {
          rejection nobody warned about"
     );
     // The ENGINE answers a narrower question and must keep answering it (hub#1489): «can *I* sign
-    // with a business certificate?», which is `build_identity`'s gate and only ever the own slot.
+    // with a business certificate?», which is `can_sign`'s gate and only ever the own slot.
     // On the cell road the engine signs NOTHING — the cell does, with ERPlora's Seal — so tying
     // this to `can_transmit` would demand a certificate of the very hub that has no need of one.
     assert_eq!(
         engine, slots.own,
-        "{slots:?}: `build_identity` must gate on the OWN certificate, no more and no less"
+        "{slots:?}: `can_sign` must gate on the OWN certificate, no more and no less"
     );
 }
 
