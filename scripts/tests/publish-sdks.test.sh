@@ -95,14 +95,14 @@ else
 
     # `main`/`types` apuntan a `src/index.ts`: el paquete se consume como FUENTE TypeScript
     # (así lo transpilan vitest y esbuild), así que el tarball TIENE que llevar `src/`.
-    if ! printf '%s' "$files" | grep -q '"src"'; then
+    if ! grep -q '"src"' <<<"$files"; then
         bad "el tarball publicado incluye \`src/\`" \
             "\`files\` = ${files:-<sin declarar>} — \`main\` apunta a \`src/index.ts\`: sin \`src\` el paquete publicado no resuelve nada"
     else
         ok "\`files\` incluye \`src\` (el paquete se consume como fuente TS)"
     fi
 
-    if ! printf '%s' "$pkg_version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+    if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$pkg_version"; then
         bad "la versión del paquete es semver" "es '${pkg_version:-<vacía>}'"
     elif [ "$pkg_version" = "0.0.0" ]; then
         bad "la versión del paquete no es el hueco 0.0.0" \
@@ -199,7 +199,7 @@ else
     # `npm install @erplora/module-sdk` would pull the candidate. Same rule `image-tags.sh` already
     # enforces on the image: an rc NEVER moves `:latest`.
     if [ -n "$real_publish" ]; then
-        if ! printf '%s\n' "$real_publish" | grep -q -- '--tag'; then
+        if ! grep -q -- '--tag' <<<"$real_publish"; then
             bad "una prerelease (rc) no se publica como \`latest\`" \
                 "el \`npm publish\` real no lleva \`--tag\`: una \`X.Y.Z-rc.N\` movería \`latest\` en GitHub Packages, y \`npm install @erplora/module-sdk\` se llevaría la candidata"
         elif ! grep -qE '^[[:space:]]*\*-\*\)' "$build_workflow"; then

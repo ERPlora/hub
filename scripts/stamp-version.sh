@@ -50,7 +50,7 @@ fi
 # Semver 2.0: X.Y.Z con prerelease y metadatos opcionales — `1.2.3`, `1.2.3-rc.1`,
 # `1.2.3-dev.7+gabc1234` (el canal `dev` de image-tags.sh). Cualquier otra cosa se rechaza:
 # estampar basura en los tres ficheros es peor que no estampar nada.
-if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+if ! grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$' <<<"$version"; then
     echo "❌ stamp-version: '$version' no es semver X.Y.Z[-prerelease][+build]" >&2
     exit 1
 fi

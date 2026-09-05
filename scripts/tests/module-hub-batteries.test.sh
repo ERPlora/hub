@@ -363,7 +363,7 @@ ok
 # this case goes with it in the SAME commit. It is a pin on one incident, not a rule about the
 # module — do not "fix" it by weakening it.
 combo_entry='inventory/tests/combo_stock.hub.test.py'
-printf '%s\n' "$declared_shipped" | grep -Fxq "$combo_entry" || fail \
+grep -Fxq "$combo_entry" <<<"$declared_shipped" || fail \
     "the shipped manifest no longer declares $combo_entry (hub#1396)"
 ok
 

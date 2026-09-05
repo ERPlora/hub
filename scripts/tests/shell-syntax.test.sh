@@ -80,7 +80,7 @@ listing=$("$checker" --root "$repo_root" --list 2>/dev/null | grep -v '^shell-sy
 missing=""
 for want in .githooks/pre-push scripts/prepush-gate.test.sh scripts/ci/module-hub-batteries.sh \
             scripts/tests/shell-syntax.test.sh scripts/ci/shell-syntax.sh; do
-    printf '%s\n' "$listing" | grep -qx "$want" || missing="$missing $want"
+    grep -qx "$want" <<<"$listing" || missing="$missing $want"
 done
 [ -z "$missing" ] \
     && ok "discovery: the hook and the scripts are all in the scanned set" \
@@ -101,7 +101,7 @@ if [ -n "$1" ]; then
 FIXTURE
 out=$("$checker" --root "$tmp_dir/broken" 2>&1)
 code=$?
-[ "$code" -ne 0 ] && printf '%s' "$out" | grep -q 'bad.sh' \
+[ "$code" -ne 0 ] && grep -q 'bad.sh' <<<"$out" \
     && ok "a script with a plain syntax error is rejected, and named" \
     || bad "a script with a plain syntax error is rejected, and named" "exit=$code out=$(flat "$out")"
 
@@ -149,7 +149,7 @@ FIXTURE
 if [ "$legacy" = yes ]; then
     out=$("$checker" --root "$tmp_dir/regression" 2>&1)
     code=$?
-    [ "$code" -ne 0 ] && printf '%s' "$out" | grep -q 'regressed.sh' \
+    [ "$code" -ne 0 ] && grep -q 'regressed.sh' <<<"$out" \
         && ok "reintroducing a bare \`case\` inside \$( … ) turns the guard red ($interp)" \
         || bad "reintroducing a bare \`case\` inside \$( … ) turns the guard red ($interp)" \
                "exit=$code out=$(flat "$out")"

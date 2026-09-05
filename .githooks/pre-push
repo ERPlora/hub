@@ -204,7 +204,7 @@ if [ -n "$base_sha" ]; then
 fi
 diff_touches() {   # $1 = exact path
     [ "$changed_known" = 1 ] || return 1
-    printf '%s\n' "$changed_files" | grep -qxF "$1"
+    grep -qxF "$1" <<<"$changed_files"
 }
 
 # ── hub#746: the copy that RUNS is whatever core.hooksPath points at ─────────
@@ -501,8 +501,8 @@ ensure_postgres() {
         fi
     fi
 
-    if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-        if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+    if ! grep -qx "$PG_CONTAINER" <<<"$(docker ps --format '{{.Names}}')"; then
+        if grep -qx "$PG_CONTAINER" <<<"$(docker ps -a --format '{{.Names}}')"; then
             docker start "$PG_CONTAINER" >/dev/null
         else
             # shellcheck disable=SC2086  # PG_ARGS is a deliberate list of -c flags.
@@ -583,8 +583,8 @@ ensure_e2e_databases() {
     elif [ "$gate_owns_web_cmd" = 1 ]; then
         local db
         for db in hub_e2e_web hub_e2e_assistant; do
-            docker exec "$PG_CONTAINER" psql -U postgres -tAc \
-                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null | grep -q 1 && continue
+            grep -q 1 <<<"$(docker exec "$PG_CONTAINER" psql -U postgres -tAc \
+                "SELECT 1 FROM pg_database WHERE datname='$db'" 2>/dev/null)" && continue
             if ! docker exec "$PG_CONTAINER" psql -U postgres -c "CREATE DATABASE $db;" >/dev/null 2>&1; then
                 echo "❌ pre-push: no pude crear la base '$db' en $PG_CONTAINER (la necesita el e2e de web)." >&2
                 return 1
@@ -1216,6 +1216,25 @@ if [ -f "$SHELL_SYNTAX" ]; then
         echo "$shell_syntax_out" >&2
         echo "❌ pre-push: un script del repo no parsea con el bash de esta máquina → push ABORTADO." >&2
         echo "   Verde en CI (Ubuntu, bash 5) y rojo aquí es el peor reparto posible: arréglalo antes de subir." >&2
+        exit 1
+    fi
+fi
+
+# ── hub#1534: que ningún script canalice hacia un lector que CORTA ──────────
+# `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO: `grep -q` sale en
+# el primer match y cierra el pipe, el productor muere con EPIPE (141) y `pipefail` le da a la
+# tubería el estado del PRODUCTOR. Es una carrera, así que sale verde en macOS y en un runner
+# ocioso y rojo en uno cargado — el 04/09 tumbó la PR de hub#1530 diciendo que faltaba una
+# línea que llevaba puesta desde julio. Aquí, por céntimos y antes de cualquier cargo, porque
+# el rojo del que estamos hablando es justamente el que llega 40 min tarde y en otra máquina.
+# Contrato: scripts/tests/no-short-circuit-pipes.test.sh.
+SHORT_CIRCUIT_PIPES="$(git rev-parse --show-toplevel)/scripts/ci/no-short-circuit-pipes.sh"
+if [ -f "$SHORT_CIRCUIT_PIPES" ]; then
+    if ! short_circuit_out=$(bash "$SHORT_CIRCUIT_PIPES" 2>&1); then
+        echo "" >&2
+        echo "$short_circuit_out" >&2
+        echo "❌ pre-push: un script canaliza hacia un lector que corta → push ABORTADO." >&2
+        echo "   Usa \`grep -q PATRÓN <<<\"\$bloque\"\`: el here-string no abre tubería (hub#1534)." >&2
         exit 1
     fi
 fi

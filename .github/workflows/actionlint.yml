@@ -101,6 +101,13 @@ on:
       # so without this path a PR touching only the test would not run it.
       - 'scripts/tests/n-minus-one.test.sh'
       - 'scripts/ci/n-minus-one.sh'
+      # The short-circuiting-pipe scanner (hub#1534). Its contract test is already covered by
+      # the `scripts/tests/*.test.sh` glob above; this entry is for the SCANNER, which lives in
+      # `scripts/ci/` — and for the tree it sweeps: a PR that reintroduces the pattern in ANY
+      # shell script must find the red here. Hence `**/*.sh` and the hook itself, not a list.
+      - 'scripts/ci/no-short-circuit-pipes.sh'
+      - '**/*.sh'
+      - '.githooks/pre-push'
   workflow_dispatch:
 
 permissions:
@@ -321,3 +328,16 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/scripts-tests-wiring.test.sh
+
+      # ── Ningún script canaliza hacia un lector que CORTA (hub#1534) ────────────────────
+      # `productor | grep -q PATRÓN` bajo `pipefail` reporta un MATCH como FALLO, y es una
+      # CARRERA: verde en macOS y en un runner ocioso, rojo en uno cargado. Por eso el sitio
+      # que manda es este, Linux — el 04/09 tumbó la PR de hub#1530 afirmando que el banco de
+      # Playwright no fijaba `HUB_CLOUD_API_URL` y llamaría a producción desde el runner, con
+      # esa línea puesta desde julio. La batería demuestra primero el mecanismo (bloque de
+      # 200 KB, más que el buffer del pipe) y solo después barre el árbol: un grep contra una
+      # cadena prohibida es un lint de estilo hasta que alguien enseña que la cadena hace daño.
+      - name: "Contrato: ningún script canaliza hacia un lector que corta (hub#1534)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/no-short-circuit-pipes.test.sh

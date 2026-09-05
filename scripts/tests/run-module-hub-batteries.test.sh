@@ -211,7 +211,7 @@ ok
 INSTALLED=alpha,beta BATTERY_EXIT_BETA=1 run_runner
 [ "$rc" -eq 1 ] || fail "2: a failing battery must exit 1 (verdict), got $rc"
 ok
-printf '%s%s' "$out" "$err" | grep -q 'beta/tests/only.hub.test.py' \
+grep -q 'beta/tests/only.hub.test.py' <<<"$out$err" \
     || fail "2: the failing battery is not named in the report"
 ok
 
@@ -227,7 +227,7 @@ PY
 INSTALLED=alpha,beta run_runner
 [ "$rc" -eq 1 ] || fail "3: a battery that skips itself and exits 0 must be RED, got $rc"
 ok
-printf '%s%s' "$out" "$err" | grep -qi 'skip' \
+grep -qi 'skip' <<<"$out$err" \
     || fail "3: the report does not say the battery skipped itself"
 ok
 cp "$tmp_dir/two.bak" "$skipper"
@@ -236,7 +236,7 @@ cp "$tmp_dir/two.bak" "$skipper"
 INSTALLED=alpha run_runner
 [ "$rc" -eq 1 ] || fail "4: a module missing from the runtime must exit 1, got $rc"
 ok
-printf '%s%s' "$out" "$err" | grep -q 'beta' \
+grep -q 'beta' <<<"$out$err" \
     || fail "4: the uninstalled module is not named"
 ok
 grep -q '^beta/' "$tmp_dir/battery.log" \
@@ -247,7 +247,7 @@ ok
 INSTALLED=alpha,beta run_runner --exempt 'beta=hub#0 fake reason'
 [ "$rc" -eq 1 ] || fail "5: an exemption whose module installs must go RED so it gets deleted"
 ok
-printf '%s%s' "$out" "$err" | grep -qi 'exempt' \
+grep -qi 'exempt' <<<"$out$err" \
     || fail "5: the report does not explain the stale exemption"
 ok
 
@@ -255,7 +255,7 @@ ok
 INSTALLED=alpha run_runner --exempt 'beta=hub#0 fake reason'
 [ "$rc" -eq 0 ] || fail "6: a live exemption must not fail the job, got $rc"
 ok
-printf '%s%s' "$out" "$err" | grep -q 'hub#0' \
+grep -q 'hub#0' <<<"$out$err" \
     || fail "6: the exemption is not reported with its issue"
 ok
 grep -q '^beta/' "$tmp_dir/battery.log" \
@@ -326,7 +326,7 @@ strict_bash="bash"
 INSTALLED=alpha,beta RUNNER_BASH="$strict_bash" run_runner
 [ "$rc" -eq 0 ] || fail "10: the happy path with no exemptions must be green under $strict_bash, got $rc"
 ok
-printf '%s' "$err" | grep -q 'unbound variable' \
+grep -q 'unbound variable' <<<"$err" \
     && fail "10: the runner leaked a shell error into its verdict channel under $strict_bash:
 $(printf '%s' "$err" | grep -n 'unbound variable' | head -3)"
 ok
