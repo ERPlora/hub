@@ -29,7 +29,11 @@
     "dberr.notes.paged": {
       "permission": "dberr.note.read",
       "sql": "queries/notes_list.sql",
-      "list": { "sort": ["id"], "default_sort": "id" }
+      "list": {
+        "sort": ["id"],
+        "default_sort": "id",
+        "filters": { "weight": { "op": "range" } }
+      }
     }
   },
   "commands": {
