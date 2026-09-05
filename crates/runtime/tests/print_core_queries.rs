@@ -314,3 +314,407 @@ async fn a_neighbouring_name_in_the_namespace_is_still_not_found() {
         "the error must name the query that does not exist: {err}"
     );
 }
+
+// ── Reading back the stamp a person left on a job (hub#1565) ──────────────────────────────────
+//
+// hub#1108 and hub#1532 made the hub WRITE who retired a ticket, when, why and through which
+// module. Nothing read it back: the stamp reached the person who had just made the gesture (it
+// comes back in the response of the discard/retry itself) and nobody else. The question a stuck
+// queue actually raises the NEXT day — «who binned my ticket?», «why did this order print twice?»
+// — had no answer outside `psql`.
+//
+// **The audience is the admin's, and that is a market decision, not a shortcut** (the research is
+// in the issue): every mature POS keeps «voided by X, because Y» in the back office —
+// Square's comp&void report needs the `reports` permission, Toast's Voided Orders lives in Toast
+// Web, Lightspeed's Cancellations report in the Back Office, Odoo's cancelled-orders report in the
+// PoS Manager group. The reason is the same everywhere and it is not privacy for its own sake: the
+// report exists to spot till fraud, so it cannot be readable by the population it is watching.
+//
+// It does NOT move the gate hub#987 decided: the queue itself stays open to the counter, because
+// the alarm belongs to whoever is standing next to the printer. What is admin-only is the stamp,
+// so the two facts travel through one door with two audiences instead of two doors that drift.
+
+/// Administering the hub — the permission that decides the audience of the stamp, on both doors.
+const ADMIN: &str = "hub.administer";
+
+/// Drives a queued job to `dead` the way the machine really does, so a retry has a legal subject.
+async fn seed_dead(rt: &Runtime, hub_id: &str, job_id: &str, role: &str) {
+    use erplora_runtime::print_queue::{self, MAX_ATTEMPTS};
+    let station = erplora_runtime::print_stations::resolve(rt.db_for_test(), hub_id, role)
+        .await
+        .unwrap();
+    for _ in 0..MAX_ATTEMPTS {
+        print_queue::claim_next(rt.db_for_test(), hub_id, &station.id, "till-1", 90)
+            .await
+            .unwrap()
+            .expect("there is a job to hand out");
+        print_queue::mark_failed(rt.db_for_test(), hub_id, job_id, "printer offline")
+            .await
+            .unwrap();
+    }
+}
+
+/// The whole point of hub#1565: the stamp survives the gesture and can be read back later.
+#[tokio::test]
+async fn an_admin_reads_who_retired_a_ticket_and_why() {
+    let rt = runtime("hub-stamp").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", "hub_user:u9", "printing", "duplicado del ticket 42")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-stamp", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 1, "a retired job is still listed: {rows:?}");
+    assert_eq!(rows[0]["status"], "discarded");
+    assert_eq!(
+        rows[0]["discardedBy"], "hub_user:u9",
+        "«who binned my ticket?» has an answer: {rows:?}"
+    );
+    assert_eq!(
+        rows[0]["discardedByModule"], "printing",
+        "and «WHAT binned it» too (hub#1532): {rows:?}"
+    );
+    assert_eq!(
+        rows[0]["discardReason"], "duplicado del ticket 42",
+        "the half only the person knew: {rows:?}"
+    );
+    assert!(
+        rows[0]["discardedAt"].as_str().is_some_and(|s| !s.is_empty()),
+        "when it happened is what makes it an answer and not an anecdote: {rows:?}"
+    );
+}
+
+/// The other half of the stamp: a job that came out of the printer a SECOND time.
+#[tokio::test]
+async fn an_admin_reads_who_re_fired_a_ticket() {
+    let rt = runtime("hub-refire").await;
+    enqueue(&rt, "twice", "kitchen", "kitchen_order").await;
+    seed_dead(&rt, "hub-refire", "twice", "kitchen").await;
+    rt.retry_print_job("twice", "hub_user:u9", "printing")
+        .await
+        .expect("a dead job is re-fired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-refire", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0]["status"], "pending",
+        "a re-fired job is back in the queue, and the stamp travels with it: {rows:?}"
+    );
+    assert_eq!(rows[0]["retriedBy"], "hub_user:u9");
+    assert_eq!(rows[0]["retriedByModule"], "printing");
+    assert!(
+        rows[0]["retriedAt"].as_str().is_some_and(|s| !s.is_empty()),
+        "«why did this order print twice?» is a question about a moment: {rows:?}"
+    );
+}
+
+/// The market's rule, enforced: the counter reads the QUEUE (hub#987) and not the stamp.
+///
+/// The keys are ABSENT, never present-and-empty. `""` already means something in this stamp — «no
+/// module named itself» — so answering `""` to a cashier would be the hub saying «nobody binned
+/// it», which is a lie, instead of «you are not being told».
+#[tokio::test]
+async fn the_counter_reads_the_queue_but_not_who_retired_a_ticket() {
+    let rt = runtime("hub-counter-stamp").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", "hub_user:u9", "printing", "duplicado")
+        .await
+        .unwrap();
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-counter-stamp", &[SESSION]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 1, "the cashier still sees the queue: {rows:?}");
+    assert_eq!(rows[0]["status"], "discarded", "…and its state: {rows:?}");
+    for key in [
+        "discardedBy",
+        "discardedByModule",
+        "discardReason",
+        "discardedAt",
+        "retriedBy",
+        "retriedByModule",
+        "retriedAt",
+    ] {
+        assert!(
+            rows[0].get(key).is_none(),
+            "`{key}` is back-office data and must be ABSENT for the counter: {rows:?}"
+        );
+    }
+    assert!(
+        !serde_json::to_string(&rows[0]).unwrap().contains("u9"),
+        "and nothing of the stamp may leak by another name: {rows:?}"
+    );
+}
+
+/// A job nobody touched carries no stamp — not even for an admin. An empty `discardedBy` on a
+/// `pending` job would make every screen render "retired by ―" on a ticket that is simply waiting.
+#[tokio::test]
+async fn a_job_nobody_touched_carries_no_stamp() {
+    let rt = runtime("hub-untouched").await;
+    enqueue(&rt, "waiting", "receipt", "receipt").await;
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-untouched", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(rows[0]["status"], "pending");
+    for key in ["discardedBy", "discardedAt", "retriedBy", "retriedAt"] {
+        assert!(
+            rows[0].get(key).is_none(),
+            "nothing happened to this job, so `{key}` has nothing to say: {rows:?}"
+        );
+    }
+}
+
+/// A CLOSED bucket is read from the other end, and without this the stamp is unreachable in
+/// practice (hub#1565).
+///
+/// `LIMIT` over `ORDER BY seq` hands back the OLDEST rows. For `pending`/`printing`/`dead` that is
+/// the right end — the ticket that has waited longest is the one on fire. For `discarded` it is the
+/// wrong one by exactly the same reasoning: those rows never leave, so a hub with a year of
+/// retired tickets would page forever through its first hundred and never show the one somebody is
+/// asking about, which is always today's.
+#[tokio::test]
+async fn the_retired_bucket_is_read_newest_first() {
+    let rt = runtime("hub-order").await;
+    for job_id in ["old", "middle", "recent"] {
+        enqueue(&rt, job_id, "receipt", "receipt").await;
+        rt.discard_print_job(job_id, "hub_user:u9", "", "")
+            .await
+            .expect("the job is retired");
+    }
+
+    let mut discarded = Params::new();
+    discarded.insert("status".into(), json!("discarded"));
+    discarded.insert("limit".into(), json!(2));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        discarded,
+        &ctx("hub-order", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 2, "the page is capped as asked: {rows:?}");
+    assert_eq!(
+        rows.iter().map(|r| r["jobId"].clone()).collect::<Vec<_>>(),
+        vec![json!("recent"), json!("middle")],
+        "the LAST tickets retired are the ones somebody is asking about: {rows:?}"
+    );
+
+    // …and the live bucket keeps reading from the end it always did: oldest first is the alarm.
+    enqueue(&rt, "waiting-first", "receipt", "receipt").await;
+    enqueue(&rt, "waiting-second", "receipt", "receipt").await;
+    let mut pending = Params::new();
+    pending.insert("status".into(), json!("pending"));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        pending,
+        &ctx("hub-order", &[SESSION, ADMIN]),
+    )
+    .await;
+    assert_eq!(
+        rows.iter().map(|r| r["jobId"].clone()).collect::<Vec<_>>(),
+        vec![json!("waiting-first"), json!("waiting-second")],
+        "a queue is still served in hand-out order: {rows:?}"
+    );
+}
+
+/// Drives a queued job through a printer the way a host does — hand-out, then confirmed — so the
+/// `done` bucket has a real row in it.
+async fn print_it(rt: &Runtime, hub_id: &str, job_id: &str, role: &str) {
+    use erplora_runtime::print_queue;
+    let station = erplora_runtime::print_stations::resolve(rt.db_for_test(), hub_id, role)
+        .await
+        .unwrap();
+    let handed = print_queue::claim_next(rt.db_for_test(), hub_id, &station.id, "till-1", 90)
+        .await
+        .unwrap()
+        .expect("there is a job to hand out");
+    assert_eq!(handed.job_id, job_id, "a queue hands out in seq order");
+    assert!(
+        print_queue::mark_done(rt.db_for_test(), hub_id, job_id)
+            .await
+            .unwrap(),
+        "the paper came out"
+    );
+}
+
+/// The PRINTED bucket is closed too, and it is read from the same end as the retired one
+/// (hub#1565): `done` rows never leave the table either, so `LIMIT` over `seq` ascending would hand
+/// back the first tickets this hub ever printed instead of the ones somebody could be asking about
+/// («did the kitchen get table 4's order?» is always a question about today).
+#[tokio::test]
+async fn the_printed_bucket_is_read_newest_first_too() {
+    let rt = runtime("hub-done-order").await;
+    for job_id in ["first-printed", "second-printed", "third-printed"] {
+        enqueue(&rt, job_id, "receipt", "receipt").await;
+        print_it(&rt, "hub-done-order", job_id, "receipt").await;
+    }
+
+    let mut done = Params::new();
+    done.insert("status".into(), json!("done"));
+    done.insert("limit".into(), json!(2));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        done,
+        &ctx("hub-done-order", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows.iter().map(|r| r["jobId"].clone()).collect::<Vec<_>>(),
+        vec![json!("third-printed"), json!("second-printed")],
+        "the LAST tickets printed are the ones somebody could be asking about: {rows:?}"
+    );
+}
+
+// ── The stamp names a PERSON, not a row id (hub#1565) ─────────────────────────────────────────
+//
+// The stamp is stored as the principal the HTTP layer resolved from the session — `hub_user:<id>`
+// — because that is the only identity that cannot be forged from a body. It is also unreadable:
+// «Retirado por hub_user:018f3c…» leaves the owner exactly where the missing stamp did.
+//
+// This is not a new lesson in this repo. `hub.approvals.list` resolves both of its ids against
+// `hub_user` for the stated reason that otherwise «the screen shows UUIDs and nobody uses it», and
+// hub#1560 — three commits back, same family — is the identical fix for the device that prints.
+// Serving the code here would recreate a defect the printing area has already closed twice.
+//
+// Both facts travel: `discardedBy` is the stable id support quotes, `discardedByName` is what the
+// screen prints. The name FALLS BACK to the principal, never to an empty string: an employee who
+// has since been deleted must not turn an audit row into «retired by ——».
+
+/// Creates a person in this hub and returns the principal their gestures are stamped with.
+async fn person(rt: &Runtime, hub_id: &str, name: &str) -> String {
+    let id = erplora_runtime::identity::create_user(rt.db_for_test(), hub_id, name, "4271", "manager", None)
+        .await
+        .expect("the person is created");
+    format!("hub_user:{id}")
+}
+
+#[tokio::test]
+async fn the_stamp_names_the_person_who_retired_the_ticket() {
+    let rt = runtime("hub-who").await;
+    let ana = person(&rt, "hub-who", "Ana").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", &ana, "printing", "duplicado del ticket 42")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-who", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["discardedByName"], "Ana",
+        "«who binned my ticket?» is answered with a name: {rows:?}"
+    );
+    assert_eq!(
+        rows[0]["discardedBy"],
+        json!(ana),
+        "and the stable id survives for support: {rows:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_stamp_names_the_person_who_re_fired_the_ticket() {
+    let rt = runtime("hub-who-again").await;
+    let leo = person(&rt, "hub-who-again", "Leo").await;
+    enqueue(&rt, "twice", "kitchen", "kitchen_order").await;
+    seed_dead(&rt, "hub-who-again", "twice", "kitchen").await;
+    rt.retry_print_job("twice", &leo, "printing")
+        .await
+        .expect("the job is re-fired");
+
+    let mut dead = Params::new();
+    dead.insert("status".into(), json!("pending"));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        dead,
+        &ctx("hub-who-again", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["retriedByName"], "Leo",
+        "«who printed this twice?» is answered with a name: {rows:?}"
+    );
+}
+
+/// An employee who has left is still the answer: the audit row keeps the only identity it has.
+#[tokio::test]
+async fn a_stamp_left_by_somebody_this_hub_no_longer_knows_still_says_something() {
+    let rt = runtime("hub-gone").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", "hub_user:u-long-gone", "printing", "")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-gone", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["discardedByName"], "hub_user:u-long-gone",
+        "an unknown principal falls back to itself, never to an empty label: {rows:?}"
+    );
+}
+
+/// The name is part of the stamp, so it obeys the same audience: the counter reads neither.
+#[tokio::test]
+async fn the_counter_reads_no_name_either() {
+    let rt = runtime("hub-who-not").await;
+    let ana = person(&rt, "hub-who-not", "Ana").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", &ana, "printing", "duplicado")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-who-not", &[SESSION]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 1, "the queue itself stays open (hub#987): {rows:?}");
+    assert!(
+        rows[0].get("discardedByName").is_none(),
+        "the name is the stamp by another route: {rows:?}"
+    );
+}

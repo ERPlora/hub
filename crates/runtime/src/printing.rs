@@ -24,6 +24,18 @@ impl Runtime {
         print_queue::list(self.db.as_ref(), &self.hub_id, role, status, limit).await
     }
 
+    /// The names behind the stamps in `jobs`, for the door that is allowed to read them.
+    ///
+    /// Kept next to [`Runtime::print_queue`] because the HTTP listing has no database handle of its
+    /// own: the shape it serves and the shape the dispatcher serves must resolve the same way, or
+    /// the module's screen and the shell's would disagree about who binned a ticket.
+    pub async fn print_queue_actor_names(
+        &self,
+        jobs: &[print_queue::PrintJob],
+    ) -> Result<print_queue::ActorNames> {
+        print_queue::ActorNames::of(self.db.as_ref(), &self.hub_id, jobs).await
+    }
+
     /// **Puts a dead print job back in front of the hosts** (hub#1108), with its hand-outs reset,
     /// stamping who asked for it and — since hub#1532 — through which module.
     /// Scoped to the deployment's `hub_id`, like every other read and write here: another tenant's

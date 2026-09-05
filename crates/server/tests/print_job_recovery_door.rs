@@ -495,3 +495,126 @@ async fn hub1532_a_person_acting_through_the_shell_stamps_no_module() {
     );
     let _ = std::fs::remove_dir_all(&f.temp);
 }
+
+// ── Reading the stamp back, days later (hub#1565) ─────────────────────────────────────────────
+//
+// Everything above proves the stamp is WRITTEN. This is the other half: `GET /api/print/jobs`
+// hands it back, and only to a session that administers the hub.
+//
+// The asymmetry is deliberate and it is the market's, not ours (research in hub#1565): the queue
+// is read by the counter (hub#987) because the alarm belongs to whoever is next to the printer,
+// while «voided by X, because Y» lives in the back office in every mature POS — Square gates its
+// comp&void report behind `reports`, Toast's Voided Orders is a Toast Web report, Lightspeed's
+// Cancellations report is Back Office, Odoo's is the PoS Manager group. The report exists to spot
+// till fraud, so the population it watches is not its audience.
+
+fn get(uri: &str, session: Option<&str>) -> Request<Body> {
+    let mut builder = Request::builder().method("GET").uri(uri);
+    if let Some(token) = session {
+        builder = builder.header("x-hub-session", token);
+    }
+    builder.body(Body::empty()).unwrap()
+}
+
+/// Retires a job through the real door, with a reason, so the row carries a REAL stamp.
+async fn discard_with_reason(f: &Fixture, job_id: &str, reason: &str) {
+    let request = Request::builder()
+        .method("POST")
+        .uri(format!("/api/print/jobs/{job_id}/discard"))
+        .header("x-hub-session", &f.admin)
+        .header(MODULE_HEADER, PRINTING)
+        .header("content-type", "application/json")
+        .body(Body::from(json!({ "reason": reason }).to_string()))
+        .unwrap();
+    let response = send(&f.router, request).await;
+    assert_eq!(response.status(), StatusCode::OK, "the job is retired");
+}
+
+/// The question the owner asks the next day, answered by the listing instead of by `psql`.
+#[tokio::test]
+async fn hub1565_an_admin_reads_the_stamp_back_from_the_listing() {
+    let f = fixture(true).await;
+    discard_with_reason(&f, JOB_DISCARD, "se imprimió dos veces").await;
+
+    let body = body_json(send(&f.router, get("/api/print/jobs", Some(&f.admin))).await).await;
+    let job = body["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["jobId"] == JOB_DISCARD)
+        .unwrap_or_else(|| panic!("the retired job is still listed: {body}"))
+        .clone();
+
+    assert_eq!(job["status"], "discarded");
+    assert_eq!(
+        job["discardReason"], "se imprimió dos veces",
+        "the reason survives the gesture: {job}"
+    );
+    assert_eq!(
+        job["discardedByModule"],
+        json!(PRINTING),
+        "and so does the module that asked for it: {job}"
+    );
+    assert!(
+        job["discardedBy"]
+            .as_str()
+            .is_some_and(|s| s.starts_with("hub_user:")),
+        "the person is identified: {job}"
+    );
+    // …and IDENTIFIED is not NAMED. `hub_user:018f3c…` is what the door stores because it is the
+    // only identity a body cannot forge, and it is not an answer to «who binned my ticket?» —
+    // the same lesson hub#1560 taught three commits ago about the device that prints.
+    assert_eq!(
+        job["discardedByName"], "Ioan",
+        "the id resolves to the person's name: {job}"
+    );
+    assert!(
+        job["discardedAt"].as_str().is_some_and(|s| !s.is_empty()),
+        "with the moment it happened: {job}"
+    );
+    let _ = std::fs::remove_dir_all(&f.temp);
+}
+
+/// …and the cashier who reads the same listing gets the queue WITHOUT the stamp.
+#[tokio::test]
+async fn hub1565_the_cashier_reads_the_queue_without_the_stamp() {
+    let f = fixture(true).await;
+    discard_with_reason(&f, JOB_DISCARD, "se imprimió dos veces").await;
+
+    let body = body_json(send(&f.router, get("/api/print/jobs", Some(&f.cashier))).await).await;
+    let job = body["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|j| j["jobId"] == JOB_DISCARD)
+        .unwrap_or_else(|| panic!("the cashier still sees the queue: {body}"))
+        .clone();
+
+    assert_eq!(
+        job["status"], "discarded",
+        "what the STATE is stays the counter's: {job}"
+    );
+    for key in [
+        "discardedBy",
+        "discardedByName",
+        "discardedByModule",
+        "discardReason",
+        "discardedAt",
+        "retriedBy",
+        "retriedByName",
+        "retriedByModule",
+        "retriedAt",
+    ] {
+        assert!(
+            job.get(key).is_none(),
+            "`{key}` is back-office data and must be ABSENT for the counter: {job}"
+        );
+    }
+    for leak in ["se imprimió dos veces", "Ioan"] {
+        assert!(
+            !serde_json::to_string(&job).unwrap().contains(leak),
+            "and neither the reason nor WHO must leak by another key (`{leak}`): {job}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&f.temp);
+}

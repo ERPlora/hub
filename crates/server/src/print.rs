@@ -108,14 +108,20 @@ fn unauthorized(e: auth::AuthError) -> Response {
         .into_response()
 }
 
-/// A queued job as the listing reports it: everything **except** the document.
+/// A queued job as the listing reports it: everything **except** the document, and the stamp only
+/// for the audience it belongs to.
 ///
 /// **The shape lives in the runtime** (`print_queue::status_view`), not here (hub#1107): the same
 /// view is served by the core query `hub.print.jobs`, which a module reads through the dispatcher,
 /// and two hand-written copies of "the queue seen from outside" would drift — starting with the
-/// field that must never appear.
-fn summary(job: &PrintJob) -> Value {
-    print_queue::status_view(job)
+/// field that must never appear. `audience` (hub#1565) travels the same way, resolved by
+/// `print_queue::audience_of` from the context both doors already have.
+fn summary(
+    job: &PrintJob,
+    audience: print_queue::QueueAudience,
+    names: &print_queue::ActorNames,
+) -> Value {
+    print_queue::status_view(job, audience, names)
 }
 
 /// POST /api/print/jobs — enqueue a document for a printer role. Auth = any user session.
@@ -191,16 +197,33 @@ pub async fn list_jobs(
         Err(e) => return crate::tenant_rejected(e),
     };
     let rt = arc.read().await;
-    if let Err(e) = auth::require_user_session(&headers, &st.config, &rt).await {
-        return unauthorized(e);
-    }
+    // The session that opens the door is ALSO what decides how much of each job comes back: the
+    // queue is any session's (hub#987), the stamp on a job is the back office's (hub#1565). One
+    // resolution, no second round-trip, and the same predicate the core query uses.
+    let ctx = match auth::require_user_session(&headers, &st.config, &rt).await {
+        Ok(ctx) => ctx,
+        Err(e) => return unauthorized(e),
+    };
+    let audience = print_queue::audience_of(&ctx);
     let limit = filter.limit.unwrap_or(DEFAULT_LIMIT);
     match rt
         .print_queue(filter.role.as_deref(), filter.status.as_deref(), limit)
         .await
     {
         Ok(jobs) => {
-            let jobs: Vec<Value> = jobs.iter().map(summary).collect();
+            // The stamp names a person (hub#1565), and only the back office reads it: a counter
+            // session resolves nothing, which is both the right answer and the cheap one.
+            let names = match audience {
+                print_queue::QueueAudience::Admin => match rt.print_queue_actor_names(&jobs).await {
+                    Ok(names) => names,
+                    Err(e) => return crate::err_response(e),
+                },
+                print_queue::QueueAudience::Counter => print_queue::ActorNames::none(),
+            };
+            let jobs: Vec<Value> = jobs
+                .iter()
+                .map(|job| summary(job, audience, &names))
+                .collect();
             Json(json!({ "ok": true, "jobs": jobs })).into_response()
         }
         Err(e) => crate::err_response(e),
@@ -991,6 +1014,25 @@ mod tests {
             attempts: 0,
             created_at: "2026-08-07T10:00:00+00:00".into(),
             last_error: String::new(),
+            discarded_at: String::new(),
+            discarded_by: String::new(),
+            discarded_by_module: String::new(),
+            discard_reason: String::new(),
+            retried_at: String::new(),
+            retried_by: String::new(),
+            retried_by_module: String::new(),
+        }
+    }
+
+    /// The same job after somebody retired it: the row the stamp lives on.
+    fn retired_job() -> PrintJob {
+        PrintJob {
+            status: print_queue::STATUS_DISCARDED.into(),
+            discarded_at: "2026-08-07T10:05:00+00:00".into(),
+            discarded_by: "hub_user:u9".into(),
+            discarded_by_module: "printing".into(),
+            discard_reason: "duplicado".into(),
+            ..job()
         }
     }
 
@@ -1000,7 +1042,11 @@ mod tests {
     /// the owner needs to read.
     #[test]
     fn the_listing_view_reports_state_without_the_document() {
-        let v = summary(&job());
+        let v = summary(
+            &job(),
+            print_queue::QueueAudience::Counter,
+            &print_queue::ActorNames::none(),
+        );
         assert_eq!(v["jobId"], json!("j1"));
         assert_eq!(v["role"], json!("kitchen"));
         assert_eq!(v["documentType"], json!("kitchen_order"));
@@ -1010,6 +1056,43 @@ mod tests {
             assert!(
                 v.get(leak).is_none(),
                 "the document never travels in the listing (`{leak}`)"
+            );
+        }
+    }
+
+    /// hub#1565 — the audience the listing is served to decides whether the stamp comes with it.
+    /// Asserted HERE, on the door's own helper, so a handler that stops resolving the audience and
+    /// hard-codes one turns this red instead of shipping the back office's data to the counter.
+    #[test]
+    fn the_stamp_travels_to_the_back_office_and_not_to_the_counter() {
+        let admin = summary(
+            &retired_job(),
+            print_queue::QueueAudience::Admin,
+            &print_queue::ActorNames::none(),
+        );
+        assert_eq!(admin["discardedBy"], json!("hub_user:u9"));
+        assert_eq!(admin["discardReason"], json!("duplicado"));
+
+        let counter = summary(
+            &retired_job(),
+            print_queue::QueueAudience::Counter,
+            &print_queue::ActorNames::none(),
+        );
+        assert_eq!(
+            counter["status"],
+            json!("discarded"),
+            "the counter still reads the STATE: {counter}"
+        );
+        for key in [
+            "discardedBy",
+            "discardedByName",
+            "discardedByModule",
+            "discardReason",
+            "discardedAt",
+        ] {
+            assert!(
+                counter.get(key).is_none(),
+                "`{key}` is the back office's: {counter}"
             );
         }
     }
