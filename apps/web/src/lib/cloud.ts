@@ -88,13 +88,21 @@ export interface CloudMarketplaceModule {
 // Bearer). Persistimos el access+refresh del login en localStorage.
 const TOKENS = { access: 'erplora.access', refresh: 'erplora.refresh' };
 
+// Bumped on every write to the store. A refresh that was already in flight when the store changed
+// under it — the PIN hand-over took the previous person's credentials away (hub#1538), or another
+// login replaced them — belongs to a login that no longer exists, and must not write its rotated
+// pair back: that would silently undo the hand-over.
+let tokenEpoch = 0;
+
 export function setTokens(access: string, refresh: string): void {
+  tokenEpoch += 1;
   try {
     localStorage.setItem(TOKENS.access, access);
     localStorage.setItem(TOKENS.refresh, refresh);
   } catch { /* ignore */ }
 }
 export function clearTokens(): void {
+  tokenEpoch += 1;
   try {
     localStorage.removeItem(TOKENS.access);
     localStorage.removeItem(TOKENS.refresh);
@@ -184,6 +192,7 @@ async function refreshTokens(): Promise<string | null> {
   refreshing = (async () => {
     const refresh = getRefreshToken();
     if (!refresh) return null;
+    const epoch = tokenEpoch;
     try {
       await cloudApiUrlReady();
       const res = await fetch(`${config.cloudApiUrl}/api/v1/auth/refresh/`, {
@@ -194,7 +203,11 @@ async function refreshTokens(): Promise<string | null> {
       if (!res.ok) return null;
       const data = (await res.json()) as { access?: string; refresh?: string };
       if (!data.access) return null;
-      // Rota ambos: el access nuevo y el refresh nuevo (rotating refresh tokens del Cloud).
+      // The store changed while the SaaS was answering (hub#1538): the rotated pair is the
+      // previous person's and stays out. Whatever the store holds NOW is the answer — null after a
+      // hand-over, the newcomer's own token after a fresh login.
+      if (epoch !== tokenEpoch) return getAccessToken();
+      // Rotates both: the new access and the new refresh (the Cloud's rotating refresh tokens).
       setTokens(data.access, data.refresh ?? refresh);
       return data.access;
     } catch {

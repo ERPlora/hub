@@ -133,4 +133,35 @@ describe('refresh-on-401 según el plano de sesión', () => {
     expect(sessionExpired).toHaveBeenCalledOnce();
     expect(getAccessToken()).toBeNull();
   });
+
+  // hub#1538 — the PIN hand-over (`switchUser`) takes the previous person's erplora.com credentials
+  // off the till WITHOUT signing the till out. A refresh that was already in flight when that
+  // happened — a 401 from billing or from the entitlement re-check on window focus, an instant
+  // before the PIN — rotates THAT person's tokens and used to write them straight back when the
+  // answer arrived, undoing the hand-over with nobody watching. What comes back belongs to a login
+  // that no longer exists: the store is the authority, not the response.
+  it('hub#1538: a refresh in flight does not resurrect the credentials the hand-over just cleared', async () => {
+    setTokens('acc-owner', 'ref-owner');
+    let releaseRefresh!: (res: Response) => void;
+    const refreshInFlight = new Promise<Response>((resolve) => { releaseRefresh = resolve; });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 })) // invoices, stale access token
+      .mockReturnValueOnce(refreshInFlight) // POST /auth/refresh, still waiting for the SaaS
+      .mockResolvedValue(new Response('[]', { status: 200 })); // the retry, if one were to happen
+    vi.stubGlobal('fetch', fetchMock);
+
+    const invoices = cloudInvoices();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    clearTokens(); // the hand-over: the owner leaves and her credentials go with her
+    releaseRefresh(new Response(
+      JSON.stringify({ access: 'acc-owner-rotated', refresh: 'ref-owner-rotated' }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    await invoices.catch(() => undefined);
+
+    expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem('erplora.refresh')).toBeNull();
+    expect(sessionExpired).not.toHaveBeenCalled();
+  });
 });
