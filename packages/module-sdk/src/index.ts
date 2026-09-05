@@ -727,12 +727,88 @@ function activeLocale(): string {
   }
 }
 
+// ── hub#1570: a module's DOMAIN refusal, in the module's own words ───────────────────────────
+//
+// ADR-0398 split the two halves of a domain code (ADR-0205, `<module>.<snake_case>`): the manifest
+// declares that the code EXISTS and whether it is deprecated, and `locales/<lang>.json → errors`
+// says what it SAYS — English the source, `es` the translation (ADR-0055), both forced by
+// `erplora validate`. The runtime deliberately never reads that block (`manifest::ModuleLocale`
+// keeps `name`/`navigation`/`setup` and nothing else), so the sentence only ever exists inside the
+// module's own Web Component bundle.
+//
+// Which is why nobody read it: 18 modules ship 176 translated refusals and there was not one
+// consumer. The screens do the ordinary `this.error = e.message`, and `message` is whatever the
+// handler or `expect_rows.error` wrote — English, on a Spanish till. Fixing it in a screen fixes
+// it once and misses the other 26 (the same reasoning that put the PLATFORM half here, hub#1102).
+//
+// The catalogue reaches us through the door every module already uses: `erplora.t(CATALOG, …)`,
+// which each Web Component calls to render its own labels. Nothing to add in the 27 module repos —
+// a module that translated its refusals gets them spoken by having been rendered.
+const REFUSAL_TEXTS = new Map<string, Record<string, string>>();
+
+/** Catalogues already indexed, by identity: `t()` runs on every render, this must not. */
+const INDEXED_CATALOGS = new WeakSet<object>();
+
+/**
+ * A DOMAIN code and nothing else (ADR-0205): `<module>.<snake_case>`, exactly two segments.
+ *
+ * The guard is on the way IN, not on the way out: it keeps a catalogue with a stray key from ever
+ * being able to answer for a core refusal (`not_found`, `permission_denied`) or for the core's own
+ * three-segment namespaces (`hub.fiscal.*`, `flow.*`) — a module does not get to rewrite those.
+ */
+const DOMAIN_CODE = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+
+/**
+ * Index the `errors` block of a module locale catalogue, in every language it carries — not only
+ * the active one, so switching the hub's language later resolves without re-rendering.
+ */
+function rememberRefusalTexts(catalog: Record<string, unknown>): void {
+  if (!catalog || typeof catalog !== 'object' || INDEXED_CATALOGS.has(catalog)) return;
+  INDEXED_CATALOGS.add(catalog);
+  for (const [lang, dict] of Object.entries(catalog)) {
+    const errors = (dict as { errors?: unknown } | null)?.errors;
+    if (!errors || typeof errors !== 'object') continue;
+    for (const [code, text] of Object.entries(errors as Record<string, unknown>)) {
+      if (typeof text !== 'string' || !text || !DOMAIN_CODE.test(code)) continue;
+      const byLang = REFUSAL_TEXTS.get(code) ?? {};
+      byLang[lang] = text;
+      REFUSAL_TEXTS.set(code, byLang);
+    }
+  }
+}
+
+/**
+ * What the module that owns `code` says about this refusal, in `locale`, or `null` when it never
+ * said anything — in which case the sentence that arrived wins, exactly as for an unknown platform
+ * code (hub#1102 rule 2): a sentence we invented says strictly less than the one the hub sent.
+ *
+ * Resolution is `locale → en → nothing`, the chain `ErploraClient.t` already uses. A text may
+ * splice the server's own detail with `{message}` — `combos.combo_in_use` is written that way in
+ * both languages, because the module wants its sentence AND the list the handler computed.
+ */
+function refusalText(code: string, locale: string, serverMessage: string): string | null {
+  const byLang = REFUSAL_TEXTS.get(code);
+  if (!byLang) return null;
+  const text = byLang[locale] ?? byLang.en;
+  if (!text) return null;
+  return text.includes('{message}') ? text.replaceAll('{message}', serverMessage) : text;
+}
+
 function unwrap(env: Envelope): unknown {
   if (!env.ok) {
     const e = env.error;
     // hub#1102: a platform failure is told in the user's language and in business words; a module's
     // own refusal (and any code we do not know) keeps the sentence it arrived with.
-    const spoken = e ? platformFailureMessage(e, activeLocale()) : null;
+    //
+    // hub#1570: below the platform half, a module's OWN refusal is spoken with the module's own
+    // translated sentence when it published one (`locales/<lang>.json → errors`, ADR-0398). The
+    // order is load-bearing: a platform code is never a module's to rewrite, and a code nobody
+    // translated still keeps what arrived.
+    const locale = activeLocale();
+    const spoken = e
+      ? (platformFailureMessage(e, locale) ??
+        (e.code ? refusalText(e.code, locale, e.message ?? '') : null))
+      : null;
     throw new ErploraError(
       e?.code ?? 'error',
       spoken ?? (e?.message || 'unknown error'),
@@ -2556,6 +2632,12 @@ export class ErploraClient {
    *   …  ${erplora.t(C, 'ui.addProduct')}  …  ${erplora.t(C, 'ui.greet', { name })}
    */
   t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string {
+    // hub#1570: this is the one call every module Web Component already makes, and the catalogue it
+    // hands over carries the module's translated REFUSALS too (`errors`, ADR-0398). Remembering
+    // them here is what lets a domain refusal be spoken in the user's language on every screen
+    // without any of the 27 module repos adding a line. Indexed once per catalogue object, not per
+    // render, and it never touches what `t()` returns.
+    rememberRefusalTexts(catalog);
     const dict = (catalog[this.locale] ?? catalog.en ?? {}) as Record<string, unknown>;
     let cur: unknown = dict;
     for (const part of key.split('.')) {
