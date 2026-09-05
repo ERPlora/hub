@@ -32,7 +32,8 @@
 # `| tail` is NOT scanned and must not be: `tail` reads its input to the END, so
 # it can never send SIGPIPE upstream. Nor is `head` reading a FILE, or `head` as
 # the PRODUCER of a pipe. The word boundary matters too — `| headers_of` is not
-# `head`, and a guard that fired on it would be the false red it exists to stop.
+# `head`, and a guard that fired on it would be the false red it exists to stop;
+# but `$(… | head)` and `| head>/dev/null` ARE `head`, glued to the next token.
 #
 # The fixes, both with no pipe at all:
 #
@@ -84,8 +85,11 @@ while [ $# -gt 0 ]; do
         (-h | --help)
             # Bounded by the closing rule of the header block, not by a line
             # number: the previous `2,45p` silently started cutting the usage
-            # off the moment the header grew (hub#1552).
-            sed -n '2,/^# ─\{5,\}/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+            # off the moment the header grew (hub#1552). Five LITERAL rule
+            # characters, no quantifier: `─` is three bytes under LC_ALL=C, a
+            # `\{5,\}` on it applies to its last byte only, the rule never
+            # matches and the range runs to EOF — the whole script as "help".
+            sed -n '2,/^# ─────/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         (*) die "unknown argument: $1" ;;
     esac
 done
@@ -138,9 +142,12 @@ pipe_then_grep='[|][[:space:]]*grep([[:space:]]+-[A-Za-z-]+)*[[:space:]]+'
 quiet_flag="${pipe_then_grep}(-[A-Za-z]*q|--quiet|--silent)"
 max_count_flag="${pipe_then_grep}(-m[[:space:]]*[0-9]|--max-count(=|[[:space:]]+)[0-9])"
 # No flag to enumerate here: EVERY shape of `head` cuts, the bare one included.
-# What the pattern must not lose is the word boundary — without the trailing
-# `([[:space:]]|$)` it would also claim `| headers_of` and `| head_of_queue`.
-pipe_then_head='[|][[:space:]]*head([[:space:]]|$)'
+# What the pattern must not lose is the word boundary, and it is "not a
+# character a command NAME can continue with", not "a space": `| head)`,
+# `| head>/dev/null`, `| head;` and `| head|` are all bare `head` with nothing
+# after it, while `| headers_of`, `| head_of_queue` and `| head.sh` are other
+# commands and must stay unclaimed.
+pipe_then_head='[|][[:space:]]*head([^A-Za-z0-9_.-]|$)'
 
 failed=0
 offenders=0

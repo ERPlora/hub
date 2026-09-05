@@ -267,6 +267,38 @@ else
     ok "caza la tubería partida en dos líneas con \`head\` y nombra la línea del lector"
 fi
 
+# ── 3c. `head` glued to what follows it — `)`, `>`, `;`, `|` ────────────────
+# `$(… | head)`, `| head>/dev/null`, `| head; …` and `| head| wc -l` are the
+# bare form with nothing between `head` and the next token. A boundary spelled
+# "a space or the end of the line" waves all four through; the boundary that
+# holds is "not a character a command NAME can continue with" — which still
+# leaves `headers_of`, `head_of_queue` and a `head.sh` alone (hub#1552, review).
+k=0
+for glued in ')' '>/dev/null' '; :' '| wc -l'; do
+    k=$((k + 1))
+    case "$glued" in
+        (')') line="first=\$(printf '%s\\n' \"\$block\" | $HEAD)" ;;
+        (*)   line="printf '%s\\n' \"\$block\" | $HEAD$glued" ;;
+    esac
+    fixture "posglued$k" dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+$line
+FIXTURE
+    out=$("$scanner" --root "$tmp_dir/posglued$k" 2>&1)
+    code=$?
+    if [ "$code" -eq 0 ]; then
+        bad "el guard caza \`| head\` pegado a \`$glued\`" \
+            "salió 0 sobre un fichero que SÍ tiene el patrón — \`| head${glued}\` pasaría entero (hub#1552)"
+    elif ! grep -qE 'dirty\.sh:4' <<<"$out"; then
+        bad "el guard nombra fichero y línea al cazar \`| head\` pegado a \`$glued\`" \
+            "se esperaba \`dirty.sh:4\`: out=$(flat "$out")"
+    else
+        ok "caza \`| head\` pegado a \`$glued\`, con fichero y línea"
+    fi
+done
+
 # ── 4. Negative control: the FIX, prose about the pattern, and the opt-out ──
 # A guard that also fires on the fix is a guard nobody can satisfy; one that
 # fires on a comment explaining the trap punishes writing the explanation down.
@@ -365,6 +397,23 @@ done
     && ok "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
     || bad "\`--help\` imprime la cabecera entera, uso y códigos de salida incluidos" \
            "faltan:$help_missing — el corte va anclado al cierre del bloque, no a un número de línea (hub#1552)"
+
+
+# And it STOPS at the closing rule — in any locale. `─` is one character under
+# UTF-8 and three bytes under C/POSIX, so a quantifier written on it applies to
+# its LAST byte only and the closing rule never matches: `sed '2,/re/p'` then
+# runs to EOF and `--help` prints the whole script, code included (measured:
+# 215 lines instead of 68). The wanted-strings check above cannot see that — the
+# whole script contains them all — so the body is asserted ABSENT, twice.
+help_c=$(LC_ALL=C LANG=C "$scanner" --help 2>&1)
+help_leak=""
+grep -qF 'self_dir=' <<<"$help_out" && help_leak="$help_leak UTF-8"
+grep -qF 'self_dir=' <<<"$help_c"   && help_leak="$help_leak C"
+grep -qF -- '--root DIR' <<<"$help_c" || help_leak="$help_leak C-sin-uso"
+[ -z "$help_leak" ] \
+    && ok "\`--help\` se detiene en el cierre de la cabecera, también bajo LC_ALL=C" \
+    || bad "\`--help\` se detiene en el cierre de la cabecera, también bajo LC_ALL=C" \
+           "el cuerpo del script se cuela en la ayuda bajo:$help_leak — el ancla del cierre lleva un cuantificador sobre un carácter multibyte (hub#1552)"
 
 # ── 7. Wiring: something actually RUNS both halves ──────────────────────────
 # `scripts-tests-wiring.test.sh` already refuses a contract test no workflow

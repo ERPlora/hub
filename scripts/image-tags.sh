@@ -192,7 +192,7 @@ minor="${core%.*}"   # X.Y.Z → X.Y
 # El registro es la fuente que importa (es donde se publica) y el workflow ya se ha autenticado
 # contra él con el `docker login` del paso anterior, así que basta el mismo `GITHUB_TOKEN`.
 registry_tags() { # $1 = <owner>/<package>
-    local repo="$1" base token url headers body
+    local repo="$1" base token url headers body next_urls
     base="${IMAGE_TAGS_REGISTRY_BASE:-https://ghcr.io}"
     token=$(curl -fsS --max-time 30 -u "${GITHUB_ACTOR:-github-actions}:${GH_TOKEN:-}" \
         "$base/token?service=ghcr.io&scope=repository:${repo}:pull" 2>/dev/null |
