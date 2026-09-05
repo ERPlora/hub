@@ -35,7 +35,10 @@
 
 use std::path::{Path, PathBuf};
 
-use erplora_db::{testutil::fresh_db, Params};
+use erplora_db::{
+    testutil::{fresh_db, TestDb},
+    Params,
+};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, ModuleDataSelection};
 use erplora_runtime::import::{import_sections, ImportSelection, SectionStatus};
 use erplora_runtime::reset::undo_import;
@@ -47,7 +50,10 @@ fn fixture_dir(tag: &str) -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .expect("clock")
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("erplora-hub1535-{tag}-{}-{unique}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "erplora-hub1535-{tag}-{}-{unique}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(dir.join("migrations/postgres")).expect("migrations dir");
     std::fs::create_dir_all(dir.join("seed")).expect("seed dir");
     dir
@@ -170,8 +176,7 @@ fn modulo_con_marcador_y_clave_unica() -> PathBuf {
                       (6, '00:00', '00:00', 1)) \
               AS d(day_of_week, open_time, close_time, is_closed) \
          WHERE NOT EXISTS (SELECT 1 FROM gridplan_hours WHERE hub_id = :hub_id);",
-    )
-    ;
+    );
     dir
 }
 
@@ -495,7 +500,11 @@ async fn deshacer_la_importacion_devuelve_el_horario_que_el_modulo_habia_sembrad
 
     let mut destino = hub_con("h2", &[&wp]).await;
     let sembrada = semana(&destino, "h2").await;
-    assert_eq!(sembrada.len(), 7, "precondición: la semana sembrada — {sembrada:?}");
+    assert_eq!(
+        sembrada.len(),
+        7,
+        "precondición: la semana sembrada — {sembrada:?}"
+    );
 
     let report = import_sections(
         &mut destino,
@@ -628,5 +637,89 @@ async fn si_la_plantilla_no_llega_a_entrar_el_hub_conserva_su_semana() {
     assert_eq!(
         tras, sembrada,
         "y se queda tal cual estaba, sin retirar ni duplicar nada — {tras:?}"
+    );
+}
+
+/// 🔴 Tenancy (hub#1535): retiring the placeholder is scoped to the hub that imported. On a
+/// database SHARED by several hubs (the pre-ADR-0201 layout, still live for legacy hubs and the
+/// case hub#260 was written for), the neighbour's seeded week has to stay exactly as it was —
+/// after the import AND after undoing it. The retire query selects by `hub_id`; the soft-delete
+/// then goes by the ids it found. Drop the `hub_id` filter and the neighbour wakes up with no hours.
+#[tokio::test]
+async fn retiring_the_placeholder_never_touches_a_sibling_hub_on_the_same_database() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h0", &[&wp]).await;
+    owner_sets_hours(&origen, "h0").await;
+    let bundle = export_hub(
+        &origen,
+        "h0",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    // Two hubs over ONE schema, each with the module installed — and therefore each with its own
+    // seeded week signed by the installer.
+    let shared = TestDb::new().await;
+    let mut vecino = Runtime::with_hub_id(Box::new(shared.adapter().await), "h1");
+    vecino
+        .install_from_dir(&wp)
+        .await
+        .expect("instalar en el vecino");
+    let mut destino = Runtime::with_hub_id(Box::new(shared.adapter().await), "h2");
+    destino
+        .install_from_dir(&wp)
+        .await
+        .expect("instalar en el destino");
+    let semana_vecino = semana(&vecino, "h1").await;
+    assert_eq!(
+        semana_vecino.len(),
+        7,
+        "precondition: the neighbour has its seeded week — {semana_vecino:?}"
+    );
+    assert!(
+        semana_vecino.iter().all(|r| r.4 == "system"),
+        "precondition: the neighbour's week is the installer's — {semana_vecino:?}"
+    );
+
+    let report = import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report.batch_id.clone().expect("lote del import");
+    let tras = semana(&destino, "h2").await;
+    assert_eq!(
+        tras.len(),
+        7,
+        "the target adopts the template's week — {tras:?}"
+    );
+    assert!(
+        tras.iter().all(|r| r.4 != "system"),
+        "…and its placeholder is gone — {tras:?}"
+    );
+    assert_eq!(
+        semana(&vecino, "h1").await,
+        semana_vecino,
+        "the neighbour's seeded week must not be retired by ANOTHER hub's import"
+    );
+
+    undo_import(&destino, "h2", &batch).await.expect("deshacer");
+    assert_eq!(
+        semana(&vecino, "h1").await,
+        semana_vecino,
+        "…nor touched by undoing it"
+    );
+    let devuelta = semana(&destino, "h2").await;
+    assert!(
+        devuelta.len() == 7 && devuelta.iter().all(|r| r.4 == "system"),
+        "the target gets ITS OWN seeded week back — {devuelta:?}"
     );
 }
