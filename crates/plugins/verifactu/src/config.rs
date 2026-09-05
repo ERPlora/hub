@@ -736,12 +736,38 @@ mod cert_source_tests {
         }
     }
 
-    // 🪦 hub#1529 — `the_error_without_any_certificate_names_both_halves` se retiró con
-    // `build_identity`. Lo que probaba —que el error nombra las DOS mitades, la del negocio y la de
-    // ERPlora— lo prueba hoy sobre la puerta viva
-    // `transmission::tests::a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire`, que
-    // exige «vía de transmisión» + «pasarela» en el error de `resolve_route`. Su redacción hablaba
-    // además de «uno delegado de ERPlora», un slot retirado en hub#1435: copiarla tal cual habría
-    // recanonizado un vocabulario muerto.
+    /// 🔒 **hub#1529 — la mitad ACCIONABLE del error, que se quedó sin dueño al borrar
+    /// `build_identity`.**
+    ///
+    /// The test that pinned it (`the_error_without_any_certificate_names_both_halves`) was hers and
+    /// went with her. What survives on the live door —
+    /// `transmission::tests::a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire`—
+    /// demands «vía de transmisión» + «pasarela»: the two halves of the DIAGNOSIS, and neither of
+    /// them tells the business WHERE to fix its own. Without this guard, dropping «súbelo en
+    /// Ajustes → Negocio» from the message breaks nothing, and the only thing left standing is the
+    /// name of a service the business cannot touch — the very defect hub#1531 removes from the
+    /// diagnostic, one door over.
+    ///
+    /// The wording is NOT copied from the retired test: that one also demanded «uno delegado de
+    /// ERPlora», a slot retired in hub#1435. The ERPlora half is asked for as what it is TODAY, the
+    /// gateway.
+    #[tokio::test]
+    async fn the_no_road_error_still_says_where_the_business_fixes_its_half_hub1529() {
+        let host = SlotHost::new(None, vec![]);
+        let cfg = read_config(&host, "h1").await.unwrap().unwrap();
+        let err = resolve_route(&host, "h1", &cfg)
+            .await
+            .err()
+            .expect("no certificate and no gateway is an error, never a silent direct road")
+            .to_string();
+        assert!(
+            err.contains("Ajustes → Negocio"),
+            "the half the business can act on names the screen where it acts: {err}"
+        );
+        assert!(
+            err.contains("pasarela"),
+            "and ERPlora's half is named as what it is today, the gateway: {err}"
+        );
+    }
 }
 
