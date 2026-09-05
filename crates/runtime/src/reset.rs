@@ -854,8 +854,42 @@ pub async fn apply_tracked_into(
     Ok(applied)
 }
 
-/// Retira el MARCADOR DE POSICIÓN que el seed de un módulo plantó en `table`, ahora que el import
-/// acaba de escribir ahí los datos de verdad del negocio (hub#1535).
+/// Ids de las filas VIVAS que `table` tiene ahora mismo en este hub.
+///
+/// Es la foto que [`retire_replaced_placeholder`] compara contra la de después de aplicar la
+/// sección: lo que ya estaba es lo que el bundle sustituye, y lo que no estaba es la prueba de que
+/// el bundle llegó a entrar. Se saca por `id` y no por `count(*)` porque hacen falta las dos cosas
+/// —cuánto y CUÁL— y una tabla puede perder y ganar filas en la misma sección.
+pub(crate) async fn live_row_ids(
+    db: &dyn erplora_db::DatabaseAdapter,
+    hub_id: &str,
+    table: &str,
+) -> crate::Result<Vec<String>> {
+    if !safe_ident(table)
+        || !has_column(db, table, "hub_id").await
+        || !has_column(db, table, "is_deleted").await
+    {
+        return Ok(Vec::new());
+    }
+    let p = hub_params(hub_id);
+    let res = db
+        .query(
+            &format!("SELECT id FROM {table} WHERE hub_id = :hub_id AND is_deleted = 0"),
+            &p,
+        )
+        .await
+        .map_err(|e| {
+            crate::RuntimeError::Other(format!("import: leer las filas vivas de {table}: {e}"))
+        })?;
+    Ok(res
+        .rows
+        .iter()
+        .filter_map(|r| r.get("id").and_then(|v| v.as_str()).map(str::to_string))
+        .collect())
+}
+
+/// Retira el contenido ANTERIOR de una tabla de **objeto único**, ahora que la sección del bundle
+/// acaba de poner ahí el suyo (hub#1535 · hub#1548).
 ///
 /// El caso que lo motiva: un hub recién montado instala `schedules`, cuyo seed siembra una semana
 /// genérica (Mon–Fri 09:00–18:00, fin de semana cerrado) para que «sin horario configurado» deje de
@@ -866,82 +900,68 @@ pub async fn apply_tracked_into(
 /// son varias filas por día) y el seed no declara clave (su guarda es la tabla entera) —, así que
 /// la guarda queda solo por `id` y los ids nunca coinciden.
 ///
-/// La regla que aplica es la que el catálogo starter ya escribe a mano en SQL
-/// (ERPlora/blueprints#24): **una fila firmada por el instalador es provisional y cede**. Aquí vive
-/// en el importador, que es genérico y sirve a los 27 módulos.
+/// hub#1535 lo cerró retirando **lo que firmó el instalador** (`created_by = 'system'`). hub#1548
+/// enseñó que el cruce es más ancho: si el negocio prueba un blueprint y después OTRO, las dos
+/// semanas que chocan las trajeron dos plantillas y ya no queda ninguna fila `system` a la que
+/// agarrarse — cada día salía dos veces, con las horas de la primera y las de la segunda. Por eso
+/// lo que se retira no es «lo que firmó el instalador» sino **lo que hubiera antes**, sea de quien
+/// sea: una guarda de seed por la tabla entera es el módulo declarando que ahí vive UN objeto del
+/// hub, y un objeto no se importa dos veces, se sustituye. Es lo que hace todo el mercado con los
+/// datos maestros (Odoo hace upsert por external ID, Shopify casa por handle, Business Central
+/// sobrescribe al aplicar el paquete de configuración): ninguno deja dos lunes contradictorios.
 ///
-/// Tres cierres, y los tres importan:
+/// Suena a borrado silencioso de datos del negocio, y no lo es — por los cuatro cierres, y los
+/// cuatro importan:
 ///
 /// * **Solo tablas que el módulo declaró como marcador** (`Registry::seeds_placeholder_table`), o
 ///   sea aquellas cuyo seed se guarda por el hub entero. Las categorías fiscales canónicas de
 ///   `taxes` o las unidades de `inventory` NO entran: su seed declara clave por fila, van por la
 ///   vía de hub#842 y borrarlas se llevaría por delante datos de referencia que otros módulos
 ///   resuelven por clave (`tax_category_key`).
-/// * **Solo si los datos de verdad están YA ahí.** Se exige una fila viva no sembrada antes de
-///   retirar nada: si la sección no llegó a insertar (guarda que la saltó, índice único que la
-///   rechazó), retirar el marcador dejaría al hub sin horario — exactamente el estado que
+/// * **Solo si la sección llegó a ENTRAR en esta tabla.** Se exige una fila viva que no estuviera
+///   en la foto anterior: si la sección no insertó nada (guarda que la saltó, índice único que la
+///   rechazó), retirar el contenido dejaría al hub sin horario — exactamente el estado que
 ///   schedules#36 hizo inalcanzable. Por eso se llama DESPUÉS de aplicar, no antes.
 /// * **Soft-delete, y apuntado en el lote.** La fila se marca `is_deleted = 1` como manda el
-///   contrato de fila, y su id queda registrado para que [`undo_import`] la devuelva. Sin eso,
-///   deshacer la importación borraría el horario importado y dejaría el marcador enterrado: la
-///   guarda del seed no filtra `is_deleted`, así que el módulo NO lo replantaría nunca y el hub se
-///   quedaría sin horas para siempre.
+///   contrato de fila, y su id queda registrado para que [`undo_import`] la devuelva. Sustituir
+///   solo vale si es REVERSIBLE: deshacer el segundo blueprint devuelve el primero entero. Sin
+///   eso, deshacer la importación borraría el horario importado y dejaría lo anterior enterrado:
+///   la guarda del seed no filtra `is_deleted`, así que el módulo NO lo replantaría nunca y el hub
+///   se quedaría sin horas para siempre.
+/// * **Acotado al hub que importó.** En una BD compartida por varios hubs (el reparto pre-ADR-0201,
+///   vivo aún para los hubs legacy) la semana del vecino no se toca.
 ///
 /// Devuelve cuántas filas retiró. Es best-effort como el resto del camino del import: una tabla sin
 /// las columnas del contrato de fila no se toca.
-pub(crate) async fn retire_seeded_placeholder(
+pub(crate) async fn retire_replaced_placeholder(
     rt: &Runtime,
     batch_id: Option<&str>,
     hub_id: &str,
     table: &str,
+    previous: &[String],
 ) -> crate::Result<usize> {
     let db = rt.db();
     if !safe_ident(table) {
         return Ok(0);
     }
-    // Sin estas dos columnas no se puede ni reconocer el marcador ni retirarlo sin borrar: se deja
+    // Sin `is_deleted` no se puede retirar sin BORRAR, y borrar no lo devuelve el undo: se deja
     // como estaba, igual que hace el resto del import ante una tabla que no entiende.
-    if !has_column(db, table, "created_by").await || !has_column(db, table, "is_deleted").await {
-        return Ok(0);
-    }
-    let mut p = hub_params(hub_id);
-    p.insert("marker".into(), serde_json::json!(crate::seed::SEEDED_BY));
-
-    // ¿Aterrizaron los datos del negocio? Si no, no hay nada que sustituya al marcador.
-    let real = db
-        .query(
-            &format!(
-                "SELECT id FROM {table} \
-                 WHERE hub_id = :hub_id AND is_deleted = 0 \
-                 AND (created_by IS NULL OR created_by <> :marker) LIMIT 1"
-            ),
-            &p,
-        )
-        .await
-        .map_err(|e| {
-            crate::RuntimeError::Other(format!("import: leer las filas del negocio en {table}: {e}"))
-        })?;
-    if real.rows.is_empty() {
+    if !has_column(db, table, "is_deleted").await {
         return Ok(0);
     }
 
-    let seeded = db
-        .query(
-            &format!(
-                "SELECT id FROM {table} \
-                 WHERE hub_id = :hub_id AND is_deleted = 0 AND created_by = :marker"
-            ),
-            &p,
-        )
-        .await
-        .map_err(|e| {
-            crate::RuntimeError::Other(format!("import: leer el marcador sembrado en {table}: {e}"))
-        })?;
-    let ids: Vec<String> = seeded
-        .rows
-        .iter()
-        .filter_map(|r| r.get("id").and_then(|v| v.as_str()).map(str::to_string))
-        .collect();
+    let live = live_row_ids(db, hub_id, table).await?;
+    // ¿Aterrizó algo de la sección EN ESTA TABLA? Una fila viva que no estaba en la foto anterior
+    // es la prueba, y es la única que vale: `applied` cuenta la sección ENTERA, así que una tabla
+    // que no recibió nada saldría igual de verde que una que sí.
+    if !live.iter().any(|id| !previous.contains(id)) {
+        return Ok(0);
+    }
+    // `previous` es la foto de las filas VIVAS de antes, y sigue siéndolo: los datos de un bundle
+    // solo pueden ser `INSERT INTO` (`import_sql` rechaza `UPDATE`/`DELETE`, y hasta el
+    // `WITH x AS (DELETE …)` que PG aceptaría), así que aplicar la sección no puede haber enterrado
+    // ninguna. Intersecar con `live` sería una rama que ningún test puede alcanzar.
+    let ids = previous;
     if ids.is_empty() {
         return Ok(0);
     }
@@ -965,7 +985,7 @@ pub(crate) async fn retire_seeded_placeholder(
     // no apuntara sería un horario que `undo_import` no sabría devolver.
     if let Some(batch) = batch_id {
         ensure_batch_tables(db).await?;
-        for id in &ids {
+        for id in ids {
             let mut rp = erplora_db::Params::new();
             rp.insert("batch_id".into(), serde_json::json!(batch));
             rp.insert("table_name".into(), serde_json::json!(table));
@@ -979,7 +999,7 @@ pub(crate) async fn retire_seeded_placeholder(
         }
     }
     db.execute_tx(&ops).await.map_err(|e| {
-        crate::RuntimeError::Other(format!("import: retirar el marcador sembrado de {table}: {e}"))
+        crate::RuntimeError::Other(format!("import: retirar el contenido anterior de {table}: {e}"))
     })?;
     Ok(ids.len())
 }
@@ -1245,6 +1265,31 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
         }
     }
     for (table, ids) in &retired_by_table {
+        // hub#1551: se devuelve lo retirado SOLO si el hueco que dejó SIGUE AHÍ. Es el espejo de
+        // la regla de la retirada («solo si el dato de verdad está ya dentro»), y sin él deshacer
+        // vuelve a plantar el marcador ENCIMA de lo que el negocio ya escribió: importas una
+        // plantilla, ajustas el lunes en la pantalla de horas, deshaces, y el lunes sale dos veces
+        // —el genérico de 09:00 a 18:00 y el tuyo— que es exactamente el síntoma que hub#1535
+        // cerró, entrando por la otra puerta.
+        //
+        // El hueco sigue ahí si, quitadas las filas que este lote insertó (las de arriba, que se
+        // borran en esta misma transacción), no queda nada vivo en la tabla. Si queda algo, lo
+        // escribió una persona después de importar: la tabla ya es suya y el marcador se queda
+        // retirado. No hay forma de devolverlo «solo por los días que falten» — no hay clave
+        // declarada, que es precisamente el motivo de que exista hub#1535.
+        let batch_rows: &[String] = by_table
+            .iter()
+            .find(|(t, _)| t == table)
+            .map(|(_, i)| i.as_slice())
+            .unwrap_or(&[]);
+        let survivors = live_row_ids(db, hub_id, table)
+            .await?
+            .into_iter()
+            .filter(|id| !batch_rows.contains(id))
+            .count();
+        if survivors > 0 {
+            continue;
+        }
         let list = ids
             .iter()
             .map(|id| format!("'{}'", id.replace('\'', "''")))

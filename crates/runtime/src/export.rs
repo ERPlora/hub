@@ -406,7 +406,7 @@ pub async fn export_hub(
         // la tabla entera, así que en una BD compartida el backup de un negocio se llevaba dentro
         // al personal del de al lado —con su rol y su `pin_hash`— y restaurarlo en cualquier sitio
         // los daba de alta ahí.
-        let mut rows = fetch_rows(db, "hub_user", Some(hub_id))
+        let mut rows = fetch_rows(db, "hub_user", Some(hub_id), false)
             .await
             .unwrap_or_default();
         // …pero DESVINCULADA de las cuentas Cloud. `cloud_user_id` es la identidad de una
@@ -438,7 +438,7 @@ pub async fn export_hub(
         // never travel in a template (`carries_identity`), so a published blueprint still carries no
         // personal data.
         for table in ["hub_user_profile", "hub_user_pref"] {
-            let rows = fetch_rows(db, table, Some(hub_id))
+            let rows = fetch_rows(db, table, Some(hub_id), false)
                 .await
                 .unwrap_or_default();
             if !rows.is_empty() {
@@ -451,7 +451,7 @@ pub async fn export_hub(
         sections.push("hub_users".into());
     }
     if selection.settings {
-        let mut rows = fetch_rows(db, "hub_settings", Some(hub_id))
+        let mut rows = fetch_rows(db, "hub_settings", Some(hub_id), false)
             .await
             .unwrap_or_default();
         if let Some(keys) = &selection.settings_items {
@@ -565,9 +565,14 @@ pub async fn export_hub(
             // el bundle perdía la categoría de cada producto. Se vuelcan acotadas por su tabla
             // PADRE a través de la FK DECLARADA (metadato de la BD, no adivinar nombres).
             let rows = if has_column(db, table, "hub_id").await {
-                fetch_rows(db, table, Some(hub_id))
-                    .await
-                    .unwrap_or_default()
+                fetch_rows(
+                    db,
+                    table,
+                    Some(hub_id),
+                    rt.registry().seeds_placeholder_table(table),
+                )
+                .await
+                .unwrap_or_default()
             } else {
                 match fetch_join_rows(db, table, hub_id).await {
                     Some(rows) => rows,
@@ -777,10 +782,15 @@ pub async fn module_table_counts(
             .filter(|t| table_owner(t, &installed_ids).as_deref() == Some(module_id.as_str()))
         {
             let rows = if has_column(db, table, "hub_id").await {
-                fetch_rows(db, table, Some(hub_id))
-                    .await
-                    .unwrap_or_default()
-                    .len()
+                fetch_rows(
+                    db,
+                    table,
+                    Some(hub_id),
+                    rt.registry().seeds_placeholder_table(table),
+                )
+                .await
+                .unwrap_or_default()
+                .len()
             } else {
                 fetch_join_rows(db, table, hub_id)
                     .await
@@ -1226,10 +1236,14 @@ async fn fetch_join_rows(
 }
 
 /// Filas de `table` (opcionalmente scoped por hub_id), sin las soft-deleted.
+///
+/// `placeholder` = el módulo declaró esta tabla como MARCADOR de tabla entera (guarda de seed por
+/// el hub entero, [`crate::Registry::seeds_placeholder_table`]). Ver [`fetch_rows`] §hub#1550.
 async fn fetch_rows(
     db: &dyn erplora_db::DatabaseAdapter,
     table: &str,
     hub_id: Option<&str>,
+    placeholder: bool,
 ) -> Result<Vec<serde_json::Value>, erplora_db::DbError> {
     let (sql, params) = match hub_id {
         Some(h) => {
@@ -1243,11 +1257,27 @@ async fn fetch_rows(
     // Filtros en Rust (no todas las tablas tienen estas columnas): fuera las soft-deleted y fuera
     // los datos PROPIEDAD DEL MÓDULO (los re-siembra al instalarse) — ver `is_module_seeded`,
     // salvo las tablas que son DATOS DEL NEGOCIO aunque las sembrara el módulo (hub#576).
-    let seeded_travels = SEEDED_ROWS_TRAVEL_TABLES.contains(&table);
-    Ok(res
+    let live: Vec<serde_json::Value> = res
         .rows
         .into_iter()
-        .filter(|r| !truthy(r.get("is_deleted")) && (seeded_travels || !is_module_seeded(r)))
+        .filter(|r| !truthy(r.get("is_deleted")))
+        .collect();
+    // hub#1550: y salvo un MARCADOR DE TABLA ENTERA que el negocio ya ADOPTÓ. Una guarda de seed
+    // por el hub entero es el módulo diciendo «esta tabla es UN objeto del hub y lo que planto es
+    // provisional». En cuanto el negocio escribe una sola fila ahí, el objeto ENTERO es suyo: la
+    // semana que dejó como venía es tan parte de su horario como la que escribió, y un negocio
+    // toca el horario día a día (`schedules.business_hours.set` reemplaza UN día), así que media
+    // semana firmada es el estado normal, no el raro. Si solo viajaran las filas que tocó, el hub
+    // destino saldría con los demás días SIN horario — el estado que ERPlora/schedules#36 hizo
+    // inalcanzable — y restaurar la copia propia sobre una instalación nueva perdería lo mismo.
+    //
+    // Mientras nadie lo toque sigue siendo dato DEL MÓDULO y no viaja (ADR-0359): el destino lo
+    // replanta al instalarse, que es justo lo que evita que el marcador genérico se propague.
+    let seeded_travels = SEEDED_ROWS_TRAVEL_TABLES.contains(&table)
+        || (placeholder && live.iter().any(|r| !is_module_seeded(r)));
+    Ok(live
+        .into_iter()
+        .filter(|r| seeded_travels || !is_module_seeded(r))
         .collect())
 }
 
