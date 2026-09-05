@@ -1009,8 +1009,13 @@ mod tests {
     #[test]
     fn a_text_bound_over_a_numeric_column_is_read_as_a_number() {
         assert_eq!(
-            range_bound_expr("q", "f_c_from", &bound(json!("10")), Some(ColumnKind::Numeric))
-                .unwrap(),
+            range_bound_expr(
+                "q",
+                "f_c_from",
+                &bound(json!("10")),
+                Some(ColumnKind::Numeric)
+            )
+            .unwrap(),
             "CAST(:f_c_from AS NUMERIC)"
         );
     }
@@ -1087,6 +1092,8 @@ mod tests {
         );
         // El filtro declarado es el que manda: `FilterSpec`/`FilterOp` entran aquí desde el
         // manifest, no desde el llamador.
-        let _ = FilterSpec { op: FilterOp::Range };
+        let _ = FilterSpec {
+            op: FilterOp::Range,
+        };
     }
 }

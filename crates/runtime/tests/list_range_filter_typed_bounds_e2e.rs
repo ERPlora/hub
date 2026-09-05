@@ -89,11 +89,7 @@ async fn string_bounds_on_a_numeric_column_filter_by_number() {
 /// has to keep answering exactly the same rows.
 #[tokio::test]
 async fn numeric_bounds_on_a_numeric_column_are_unchanged() {
-    let ids = ids_for(&[
-        ("f_priority_from", json!(10)),
-        ("f_priority_to", json!(20)),
-    ])
-    .await;
+    let ids = ids_for(&[("f_priority_from", json!(10)), ("f_priority_to", json!(20))]).await;
 
     assert_eq!(ids, vec!["evening".to_string(), "morning".to_string()]);
 }
@@ -345,10 +341,7 @@ async fn without_column_types_a_numeric_bound_is_still_bound_as_a_number() {
     let page = rt
         .execute_query_page(
             "rangefix.events.list",
-            &params(&[
-                ("f_priority_from", json!(10)),
-                ("f_priority_to", json!(20)),
-            ]),
+            &params(&[("f_priority_from", json!(10)), ("f_priority_to", json!(20))]),
             &ctx(),
         )
         .await
