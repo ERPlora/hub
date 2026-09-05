@@ -1023,12 +1023,15 @@ mod audit_message_keys {
                 Some(slice) => slice,
                 None => continue,
             };
-            // 🔎 hub#1531: el sitio puede pasar la clave por VARIABLE (`details_for(message_key,
-            // details)`) cuando la misma decisión alimenta además la frase del evento. Sin esta
-            // rama el barrido leería el tramo siguiente y daría por clave lo que pillase —
-            // `timestamp`—, así que se resuelve el `let` y se leen SUS literales. Si el binding no
-            // aparece, el sitio se queda sin claves y el recuento mínimo de abajo lo caza: un
-            // agujero silencioso en el control es peor que no tenerlo.
+            // 🔎 hub#1531: el sitio puede pasar la clave por VARIABLE en vez de por literal, que
+            // es lo que hace el diagnóstico desde que la MISMA decisión alimenta además la frase
+            // del evento. Sin esta rama el barrido leería el tramo siguiente y daría por clave lo
+            // que pillase —`timestamp`—, así que se resuelve el `let` y se leen SUS literales.
+            //
+            // ⚠️ Y por eso este comentario no escribe el nombre de la función seguido de su
+            // paréntesis: el barrido incluye ESTE fichero, así que una mención literal se contaría
+            // como un sitio más (por eso la aguja se compone en tiempo de ejecución). Costó una
+            // corrida entera de mutantes descubrirlo.
             let literals = if slice.contains('"') {
                 slice
             } else {
