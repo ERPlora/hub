@@ -32,7 +32,8 @@
 //!
 //! | Endpoint | Contract |
 //! |----------|----------|
-//! | `POST /api/print/hosts` | `{ role, label? }` for the CALLER's `X-Device-Id`. Idempotent. |
+//! | `POST /api/print/hosts` | `{ role, label? }` for the CALLER's `X-Device-Id`. Idempotent. No
+//!   `label` registers it under the name the business gave the device (hub#1560). |
 //! | `POST /api/print/hosts/heartbeat` | "still here", for every role that device drains. |
 //! | `GET`/`DELETE /api/print/hosts` | the registry (+ per-role coverage), and retiring a device. |
 //!
@@ -451,7 +452,8 @@ pub struct SetRoute {
 pub struct RegisterHost {
     /// Which queue this device drains: `receipt`, `kitchen`, `bar`, `label`, …
     pub role: String,
-    /// Human name for the owner's screen. Absent keeps the name the device already had.
+    /// Human name for the owner's screen. Absent is the ordinary shape: the hub registers the
+    /// device under the name the business gave it, or under the platform it announces (hub#1560).
     #[serde(default)]
     pub label: Option<String>,
 }
@@ -497,13 +499,12 @@ pub async fn register_host(
     if device_id.is_empty() {
         return device_required();
     }
+    let label = match input.label.as_deref().map(str::trim) {
+        Some(label) if !label.is_empty() => label.to_string(),
+        _ => device_name(&rt, device_id, &headers).await,
+    };
     match rt
-        .register_print_host(
-            device_id,
-            &input.role,
-            input.label.as_deref().unwrap_or_default(),
-            &ctx.user_id,
-        )
+        .register_print_host(device_id, &input.role, &label, &ctx.user_id)
         .await
     {
         Ok(host) => Json(json!({
@@ -516,6 +517,39 @@ pub async fn register_host(
         .into_response(),
         Err(e) => crate::err_response(e),
     }
+}
+
+/// The name to register a device under when it sends none (hub#1560).
+///
+/// The shell registers with the role and nothing else, and hub#1527 turned that silence into an
+/// opaque `dev_…` id on the owner's Printers screen. The name is **not** minted here — this hub
+/// already knows what the business calls each device (`hub_trusted_device.name`, hub#494): born
+/// from the platform it announced on its first online login, renameable in Settings → Devices.
+/// Reusing it is what keeps one tablet from having two names, one per screen.
+///
+/// Order, and why: what the **owner** typed beats what the **device** announced, and both beat
+/// nothing. `""` is the honest last answer — `print_hosts::register` reads it as "keep the name
+/// this device already had", so a hub that knows nothing about a device never blanks a name off
+/// the screen to say so.
+async fn device_name(
+    rt: &erplora_runtime::Runtime,
+    device_id: &str,
+    headers: &HeaderMap,
+) -> String {
+    // Best-effort: a registry read that fails must not stop a till becoming a print host. Losing
+    // the name costs the owner a legible row; losing the registration costs them the ticket.
+    let named = rt.device_name(device_id).await.unwrap_or_else(|e| {
+        tracing::warn!(
+            device_id,
+            error = %e,
+            "print host registered without the name of the device: its name could not be read"
+        );
+        String::new()
+    });
+    if !named.is_empty() {
+        return named;
+    }
+    crate::devices::default_device_name(crate::devices::user_agent_of(headers))
 }
 
 /// POST /api/print/hosts/heartbeat — still here. Auth = any user session.

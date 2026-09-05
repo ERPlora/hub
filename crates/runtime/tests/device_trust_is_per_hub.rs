@@ -310,3 +310,51 @@ async fn a_deployment_that_does_not_say_which_hub_it_is_trusts_no_device() {
     );
     assert!(nameless.list_devices().await.unwrap().is_empty());
 }
+
+/// hub#1560 — reading **one** device's name is scoped like reading all of them.
+///
+/// The print host registry asks this on every registration, so an unscoped read would put the
+/// neighbour's name for the same `device_id` on my Printers screen — the same shape of leak as the
+/// device list, through a door an ordinary cashier's session can open.
+#[tokio::test]
+async fn the_name_of_a_device_is_the_name_my_own_hub_gave_it() {
+    let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
+    // The neighbour is alive and populated while the read runs: a test that named the device in
+    // only one hub would pass with unscoped SQL too.
+    mine.trust_device("till-1", "Marta").await.unwrap();
+    neighbour.trust_device("till-1", "Luis").await.unwrap();
+    mine.rename_device("till-1", "Barra").await.unwrap();
+    neighbour.rename_device("till-1", "Cocina").await.unwrap();
+
+    assert_eq!(mine.device_name("till-1").await.unwrap(), "Barra");
+    assert_eq!(neighbour.device_name("till-1").await.unwrap(), "Cocina");
+    assert_eq!(
+        mine.device_name("unknown-1").await.unwrap(),
+        "",
+        "a device this hub never saw has no name, and that is not an error"
+    );
+}
+
+/// hub#1560 — and naming a device only renames the print host of the hub that named it.
+#[tokio::test]
+async fn naming_a_device_does_not_rename_the_neighbours_print_host() {
+    let (_db, mine, neighbour) = two_hubs_sharing_a_database().await;
+    mine.trust_device("till-1", "Marta").await.unwrap();
+    neighbour.trust_device("till-1", "Luis").await.unwrap();
+    mine.register_print_host("till-1", "receipt", "Mostrador", "u1")
+        .await
+        .unwrap();
+    neighbour
+        .register_print_host("till-1", "receipt", "Cocina", "u2")
+        .await
+        .unwrap();
+
+    mine.rename_device("till-1", "Barra").await.unwrap();
+
+    assert_eq!(mine.print_hosts().await.unwrap()[0].label, "Barra");
+    assert_eq!(
+        neighbour.print_hosts().await.unwrap()[0].label,
+        "Cocina",
+        "the neighbour's printer card is not mine to rewrite"
+    );
+}

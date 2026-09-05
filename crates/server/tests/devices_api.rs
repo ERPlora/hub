@@ -841,3 +841,77 @@ async fn the_first_login_names_a_device_after_the_platform_it_announced() {
         "Chrome · Android"
     );
 }
+
+// ── One device, ONE name: the printer card follows the device list (hub#1560) ─────────────────
+//
+// hub#1527 made Settings → Printers say *which* device prints each station. The registry it reads
+// has a name column of its own (`_print_host.label`), so without this the same tablet would carry
+// two names: "Barra" in the device list and whatever it happened to register with on the printer
+// card — and renaming it in the one place an owner can rename anything would not move the other.
+
+#[tokio::test]
+async fn hub1560_naming_a_device_names_it_on_the_printer_card_too() {
+    let (router, sessions, state) = fixture_with_state("hub-1560").await;
+    state
+        .runtime
+        .read()
+        .await
+        .register_print_host("till-1", "receipt", "Chrome · Android", "u1")
+        .await
+        .unwrap();
+
+    let response = call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "Barra" }),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let hosts = state.runtime.read().await.print_hosts().await.unwrap();
+    let till = hosts
+        .iter()
+        .find(|h| h.device_id == "till-1")
+        .expect("the till is a print host");
+    assert_eq!(
+        till.label, "Barra",
+        "the printer card must not keep a name the owner has just replaced"
+    );
+}
+
+#[tokio::test]
+async fn hub1560_taking_the_name_back_does_not_blank_the_printer_card() {
+    let (router, sessions, state) = fixture_with_state("hub-1560-blank").await;
+    state
+        .runtime
+        .read()
+        .await
+        .register_print_host("till-1", "receipt", "Caja 1", "u1")
+        .await
+        .unwrap();
+
+    // Blank is a real gesture on the device list ("I have no name for it") and it returns that row
+    // to unnamed. It must not, however, wipe the name off the printer card and put the opaque
+    // device id back on it — the same contract `print_hosts::register` already keeps for a client
+    // that registers without repeating the name.
+    call_with_body(
+        &router,
+        "PUT",
+        "/api/devices/till-1",
+        Some(&sessions.admin),
+        json!({ "name": "   " }),
+    )
+    .await;
+
+    let hosts = state.runtime.read().await.print_hosts().await.unwrap();
+    assert_eq!(
+        hosts
+            .iter()
+            .find(|h| h.device_id == "till-1")
+            .expect("the till is a print host")
+            .label,
+        "Caja 1"
+    );
+}

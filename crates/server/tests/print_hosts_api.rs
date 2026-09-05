@@ -530,3 +530,122 @@ async fn the_registry_reports_work_waiting_with_nobody_to_print_it() {
     assert_eq!(kitchen["waiting"], json!(1));
     assert_eq!(kitchen["liveHosts"], json!(0));
 }
+
+// ── The device that prints presents itself with a NAME (hub#1560) ────────────────────────────
+//
+// hub#1527 made the Printers screen say *which* device prints each station instead of *how many*.
+// It landed on a registry where nobody had ever written a name: the shell registers with the role
+// and nothing else, so every station was about to read `dev_` + 32 hex — an id the owner cannot
+// match to either of the two tablets on the counter.
+//
+// The name is **not** minted here. This hub already knows what the business calls each device
+// (`hub_trusted_device.name`, hub#494): born from the platform it announced on its first online
+// login, renameable by an administrator in Settings → Devices. Reusing it is what keeps one device
+// from having two names — the one in the device list and a second, frozen one on the printer card.
+
+/// `POST /api/print/hosts` **exactly as the shell does it** (`print-host.ts`): the role, no name.
+/// `user_agent` is what the browser announces, which is the only thing a hub that never saw this
+/// device before has to go on.
+async fn register_bare(
+    router: &axum::Router,
+    session: &str,
+    device_id: &str,
+    role: &str,
+    user_agent: Option<&str>,
+) -> (StatusCode, Value) {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/print/hosts")
+        .header("x-hub-session", session)
+        .header("x-device-id", device_id)
+        .header("content-type", "application/json");
+    if let Some(agent) = user_agent {
+        builder = builder.header("user-agent", agent);
+    }
+    let resp = router
+        .clone()
+        .oneshot(
+            builder
+                .body(Body::from(json!({ "role": role }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    (resp.status(), body_json(resp).await)
+}
+
+/// A second handle on the fixture's schema, to write the facts a login would have written.
+fn behind(probe: erplora_db::PgAdapter) -> Runtime {
+    Runtime::with_hub_id(Box::new(probe), HUB_ID)
+}
+
+#[tokio::test]
+async fn hub1560_a_host_that_sends_no_name_takes_the_name_the_business_gave_the_device() {
+    let (router, admin, _employee, probe) = fixture_with_db().await;
+    let rt = behind(probe);
+    // The device signed in online once (that is what writes the trust row) and the owner then
+    // named it in Settings → Devices. That name is the whole point of hub#494.
+    rt.trust_device_with_default_name("till-1", "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    rt.rename_device("till-1", "Caja 1").await.unwrap();
+
+    let (status, body) = register_bare(&router, &admin, "till-1", "receipt", None).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["host"]["label"], "Caja 1",
+        "the printer card must read the name the owner chose, not the opaque device id"
+    );
+}
+
+#[tokio::test]
+async fn hub1560_a_device_the_business_never_named_is_presented_by_what_it_announced() {
+    let (router, admin, _employee, _probe) = fixture_with_db().await;
+
+    // No trust row and no name: the hub has never seen this device anywhere but here. The honest
+    // default is the platform it announces — the same one `hub_trusted_device` is born with, so
+    // both screens say the same words about the same tablet.
+    let (status, body) = register_bare(
+        &router,
+        &admin,
+        "tablet-9",
+        "receipt",
+        Some("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["host"]["label"], "Chrome · Android");
+}
+
+#[tokio::test]
+async fn hub1560_a_client_that_does_send_a_name_still_wins() {
+    let (router, admin, _employee, probe) = fixture_with_db().await;
+    let rt = behind(probe);
+    rt.trust_device_with_default_name("till-1", "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    rt.rename_device("till-1", "Caja 1").await.unwrap();
+
+    // The default fills a gap; it does not take the door's own field away from a client that has
+    // something better to say (a host registered by a fixed installation, say).
+    let (status, body) = register(&router, &admin, Some("till-1"), "receipt", "Barra").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["host"]["label"], "Barra");
+}
+
+#[tokio::test]
+async fn hub1560_a_device_with_no_name_and_an_unreadable_agent_keeps_the_name_it_had() {
+    let (router, admin, _employee, _probe) = fixture_with_db().await;
+    register(&router, &admin, Some("till-1"), "receipt", "Counter till").await;
+
+    // Nothing to derive a name from — and "nothing" must never blank the name already on the
+    // owner's screen. This is `print_hosts::register`'s empty-label contract, which the default
+    // must not step around.
+    let (status, body) = register_bare(&router, &admin, "till-1", "receipt", None).await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["host"]["label"], "Counter till");
+}
