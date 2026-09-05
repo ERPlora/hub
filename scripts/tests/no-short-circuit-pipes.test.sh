@@ -29,11 +29,13 @@
 #   · the MECHANISM is real — not assumed: the piped form is asked for a pattern
 #     that IS present and answers "absent"; the here-string answers "present";
 #   · the guard CATCHES the positive — every flag shape used in this repo
-#     (`-q`, `-qE`, `-qF`, `-qx`, `-Fxq`, `-q --`, `-m 1`), each with its own
-#     fixture, because a guard whose regex silently stops matching is the same
-#     lie one level up (hub#1327, hub#1359);
+#     (`-q`, `-qE`, `-qF`, `-qx`, `-Fxq`, `-q --`, `-m 1`), the long spellings
+#     (`--quiet`, `--silent`, `--max-count=N`) and the pipeline split over two
+#     lines, each with its own fixture, because a guard whose regex silently
+#     stops matching is the same lie one level up (hub#1327, hub#1359);
 #   · it does NOT fire on the fix (`grep -q P <<<"$b"`), on prose that merely
-#     TALKS about the pattern, or on the one line tagged `sigpipe-demo`;
+#     TALKS about the pattern, on `||` (the OR operator is not a pipe — and the
+#     pre-push gate would abort that push), or on the line tagged `sigpipe-demo`;
 #   · DISCOVERY is the whole repo, hook included — not a hand-written list;
 #   · THIS repo is clean — the regression test for the sixty-three of hub#1534;
 #   · the WIRING exists: a workflow runs this battery and the pre-push gate runs
@@ -106,9 +108,12 @@ dirty() { # $1 = the grep flags → one offending line
 # ── 3. Positive control: every flag shape this repo uses is caught ──────────
 # One fixture per shape. A single `-q` case would pass while `-Fxq` (used in
 # `module-hub-batteries.test.sh`) or `-q --` (used in `clippy-lints.test.sh`)
-# walked straight through the regex.
+# walked straight through the regex. The long spellings (`--quiet`, `--silent`,
+# `--max-count=N`) are the same short-circuit under another name: a guard that
+# only knows `-q` is bypassed by whoever writes it out in full.
 i=0
-for flags in "-q" "-qE" "-qF" "-qx" "-qi" "-qxF" "-Fxq" "-qvE" "-q --" "-m 1" "-m1"; do
+for flags in "-q" "-qE" "-qF" "-qx" "-qi" "-qxF" "-Fxq" "-qvE" "-q --" "-m 1" "-m1" \
+             "--quiet" "--silent" "--max-count=1" "--max-count 1"; do
     i=$((i + 1))
     fixture "pos$i" dirty.sh <<FIXTURE
 #!/usr/bin/env bash
@@ -132,6 +137,46 @@ FIXTURE
     fi
 done
 
+# bash allows the newline right after `|` — blank lines and comments included — so a
+# pipeline split over two lines is the same pipe. The offending line to name is the
+# READER's, which is where the fix goes.
+fixture pos-eol dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+printf '%s' "\$block" |
+
+    # the reader, two lines below the pipe
+    $GREP -q 'NEEDLE'
+FIXTURE
+out=$("$scanner" --root "$tmp_dir/pos-eol" 2>&1)
+code=$?
+if [ "$code" -eq 0 ]; then
+    bad "el guard caza la tubería partida en dos líneas (\`|\` al final, \`grep -q\` en la siguiente)" \
+        "salió 0: bash acepta el salto de línea tras \`|\` y el scanner mira línea a línea"
+elif ! grep -qE 'dirty\.sh:7' <<<"$out"; then
+    bad "el guard nombra la línea del LECTOR en la tubería partida" \
+        "se esperaba \`dirty.sh:7\`: out=$(flat "$out")"
+else
+    ok "caza la tubería partida en dos líneas y nombra la línea del lector"
+fi
+
+# A `||` earlier on the line is not a pipe and must not hide the real one after it.
+fixture pos-after-or dirty.sh <<FIXTURE
+#!/usr/bin/env bash
+set -uo pipefail
+block=NEEDLE
+[ -z "\$block" ] || $GREP -q 'NEEDLE' <<<"\$block"; $(dirty "-q")
+FIXTURE
+out=$("$scanner" --root "$tmp_dir/pos-after-or" 2>&1)
+code=$?
+if [ "$code" -eq 0 ] || ! grep -qE 'dirty\.sh:4' <<<"$out"; then
+    bad "el guard sigue mirando la línea después de un \`||\` legítimo" \
+        "un \`|| grep -q … <<<\` antes en la misma línea tapó la tubería real: exit=$code out=$(flat "$out")"
+else
+    ok "un \`||\` antes en la línea no tapa la tubería real que viene después"
+fi
+
 # ── 4. Negative control: the FIX, prose about the pattern, and the opt-out ──
 # A guard that also fires on the fix is a guard nobody can satisfy; one that
 # fires on a comment explaining the trap punishes writing the explanation down.
@@ -142,15 +187,18 @@ block=NEEDLE
 $GREP -q 'NEEDLE' <<<"\$block"
 # Never \`printf '%s' "\$block" | $GREP -q NEEDLE\`: the pipeline lies under pipefail.
 echo "el patrón \\\`printf … | $GREP -q\\\` miente bajo pipefail"
+[ -n "\$block" ] || $GREP -q 'NEEDLE' <<<"\$block"
+[ -n "\$block" ] ||
+    $GREP -q 'NEEDLE' <<<"\$block"
 $(dirty "-q") # sigpipe-demo
 FIXTURE
 out=$("$scanner" --root "$tmp_dir/neg" 2>&1)
 code=$?
 if [ "$code" -ne 0 ]; then
-    bad "el guard NO fira sobre el arreglo, la prosa ni la línea marcada \`sigpipe-demo\`" \
+    bad "el guard NO fira sobre el arreglo, la prosa, un \`||\` ni la línea marcada \`sigpipe-demo\`" \
         "exit=$code out=$(flat "$out")"
 else
-    ok "no fira sobre el here-string, sobre la prosa entre backticks ni sobre \`sigpipe-demo\`"
+    ok "no fira sobre el here-string, la prosa entre backticks, un \`||\` (entero o partido) ni \`sigpipe-demo\`"
 fi
 
 # ── 5. Discovery is the whole repo, hook included ───────────────────────────

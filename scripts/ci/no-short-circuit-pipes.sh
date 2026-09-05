@@ -20,10 +20,16 @@
 #     grep -q PATTERN <<<"$block"          instead of   printf '%s' "$block" | grep -q PATTERN
 #     grep -qx "$x" <<<"$(some_command)"   instead of   some_command | grep -qx "$x"
 #
-# What counts as short-circuiting here: `grep` with `-q` (exits at the first
-# match) or with `-m N` (exits at the Nth). `| head -N` is the same mechanism and
-# is NOT scanned yet — hub#1552 has the sixteen live occurrences; adding it here
-# before they are swept would be a guard born red.
+# What counts as short-circuiting here: `grep` with `-q` / `--quiet` / `--silent`
+# (exits at the first match) or with `-m N` / `--max-count=N` (exits at the Nth).
+# `| head -N` is the same mechanism and is NOT scanned yet — hub#1552 has the
+# sixteen live occurrences; adding it here before they are swept would be a
+# guard born red.
+#
+# A pipeline split over two lines (`producer |` at the end of one line, the
+# reader on the next — bash allows blank lines and comments in between) is the
+# same pipe and is scanned as such; the line named is the READER's. `||` is the
+# OR operator, not a pipe, and is left alone.
 #
 # Not flagged, on purpose:
 #   · comment lines — the trap has to be explainable in writing;
@@ -112,25 +118,45 @@ fi
 #
 # Assembled from fragments so that these lines do not match themselves — a guard
 # that has to exempt its own source has a hole the size of that exemption.
-pipe_then_grep='[|][[:space:]]*grep([[:space:]]+-[A-Za-z-]+)*[[:space:]]+-[A-Za-z]*'
-quiet_flag="${pipe_then_grep}q"
-max_count_flag="${pipe_then_grep}m[[:space:]]*[0-9]"
+pipe_then_grep='[|][[:space:]]*grep([[:space:]]+-[A-Za-z-]+)*[[:space:]]+'
+quiet_flag="${pipe_then_grep}(-[A-Za-z]*q|--quiet|--silent)"
+max_count_flag="${pipe_then_grep}(-m[[:space:]]*[0-9]|--max-count(=|[[:space:]]+)[0-9])"
 
 failed=0
 offenders=0
 while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     hits=$(awk -v q="$quiet_flag" -v m="$max_count_flag" '
+        # `carry` = the previous code line ended in a bare `|`: bash lets the reader
+        # start on the next line, past any blank lines and comments, so those do not
+        # reset it. The reader line is scanned as if the pipe were on it.
+        BEGIN             { carry = 0 }
         /^[[:space:]]*#/  { next }
-        /sigpipe-demo/    { next }
+        /^[[:space:]]*$/  { next }
+        /sigpipe-demo/    { carry = 0; next }
         {
-            if (!match($0, q) && !match($0, m)) next
-            # A match inside a backtick span is prose ABOUT the pattern, not code:
-            # an odd number of backticks before it means the span is still open.
-            before = substr($0, 1, RSTART - 1)
-            ticks = gsub(/`/, "`", before)
-            if (ticks % 2 == 1) next
-            printf "%d: %s\n", FNR, $0
+            line = $0
+            if (carry) line = "| " line
+            carry = (line ~ /(^|[^|])[|][[:space:]]*$/)
+            rest = line; offset = 0
+            while (1) {
+                rq = match(rest, q) ? RSTART : 0
+                rm = match(rest, m) ? RSTART : 0
+                if (!rq && !rm) break
+                start = offset + ((rq && (!rm || rq < rm)) ? rq : rm)
+                # `||` is the OR operator, not a pipe — but the line may still
+                # hold a real one further right, so keep scanning after it.
+                if (start > 1 && substr(line, start - 1, 1) == "|") {
+                    offset = start; rest = substr(line, offset + 1); continue
+                }
+                # A match inside a backtick span is prose ABOUT the pattern, not
+                # code: an odd number of backticks before it means the span is
+                # still open.
+                before = substr(line, 1, start - 1)
+                ticks = gsub(/`/, "`", before)
+                if (ticks % 2 == 0) { printf "%d: %s\n", FNR, $0; break }
+                offset = start; rest = substr(line, offset + 1)
+            }
         }
     ' "$root/$rel") || die "awk failed while scanning $rel — the scan is UNPROVEN, not clean"
     [ -n "$hits" ] || continue
