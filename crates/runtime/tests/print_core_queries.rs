@@ -544,6 +544,56 @@ async fn the_retired_bucket_is_read_newest_first() {
     );
 }
 
+/// Drives a queued job through a printer the way a host does — hand-out, then confirmed — so the
+/// `done` bucket has a real row in it.
+async fn print_it(rt: &Runtime, hub_id: &str, job_id: &str, role: &str) {
+    use erplora_runtime::print_queue;
+    let station = erplora_runtime::print_stations::resolve(rt.db_for_test(), hub_id, role)
+        .await
+        .unwrap();
+    let handed = print_queue::claim_next(rt.db_for_test(), hub_id, &station.id, "till-1", 90)
+        .await
+        .unwrap()
+        .expect("there is a job to hand out");
+    assert_eq!(handed.job_id, job_id, "a queue hands out in seq order");
+    assert!(
+        print_queue::mark_done(rt.db_for_test(), hub_id, job_id)
+            .await
+            .unwrap(),
+        "the paper came out"
+    );
+}
+
+/// The PRINTED bucket is closed too, and it is read from the same end as the retired one
+/// (hub#1565): `done` rows never leave the table either, so `LIMIT` over `seq` ascending would hand
+/// back the first tickets this hub ever printed instead of the ones somebody could be asking about
+/// («did the kitchen get table 4's order?» is always a question about today).
+#[tokio::test]
+async fn the_printed_bucket_is_read_newest_first_too() {
+    let rt = runtime("hub-done-order").await;
+    for job_id in ["first-printed", "second-printed", "third-printed"] {
+        enqueue(&rt, job_id, "receipt", "receipt").await;
+        print_it(&rt, "hub-done-order", job_id, "receipt").await;
+    }
+
+    let mut done = Params::new();
+    done.insert("status".into(), json!("done"));
+    done.insert("limit".into(), json!(2));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        done,
+        &ctx("hub-done-order", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows.iter().map(|r| r["jobId"].clone()).collect::<Vec<_>>(),
+        vec![json!("third-printed"), json!("second-printed")],
+        "the LAST tickets printed are the ones somebody could be asking about: {rows:?}"
+    );
+}
+
 // ── The stamp names a PERSON, not a row id (hub#1565) ─────────────────────────────────────────
 //
 // The stamp is stored as the principal the HTTP layer resolved from the session — `hub_user:<id>`
