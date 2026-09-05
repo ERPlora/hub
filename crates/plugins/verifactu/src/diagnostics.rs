@@ -1,6 +1,7 @@
 //! Diagnostics run and AEAT consult snapshot — split out of `lib.rs` verbatim (hub#1405).
 
 use crate::*;
+use erplora_runtime::producer_facts::ProducerFacts;
 
 /// Prueba de extremo a extremo SIN tocar la cadena: verifica que el certificado carga con su
 /// contraseña, genera una huella + QR de un registro de **muestra** y (si el cert es válido) hace
@@ -108,6 +109,10 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
 
     let mut cert_ok = false;
     let cert_message;
+    // WHY the test failed, as a code the module translates (hub#1575). The prose below is the
+    // same sentence it always was and keeps travelling as `cert_message`: it is what a hub on an
+    // older module version still paints, exactly like `message` since hub#1178.
+    let mut cert_reason: Option<CertReason> = None;
     let mut aeat = Json::Null;
     let mut gateway = Json::Null;
     // Whether the test stopped on a field of THIS hub instead of on the road (hub#1531). It is a
@@ -148,7 +153,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 // envío de verdad, no ir a la AEAT a que lo diga con un 4102. Y si el sobre ni
                 // siquiera se puede construir (hub#324), el diagnóstico lo dice aquí.
                 match sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif) {
-                    Err(error) => aeat = json!({ "ok": false, "error": error }),
+                    Err(reason) => aeat = json!({ "ok": false, "error": reason.prose }),
                     Ok(xml) => {
                         let TransmitRoute::Direct { identity, .. } = route else {
                             unreachable!("this arm matched Direct")
@@ -207,19 +212,16 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                     if readiness.ready {
                         Ok(())
                     } else {
-                        Err(format!(
-                            "La pasarela fiscal no puede transmitir ahora mismo ({}).",
-                            if readiness.reason.is_empty() {
-                                readiness.status.clone()
-                            } else {
-                                readiness.reason.clone()
-                            }
-                        ))
+                        Err(gateway_not_ready_reason(&readiness))
                     }
                 }
                 Err(e) => {
                     gateway = json!({ "ok": false, "error": e.to_string() });
-                    Err(format!("No se pudo contactar con la pasarela fiscal: {e}"))
+                    Err(CertReason::new(
+                        "gateway_unreachable",
+                        json!({ "error": e.to_string() }),
+                        format!("No se pudo contactar con la pasarela fiscal: {e}"),
+                    ))
                 }
             };
 
@@ -229,20 +231,24 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             if issuer_nif.is_empty() {
                 missing_issuer_nif = true;
                 cert_message = "Configura el NIF del obligado tributario (emisor) antes de probar la conexión.".into();
-            } else if let Err(error) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
+            } else if let Err(reason) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
             {
                 // El sobre se construye y se valida IGUAL que en la vía propia. Una config que no
                 // produce un registro conforme es un fallo de ESTE hub, y el diagnóstico es donde
                 // tiene que salir — solo que sin dárselo a Hacienda para que lo diga ella.
                 invalid_sample_record = true;
-                cert_message = error;
+                cert_message = reason.prose.clone();
+                cert_reason = Some(reason);
             } else {
                 match cell {
                     Ok(()) => {
                         cert_ok = true;
                         cert_message = "Pasarela fiscal disponible: ERPlora presenta por ti.".into();
                     }
-                    Err(message) => cert_message = message,
+                    Err(reason) => {
+                        cert_message = reason.prose.clone();
+                        cert_reason = Some(reason);
+                    }
                 }
             }
         }
@@ -250,17 +256,32 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             // Sin vía NINGUNA. Con certificado del negocio el mensaje sigue hablando del
             // certificado, que es lo que hay que arreglar; sin él habla de la pasarela, porque
             // mandar a alguien a renovar un `.p12` que no tiene es el defecto de hub#1485 otra vez.
-            cert_message = if road == erplora_runtime::certificate::ROUTE_OWN {
-                format!("El certificado no carga o no está configurado: {e}")
+            let reason = if road == erplora_runtime::certificate::ROUTE_OWN {
+                CertReason::new(
+                    "certificate_unavailable",
+                    json!({ "error": e.to_string() }),
+                    format!("El certificado no carga o no está configurado: {e}"),
+                )
             } else {
-                format!("Este hub no tiene vía de transmisión: {e}")
+                CertReason::new(
+                    "no_transmission_route",
+                    json!({ "error": e.to_string() }),
+                    format!("Este hub no tiene vía de transmisión: {e}"),
+                )
             };
+            cert_message = reason.prose.clone();
+            cert_reason = Some(reason);
         }
     }
 
     let details = json!({
         "cert_ok": cert_ok,
         "cert_message": cert_message,
+        // El motivo detrás del guion, como CÓDIGO + hechos (hub#1575), para que el catálogo del
+        // módulo lo diga en el idioma del negocio en vez de interpolar prosa castellana dentro de
+        // una frase inglesa. `null` cuando no hay motivo que dar: la prueba pasó, o el veredicto se
+        // basta solo (hub#1531 dejó el del NIF sin motivo a propósito).
+        "cert_reason": cert_reason.as_ref().map_or(Json::Null, CertReason::as_details),
         // Por dónde sale este hub (hub#1485). Las palabras son las del core
         // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) porque la pantalla programa contra ellas.
         "route": road,
@@ -343,11 +364,109 @@ fn sample_envelope(
     route: &TransmitRoute,
     hub_id: &str,
     issuer_nif: &str,
-) -> std::result::Result<String, String> {
-    let xml = aeat::build_soap(sample, config, None, hub_id).map_err(|e| e.to_string())?;
+) -> std::result::Result<String, CertReason> {
+    let xml = aeat::build_soap(sample, config, None, hub_id).map_err(|e| {
+        // WHICH of the two it is, asked of the CONFIG and never of the message (hub#1575): the
+        // prose belongs to the engine and would move with any reword, while whether the control
+        // plane has served the producer facts is a fact this hub can read. The two ask opposite
+        // things of the reader — one waits for the next heartbeat, the other has a form to fix.
+        let missing_facts = config
+            .get("producer_facts")
+            .and_then(ProducerFacts::parse)
+            .is_none();
+        CertReason::new(
+            if missing_facts {
+                "producer_facts_missing"
+            } else {
+                "sample_envelope_invalid"
+            },
+            json!({ "error": e.to_string() }),
+            e.to_string(),
+        )
+    })?;
     let xml = aeat::set_representative(&xml, route.presenter(), issuer_nif);
-    xsd::validate_registro(&xml).map_err(|e| format!("XML no conforme al esquema: {e}"))?;
+    xsd::validate_registro(&xml).map_err(|e| {
+        CertReason::new(
+            "sample_record_schema_invalid",
+            // The element the validator named travels on its own: it is the actionable half, and
+            // the AEAT spells those in Spanish by law, so it reads the same in either language.
+            json!({ "detail": e.to_string() }),
+            format!("XML no conforme al esquema: {e}"),
+        )
+    })?;
     Ok(xml)
+}
+
+/// Por qué falló la prueba, como **código estable + hechos** — y la prosa castellana que hasta
+/// hub#1575 era la respuesta entera (hub#1575).
+///
+/// El veredicto ya viajaba como clave (`message_key`, hub#1178) y el módulo lo traducía; el MOTIVO
+/// que va detrás del guion no, así que un negocio en inglés leía «…does not produce a valid test
+/// record — faltan los hechos del productor…»: media frase en un idioma que no eligió, y justo la
+/// mitad que dice qué arreglar.
+///
+/// `prose` **no se retira**: es el respaldo que pinta un hub cuyo módulo todavía no conoce el
+/// código, exactamente el contrato que `message` tiene desde hub#1178. Quitarla el día que aterriza
+/// el código dejaría a esos hubs con media frase vacía, que es peor que la castellana.
+#[derive(Debug)]
+pub(crate) struct CertReason {
+    /// Estable: es lo que el catálogo del módulo indexa. No se renombra sin traducir el catálogo.
+    code: &'static str,
+    /// Los datos que la frase necesita, ya separados de ella. Objeto siempre.
+    facts: Json,
+    /// La frase castellana del motor, tal cual se venía escribiendo.
+    prose: String,
+}
+
+impl CertReason {
+    fn new(code: &'static str, facts: Json, prose: impl Into<String>) -> Self {
+        Self {
+            code,
+            facts,
+            prose: prose.into(),
+        }
+    }
+
+    /// `{"code": …}` con los hechos al lado — la forma que `details` publica y que el módulo lee.
+    fn as_details(&self) -> Json {
+        let mut out = json!({ "code": self.code });
+        if let (Some(target), Some(source)) = (out.as_object_mut(), self.facts.as_object()) {
+            for (key, value) in source {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+        out
+    }
+}
+
+/// La celda contestó y dijo que no. Cuál de las dos formas es depende de si dijo POR QUÉ: una
+/// celda que da motivo lleva su frase con él; una que no lo da —una celda vieja, la página de
+/// error de un intermediario— lleva una frase que se basta sola.
+///
+/// Son dos códigos y no uno con el hueco vacío porque un `{detail}` que se pinta en blanco se lee
+/// como un fallo de la pantalla, no como un servicio que se quedó callado.
+fn gateway_not_ready_reason(readiness: &crate::gateway::GatewayReadiness) -> CertReason {
+    let detail = if readiness.reason.is_empty() {
+        readiness.status.clone()
+    } else {
+        readiness.reason.clone()
+    };
+    if detail.is_empty() {
+        return CertReason::new(
+            "gateway_not_ready_unspecified",
+            json!({}),
+            "La pasarela fiscal no puede transmitir ahora mismo.",
+        );
+    }
+    CertReason::new(
+        "gateway_not_ready",
+        json!({
+            "status": readiness.status,
+            "reason": readiness.reason,
+            "detail": detail,
+        }),
+        format!("La pasarela fiscal no puede transmitir ahora mismo ({detail})."),
+    )
 }
 
 // ── helpers de recuperación / consulta ────────────────────────────────────────
@@ -1194,5 +1313,295 @@ mod tests {
             details["aeat"].is_null(),
             "a diagnostic through the cell must never present a sample invoice: {details}"
         );
+    }
+
+    // ── hub#1575: the reason behind the dash travels as a CODE ────────────────────────────────
+
+    /// A hub on the CELL road whose obligado NIF is set and whose sample record still does not
+    /// come out — the same host hub#1559 left, asked the question hub#1575 asks.
+    ///
+    /// 🔴 **RED de hub#1575.** The verdict already travels as a key the module translates
+    /// (`message_key`), but the REASON behind the dash is Spanish prose the engine wrote, and the
+    /// module interpolates it raw as `{cert_message}`. An English reader gets «…does not produce a
+    /// valid test record — faltan los hechos del productor…»: half a sentence in a language they
+    /// did not choose, and it is the half that says what to fix.
+    #[tokio::test]
+    async fn the_reason_a_test_failed_travels_as_a_code_hub1575() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("producer_facts_missing"),
+            "the reason has to be a code the module can translate, not prose: {details}"
+        );
+    }
+
+    /// 🔒 And the prose STAYS. It is the fallback a hub on an older module version paints — the
+    /// same contract `message` has carried since hub#1178. Dropping it the day the code lands
+    /// would leave those hubs with an empty half-sentence, which is worse than the Spanish one.
+    #[tokio::test]
+    async fn the_spanish_prose_stays_as_the_fallback_for_older_modules_hub1575() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("no se puede construir el registro"),
+            "the prose is the fallback for a module that does not know the code yet: {details}"
+        );
+    }
+
+    /// A cell that cannot be reached is a road fault, and it says so with its own code: what the
+    /// business does about it (wait, retry) is the opposite of what a broken sample record asks
+    /// for (fix the settings), so the two cannot share a sentence.
+    #[tokio::test]
+    async fn an_unreachable_cell_reports_its_own_reason_code_hub1575() {
+        let out = run_diagnostics(&diagnostics_input("hub-cell"), &CellHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("gateway_unreachable"),
+            "{details}"
+        );
+    }
+
+    /// A hub with NO road at all: not enrolled and with no `.p12` of its own. Its own code, for
+    /// the same reason hub#1485 gave it its own sentence — «renew your certificate» is
+    /// unfollowable advice for somebody who never had one.
+    #[tokio::test]
+    async fn a_hub_with_no_road_reports_the_missing_road_as_a_code_hub1575() {
+        struct NoRoadHost;
+        #[async_trait::async_trait]
+        impl NativeHost for NoRoadHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({
+                    "id": "cfg-1",
+                    "environment": "testing",
+                    "issuer_nif": "B12345678",
+                })])
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-nowhere"), &NoRoadHost)
+            .await
+            .expect("the diagnostic always answers, even with nowhere to go");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("no_transmission_route"),
+            "{details}"
+        );
+    }
+
+    /// The taxpayer's own road, with a container the core cannot open. Its own code too: this one
+    /// IS a certificate to renew, and it is the only reason of the five that says so.
+    #[tokio::test]
+    async fn an_own_certificate_that_does_not_load_reports_its_own_code_hub1575() {
+        struct BrokenCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for BrokenCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({
+                    "id": "cfg-1",
+                    "environment": "testing",
+                    "issuer_nif": "B12345678",
+                })])
+            }
+            async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+                Ok(Some("own".to_owned()))
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Err(RuntimeError::Certificate(
+                    "el .p12 no abre con la contraseña guardada".into(),
+                ))
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-broken-cert"), &BrokenCertHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["route"],
+            json!(erplora_runtime::certificate::ROUTE_OWN),
+            "{details}"
+        );
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("certificate_unavailable"),
+            "{details}"
+        );
+    }
+
+    /// The sample record that IS built and then refused by the schema. Distinct from
+    /// `producer_facts_missing` because the two ask opposite things of the reader: one waits for
+    /// ERPlora's next heartbeat, the other has a field to fix — so the element the schema named
+    /// travels with the code.
+    ///
+    /// Asked of [`sample_envelope`] directly: the diagnostic's own sample is synthetic and well
+    /// formed, so the only way through this arm from `run_diagnostics` would be producer facts
+    /// that parse and then break the schema — and `ProducerFacts::parse` already enforces the
+    /// bounds the schema checks. A host contrived past that would be testing the stub, not the map.
+    #[test]
+    fn a_sample_refused_by_the_schema_carries_the_element_it_named_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        // The diagnostic's own sample with ONE hole the schema refuses: `Descripcion` is
+        // mandatory and this one is empty.
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("an empty Descripcion is refused by the schema");
+
+        assert_eq!(reason.code, "sample_record_schema_invalid", "{reason:?}");
+        assert!(
+            reason.facts["detail"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("Descripcion"),
+            "the reason has to keep naming what to fix: {reason:?}"
+        );
+        // And the prose stays whole for a hub whose module does not know the code yet.
+        assert!(reason.prose.contains("XML no conforme al esquema"), "{reason:?}");
+    }
+
+    /// 🔒 The same envelope with nothing missing produces no reason at all — the control has to
+    /// catch the positive it claims to catch, or «refused by the schema» would be what this
+    /// builder answers to everything.
+    #[test]
+    fn a_complete_sample_is_not_refused_by_the_schema_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        assert!(
+            sample_envelope(&sample, &config, &route, "hub-1", "B12345678").is_ok(),
+            "the diagnostic's own sample has to pass, or the guard above proves nothing"
+        );
+    }
+
+    /// A cell that answers and says no gives its state as FACTS, not inside a sentence — that is
+    /// what lets the module put the sentence in the reader's language and keep the state.
+    #[test]
+    fn a_cell_that_cannot_file_reports_its_state_as_facts_hub1575() {
+        let reason = gateway_not_ready_reason(&crate::gateway::GatewayReadiness {
+            ready: false,
+            status: "expired".to_owned(),
+            reason: "seal expired on 2026-08-31".to_owned(),
+            transmission_enabled: true,
+            holder_nif: "B27593136".to_owned(),
+        });
+
+        assert_eq!(reason.code, "gateway_not_ready", "{reason:?}");
+        assert_eq!(reason.facts["status"], json!("expired"), "{reason:?}");
+        assert_eq!(
+            reason.facts["detail"],
+            json!("seal expired on 2026-08-31"),
+            "the sentence needs ONE value that is never empty: {reason:?}"
+        );
+    }
+
+    /// 🔒 And a cell that says nothing gets a sentence that stands on its own. A `{detail}` painted
+    /// blank reads like a broken screen, not like a service that stayed quiet — which is the same
+    /// trade hub#1531 made for the missing-NIF verdict.
+    #[test]
+    fn a_cell_that_gives_no_reason_gets_a_sentence_that_stands_alone_hub1575() {
+        let reason = gateway_not_ready_reason(&crate::gateway::GatewayReadiness {
+            ready: false,
+            status: String::new(),
+            reason: String::new(),
+            transmission_enabled: false,
+            holder_nif: String::new(),
+        });
+
+        assert_eq!(reason.code, "gateway_not_ready_unspecified", "{reason:?}");
+        assert!(!reason.prose.contains("()"), "{reason:?}");
+    }
+
+    /// 🔒 A verdict that succeeded has no reason to give. `cert_reason` is filed as null there so
+    /// the module cannot compose «the test ran — <reason>» out of a stale field.
+    #[tokio::test]
+    async fn a_test_that_passes_files_no_reason_hub1575() {
+        struct OwnCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for OwnCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({ "id": "cfg-1", "environment": "testing" })])
+            }
+            async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+                Ok(Some("own".to_owned()))
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-own"), &OwnCertHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(details["cert_ok"], json!(true), "{details}");
+        assert!(details["cert_reason"].is_null(), "{details}");
     }
 }
