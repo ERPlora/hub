@@ -1332,10 +1332,13 @@ mod tests {
     #[tokio::test]
     async fn hub1527_coverage_names_the_live_hosts_and_not_only_their_number() {
         let db = hosts_db().await;
-        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
+        // Registered back to front on purpose. The list is read as ONE sentence, so it comes out
+        // in the order of the NAMES and not in whatever order the rows happen to sit in: an order
+        // that changed between two reads of the same screen would look like the devices moved.
+        register(&db, "h1", "tablet-1", "kitchen", "Floor tablet", "u1")
             .await
             .unwrap();
-        register(&db, "h1", "tablet-1", "kitchen", "Floor tablet", "u1")
+        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
             .await
             .unwrap();
         register(&db, "h1", "till-1", "receipt", "Counter till", "u1")
@@ -1381,6 +1384,30 @@ mod tests {
             kitchen.live_host_labels.len() as i64,
             kitchen.live_hosts,
             "the count and the names are the same answer, read at the same instant"
+        );
+    }
+
+    #[tokio::test]
+    async fn hub1527_the_names_answer_to_the_cutoff_their_caller_hands_down() {
+        // The guarantee above rests on `coverage` resolving "live" ONCE and handing the same
+        // instant to both reads. If the names took a second `now` of their own, the two would
+        // disagree over any host sitting on the TTL boundary — the screen naming a till the badge
+        // had already given up on. That is a sub-millisecond race no wall-clock test can catch, so
+        // the contract is pinned where it can be: the cutoff is the CALLER'S, and a cutoff nobody
+        // could have reported since answers nobody.
+        let db = hosts_db().await;
+        register(&db, "h1", "till-1", "kitchen", "Counter till", "u1")
+            .await
+            .unwrap();
+
+        let now = live_host_labels(&db, "h1", &live_cutoff()).await.unwrap();
+        assert_eq!(now.get("kitchen").map(Vec::as_slice), Some(&["Counter till".to_string()][..]));
+
+        let unreachable = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let none = live_host_labels(&db, "h1", &unreachable).await.unwrap();
+        assert!(
+            none.is_empty(),
+            "the caller's cutoff decides who is live, not a clock read a second time: {none:?}"
         );
     }
 
