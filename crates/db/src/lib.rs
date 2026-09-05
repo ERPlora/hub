@@ -734,15 +734,24 @@ impl DatabaseAdapter for PgAdapter {
     /// infer, read back off the prepared statement.
     ///
     /// It goes through sqlx's per-connection statement cache (unlike the queries themselves, which
-    /// opt out of it — see `build_query!`), so a list asked for a second time on the same
-    /// connection pays no round trip. That cache is exactly right here: what is being cached is
-    /// the SHAPE of a static SELECT, not the types of the parameters that vary per call.
+    /// opt out of it — see `build_query!`), so the SHAPE of a static SELECT is resolved once per
+    /// connection; what still travels on every call is the connection check of `acquire`.
+    /// Measured in the review of hub#1567 (Postgres 18 in Docker, loopback, one connection):
+    /// 0.33 ms warm, 0.49 ms cold, against 0.58 ms for the simplest `query()`.
+    ///
+    /// That cache is the one hub#1348 keeps `query()` out of, and it bites here too: sqlx keys it
+    /// on the TEXT and `get_or_prepare` reads it BEFORE it honours `.persistent(false)`, so a text
+    /// described here must never be one `query()` executes — the cached statement would pin the
+    /// server-inferred parameter types onto that execution (a FLOAT8 bound decoded as INT8: the
+    /// row vanishes, silently). The marker below makes the described text unique to this door;
+    /// Postgres ignores the comment.
     async fn column_kinds(&self, sql: &str) -> Result<BTreeMap<String, ColumnKind>, DbError> {
         use sqlx::{SqlSafeStr, Statement};
         let (tsql, _names) = translate(sql);
+        let described = format!("{tsql}\n/* column_kinds: described, never executed (hub#1348) */");
         let mut conn = self.pool.acquire().await?;
         let stmt = (&mut *conn)
-            .prepare_with(sqlx::AssertSqlSafe(tsql).into_sql_str(), &[])
+            .prepare_with(sqlx::AssertSqlSafe(described).into_sql_str(), &[])
             .await?;
         Ok(stmt
             .columns()
@@ -1763,6 +1772,42 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(q.rows.len(), 1, "the exact decimal bound matches its own row: {:?}", q.rows);
+    }
+
+    /// hub#1542 × hub#1348 — DESCRIBING a text must never pin the parameter types of RUNNING
+    /// that same text. sqlx's statement cache is keyed on the SQL text alone and `get_or_prepare`
+    /// reads it BEFORE it honours `.persistent(false)`, so a `column_kinds` that left the
+    /// server-inferred types in that cache would hand them to the next `query()` of the same text
+    /// on that connection. Reproduced in the review of hub#1567: after the describe, a `5.0`
+    /// bound (FLOAT8) was decoded with the cached `INT8` and the row a fresh connection answers
+    /// went missing — silently, the exact shape of corruption hub#1348 closed. One connection on
+    /// purpose: a pool is what would otherwise hide it.
+    #[tokio::test]
+    async fn describing_a_text_never_pins_the_parameter_types_of_running_it() {
+        let test_db = crate::testutil::TestDb::new().await;
+        let db = test_db.adapter_with_max_connections(1).await;
+        db.execute_batch(
+            "CREATE TABLE erplora_pin (n INTEGER NOT NULL); INSERT INTO erplora_pin (n) VALUES (5);",
+        )
+        .await
+        .unwrap();
+        let sql = "SELECT n FROM erplora_pin WHERE n = :v";
+
+        let kinds = db.column_kinds(sql).await.unwrap();
+        assert_eq!(kinds.get("n"), Some(&ColumnKind::Numeric));
+
+        // `5.0` binds as FLOAT8 and `n = 5.0` is TRUE for the row. Decoded with the parameter
+        // type the describe left behind, the same eight bytes are another number: the row vanishes.
+        let q = db
+            .query(sql, &params(json!({"v": 5.0})))
+            .await
+            .expect("running the text just described must bind by its OWN parameter types");
+        assert_eq!(
+            q.rows.len(),
+            1,
+            "the row a fresh connection answers must not vanish after a describe: {:?}",
+            q.rows
+        );
     }
 
     // ── JSON boolean → INTEGER 0/1 (hub#208 / ADR-0154) ───────────────────────────────────────
