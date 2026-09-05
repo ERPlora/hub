@@ -723,3 +723,478 @@ async fn retiring_the_placeholder_never_touches_a_sibling_hub_on_the_same_databa
         "the target gets ITS OWN seeded week back — {devuelta:?}"
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hub#1548 · hub#1550 · hub#1551 — the three other doors into the same symptom.
+//
+// hub#1535 pinned ONE crossing: the module's placeholder against a template. These three are the
+// rest of the rule, and they only make sense together because they are the same statement read at
+// its three ends — a whole-table seed guard is the module saying **this table holds ONE hub-wide
+// object**, so:
+//
+// * it travels WHOLE once the business adopted it (export, #1550),
+// * an incoming bundle REPLACES it instead of living beside it (import, #1548),
+// * and undo only puts back what it took IF the hole is still there (undo, #1551).
+//
+// Market check (the two business calls, per the `market-decision` skill): every mature product
+// keys master-data import and replaces — Odoo upserts by external ID, Shopify matches by handle
+// («overwrite products with matching handles», and without the flag the matching product is
+// IGNORED, never duplicated), WooCommerce matches by ID/SKU, Business Central's configuration
+// packages overwrite existing values on apply. None of them can produce two contradictory
+// Mondays, and Square's hours are one setting per weekday. Full table with URLs in the PR body.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The owner saves the whole Hours screen with one shift — a second, distinguishable template.
+async fn owner_sets_whole_week(rt: &Runtime, hub_id: &str, open: &str, close: &str) {
+    let sql = format!(
+        "UPDATE weekplan_hours \
+         SET open_time = '{open}', close_time = '{close}', is_closed = 0, \
+             created_by = 'u-owner', updated_by = 'u-owner', \
+             updated_at = '2026-08-15T11:00:00Z' \
+         WHERE hub_id = '{hub_id}' AND is_deleted = 0"
+    );
+    rt.db()
+        .execute(&sql, &Params::new())
+        .await
+        .expect("owner saves the whole week");
+}
+
+/// The owner saves **one** weekday and leaves the rest of the week as it came — the normal state,
+/// because `schedules.business_hours.set` replaces the intervals of a SINGLE day and nobody ever
+/// opens Sunday to confirm it is closed.
+async fn owner_sets_one_day(rt: &Runtime, hub_id: &str, day: i64, open: &str, close: &str) {
+    let sql = format!(
+        "UPDATE weekplan_hours \
+         SET open_time = '{open}', close_time = '{close}', is_closed = 0, \
+             created_by = 'u-owner', updated_by = 'u-owner', \
+             updated_at = '2026-08-15T10:00:00Z' \
+         WHERE hub_id = '{hub_id}' AND day_of_week = {day} AND is_deleted = 0"
+    );
+    rt.db()
+        .execute(&sql, &Params::new())
+        .await
+        .expect("owner saves one day");
+}
+
+/// Exactly what `schedules.business_hours.set` does to a weekday AFTER an import: soft-delete the
+/// intervals that day had (`_clear_business_hours_day`) and insert the new one
+/// (`_insert_business_hours`), signed by whoever saved the screen — a row the import batch knows
+/// nothing about.
+async fn owner_rewrites_day(rt: &Runtime, hub_id: &str, day: i64, open: &str, close: &str) {
+    let clear = format!(
+        "UPDATE weekplan_hours \
+         SET is_deleted = 1, deleted_at = '2026-08-16T09:00:00Z', \
+             updated_at = '2026-08-16T09:00:00Z' \
+         WHERE hub_id = '{hub_id}' AND day_of_week = {day} AND is_deleted = 0"
+    );
+    rt.db()
+        .execute(&clear, &Params::new())
+        .await
+        .expect("clear the weekday");
+    let insert = format!(
+        "INSERT INTO weekplan_hours \
+           (id, hub_id, day_of_week, position, open_time, close_time, is_closed, \
+            is_deleted, created_by, created_at, updated_by, updated_at) \
+         VALUES ('{hub_id}-own-d{day}', '{hub_id}', {day}, 0, '{open}', '{close}', 0, 0, \
+                 'u-owner', '2026-08-16T09:00:00Z', 'u-owner', '2026-08-16T09:00:00Z')"
+    );
+    rt.db()
+        .execute(&insert, &Params::new())
+        .await
+        .expect("insert the weekday");
+}
+
+/// 🔴 hub#1548: the business tries the template of its sector, does not like it and tries another.
+/// After the SECOND one its week must be **one** week — the last one — not both at once.
+///
+/// This is the crossing hub#1535 does not cover: there the two weeks were the module's placeholder
+/// and a template; here BOTH came from templates, so the `created_by = 'system'` marker the
+/// retirement looked for is long gone and every day ends up twice.
+#[tokio::test]
+async fn un_segundo_blueprint_deja_una_sola_semana() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+
+    let a = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&a, "h1").await; // 09:30–20:00, Saturday open
+    let plantilla_a = export_hub(
+        &a,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla A");
+
+    let b = hub_con("h3", &[&wp]).await;
+    owner_sets_whole_week(&b, "h3", "07:00", "15:00").await;
+    let plantilla_b = export_hub(
+        &b,
+        "h3",
+        &seleccion(&["weekplan"]),
+        "panaderia",
+        "es",
+        "2026-08-15T11:00:00Z",
+    )
+    .await
+    .expect("export plantilla B");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    aplica(&mut destino, &plantilla_a, "h2", &["weekplan"]).await;
+    let tras_a = semana(&destino, "h2").await;
+    assert_eq!(
+        tras_a.len(),
+        7,
+        "precondición (hub#1535): tras la PRIMERA plantilla queda una sola semana — {tras_a:?}"
+    );
+
+    aplica(&mut destino, &plantilla_b, "h2", &["weekplan"]).await;
+
+    let tras = semana(&destino, "h2").await;
+    assert_eq!(
+        tras.len(),
+        7,
+        "el lunes sale de 09:30 a 20:00 y de 07:00 a 15:00 a la vez: {} filas vivas donde debe \
+         haber 7 — {tras:?}",
+        tras.len()
+    );
+    assert!(
+        tras.iter()
+            .all(|r| (r.1.as_str(), r.2.as_str()) == ("07:00", "15:00")),
+        "la semana que queda tiene que ser la de la ÚLTIMA plantilla, no una mezcla — {tras:?}"
+    );
+}
+
+/// 🔴 The close that makes replacing SAFE, and the reason it is not a silent deletion of business
+/// data: undoing the second template gives the first one back, whole.
+#[tokio::test]
+async fn deshacer_el_segundo_blueprint_devuelve_la_semana_del_primero() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+
+    let a = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&a, "h1").await;
+    let plantilla_a = export_hub(
+        &a,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla A");
+
+    let b = hub_con("h3", &[&wp]).await;
+    owner_sets_whole_week(&b, "h3", "07:00", "15:00").await;
+    let plantilla_b = export_hub(
+        &b,
+        "h3",
+        &seleccion(&["weekplan"]),
+        "panaderia",
+        "es",
+        "2026-08-15T11:00:00Z",
+    )
+    .await
+    .expect("export plantilla B");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    aplica(&mut destino, &plantilla_a, "h2", &["weekplan"]).await;
+    let con_la_a = semana(&destino, "h2").await;
+
+    let report = import_sections(
+        &mut destino,
+        &plantilla_b.manifest,
+        &plantilla_b.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report.batch_id.clone().expect("lote del segundo import");
+
+    undo_import(&destino, "h2", &batch)
+        .await
+        .expect("deshacer el segundo blueprint");
+
+    assert_eq!(
+        semana(&destino, "h2").await,
+        con_la_a,
+        "sustituir la semana solo vale si es REVERSIBLE: deshacer la segunda plantilla tiene que \
+         devolver la primera entera"
+    );
+}
+
+/// 🔴 hub#1550: the origin configured only Monday and left the rest of the week as the module
+/// planted it. The template has to carry the week the business actually HAS — the days it adopted
+/// without touching them included — not just the one row it typed.
+///
+/// Today `export::is_module_seeded` drops the six `system` rows and the destination ends up with a
+/// single day and six days «not configured», which is the state ERPlora/schedules#36 exists to make
+/// unreachable. Adopting a table half way is still adopting it.
+#[tokio::test]
+async fn una_semana_configurada_a_medias_viaja_entera() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_one_day(&origen, "h1", 0, "09:30", "20:00").await;
+
+    let efectiva = semana(&origen, "h1").await;
+    assert_eq!(
+        efectiva.len(),
+        7,
+        "precondición: el hub de origen tiene la semana entera — {efectiva:?}"
+    );
+    assert_eq!(
+        efectiva.iter().filter(|r| r.4 == "system").count(),
+        6,
+        "precondición: el negocio solo firmó el lunes; los otros seis días son los del módulo — \
+         {efectiva:?}"
+    );
+
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    aplica(&mut destino, &bundle, "h2", &["weekplan"]).await;
+
+    let tras = semana(&destino, "h2").await;
+    assert_eq!(
+        tras, efectiva,
+        "el hub importado tiene que quedar con la MISMA semana efectiva que el de origen, no solo \
+         con el día que el negocio escribió — {tras:?}"
+    );
+}
+
+/// 🔴 A pristine placeholder still does NOT travel: if the business never touched the week, the
+/// table is the module's own data and the destination plants its own at install. Otherwise every
+/// template would carry a generic week nobody chose, and hub#1535 would come back through the door
+/// hub#1550 opens.
+#[tokio::test]
+async fn una_semana_que_el_negocio_no_ha_tocado_no_viaja() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let sql = String::from_utf8(bundle.files["data/weekplan.sql"].clone()).unwrap();
+    assert!(
+        !sql.contains("weekplan_hours"),
+        "un marcador que nadie adoptó es dato DEL MÓDULO y no viaja (ADR-0359):\n{sql}"
+    );
+}
+
+/// 🔴 hub#1551: the business imports a template, edits one weekday on the Hours screen and then
+/// undoes the import. Undo must not resurrect the placeholder on top of what the business just
+/// wrote — that is the same contradictory Monday hub#1535 closed, coming in through the undo.
+///
+/// The rule is the mirror of the retirement's: the placeholder is retired only when the real data
+/// is IN, so it comes back only while the hole it left is still there.
+#[tokio::test]
+async fn deshacer_tras_editar_el_horario_no_duplica_el_dia_editado() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&origen, "h1").await;
+    let bundle = export_hub(
+        &origen,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export plantilla");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let report = import_sections(
+        &mut destino,
+        &bundle.manifest,
+        &bundle.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort");
+    let batch = report.batch_id.clone().expect("lote del import");
+
+    // The business adjusts Monday on the Hours screen — the imported week is now ITS week.
+    owner_rewrites_day(&destino, "h2", 0, "10:00", "19:00").await;
+
+    undo_import(&destino, "h2", &batch)
+        .await
+        .expect("deshacer la importación");
+
+    let tras = semana(&destino, "h2").await;
+    let lunes: Vec<_> = tras.iter().filter(|r| r.0 == 0).collect();
+    assert_eq!(
+        lunes.len(),
+        1,
+        "el lunes queda con DOS horarios contradictorios tras deshacer — {lunes:?}"
+    );
+    assert_eq!(
+        (
+            lunes[0].1.as_str(),
+            lunes[0].2.as_str(),
+            lunes[0].4.as_str()
+        ),
+        ("10:00", "19:00", "u-owner"),
+        "y el que se queda es el que el negocio acaba de escribir, no el genérico — {lunes:?}"
+    );
+    assert!(
+        tras.iter().all(|r| r.4 != "system"),
+        "deshacer no puede replantar el marcador sobre una semana que el negocio ya hizo suya — \
+         {tras:?}"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Review of hub#1555 — two holes the eight mutants did not reach.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 🔴 Settings › Data lists EVERY batch with its own «undo» button (newest first), so the business
+/// can undo the OLDER template while the newer one is still in place. Whatever order it picks, the
+/// hub can never end up WITHOUT hours — the state ERPlora/schedules#36 made unreachable.
+///
+/// The chain: template A retired the seeded week; template B retired A's week. Undoing A first
+/// finds B's week alive (so the seeded week stays retired, correctly) but hard-deletes A's rows —
+/// the very rows batch B promised to bring back. Undoing B then restores ids that no longer exist,
+/// and the hub is left with zero rows. What A retired has to pass on to B: undoing B must give the
+/// seeded week back.
+#[tokio::test]
+async fn undoing_the_older_template_first_still_leaves_a_week_after_undoing_both() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let a = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&a, "h1").await;
+    let plantilla_a = export_hub(
+        &a,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export template A");
+    let b = hub_con("h3", &[&wp]).await;
+    owner_sets_whole_week(&b, "h3", "07:00", "15:00").await;
+    let plantilla_b = export_hub(
+        &b,
+        "h3",
+        &seleccion(&["weekplan"]),
+        "panaderia",
+        "es",
+        "2026-08-15T11:00:00Z",
+    )
+    .await
+    .expect("export template B");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let sembrada = semana(&destino, "h2").await;
+    let batch_a = import_sections(
+        &mut destino,
+        &plantilla_a.manifest,
+        &plantilla_a.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort")
+    .batch_id
+    .expect("batch A");
+    let batch_b = import_sections(
+        &mut destino,
+        &plantilla_b.manifest,
+        &plantilla_b.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort")
+    .batch_id
+    .expect("batch B");
+
+    undo_import(&destino, "h2", &batch_a)
+        .await
+        .expect("undo the older template");
+    let con_b = semana(&destino, "h2").await;
+    assert_eq!(
+        con_b.len(),
+        7,
+        "undoing the SUPERSEDED template changes nothing visible: the newer week stays — {con_b:?}"
+    );
+    assert!(
+        con_b
+            .iter()
+            .all(|r| (r.1.as_str(), r.2.as_str()) == ("07:00", "15:00")),
+        "…and it is B's week, untouched — {con_b:?}"
+    );
+
+    undo_import(&destino, "h2", &batch_b)
+        .await
+        .expect("undo the newer template");
+    let tras = semana(&destino, "h2").await;
+    assert_eq!(
+        tras, sembrada,
+        "the hub is left WITHOUT hours: undoing both templates has to give the seeded week back, \
+         whatever the order — {tras:?}"
+    );
+}
+
+/// 🔴 The count the export screen shows («Hours: N rows») is what turns the checkbox into a
+/// decision (hub#534), so it has to be what travels: a week the business adopted half way counts
+/// SEVEN rows, not the one it typed — and a week nobody touched counts zero, because it does not
+/// travel at all.
+#[tokio::test]
+async fn the_export_count_of_a_half_adopted_week_is_the_whole_week() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_one_day(&origen, "h1", 0, "09:30", "20:00").await;
+    let count = |mapa: &[erplora_runtime::export::ModuleTables]| {
+        mapa.iter()
+            .find(|m| m.module_id == "weekplan")
+            .expect("weekplan")
+            .tables
+            .iter()
+            .find(|t| t.table == "weekplan_hours")
+            .expect("weekplan_hours")
+            .rows
+    };
+
+    let adoptada =
+        erplora_runtime::export::module_table_counts(&origen, "h1", &["weekplan".to_string()])
+            .await
+            .expect("count");
+    assert_eq!(
+        count(&adoptada),
+        7,
+        "the export screen says 1 row while 7 travel: the count has to be what the bundle carries"
+    );
+
+    let intacta = hub_con("h2", &[&wp]).await;
+    let sin_tocar =
+        erplora_runtime::export::module_table_counts(&intacta, "h2", &["weekplan".to_string()])
+            .await
+            .expect("count");
+    assert_eq!(
+        count(&sin_tocar),
+        0,
+        "a week nobody adopted does not travel, so the screen must not count it either"
+    );
+}
