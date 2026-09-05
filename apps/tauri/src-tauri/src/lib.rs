@@ -1254,6 +1254,32 @@ fn merge_usb_printers(
     }
 }
 
+/// Puts the machine's own print queues into the device registry, so the owner can say which one
+/// prints the kitchen's tickets (hub#1536).
+///
+/// The network and Bluetooth halves of discovery already register what they find; this is the
+/// third. A queue has neither MAC nor socket, so it enters by its `printer_id` — the door
+/// `DeviceRegistry::register_queue` exists for.
+///
+/// A refusal is **logged and skipped**, never propagated: a discovery is a batch, and one queue
+/// with an id CUPS could not have produced must not cost the till the printer it does have. Logged
+/// because a queue that silently never accepts a role is exactly the mute failure that sends a
+/// user to press a button that does nothing.
+fn register_discovered_queues(
+    registry: &DeviceRegistry,
+    queues: &[erplora_peripherals::protocol::PrinterInfo],
+) {
+    for queue in queues {
+        if let Err(e) = registry.register_queue(&queue.id, &queue.name) {
+            log::warn!(
+                "shell: the print queue `{}` did not enter the device registry ({e}); it prints, \
+                 but it will not accept a role",
+                queue.id
+            );
+        }
+    }
+}
+
 /// `erplora_discover_printers` — re-escanea la red (mDNS + subred), lista las impresoras
 /// Bluetooth EMPAREJADAS (solo Android, ADR-0204), registra y devuelve las impresoras. Espejo de
 /// `Command::DiscoverPrinters` del bridge.
@@ -1309,6 +1335,11 @@ async fn erplora_discover_printers(
     });
     #[cfg(target_os = "android")]
     let usb = Vec::new();
+
+    // Registered like their network and bluetooth siblings, so roles (kitchen/bar/receipt) can be
+    // assigned to them (hub#1536); the printer_id is the key, ip/port stay empty — the watchdog
+    // only monitors `network`, so a queue never enters the health probe or the ARP recovery sweep.
+    register_discovered_queues(&state.registry, &usb);
 
     Ok(merge_usb_printers(
         merge_bluetooth_printers(outcome, bonded),
@@ -1965,6 +1996,52 @@ mod tests {
             vec![a_usb_printer()],
         );
         assert_eq!(merged.scanned_printers(), None);
+    }
+
+    // ── hub#1536: a discovered queue is a DEVICE, so the owner can say it is the kitchen's ───
+    //
+    // Listing the queue was hub#1083; without an entry in the registry it can be printed to but
+    // never named, so a venue with a USB printer at the counter and a network one in the kitchen
+    // can only tell the hub about one of the two.
+
+    #[test]
+    fn hub1536_a_discovered_usb_queue_enters_the_device_registry() {
+        let registry = DeviceRegistry::load(tempdir().join("devices.json"));
+        let second = erplora_peripherals::protocol::PrinterInfo {
+            id: "usb:EPSON_TM".into(),
+            name: "EPSON TM-T20III".into(),
+            ..a_usb_printer()
+        };
+
+        register_discovered_queues(&registry, &[a_usb_printer(), second]);
+
+        let mut keys: Vec<String> = registry.get_all().into_iter().map(|d| d.key).collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            ["usb:EPSON_TM", "usb:Star_TSP143"],
+            "each queue keeps an identity of its own"
+        );
+        registry
+            .set_role("usb:Star_TSP143", "kitchen")
+            .expect("and can be told which paper it prints");
+    }
+
+    #[test]
+    fn hub1536_a_queue_that_cannot_be_registered_does_not_cost_the_others_theirs() {
+        // A discovery is a batch: one id the registry refuses must not take the working printer
+        // down with it, or a single odd queue would leave the till with no roles at all.
+        let registry = DeviceRegistry::load(tempdir().join("devices.json"));
+        let broken = erplora_peripherals::protocol::PrinterInfo {
+            id: "usb:".into(),
+            name: "nameless".into(),
+            ..a_usb_printer()
+        };
+
+        register_discovered_queues(&registry, &[broken, a_usb_printer()]);
+
+        let keys: Vec<String> = registry.get_all().into_iter().map(|d| d.key).collect();
+        assert_eq!(keys, ["usb:Star_TSP143"], "the good one is registered anyway");
     }
 
     // ── hub#447: forgetting BY CHOICE lands on the chooser, forgetting on a 410 does not ─────
