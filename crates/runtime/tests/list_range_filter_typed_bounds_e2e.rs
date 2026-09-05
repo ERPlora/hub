@@ -172,3 +172,16 @@ async fn a_bound_that_is_not_a_position_on_the_number_line_is_refused_too() {
         );
     }
 }
+
+/// A TEXT column swallows the very same bound without complaint — proof that the refusal
+/// comes from the COLUMN's type and not from a value-shape guess made by the engine. Under
+/// the database collation `'B12345678'` sorts above `'abc'`, so the honest answer is one row.
+#[tokio::test]
+async fn the_same_unreadable_bound_is_a_legitimate_text_bound() {
+    let ids = ids_for(&[("f_tax_id_from", json!("abc"))]).await;
+    assert_eq!(
+        ids,
+        vec!["evening".to_string()],
+        "'B12345678' is the only tax id the collation puts at or above 'abc'"
+    );
+}
