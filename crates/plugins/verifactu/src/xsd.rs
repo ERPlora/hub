@@ -38,6 +38,7 @@
 //! que pase por aquí puede, en teoría, seguir siendo rechazado con 4102 por algo fuera de esa
 //! lista; lo que ya no puede es salir con un obligatorio ausente o desordenado.
 use crate::VerifactuError;
+use serde_json::{json, Value as Json};
 
 // ── Contrato del esquema (contrastado contra `schemas/aeat/` en tests/xsd.rs) ──────────────
 
@@ -293,7 +294,26 @@ fn err(msg: impl Into<String>) -> VerifactuError {
     VerifactuError::Payload(msg.into())
 }
 
+/// The same refusal as [`err`], plus the **stable code + facts** a module can translate
+/// (hub#1576) — identical prose, identical `Display`, so nothing that reads the sentence moves.
+///
+/// It is added beside `err` rather than replacing it: `err` still serves the validators of the
+/// desglose, the rectificativa and the F2 limit, which are unreachable from the diagnostic sample
+/// and stay on the fallback prose for now (hub#1590).
+fn named(code: &'static str, facts: Json, msg: impl Into<String>) -> VerifactuError {
+    VerifactuError::Schema {
+        code,
+        facts,
+        prose: msg.into(),
+    }
+}
+
 type Element<'a> = (&'a str, &'a str, usize);
+
+/// El `xs:sequence` de `CabeceraType`, escrito una vez: las dos formas de romperlo (el
+/// representante delante del obligado, o detrás de la remisión voluntaria) publican el MISMO
+/// código y los mismos hechos, así que la secuencia que viaja en ellos no puede divergir.
+const CABECERA_SEQUENCE: &str = "ObligadoEmision → Representante → RemisionVoluntaria";
 
 /// Posición del primer elemento con ese nombre, en orden de documento. Es lo que permite mirar
 /// los hijos INMEDIATOS de un elemento cuando la profundidad no basta para distinguirlo de un
@@ -343,17 +363,27 @@ fn present_at(elements: &[Element<'_>], tag: &str, depth: usize) -> bool {
 pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     let elements = walk(xml);
     if elements.is_empty() {
-        return Err(err("el XML a transmitir está vacío o no es XML"));
+        return Err(named(
+            "schema_envelope_empty",
+            json!({}),
+            "el XML a transmitir está vacío o no es XML",
+        ));
     }
     if !present(&elements, "RegFactuSistemaFacturacion") {
-        return Err(err(
+        return Err(named(
+            "schema_envelope_not_regfactu",
+            json!({}),
             "el sobre no es un RegFactuSistemaFacturacion (SuministroLR.xsd)",
         ));
     }
 
     // ── Cabecera: ObligadoEmision exige NombreRazon y NIF ────────────────────────────────
     if !present(&elements, "ObligadoEmision") {
-        return Err(err("falta Cabecera/ObligadoEmision"));
+        return Err(named(
+            "schema_header_issuer_missing",
+            json!({}),
+            "falta Cabecera/ObligadoEmision",
+        ));
     }
     // El `Representante` (hub#1460) es el OTRO `PersonaFisicaJuridicaESType` de la cabecera y
     // lleva las mismas dos etiquetas dentro, así que se comprueba su posición ANTES de leer las
@@ -362,7 +392,9 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     let representante = index_of(&elements, "Representante");
     if let (Some(rep), Some(obligado)) = (representante, index_of(&elements, "ObligadoEmision")) {
         if rep < obligado {
-            return Err(err(
+            return Err(named(
+                "schema_element_out_of_order",
+                json!({ "element": "Representante", "sequence": CABECERA_SEQUENCE }),
                 "Representante va delante de ObligadoEmision; el xs:sequence de CabeceraType es \
                  ObligadoEmision → Representante → RemisionVoluntaria",
             ));
@@ -372,10 +404,14 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         match text_of(&elements, tag) {
             Some(v) if !v.is_empty() => {}
             _ => {
-                return Err(err(format!(
-                    "ObligadoEmision/{tag} es obligatorio y viene vacío (identidad fiscal del \
-                     negocio sin configurar)"
-                )))
+                return Err(named(
+                    "schema_issuer_identity_incomplete",
+                    json!({ "element": tag }),
+                    format!(
+                        "ObligadoEmision/{tag} es obligatorio y viene vacío (identidad fiscal \
+                         del negocio sin configurar)"
+                    ),
+                ))
             }
         }
     }
@@ -392,16 +428,22 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
             match elements.get(at + 1 + offset) {
                 Some((t, v, d)) if *t == tag && *d == depth + 1 && !v.is_empty() => {}
                 _ => {
-                    return Err(err(format!(
-                        "Representante/{tag} es obligatorio y falta o viene vacío \
-                         (PersonaFisicaJuridicaESType exige NombreRazon y NIF, en ese orden)"
-                    )))
+                    return Err(named(
+                        "schema_representative_incomplete",
+                        json!({ "element": tag }),
+                        format!(
+                            "Representante/{tag} es obligatorio y falta o viene vacío \
+                             (PersonaFisicaJuridicaESType exige NombreRazon y NIF, en ese orden)"
+                        ),
+                    ))
                 }
             }
         }
         if let Some(voluntaria) = index_of(&elements, "RemisionVoluntaria") {
             if voluntaria < at {
-                return Err(err(
+                return Err(named(
+                    "schema_element_out_of_order",
+                    json!({ "element": "Representante", "sequence": CABECERA_SEQUENCE }),
                     "Representante va detrás de RemisionVoluntaria; el xs:sequence de \
                      CabeceraType es ObligadoEmision → Representante → RemisionVoluntaria",
                 ));
@@ -412,7 +454,9 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     // ── El registro: alta o anulación ────────────────────────────────────────────────────
     let anulacion = present(&elements, "RegistroAnulacion");
     if !anulacion && !present(&elements, "RegistroAlta") {
-        return Err(err(
+        return Err(named(
+            "schema_record_missing",
+            json!({}),
             "el sobre no contiene ni RegistroAlta ni RegistroAnulacion",
         ));
     }
@@ -438,15 +482,21 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     // Obligatorios presentes y NO vacíos. Un elemento obligatorio vacío es exactamente lo que la
     // AEAT rechaza con «Falta informar campo obligatorio».
     if !present_at(&elements, "IDFactura", nivel) {
-        return Err(err("falta IDFactura"));
+        return Err(named(
+            "schema_element_missing",
+            json!({ "element": "IDFactura" }),
+            "falta IDFactura",
+        ));
     }
     for tag in id_factura {
         match text_at(&elements, tag, nivel + 1) {
             Some(v) if !v.is_empty() => {}
             _ => {
-                return Err(err(format!(
-                    "IDFactura/{tag} es obligatorio y falta o va vacío"
-                )))
+                return Err(named(
+                    "schema_element_missing_or_empty",
+                    json!({ "element": tag }),
+                    format!("IDFactura/{tag} es obligatorio y falta o va vacío"),
+                ))
             }
         }
     }
@@ -456,11 +506,19 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         let contenedor = CONTAINERS.contains(tag);
         match text_at(&elements, tag, nivel) {
             Some(v) if contenedor || !v.is_empty() => {}
-            Some(_) => return Err(err(format!("{tag} es obligatorio y viene vacío"))),
+            Some(_) => {
+                return Err(named(
+                    "schema_element_empty",
+                    json!({ "element": tag }),
+                    format!("{tag} es obligatorio y viene vacío"),
+                ))
+            }
             None => {
-                return Err(err(format!(
-                    "{tag} es obligatorio y no está en el registro"
-                )))
+                return Err(named(
+                    "schema_element_missing",
+                    json!({ "element": tag }),
+                    format!("{tag} es obligatorio y no está en el registro"),
+                ))
             }
         }
     }
@@ -486,28 +544,48 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
     let tipo = text_at(&elements, "TipoFactura", nivel).unwrap_or_default();
     if !anulacion {
         if !TIPO_FACTURA.contains(&tipo) {
-            return Err(err(format!(
-                "TipoFactura `{tipo}` no está en la enumeración del esquema ({})",
-                TIPO_FACTURA.join("|")
-            )));
+            return Err(named(
+                "schema_value_not_in_enum",
+                json!({
+                    "element": "TipoFactura",
+                    "value": tipo,
+                    "allowed": TIPO_FACTURA.join("|"),
+                }),
+                format!(
+                    "TipoFactura `{tipo}` no está en la enumeración del esquema ({})",
+                    TIPO_FACTURA.join("|")
+                ),
+            ));
         }
         // Error 1189: los tipos que identifican destinatario NO pueden ir sin el bloque.
         if TIPOS_CON_DESTINATARIO.contains(&tipo) && !present_at(&elements, "Destinatarios", nivel)
         {
-            return Err(err(format!(
-                "una factura {tipo} exige el bloque Destinatarios; la AEAT la rechaza con el \
-                 error 1189 (una venta sin NIF de cliente es una simplificada F2)"
-            )));
+            return Err(named(
+                "schema_recipient_block_required",
+                json!({ "invoice_type": tipo }),
+                format!(
+                    "una factura {tipo} exige el bloque Destinatarios; la AEAT la rechaza con el \
+                     error 1189 (una venta sin NIF de cliente es una simplificada F2)"
+                ),
+            ));
         }
         validate_rectificativa(&elements, tipo, nivel)?;
     }
 
     let id_si = text_of(&elements, "IdSistemaInformatico").unwrap_or_default();
     if id_si.chars().count() > MAX_ID_SISTEMA_INFORMATICO {
-        return Err(err(format!(
-            "IdSistemaInformatico `{id_si}` pasa de {MAX_ID_SISTEMA_INFORMATICO} caracteres; la \
-             AEAT lo rechaza con el error 1100"
-        )));
+        return Err(named(
+            "schema_value_too_long",
+            json!({
+                "element": "IdSistemaInformatico",
+                "value": id_si,
+                "max": MAX_ID_SISTEMA_INFORMATICO,
+            }),
+            format!(
+                "IdSistemaInformatico `{id_si}` pasa de {MAX_ID_SISTEMA_INFORMATICO} caracteres; \
+                 la AEAT lo rechaza con el error 1100"
+            ),
+        ));
     }
 
     // ── Desglose: la calificación, que el XSD deja pasar ─────────────────────────────────
@@ -518,14 +596,21 @@ pub fn validate_registro(xml: &str) -> Result<(), VerifactuError> {
         validate_limite_f2(&elements, tipo, nivel)?;
     }
 
-    if text_at(&elements, "TipoHuella", nivel).unwrap_or_default() != "01" {
-        return Err(err("TipoHuella solo admite `01` (SHA-256)"));
+    let tipo_huella = text_at(&elements, "TipoHuella", nivel).unwrap_or_default();
+    if tipo_huella != "01" {
+        return Err(named(
+            "schema_hash_type_unsupported",
+            json!({ "value": tipo_huella }),
+            "TipoHuella solo admite `01` (SHA-256)",
+        ));
     }
     // La huella PROPIA del registro, no la de su `RegistroAnterior` (mismo nombre, un nivel más
     // abajo): comprobar la del anterior daba por buena una huella propia corrupta o vacía.
     let huella = text_at(&elements, "Huella", nivel).unwrap_or_default();
     if huella.len() != 64 || !huella.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err(err(
+        return Err(named(
+            "schema_hash_malformed",
+            json!({}),
             "Huella debe ser un SHA-256 en hexadecimal (64 caracteres)",
         ));
     }
@@ -1041,6 +1126,228 @@ mod tests {
     use super::*;
 
     const XSD: &str = include_str!("../schemas/aeat/SuministroInformacion.xsd");
+
+    // ── hub#1576: every refusal of `validate_registro` travels as a CODE ────────────────────
+    //
+    // The verdict of the diagnostic was translated by hub#1575, but its last half was not: the
+    // reason `sample_record_schema_invalid` carries is `{detail}`, and the detail is whatever
+    // sentence THIS validator wrote — in Spanish. A business running in English read «…the AEAT
+    // schema refused the test record: Descripcion es obligatorio y viene vacío», with the only
+    // actionable half in a language it did not choose.
+    //
+    // So each refusal now carries a stable code plus the element it is about, as DATA. The
+    // Spanish stays as the prose (`Display`), which is what a hub on an older module still paints.
+
+    /// Every case this table drives, mutated out of the one envelope that passes. Written as a
+    /// table on purpose: fifteen separate tests would let a new refusal land with no code and
+    /// nobody notice — here the count itself is an assertion.
+    fn refusals() -> Vec<(&'static str, String, &'static str, Json)> {
+        let base = envelope_with("");
+        let swap = |from: &str, to: &str| base.replace(from, to);
+        vec![
+            (
+                "an empty document",
+                String::new(),
+                "schema_envelope_empty",
+                json!({}),
+            ),
+            (
+                "a document that is not a RegFactu envelope",
+                "<sum:Otra><sum1:Cosa>1</sum1:Cosa></sum:Otra>".to_owned(),
+                "schema_envelope_not_regfactu",
+                json!({}),
+            ),
+            (
+                "a header with no ObligadoEmision",
+                swap("<sum1:ObligadoEmision>", "<sum1:ObligadoOtro>")
+                    .replace("</sum1:ObligadoEmision>", "</sum1:ObligadoOtro>"),
+                "schema_header_issuer_missing",
+                json!({}),
+            ),
+            (
+                "an issuer with no tax name",
+                swap(
+                    "<sum1:NombreRazon>CLIENTE SL</sum1:NombreRazon>",
+                    "<sum1:NombreRazon></sum1:NombreRazon>",
+                ),
+                "schema_issuer_identity_incomplete",
+                json!({ "element": "NombreRazon" }),
+            ),
+            (
+                "a representative missing its tax ID",
+                envelope_with(
+                    "<sum1:Representante><sum1:NombreRazon>GESTORIA SL</sum1:NombreRazon>\
+                     </sum1:Representante>",
+                ),
+                "schema_representative_incomplete",
+                json!({ "element": "NIF" }),
+            ),
+            (
+                "a representative filed ahead of the issuer",
+                base.replace(
+                    "<sum:Cabecera><sum1:ObligadoEmision>",
+                    "<sum:Cabecera><sum1:Representante><sum1:NombreRazon>GESTORIA SL\
+                     </sum1:NombreRazon><sum1:NIF>B99999999</sum1:NIF></sum1:Representante>\
+                     <sum1:ObligadoEmision>",
+                ),
+                "schema_element_out_of_order",
+                json!({
+                    "element": "Representante",
+                    "sequence": "ObligadoEmision → Representante → RemisionVoluntaria",
+                }),
+            ),
+            (
+                "an envelope carrying neither an alta nor an anulacion",
+                swap("<sum1:RegistroAlta>", "<sum1:RegistroOtro>")
+                    .replace("</sum1:RegistroAlta>", "</sum1:RegistroOtro>"),
+                "schema_record_missing",
+                json!({}),
+            ),
+            (
+                "a record with no IDFactura at all",
+                swap("<sum1:IDFactura>", "<sum1:IDFacturaOtra>")
+                    .replace("</sum1:IDFactura>", "</sum1:IDFacturaOtra>"),
+                "schema_element_missing",
+                json!({ "element": "IDFactura" }),
+            ),
+            (
+                "an invoice number that came in empty",
+                swap(
+                    "<sum1:NumSerieFactura>A-1</sum1:NumSerieFactura>",
+                    "<sum1:NumSerieFactura></sum1:NumSerieFactura>",
+                ),
+                "schema_element_missing_or_empty",
+                json!({ "element": "NumSerieFactura" }),
+            ),
+            (
+                "a required element that came in empty",
+                swap(
+                    "<sum1:DescripcionOperacion>Servicio</sum1:DescripcionOperacion>",
+                    "<sum1:DescripcionOperacion></sum1:DescripcionOperacion>",
+                ),
+                "schema_element_empty",
+                json!({ "element": "DescripcionOperacion" }),
+            ),
+            (
+                "a required element that is not in the record",
+                swap("<sum1:CuotaTotal>21.00</sum1:CuotaTotal>", ""),
+                "schema_element_missing",
+                json!({ "element": "CuotaTotal" }),
+            ),
+            (
+                "an invoice type outside the enumeration",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>XX</sum1:TipoFactura>",
+                ),
+                "schema_value_not_in_enum",
+                json!({
+                    "element": "TipoFactura",
+                    "value": "XX",
+                    "allowed": TIPO_FACTURA.join("|"),
+                }),
+            ),
+            (
+                "an F1 with no recipient block",
+                swap(
+                    "<sum1:Destinatarios><sum1:IDDestinatario>\
+             <sum1:NombreRazon>OTRO SL</sum1:NombreRazon><sum1:NIF>B87654321</sum1:NIF>\
+             </sum1:IDDestinatario></sum1:Destinatarios>",
+                    "",
+                ),
+                "schema_recipient_block_required",
+                json!({ "invoice_type": "F1" }),
+            ),
+            (
+                "a software id longer than the AEAT allows",
+                swap(
+                    "<sum1:IdSistemaInformatico>EC</sum1:IdSistemaInformatico>",
+                    "<sum1:IdSistemaInformatico>ERPLORA</sum1:IdSistemaInformatico>",
+                ),
+                "schema_value_too_long",
+                json!({
+                    "element": "IdSistemaInformatico",
+                    "value": "ERPLORA",
+                    "max": MAX_ID_SISTEMA_INFORMATICO,
+                }),
+            ),
+            (
+                "a hash algorithm the schema does not admit",
+                swap(
+                    "<sum1:TipoHuella>01</sum1:TipoHuella>",
+                    "<sum1:TipoHuella>02</sum1:TipoHuella>",
+                ),
+                "schema_hash_type_unsupported",
+                json!({ "value": "02" }),
+            ),
+            (
+                "a hash that is not a SHA-256 in hexadecimal",
+                swap(&"A".repeat(64), "ZZZ"),
+                "schema_hash_malformed",
+                json!({}),
+            ),
+        ]
+    }
+
+    /// 🔴 **RED de hub#1576.** Each refusal names a stable code and carries the element it is
+    /// about as DATA, so the module can say the sentence in the reader's language instead of
+    /// interpolating this file's Spanish into an English screen.
+    #[test]
+    fn every_schema_refusal_travels_as_a_code_hub1576() {
+        for (what, xml, code, facts) in refusals() {
+            let e = validate_registro(&xml)
+                .expect_err(&format!("{what} has to be refused, or the case measures nothing"));
+            let (got_code, got_facts) = e
+                .as_reason()
+                .unwrap_or_else(|| panic!("{what}: the refusal carries no code — `{e}`"));
+            assert_eq!(got_code, code, "{what}: `{e}`");
+            assert_eq!(got_facts, facts, "{what}: `{e}`");
+        }
+    }
+
+    /// 🔒 The prose does NOT go away. It is the fallback a hub whose module predates this change
+    /// still paints, exactly the contract `cert_message` has had since hub#1575 — and it keeps
+    /// naming the element, because half an empty sentence is worse than a Spanish one.
+    #[test]
+    fn a_coded_refusal_still_says_it_in_prose_hub1576() {
+        for (what, xml, _, facts) in refusals() {
+            let e = validate_registro(&xml).expect_err(what);
+            let prose = e.to_string();
+            assert!(
+                !prose.is_empty(),
+                "{what}: a refusal with no prose leaves an older module with nothing to paint"
+            );
+            if let Some(element) = facts.get("element").and_then(Json::as_str) {
+                assert!(
+                    prose.contains(element),
+                    "{what}: the prose has to keep naming what to fix — `{prose}`"
+                );
+            }
+        }
+    }
+
+    /// 🔒 And the codes are DISTINCT per family: a table that mapped everything to one code would
+    /// pass the test above and leave the reader with one sentence for fifteen different faults.
+    #[test]
+    fn the_schema_codes_are_not_all_the_same_one_hub1576() {
+        let mut codes: Vec<&str> = refusals()
+            .iter()
+            .map(|(_, xml, _, _)| {
+                validate_registro(xml)
+                    .expect_err("every case in the table is a refusal")
+                    .as_reason()
+                    .expect("every refusal carries a code")
+                    .0
+            })
+            .collect();
+        codes.sort_unstable();
+        codes.dedup();
+        assert_eq!(
+            codes.len(),
+            15,
+            "fifteen families of refusal, fifteen sentences to write: {codes:?}"
+        );
+    }
 
     /// Un sobre completo y válido, con el `Representante` que hub#1460 estampa, para medir sobre
     /// él lo que el validador dice del bloque nuevo.

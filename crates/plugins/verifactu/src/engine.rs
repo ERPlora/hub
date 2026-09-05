@@ -39,6 +39,50 @@ pub enum VerifactuError {
     /// the order the schema expects (hub#1070: asserted by tag, not by the Spanish text).
     #[error("`{tag}` va fuera de orden: la secuencia del esquema es {sequence}")]
     OutOfOrder { tag: String, sequence: String },
+    /// A refusal of the schema validator, with a **stable code** and the element it is about as
+    /// data beside its prose (hub#1576).
+    ///
+    /// Its `Display` is byte-for-byte the one [`VerifactuError::Payload`] gives, and on purpose:
+    /// this variant replaces `Payload` at every `validate_registro` refusal, and every sentence
+    /// the engine already writes — the `xsd_invalid` event, the rejected record's reason, the
+    /// diagnostic's `cert_message` — has to keep reading exactly as it did. What is NEW is
+    /// [`VerifactuError::as_reason`], which is the half a module can translate.
+    #[error("payload inválido: {prose}")]
+    Schema {
+        /// Stable: it is what the module's catalogue indexes. Never renamed without translating it.
+        code: &'static str,
+        /// The data the sentence needs, already split out of it. Always an object.
+        facts: Json,
+        /// The Spanish sentence this engine has always written. The fallback, never withdrawn.
+        prose: String,
+    },
+}
+
+impl VerifactuError {
+    /// The **stable code + facts** behind this error, for the errors that have one — `None` for
+    /// the ones that do not.
+    ///
+    /// It is the same channel `CertReason` opened for the diagnostic (hub#1575): the engine
+    /// publishes a code and the data, the module composes the sentence from its `en`/`es`
+    /// catalogue, and the prose travels beside it as the fallback for a module that does not know
+    /// the code yet. Here it lets the LAST untranslated half of a diagnostic — the detail of why
+    /// the sample record did not pass the schema — cross the same bridge (hub#1576).
+    ///
+    /// `None` is not a gap to fill in blindly: an error whose prose is a wrapped `reqwest` failure
+    /// or an AEAT SOAP fault has nothing this catalogue could say better, and coding it would mean
+    /// inventing a sentence for somebody else's words.
+    pub(crate) fn as_reason(&self) -> Option<(&'static str, Json)> {
+        match self {
+            Self::Schema { code, facts, .. } => Some((code, facts.clone())),
+            // Its own variant since hub#1070, and it predates the channel — mapped here so the
+            // ordering refusal is not the one hole in an otherwise complete table.
+            Self::OutOfOrder { tag, sequence } => Some((
+                "schema_element_out_of_order",
+                json!({ "element": tag, "sequence": sequence }),
+            )),
+            _ => None,
+        }
+    }
 }
 
 impl From<VerifactuError> for RuntimeError {

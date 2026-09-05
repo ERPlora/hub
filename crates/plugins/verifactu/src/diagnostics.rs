@@ -112,7 +112,9 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     // WHY the test failed, as a code the module translates (hub#1575). The prose below is the
     // same sentence it always was and keeps travelling as `cert_message`: it is what a hub on an
     // older module version still paints, exactly like `message` since hub#1178.
-    let mut cert_reason: Option<CertReason> = None;
+    // Since verifactu#95 EVERY road answers with one, success included, so there is no `None` to
+    // carry any more — it is assigned exactly like `cert_message` above, once per road.
+    let cert_reason: CertReason;
     let mut aeat = Json::Null;
     let mut gateway = Json::Null;
     // Whether the test stopped on a field of THIS hub instead of on the road (hub#1531). It is a
@@ -146,7 +148,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             cert_ok = true;
             let loaded = constant_reason("certificate_loaded", "Certificado cargado correctamente.");
             cert_message = loaded.prose.clone();
-            cert_reason = Some(loaded);
+            cert_reason = loaded;
             if issuer_nif.is_empty() {
                 // Sin NIF del obligado no se puede enviar (la AEAT lo rechazaría por formato).
                 // El código es el MISMO que la vía delegada ya publica para este hueco
@@ -259,7 +261,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                     "Configura el NIF del obligado tributario (emisor) antes de probar la conexión.",
                 );
                 cert_message = missing.prose.clone();
-                cert_reason = Some(missing);
+                cert_reason = missing;
             } else if let Err(reason) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
             {
                 // El sobre se construye y se valida IGUAL que en la vía propia. Una config que no
@@ -267,7 +269,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 // tiene que salir — solo que sin dárselo a Hacienda para que lo diga ella.
                 invalid_sample_record = true;
                 cert_message = reason.prose.clone();
-                cert_reason = Some(reason);
+                cert_reason = reason;
             } else {
                 match cell {
                     Ok(()) => {
@@ -277,11 +279,11 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                             "Pasarela fiscal disponible: ERPlora presenta por ti.",
                         );
                         cert_message = ready.prose.clone();
-                        cert_reason = Some(ready);
+                        cert_reason = ready;
                     }
                     Err(reason) => {
                         cert_message = reason.prose.clone();
-                        cert_reason = Some(reason);
+                        cert_reason = reason;
                     }
                 }
             }
@@ -304,7 +306,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 )
             };
             cert_message = reason.prose.clone();
-            cert_reason = Some(reason);
+            cert_reason = reason;
         }
     }
 
@@ -315,8 +317,8 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
         // say it in the language of the business instead of interpolating Spanish prose inside an
         // English sentence. Since verifactu#95 the runs that SUCCEED carry one too: «it went well»
         // was the last sentence a business read in Spanish, and it is the one it reads most often.
-        // `null` is left for the road that answers nothing at all — never for a verdict.
-        "cert_reason": cert_reason.as_ref().map_or(Json::Null, CertReason::as_details),
+        // There is no road left that answers nothing: the field is always an object.
+        "cert_reason": cert_reason.as_details(),
         // Which road this hub files on (hub#1485). The words are the core's own
         // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) because the screen programs against them.
         "route": road,
@@ -421,11 +423,27 @@ fn sample_envelope(
     })?;
     let xml = aeat::set_representative(&xml, route.presenter(), issuer_nif);
     xsd::validate_registro(&xml).map_err(|e| {
+        // The element the validator named travels on its own: it is the actionable half. Twice
+        // over since hub#1576 — as `detail`, the validator's Spanish sentence, which is what a hub
+        // on an older module still paints; and as `detail_reason`, the same refusal as a
+        // `{code, …facts}` the catalogue turns into a sentence in the reader's language.
+        //
+        // Absent when the refusal has no code of its own. Absent and not empty: the module asks
+        // «is there a code I know?», and an object with nothing in it would answer yes and paint a
+        // blank where the half that says what to fix used to be.
+        let mut facts = json!({ "detail": e.to_string() });
+        if let (Some(target), Some((code, detail_facts))) = (facts.as_object_mut(), e.as_reason()) {
+            let mut nested = json!({ "code": code });
+            if let (Some(into), Some(from)) = (nested.as_object_mut(), detail_facts.as_object()) {
+                for (key, value) in from {
+                    into.insert(key.clone(), value.clone());
+                }
+            }
+            target.insert("detail_reason".to_owned(), nested);
+        }
         CertReason::new(
             "sample_record_schema_invalid",
-            // The element the validator named travels on its own: it is the actionable half, and
-            // the AEAT spells those in Spanish by law, so it reads the same in either language.
-            json!({ "detail": e.to_string() }),
+            facts,
             format!("XML no conforme al esquema: {e}"),
         )
     })?;
@@ -1582,6 +1600,80 @@ mod tests {
         );
         // And the prose stays whole for a hub whose module does not know the code yet.
         assert!(reason.prose.contains("XML no conforme al esquema"), "{reason:?}");
+    }
+
+    /// 🔴 **RED de hub#1576.** The element the schema named travels, and it travels in SPANISH:
+    /// `detail` is the validator's own sentence, and the module interpolates it whole into
+    /// `ui.evt.reason.sample_record_schema_invalid`. So an English hub read «…the AEAT schema
+    /// refused the test record: **Descripcion es obligatorio y viene vacío**» — the verdict in its
+    /// language and the only actionable half in one it did not choose.
+    ///
+    /// The reason therefore nests: `detail` stays as the fallback prose, and `detail_reason`
+    /// carries the validator's own `{code, …facts}` for the module to compose. Nested and not
+    /// flattened, because the two codes answer different questions — «the sample did not pass» and
+    /// «this element came in empty» — and flattening them would let one overwrite the other's
+    /// facts.
+    #[test]
+    fn the_reason_the_schema_gave_travels_as_a_code_of_its_own_hub1576() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("an empty Descripcion is refused by the schema");
+
+        assert_eq!(
+            reason.facts["detail_reason"]["code"],
+            json!("schema_element_empty"),
+            "the detail is the half that says what to fix, and it needs its own code: {reason:?}"
+        );
+        assert_eq!(
+            reason.facts["detail_reason"]["element"],
+            json!("DescripcionOperacion"),
+            "the element the schema named travels as DATA, not inside a sentence: {reason:?}"
+        );
+        assert!(
+            reason.facts["detail"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("Descripcion"),
+            "the Spanish detail stays as the fallback for a module that does not know the code: \
+             {reason:?}"
+        );
+    }
+
+    /// 🔒 And a refusal the validator cannot code publishes NO `detail_reason` at all, rather than
+    /// an empty object. The module's fallback is «is there a code I know?», so an object with
+    /// nothing in it would read as «yes» and paint a blank where the actionable half was.
+    #[test]
+    fn a_refusal_with_no_code_of_its_own_publishes_no_nested_reason_hub1576() {
+        let plain = crate::VerifactuError::Payload("algo que este validador no clasifica".into());
+
+        assert!(
+            plain.as_reason().is_none(),
+            "only the refusals with a stable code publish one"
+        );
     }
 
     /// 🔒 The same envelope with nothing missing produces no reason at all — the control has to
