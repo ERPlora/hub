@@ -823,9 +823,6 @@ fn is_ident(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-/// `"2026-01-15"` → `Some("2026-01-16")`. `None` for anything that is not EXACTLY a bare
-/// `YYYY-MM-DD` calendar date — in particular a full ISO-8601 instant (`…T14:23:11+02:00`),
-/// which already means what it says and is left untouched (verifactu#70).
 /// ¿Hay algún extremo de `range` que haya que colocar contra el tipo de su columna? Lo son los
 /// DOS: el escrito como TEXTO sobre una columna numérica (hub#1542) y el escrito como NÚMERO
 /// sobre una que no lo es (hub#1566). Ninguna de las dos direcciones se puede resolver mirando
@@ -890,6 +887,9 @@ fn range_bound_expr(
     Ok(format!("CAST(:{key} AS NUMERIC)"))
 }
 
+/// `"2026-01-15"` → `Some("2026-01-16")`. `None` for anything that is not EXACTLY a bare
+/// `YYYY-MM-DD` calendar date — in particular a full ISO-8601 instant (`…T14:23:11+02:00`),
+/// which already means what it says and is left untouched (verifactu#70).
 fn next_day(s: &str) -> Option<String> {
     let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()?;
     Some(date.succ_opt()?.format("%Y-%m-%d").to_string())
