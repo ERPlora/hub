@@ -999,7 +999,9 @@ pub(crate) async fn retire_replaced_placeholder(
         }
     }
     db.execute_tx(&ops).await.map_err(|e| {
-        crate::RuntimeError::Other(format!("import: retirar el contenido anterior de {table}: {e}"))
+        crate::RuntimeError::Other(format!(
+            "import: retirar el contenido anterior de {table}: {e}"
+        ))
     })?;
     Ok(ids.len())
 }
@@ -1305,6 +1307,69 @@ pub async fn undo_import(rt: &Runtime, hub_id: &str, batch_id: &str) -> crate::R
             format!("UPDATE {table} SET {sets} WHERE id IN ({list})"),
             erplora_db::Params::new(),
         ));
+    }
+    // hub#1555 (review of hub#1548): the chain of substitutions is INHERITED when a batch is undone
+    // out of order. Settings › Data lists every batch with its own «undo» button, so the business
+    // can undo template A while template B — which retired A's week — is still in place. A's rows
+    // are being hard-deleted above, and they are exactly the rows B's ledger promised to bring
+    // back: without this, undoing B afterwards restores ids that no longer exist and the hub is
+    // left with NO hours — the state schedules#36 made unreachable. So what A had retired (the
+    // seeded week) passes on to B's ledger, in this same transaction: undoing B then gives back
+    // what was there before A, which is the honest «before B» once A is gone. An id lives in ONE
+    // ledger at a time (a batch only retires LIVE rows, and what it retired was already buried when
+    // the next one ran), so the move needs no dedupe.
+    for (table, ids) in &by_table {
+        let list = ids
+            .iter()
+            .map(|id| format!("'{}'", id.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut tp = p.clone();
+        tp.insert("table_name".into(), serde_json::json!(table));
+        let heirs = db
+            .query(
+                &format!(
+                    "SELECT DISTINCT r.batch_id AS batch_id FROM _hub_import_retired_row r \
+                     JOIN _hub_import_batch b ON b.id = r.batch_id \
+                     WHERE b.hub_id = :hub_id AND r.batch_id <> :batch \
+                       AND r.table_name = :table_name AND r.row_id IN ({list})"
+                ),
+                &tp,
+            )
+            .await
+            .map_err(|e| {
+                crate::RuntimeError::Other(format!(
+                    "reset: read which later batch retired the rows of {table}: {e}"
+                ))
+            })?;
+        let inherited: &[String] = retired_by_table
+            .iter()
+            .find(|(t, _)| t == table)
+            .map(|(_, i)| i.as_slice())
+            .unwrap_or(&[]);
+        for heir in heirs.rows.iter().filter_map(|r| r["batch_id"].as_str()) {
+            let mut hp = tp.clone();
+            hp.insert("heir".into(), serde_json::json!(heir));
+            // The later batch stops waiting for rows that are about to be gone…
+            ops.push((
+                format!(
+                    "DELETE FROM _hub_import_retired_row \
+                     WHERE batch_id = :heir AND table_name = :table_name AND row_id IN ({list})"
+                ),
+                hp.clone(),
+            ));
+            // …and waits for what THIS batch had retired instead.
+            for id in inherited {
+                let mut rp = hp.clone();
+                rp.insert("row_id".into(), serde_json::json!(id));
+                ops.push((
+                    "INSERT INTO _hub_import_retired_row (batch_id, table_name, row_id) \
+                     VALUES (:heir, :table_name, :row_id)"
+                        .into(),
+                    rp,
+                ));
+            }
+        }
     }
     ops.push((
         "DELETE FROM _hub_import_retired_row WHERE batch_id = :batch".into(),

@@ -1049,7 +1049,11 @@ async fn deshacer_tras_editar_el_horario_no_duplica_el_dia_editado() {
         "el lunes queda con DOS horarios contradictorios tras deshacer — {lunes:?}"
     );
     assert_eq!(
-        (lunes[0].1.as_str(), lunes[0].2.as_str(), lunes[0].4.as_str()),
+        (
+            lunes[0].1.as_str(),
+            lunes[0].2.as_str(),
+            lunes[0].4.as_str()
+        ),
         ("10:00", "19:00", "u-owner"),
         "y el que se queda es el que el negocio acaba de escribir, no el genérico — {lunes:?}"
     );
@@ -1057,5 +1061,140 @@ async fn deshacer_tras_editar_el_horario_no_duplica_el_dia_editado() {
         tras.iter().all(|r| r.4 != "system"),
         "deshacer no puede replantar el marcador sobre una semana que el negocio ya hizo suya — \
          {tras:?}"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Review of hub#1555 — two holes the eight mutants did not reach.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 🔴 Settings › Data lists EVERY batch with its own «undo» button (newest first), so the business
+/// can undo the OLDER template while the newer one is still in place. Whatever order it picks, the
+/// hub can never end up WITHOUT hours — the state ERPlora/schedules#36 made unreachable.
+///
+/// The chain: template A retired the seeded week; template B retired A's week. Undoing A first
+/// finds B's week alive (so the seeded week stays retired, correctly) but hard-deletes A's rows —
+/// the very rows batch B promised to bring back. Undoing B then restores ids that no longer exist,
+/// and the hub is left with zero rows. What A retired has to pass on to B: undoing B must give the
+/// seeded week back.
+#[tokio::test]
+async fn undoing_the_older_template_first_still_leaves_a_week_after_undoing_both() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let a = hub_con("h1", &[&wp]).await;
+    owner_sets_hours(&a, "h1").await;
+    let plantilla_a = export_hub(
+        &a,
+        "h1",
+        &seleccion(&["weekplan"]),
+        "peluqueria",
+        "es",
+        "2026-08-15T10:00:00Z",
+    )
+    .await
+    .expect("export template A");
+    let b = hub_con("h3", &[&wp]).await;
+    owner_sets_whole_week(&b, "h3", "07:00", "15:00").await;
+    let plantilla_b = export_hub(
+        &b,
+        "h3",
+        &seleccion(&["weekplan"]),
+        "panaderia",
+        "es",
+        "2026-08-15T11:00:00Z",
+    )
+    .await
+    .expect("export template B");
+
+    let mut destino = hub_con("h2", &[&wp]).await;
+    let sembrada = semana(&destino, "h2").await;
+    let batch_a = import_sections(
+        &mut destino,
+        &plantilla_a.manifest,
+        &plantilla_a.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort")
+    .batch_id
+    .expect("batch A");
+    let batch_b = import_sections(
+        &mut destino,
+        &plantilla_b.manifest,
+        &plantilla_b.files,
+        &import_selection(&["weekplan"]),
+        "h2",
+    )
+    .await
+    .expect("best-effort")
+    .batch_id
+    .expect("batch B");
+
+    undo_import(&destino, "h2", &batch_a)
+        .await
+        .expect("undo the older template");
+    let con_b = semana(&destino, "h2").await;
+    assert_eq!(
+        con_b.len(),
+        7,
+        "undoing the SUPERSEDED template changes nothing visible: the newer week stays — {con_b:?}"
+    );
+    assert!(
+        con_b
+            .iter()
+            .all(|r| (r.1.as_str(), r.2.as_str()) == ("07:00", "15:00")),
+        "…and it is B's week, untouched — {con_b:?}"
+    );
+
+    undo_import(&destino, "h2", &batch_b)
+        .await
+        .expect("undo the newer template");
+    let tras = semana(&destino, "h2").await;
+    assert_eq!(
+        tras, sembrada,
+        "the hub is left WITHOUT hours: undoing both templates has to give the seeded week back, \
+         whatever the order — {tras:?}"
+    );
+}
+
+/// 🔴 The count the export screen shows («Hours: N rows») is what turns the checkbox into a
+/// decision (hub#534), so it has to be what travels: a week the business adopted half way counts
+/// SEVEN rows, not the one it typed — and a week nobody touched counts zero, because it does not
+/// travel at all.
+#[tokio::test]
+async fn the_export_count_of_a_half_adopted_week_is_the_whole_week() {
+    let wp = modulo_con_marcador_de_tabla_entera();
+    let origen = hub_con("h1", &[&wp]).await;
+    owner_sets_one_day(&origen, "h1", 0, "09:30", "20:00").await;
+    let count = |mapa: &[erplora_runtime::export::ModuleTables]| {
+        mapa.iter()
+            .find(|m| m.module_id == "weekplan")
+            .expect("weekplan")
+            .tables
+            .iter()
+            .find(|t| t.table == "weekplan_hours")
+            .expect("weekplan_hours")
+            .rows
+    };
+
+    let adoptada =
+        erplora_runtime::export::module_table_counts(&origen, "h1", &["weekplan".to_string()])
+            .await
+            .expect("count");
+    assert_eq!(
+        count(&adoptada),
+        7,
+        "the export screen says 1 row while 7 travel: the count has to be what the bundle carries"
+    );
+
+    let intacta = hub_con("h2", &[&wp]).await;
+    let sin_tocar =
+        erplora_runtime::export::module_table_counts(&intacta, "h2", &["weekplan".to_string()])
+            .await
+            .expect("count");
+    assert_eq!(
+        count(&sin_tocar),
+        0,
+        "a week nobody adopted does not travel, so the screen must not count it either"
     );
 }
