@@ -315,10 +315,59 @@ pub async fn rename(
             &p,
         )
         .await?;
+    // **The printer card follows the device list** (hub#1560). `_print_host` carries a name of its
+    // own — what Settings → Printers shows for the device that drains each station (hub#1527) — and
+    // the only place a business can rename anything is this door. Left alone, the same tablet would
+    // answer to "Barra" in one screen and to whatever it registered with in the other.
+    //
+    // Only a NON-BLANK name travels. Blank here means "I have no name for it", and the registry's
+    // own contract is that an empty name never blanks the one already on the owner's screen — the
+    // alternative is putting the opaque device id back on the printer card, which is the bug
+    // hub#1560 exists to remove.
+    if renamed.affected > 0 && !name.is_empty() {
+        db.execute(
+            "UPDATE _print_host SET label = :name \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &p,
+        )
+        .await?;
+    }
     Ok(Renamed {
         was_known: renamed.affected > 0,
         name: name.to_string(),
     })
+}
+
+/// What the **business** calls `device_id`, or `""` when this hub knows no name for it.
+///
+/// The one field of the row a business decides ([`rename`], hub#494), read on its own so a caller
+/// that only needs the name does not have to enumerate every device of the hub — which is an
+/// admin-only shape for good reason ([`list`]).
+///
+/// A device this hub has never seen is `""` and not an error: "I have no name for it" is a fact,
+/// and every caller of this either has a fallback or shows the id.
+pub async fn name_of(db: &dyn DatabaseAdapter, hub_id: &str, device_id: &str) -> Result<String> {
+    let device_id = device_id.trim();
+    if device_id.is_empty() {
+        return Ok(String::new());
+    }
+    let mut p = Params::new();
+    p.insert("hub_id".into(), json!(hub_id));
+    p.insert("device_id".into(), json!(device_id));
+    let res = db
+        .query(
+            "SELECT name FROM hub_trusted_device \
+              WHERE hub_id = :hub_id AND device_id = :device_id",
+            &p,
+        )
+        .await?;
+    Ok(res
+        .rows
+        .first()
+        .and_then(|r| r["name"].as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string())
 }
 
 #[cfg(test)]

@@ -559,6 +559,19 @@ impl Runtime {
         devices::rename(self.db.as_ref(), &self.hub_id, device_id, name).await
     }
 
+    /// Cómo llama el **negocio** a este dispositivo (hub#494), o `""` si no le puso nombre.
+    ///
+    /// Es lo mismo que muestra la lista de dispositivos, leído de una fila y no de todas: quien
+    /// necesita el nombre del dispositivo que tiene delante —el registro de impresión al darlo de
+    /// alta, hub#1560— no tiene por qué enumerar los de todo el negocio, que es una puerta de
+    /// administrador a propósito ([`Self::list_devices`]).
+    pub async fn device_name(&self, device_id: &str) -> Result<String> {
+        match self.device_of_this_hub(device_id) {
+            Some((hub_id, id)) => devices::name_of(self.db.as_ref(), hub_id, id).await,
+            None => Ok(String::new()), // nombrar al hub no nombra a ningún dispositivo (hub#454).
+        }
+    }
+
     /// Qué clase de dispositivo es este: `shared` (mostrador) o `personal` (equipo propio),
     /// paso 2b / hub#357. Un dispositivo que el hub no conoce es **`shared`** — el modo estricto.
     pub async fn device_mode(&self, device_id: &str) -> Result<device_mode::DeviceMode> {
