@@ -505,7 +505,21 @@ pub(crate) async fn run_list(
     // Si el servidor no sabe responder, se sigue exactamente como antes: no saber tiene que
     // dejar el extremo tal cual lo escribió quien llama, nunca inventarse una conversión.
     let column_kinds = if needs_column_kinds(spec, &p) {
-        db.column_kinds(base_sql).await.unwrap_or_default()
+        match db.column_kinds(base_sql).await {
+            Ok(kinds) => kinds,
+            Err(e) => {
+                // Degradar en silencio sería el mismo fallo mudo que este cambio viene a quitar:
+                // la página sigue respondiendo lo que respondía ayer (el extremo de texto sobre
+                // columna numérica vuelve a fallar con el `db` genérico), y sin esta línea nadie
+                // sabría por qué. `eprintln!` y no `tracing`: este crate no tiene logging propio
+                // por diseño (ver `retention.rs`), lo tiene el host de `crates/server`.
+                eprintln!(
+                    "queries: no se pudo resolver el tipo de las columnas de `{query}` ({e}): los \
+                     extremos de `range` se comparan sin convertir, como antes de hub#1542"
+                );
+                BTreeMap::new()
+            }
+        }
     } else {
         BTreeMap::new()
     };
