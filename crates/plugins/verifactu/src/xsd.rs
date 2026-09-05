@@ -299,7 +299,7 @@ fn err(msg: impl Into<String>) -> VerifactuError {
 ///
 /// It is added beside `err` rather than replacing it: `err` still serves the validators of the
 /// desglose, the rectificativa and the F2 limit, which are unreachable from the diagnostic sample
-/// and stay on the fallback prose for now (hub#1590).
+/// and stay on the fallback prose for now (hub#1579).
 fn named(code: &'static str, facts: Json, msg: impl Into<String>) -> VerifactuError {
     VerifactuError::Schema {
         code,
