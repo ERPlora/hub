@@ -114,6 +114,10 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     // fact of its own because the two ask for opposite things from whoever reads the event: one is
     // a form to fill, the other a service to wait for.
     let mut missing_issuer_nif = false;
+    // And whether it stopped on the test RECORD this hub's own data produces (hub#1559). Same
+    // shape, same reason: «your configuration does not yield a valid record» asks for a form, «the
+    // gateway cannot transmit» asks for patience, and only one of them is true at a time.
+    let mut invalid_sample_record = false;
 
     // ── ¿POR DÓNDE sale este hub? (hub#1485) ─────────────────────────────────────────────────
     // Which road this hub is ON, in the CORE's words (`certificate::route_of`), so the screen
@@ -230,6 +234,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 // El sobre se construye y se valida IGUAL que en la vía propia. Una config que no
                 // produce un registro conforme es un fallo de ESTE hub, y el diagnóstico es donde
                 // tiene que salir — solo que sin dárselo a Hacienda para que lo diga ella.
+                invalid_sample_record = true;
                 cert_message = error;
             } else {
                 match cell {
@@ -274,13 +279,17 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     // que falla NO es un certificado que el negocio pueda arreglar, sino la pasarela — mandarle a
     // renovar un `.p12` que no tiene es el defecto original. Y desde hub#1531 un cuarto: cuando lo
     // que falta es un dato SUYO, culpar a la pasarela lo manda a vigilar un servicio que no puede
-    // tocar en vez de rellenar el campo que tiene delante.
+    // tocar en vez de rellenar el campo que tiene delante. Y desde hub#1559 un quinto: el NIF puede
+    // estar puesto y el registro de prueba no salir igual — culpar entonces a la pasarela nombra a
+    // un servicio al que ni se le ha pedido llevar ese registro.
     //
     // Por la vía propia el mismo hueco ya se cuenta bien sin clave nueva: el certificado carga
     // (`cert_ok`) y el bloque `aeat` lleva el «configura el NIF antes de enviar» que la pantalla
     // pinta en rojo, así que ahí la clave sigue siendo la de la prueba que corrió.
     let message_key = if missing_issuer_nif {
         "verifactu.diagnostic_issuer_nif_missing"
+    } else if invalid_sample_record {
+        "verifactu.diagnostic_sample_record_invalid"
     } else if cert_ok {
         "verifactu.diagnostic_ran"
     } else if road == erplora_runtime::certificate::ROUTE_OWN {
@@ -306,6 +315,9 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 }
                 "verifactu.diagnostic_certificate_invalid" => {
                     "Prueba VeriFactu: certificado no válido".to_string()
+                }
+                "verifactu.diagnostic_sample_record_invalid" => {
+                    "Prueba VeriFactu: el registro de prueba no es válido".to_string()
                 }
                 _ => "Prueba VeriFactu: la pasarela fiscal no está disponible".to_string(),
             },
@@ -1029,6 +1041,158 @@ mod tests {
                 .as_str()
                 .is_some_and(|e| e.contains("pasarela")),
             "the failure has to name the leg that failed: {details}"
+        );
+    }
+
+    /// The same enrolled, certless hub as [`CellHost`] — obligado NIF filled in, cell identical —
+    /// except the producer facts this hub files with never arrived from the control plane, so the
+    /// test record cannot be built at all (`sistema_informatico` refuses: a legal declaration has
+    /// no defaults).
+    ///
+    /// It is the reachable half of `sample_envelope`. The other half — a record that builds and
+    /// then fails the XSD — is closed today from every input the diagnostic has: the sample is
+    /// hardcoded well-formed, `ProducerFacts::parse` already enforces the bounds the schema
+    /// checks, and `representative_block` refuses a half presenter rather than emit one. Both
+    /// halves leave through the SAME arm, so pinning this one pins the verdict for both.
+    struct CellHostWithoutProducerFacts;
+
+    #[async_trait::async_trait]
+    impl NativeHost for CellHostWithoutProducerFacts {
+        async fn read(&self, sql: &str, params: &Params) -> Result<Vec<Json>> {
+            CellHost.read(sql, params).await
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(None)
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            CellHost.machine_identity(hub_id).await
+        }
+        async fn cloud_call(
+            &self,
+            request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            CellHost.cloud_call(request).await
+        }
+    }
+
+    /// 🔴 **RED de hub#1559.** hub#1531 one box further along: the obligado NIF IS filled in, and
+    /// the test record still does not come out — so the diagnostic falls through to «the fiscal
+    /// gateway is unavailable», naming a service the business cannot touch and that was never even
+    /// asked to carry this record. The long text does explain the real error; the headline and the
+    /// KEY, which are what the screen programs against, blame the road.
+    #[tokio::test]
+    async fn a_sample_record_that_does_not_come_out_is_never_blamed_on_the_gateway_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        // The control has to catch the positive it claims to catch: this run stops on the RECORD,
+        // not on the cell. Both are false in this test, and only one of them is the verdict.
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("no se puede construir el registro"),
+            "this case has to stop on the sample record, not on the road: {details}"
+        );
+        assert_eq!(
+            details["message_key"],
+            json!("verifactu.diagnostic_sample_record_invalid"),
+            "a test record that does not come out is this hub's own verdict, not a gateway fault: \
+             {details}"
+        );
+    }
+
+    /// The event as filed, so a test can read the prose the screen paints while the module's
+    /// catalogue has not caught up with a key (hub#1178: `message` is the fallback, and for a hub
+    /// on an older module version it is the ONLY thing shown).
+    fn filed_event_message(out: &Output) -> String {
+        out.operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .and_then(|o| o.params.get("message"))
+            .and_then(Json::as_str)
+            .expect("the diagnostic always files its event with a sentence")
+            .to_string()
+    }
+
+    /// 🔒 The HEADLINE has to move with the key. `message_key` is what the module renders once its
+    /// catalogue knows the key; `message` is what every hub shows until then — leaving the prose on
+    /// the gateway would fix the code and change nothing on the screen.
+    #[tokio::test]
+    async fn the_headline_stops_naming_the_gateway_too_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let message = filed_event_message(&out);
+
+        assert!(
+            !message.contains("pasarela"),
+            "the headline must stop blaming a service that was never asked to carry this: {message}"
+        );
+        assert!(
+            message.contains("registro de prueba"),
+            "and it has to name what actually failed: {message}"
+        );
+    }
+
+    /// 🔒 And the sentence keeps carrying WHY the record was refused. A verdict of its own that
+    /// dropped the reason would trade one lie for a silence: the person would know it is not the
+    /// gateway and still not know what to fix.
+    #[tokio::test]
+    async fn the_verdict_still_carries_the_reason_the_record_was_refused_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(details["cert_ok"], json!(false), "{details}");
+        assert!(
+            !details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("pasarela"),
+            "the sentence must stop naming a service that was never asked to carry this: {details}"
+        );
+    }
+
+    /// 🔒 The same guard hub#1531 left for its own case: `/readyz` needs nothing from this hub, so
+    /// the cell is still probed and its block still filed. Otherwise the new verdict would buy a
+    /// truthful headline by hiding the state of the road — and an empty block reads exactly like a
+    /// probe nobody made.
+    #[tokio::test]
+    async fn the_cell_is_still_probed_when_the_sample_record_is_invalid_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert!(
+            !details["gateway"].is_null(),
+            "the cell answers whatever this hub's config says, so its state belongs in the report: \
+             {details}"
+        );
+        assert_eq!(details["gateway"]["ok"], json!(false), "{details}");
+        // And nothing was filed: this road checks the road, it never uses it (ADR-0189).
+        assert!(
+            details["aeat"].is_null(),
+            "a diagnostic through the cell must never present a sample invoice: {details}"
         );
     }
 }
