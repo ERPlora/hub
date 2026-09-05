@@ -649,3 +649,150 @@ async fn hub1560_a_device_with_no_name_and_an_unreadable_agent_keeps_the_name_it
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["host"]["label"], "Counter till");
 }
+
+// ── From the alta to the owner's screen (hub#1560, review) ───────────────────────────────────
+//
+// The tests above prove the door answers with a name. The owner never reads that answer: they read
+// `liveHostLabels` of `hub.print.coverage`, which is what Settings → Printers and the `printing`
+// module render (hub#1527 / printing#33). These walk the same path the shell walks — a bare
+// `POST /api/print/hosts` from a device called `dev_<32 hex>` — and then run the query the screen
+// runs, asserting on the words the owner reads and on the absence of the opaque id.
+
+/// The `hub.print.coverage` row of `role`, read through `/api/query` as a module does.
+async fn coverage_row(router: &axum::Router, session: &str, role: &str) -> Value {
+    let resp = router
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/api/query",
+            Some(session),
+            None,
+            Some(json!({ "name": "hub.print.coverage", "params": {} })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["ok"], json!(true), "{body}");
+    body["data"]
+        .as_array()
+        .unwrap_or_else(|| panic!("coverage is an array: {body}"))
+        .iter()
+        .find(|c| c["role"] == json!(role))
+        .cloned()
+        .unwrap_or_else(|| panic!("no coverage row for {role}: {body}"))
+}
+
+/// `liveHostLabels` of a coverage row, as the screen receives them.
+fn labels_of(row: &Value) -> Vec<String> {
+    row["liveHostLabels"]
+        .as_array()
+        .unwrap_or_else(|| panic!("liveHostLabels is an array: {row}"))
+        .iter()
+        .map(|l| l.as_str().unwrap_or_default().to_string())
+        .collect()
+}
+
+/// Device ids exactly as the shell mints them (`apps/web/src/lib/device.ts`): `dev_` + 32 hex.
+const TILL: &str = "dev_3f9c2b1c4d5e6f708192a3b4c5d6e7f8";
+const TABLET: &str = "dev_0a1b2c3d4e5f60718293a4b5c6d7e8f9";
+const ANDROID_UA: &str =
+    "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
+const IPAD_UA: &str =
+    "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Safari/604.1";
+
+#[tokio::test]
+async fn hub1560_the_owner_reads_a_name_on_the_coverage_and_never_the_device_id() {
+    let (router, admin, _employee, probe) = fixture_with_db().await;
+    let rt = behind(probe);
+    // The till signed in online once (that writes the trust row, born "Chrome · Android") and the
+    // owner then named it in Settings → Devices.
+    rt.trust_device_with_default_name(TILL, "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    rt.rename_device(TILL, "Caja 1").await.unwrap();
+    // The tablet signed in as Luis and nobody named it. Its name is the platform it announced —
+    // NOT the person who signed in on it: that is `label`, a different column with a different job,
+    // and a name that changes with every login would not be a name.
+    rt.trust_device_with_default_name(TABLET, "Luis Pérez", "Safari · iPad")
+        .await
+        .unwrap();
+
+    // Both register exactly as the shell does: the role and nothing else.
+    let (status, _) = register_bare(&router, &admin, TILL, "receipt", Some(ANDROID_UA)).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = register_bare(&router, &admin, TABLET, "receipt", Some(IPAD_UA)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let receipt = coverage_row(&router, &admin, "receipt").await;
+    let labels = labels_of(&receipt);
+    assert_eq!(labels, ["Caja 1", "Safari · iPad"], "{receipt}");
+    assert_eq!(receipt["liveHosts"], json!(2));
+    assert!(
+        labels.iter().all(|l| !l.starts_with("dev_")),
+        "the owner must never read the opaque device id: {labels:?}"
+    );
+    assert!(
+        !labels
+            .iter()
+            .any(|l| l.contains("Luis") || l.contains("Marta")),
+        "who signed in on a device is not the device's name: {labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn hub1560_a_name_the_owner_took_back_falls_to_the_platform_or_the_id_never_to_a_blank() {
+    let (router, admin, _employee, probe) = fixture_with_db().await;
+    let rt = behind(probe);
+    rt.trust_device_with_default_name(TILL, "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    rt.rename_device(TILL, "Caja 1").await.unwrap();
+    // "I have no name for it" is a real gesture in Settings → Devices.
+    rt.rename_device(TILL, "   ").await.unwrap();
+
+    // The till boots: no name from the business, so the platform it announces.
+    register_bare(&router, &admin, TILL, "receipt", Some(ANDROID_UA)).await;
+    // A device nobody named, that announces nothing and that this hub never saw: the id, spelled
+    // out — never an empty string, which the screen would render as a dangling comma.
+    register_bare(&router, &admin, TABLET, "receipt", None).await;
+
+    let labels = labels_of(&coverage_row(&router, &admin, "receipt").await);
+    assert_eq!(labels, ["Chrome · Android", TABLET]);
+    assert!(
+        labels.iter().all(|l| !l.trim().is_empty()),
+        "no entry of the list is ever blank: {labels:?}"
+    );
+}
+
+/// The rows every live hub holds today (shell at `origin/develop` registers `{ role }` and nothing
+/// else) are not migrated or backfilled: the shell re-registers on **every boot**
+/// (`bootPrintHost` → `registration.tick()`), still bare, and that boot is what names the row.
+#[tokio::test]
+async fn hub1560_a_host_the_fleet_registered_nameless_is_named_on_its_next_boot() {
+    let (router, admin, _employee, probe) = fixture_with_db().await;
+    let rt = behind(probe);
+    rt.trust_device_with_default_name(TILL, "Marta Ruiz", "Chrome · Android")
+        .await
+        .unwrap();
+    rt.rename_device(TILL, "Caja 1").await.unwrap();
+    // Named in the device list, nameless on the printer card: what the fleet has today.
+    rt.register_print_host(TILL, "receipt", "", "u1")
+        .await
+        .unwrap();
+    rt.register_print_host(TABLET, "receipt", "", "u1")
+        .await
+        .unwrap();
+    let before = labels_of(&coverage_row(&router, &admin, "receipt").await);
+    assert_eq!(
+        before,
+        [TABLET, TILL],
+        "the rows the fleet has today read as ids"
+    );
+
+    register_bare(&router, &admin, TILL, "receipt", Some(ANDROID_UA)).await;
+    register_bare(&router, &admin, TABLET, "receipt", Some(IPAD_UA)).await;
+
+    let after = labels_of(&coverage_row(&router, &admin, "receipt").await);
+    assert_eq!(after, ["Caja 1", "Safari · iPad"]);
+}
