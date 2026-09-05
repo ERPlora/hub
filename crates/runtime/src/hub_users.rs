@@ -1151,11 +1151,15 @@ pub async fn core_query(
                 .get("limit")
                 .and_then(|v| v.as_i64())
                 .unwrap_or(PRINT_JOBS_LIMIT);
+            // The stamp a person left on a job is back-office data, so WHO is asking decides how
+            // much of each job comes back (hub#1565). It is not a second gate: the query itself
+            // stays open to the counter, which is hub#987's audience for the alarm.
+            let audience = crate::print_queue::audience_of(ctx);
             Ok(whole(
                 crate::print_queue::list(db, hub_id, role.as_deref(), status.as_deref(), limit)
                     .await?
                     .iter()
-                    .map(crate::print_queue::status_view)
+                    .map(|job| crate::print_queue::status_view(job, audience))
                     .collect(),
             ))
         }

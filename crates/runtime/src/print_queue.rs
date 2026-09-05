@@ -186,11 +186,26 @@ pub struct PrintJob {
     pub attempts: i64,
     pub created_at: String,
     pub last_error: String,
+    /// The stamp a person left on this job, or empty strings when nobody touched it (hub#1108,
+    /// hub#1532). It is read from the row like everything else here — the queue is the only place
+    /// it is stored, and [`status_view`] decides who gets to see it.
+    ///
+    /// `discarded_at`/`discarded_by`/`retried_at`/`retried_by` are nullable in the table and arrive
+    /// here as `""` when NULL, which is the same "nothing to say" the other halves already spell.
+    pub discarded_at: String,
+    pub discarded_by: String,
+    pub discarded_by_module: String,
+    pub discard_reason: String,
+    pub retried_at: String,
+    pub retried_by: String,
+    pub retried_by_module: String,
 }
 
 /// Columns every read of the queue returns, in the order [`row_to_job`] expects.
-const JOB_COLUMNS: &str =
-    "job_id, role, document_type, document, format, status, attempts, created_at, last_error";
+const JOB_COLUMNS: &str = "job_id, role, document_type, document, format, status, attempts, \
+                           created_at, last_error, discarded_at, discarded_by, \
+                           discarded_by_module, discard_reason, retried_at, retried_by, \
+                           retried_by_module";
 
 /// Rejection of a malformed job, before it reaches the database.
 fn invalid(detail: impl Into<String>) -> RuntimeError {
@@ -479,8 +494,18 @@ pub async fn list(
         p.insert("status".into(), json!(status));
         where_sql.push_str(" AND status = :status");
     }
-    let sql =
-        format!("SELECT {JOB_COLUMNS} FROM _print_queue WHERE {where_sql} ORDER BY seq LIMIT :lim");
+    // **A CLOSED bucket is read from the other end** (hub#1565). `seq` ascending is hand-out order,
+    // and for a LIVE bucket that is the right end: the ticket that has waited longest is the one on
+    // fire. `discarded` and `done` never leave the table, so on a hub with a year of history the
+    // same ordering would page forever through its first hundred rows and never reach the ticket
+    // somebody is actually asking about — which is always one of the last ones.
+    let order = match status {
+        Some(STATUS_DISCARDED | STATUS_DONE) => "seq DESC",
+        _ => "seq",
+    };
+    let sql = format!(
+        "SELECT {JOB_COLUMNS} FROM _print_queue WHERE {where_sql} ORDER BY {order} LIMIT :lim"
+    );
     let res = db.query(&sql, &p).await?;
     Ok(res.rows.iter().map(row_to_job).collect())
 }
@@ -496,17 +521,79 @@ pub async fn list(
 /// is waiting" is exactly what a screen showing a stuck queue has to say — while `document` is the
 /// ticket itself (names, lines, totals, the fiscal QR) and only ever leaves through the drain, past
 /// both of its guards (hub#343).
-pub fn status_view(job: &PrintJob) -> serde_json::Value {
-    json!({
-        "jobId": job.job_id,
-        "role": job.role,
-        "documentType": job.document_type,
-        "format": job.format,
-        "status": job.status,
-        "attempts": job.attempts,
-        "createdAt": job.created_at,
-        "lastError": job.last_error,
-    })
+pub fn status_view(job: &PrintJob, audience: QueueAudience) -> serde_json::Value {
+    let mut view = serde_json::Map::new();
+    let mut put = |key: &str, value: serde_json::Value| {
+        view.insert(key.to_string(), value);
+    };
+    put("jobId", json!(job.job_id));
+    put("role", json!(job.role));
+    put("documentType", json!(job.document_type));
+    put("format", json!(job.format));
+    put("status", json!(job.status));
+    put("attempts", json!(job.attempts));
+    put("createdAt", json!(job.created_at));
+    put("lastError", json!(job.last_error));
+    if audience == QueueAudience::Admin {
+        // Only when the gesture actually HAPPENED. A `pending` job carries empty stamp columns,
+        // and answering `discardedBy: ""` on it would have every screen render "retired by —" on a
+        // ticket that is simply waiting its turn.
+        if !job.discarded_at.is_empty() {
+            put("discardedAt", json!(job.discarded_at));
+            put("discardedBy", json!(job.discarded_by));
+            put("discardedByModule", json!(job.discarded_by_module));
+            put("discardReason", json!(job.discard_reason));
+        }
+        if !job.retried_at.is_empty() {
+            put("retriedAt", json!(job.retried_at));
+            put("retriedBy", json!(job.retried_by));
+            put("retriedByModule", json!(job.retried_by_module));
+        }
+    }
+    serde_json::Value::Object(view)
+}
+
+/// **Who is asking the queue what it is doing**, and therefore how much of a job's history comes
+/// back (hub#1565).
+///
+/// The queue's STATE and the STAMP a person left on a job are two different facts with two
+/// different audiences, and this is what keeps them travelling through one door instead of two:
+///
+///  - The state is the counter's. hub#987 decided that on purpose — a queue nobody is draining
+///    needs whoever is standing next to the printer, not whoever can administer the hub.
+///  - The stamp («binned by Ana, because X», «re-fired by Ana») is the back office's. That is the
+///    market's answer, not ours: Square's comp & void report needs the `reports` permission, Toast's
+///    Voided Orders is a Toast Web report, Lightspeed's Cancellations and Corrections report is Back
+///    Office, Odoo's cancelled-orders report is the PoS Manager group. The reason is the same
+///    everywhere and it is not privacy for its own sake — the report exists to spot till fraud, so
+///    the population it watches cannot be its audience.
+///
+/// Two hand-written views would have been the other way to do it, and it is exactly what
+/// [`status_view`] exists to prevent (hub#1107): the field that drifts first is the one that must
+/// not appear.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueueAudience {
+    /// Any local session — the state of the queue, and nothing about who touched it.
+    Counter,
+    /// A session that administers the hub — the state **plus** the stamp.
+    Admin,
+}
+
+/// The audience a request context belongs to.
+///
+/// One definition for the two doors (`GET /api/print/jobs` and the core query `hub.print.jobs`),
+/// for the same reason [`status_view`] is one definition: two copies of "is this the back office?"
+/// would drift, and the one that drifts open is the one nobody notices.
+///
+/// It reads the permission with [`crate::permissions::has`] and not `check`, because this FILTERS
+/// instead of rejecting: not being an admin is a smaller answer, never a refusal — the cashier's
+/// listing must not turn into a `403`.
+pub fn audience_of(ctx: &crate::registry::RequestContext) -> QueueAudience {
+    if crate::permissions::has(ctx, crate::hub_users::ADMINISTER_PERMISSION) {
+        QueueAudience::Admin
+    } else {
+        QueueAudience::Counter
+    }
 }
 
 /// Which printer role a job belongs to, or `None` when **this hub** has no such job.
@@ -773,6 +860,13 @@ fn row_to_job(row: &serde_json::Value) -> PrintJob {
         attempts: row["attempts"].as_i64().unwrap_or(0),
         created_at: s("created_at"),
         last_error: s("last_error"),
+        discarded_at: s("discarded_at"),
+        discarded_by: s("discarded_by"),
+        discarded_by_module: s("discarded_by_module"),
+        discard_reason: s("discard_reason"),
+        retried_at: s("retried_at"),
+        retried_by: s("retried_by"),
+        retried_by_module: s("retried_by_module"),
     }
 }
 
