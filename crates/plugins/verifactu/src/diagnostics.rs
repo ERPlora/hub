@@ -149,13 +149,35 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             cert_reason = Some(loaded);
             if issuer_nif.is_empty() {
                 // Sin NIF del obligado no se puede enviar (la AEAT lo rechazaría por formato).
-                aeat = json!({ "ok": false, "error": "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba." });
+                // El código es el MISMO que la vía delegada ya publica para este hueco
+                // (hub#1578): para quien lo lee es el mismo campo que rellenar, y la vía por la
+                // que se topó con él no cambia la frase.
+                let missing = constant_reason(
+                    "issuer_nif_missing",
+                    "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba.",
+                );
+                aeat = json!({
+                    "ok": false,
+                    "error": missing.prose,
+                    "reason": missing.as_details(),
+                });
             } else {
                 // Mismo gate que la transmisión real: la prueba tiene que fallar donde falla el
                 // envío de verdad, no ir a la AEAT a que lo diga con un 4102. Y si el sobre ni
                 // siquiera se puede construir (hub#324), el diagnóstico lo dice aquí.
                 match sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif) {
-                    Err(reason) => aeat = json!({ "ok": false, "error": reason.prose }),
+                    // El motivo que `sample_envelope` ya calcula (hub#1575) viaja también aquí
+                    // como código (hub#1578). Por esta vía el certificado SÍ carga, así que el
+                    // veredicto de arriba sale en verde y lo que hay que arreglar cae en esta
+                    // caja: era la última que hablaba castellano en una pantalla en inglés, y es
+                    // la que dice qué tocar.
+                    Err(reason) => {
+                        aeat = json!({
+                            "ok": false,
+                            "error": reason.prose,
+                            "reason": reason.as_details(),
+                        })
+                    }
                     Ok(xml) => {
                         let TransmitRoute::Direct { identity, .. } = route else {
                             unreachable!("this arm matched Direct")
@@ -1838,6 +1860,101 @@ mod tests {
                 .as_str()
                 .is_some_and(|e| e.contains("total_amount")),
             "the reason has to keep naming what to fix: {reason:?}"
+        );
+    }
+
+    // ── hub#1578: the AEAT box of the OWN road ───────────────────────────────────────────────
+    //
+    // hub#1575 and verifactu#95 coded the certificate verdict. On the own road that verdict is
+    // «loaded ✓» — the `.p12` really does load — and what stops the run lands one field lower, in
+    // `aeat`, as Spanish prose the module pastes straight onto the screen. So the box that says
+    // WHAT TO FIX was the one still speaking a language the reader did not choose.
+    //
+    // Same channel, same shape: `aeat` gains a `reason` beside its `error`, and `error` keeps the
+    // prose exactly as it was — the fallback for a hub whose module does not know the code yet.
+
+    /// A hub that files with its OWN certificate and has not filled in the obligado's tax ID.
+    /// The `.p12` loads, so the fault is a field of this hub, and it is reported in the `aeat` box.
+    struct OwnRoadHost(Json);
+
+    #[async_trait::async_trait]
+    impl NativeHost for OwnRoadHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![self.0.clone()])
+        }
+        async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(Some("own".to_owned()))
+        }
+        async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+            Ok(throwaway_identity())
+        }
+    }
+
+    /// 🔴 **RED de hub#1578.** With no obligado tax ID the own road answers «Configura el NIF del
+    /// obligado tributario…» inside `aeat.error`, and that is all it answers. An English hub read
+    /// it in Spanish, in red, in the only box on the card that names something to do.
+    ///
+    /// The code is the SAME one the delegated road already files for this (`issuer_nif_missing`):
+    /// for whoever reads it, it is the same field to fill, and the road it happened on does not
+    /// change the sentence.
+    #[tokio::test]
+    async fn a_missing_issuer_nif_travels_as_a_code_on_the_own_road_too_hub1578() {
+        let host = OwnRoadHost(json!({ "id": "cfg-1", "environment": "testing" }));
+
+        let out = run_diagnostics(&diagnostics_input("hub-own-no-nif"), &host)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["aeat"]["reason"]["code"],
+            json!("issuer_nif_missing"),
+            "the AEAT box has to say WHY as a code, not only as prose: {details}"
+        );
+        assert!(
+            details["aeat"]["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("NIF del obligado")),
+            "the prose stays as the fallback for a module that does not know the code: {details}"
+        );
+    }
+
+    /// 🔴 **RED de hub#1578, la otra mitad.** The tax ID is filled in and the sample still cannot
+    /// be wrapped — here because the control plane has never served this hub its producer facts.
+    /// The reason `sample_envelope` already computes (hub#1575) is the one the box must carry:
+    /// «wait for the next sync» and «fix your data» ask opposite things of the reader, and until
+    /// now both arrived as one blob of Spanish.
+    #[tokio::test]
+    async fn a_sample_the_own_road_cannot_wrap_travels_as_a_code_hub1578() {
+        let host = OwnRoadHost(json!({
+            "id": "cfg-1",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+        }));
+
+        let out = run_diagnostics(&diagnostics_input("hub-own-no-facts"), &host)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_ok"],
+            json!(true),
+            "the certificate DOES load on this road: the fault is the record, not the .p12: {details}"
+        );
+        assert_eq!(
+            details["aeat"]["reason"]["code"],
+            json!("producer_facts_missing"),
+            "waiting for a heartbeat and fixing a form are different answers: {details}"
+        );
+        assert!(
+            details["aeat"]["reason"]["error"].is_string(),
+            "the facts the sentence needs travel with the code: {details}"
+        );
+        assert!(
+            details["aeat"]["error"].as_str().is_some_and(|e| !e.is_empty()),
+            "the prose stays as the fallback: {details}"
         );
     }
 }
