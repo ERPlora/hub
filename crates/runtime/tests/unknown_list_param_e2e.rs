@@ -96,34 +96,84 @@ async fn an_undeclared_param_is_refused_instead_of_ignored() {
     }
 }
 
-/// The OTHER half, pinned as it stands today: `f_*` is the engine's own namespace, and an
-/// undeclared column inside it is still DROPPED, not refused.
+/// The OTHER half, now closed (hub#1182): `f_*` is the engine's own namespace, and an undeclared
+/// column inside it is REFUSED, not dropped.
 ///
-/// Deliberate and measured, not an oversight. The SDK flattens `filters` to `f_<col>` whatever the
-/// manifest says, so a column a screen's table declares `filterable` while its manifest declares no
-/// filter for it arrives here correctly prefixed. That case EXISTS: the sweep of the 27 module
-/// repos (`origin/main`, 25/08/2026) finds 5 such components, `inventory`'s product table among
-/// them (`name`/`sku` are `search` columns, not `filters`). Refusing them here would turn "the
-/// filter does nothing" into "the table breaks", which is not fixing it — what fixes it is
-/// declaring the missing filter in those manifests (hub#1182 carries the measured list). Only then
-/// can this door cover `f_*` too.
+/// This test used to pin the opposite, and the reason it did is the reason it changes now. The SDK
+/// flattens `filters` to `f_<col>` whatever the manifest says, so a column a screen's table
+/// declares `filterable` while its manifest declares no filter for it arrived here correctly
+/// prefixed. That case EXISTED: the sweep of the 27 module repos (`origin/main`, 25/08/2026) found
+/// five such components, `inventory`'s product table among them. Refusing them then would have
+/// turned "the filter does nothing" into "the table breaks", which is not fixing it.
+///
+/// What fixed it is declaring the missing filter in those manifests, module by module — inventory,
+/// taxes, verifactu, pricing, sales, tables, schedules and reservations, each with a permanent
+/// guard in its own repo. Re-swept on 05/09/2026 against `origin/main` of all 27: **55 server-side
+/// list tables, zero `f_*` the manifest does not accept**. So there is no live screen left for
+/// this door to break, and the silence has no reason to survive.
 #[tokio::test]
-async fn an_undeclared_column_inside_the_engine_prefix_is_still_dropped() {
+async fn an_undeclared_column_inside_the_engine_prefix_is_refused_too() {
     let rt = hub().await;
 
-    let page = rt
+    let err = rt
         .execute_query_page(
             "lbind.items.list",
             &params(&[("cart_id", json!("cart-a")), ("f_price", json!(5))]),
             &ctx(),
         )
         .await
-        .expect("`f_*` is the engine namespace: an unmatched filter is dropped, as it always was");
-    assert_eq!(
-        page.total, 3,
-        "the documented hole, pinned: the page is the unfiltered scope (hub#1182): {:?}",
-        page.rows
-    );
+        .expect_err("an undeclared column inside `f_*` must not answer the whole list either");
+
+    match err {
+        RuntimeError::UnknownFilter {
+            query,
+            param,
+            accepted,
+        } => {
+            assert_eq!(query, "lbind.items.list");
+            assert_eq!(
+                param, "f_price",
+                "the refusal names the parameter as it travelled, prefix included"
+            );
+            assert!(
+                accepted.iter().any(|a| a == "f_name"),
+                "and lists what IS accepted, so the caller can fix it: {accepted:?}"
+            );
+        }
+        other => panic!("expected the stable unknown-filter refusal, got {other:?}"),
+    }
+}
+
+/// The edge that only exists inside `f_*`, and the one that pays for closing it: a RANGE edge sent
+/// to a filter that is not a range.
+///
+/// `buildListParams` decides the shape from the VALUE, not from the manifest: a `{from, to}` (what
+/// `ok-data-table` emits for `filterType: 'range'` / `'daterange'`) travels as `f_<col>_from` /
+/// `f_<col>_to`, anything else as `f_<col>`. So a column painted as a two-bound control over a
+/// filter declared `eq` or `like` sends a parameter name the query never had — and until now the
+/// engine dropped it and answered the unfiltered page. It is the same silent success as its
+/// sibling, reached from the shape of the control instead of from a missing declaration, and it is
+/// what makes the `filterType` ↔ `op` guards the modules just installed enforceable at all.
+#[tokio::test]
+async fn a_range_edge_on_a_scalar_filter_is_refused() {
+    let rt = hub().await;
+
+    let err = rt
+        .execute_query_page(
+            "lbind.items.list",
+            &params(&[("cart_id", json!("cart-a")), ("f_name_from", json!("c"))]),
+            &ctx(),
+        )
+        .await
+        .expect_err("`name` is declared `like`, so it has no `_from` edge to bind");
+
+    match err {
+        RuntimeError::UnknownFilter { param, .. } => assert_eq!(
+            param, "f_name_from",
+            "the refusal names the edge, which is what tells the author the `op` is wrong"
+        ),
+        other => panic!("expected the stable unknown-filter refusal, got {other:?}"),
+    }
 }
 
 /// Positive control — without it the two tests above pass for the wrong reason (everything
