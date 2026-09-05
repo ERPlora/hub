@@ -116,8 +116,12 @@ fn unauthorized(e: auth::AuthError) -> Response {
 /// and two hand-written copies of "the queue seen from outside" would drift — starting with the
 /// field that must never appear. `audience` (hub#1565) travels the same way, resolved by
 /// `print_queue::audience_of` from the context both doors already have.
-fn summary(job: &PrintJob, audience: print_queue::QueueAudience) -> Value {
-    print_queue::status_view(job, audience)
+fn summary(
+    job: &PrintJob,
+    audience: print_queue::QueueAudience,
+    names: &print_queue::ActorNames,
+) -> Value {
+    print_queue::status_view(job, audience, names)
 }
 
 /// POST /api/print/jobs — enqueue a document for a printer role. Auth = any user session.
@@ -207,7 +211,19 @@ pub async fn list_jobs(
         .await
     {
         Ok(jobs) => {
-            let jobs: Vec<Value> = jobs.iter().map(|job| summary(job, audience)).collect();
+            // The stamp names a person (hub#1565), and only the back office reads it: a counter
+            // session resolves nothing, which is both the right answer and the cheap one.
+            let names = match audience {
+                print_queue::QueueAudience::Admin => match rt.print_queue_actor_names(&jobs).await {
+                    Ok(names) => names,
+                    Err(e) => return crate::err_response(e),
+                },
+                print_queue::QueueAudience::Counter => print_queue::ActorNames::none(),
+            };
+            let jobs: Vec<Value> = jobs
+                .iter()
+                .map(|job| summary(job, audience, &names))
+                .collect();
             Json(json!({ "ok": true, "jobs": jobs })).into_response()
         }
         Err(e) => crate::err_response(e),
@@ -1026,7 +1042,11 @@ mod tests {
     /// the owner needs to read.
     #[test]
     fn the_listing_view_reports_state_without_the_document() {
-        let v = summary(&job(), print_queue::QueueAudience::Counter);
+        let v = summary(
+            &job(),
+            print_queue::QueueAudience::Counter,
+            &print_queue::ActorNames::none(),
+        );
         assert_eq!(v["jobId"], json!("j1"));
         assert_eq!(v["role"], json!("kitchen"));
         assert_eq!(v["documentType"], json!("kitchen_order"));
@@ -1045,17 +1065,31 @@ mod tests {
     /// hard-codes one turns this red instead of shipping the back office's data to the counter.
     #[test]
     fn the_stamp_travels_to_the_back_office_and_not_to_the_counter() {
-        let admin = summary(&retired_job(), print_queue::QueueAudience::Admin);
+        let admin = summary(
+            &retired_job(),
+            print_queue::QueueAudience::Admin,
+            &print_queue::ActorNames::none(),
+        );
         assert_eq!(admin["discardedBy"], json!("hub_user:u9"));
         assert_eq!(admin["discardReason"], json!("duplicado"));
 
-        let counter = summary(&retired_job(), print_queue::QueueAudience::Counter);
+        let counter = summary(
+            &retired_job(),
+            print_queue::QueueAudience::Counter,
+            &print_queue::ActorNames::none(),
+        );
         assert_eq!(
             counter["status"],
             json!("discarded"),
             "the counter still reads the STATE: {counter}"
         );
-        for key in ["discardedBy", "discardedByModule", "discardReason", "discardedAt"] {
+        for key in [
+            "discardedBy",
+            "discardedByName",
+            "discardedByModule",
+            "discardReason",
+            "discardedAt",
+        ] {
             assert!(
                 counter.get(key).is_none(),
                 "`{key}` is the back office's: {counter}"

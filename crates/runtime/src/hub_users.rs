@@ -1155,11 +1155,23 @@ pub async fn core_query(
             // much of each job comes back (hub#1565). It is not a second gate: the query itself
             // stays open to the counter, which is hub#987's audience for the alarm.
             let audience = crate::print_queue::audience_of(ctx);
-            Ok(whole(
+            let jobs =
                 crate::print_queue::list(db, hub_id, role.as_deref(), status.as_deref(), limit)
-                    .await?
-                    .iter()
-                    .map(|job| crate::print_queue::status_view(job, audience))
+                    .await?;
+            // The stamp names a PERSON, not a row id. Resolved once for the page and only for the
+            // audience that gets the stamp at all: a counter read never pays for it, and neither
+            // does a page where nothing was retired (`ActorNames::of` looks before it asks).
+            let names = match audience {
+                crate::print_queue::QueueAudience::Admin => {
+                    crate::print_queue::ActorNames::of(db, hub_id, &jobs).await?
+                }
+                crate::print_queue::QueueAudience::Counter => {
+                    crate::print_queue::ActorNames::none()
+                }
+            };
+            Ok(whole(
+                jobs.iter()
+                    .map(|job| crate::print_queue::status_view(job, audience, &names))
                     .collect(),
             ))
         }

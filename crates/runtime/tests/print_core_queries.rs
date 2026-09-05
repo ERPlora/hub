@@ -543,3 +543,128 @@ async fn the_retired_bucket_is_read_newest_first() {
         "a queue is still served in hand-out order: {rows:?}"
     );
 }
+
+// ── The stamp names a PERSON, not a row id (hub#1565) ─────────────────────────────────────────
+//
+// The stamp is stored as the principal the HTTP layer resolved from the session — `hub_user:<id>`
+// — because that is the only identity that cannot be forged from a body. It is also unreadable:
+// «Retirado por hub_user:018f3c…» leaves the owner exactly where the missing stamp did.
+//
+// This is not a new lesson in this repo. `hub.approvals.list` resolves both of its ids against
+// `hub_user` for the stated reason that otherwise «the screen shows UUIDs and nobody uses it», and
+// hub#1560 — three commits back, same family — is the identical fix for the device that prints.
+// Serving the code here would recreate a defect the printing area has already closed twice.
+//
+// Both facts travel: `discardedBy` is the stable id support quotes, `discardedByName` is what the
+// screen prints. The name FALLS BACK to the principal, never to an empty string: an employee who
+// has since been deleted must not turn an audit row into «retired by ——».
+
+/// Creates a person in this hub and returns the principal their gestures are stamped with.
+async fn person(rt: &Runtime, hub_id: &str, name: &str) -> String {
+    let id = erplora_runtime::identity::create_user(rt.db_for_test(), hub_id, name, "4271", "manager", None)
+        .await
+        .expect("the person is created");
+    format!("hub_user:{id}")
+}
+
+#[tokio::test]
+async fn the_stamp_names_the_person_who_retired_the_ticket() {
+    let rt = runtime("hub-who").await;
+    let ana = person(&rt, "hub-who", "Ana").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", &ana, "printing", "duplicado del ticket 42")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-who", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["discardedByName"], "Ana",
+        "«who binned my ticket?» is answered with a name: {rows:?}"
+    );
+    assert_eq!(
+        rows[0]["discardedBy"],
+        json!(ana),
+        "and the stable id survives for support: {rows:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_stamp_names_the_person_who_re_fired_the_ticket() {
+    let rt = runtime("hub-who-again").await;
+    let leo = person(&rt, "hub-who-again", "Leo").await;
+    enqueue(&rt, "twice", "kitchen", "kitchen_order").await;
+    seed_dead(&rt, "hub-who-again", "twice", "kitchen").await;
+    rt.retry_print_job("twice", &leo, "printing")
+        .await
+        .expect("the job is re-fired");
+
+    let mut dead = Params::new();
+    dead.insert("status".into(), json!("pending"));
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        dead,
+        &ctx("hub-who-again", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["retriedByName"], "Leo",
+        "«who printed this twice?» is answered with a name: {rows:?}"
+    );
+}
+
+/// An employee who has left is still the answer: the audit row keeps the only identity it has.
+#[tokio::test]
+async fn a_stamp_left_by_somebody_this_hub_no_longer_knows_still_says_something() {
+    let rt = runtime("hub-gone").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", "hub_user:u-long-gone", "printing", "")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-gone", &[SESSION, ADMIN]),
+    )
+    .await;
+
+    assert_eq!(
+        rows[0]["discardedByName"], "hub_user:u-long-gone",
+        "an unknown principal falls back to itself, never to an empty label: {rows:?}"
+    );
+}
+
+/// The name is part of the stamp, so it obeys the same audience: the counter reads neither.
+#[tokio::test]
+async fn the_counter_reads_no_name_either() {
+    let rt = runtime("hub-who-not").await;
+    let ana = person(&rt, "hub-who-not", "Ana").await;
+    enqueue(&rt, "binned", "receipt", "receipt").await;
+    rt.discard_print_job("binned", &ana, "printing", "duplicado")
+        .await
+        .expect("the job is retired");
+
+    let rows = query(
+        &rt,
+        "hub.print.jobs",
+        Params::new(),
+        &ctx("hub-who-not", &[SESSION]),
+    )
+    .await;
+
+    assert_eq!(rows.len(), 1, "the queue itself stays open (hub#987): {rows:?}");
+    assert!(
+        rows[0].get("discardedByName").is_none(),
+        "the name is the stamp by another route: {rows:?}"
+    );
+}

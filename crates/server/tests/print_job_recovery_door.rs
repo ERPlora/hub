@@ -559,7 +559,14 @@ async fn hub1565_an_admin_reads_the_stamp_back_from_the_listing() {
         job["discardedBy"]
             .as_str()
             .is_some_and(|s| s.starts_with("hub_user:")),
-        "the person is named: {job}"
+        "the person is identified: {job}"
+    );
+    // …and IDENTIFIED is not NAMED. `hub_user:018f3c…` is what the door stores because it is the
+    // only identity a body cannot forge, and it is not an answer to «who binned my ticket?» —
+    // the same lesson hub#1560 taught three commits ago about the device that prints.
+    assert_eq!(
+        job["discardedByName"], "Ioan",
+        "the id resolves to the person's name: {job}"
     );
     assert!(
         job["discardedAt"].as_str().is_some_and(|s| !s.is_empty()),
@@ -589,10 +596,12 @@ async fn hub1565_the_cashier_reads_the_queue_without_the_stamp() {
     );
     for key in [
         "discardedBy",
+        "discardedByName",
         "discardedByModule",
         "discardReason",
         "discardedAt",
         "retriedBy",
+        "retriedByName",
         "retriedByModule",
         "retriedAt",
     ] {
@@ -601,11 +610,11 @@ async fn hub1565_the_cashier_reads_the_queue_without_the_stamp() {
             "`{key}` is back-office data and must be ABSENT for the counter: {job}"
         );
     }
-    assert!(
-        !serde_json::to_string(&job)
-            .unwrap()
-            .contains("se imprimió dos veces"),
-        "and the reason must not leak by another name: {job}"
-    );
+    for leak in ["se imprimió dos veces", "Ioan"] {
+        assert!(
+            !serde_json::to_string(&job).unwrap().contains(leak),
+            "and neither the reason nor WHO must leak by another key (`{leak}`): {job}"
+        );
+    }
     let _ = std::fs::remove_dir_all(&f.temp);
 }

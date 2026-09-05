@@ -521,7 +521,11 @@ pub async fn list(
 /// is waiting" is exactly what a screen showing a stuck queue has to say — while `document` is the
 /// ticket itself (names, lines, totals, the fiscal QR) and only ever leaves through the drain, past
 /// both of its guards (hub#343).
-pub fn status_view(job: &PrintJob, audience: QueueAudience) -> serde_json::Value {
+pub fn status_view(
+    job: &PrintJob,
+    audience: QueueAudience,
+    names: &ActorNames,
+) -> serde_json::Value {
     let mut view = serde_json::Map::new();
     let mut put = |key: &str, value: serde_json::Value| {
         view.insert(key.to_string(), value);
@@ -541,12 +545,14 @@ pub fn status_view(job: &PrintJob, audience: QueueAudience) -> serde_json::Value
         if !job.discarded_at.is_empty() {
             put("discardedAt", json!(job.discarded_at));
             put("discardedBy", json!(job.discarded_by));
+            put("discardedByName", json!(names.label(&job.discarded_by)));
             put("discardedByModule", json!(job.discarded_by_module));
             put("discardReason", json!(job.discard_reason));
         }
         if !job.retried_at.is_empty() {
             put("retriedAt", json!(job.retried_at));
             put("retriedBy", json!(job.retried_by));
+            put("retriedByName", json!(names.label(&job.retried_by)));
             put("retriedByModule", json!(job.retried_by_module));
         }
     }
@@ -595,6 +601,77 @@ pub fn audience_of(ctx: &crate::registry::RequestContext) -> QueueAudience {
         QueueAudience::Counter
     }
 }
+
+/// **The name behind each `hub_user:<id>` a stamp names.**
+///
+/// The stamp stores the principal the door resolved from the session, because that is the only
+/// identity that cannot be forged from a request body — and it is also unreadable. «Retirado por
+/// hub_user:018f3c…» leaves the owner exactly where the missing stamp left them, which is the
+/// whole complaint of hub#1565.
+///
+/// This repo has learned it twice already: `hub.approvals.list` resolves both of its ids against
+/// `hub_user` for the stated reason that otherwise "the screen shows UUIDs and nobody uses it", and
+/// hub#1560 is the identical fix for the device that prints. Both facts travel — `discardedBy` is
+/// the stable id support quotes, `discardedByName` is what a screen prints.
+#[derive(Debug, Clone, Default)]
+pub struct ActorNames(std::collections::HashMap<String, String>);
+
+impl ActorNames {
+    /// Nobody resolved: every principal is its own label. What a counter read uses, where no stamp
+    /// travels at all, and what a unit test that is not asking about names passes.
+    pub fn none() -> Self {
+        Self::default()
+    }
+
+    /// One read of this hub's people, keyed by the principal their gestures are stamped with.
+    ///
+    /// **Skipped entirely when no job in `jobs` carries a stamp**, which is the ordinary state of a
+    /// live queue: the pending/printing/dead buckets a till polls every 30 s must not pay for a
+    /// second query to answer a question nobody asked. `hub_user` is a handful of rows on any hub,
+    /// so the ones that DO carry a stamp are resolved in a single pass instead of one lookup per
+    /// row.
+    pub async fn of(db: &dyn DatabaseAdapter, hub_id: &str, jobs: &[PrintJob]) -> Result<Self> {
+        let stamped = jobs
+            .iter()
+            .any(|j| !j.discarded_by.is_empty() || !j.retried_by.is_empty());
+        if !stamped {
+            return Ok(Self::default());
+        }
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(hub_id));
+        let res = db
+            .query(
+                "SELECT id, name FROM hub_user WHERE hub_id = :hub_id",
+                &p,
+            )
+            .await?;
+        let mut by_principal = std::collections::HashMap::new();
+        for row in &res.rows {
+            let id = row["id"].as_str().unwrap_or_default();
+            let name = row["name"].as_str().unwrap_or_default().trim();
+            if id.is_empty() || name.is_empty() {
+                continue;
+            }
+            by_principal.insert(format!("{USER_PRINCIPAL_PREFIX}{id}"), name.to_string());
+        }
+        Ok(Self(by_principal))
+    }
+
+    /// The name to print for `principal`, **falling back to the principal itself**.
+    ///
+    /// Never an empty label: an employee this hub no longer knows (identity is per deployment and
+    /// has no soft-delete) must not turn an audit row into «retired by ——». The id is a poor
+    /// answer; no answer at all is the bug hub#1565 is about.
+    pub fn label<'a>(&'a self, principal: &'a str) -> &'a str {
+        self.0
+            .get(principal)
+            .map(String::as_str)
+            .unwrap_or(principal)
+    }
+}
+
+/// How a person's id travels in a stamp — the shape `server::print` writes from the session.
+const USER_PRINCIPAL_PREFIX: &str = "hub_user:";
 
 /// Which printer role a job belongs to, or `None` when **this hub** has no such job.
 ///
