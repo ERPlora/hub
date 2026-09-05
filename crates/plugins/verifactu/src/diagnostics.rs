@@ -127,10 +127,10 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     };
 
     // La MISMA puerta que la transmisión y la consulta (`resolve_route`, hub#1432). Antes era
-    // el gate del certificado propio, que solo sabe del `.p12` del negocio: por la celda (ADR-0320) contestaba
-    // «no hay certificado» a un hub que transmite perfectamente, y el botón «probar conexión»
-    // informaba de un fallo de certificado a un hub sano (hub#1485). Un diagnóstico que miente
-    // sobre el camino sano es peor que no tenerlo.
+    // el gate del certificado propio, que solo sabe del `.p12` del negocio: por la celda
+    // (ADR-0320) contestaba «no hay certificado» a un hub que transmite perfectamente, y el botón
+    // «probar conexión» informaba de un fallo de certificado a un hub sano (hub#1485). Un
+    // diagnóstico que miente sobre el camino sano es peor que no tenerlo.
     match resolve_route(host, &ctx.hub_id, &config).await {
         Ok(TransmitRoute::Direct { identity, holder }) => {
             let route = TransmitRoute::Direct { identity, holder };
@@ -707,7 +707,8 @@ mod tests {
 
     /// 🔴 **RED de hub#1485.** A hub on the cell road is transmitting perfectly, and the «test
     /// connection» button tells it its CERTIFICATE is broken — because `run_diagnostics` asked
-    /// for the business `.p12` instead of `resolve_route`, the one door hub#1432 left for this question.
+    /// for the business `.p12` instead of `resolve_route`, the one door hub#1432 left for this
+    /// question.
     /// A diagnostic that lies about the healthy road is worse than no diagnostic.
     #[tokio::test]
     async fn the_cell_road_is_never_diagnosed_as_a_broken_certificate_hub1485() {

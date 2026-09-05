@@ -1222,9 +1222,8 @@ pub(crate) mod tests {
 
     /// 🔒 REGRESIÓN (hub#1432, lo que la tarea exige): un hub sin certificado Y sin pasarela no
     /// llega a ningún cable — ni a la AEAT directa (antes lo garantizaba el gate del certificado
-    /// propio) ni a la
-    /// celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola deja los
-    /// registros `pending` en vez de quemar reintentos.
+    /// propio) ni a la celda. La ruta es la ÚNICA puerta y contesta con el error visible; la cola
+    /// deja los registros `pending` en vez de quemar reintentos.
     #[tokio::test]
     async fn a_hub_with_neither_certificate_nor_gateway_never_reaches_any_wire() {
         let host = NoRoadHost;
