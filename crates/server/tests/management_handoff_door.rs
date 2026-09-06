@@ -484,3 +484,216 @@ async fn a_cloud_that_cannot_be_reached_says_so_instead_of_failing_silently() {
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
     assert_eq!(body_json(response).await["code"], json!("handoff_unavailable"));
 }
+
+// ── The own-account door: your own account is not somebody else's task (hub#1539) ──────────────
+//
+// The three checks above were written for the doors this app links to for MANAGEMENT — the plan,
+// the invoices, the fiscal representation grant. «Mi perfil» links to a fourth one that is not
+// management at all: the person's own account at erplora.com, where they change their password,
+// their email and their second factor. It was left out of pm#196 on purpose, because it needed
+// this decision first — and the decision is that `hub.administer` has no business here:
+//
+//   - What the lock protects is that a **shift PIN** never carries off a browser session. That is
+//     checks (1) `credential_kind == cloud` and (3) the JWT names the session's own person, and
+//     both stay exactly as they were for every destination.
+//   - `hub.administer` answers a different question — «is this task yours?» — and for one's own
+//     account the answer is yes by definition. An assistant manager who typed her email and her
+//     password has every right to change her own password, and today the pass is denied to her.
+//   - It grants nothing: the pass mints the browser session of the very person standing there,
+//     which is precisely what she would get by typing that same password into the browser. So
+//     refusing it does not withhold authority, it only withholds the typing.
+//
+// **What the destination does NOT do is confine the browser** — and it must not be read as if it
+// did. The one-time code the SaaS mints (`/api/v1/auth/handoff/issue/`) opens a full session; the
+// `next` only decides the landing page, so whoever lands on the account page can click onwards. Its
+// job here is narrower and honest: it scopes WHERE THIS HUB RELAXES ITS OWN CHECK, so that
+// hub#1400's lock keeps applying, untouched, to every management destination.
+//
+// Which is why the matching has to be exact rather than a prefix — see the address that only
+// *looks* like the account page below.
+
+/// The account page of the SaaS, which is what «Mi perfil» links to.
+const OWN_ACCOUNT: &str = "/dashboard/profile/";
+
+#[tokio::test]
+async fn a_cloud_session_that_does_not_administer_is_handed_a_pass_for_its_own_account() {
+    let (cloud, serving) = mock_saas();
+    let (router, rt, ana) = fixture("employee", cloud.clone()).await;
+    // The half that matters is missing on purpose: Ana cannot administer this hub.
+    assert!(!rt
+        .session_permissions("employee")
+        .contains(erplora_runtime::hub_users::ADMINISTER_PERMISSION));
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(77)),
+            json!({ "next": OWN_ACCOUNT }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let url = body_json(response).await["url"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(
+        url.starts_with(&format!("{cloud}/auth/handoff/code-abc/")),
+        "expected the one-time door of the configured Cloud, got {url}"
+    );
+    assert!(
+        url.contains("next=%2Fdashboard%2Fprofile%2F"),
+        "expected to land on her own account page, got {url}"
+    );
+    serving.abort();
+}
+
+#[tokio::test]
+async fn the_account_page_is_still_the_account_page_when_it_carries_a_marker() {
+    // The callers of `saasDoor` hang `utm_source` and friends off the path. A query string does
+    // not change which page the browser lands on, so it must not change the answer either.
+    let (cloud, serving) = mock_saas();
+    let (router, rt, ana) = fixture("employee", cloud).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(77)),
+            json!({ "next": "/dashboard/profile/?utm_source=hub" }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    serving.abort();
+}
+
+#[tokio::test]
+async fn the_same_session_is_still_refused_a_pass_for_management() {
+    // The negative half of the decision, and the reason this is not simply "drop the permission
+    // check": hub#1400's lock on the management doors is untouched.
+    let (router, rt, ana) = fixture("employee", nowhere()).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(77)),
+            json!({ "next": "/dashboard/?view=advanced" }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(response).await["code"],
+        json!("handoff_requires_administer")
+    );
+}
+
+#[tokio::test]
+async fn an_address_that_only_looks_like_the_account_page_opens_nothing() {
+    // The classifier is what decides whether a check gets skipped, so it may not be foolable: a
+    // prefix match would have taken every one of these for the account page. `..` never survives
+    // an exact comparison, which is why traversal is not a separate rule.
+    let (router, rt, ana) = fixture("employee", nowhere()).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    for disguise in [
+        "/dashboard/profile/../billing/",
+        "/dashboard/profile/../../dashboard/",
+        "/dashboard/profilex/",
+        "/dashboard/profile-of-somebody-else/",
+        "/dashboard/?next=/dashboard/profile/",
+        "/dashboard/billing/#/dashboard/profile/",
+    ] {
+        let response = router
+            .clone()
+            .oneshot(ask(
+                Some(&session),
+                Some(&sign_user_jwt(77)),
+                json!({ "next": disguise }),
+            ))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "«{disguise}» is not the account page"
+        );
+        assert_eq!(
+            body_json(response).await["code"],
+            json!("handoff_requires_administer"),
+            "«{disguise}»"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_pin_session_is_refused_its_own_account_too() {
+    // The lock this door exists for is untouched by the decision above: what is relaxed is the
+    // permission of the ROLE, never the METHOD of authentication. A four-digit code typed in front
+    // of people does not carry off a browser session, not even to the account page.
+    let (router, rt, ana) = fixture("owner", nowhere()).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::pin())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(77)),
+            json!({ "next": OWN_ACCOUNT }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(response).await["code"],
+        json!("handoff_requires_cloud_login")
+    );
+}
+
+#[tokio::test]
+async fn the_account_page_is_no_excuse_to_spend_somebody_elses_token() {
+    // The till was not logged out and the previous person's JWT is still in `localStorage`. "Their
+    // own account" is only true while the session and the token name the same person.
+    let (router, rt, ana) = fixture("employee", nowhere()).await;
+    let session = rt
+        .create_session_with_credential(&ana, 3600, Some("till-1"), &Credential::cloud())
+        .await
+        .unwrap();
+
+    let response = router
+        .oneshot(ask(
+            Some(&session),
+            Some(&sign_user_jwt(99)),
+            json!({ "next": OWN_ACCOUNT }),
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(
+        body_json(response).await["code"],
+        json!("handoff_identity_mismatch")
+    );
+}

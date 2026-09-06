@@ -655,6 +655,37 @@ fn handoff_destination(next: Option<&str>) -> Option<String> {
     Some(next.to_string())
 }
 
+/// The pages of the SaaS that are the ACCOUNT of whoever is standing at the till, as opposed to a
+/// task of managing the business (hub#1539).
+///
+/// «Mi perfil» links to the one place where a person changes their own password, their own email
+/// and their own second factor. It is not administration — it is theirs by definition — and until
+/// this list existed the door asked them for `hub.administer` all the same, so an assistant manager
+/// who had typed her email and her password was sent to a login form to reach her own account.
+const HANDOFF_OWN_ACCOUNT: &[&str] = &["/dashboard/profile/"];
+
+/// Whether `next` lands on the asker's own account.
+///
+/// 🔴 **This does not confine the browser, and must not be read as if it did.** The one-time code
+/// the SaaS mints opens a full session; `next` only picks the landing page, so whoever lands on the
+/// account page can click onwards exactly as if they had signed in by hand — which is precisely the
+/// point, because that session grants nothing they could not get by typing that same password. What
+/// this decides is narrower: WHERE THIS HUB RELAXES ITS OWN CHECK, so hub#1400's lock keeps
+/// applying, untouched, to every management destination.
+///
+/// The comparison is **exact** on the path, never a prefix: `/dashboard/profile/../billing/` and
+/// `/dashboard/profile-of-somebody-else/` both start with the account page and are neither of it.
+/// Traversal needs no rule of its own because `..` cannot survive an exact match. The query and the
+/// fragment are dropped first — they do not change which page the browser opens, so they may not
+/// change the answer.
+fn is_own_account_destination(next: &str) -> bool {
+    let path = next.split(['?', '#']).next().unwrap_or_default();
+    let path = path.strip_suffix('/').unwrap_or(path);
+    HANDOFF_OWN_ACCOUNT
+        .iter()
+        .any(|own| own.strip_suffix('/').unwrap_or(own) == path)
+}
+
 /// **`POST /api/auth/handoff`** — hands the browser the SaaS session of whoever is at the till
 /// (pm#196, hub#1400). Body `{next?}` → `200 {url}` with a one-time address.
 ///
@@ -672,10 +703,14 @@ fn handoff_destination(next: Option<&str>) -> Option<String> {
 /// — the local user's credential is never administrative), and turning it into the key to the
 /// billing panel would hand the business's money to whoever opens the till.
 ///
-/// That is why `hub.administer` (ADR-0248) is necessary and **not sufficient**: it is a permission
-/// of the ROLE and the question is about the METHOD. The third check closes the gap the other two
-/// leave — the presented JWT has to name the same person as the session, because a till nobody has
-/// signed out of keeps the previous person's tokens in `localStorage`.
+/// That is why `hub.administer` (ADR-0248) is **not sufficient**: it is a permission of the ROLE
+/// and the question is about the METHOD. The third check closes the gap the other two leave — the
+/// presented JWT has to name the same person as the session, because a till nobody has signed out
+/// of keeps the previous person's tokens in `localStorage`.
+///
+/// Nor is it **necessary for every destination** (hub#1539). It answers «is this task yours?», and
+/// the account page of the person standing there is theirs by definition: see
+/// [`is_own_account_destination`], which is why the destination is settled before the permission.
 ///
 /// Every refusal travels as its CODE, never as its prose (ADR-0055).
 pub(crate) async fn auth_handoff(
@@ -710,7 +745,12 @@ pub(crate) async fn auth_handoff(
     if credential.kind != erplora_runtime::identity::CREDENTIAL_CLOUD {
         return refuse(StatusCode::FORBIDDEN, "handoff_requires_cloud_login");
     }
-    if !administers {
+    // The destination is resolved BEFORE the permission, because it is what decides which
+    // permission applies: management is somebody's task, one's own account is not (hub#1539).
+    let Some(next) = handoff_destination(body.and_then(|b| b.0.next).as_deref()) else {
+        return refuse(StatusCode::BAD_REQUEST, "handoff_destination_not_allowed");
+    };
+    if !administers && !is_own_account_destination(&next) {
         return refuse(StatusCode::FORBIDDEN, "handoff_requires_administer");
     }
 
@@ -733,10 +773,6 @@ pub(crate) async fn auth_handoff(
     if user.cloud_user_id.as_deref() != Some(claims.user_id_str().as_str()) {
         return refuse(StatusCode::FORBIDDEN, "handoff_identity_mismatch");
     }
-
-    let Some(next) = handoff_destination(body.and_then(|b| b.0.next).as_deref()) else {
-        return refuse(StatusCode::BAD_REQUEST, "handoff_destination_not_allowed");
-    };
 
     let auth = cloud_client::Auth::UserJwt {
         hub_id: auth::hub_id(&headers, &st.hub_id()),

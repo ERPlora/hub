@@ -259,7 +259,8 @@ import { config } from '../lib/config';
 import { HUB_USERS_ERROR_PREFIX, isGuessablePin } from '../lib/hub-users';
 import { openExternal } from '../lib/open-external';
 import { hubPinLength } from '../lib/pin-length';
-import { getHubSession, user } from '../lib/session';
+import { saasDoor } from '../lib/saas-door';
+import { getHubSession, openedWithCloudLogin, user } from '../lib/session';
 import {
   hasLocalPalette,
   themeMode,
@@ -497,10 +498,27 @@ async function removeAvatar(): Promise<void> {
 // The account lives in the SaaS, so this is a trip to the user's own browser. It used to be fired
 // and forgotten (`void`), which inside the installed app meant pressing it did nothing at all and
 // said nothing either (hub#475).
+//
+// And it used to cross with NOTHING (hub#1539). The system browser is a different cookie jar from
+// the webview, so the plain link dropped the person on a login form — password and second factor
+// again — to reach her own account. The other three doors out (`saasDoor`, pm#196) already carry a
+// one-time pass; this one was left out because the runtime only minted it for whoever administers
+// the hub, and the account page is not administration: it is hers by definition. The runtime tells
+// the two apart now, so the same door serves this trip too.
+const CLOUD_ACCOUNT_PATH = '/dashboard/profile/';
+
 async function manageCloudAccount(): Promise<void> {
   const base = config.cloudApiUrl.replace(/\/+$/, '');
+  const plain = `${base}${CLOUD_ACCOUNT_PATH}`;
+  // The pass is asked for only when it CAN be minted. A shift session is refused by design
+  // (hub#1400), and asking anyway would report a failure every time somebody on a PIN pressed
+  // this — noise that teaches everyone to ignore the report, for a link that opens either way.
   try {
-    await openExternal(`${base}/dashboard/profile/`);
+    await openExternal(
+      openedWithCloudLogin.value
+        ? await saasDoor(CLOUD_ACCOUNT_PATH, plain, 'cloud-account')
+        : plain,
+    );
   } catch {
     await toast(t('profile.cloudAccountError'), 'danger');
   }
