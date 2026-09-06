@@ -216,7 +216,12 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 ///
 /// No es la puerta de seguridad —esa sigue siendo el `permission` de la operación, revalidado
 /// server-side en cada llamada—: decide solo si el usuario ve la tarjeta antes.
-fn command_only_answers(
+///
+/// `pub(crate)` porque el asistente no es su único consumidor: el runner de flows (hub#1595)
+/// tiene el MISMO problema en otra capa —un paso con `policy: manual` que necesita consultar
+/// escribe una fila en `_flow_approvals` y le pide a una persona que apruebe una pregunta— y la
+/// regla tiene que ser una sola, no dos que se desincronicen.
+pub(crate) fn command_only_answers(
     def: &erplora_runtime::manifest::CommandDef,
     risk: Option<erplora_runtime::manifest::AiRisk>,
     module_read_permissions: Option<&std::collections::HashSet<&str>>,
