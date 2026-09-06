@@ -66,6 +66,13 @@ ENV APP_VERSION=${APP_VERSION}
 # Build de producción del shell (vue-tsc + vite build → apps/web/dist).
 # prebuild (sync-modules.mjs) busca módulos en un workspace externo ausente aquí: warn+skip (ok).
 RUN pnpm -F @erplora/web build
+# hub#1588 — la imagen NO sale sin DECIR qué OutfitKit lleva. El sello lo emite el build del shell
+# (`apps/web/outfitkit-version.ts` → `dist/outfitkit-version.json`, que la etapa (3) copia a
+# `/app/web/`); aquí se coteja contra el paquete que el `pnpm add @latest` de arriba acabó de
+# instalar, que es el único sitio donde los dos existen a la vez. Si falta o no coincide, el build
+# PARA: una imagen sin sello devuelve a deducir su versión por la fecha de construcción, que es
+# justo lo que esta issue vino a quitar (y lo que costó hub#1547 y ERPlora/sales#259).
+RUN node -e "const fs=require('node:fs');const read=(p)=>JSON.parse(fs.readFileSync(p,'utf8'));const D='/app/apps/web';let stamp;try{stamp=read(D+'/dist/outfitkit-version.json')}catch(e){console.error('OUTFITKIT_STAMP_MISSING: the shell build emitted no dist/outfitkit-version.json ('+e.message+'). Check that vite.config.ts still wires outfitkitVersionStamp() - see apps/web/outfitkit-version.test.ts');process.exit(1)}const installed=read(D+'/node_modules/@erplora/outfitkit/package.json').version;if(stamp.outfitkit!==installed){console.error('OUTFITKIT_STAMP_MISMATCH: dist says '+JSON.stringify(stamp.outfitkit)+', node_modules has '+JSON.stringify(installed));process.exit(1)}console.log('outfitkit stamp OK: '+stamp.outfitkit+' (hub '+stamp.hub+')')"
 
 # ------------------------------------------------------------------------------
 # (2) Builder — Rust release del servidor del runtime.
