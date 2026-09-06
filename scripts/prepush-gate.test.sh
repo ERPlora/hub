@@ -2502,7 +2502,7 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     && ok "hub#1534: el arreglo con here-string pasa el gate" \
     || bad "hub#1534: el arreglo con here-string pasa el gate" "exit=$code out=$(cat "$repo/.out" 2>/dev/null)"
 
-# ── 55. Canonical installed copy → the warning must not send you to DOWNGRADE ─
+# ── 55. hub#1602 — canonical installed copy → the warning must not DOWNGRADE ──
 #    Same state as 46 (installed copy IS the integration ref's blob, checkout is
 #    behind), but this pins the MESSAGE instead of the file. `install-hooks.sh`
 #    copies `$REPO_ROOT/.githooks/pre-push` — the WORKING TREE — into the shared
