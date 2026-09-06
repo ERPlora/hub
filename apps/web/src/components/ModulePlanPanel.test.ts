@@ -20,6 +20,12 @@ import { createI18n } from 'vue-i18n';
 
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
 
+// The panel asks the module for the words of its quota metrics (hub#1604). That lookup lives in
+// `module-loader`, which imports the icon registry — virtual `~icons/*?raw` ids this environment
+// refuses to resolve — and, left real, reaches for the network. Neither is under test here; what
+// the words end up saying is guarded next door, in `ModulePlanPanel.quota-i18n.hub1604.test.ts`.
+vi.mock('../lib/module-loader', () => ({ loadModuleLocale: vi.fn(async () => undefined) }));
+
 const { cloudModuleSubscription } = vi.hoisted(() => ({
   cloudModuleSubscription: vi.fn(async () => ({ status: 'none' })),
 }));

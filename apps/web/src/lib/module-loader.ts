@@ -18,6 +18,7 @@ import { isModuleEntitled } from './entitlement';
 import { moduleIconRegistry } from './icons';
 import type { ModuleSettingsLocale } from './module-settings';
 import { moduleBase } from './module-url';
+import type { ModuleBillingLocale } from './module-quota';
 import { RUNTIME_URL, runtimeHeaders } from './runtime';
 import { orderSlotFillers } from './slot-fillers';
 import type { SlotDef } from './slot-fillers';
@@ -394,6 +395,13 @@ export interface ModuleLocaleFile {
    * very keys for weeks. Resolved in `lib/module-settings.ts`.
    */
   settings?: ModuleSettingsLocale;
+  /**
+   * Strings of the module's «Plan» tab (hub#1604): today, how each quota METRIC of
+   * `billing.tiers[].quota` is named. Same story as `settings` — the shell generates that screen out
+   * of the manifest, which is canonical English, so «Incluye 30 conversations per month» is what a
+   * Spanish hub read. Resolved in `lib/module-quota.ts`.
+   */
+  billing?: ModuleBillingLocale;
 }
 
 export interface InstalledManifest {
