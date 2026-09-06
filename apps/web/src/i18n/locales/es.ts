@@ -754,6 +754,31 @@ export default {
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
+  // «Conectar WhatsApp» — el bloque que el módulo de WhatsApp incrusta como <erp-whatsapp-connect> (hub#1600).
+  // El dueño conecta el número del negocio desde aquí: popup de Meta, QR escaneado con la app de
+  // WhatsApp Business. Los errores son frases que una persona puede accionar, por el código del SaaS.
+  whatsappConnect: {
+    intro: 'Conecta el número de WhatsApp de tu negocio. Iniciarás sesión con Facebook y escanearás un código QR con la app de WhatsApp Business de tu móvil.',
+    connect: 'Conectar WhatsApp',
+    connected: 'Conectado',
+    businessApp: 'App de WhatsApp Business',
+    connectedHelp: 'Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.',
+    disconnect: 'Desconectar',
+    disconnectConfirm: '¿Desconectar este número? Los mensajes dejarán de llegar aquí.',
+    adminOnly: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
+    loading: 'Abriendo la conexión con WhatsApp…',
+    connecting: 'Conectando tu número…',
+    errors: {
+      cancelled: 'La conexión se canceló antes de terminar.',
+      no_phone_number: 'No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.',
+      no_business_account: 'Facebook no ha devuelto ninguna cuenta de WhatsApp Business. Inténtalo de nuevo y elige tu negocio en la ventana.',
+      not_configured: 'WhatsApp todavía no está disponible en este hub. Contacta con soporte.',
+      sdk_unavailable: 'No se pudo abrir la ventana de Facebook. Permite las ventanas emergentes en este sitio e inténtalo de nuevo.',
+      unreachable: 'Tu hub no ha podido llegar a erplora.com. Revisa la conexión e inténtalo de nuevo.',
+      forbidden: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
+      default: 'Algo ha fallado al conectar. Inténtalo de nuevo en un minuto.',
+    },
+  },
   apps: {
     searchInstalled: 'Buscar en tus apps…',
     searchCatalog: 'Buscar apps para añadir…',

@@ -69,13 +69,20 @@ pub struct ServeConfig {
 /// porque alguien abrió la consola a mano. Apunta a este mismo hub —no al SaaS— para que un
 /// self-host sin Cloud detrás siga teniendo dónde reportar; el receptor es
 /// [`crate::csp_report`].
+/// And the one foreign script the page may run, with its frames (hub#1600, ADR-0452): Meta's JS
+/// SDK, `https://connect.facebook.net`, which is how the owner connects the WhatsApp number of
+/// the business FROM THE HUB (the «Connect WhatsApp» button in the module's settings opens
+/// Meta's Embedded Signup popup and the QR is scanned with the WhatsApp Business app). The SDK
+/// talks to its popup through hidden iframes on `*.facebook.com` and calls `graph.facebook.com`
+/// on its own; block any of the three and the popup never opens, silently. Kept to exact hosts —
+/// never `https:` — and mirrored in `tests/cloud_csp.rs` as explained widenings.
 pub(crate) const CSP_BASE: &str = "default-src 'self'; \
-                        script-src 'self'; \
+                        script-src 'self' https://connect.facebook.net; \
                         worker-src 'self'; \
                         style-src 'self' 'unsafe-inline'; \
                         img-src 'self' data: blob:; \
                         media-src 'self' blob:; \
-                        frame-src 'none'; \
+                        frame-src https://*.facebook.com; \
                         object-src 'none'; \
                         base-uri 'self'; \
                         report-uri /csp-report/";
@@ -91,7 +98,8 @@ pub(crate) const CSP_BASE: &str = "default-src 'self'; \
 ///
 /// En un navegador a secas son inertes: `ipc:` no es un esquema navegable y `ipc.localhost` no
 /// resuelve. Cuestan cero fuera de la app.
-pub(crate) const CSP_CONNECT_BASE: &str = "connect-src 'self' ipc: http://ipc.localhost";
+pub(crate) const CSP_CONNECT_BASE: &str =
+    "connect-src 'self' ipc: http://ipc.localhost https://*.facebook.com https://graph.facebook.com";
 
 /// La política que sirve este hub. Lo único que no puede ser constante es el **origen del Cloud**:
 /// el front habla directo con él para el login, el refresh de JWT y las facturas

@@ -221,6 +221,24 @@ pub fn app(state: AppState) -> Router {
         // Proxies hub-scoped al Cloud (el token de máquina se queda en el runtime, no en el navegador)
         .route("/api/entitlement", get(proxy_entitlement))
         .route("/api/marketplace/catalog", get(proxy_marketplace_catalog))
+        // «Connect WhatsApp» from the hub (hub#1600, ADR-0452): owner/admin session here, the
+        // hub's machine credential towards the SaaS, which keeps the Meta token.
+        .route(
+            "/api/hub/whatsapp/config",
+            get(whatsapp_connect::whatsapp_config),
+        )
+        .route(
+            "/api/hub/whatsapp/numbers",
+            get(whatsapp_connect::whatsapp_numbers),
+        )
+        .route(
+            "/api/hub/whatsapp/connect",
+            post(whatsapp_connect::whatsapp_connect),
+        )
+        .route(
+            "/api/hub/whatsapp/disconnect/:phone_number_id",
+            post(whatsapp_connect::whatsapp_disconnect),
+        )
         // Qué dice el marketplace de UN módulo (hub#1134). El catálogo de arriba sólo trae lo que
         // se sigue OFRECIENDO, así que no puede contestar por un módulo que este hub corre y el
         // marketplace ha retirado — que es justo el que «Mis apps» tiene que poder marcar.

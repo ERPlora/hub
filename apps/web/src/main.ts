@@ -14,6 +14,7 @@ import { iconRegistry } from './lib/icons';
 import App from './App.vue';
 import { router } from './router';
 import { i18n } from './i18n';
+import { registerWhatsAppConnectElement } from './elements/whatsapp-connect';
 import {
   getClient,
   clientInjectionKey,
@@ -156,6 +157,9 @@ bootActionFeedback();
 // el ion-menu fijo del split-pane (App.vue, when="lg") tapa el borde y el gesto no puede empezar —
 // o sea que afecta justo al tablet en vertical (768/834), el formato de sala. ADR-0143.
 const app = createApp(App).use(IonicVue, { mode: 'ios', swipeBackEnabled: false }).use(router).use(i18n);
+// «Connect WhatsApp» as a global element for the WhatsApp module's settings (hub#1600): registered
+// here, next to the app, so it exists before any module screen mounts.
+registerWhatsAppConnectElement();
 
 // Captura AUTOMÁTICA de errores del frontend (sin modal ni acción del usuario): errores globales,
 // promesas rechazadas y errorHandler de Vue → POST best-effort al runtime local (lib/error-report).
