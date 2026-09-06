@@ -86,6 +86,12 @@ import { deviceMode, deviceTrusted } from './device-mode';
 import { pinPolicy } from './pin-policy';
 import { getAccessToken, setTokens } from './cloud';
 import { getHubSession, isAuthed, setHubSession, setUser, user } from './session';
+// **Not mocked either, and for the same reason as the token store above** (hub#1544). Whether the
+// previous person's conversation really leaves the till is a statement about two things at once —
+// the live `ref` the drawer renders and the `sessionStorage` key it re-reads after a reload — and a
+// `vi.fn()` standing in for `clearAssistantHistory` could only say that a call happened, which is
+// true of a version that forgets either half.
+import { assistantMessages, saveAssistantHistory } from './assistant-history';
 
 /** Who was at the till before the hand-over, session token included. */
 function seedCashier(): void {
@@ -107,6 +113,25 @@ function seedCashier(): void {
  */
 function seedCloudLogin(): void {
   setTokens('acc-owner', 'ref-owner');
+}
+
+/**
+ * Where the assistant thread lives (`assistant-history.ts`, ADR-0149). Re-declared instead of
+ * exported so a rename of the key has to be a deliberate edit in both places.
+ */
+const ASSISTANT_SS_KEY = 'erplora.assistant.history';
+
+/**
+ * The morning's conversation with the assistant, exactly as the drawer leaves it: the live thread
+ * in memory AND the copy in `sessionStorage` it re-hydrates from after a reload (`AssistantDrawer`
+ * calls `saveAssistantHistory` on send and at the end of every stream).
+ */
+function seedAssistantThread(): void {
+  assistantMessages.value = [
+    { role: 'user', content: '\u00bfCu\u00e1nto llevo vendido hoy?' },
+    { role: 'assistant', content: 'Llevas 1.240,50 \u20ac en 37 tickets.' },
+  ];
+  saveAssistantHistory();
 }
 
 /** The runtime accepting four digits: a fresh session for somebody else. */
@@ -138,6 +163,10 @@ beforeEach(() => {
   deviceTrusted.value = false;
   pinPolicy.value = 'per_shift';
   localStorage.clear();
+  // Set straight, never through `clearAssistantHistory()`: the cleanup of a test must not be the
+  // function the test is about to judge.
+  assistantMessages.value = [];
+  sessionStorage.clear();
   runtimePinLogin.mockReset();
   runtimeLogout.mockClear();
   getUserProfile.mockClear();
@@ -271,6 +300,36 @@ describe('the hand-over itself', () => {
     expect(localStorage.getItem('erplora.refresh')).toBeNull();
   });
 
+  it('takes the previous person\u2019s assistant conversation off the till', async () => {
+    // hub#1544, and the same separation as the credentials above. The owner asks the assistant what
+    // she has taken, what she still owes, what happened with an order; then she hands the counter
+    // over. Until this, the ONLY thing that emptied that thread was `logout()` \u2014 the gesture this
+    // whole feature exists to avoid \u2014 so the cashier who came in opened the drawer onto the
+    // owner's morning and could read it all the way up.
+    //
+    // Both halves are asserted because forgetting either one leaves the conversation readable: the
+    // `ref` is what the drawer renders right now, and the `sessionStorage` key is what it hydrates
+    // from on the next reload (ADR-0149 \u2014 the Cloud keeps no copy, so this box is the whole story).
+    seedCashier();
+    seedCounterTill();
+    seedAssistantThread();
+    accepts();
+    // The positive first: the thread really is on this till, in both places.
+    expect(assistantMessages.value).toHaveLength(2);
+    expect(sessionStorage.getItem(ASSISTANT_SS_KEY)).not.toBeNull();
+
+    const routeBefore = window.location.pathname;
+    await switchUser('Sof\u00eda', '8317');
+
+    expect(assistantMessages.value).toEqual([]);
+    expect(sessionStorage.getItem(ASSISTANT_SS_KEY)).toBeNull();
+    // And \u2014 the half that makes this different from signing out \u2014 the cashier is still at her
+    // till, on her screen, with her sale.
+    expect(isAuthed.value).toBe(true);
+    expect(getHubSession()).toBe('sess-sofia');
+    expect(window.location.pathname).toBe(routeBefore);
+  });
+
   it('revokes the session of the person who walked away, and only once the new one exists', async () => {
     // Attribution is the reason this feature exists: a live token for the previous cashier is a
     // second, unattended door into the till. Ordered on purpose — revoking first would leave a
@@ -325,6 +384,7 @@ describe('the hand-over itself', () => {
     seedCashier();
     seedCounterTill();
     seedCloudLogin();
+    seedAssistantThread();
     runtimePinLogin.mockRejectedValue(refusal());
 
     await expect(switchUser('Sofía', '0000')).rejects.toThrow();
@@ -333,6 +393,10 @@ describe('the hand-over itself', () => {
     expect(getHubSession()).toBe('sess-nacho');
     expect(runtimeLogout).not.toHaveBeenCalled();
     expect(getAccessToken()).toBe('acc-owner');
+    // Her conversation included (hub#1544): nobody has taken the till over, so there is nobody yet
+    // to take it away from — and wiping it on a typo would lose the owner's own morning.
+    expect(assistantMessages.value).toHaveLength(2);
+    expect(sessionStorage.getItem(ASSISTANT_SS_KEY)).not.toBeNull();
   });
 });
 

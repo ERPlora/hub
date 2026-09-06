@@ -25,6 +25,9 @@
 //     to the till, and until this they only ever left through `logout()` — i.e. never, here. That
 //     is the separation this module was missing: forgetting erplora.com and throwing somebody off
 //     the TPV used to be a single gesture, and only one of the two is wanted;
+//   - the **assistant conversation leaves with her too** (hub#1544), and for the same reason and by
+//     the same route: it is hers, it was pinned to that same sign-out, and it is the one piece of
+//     the previous shift the next person can sit and READ;
 //   - the per-user preferences (language, theme, avatar) are re-read for the person who just
 //     arrived, so the sidebar stops showing the face of the one who left.
 //
@@ -36,6 +39,7 @@ import { computed, ref } from 'vue';
 import { deviceMode, deviceTrusted, type DeviceMode } from './device-mode';
 import { asksForPin, pinPolicy, type PinPolicy } from './pin-policy';
 import { clearTokens, runtimeLogout, runtimePinLogin } from './cloud';
+import { clearAssistantHistory } from './assistant-history';
 import { getHubSession, isAuthed, setHubSession, setUser } from './session';
 import { getUserProfile, resetUserProfile } from './user-profile';
 import { resetUserThemePreferences } from './theme';
@@ -133,6 +137,21 @@ export async function switchUser(name: string, pin: string): Promise<void> {
   // The runtime's `handoff_identity_mismatch` (`crates/server/src/auth_api.rs`, hub#1400) stays as
   // it is: it guards the door, and the door is a different thing from not leaving keys behind.
   clearTokens();
+
+  // And her conversation with the assistant goes with her too (hub#1544). Same separation, one
+  // drawer along: the thread is session-scoped and lives only on the client (ADR-0149), so the box
+  // it sits in IS the whole record — the Cloud keeps no copy to fall back on. Until this, the only
+  // thing that emptied it was `logout()`, which is the gesture this module exists to avoid, so the
+  // arriving cashier opened the ✨ drawer onto the previous person's morning — what she had taken,
+  // what she still owed, what happened with an order — and could scroll all the way up it.
+  //
+  // Clearing it is NOT signing out, exactly like the credentials above: the runtime session just
+  // minted, the screen and the route are untouched, and the new thread starts empty at her first
+  // question. Both halves have to go — the in-memory `ref` the drawer is rendering right now, and
+  // the `sessionStorage` key it re-hydrates from on the next reload — which is what
+  // `clearAssistantHistory()` already does for `logout()`; this reuses it rather than inventing a
+  // second way to forget.
+  clearAssistantHistory();
 
   // Language, theme and avatar are per-user rows. Cleared first so nothing of the previous cashier
   // is left standing if `/api/profile` never answers, then re-read for the one who just arrived.
