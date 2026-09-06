@@ -60,7 +60,7 @@
   },
   "POST /api/keys": {
     "name": "Create an API key (the secret is shown ONCE — saved as hub_api_key)",
-    "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` on `/api/v1/{module}/q|c/…` and on `/ws`.",
+    "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` ONLY on the module data API (`POST /api/v1/{module}/q|c/…`) and on `/ws` — not on `/api/query`, `/api/command` or any other core route.",
     "body": {
       "name": "Postman",
       "access": "full",
@@ -90,7 +90,7 @@
   },
   "POST /api/query": {
     "name": "Run a declarative query of a module",
-    "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Any credential: session or API key.",
+    "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
     "body": {
       "name": "<module>.<query>",
       "params": {}
@@ -98,7 +98,7 @@
   },
   "POST /api/command": {
     "name": "Run a declarative command of a module",
-    "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Any credential: session or API key.",
+    "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.",
     "body": {
       "name": "<module>.<command>",
       "payload": {}

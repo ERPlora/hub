@@ -210,7 +210,7 @@
               },
               "raw": "{\n  \"access\": \"full\",\n  \"name\": \"Postman\",\n  \"rate_limit_per_minute\": 120\n}"
             },
-            "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` on `/api/v1/{module}/q|c/…` and on `/ws`.\n\n(auth: admin)",
+            "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` ONLY on the module data API (`POST /api/v1/{module}/q|c/…`) and on `/ws` — not on `/api/query`, `/api/command` or any other core route.\n\n(auth: admin)",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -877,7 +877,7 @@
               },
               "raw": "{\n  \"name\": \"<module>.<command>\",\n  \"payload\": {}\n}"
             },
-            "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Any credential: session or API key.\n\n(auth: any-credential)",
+            "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
             "header": [
               {
                 "key": "X-Hub-Session",
@@ -4049,7 +4049,7 @@
               },
               "raw": "{\n  \"name\": \"<module>.<query>\",\n  \"params\": {}\n}"
             },
-            "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Any credential: session or API key.\n\n(auth: any-credential)",
+            "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
             "header": [
               {
                 "key": "X-Hub-Session",
