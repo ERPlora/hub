@@ -29,14 +29,17 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response as AxumResponse;
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::flows::grants::GrantKind;
 use erplora_runtime::flows::{approvals, store, NewFlow};
+use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Runtime;
 use erplora_server::{agent_runner, app, AppState, AuthMode, HubConfig};
+use erplora_wasm_host::Output;
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -136,6 +139,37 @@ fn sse_call(name: &str, call_id: &str, arguments: Value) -> Turn {
 
 // ── the hub ───────────────────────────────────────────────────────────────────────────────────
 
+/// The `agenda` module's native engine, so its ONE handler-backed operation actually runs.
+///
+/// `agenda.availability.check` is the shape hub#1595 is about: an operation a module publishes as
+/// a *command* — because answering needs a handler, not a SELECT — that changes nothing. It has no
+/// `sql` and no `emit`, and it asks for `agenda.view`, the same permission the module gives its own
+/// queries. Without a body behind it the test could only prove that no approval row was written;
+/// with one it also proves the ANSWER came back into the turn.
+#[derive(Debug)]
+struct AgendaEngine;
+
+#[async_trait]
+impl NativeHandler for AgendaEngine {
+    async fn call(
+        &self,
+        function: &str,
+        input: &Value,
+        _host: &dyn NativeHost,
+    ) -> Result<Output, erplora_runtime::RuntimeError> {
+        match function {
+            // Answers, and only answers: no `Operation`, no event, just the verdict.
+            "check_availability" => Ok(Output::new().with_result(json!({
+                "slot_id": input["payload"]["slot_id"].clone(),
+                "free": true,
+            }))),
+            other => Err(erplora_runtime::RuntimeError::Native(format!(
+                "the agenda fixture has no native function `{other}`"
+            ))),
+        }
+    }
+}
+
 fn fixture() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixture_agent/agenda")
 }
@@ -188,6 +222,7 @@ async fn hub(
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
     rt.install_from_dir(&fixture()).await.unwrap();
+    rt.register_native("agenda", Arc::new(AgendaEngine));
     let admin = rt.create_user("Ioan", "1111", "admin", None).await.unwrap();
     let admin_session = rt.create_session(&admin, 3600, None).await.unwrap();
 
@@ -225,6 +260,21 @@ fn agent_step(policy: &str) -> Value {
         "tools": {
             "queries": ["agenda.slots.list"],
             "commands": ["agenda.booking.create"]
+        },
+        "policy": policy
+    })
+}
+
+/// The step of hub#1595: the automation has to ASK something before it can propose anything.
+/// `agenda.availability.check` is a command that only answers; `agenda.booking.create` writes.
+fn agent_step_that_asks_before_it_writes(policy: &str) -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Book them in.",
+        "tools": {
+            "queries": [],
+            "commands": ["agenda.availability.check", "agenda.booking.create"]
         },
         "policy": policy
     })
@@ -397,6 +447,99 @@ async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person(
         cloud.turns(),
         2,
         "a proposal awaiting approval ends the turn; it does not keep the model spinning"
+    );
+}
+
+/// **hub#1595 — a question is not a proposal.**
+///
+/// The automation that answers WhatsApp has to consult before it can propose: is that slot still
+/// free? The answer lives behind an operation the module publishes as a *command*, because
+/// answering it needs a handler and not a SELECT. Under `policy: "manual"` — the default, and the
+/// policy any step that ALSO writes has to use — that question used to be parked in
+/// `_flow_approvals` and end the turn: the owner opened the tray in the morning and was asked to
+/// approve «check availability», which is not a decision anybody can take, and the appointment was
+/// never proposed at all.
+///
+/// A command that only answers now runs in the turn, exactly like a query, and the model carries
+/// on to the part that DOES need a person. The rule is the one hub#1594 already proved and left
+/// `pub(crate)` for this: no `sql`, no `emit`, no row expectations, normal risk, and a permission
+/// the module also gives its own queries.
+#[tokio::test]
+async fn a_question_the_automation_asks_is_answered_in_the_turn_and_only_the_write_waits() {
+    let cloud = FakeCloud::with(vec![
+        sse_call(
+            "agenda.availability.check",
+            "c1",
+            json!({ "slot_id": "slot-1" }),
+        ),
+        sse_call(
+            "agenda.booking.create",
+            "c2",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "asks",
+        agent_step_that_asks_before_it_writes("manual"),
+        &[
+            (GrantKind::Command, "agenda.availability.check".into()),
+            (GrantKind::Command, "agenda.booking.create".into()),
+        ],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "is 10 still free tomorrow?" })).await;
+
+    perform(&h, &run_id).await;
+
+    // (1) The question was ANSWERED — the turn continued instead of ending on the question.
+    assert_eq!(
+        cloud.turns(),
+        2,
+        "a command that only answers runs in the turn, like a query does"
+    );
+
+    // (2) …and what came back is the handler's own answer, not an acknowledgement. This is what
+    // separates «it ran» from «it was routed somewhere that happened not to fail».
+    let second = &cloud.bodies()[1];
+    let tool_message = second["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["role"] == "tool" && m["tool_call_id"] == "c1")
+        .unwrap_or_else(|| panic!("the answer never reached the model: {second}"))
+        .clone();
+    let content: Value =
+        serde_json::from_str(tool_message["content"].as_str().unwrap()).expect("a JSON result");
+    assert_eq!(content["ok"], json!(true), "got {content}");
+    assert_eq!(
+        content["result"]["result"],
+        json!({ "slot_id": "slot-1", "free": true }),
+        "the handler's verdict travels to the model whole: {content}"
+    );
+
+    // (3) The tray holds the BOOKING and nothing else: the question never became a decision for a
+    // person, and the write still waits for one.
+    let rt = h.state.runtime.read().await;
+    let pending = rt
+        .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+        .await
+        .unwrap();
+    drop(rt);
+    let parked: Vec<&str> = pending.iter().map(|a| a.command.as_str()).collect();
+    assert_eq!(
+        parked,
+        vec!["agenda.booking.create"],
+        "only the write waits for a person"
+    );
+    assert!(
+        bookings(&h).await.is_empty(),
+        "the write itself did not run: it is a proposal (ADR-0283 D3)"
+    );
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL
     );
 }
 

@@ -207,6 +207,12 @@ struct Tools {
     offered: Vec<Value>,
     /// name → `"query"` | `"command"`, for dispatch.
     kinds: HashMap<String, String>,
+    /// The names that only ANSWER (hub#1595). `kind` says which door of the dispatcher a call goes
+    /// through; this says whether it changes anything, which is a different question and the one
+    /// the approval tray is actually about. It is `assistant::assemble_tools` that decides it —
+    /// the SAME rule the drawer uses (`assistant::command_only_answers`), read off the tool spec
+    /// so the runner cannot drift from it.
+    answers_only: HashSet<String>,
 }
 
 /// Reads the parked request and assembles the tool catalogue, under ONE lock: the registry the
@@ -245,6 +251,7 @@ async fn prepare(st: &AppState, run_id: &str, step_id: &str) -> Result<(AiReques
 
     let mut offered = Vec::new();
     let mut kinds = HashMap::new();
+    let mut answers_only = HashSet::new();
     for tool in assembled {
         let (Some(name), Some(kind)) = (
             tool.get("name").and_then(Value::as_str),
@@ -266,10 +273,22 @@ async fn prepare(st: &AppState, run_id: &str, step_id: &str) -> Result<(AiReques
         if !permitted {
             continue;
         }
+        // Absent or anything other than a literal `true` means WRITE: a catalogue that forgot to
+        // say must never read as permission to skip the person (same reading as the drawer's).
+        if tool.get("read_only") == Some(&Value::Bool(true)) {
+            answers_only.insert(name.to_string());
+        }
         kinds.insert(name.to_string(), kind.to_string());
         offered.push(tool);
     }
-    Ok((request, Tools { offered, kinds }))
+    Ok((
+        request,
+        Tools {
+            offered,
+            kinds,
+            answers_only,
+        },
+    ))
 }
 
 /// The extra system turn that tells the model where it is standing.
@@ -295,9 +314,12 @@ fn automation_briefing(request: &AiRequest) -> String {
              the values you actually mean.\n",
         ),
         AiPolicy::Manual => s.push_str(
-            "- **Writes do NOT take effect yet.** Any action you call is queued for a person to \
-             approve, and your turn ends there. So make the single best proposal you can and \
-             describe it precisely — never claim the action is done.\n",
+            "- **Writes do NOT take effect yet.** Any action that CHANGES something is queued for \
+             a person to approve, and your turn ends there. So make the single best proposal you \
+             can and describe it precisely — never claim the action is done.\n\
+             - **Questions are answered right away.** An operation that only reads — checking a \
+             time, a price, whether something is free — runs immediately and comes back to you, \
+             even here. Ask everything you need before you propose anything.\n",
         ),
     }
     s
@@ -503,8 +525,28 @@ async fn dispatch(
         ));
     }
 
+    // **hub#1595 — a question is not a proposal.** A command that only ANSWERS runs here and now,
+    // whatever the policy says, and its answer goes back into the turn like a query's rows.
+    //
+    // `kind` was doing two jobs: choosing the dispatcher's door (`query` → `execute_query`,
+    // `command` → `execute_command`) AND deciding whether a person confirms. They are not the same
+    // question. An operation that has to cross data from another module can only be published as a
+    // *command* — that is what a handler is for — and being a command said nothing about whether it
+    // writes. So the automation that needs to ask «is that slot still free?» before proposing an
+    // appointment parked the QUESTION in `_flow_approvals` and ended its turn: the owner opened the
+    // tray in the morning, was asked to approve «check availability» — not a decision anybody can
+    // take — and the appointment was never proposed at all. The only way out was splitting the
+    // automation in two steps, paying an extra metered turn per incoming message.
+    //
+    // This is NOT a hole in the gate, and it is not a second gate either: the permission is still
+    // revalidated by `execute_flow_command` (`Origin::Automation`, the grant re-read there), and
+    // the classification itself demands the operation ask for a permission the module also gives
+    // its own QUERIES (`assistant::command_only_answers`). What disappears is the confirmation, and
+    // a confirmation exists to stop a surprise change — there is no change to be surprised by.
+    let only_answers = tools.answers_only.contains(&call.name);
+
     // A WRITE. Under `manual` — the default — it becomes a row and the turn ends here.
-    if !request.policy.is_auto() {
+    if !request.policy.is_auto() && !only_answers {
         let rt = st.runtime.read().await;
 
         // **hub#825 — the tray only ever shows what, if approved, runs.** The payload is judged
@@ -555,7 +597,8 @@ async fn dispatch(
         return Ok(Dispatched::AwaitingApproval);
     }
 
-    // `policy: "auto"` — the owner said so in writing. The gate is still the runtime's:
+    // Runs in the turn: either `policy: "auto"` — the owner said so in writing — or an operation
+    // that only answers, which changes nothing to authorise. The gate is still the runtime's:
     // `execute_flow_command` re-reads the grant and runs through `Origin::Automation`, so the
     // fiscal gates, the schema validation and the transactional outbox all still apply.
     let rt = st.runtime.read().await;
