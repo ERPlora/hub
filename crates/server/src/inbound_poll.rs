@@ -676,19 +676,37 @@ fn non_empty(value: &str) -> Option<&str> {
 /// and not 720 an hour.
 ///
 /// Same shape as [`AuthBackoff`] and for the same reason: the tick runs every 5 s, and a warning
-/// repeated on every one of them is a warning nobody reads. Bounded by the contract — it can only
-/// ever hold field names and values the SaaS actually served.
+/// repeated on every one of them is a warning nobody reads. Hard-bounded at
+/// [`ContractDrift::MAX_TRACKED`] distinct gaps: what it remembers comes off the wire, so
+/// "the SaaS would never serve that many" is an assumption and not a limit.
 #[derive(Debug, Default)]
 pub struct ContractDrift {
     seen: BTreeSet<String>,
 }
 
 impl ContractDrift {
+    /// Ceiling on how many distinct gaps are remembered. Sixty-four is far past the point where a
+    /// human has read the warnings and opened an issue, and it is what makes the sentence above
+    /// true rather than hopeful: an out-of-contract VALUE is remote data, so a SaaS that stamped
+    /// an id into one would otherwise hand this tracker a brand-new key every 5 s for as long as
+    /// the process lives.
+    pub const MAX_TRACKED: usize = 64;
+
     /// Record what a page carried and return only what is NEW — what is worth saying out loud.
+    ///
+    /// Once [`Self::MAX_TRACKED`] distinct gaps are remembered nothing else earns a line. That is
+    /// the safe way round: the drift has already been warned about that many times, and
+    /// [`PollReport::unexpected`] keeps counting every gap into the ordinary tick line, so the
+    /// number never goes mute — only the repetition does.
     pub fn observe<I: IntoIterator<Item = String>>(&mut self, gaps: I) -> Vec<String> {
         gaps.into_iter()
-            .filter(|gap| self.seen.insert(gap.clone()))
+            .filter(|gap| self.seen.len() < Self::MAX_TRACKED && self.seen.insert(gap.clone()))
             .collect()
+    }
+
+    /// How many distinct gaps are being remembered.
+    pub fn tracked(&self) -> usize {
+        self.seen.len()
     }
 }
 
@@ -1456,6 +1474,33 @@ mod tests {
         );
         assert_eq!(message.event_payload()["direction"], json!("sideways"));
         assert_eq!(message.event_payload()["source"], json!("yesterday"));
+    }
+
+    /// **The noise filter cannot become the leak.** Every gap it remembers is a string the SaaS
+    /// served — an out-of-contract VALUE is remote data, so a SaaS that stamped an id into it
+    /// (`source:history-<batch>`) would hand this runtime a brand-new gap on every single tick,
+    /// for the whole lifetime of the process. The tracker keeps at most
+    /// [`ContractDrift::MAX_TRACKED`] distinct gaps; past that it says nothing more, which is the
+    /// right way round: by then the drift has already earned its warnings, and `PollReport
+    /// ::unexpected` still counts every one of them into the tick line, so nothing goes mute.
+    #[test]
+    fn the_drift_tracker_cannot_grow_without_bound_however_odd_the_saas_gets() {
+        let mut drift = ContractDrift::default();
+
+        let reported: usize = (0..ContractDrift::MAX_TRACKED + 50)
+            .map(|n| drift.observe(vec![format!("source:history-{n}")]).len())
+            .sum();
+
+        assert_eq!(
+            reported,
+            ContractDrift::MAX_TRACKED,
+            "a SaaS inventing a value per tick stops earning lines once the tracker is full"
+        );
+        assert_eq!(
+            drift.tracked(),
+            ContractDrift::MAX_TRACKED,
+            "and the tracker stops growing with it"
+        );
     }
 
     /// The tick runs every 5 s. A drift that warned on every one of them would be 720 lines an
