@@ -196,14 +196,14 @@ impl CatalogQuery {
     }
 }
 
-/// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
-/// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
-/// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
-/// el path: `ana+x@bar.com` → `ana%2Bx%40bar.com` (el `.` del dominio se preserva por legibilidad).
 /// The whole conversation, both directions and both sources — see [`CloudClient::whatsapp_inbox`]
 /// for why the endpoint's own defaults are narrower than what this runtime wants (hub#1612).
 const WHATSAPP_INBOX_FILTERS: &str = "direction=all&source=all";
 
+/// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
+/// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
+/// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
+/// el path: `ana+x@bar.com` → `ana%2Bx%40bar.com` (el `.` del dominio se preserva por legibilidad).
 fn encode_path_segment(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {
