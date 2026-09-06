@@ -103,6 +103,41 @@ describe('what the owner sees', () => {
     expect(wrapper.find('[data-test="whatsapp-disconnect-button"]').exists()).toBe(true);
   });
 
+  it('says the hub could not be reached instead of a blank block when the doors fail at mount', async () => {
+    // A SaaS that is down at mount used to leave the block EMPTY: no button, no sentence — the
+    // owner cannot tell «not available» from «broken». The refusal is painted, with its sentence.
+    vi.mocked(fetchWhatsAppConfig).mockRejectedValue(new WhatsAppConnectError('unreachable', 0));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+    expect(wrapper.text()).toContain(es.whatsappConnect.errors.unreachable);
+    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+  });
+
+  it('tells a cashier this is the owner’s when the runtime refuses the doors', async () => {
+    // In production the runtime answers a cashier's session with 403 BEFORE any config arrives,
+    // so the `isAdmin` branch below is never reached: this is the path a cashier actually walks.
+    vi.mocked(fetchWhatsAppConfig).mockRejectedValue(new WhatsAppConnectError('forbidden', 403));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+    expect(wrapper.text()).toContain(es.whatsappConnect.errors.forbidden);
+    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="whatsapp-retry-button"]').exists()).toBe(false);
+  });
+
+  it('offers to retry after a failed mount and recovers when the doors answer', async () => {
+    vi.mocked(fetchWhatsAppConfig).mockRejectedValueOnce(new WhatsAppConnectError('unreachable', 0)).mockResolvedValueOnce(CONFIG);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+    expect(wrapper.find('[data-test="whatsapp-retry-button"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="whatsapp-retry-button"]').trigger('click');
+    await flushPromises();
+
+    expect(vi.mocked(fetchWhatsAppConfig)).toHaveBeenCalledTimes(2);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.errors.unreachable);
+    expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+  });
+
   it('tells a cashier this is the owner’s, without a button', async () => {
     (isAdmin as unknown as { value: boolean }).value = false;
     const wrapper = mountBlock('es');

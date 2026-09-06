@@ -125,18 +125,10 @@ fn the_shell_page_can_neither_inline_nor_evaluate_script() {
 }
 
 #[test]
-fn the_shell_page_frames_only_meta_and_rebases_nowhere() {
-    // hub#1600: `frame-src` names ONE foreign host — Meta's, the hidden frames its JS SDK uses to
-    // talk to the Embedded Signup popup («Connect WhatsApp» in the WhatsApp module's settings).
-    // The bundled page itself never opens that popup; the line is here because the policy the hub
-    // SERVES carries it, and `crates/server/tests/cloud_csp.rs` keeps the two frame locks equal so
-    // neither can drift without the other noticing. Exact host, never `https:`.
+fn the_shell_page_frames_nothing_and_rebases_nowhere() {
     let directives = csp_directives();
     assert_eq!(directives.get("object-src"), Some(&vec!["'none'".to_string()]));
-    assert_eq!(
-        directives.get("frame-src"),
-        Some(&vec!["https://*.facebook.com".to_string()])
-    );
+    assert_eq!(directives.get("frame-src"), Some(&vec!["'none'".to_string()]));
     assert_eq!(directives.get("base-uri"), Some(&vec!["'self'".to_string()]));
 }
 

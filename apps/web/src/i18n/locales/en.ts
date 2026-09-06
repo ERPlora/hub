@@ -829,6 +829,7 @@ export default {
     adminOnly: 'Only an owner or an administrator can connect the WhatsApp number.',
     loading: 'Opening the WhatsApp connection…',
     connecting: 'Connecting your number…',
+    retry: 'Retry',
     errors: {
       cancelled: 'The connection was cancelled before finishing.',
       no_phone_number: 'No phone number was added. Open the connection again and add or choose a number.',

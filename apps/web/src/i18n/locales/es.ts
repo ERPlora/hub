@@ -768,6 +768,7 @@ export default {
     adminOnly: 'Solo un dueño o un administrador puede conectar el número de WhatsApp.',
     loading: 'Abriendo la conexión con WhatsApp…',
     connecting: 'Conectando tu número…',
+    retry: 'Reintentar',
     errors: {
       cancelled: 'La conexión se canceló antes de terminar.',
       no_phone_number: 'No se añadió ningún número de teléfono. Vuelve a abrir la conexión y añade o elige un número.',

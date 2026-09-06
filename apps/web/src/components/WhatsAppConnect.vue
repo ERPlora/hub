@@ -32,6 +32,9 @@ const ready = ref(false);
 const busy = ref(false);
 const status = ref('');
 const statusIsError = ref(false);
+/** The sentence for a mount that failed, and whether asking again could change it (a refusal by role cannot). */
+const loadError = ref('');
+const loadRefused = ref(false);
 
 const configured = computed(() => config.value?.configured === true);
 
@@ -40,11 +43,15 @@ async function refresh(): Promise<void> {
     const [cfg, list] = await Promise.all([fetchWhatsAppConfig(), fetchWhatsAppNumbers()]);
     config.value = cfg;
     numbers.value = list.filter((n) => n.is_active !== false);
-  } catch {
-    // A runtime that cannot answer (no session yet, SaaS down) renders nothing rather than a
-    // button that would fail on click; the next mount asks again.
+    loadError.value = '';
+    loadRefused.value = false;
+  } catch (error) {
+    // A runtime that cannot answer (SaaS down, no session, a cashier's session) is said out loud
+    // and can be asked again: an empty block reads as «not available» and hides the failure.
     config.value = null;
     numbers.value = [];
+    loadError.value = sentence(error);
+    loadRefused.value = error instanceof WhatsAppConnectError && (error.status === 401 || error.status === 403);
   } finally {
     ready.value = true;
   }
@@ -101,8 +108,14 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
 </script>
 
 <template>
-  <section v-if="ready && configured" class="whatsapp-connect">
-    <template v-if="numbers.length">
+  <section v-if="ready && (configured || loadError)" class="whatsapp-connect">
+    <template v-if="loadError">
+      <p class="whatsapp-connect__status whatsapp-connect__status--error" role="alert">{{ loadError }}</p>
+      <ion-button v-if="!loadRefused" data-test="whatsapp-retry-button" fill="clear" size="small" @click="refresh">
+        {{ t('whatsappConnect.retry') }}
+      </ion-button>
+    </template>
+    <template v-else-if="numbers.length">
       <div v-for="number in numbers" :key="number.phone_number_id" class="whatsapp-connect__number">
         <div class="whatsapp-connect__identity">
           <strong class="whatsapp-connect__phone">{{ number.display_phone }}</strong>

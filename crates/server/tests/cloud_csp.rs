@@ -337,6 +337,13 @@ const JUSTIFIED_WIDENINGS: &[(&str, &str, &str)] = &[
         "hub#1600: the Graph calls the SDK makes on its own once initialised",
     ),
     (
+        "frame-src",
+        "https://*.facebook.com",
+        "hub#1600: the hidden frames Meta's SDK talks to its popup through. The shell page frames \
+         nothing — it has no such button — so this stays a widening of the served policy alone \
+         instead of being copied into the shell to keep two lists equal",
+    ),
+    (
         "img-src",
         "blob:",
         "the file viewer and the avatar paint bytes the runtime already fetched, via \
@@ -411,15 +418,34 @@ fn every_way_the_served_policy_is_looser_than_the_shell_is_written_down() {
 
 #[test]
 fn the_served_policy_keeps_every_lock_the_shell_has() {
-    // The other direction: the shell may not be strictly tighter on the directives that decide
-    // whether a page is a sealed box. (It is allowed to be tighter where the widenings above say
-    // so, and those are checked by name.)
+    // The other direction: the served policy may not be looser than the shell on the directives
+    // that decide whether a page is a sealed box — except where JUSTIFIED_WIDENINGS says so, by
+    // name. Those sources are discounted here, so a widening the shell does not need (hub#1600:
+    // Meta's frames, for a popup the bundled page never opens) stays a widening of the served
+    // policy alone instead of being copied into the shell to keep two lists equal; and the shell
+    // cannot quietly carry one of them either, because it is compared against the list WITHOUT.
     let shell = shell_policy();
+    let shell = directives(&shell);
     let served = directives(&served());
     for directive in ["default-src", "object-src", "frame-src", "base-uri"] {
+        let mut kept: Vec<String> = served
+            .get(directive)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|s| {
+                !JUSTIFIED_WIDENINGS
+                    .iter()
+                    .any(|(d, w, _)| *d == directive && *w == s.as_str())
+            })
+            .collect();
+        // A source list emptied of its justified widenings allows nothing: that is `'none'`.
+        if kept.is_empty() {
+            kept = vec!["'none'".to_string()];
+        }
         assert_eq!(
-            served.get(directive),
-            directives(&shell).get(directive),
+            Some(&kept),
+            shell.get(directive),
             "{directive} drifted apart from the shell policy with no widening to justify it"
         );
     }

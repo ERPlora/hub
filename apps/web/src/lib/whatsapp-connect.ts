@@ -189,18 +189,27 @@ async function runtimeCall<T>(path: string, init: RequestInit = {}): Promise<T> 
     body = {};
   }
   if (!response.ok) {
-    const error = body.error;
-    const code =
-      typeof error === 'string'
-        ? error
-        : typeof error === 'object' && error && typeof (error as { code?: unknown }).code === 'string'
-          ? String((error as { code: string }).code)
-          : response.status === 401 || response.status === 403
-            ? 'forbidden'
-            : 'default';
-    throw new WhatsAppConnectError(code, response.status);
+    throw new WhatsAppConnectError(refusalCode(body, response.status), response.status);
   }
   return body as T;
+}
+
+/** A catalogue key, not a sentence: what `whatsappConnect.errors.<code>` can be looked up by. */
+const CODE_SHAPE = /^[a-z][a-z0-9_.-]*$/;
+
+/**
+ * The code a refusal maps to: `code` first (what the SaaS's view is asked to send next to its
+ * prose), then `error.code`, then a bare `error` that IS a code. Prose is never a key — the SaaS's
+ * connect view answers with sentences («No phone numbers found…», saas#1886) and the runtime's
+ * gate with its own — so it falls back on the status: 401/403 is «not yours», the rest is the
+ * generic sentence.
+ */
+function refusalCode(body: Record<string, unknown>, status: number): string {
+  const nested = typeof body.error === 'object' && body.error ? (body.error as { code?: unknown }).code : undefined;
+  for (const candidate of [body.code, nested, body.error]) {
+    if (typeof candidate === 'string' && CODE_SHAPE.test(candidate)) return candidate;
+  }
+  return status === 401 || status === 403 ? 'forbidden' : 'default';
 }
 
 export function fetchWhatsAppConfig(): Promise<WhatsAppConnectConfig> {
@@ -212,12 +221,21 @@ export async function fetchWhatsAppNumbers(): Promise<WhatsAppNumber[]> {
   return body.numbers ?? [];
 }
 
-export function connectWhatsApp(result: EmbeddedSignupResult): Promise<{ phone_number_id: string; display_phone: string; is_on_biz_app?: boolean }> {
-  return runtimeCall('/api/hub/whatsapp/connect', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(result),
-  });
+export async function connectWhatsApp(result: EmbeddedSignupResult): Promise<{ phone_number_id: string; display_phone: string; is_on_biz_app?: boolean }> {
+  try {
+    return await runtimeCall('/api/hub/whatsapp/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(result),
+    });
+  } catch (error) {
+    // The only 404 the SaaS's connect view returns is «no phone numbers in the WhatsApp Business
+    // Account» (`whatsapp_connect`, saas#1886): named in prose alone, the page can still name it.
+    if (error instanceof WhatsAppConnectError && error.status === 404 && error.code === 'default') {
+      throw new WhatsAppConnectError('no_phone_number', 404);
+    }
+    throw error;
+  }
 }
 
 export async function disconnectWhatsApp(phoneNumberId: string): Promise<void> {

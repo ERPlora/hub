@@ -209,6 +209,31 @@ describe('the runtime doors', () => {
     expect(new WhatsAppConnectError('x', 502).code).toBe('x');
   });
 
+  const POPUP = { code: 'c', event: 'FINISH_ONLY_WABA', waba_id: 'w', phone_number_id: '', business_id: '' };
+
+  it("reads the SaaS's `code` when the view sends one next to its prose", async () => {
+    answer(404, { error: 'No phone numbers found in WhatsApp Business Account', code: 'no_phone_number' });
+
+    await expect(connectWhatsApp(POPUP)).rejects.toMatchObject({ code: 'no_phone_number', status: 404 });
+  });
+
+  it('does not take a sentence for a code: the connect door\u2019s 404 without one means no phone number', async () => {
+    // What saas#1886 actually answers today: prose in `error`, no code. The only 404 that view
+    // returns is «no phone numbers in the WABA», so the page may name it; any other prose is the
+    // generic sentence — never a catalogue key made out of the prose.
+    answer(404, { error: 'No phone numbers found in WhatsApp Business Account' });
+    await expect(connectWhatsApp(POPUP)).rejects.toMatchObject({ code: 'no_phone_number', status: 404 });
+
+    answer(502, { error: 'Could not identify WhatsApp Business Account' });
+    await expect(connectWhatsApp(POPUP)).rejects.toMatchObject({ code: 'default', status: 502 });
+  });
+
+  it("lands the runtime's own refusal, prose too, on `forbidden`", async () => {
+    answer(403, { ok: false, error: 'se requiere rol owner/admin para gestionar el Hub (rol actual: employee)' });
+
+    await expect(fetchWhatsAppConfig()).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+  });
+
   it('disconnects by posting to the number', async () => {
     answer(200, { success: true });
 
