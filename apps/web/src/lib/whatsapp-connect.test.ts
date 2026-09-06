@@ -97,7 +97,7 @@ describe('the popup', () => {
 
     const result = await openEmbeddedSignup(FB, 'cfg_987', win);
 
-    const [, opts] = FB.login.mock.calls[0] as [unknown, Record<string, unknown>];
+    const [, opts] = FB.login.mock.calls[0] as unknown as [unknown, Record<string, unknown>];
     expect(opts.config_id).toBe('cfg_987');
     expect(opts.response_type).toBe('code');
     expect(opts.override_default_response_type).toBe(true);
