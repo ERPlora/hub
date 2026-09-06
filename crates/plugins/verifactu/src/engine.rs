@@ -83,6 +83,30 @@ impl VerifactuError {
             _ => None,
         }
     }
+
+    /// The same reason as [`VerifactuError::as_reason`], already merged into the `{code, …facts}`
+    /// object a module reads — `None` for an error that has no code.
+    ///
+    /// One helper and not a merge written at each call site, because there are two of them and
+    /// they publish the SAME refusal: the diagnostic's `detail_reason` (hub#1576) and the
+    /// transmission's `validation_error_reason` (hub#1579). Two hand-rolled merges are two
+    /// chances for the shape to drift, and the module resolves both through the one
+    /// `reasonSentence()` — a code that read one way in the settings card and another in the
+    /// events list would be its bug to chase, not ours.
+    ///
+    /// **Absent, never empty.** The module asks «is there a code I know?»; an object with nothing
+    /// in it answers yes and paints a blank where the half that says what to fix used to be. So
+    /// the caller omits the key entirely rather than filing `{}`.
+    pub(crate) fn as_reason_details(&self) -> Option<Json> {
+        let (code, facts) = self.as_reason()?;
+        let mut out = json!({ "code": code });
+        if let (Some(target), Some(source)) = (out.as_object_mut(), facts.as_object()) {
+            for (key, value) in source {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+        Some(out)
+    }
 }
 
 impl From<VerifactuError> for RuntimeError {

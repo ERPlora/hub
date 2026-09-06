@@ -171,6 +171,11 @@ pub const CLAVE_REGIMEN: &[&str] = &[
     "20", "21",
 ];
 
+/// §15.6 — los impuestos que admiten `ClaveRegimen`. Con «Otros» (05) el elemento sobra, y ese
+/// rechazo viaja con la lista como dato para que la frase la escriba el catálogo del módulo y no
+/// este fichero (hub#1579).
+const REGIMEN_TAXES: &[&str] = &["01", "02", "03"];
+
 /// Causas de exención que **solo** existen con IGIC (§15.5).
 const EXENTA_SOLO_IGIC: &[&str] = &["E7", "E8"];
 
@@ -290,16 +295,14 @@ fn walk(xml: &str) -> Vec<(&str, &str, usize)> {
     out
 }
 
-fn err(msg: impl Into<String>) -> VerifactuError {
-    VerifactuError::Payload(msg.into())
-}
-
-/// The same refusal as [`err`], plus the **stable code + facts** a module can translate
-/// (hub#1576) — identical prose, identical `Display`, so nothing that reads the sentence moves.
+/// A refusal of the schema validator, carrying the **stable code + facts** a module can translate
+/// (hub#1576) beside the Spanish prose this file has always written.
 ///
-/// It is added beside `err` rather than replacing it: `err` still serves the validators of the
-/// desglose, the rectificativa and the F2 limit, which are unreachable from the diagnostic sample
-/// and stay on the fallback prose for now (hub#1579).
+/// `Display` still gives that prose byte-for-byte, so nothing that reads the sentence moves; what
+/// is new is the half a module can look up in its `en`/`es` catalogue. Since hub#1579 it is the
+/// ONLY way a refusal leaves this file: the desglose, the rectificativa and the F2 ceiling were
+/// the last validators still on the untranslatable prose, and the `err` helper that served them
+/// is gone — a refusal without a code is now a compile error, not a review one.
 fn named(code: &'static str, facts: Json, msg: impl Into<String>) -> VerifactuError {
     VerifactuError::Schema {
         code,
@@ -650,11 +653,19 @@ fn validate_rectificativa(
             "ImporteRectificacion",
         ] {
             if present_at(elements, tag, nivel) {
-                return Err(err(format!(
-                    "una factura {tipo} no rectifica nada, así que no puede informar {tag}: la \
-                     AEAT solo lo admite con TipoFactura {}",
-                    TIPOS_RECTIFICATIVOS.join("|")
-                )));
+                return Err(named(
+                    "schema_rectification_field_on_plain_invoice",
+                    json!({
+                        "invoice_type": tipo,
+                        "element": tag,
+                        "allowed": TIPOS_RECTIFICATIVOS.join("|"),
+                    }),
+                    format!(
+                        "una factura {tipo} no rectifica nada, así que no puede informar {tag}: \
+                         la AEAT solo lo admite con TipoFactura {}",
+                        TIPOS_RECTIFICATIVOS.join("|")
+                    ),
+                ));
             }
         }
         return Ok(());
@@ -663,28 +674,47 @@ fn validate_rectificativa(
     let tipo_rect = match tipo_rect {
         Some(v) if !v.is_empty() => v,
         _ => {
-            return Err(err(format!(
-                "una rectificativa {tipo} exige TipoRectificativa ({}): sin él la AEAT la rechaza \
-                 y el registro ya ha gastado su número de cadena",
-                TIPO_RECTIFICATIVA.join("|")
-            )))
+            return Err(named(
+                "schema_rectification_type_missing",
+                json!({
+                    "invoice_type": tipo,
+                    "allowed": TIPO_RECTIFICATIVA.join("|"),
+                }),
+                format!(
+                    "una rectificativa {tipo} exige TipoRectificativa ({}): sin él la AEAT la \
+                     rechaza y el registro ya ha gastado su número de cadena",
+                    TIPO_RECTIFICATIVA.join("|")
+                ),
+            ))
         }
     };
     if !TIPO_RECTIFICATIVA.contains(&tipo_rect) {
-        return Err(err(format!(
-            "TipoRectificativa `{tipo_rect}` no está en la enumeración del esquema ({})",
-            TIPO_RECTIFICATIVA.join("|")
-        )));
+        return Err(named(
+            "schema_value_not_in_enum",
+            json!({
+                "element": "TipoRectificativa",
+                "value": tipo_rect,
+                "allowed": TIPO_RECTIFICATIVA.join("|"),
+            }),
+            format!(
+                "TipoRectificativa `{tipo_rect}` no está en la enumeración del esquema ({})",
+                TIPO_RECTIFICATIVA.join("|")
+            ),
+        ));
     }
 
     match (tipo_rect, importe) {
         // Sustitutiva: el desglose de lo que sustituye es obligatorio.
-        ("S", false) => Err(err(
+        ("S", false) => Err(named(
+            "schema_rectification_amount_required",
+            json!({}),
             "una rectificativa por sustitución (TipoRectificativa=S) exige ImporteRectificacion \
              con la base y la cuota rectificadas",
         )),
         // Por diferencias: el registro YA declara el delta; el bloque sobra.
-        ("I", true) => Err(err(
+        ("I", true) => Err(named(
+            "schema_rectification_amount_not_allowed",
+            json!({}),
             "una rectificativa por diferencias (TipoRectificativa=I) ya declara el delta en sus \
              propios importes: ImporteRectificacion solo se informa con TipoRectificativa=S",
         )),
@@ -728,16 +758,22 @@ fn en_lista(v: f64, permitidos: &[f64]) -> bool {
 fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
     let grupos = detalles(elements);
     if grupos.is_empty() {
-        return Err(err(
+        return Err(named(
+            "schema_breakdown_empty",
+            json!({}),
             "Desglose no lleva ningún DetalleDesglose: la AEAT no admite un desglose vacío",
         ));
     }
     if grupos.len() > MAX_DETALLES {
-        return Err(err(format!(
-            "el Desglose lleva {} líneas y el esquema admite {MAX_DETALLES} \
-             (DesgloseType/DetalleDesglose maxOccurs=12)",
-            grupos.len()
-        )));
+        return Err(named(
+            "schema_breakdown_too_many_lines",
+            json!({ "count": grupos.len(), "max": MAX_DETALLES }),
+            format!(
+                "el Desglose lleva {} líneas y el esquema admite {MAX_DETALLES} \
+                 (DesgloseType/DetalleDesglose maxOccurs=12)",
+                grupos.len()
+            ),
+        ));
     }
 
     for (i, g) in grupos.iter().enumerate() {
@@ -759,10 +795,19 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         // Impuesto (ausente ⇒ IVA, es el default explícito de la AEAT).
         let impuesto = get("Impuesto").unwrap_or("01");
         if !IMPUESTO.contains(&impuesto) {
-            return Err(err(format!(
-                "DetalleDesglose #{n}: Impuesto `{impuesto}` no está en la enumeración ({})",
-                IMPUESTO.join("|")
-            )));
+            return Err(named(
+                "schema_breakdown_value_not_in_enum",
+                json!({
+                    "line": n,
+                    "element": "Impuesto",
+                    "value": impuesto,
+                    "allowed": IMPUESTO.join("|"),
+                }),
+                format!(
+                    "DetalleDesglose #{n}: Impuesto `{impuesto}` no está en la enumeración ({})",
+                    IMPUESTO.join("|")
+                ),
+            ));
         }
         let es_iva = impuesto == "01";
         let es_igic = impuesto == "03";
@@ -771,20 +816,36 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         let regimen = get("ClaveRegimen");
         match regimen {
             Some(r) if !CLAVE_REGIMEN.contains(&r) => {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: ClaveRegimen `{r}` no está en las listas L8A/L8B"
-                )))
+                return Err(named(
+                    "schema_breakdown_regime_not_in_enum",
+                    json!({ "line": n, "value": r }),
+                    format!(
+                        "DetalleDesglose #{n}: ClaveRegimen `{r}` no está en las listas L8A/L8B"
+                    ),
+                ))
             }
             Some(_) if impuesto == "05" => {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: ClaveRegimen solo se admite con Impuesto 01, 02 o 03"
-                )))
+                return Err(named(
+                    "schema_breakdown_regime_not_allowed",
+                    json!({
+                        "line": n,
+                        "tax": impuesto,
+                        "allowed": REGIMEN_TAXES.join("|"),
+                    }),
+                    format!(
+                        "DetalleDesglose #{n}: ClaveRegimen solo se admite con Impuesto 01, 02 o 03"
+                    ),
+                ))
             }
             None if es_iva || es_igic => {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: ClaveRegimen es obligatoria con Impuesto \
-                     {impuesto}; sin ella la AEAT responde 1245"
-                )))
+                return Err(named(
+                    "schema_breakdown_regime_required",
+                    json!({ "line": n, "tax": impuesto }),
+                    format!(
+                        "DetalleDesglose #{n}: ClaveRegimen es obligatoria con Impuesto \
+                         {impuesto}; sin ella la AEAT responde 1245"
+                    ),
+                ))
             }
             _ => {}
         }
@@ -794,47 +855,80 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         let exenta = get("OperacionExenta");
         match (calificacion, exenta) {
             (Some(_), Some(_)) => {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: CalificacionOperacion y OperacionExenta son un \
-                     <choice> del esquema — van una o la otra, no las dos"
-                )))
+                return Err(named(
+                    "schema_breakdown_qualification_conflict",
+                    json!({ "line": n }),
+                    format!(
+                        "DetalleDesglose #{n}: CalificacionOperacion y OperacionExenta son un \
+                         <choice> del esquema — van una o la otra, no las dos"
+                    ),
+                ))
             }
             (None, None) => {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: falta CalificacionOperacion u OperacionExenta \
-                     (el <choice> exige una de las dos)"
-                )))
+                return Err(named(
+                    "schema_breakdown_qualification_missing",
+                    json!({ "line": n }),
+                    format!(
+                        "DetalleDesglose #{n}: falta CalificacionOperacion u OperacionExenta \
+                         (el <choice> exige una de las dos)"
+                    ),
+                ))
             }
             _ => {}
         }
         if let Some(c) = calificacion {
             if !CALIFICACION.contains(&c) {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: CalificacionOperacion `{c}` no está en la \
-                     enumeración ({})",
-                    CALIFICACION.join("|")
-                )));
+                return Err(named(
+                    "schema_breakdown_value_not_in_enum",
+                    json!({
+                        "line": n,
+                        "element": "CalificacionOperacion",
+                        "value": c,
+                        "allowed": CALIFICACION.join("|"),
+                    }),
+                    format!(
+                        "DetalleDesglose #{n}: CalificacionOperacion `{c}` no está en la \
+                         enumeración ({})",
+                        CALIFICACION.join("|")
+                    ),
+                ));
             }
         }
         if let Some(e) = exenta {
             if !OPERACION_EXENTA.contains(&e) {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: OperacionExenta `{e}` no está en la enumeración ({})",
-                    OPERACION_EXENTA.join("|")
-                )));
+                return Err(named(
+                    "schema_breakdown_value_not_in_enum",
+                    json!({
+                        "line": n,
+                        "element": "OperacionExenta",
+                        "value": e,
+                        "allowed": OPERACION_EXENTA.join("|"),
+                    }),
+                    format!(
+                        "DetalleDesglose #{n}: OperacionExenta `{e}` no está en la enumeración \
+                         ({})",
+                        OPERACION_EXENTA.join("|")
+                    ),
+                ));
             }
             if EXENTA_SOLO_IGIC.contains(&e) && !es_igic {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: OperacionExenta `{e}` solo existe con Impuesto 03 \
-                     (IGIC); con IVA la lista es E1–E6"
-                )));
+                return Err(named(
+                    "schema_breakdown_exemption_igic_only",
+                    json!({ "line": n, "value": e }),
+                    format!(
+                        "DetalleDesglose #{n}: OperacionExenta `{e}` solo existe con Impuesto 03 \
+                         (IGIC); con IVA la lista es E1–E6"
+                    ),
+                ));
             }
         }
 
         if !hay("BaseImponibleOimporteNoSujeto") {
-            return Err(err(format!(
-                "DetalleDesglose #{n}: BaseImponibleOimporteNoSujeto es obligatorio"
-            )));
+            return Err(named(
+                "schema_breakdown_base_missing",
+                json!({ "line": n, "element": "BaseImponibleOimporteNoSujeto" }),
+                format!("DetalleDesglose #{n}: BaseImponibleOimporteNoSujeto es obligatorio"),
+            ));
         }
 
         // Los cuatro campos que dependen de la calificación.
@@ -848,10 +942,14 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
         // §15.5 — con OperacionExenta no se informa ninguno.
         if exenta.is_some() {
             if let Some(t) = importes.iter().find(|t| hay(t)) {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: una línea con OperacionExenta no puede informar \
-                     `{t}` (validaciones AEAT §15.5)"
-                )));
+                return Err(named(
+                    "schema_breakdown_exempt_amount_not_allowed",
+                    json!({ "line": n, "element": t }),
+                    format!(
+                        "DetalleDesglose #{n}: una línea con OperacionExenta no puede informar \
+                         `{t}` (validaciones AEAT §15.5)"
+                    ),
+                ));
             }
         }
 
@@ -863,11 +961,15 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
             // fuera de S1 para ningún impuesto.
             if matches!(c, "N1" | "N2") {
                 if let Some(t) = importes.iter().find(|t| hay(t)) {
-                    return Err(err(format!(
-                        "DetalleDesglose #{n}: con CalificacionOperacion `{c}` no se puede \
-                         informar `{t}` — es el error 1237 de la AEAT, y el régimen 17 dejó de \
-                         ser una excepción en abril de 2025"
-                    )));
+                    return Err(named(
+                        "schema_breakdown_untaxed_amount_not_allowed",
+                        json!({ "line": n, "qualification": c, "element": t }),
+                        format!(
+                            "DetalleDesglose #{n}: con CalificacionOperacion `{c}` no se puede \
+                             informar `{t}` — es el error 1237 de la AEAT, y el régimen 17 dejó \
+                             de ser una excepción en abril de 2025"
+                        ),
+                    ));
                 }
             }
 
@@ -877,16 +979,24 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
                     match get(tag).and_then(num) {
                         Some(v) if v == 0.0 => {}
                         Some(v) => {
-                            return Err(err(format!(
-                                "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
-                                 `{tag}` tiene que ser 0 y vale {v}"
-                            )))
+                            return Err(named(
+                                "schema_breakdown_reverse_charge_not_zero",
+                                json!({ "line": n, "element": tag, "value": v }),
+                                format!(
+                                    "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
+                                     `{tag}` tiene que ser 0 y vale {v}"
+                                ),
+                            ))
                         }
                         None => {
-                            return Err(err(format!(
-                                "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
-                                 `{tag}` es obligatorio y va a 0 — no se omite (§15.4)"
-                            )))
+                            return Err(named(
+                                "schema_breakdown_reverse_charge_missing",
+                                json!({ "line": n, "element": tag }),
+                                format!(
+                                    "DetalleDesglose #{n}: con S2 (inversión del sujeto pasivo) \
+                                     `{tag}` es obligatorio y va a 0 — no se omite (§15.4)"
+                                ),
+                            ))
                         }
                     }
                 }
@@ -894,17 +1004,25 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
 
             // §15.6.6 — la clave 08 (operación localizada en Canarias/Ceuta/Melilla) obliga a N2.
             if regimen == Some("08") && c != "N2" {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: ClaveRegimen 08 exige CalificacionOperacion N2 y \
-                     lleva `{c}` (§15.6.6)"
-                )));
+                return Err(named(
+                    "schema_breakdown_regime_requires_n2",
+                    json!({ "line": n, "regime": "08", "qualification": c }),
+                    format!(
+                        "DetalleDesglose #{n}: ClaveRegimen 08 exige CalificacionOperacion N2 y \
+                         lleva `{c}` (§15.6.6)"
+                    ),
+                ));
             }
             // §15.6.10 — ídem para la clave 20 de IGIC (operaciones sujetas al IPSI).
             if es_igic && regimen == Some("20") && c != "N2" {
-                return Err(err(format!(
-                    "DetalleDesglose #{n}: con IGIC, ClaveRegimen 20 exige \
-                     CalificacionOperacion N2 y lleva `{c}` (§15.6.10)"
-                )));
+                return Err(named(
+                    "schema_breakdown_regime_requires_n2",
+                    json!({ "line": n, "regime": "20", "qualification": c }),
+                    format!(
+                        "DetalleDesglose #{n}: con IGIC, ClaveRegimen 20 exige \
+                         CalificacionOperacion N2 y lleva `{c}` (§15.6.10)"
+                    ),
+                ));
             }
 
             // §15.1 / §15.3 — las listas cerradas de tipos. Acotadas a IVA: los tipos de IGIC
@@ -912,18 +1030,27 @@ fn validate_desglose(elements: &[Element<'_>]) -> Result<(), VerifactuError> {
             if es_iva && c == "S1" {
                 if let Some(t) = get("TipoImpositivo").and_then(num) {
                     if !en_lista(t, TIPOS_IVA) {
-                        return Err(err(format!(
-                            "DetalleDesglose #{n}: TipoImpositivo {t} no es un tipo de IVA; la \
-                             AEAT solo admite 0; 2; 4; 5; 7,5; 10 y 21 (§15.1)"
-                        )));
+                        return Err(named(
+                            "schema_breakdown_vat_rate_not_allowed",
+                            json!({ "line": n, "value": t }),
+                            format!(
+                                "DetalleDesglose #{n}: TipoImpositivo {t} no es un tipo de IVA; \
+                                 la AEAT solo admite 0; 2; 4; 5; 7,5; 10 y 21 (§15.1)"
+                            ),
+                        ));
                     }
                 }
                 if let Some(t) = get("TipoRecargoEquivalencia").and_then(num) {
                     if !en_lista(t, TIPOS_RECARGO) {
-                        return Err(err(format!(
-                            "DetalleDesglose #{n}: TipoRecargoEquivalencia {t} no es un tipo de \
-                             recargo; la AEAT admite 0; 0,26; 0,5; 0,62; 1; 1,4; 1,75 y 5,2 (§15.3)"
-                        )));
+                        return Err(named(
+                            "schema_breakdown_surcharge_rate_not_allowed",
+                            json!({ "line": n, "value": t }),
+                            format!(
+                                "DetalleDesglose #{n}: TipoRecargoEquivalencia {t} no es un tipo \
+                                 de recargo; la AEAT admite 0; 0,26; 0,5; 0,62; 1; 1,4; 1,75 y \
+                                 5,2 (§15.3)"
+                            ),
+                        ));
                     }
                 }
             }
@@ -988,13 +1115,21 @@ fn validate_limite_f2(
 
     let techo = F2_CEILING_CENTS;
     if total > techo {
-        return Err(err(format!(
-            "una factura simplificada F2 no puede pasar de 3.000,00 € (más los 10,00 € de \
-             tolerancia) sumando base y cuota de todas las líneas, y suma {:.2} €: la AEAT la \
-             rechaza (§15.8). Con este importe hay que emitir factura completa identificando al \
-             destinatario",
-            total as f64 / 100.0
-        )));
+        return Err(named(
+            "schema_simplified_over_ceiling",
+            json!({
+                "total": format!("{:.2}", total as f64 / 100.0),
+                "ceiling": format!("{:.2}", MAX_F2_CENTS as f64 / 100.0),
+                "tolerance": format!("{:.2}", F2_TOLERANCE_CENTS as f64 / 100.0),
+            }),
+            format!(
+                "una factura simplificada F2 no puede pasar de 3.000,00 € (más los 10,00 € de \
+                 tolerancia) sumando base y cuota de todas las líneas, y suma {:.2} €: la AEAT \
+                 la rechaza (§15.8). Con este importe hay que emitir factura completa \
+                 identificando al destinatario",
+                total as f64 / 100.0
+            ),
+        ));
     }
     Ok(())
 }
@@ -1138,9 +1273,30 @@ mod tests {
     // So each refusal now carries a stable code plus the element it is about, as DATA. The
     // Spanish stays as the prose (`Display`), which is what a hub on an older module still paints.
 
+    /// The single `DetalleDesglose` the passing envelope carries, written once so a case that
+    /// empties the breakdown or repeats it thirteen times says only that (hub#1579).
+    const DETALLE_OK: &str = "<sum1:DetalleDesglose>\
+         <sum1:Impuesto>01</sum1:Impuesto><sum1:ClaveRegimen>01</sum1:ClaveRegimen>\
+         <sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+         <sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>\
+         <sum1:BaseImponibleOimporteNoSujeto>100.00</sum1:BaseImponibleOimporteNoSujeto>\
+         <sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
+         </sum1:DetalleDesglose>";
+
+    /// Guards the fixture above: a `replace` that matches nothing leaves the envelope VALID, and
+    /// a table row built on it would then fail saying «this has to be refused» — pointing at the
+    /// validator instead of at the typo that is really to blame.
+    #[test]
+    fn the_breakdown_fixture_is_the_one_in_the_envelope_hub1579() {
+        assert!(
+            envelope_with("").contains(DETALLE_OK),
+            "DETALLE_OK no es literalmente el detalle del sobre que pasa"
+        );
+    }
+
     /// Every case this table drives, mutated out of the one envelope that passes. Written as a
-    /// table on purpose: fifteen separate tests would let a new refusal land with no code and
-    /// nobody notice — here the count itself is an assertion.
+    /// table on purpose: separate tests would let a new refusal land with no code and nobody
+    /// notice — here the count itself is an assertion.
     fn refusals() -> Vec<(&'static str, String, &'static str, Json)> {
         let base = envelope_with("");
         let swap = |from: &str, to: &str| base.replace(from, to);
@@ -1301,6 +1457,288 @@ mod tests {
                 "schema_hash_malformed",
                 json!({}),
             ),
+            // ── hub#1579: los tres validadores que hub#1576 dejó fuera ──────────────────────
+            //
+            // Unreachable from «Test connection» — its sample is fixed (F1/F2, 121,00 €, one VAT
+            // line), so none of these refusals ever fires down that road. They fire on the surface
+            // a business actually uses every day: the real transmission.
+            (
+                "a plain invoice that fills in a rectifying field",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>\
+                     <sum1:TipoRectificativa>S</sum1:TipoRectificativa>",
+                ),
+                "schema_rectification_field_on_plain_invoice",
+                json!({
+                    "invoice_type": "F1",
+                    "element": "TipoRectificativa",
+                    "allowed": TIPOS_RECTIFICATIVOS.join("|"),
+                }),
+            ),
+            (
+                "a corrective invoice that does not say how it corrects",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>R1</sum1:TipoFactura>",
+                ),
+                "schema_rectification_type_missing",
+                json!({
+                    "invoice_type": "R1",
+                    "allowed": TIPO_RECTIFICATIVA.join("|"),
+                }),
+            ),
+            (
+                "a TipoRectificativa outside the enumeration",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>R1</sum1:TipoFactura>\
+                     <sum1:TipoRectificativa>X</sum1:TipoRectificativa>",
+                ),
+                // The SAME code the top-level enumerations already publish: for whoever reads it
+                // this is the one sentence «that value is not in the list», and a second code for
+                // it would be a second sentence saying the same thing.
+                "schema_value_not_in_enum",
+                json!({
+                    "element": "TipoRectificativa",
+                    "value": "X",
+                    "allowed": TIPO_RECTIFICATIVA.join("|"),
+                }),
+            ),
+            (
+                "a substitution corrective with no replaced amount",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>R1</sum1:TipoFactura>\
+                     <sum1:TipoRectificativa>S</sum1:TipoRectificativa>",
+                ),
+                "schema_rectification_amount_required",
+                json!({}),
+            ),
+            (
+                "a difference corrective that also declares the replaced amount",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>R1</sum1:TipoFactura>\
+                     <sum1:TipoRectificativa>I</sum1:TipoRectificativa>\
+                     <sum1:ImporteRectificacion>\
+                     <sum1:BaseRectificada>100.00</sum1:BaseRectificada>\
+                     <sum1:CuotaRectificada>21.00</sum1:CuotaRectificada>\
+                     </sum1:ImporteRectificacion>",
+                ),
+                "schema_rectification_amount_not_allowed",
+                json!({}),
+            ),
+            (
+                "a breakdown with no detail line at all",
+                base.replace(DETALLE_OK, ""),
+                "schema_breakdown_empty",
+                json!({}),
+            ),
+            (
+                "a breakdown with more lines than the schema admits",
+                base.replace(DETALLE_OK, &DETALLE_OK.repeat(MAX_DETALLES + 1)),
+                "schema_breakdown_too_many_lines",
+                json!({ "count": MAX_DETALLES + 1, "max": MAX_DETALLES }),
+            ),
+            (
+                "a line with a tax outside the enumeration",
+                swap(
+                    "<sum1:Impuesto>01</sum1:Impuesto>",
+                    "<sum1:Impuesto>09</sum1:Impuesto>",
+                ),
+                "schema_breakdown_value_not_in_enum",
+                json!({
+                    "line": 1,
+                    "element": "Impuesto",
+                    "value": "09",
+                    "allowed": IMPUESTO.join("|"),
+                }),
+            ),
+            (
+                "a line with a regime key that is in neither AEAT list",
+                swap(
+                    "<sum1:ClaveRegimen>01</sum1:ClaveRegimen>",
+                    "<sum1:ClaveRegimen>99</sum1:ClaveRegimen>",
+                ),
+                "schema_breakdown_regime_not_in_enum",
+                json!({ "line": 1, "value": "99" }),
+            ),
+            (
+                "a regime key on a tax that does not take one",
+                swap(
+                    "<sum1:Impuesto>01</sum1:Impuesto>",
+                    "<sum1:Impuesto>05</sum1:Impuesto>",
+                ),
+                "schema_breakdown_regime_not_allowed",
+                json!({ "line": 1, "tax": "05", "allowed": REGIMEN_TAXES.join("|") }),
+            ),
+            (
+                "a VAT line with no regime key",
+                swap("<sum1:ClaveRegimen>01</sum1:ClaveRegimen>", ""),
+                "schema_breakdown_regime_required",
+                json!({ "line": 1, "tax": "01" }),
+            ),
+            (
+                "a line that is both qualified and exempt",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>\
+                     <sum1:OperacionExenta>E1</sum1:OperacionExenta>",
+                ),
+                "schema_breakdown_qualification_conflict",
+                json!({ "line": 1 }),
+            ),
+            (
+                "a line that is neither qualified nor exempt",
+                swap("<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>", ""),
+                "schema_breakdown_qualification_missing",
+                json!({ "line": 1 }),
+            ),
+            (
+                "a qualification outside the enumeration",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:CalificacionOperacion>S9</sum1:CalificacionOperacion>",
+                ),
+                "schema_breakdown_value_not_in_enum",
+                json!({
+                    "line": 1,
+                    "element": "CalificacionOperacion",
+                    "value": "S9",
+                    "allowed": CALIFICACION.join("|"),
+                }),
+            ),
+            (
+                "an exemption cause outside the enumeration",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:OperacionExenta>E9</sum1:OperacionExenta>",
+                ),
+                "schema_breakdown_value_not_in_enum",
+                json!({
+                    "line": 1,
+                    "element": "OperacionExenta",
+                    "value": "E9",
+                    "allowed": OPERACION_EXENTA.join("|"),
+                }),
+            ),
+            (
+                "an IGIC-only exemption cause on a VAT line",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:OperacionExenta>E7</sum1:OperacionExenta>",
+                ),
+                "schema_breakdown_exemption_igic_only",
+                json!({ "line": 1, "value": "E7" }),
+            ),
+            (
+                "a line with no taxable base",
+                swap(
+                    "<sum1:BaseImponibleOimporteNoSujeto>100.00\
+                     </sum1:BaseImponibleOimporteNoSujeto>",
+                    "",
+                ),
+                "schema_breakdown_base_missing",
+                json!({ "line": 1, "element": "BaseImponibleOimporteNoSujeto" }),
+            ),
+            (
+                "an exempt line that still declares a rate",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:OperacionExenta>E1</sum1:OperacionExenta>",
+                ),
+                "schema_breakdown_exempt_amount_not_allowed",
+                json!({ "line": 1, "element": "TipoImpositivo" }),
+            ),
+            (
+                "a not-subject line that still declares a rate",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:CalificacionOperacion>N1</sum1:CalificacionOperacion>",
+                ),
+                "schema_breakdown_untaxed_amount_not_allowed",
+                json!({ "line": 1, "qualification": "N1", "element": "TipoImpositivo" }),
+            ),
+            (
+                "a reverse-charge line whose rate is not zero",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>",
+                ),
+                "schema_breakdown_reverse_charge_not_zero",
+                json!({ "line": 1, "element": "TipoImpositivo", "value": 21.0 }),
+            ),
+            (
+                "a reverse-charge line that omits the explicit zero",
+                swap(
+                    "<sum1:CalificacionOperacion>S1</sum1:CalificacionOperacion>",
+                    "<sum1:CalificacionOperacion>S2</sum1:CalificacionOperacion>",
+                )
+                .replace("<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>", ""),
+                "schema_breakdown_reverse_charge_missing",
+                json!({ "line": 1, "element": "TipoImpositivo" }),
+            ),
+            (
+                "a Canary/Ceuta/Melilla regime that is not marked as not-subject",
+                swap(
+                    "<sum1:ClaveRegimen>01</sum1:ClaveRegimen>",
+                    "<sum1:ClaveRegimen>08</sum1:ClaveRegimen>",
+                ),
+                "schema_breakdown_regime_requires_n2",
+                json!({ "line": 1, "regime": "08", "qualification": "S1" }),
+            ),
+            (
+                "an IGIC IPSI regime that is not marked as not-subject",
+                swap(
+                    "<sum1:Impuesto>01</sum1:Impuesto>",
+                    "<sum1:Impuesto>03</sum1:Impuesto>",
+                )
+                .replace(
+                    "<sum1:ClaveRegimen>01</sum1:ClaveRegimen>",
+                    "<sum1:ClaveRegimen>20</sum1:ClaveRegimen>",
+                ),
+                "schema_breakdown_regime_requires_n2",
+                json!({ "line": 1, "regime": "20", "qualification": "S1" }),
+            ),
+            (
+                "a rate that is not a Spanish VAT rate",
+                swap(
+                    "<sum1:TipoImpositivo>21.00</sum1:TipoImpositivo>",
+                    "<sum1:TipoImpositivo>13.00</sum1:TipoImpositivo>",
+                ),
+                "schema_breakdown_vat_rate_not_allowed",
+                json!({ "line": 1, "value": 13.0 }),
+            ),
+            (
+                "an equivalence surcharge that is not one of the admitted rates",
+                swap(
+                    "<sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>",
+                    "<sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>\
+                     <sum1:TipoRecargoEquivalencia>3.00</sum1:TipoRecargoEquivalencia>",
+                ),
+                "schema_breakdown_surcharge_rate_not_allowed",
+                json!({ "line": 1, "value": 3.0 }),
+            ),
+            (
+                "a simplified receipt over the AEAT ceiling",
+                swap(
+                    "<sum1:TipoFactura>F1</sum1:TipoFactura>",
+                    "<sum1:TipoFactura>F2</sum1:TipoFactura>",
+                )
+                .replace(
+                    "<sum1:BaseImponibleOimporteNoSujeto>100.00\
+                     </sum1:BaseImponibleOimporteNoSujeto>",
+                    "<sum1:BaseImponibleOimporteNoSujeto>4000.00\
+                     </sum1:BaseImponibleOimporteNoSujeto>",
+                )
+                .replace(
+                    "<sum1:CuotaRepercutida>21.00</sum1:CuotaRepercutida>",
+                    "<sum1:CuotaRepercutida>840.00</sum1:CuotaRepercutida>",
+                ),
+                "schema_simplified_over_ceiling",
+                json!({ "total": "4840.00", "ceiling": "3000.00", "tolerance": "10.00" }),
+            ),
         ]
     }
 
@@ -1359,8 +1797,8 @@ mod tests {
         codes.dedup();
         assert_eq!(
             codes.len(),
-            15,
-            "fifteen families of refusal, fifteen sentences to write: {codes:?}"
+            37,
+            "one sentence to write per family of refusal: {codes:?}"
         );
     }
 

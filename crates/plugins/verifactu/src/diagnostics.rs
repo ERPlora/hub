@@ -200,7 +200,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                                 });
                             }
                             Err(e) => {
-                                aeat = json!({ "ok": false, "error": e.to_string() });
+                                aeat = aeat_call_failed(&e);
                             }
                         }
                     }
@@ -432,13 +432,7 @@ fn sample_envelope(
         // «is there a code I know?», and an object with nothing in it would answer yes and paint a
         // blank where the half that says what to fix used to be.
         let mut facts = json!({ "detail": e.to_string() });
-        if let (Some(target), Some((code, detail_facts))) = (facts.as_object_mut(), e.as_reason()) {
-            let mut nested = json!({ "code": code });
-            if let (Some(into), Some(from)) = (nested.as_object_mut(), detail_facts.as_object()) {
-                for (key, value) in from {
-                    into.insert(key.clone(), value.clone());
-                }
-            }
+        if let (Some(target), Some(nested)) = (facts.as_object_mut(), e.as_reason_details()) {
             target.insert("detail_reason".to_owned(), nested);
         }
         CertReason::new(
@@ -490,6 +484,62 @@ impl CertReason {
         }
         out
     }
+}
+
+/// The `aeat` box when the call to Hacienda did not come back: the technical text in its own slot,
+/// plus the **stable code** the module turns into a sentence in the reader's language (hub#1580).
+///
+/// It was the last box of «Test connection» still answering only in Spanish. The other two
+/// refusals of this same road — the unset issuer NIF, the sample envelope that does not validate —
+/// have travelled with their `reason` since hub#1578; this one kept filing just the transport's
+/// own `to_string()`, so a business running in English read «transmisión AEAT (TLS): …» on a
+/// screen that is otherwise translated.
+///
+/// **Two codes, not one.** They ask opposite things of the reader: a secure channel the AEAT
+/// refused is FIXED — the certificate is expired, revoked or not accepted — and an unreachable
+/// AEAT is WAITED OUT. Merging them would put «try again in a few minutes» in front of somebody
+/// whose certificate expired last week. The distinction is not invented here: `aeat::transport_error`
+/// already draws it when it chooses between [`VerifactuError::Tls`] and
+/// [`VerifactuError::Transmission`], and this only publishes what the engine had already decided.
+///
+/// **Factless on purpose, and `error` is NOT withdrawn.** The alternative was one code with the
+/// raw failure interpolated into the sentence, and the module's catalogue forbids exactly that
+/// (its `never bakes the engine prose into a reason sentence` test): a translated sentence with an
+/// untranslatable `reqwest` chain inside it is half a sentence again, which is the defect being
+/// fixed. So the shape is the one the neighbouring box already uses for `gateway_unreachable` —
+/// constant sentence from the catalogue, technical detail painted beside it — and that detail is
+/// what support reads to tell a bad certificate from the customer's proxy.
+///
+/// **Two meanings needed two keys.** `error` could not be that slot: the two sibling arms of this
+/// same road file the engine's PROSE there (`missing.prose`, `reason.prose`), and the module's
+/// screen is built on that reading — `renderAeat` uses `error` only as the fallback for a code its
+/// catalogue cannot name. Reusing it for the raw chain would leak Spanish transport noise into a
+/// box whose whole point is that it stopped speaking Spanish. Hence `detail`, which no arm had.
+fn aeat_call_failed(e: &VerifactuError) -> Json {
+    let reason = if matches!(e, VerifactuError::Tls(_)) {
+        constant_reason(
+            "aeat_tls_rejected",
+            "La AEAT no ha aceptado el certificado al abrir el canal seguro: revisa que no esté \
+             caducado ni revocado.",
+        )
+    } else {
+        constant_reason(
+            "aeat_unreachable",
+            "No se ha podido contactar con la AEAT; vuelve a intentarlo en unos minutos.",
+        )
+    };
+    json!({
+        "ok": false,
+        // Prose, like the two arms beside this one: they file `missing.prose` / `reason.prose`
+        // here, and the module's screen is built on that (`renderAeat` drops `error` the moment it
+        // can compose the sentence). Putting the raw chain in this key would make the box read
+        // Spanish transport noise on the old module and nothing at all on the new one.
+        "error": reason.prose.clone(),
+        // The raw transport text, in a slot of its own: the only thing that tells a bad
+        // certificate from the customer's proxy or a quiet AEAT, so support cannot lose it.
+        "detail": e.to_string(),
+        "reason": reason.as_details(),
+    })
 }
 
 /// A verdict with nothing to fill: one code, one sentence, no facts (verifactu#95).
@@ -1479,6 +1529,74 @@ mod tests {
         );
     }
 
+    /// 🔒 REGRESIÓN (hub#1580): cuando la llamada a la AEAT por la vía propia FALLA, la caja
+    /// `aeat` publica un **código** además del texto técnico.
+    ///
+    /// Era la última casilla de «Probar conexión» que solo hablaba castellano: las otras dos
+    /// negativas de esta misma vía —NIF sin configurar, sobre que no valida— ya viajaban con su
+    /// `reason` desde hub#1578, y esta se quedó filando únicamente `error: e.to_string()`, la
+    /// prosa del transporte. Un negocio en inglés leía «transmisión AEAT (TLS): …» en una
+    /// pantalla que por lo demás está traducida.
+    ///
+    /// **Dos códigos y no uno**, porque piden cosas OPUESTAS: un canal seguro rechazado se
+    /// ARREGLA (certificado caducado, revocado o no admitido) y una AEAT inalcanzable se ESPERA.
+    /// La distinción no se inventa aquí — el motor ya la hace en `aeat::transport_error`, que es
+    /// lo que separa `Tls` de `Transmission`; esto solo la publica.
+    ///
+    /// Y el texto técnico NO se tira: viaja en `detail`, su propio hueco, que es lo que soporte
+    /// necesita para saber si el problema es el certificado, el proxy del cliente o la sede. Es el
+    /// mismo reparto que hace la caja de la pasarela con `gateway_unreachable`: la frase del
+    /// catálogo no interpola el error crudo, y el detalle se pinta aparte.
+    ///
+    /// **Por qué una clave NUEVA y no `error`:** en los dos brazos hermanos de esta misma vía
+    /// `error` es la PROSA del motor, y la pantalla del módulo está construida sobre eso. Meter
+    /// ahí el crudo lo deja invisible en el módulo nuevo (que compone la frase desde el código y
+    /// tira `error`) y convierte la caja en una fuga de castellano en el viejo. Por eso este test
+    /// afirma por CLAVES: `error` sigue siendo prosa, `detail` es el crudo.
+    #[test]
+    fn an_aeat_call_that_fails_publishes_a_code_beside_the_technical_detail_hub1580() {
+        let unreachable = super::aeat_call_failed(&VerifactuError::Transmission(
+            "error sending request for url (https://prewww1.aeat.es/…)".to_owned(),
+        ));
+        assert_eq!(unreachable["ok"], json!(false), "{unreachable}");
+        assert_eq!(
+            unreachable["reason"],
+            json!({ "code": "aeat_unreachable" }),
+            "a network failure is waited out, not fixed: {unreachable}"
+        );
+        assert_eq!(
+            unreachable["detail"],
+            json!("transmisión AEAT: error sending request for url (https://prewww1.aeat.es/…)"),
+            "the raw transport text keeps a slot of its own — it is what support reads: {unreachable}"
+        );
+        assert!(
+            unreachable["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("vuelve a intentarlo")),
+            "`error` stays what the neighbouring arms make it — the engine's prose: {unreachable}"
+        );
+
+        let rejected = super::aeat_call_failed(&VerifactuError::Tls(
+            "certificate verify failed".to_owned(),
+        ));
+        assert_eq!(
+            rejected["reason"],
+            json!({ "code": "aeat_tls_rejected" }),
+            "a refused secure channel is FIXED, and must not read as a passing outage: {rejected}"
+        );
+        assert_eq!(
+            rejected["detail"],
+            json!("transmisión AEAT (TLS): certificate verify failed"),
+            "and the chain that names the certificate fault is the whole point of the slot: {rejected}"
+        );
+        assert!(
+            rejected["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("caducado")),
+            "`error` is prose here too, never the raw chain: {rejected}"
+        );
+    }
+
     /// A hub with NO road at all: not enrolled and with no `.p12` of its own. Its own code, for
     /// the same reason hub#1485 gave it its own sentence — «renew your certificate» is
     /// unfollowable advice for somebody who never had one.
@@ -1663,9 +1781,16 @@ mod tests {
         );
     }
 
-    /// 🔒 And a refusal the validator cannot code publishes NO `detail_reason` at all, rather than
-    /// an empty object. The module's fallback is «is there a code I know?», so an object with
-    /// nothing in it would read as «yes» and paint a blank where the actionable half was.
+    /// 🔒 And a refusal the validator cannot code publishes NO nested reason at all, rather than an
+    /// empty object. The module's fallback is «is there a code I know?», so an object with nothing
+    /// in it would read as «yes» and paint a blank where the actionable half was.
+    ///
+    /// Asserted on `as_reason_details` and not only on `as_reason` (hub#1579): the merge is now the
+    /// ONE door both call sites go through — the diagnostic's `detail_reason` and the
+    /// transmission's `validation_error_reason` — so a `Some(json!({}))` slipped in there would
+    /// hand an empty code to two screens at once, and the `Option` above would still read as
+    /// correct. Measured: with the merge returning `Some({})` for an uncoded error the whole
+    /// crate stayed green, which is what this line closes.
     #[test]
     fn a_refusal_with_no_code_of_its_own_publishes_no_nested_reason_hub1576() {
         let plain = crate::VerifactuError::Payload("algo que este validador no clasifica".into());
@@ -1673,6 +1798,10 @@ mod tests {
         assert!(
             plain.as_reason().is_none(),
             "only the refusals with a stable code publish one"
+        );
+        assert!(
+            plain.as_reason_details().is_none(),
+            "absent, never empty: an empty object answers «yes, I know this code» and paints a blank"
         );
     }
 
