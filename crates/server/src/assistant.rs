@@ -1466,6 +1466,29 @@ mod tests {
                     "emit": ["appointments.availability.touched"],
                     "ai": { "description": "Writes something while asking only for the read permission." }
                 },
+                // 🔴 The two shapes below carry ONE structural signal each, and each one is the
+                // only thing standing between a REAL write of the fleet and running with no card
+                // (swept over the 27 manifests at their `origin/main`). `touch` above declares
+                // both at once, so it cannot tell whether either half is still wired.
+                //
+                // Shape of `services.packages.redeem`: a Tier-2 write that consumes one session of
+                // a customer's prepaid voucher, asks for `services.redeem_package` — the very
+                // permission the module's own `packages.redeem_check` QUERY asks for — and
+                // declares no `sql`. Its single `emit` is the whole margin.
+                "appointments.packages.redeem": {
+                    "permission": "appointments.view_schedule",
+                    "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "redeem" },
+                    "emit": ["appointments.package.redeemed"],
+                    "ai": { "description": "Consumes one session of a voucher the customer owns." }
+                },
+                // Shape of `sales.settings.update` / `inventory.settings.update`: those modules
+                // grant a QUERY the same `manage_settings` permission the writer uses, so the
+                // permission half reads «this is a read». Only the `sql` keeps the card.
+                "appointments.settings.update": {
+                    "permission": "appointments.view_schedule",
+                    "sql": ["commands/settings_update.sql"],
+                    "ai": { "description": "Saves the module settings, asking for a shared permission." }
+                },
                 // Declaring a risk contradicts «read»; the safe side wins without arguing.
                 "appointments.availability.purge": {
                     "permission": "appointments.view_schedule",
@@ -1533,6 +1556,10 @@ mod tests {
         for name in [
             "appointments.appointments.bulk_create",
             "appointments.availability.touch",
+            // One structural signal each: these die if either half of the structural test is
+            // dropped, which `touch` (it declares both) cannot notice.
+            "appointments.packages.redeem",
+            "appointments.settings.update",
             "appointments.availability.purge",
         ] {
             let tool = find(name);
