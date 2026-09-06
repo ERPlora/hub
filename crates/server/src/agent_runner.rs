@@ -273,9 +273,7 @@ async fn prepare(st: &AppState, run_id: &str, step_id: &str) -> Result<(AiReques
         if !permitted {
             continue;
         }
-        // Absent or anything other than a literal `true` means WRITE: a catalogue that forgot to
-        // say must never read as permission to skip the person (same reading as the drawer's).
-        if tool.get("read_only") == Some(&Value::Bool(true)) {
+        if only_answers(&tool) {
             answers_only.insert(name.to_string());
         }
         kinds.insert(name.to_string(), kind.to_string());
@@ -619,6 +617,16 @@ async fn dispatch(
     ))
 }
 
+/// Does this tool spec say it only ANSWERS? (hub#1595)
+///
+/// Absent, or anything other than a literal `true`, means WRITE: a catalogue that forgot to say
+/// must never read as permission to skip the person (the same reading the drawer applies). Kept
+/// as its own function so the reading is testable on its own — `assemble_tools` always states the
+/// field today, so no battery through the runner can tell `== true` from `!= false`.
+fn only_answers(tool: &Value) -> bool {
+    tool.get("read_only") == Some(&Value::Bool(true))
+}
+
 /// The model's arguments as a params map. A model that sends something that is not a JSON object
 /// gets an empty payload and the command's own schema validation refuses it by name — better than
 /// this layer inventing a shape.
@@ -745,6 +753,31 @@ mod tests {
         assert!(parse_arguments("not json").is_empty());
         assert!(parse_arguments("[1,2]").is_empty());
         assert_eq!(parse_arguments("{\"a\":1}").get("a"), Some(&json!(1)));
+    }
+
+    /// **hub#1595 — the permissive reading has to be SPELLED OUT.** Skipping the person is what
+    /// `read_only: true` buys, and nothing else buys it: a spec that forgot the field, or that says
+    /// it in any other shape (`"true"`, `1`), is a write and waits in the tray. Found by mutation
+    /// at review: `!= Some(false)` — absence read as a read — survived the whole battery, because
+    /// every tool `assemble_tools` hands out carries the field. This is the guard for the day one
+    /// does not.
+    #[test]
+    fn only_a_literal_read_only_true_skips_the_person() {
+        assert!(only_answers(
+            &json!({ "name": "agenda.availability.check", "read_only": true })
+        ));
+        for tool in [
+            json!({ "name": "agenda.booking.create", "read_only": false }),
+            json!({ "name": "agenda.booking.create" }),
+            json!({ "name": "agenda.booking.create", "read_only": "true" }),
+            json!({ "name": "agenda.booking.create", "read_only": 1 }),
+            json!({ "name": "agenda.booking.create", "read_only": null }),
+        ] {
+            assert!(
+                !only_answers(&tool),
+                "anything but a literal `true` is a write and waits for a person: {tool}"
+            );
+        }
     }
 
     fn request_with(policy: AiPolicy) -> AiRequest {
