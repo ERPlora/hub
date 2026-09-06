@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { IonButton, IonCol, IonGrid, IonRow, IonSpinner, IonToast } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
@@ -138,7 +138,10 @@ import { getDeviceContext } from '../lib/device';
 import { openExternal } from '../lib/open-external';
 import { saasDoor } from '../lib/saas-door';
 import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
+import { loadModuleLocale } from '../lib/module-loader';
 import { modulePlanPath, modulePlanUrl } from '../lib/module-plan-link';
+import { moduleBase } from '../lib/module-url';
+import { quotaLabel as tierQuotaLabel, type ModuleBillingLocale } from '../lib/module-quota';
 
 const props = defineProps<{
   /** Slug del módulo (el Hub usa el module_id como slug; el Cloud resuelve por pk|slug|module_id). */
@@ -156,6 +159,9 @@ const toastMsg = ref('');
 const toastColor = ref<'primary' | 'success' | 'danger'>('primary');
 
 const tiers = computed<BillingTierDef[]>(() => props.billing.tiers ?? []);
+
+/** Bloque `billing` de `locales/<lang>.json` del módulo. `undefined` = el módulo no traduce. */
+const billingLocale = ref<ModuleBillingLocale | undefined>(undefined);
 
 // "Posee el módulo" según el estado de la suscripción: activa, en prueba o cancelada-pero-vigente.
 const isOwned = computed(() => {
@@ -202,15 +208,13 @@ function fmtMoney(units: number): string {
   return formatAmount(units);
 }
 
-// La cuota es un dict (p.ej. `{conversations_per_month: 30}`) — la formateamos legible. Las claves
-// las define el autor del módulo (snake_case), así que solo las "humanizamos" (sin localizar): cada
-// entrada → "30 conversations per month"; varias se unen con " · ". Vacío si no hay cuota.
+// La cuota es un dict (p.ej. `{conversations_per_month: 30}`). Las claves las define el autor del
+// módulo (snake_case) y ANTES solo se "humanizaban", sin localizar: un hub en español leía «Incluye
+// 30 conversations per month», media frase traducida y media no (hub#1604). Ahora el rótulo de cada
+// métrica sale de `locales/<lang>.json` del propio módulo —igual que los campos de la pantalla de
+// ajustes (hub#1094)— y el inglés canónico es el respaldo. Detalle en `lib/module-quota.ts`.
 function quotaLabel(tier: BillingTierDef): string {
-  const q = tier.quota;
-  if (!q || typeof q !== 'object') return '';
-  return Object.entries(q)
-    .map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`)
-    .join(' · ');
+  return tierQuotaLabel(tier, billingLocale.value);
 }
 
 /** El importe. El periodo viaja aparte para que la tarjeta pueda componerlo a su manera. */
@@ -259,6 +263,18 @@ async function loadStatus(): Promise<void> {
 // dirección construida aquí para llevar al pago es steering la construya quien la construya, y esa
 // es la causa de rechazo que había que quitar de en medio antes de subir la app a las tiendas.
 
+/**
+ * Traducciones del módulo para el idioma en pantalla (hub#1604).
+ *
+ * Base SIN versionar, igual que en la pantalla de ajustes: el runtime marca los assets sin versionar
+ * «revalida siempre», y actualizar un módulo recarga la página entera (`reloadForModuleUpdate`).
+ * Un módulo que no traiga el fichero deja `undefined` y la cuota cae al inglés del manifest.
+ */
+async function refreshLocale(): Promise<void> {
+  const file = await loadModuleLocale(moduleBase(props.moduleId), locale.value);
+  billingLocale.value = file?.billing;
+}
+
 // ¿Se le ofrece el enlace a la copia que tiene delante el usuario? Mismo corte que el menú
 // lateral (`planUpgradeIsOfferable`, hub#756): manda la DISTRIBUCIÓN, no el sistema operativo, y
 // sin señal se ofrece. El razonamiento entero vive en `upgrade-plan-link.ts`.
@@ -286,8 +302,11 @@ function onFocusRecheck(): void {
   if (document.visibilityState === 'visible') void loadStatus();
 }
 
+watch(locale, () => void refreshLocale());
+
 onMounted(async () => {
   void loadStatus();
+  void refreshLocale();
   const context = await getDeviceContext();
   canOfferPlanManagement.value = planUpgradeIsOfferable(context?.distribution);
   window.addEventListener('focus', onFocusRecheck);
