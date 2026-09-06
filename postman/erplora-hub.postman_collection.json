@@ -1,0 +1,4692 @@
+{
+  "info": {
+    "_postman_id": "8b1e6c3a-2d5f-4a7b-9e0c-1f2a3b4c5d6e",
+    "description": "Generated from `contracts/kernel/routes.snapshot` + `postman/overlay.json` by `UPDATE_POSTMAN_COLLECTION=1 cargo test -p erplora-server --test postman_collection_hub1613` — do not edit by hand; a test fails when this file and the routes disagree (hub#1613).\n\nStart in the first folder: set `hub_url`, paste the SaaS `access_token` (the SaaS collection's Login saves it), run **POST /api/auth/cloud** — it saves `hub_session` by itself — then set a PIN, create an API key (saved as `hub_api_key`) and use `/api/query` and `/api/command`.\n\nCredentials by route class: `X-Hub-Session` for session/admin routes, `Authorization: Bearer erpl_live_…` for the module data API (`/api/v1/{module}/q|c/…`), nothing for the public ones. The module data API is per hub: import `GET /api/v1/openapi.json` into Postman to get the operations of the modules installed on THIS hub.\n\n`hub_url` is https://banco-pre.a.erplora.com on purpose — the permanent PRE bench.",
+    "name": "ERPlora Hub API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "description": "JWT of the SaaS → hub session → PIN → API key. Each step saves what the next one needs.",
+      "item": [
+        {
+          "name": "Hub context — who am I talking to (public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "The hub's identity and state before any session: hub_id, cloud_base_url, language, currency, whether a machine is registered, the PIN users. First request of every visit.\n\n(auth: none)",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "context"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/context"
+            }
+          },
+          "response": []
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+                  "if (j.token) save(\"hub_session\", j.token);",
+                  "if (j.user && j.user.name) save(\"hub_user_name\", j.user.name);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Open a session with the SaaS JWT",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"{{hub_user_name}}\"\n}"
+            },
+            "description": "Send the SaaS user's JWT (`Authorization: Bearer {{access_token}}` — what the SaaS collection's Login saved). The hub verifies it (RS256), links or provisions the local user and opens a session. The response's `token` is saved as `hub_session`.\n\n(auth: none)",
+            "header": [
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "cloud"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/cloud"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set (or change) my PIN",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"pin\": \"{{hub_pin}}\"\n}"
+            },
+            "description": "Sets the PIN of the session's user — SIX digits. `current_pin` is required when the user already has one (hub#1430); omit it right after the first cloud login.\n\n(auth: session)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "set-pin"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/set-pin"
+            }
+          },
+          "response": []
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+                  "if (j.token) save(\"hub_session\", j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Open a session with name + PIN (the till's day-to-day login)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"name\": \"{{hub_user_name}}\",\n  \"pin\": \"{{hub_pin}}\"\n}"
+            },
+            "description": "Local login. The response's `token` is saved as `hub_session`. `device_id` identifies the client: the device-trust gate refuses a login that does not identify its device (`device_unidentified`).\n\n(auth: none)",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "pin"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/pin"
+            }
+          },
+          "response": []
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+                  "const d = j.data || j;",
+                  "if (d.secret) save(\"hub_api_key\", d.secret);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Create an API key (the secret is shown ONCE — saved as hub_api_key)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"access\": \"full\",\n  \"name\": \"Postman\",\n  \"rate_limit_per_minute\": 120\n}"
+            },
+            "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` ONLY on the module data API (`POST /api/v1/{module}/q|c/…`) and on `/ws` — not on `/api/query`, `/api/command` or any other core route.\n\n(auth: admin)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "keys"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/keys"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "OpenAPI of THIS hub's modules — import it into Postman",
+          "request": {
+            "description": "The `expose_api` operations of the modules installed on this hub (`/api/v1/{module}/q|c/…`), as OpenAPI 3.1. Per hub: install a module and the API grows. Needs the setting `api_docs_enabled` = true (404 otherwise) and a user session. Import the response into Postman and use `Authorization: Bearer {{hub_api_key}}` on the imported requests.\n\n(auth: session)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "openapi.json"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/v1/openapi.json"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Close the session of X-Hub-Session",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/logout"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "00 · Session — start here"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/app/release",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "app",
+                "release"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/app/release"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "app"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/assistant/chat/stream",
+          "request": {
+            "description": "auth: any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "assistant",
+                "chat",
+                "stream"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/assistant/chat/stream"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/assistant/checkout",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "assistant",
+                "checkout"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/assistant/checkout"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/assistant/config",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "assistant",
+                "config"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/assistant/config"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/assistant/report",
+          "request": {
+            "description": "auth: any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "assistant",
+                "report"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/assistant/report"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "assistant"
+    },
+    {
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+                  "if (j.token) save(\"hub_session\", j.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Open a session with a badge (keyboard-wedge reader or iButton)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"badge\": \"<badge>\",\n  \"device_id\": \"{{device_id}}\"\n}"
+            },
+            "description": "auth: none",
+            "header": [
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "badge"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/badge"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/courier",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "courier"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/courier"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/handoff",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "handoff"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/auth/handoff"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "auth"
+    },
+    {
+      "item": [
+        {
+          "name": "Blueprint catalogue (proxied from the SaaS)",
+          "request": {
+            "description": "The blueprints published in the marketplace, by sector. Needed once, to pick the one the bench is built from.\n\n(auth: session)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "blueprints",
+                "catalog"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/blueprints/catalog"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Download a catalogue blueprint (zip)",
+          "request": {
+            "description": "The `*.blueprint.zip` of `slug`. Save it and feed it to POST /api/hub/import/inspect.\n\n(auth: session)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "blueprints",
+                "{{slug}}",
+                "download"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/blueprints/{{slug}}/download"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "blueprints"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/business/certificate",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "certificate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/certificate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/business/certificate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "certificate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/certificate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/business/certificate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "certificate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/certificate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/business/fiscal-identity",
+          "request": {
+            "description": "auth: admin+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "fiscal-identity"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/fiscal-identity"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/business/gateway-identity",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "gateway-identity"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/gateway-identity"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/business/gateway-identity",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "gateway-identity"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/gateway-identity"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/business/gateway-identity/certificate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "gateway-identity",
+                "certificate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/gateway-identity/certificate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/business/gateway-identity/csr",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "gateway-identity",
+                "csr"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/gateway-identity/csr"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/business/gateway-identity/enrol",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "gateway-identity",
+                "enrol"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/business/gateway-identity/enrol"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "business"
+    },
+    {
+      "item": [
+        {
+          "name": "Run a declarative command of a module",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"<module>.<command>\",\n  \"payload\": {}\n}"
+            },
+            "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "command"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/command"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "command"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/device/mode",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "device",
+                "mode"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/device/mode"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/device/mode",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "device",
+                "mode"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/device/mode"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "device"
+    },
+    {
+      "item": [
+        {
+          "name": "Devices that have logged into this hub",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "devices"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/devices"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rename a device",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"<device name>\"\n}"
+            },
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "devices",
+                "{{device_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/devices/{{device_id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/devices/:device_id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "devices",
+                "{{device_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/devices/{{device_id}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "devices"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/elevation/approve",
+          "request": {
+            "description": "auth: any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "elevation",
+                "approve"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/elevation/approve"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "elevation"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/entitlement",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "entitlement"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/entitlement"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "entitlement"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/error-report",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "error-report"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/error-report"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "error-report"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/events",
+          "request": {
+            "description": "auth: api-key",
+            "header": [
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{hub_api_key}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "events"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/events"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/events/ticket",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "events",
+                "ticket"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/events/ticket"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "events"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/fiscal/representation-grant",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "representation-grant"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/representation-grant"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/fiscal/representation-grant",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "representation-grant"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/representation-grant"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/fiscal/representation-grant/model",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "fiscal",
+                "representation-grant",
+                "model"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/fiscal/representation-grant/model"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "fiscal"
+    },
+    {
+      "item": [
+        {
+          "name": "Recent events of the hub (the bus)",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Dead-lettered events",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "dead"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/dead"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/events/dead/count",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "dead",
+                "count"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/dead/count"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/events/discarded",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "discarded"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/discarded"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/events/retry-all",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "retry-all"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/retry-all"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/events/shape",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "shape"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/shape"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/events/:id/discard",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "{{id}}",
+                "discard"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/{{id}}/discard"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/events/:id/retry",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "{{id}}",
+                "retry"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/{{id}}/retry"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/events/:id/trace",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "events",
+                "{{id}}",
+                "trace"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/events/{{id}}/trace"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · events"
+    },
+    {
+      "item": [
+        {
+          "name": "Export THIS hub as a blueprint zip",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"locale\": \"es\",\n  \"name\": \"banco-pre\",\n  \"selection\": {\n    \"media\": true,\n    \"modules\": [],\n    \"settings\": true,\n    \"users\": true\n  }\n}"
+            },
+            "description": "The bench's identity for recreation: everything selected, as a `*.blueprint.zip`. `settings_items` narrows the settings keys (never widens them, ADR-0195).\n\n(auth: admin+any-credential)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "export"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/export"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tables an export would cover",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "export",
+                "tables"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/export/tables"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · export"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/hub/flows",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/approvals",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "approvals"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/approvals"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows/approvals/:id/approve",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "approvals",
+                "{{id}}",
+                "approve"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/approvals/{{id}}/approve"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/flows/approvals/:id/reject",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "approvals",
+                "{{id}}",
+                "reject"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/approvals/{{id}}/reject"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/runs/:run_id",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "runs",
+                "{{run_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/runs/{{run_id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "The flow definition schema (triggers, steps, grants)",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "schema"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/schema"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/secrets",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "secrets"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/secrets"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/flows/secrets/:name",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "secrets",
+                "{{name}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/secrets/{{name}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/hub/flows/secrets/:name",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "secrets",
+                "{{name}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/secrets/{{name}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/:id",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/flows/:id",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/hub/flows/:id",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/:id/grants",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}",
+                "grants"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}/grants"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/flows/:id/grants",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}",
+                "grants"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}/grants"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Run a flow by hand (the `manual` trigger) — returns the run id",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}",
+                "run"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}/run"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/flows/:id/runs",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "{{id}}",
+                "runs"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/{{id}}/runs"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · flows"
+    },
+    {
+      "item": [
+        {
+          "name": "Import a staged blueprint (migrate-style)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"origin\": {\n    \"slug\": \"\",\n    \"version\": \"\"\n  },\n  \"selection\": {\n    \"fiscal\": false,\n    \"media\": true,\n    \"modules\": [],\n    \"settings\": true,\n    \"users\": true\n  },\n  \"upload_id\": \"<upload_id from inspect>\"\n}"
+            },
+            "description": "`upload_id` from inspect; `selection` chooses what to apply; `origin` (catalogue slug + version) makes a partial import retryable. Missing modules are installed from the marketplace best-effort; fiscal material lands as `pending`.\n\n(auth: admin+any-credential)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/import/batches",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import",
+                "batches"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import/batches"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inspect a blueprint zip before importing (binary body)",
+          "request": {
+            "body": {
+              "file": {
+                "src": ""
+              },
+              "mode": "file"
+            },
+            "description": "Body = the zip bytes (`application/octet-stream`, pick the file in Postman). Validates it and stages it: the response's `upload_id` goes into POST /api/hub/import.\n\n(auth: admin)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/octet-stream"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import",
+                "inspect"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import/inspect"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/import/report",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import",
+                "report"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import/report"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/import/retry",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import",
+                "retry"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import/retry"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/import/undo",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "import",
+                "undo"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/import/undo"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · import"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/hub/public-claims",
+          "request": {
+            "description": "auth: any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "public-claims"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/public-claims"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · public-claims"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/hub/reset",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "reset"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/reset"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/reset/plan",
+          "request": {
+            "description": "auth: admin+any-credential",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "reset",
+                "plan"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/reset/plan"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · reset"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/hub/roles",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "roles"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/roles"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/roles/:key",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "roles",
+                "{{key}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/roles/{{key}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · roles"
+    },
+    {
+      "item": [
+        {
+          "name": "Local users of the hub (PIN users)",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "users"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/users"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create a local user (PIN user)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"badge\": \"\",\n  \"email\": \"\",\n  \"name\": \"<name>\",\n  \"pin\": \"1234\",\n  \"role\": \"cashier\"\n}"
+            },
+            "description": "`NewHubUser` (crates/runtime/src/hub_users.rs): name, email, role, pin, badge. Admin session.\n\n(auth: admin)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "users"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/users"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/hub/users/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "users",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/users/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/hub/users/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "users",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/users/{{id}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · users"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/hub/whatsapp/config",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "config"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/config"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/whatsapp/connect",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "connect"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/connect"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/whatsapp/disconnect/:phone_number_id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "disconnect",
+                "{{phone_number_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/disconnect/{{phone_number_id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/whatsapp/numbers",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "numbers"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/numbers"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · whatsapp"
+    },
+    {
+      "item": [
+        {
+          "name": "API keys of the hub (without secrets)",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "keys"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/keys"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke an API key",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "keys",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/keys/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+                  "const d = j.data || j;",
+                  "if (d.secret) save(\"hub_api_key\", d.secret);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Rotate an API key (new secret, saved as hub_api_key)",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "keys",
+                "{{id}}",
+                "rotate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/keys/{{id}}/rotate"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "keys"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/marketplace/catalog",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "marketplace",
+                "catalog"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/marketplace/catalog"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/marketplace/modules/:id",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "marketplace",
+                "modules",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/marketplace/modules/{{id}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "marketplace"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/media",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/media",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/media/folder",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "folder"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/folder"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/media/move",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "move"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/move"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/media/raw",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "raw"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/raw"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/media/rename",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "rename"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/rename"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/media/session",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "session"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/session"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/media/upload",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "media",
+                "upload"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/media/upload"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "media"
+    },
+    {
+      "item": [
+        {
+          "name": "SaaS users with a membership on this hub",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "members"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/members"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invite a SaaS user to this hub (per-hub membership, ADR-0201)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"role\": \"admin\"\n}"
+            },
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "members"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/members"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a membership",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "members",
+                "{{email}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/members/{{email}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "members"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/modules",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/install",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "install"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/install"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/request-install",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "request-install"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/request-install"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/modules/updates",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "updates"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/updates"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/:id/activate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "activate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/activate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/modules/:id/capabilities",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "capabilities"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/capabilities"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/modules/:id/capabilities",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "capabilities"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/capabilities"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/:id/deactivate",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "deactivate"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/deactivate"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/:id/uninstall",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "uninstall"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/uninstall"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/modules/:id/update",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "update"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/update"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/modules/:id/versions",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "modules",
+                "{{id}}",
+                "versions"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/modules/{{id}}/versions"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "modules"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/navigation",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "navigation"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/navigation"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "navigation"
+    },
+    {
+      "item": [
+        {
+          "name": "POST /api/v1/:module/c/:command",
+          "request": {
+            "description": "auth: api-key",
+            "header": [
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{hub_api_key}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "{{module}}",
+                "c",
+                "{{command}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/v1/{{module}}/c/{{command}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/:module/q/:query",
+          "request": {
+            "description": "auth: api-key",
+            "header": [
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{hub_api_key}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "{{module}}",
+                "q",
+                "{{query}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/v1/{{module}}/q/{{query}}"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "openapi"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/print/hosts",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "hosts"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/hosts"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/hosts",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "hosts"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/hosts"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/print/hosts",
+          "request": {
+            "description": "auth: admin+session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "hosts"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/hosts"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/hosts/heartbeat",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "hosts",
+                "heartbeat"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/hosts/heartbeat"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/print/jobs",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "jobs"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/jobs"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/jobs",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "jobs"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/jobs"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/jobs/:job_id/discard",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "jobs",
+                "{{job_id}}",
+                "discard"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/jobs/{{job_id}}/discard"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/jobs/:job_id/retry",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "jobs",
+                "{{job_id}}",
+                "retry"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/jobs/{{job_id}}/retry"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/print/routes",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "routes"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/routes"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/print/routes",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "routes"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/routes"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/print/stations",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "stations"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/stations"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/print/stations",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "stations"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/stations"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/print/stations/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PATCH",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "stations",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/stations/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/print/stations/:id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "stations",
+                "{{id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/stations/{{id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/print/undrained",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "print",
+                "undrained"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/print/undrained"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "print"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/profile",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "profile"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/profile"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/profile",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "profile"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/profile"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/profile/avatar",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "avatar"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/profile/avatar"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/profile/avatar",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "avatar"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/profile/avatar"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/profile/avatar",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "DELETE",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "avatar"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/profile/avatar"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "profile"
+    },
+    {
+      "item": [
+        {
+          "name": "Run a declarative query of a module",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"name\": \"<module>.<query>\",\n  \"params\": {}\n}"
+            },
+            "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Needs a hub SESSION of any kind (cloud, PIN or badge) — the API key does NOT open this door: it only opens `/api/v1/{module}/q|c/…` and `/webhook`.\n\n(auth: any-credential)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "query"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/query"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "query"
+    },
+    {
+      "item": [
+        {
+          "name": "Hub settings (hub_settings keys)",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/settings"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update hub settings (partial object)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
+              "raw": "{\n  \"<setting_key>\": \"<value>\"\n}"
+            },
+            "description": "An object of `hub_settings` keys to write. Admin session.\n\n(auth: admin)",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              },
+              {
+                "key": "Content-Type",
+                "type": "text",
+                "value": "application/json"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/settings"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "settings"
+    },
+    {
+      "item": [
+        {
+          "name": "GET /api/system",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "system"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/system"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/system/declaration",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "system",
+                "declaration"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/system/declaration"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/system/metrics",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "system",
+                "metrics"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/system/metrics"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/system/update-history",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "system",
+                "update-history"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/system/update-history"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/system/usage-series",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "system",
+                "usage-series"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/system/usage-series"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /csp-report/",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "csp-report",
+                ""
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/csp-report/"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Liveness (public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "healthz"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/healthz"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /modules/:id/v/:version/*path",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "modules",
+                "{{id}}",
+                "v",
+                "{{version}}",
+                "{{path}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/modules/{{id}}/v/{{version}}/{{path}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Static asset of an installed module (public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "modules",
+                "{{id}}",
+                "{{path}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/modules/{{id}}/{{path}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /p/:locator",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "p",
+                "{{locator}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/p/{{locator}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /p/:locator",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "p",
+                "{{locator}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/p/{{locator}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness — what the container HEALTHCHECK reads (public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "readyz"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/readyz"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /robots.txt",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "auth: none",
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "robots.txt"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/robots.txt"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /ws",
+          "request": {
+            "description": "auth: api-key",
+            "header": [
+              {
+                "key": "Authorization",
+                "type": "text",
+                "value": "Bearer {{hub_api_key}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "ws"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/ws"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /ws/print",
+          "request": {
+            "description": "auth: session",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "ws",
+                "print"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/ws/print"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "system"
+    }
+  ],
+  "variable": [
+    {
+      "description": "The hub. The permanent PRE bench by default.",
+      "key": "hub_url",
+      "type": "string",
+      "value": "https://banco-pre.a.erplora.com"
+    },
+    {
+      "description": "The SaaS user JWT — what the SaaS collection's Login saves. Only POST /api/auth/cloud reads it.",
+      "key": "access_token",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "description": "Saved by POST /api/auth/cloud and POST /api/auth/pin. Sent as `X-Hub-Session`.",
+      "key": "hub_session",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "description": "Saved by POST /api/keys (shown once). Sent as `Authorization: Bearer erpl_live_…` on the module data API.",
+      "key": "hub_api_key",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "description": "The local PIN (six digits) you set with POST /api/auth/set-pin.",
+      "key": "hub_pin",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "description": "How this client identifies itself to the device-trust gate on PIN/badge logins.",
+      "key": "device_id",
+      "type": "string",
+      "value": "postman"
+    },
+    {
+      "description": "The local user's name, for POST /api/auth/pin.",
+      "key": "hub_user_name",
+      "type": "string",
+      "value": ""
+    }
+  ]
+}
