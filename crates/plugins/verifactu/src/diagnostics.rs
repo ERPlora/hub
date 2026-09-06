@@ -507,8 +507,14 @@ impl CertReason {
 /// (its `never bakes the engine prose into a reason sentence` test): a translated sentence with an
 /// untranslatable `reqwest` chain inside it is half a sentence again, which is the defect being
 /// fixed. So the shape is the one the neighbouring box already uses for `gateway_unreachable` —
-/// constant sentence from the catalogue, technical detail painted beside it out of `error` — and
-/// that detail is what support reads to tell a bad certificate from the customer's proxy.
+/// constant sentence from the catalogue, technical detail painted beside it — and that detail is
+/// what support reads to tell a bad certificate from the customer's proxy.
+///
+/// **Two meanings needed two keys.** `error` could not be that slot: the two sibling arms of this
+/// same road file the engine's PROSE there (`missing.prose`, `reason.prose`), and the module's
+/// screen is built on that reading — `renderAeat` uses `error` only as the fallback for a code its
+/// catalogue cannot name. Reusing it for the raw chain would leak Spanish transport noise into a
+/// box whose whole point is that it stopped speaking Spanish. Hence `detail`, which no arm had.
 fn aeat_call_failed(e: &VerifactuError) -> Json {
     let reason = if matches!(e, VerifactuError::Tls(_)) {
         constant_reason(
@@ -522,7 +528,18 @@ fn aeat_call_failed(e: &VerifactuError) -> Json {
             "No se ha podido contactar con la AEAT; vuelve a intentarlo en unos minutos.",
         )
     };
-    json!({ "ok": false, "error": e.to_string(), "reason": reason.as_details() })
+    json!({
+        "ok": false,
+        // Prose, like the two arms beside this one: they file `missing.prose` / `reason.prose`
+        // here, and the module's screen is built on that (`renderAeat` drops `error` the moment it
+        // can compose the sentence). Putting the raw chain in this key would make the box read
+        // Spanish transport noise on the old module and nothing at all on the new one.
+        "error": reason.prose.clone(),
+        // The raw transport text, in a slot of its own: the only thing that tells a bad
+        // certificate from the customer's proxy or a quiet AEAT, so support cannot lose it.
+        "detail": e.to_string(),
+        "reason": reason.as_details(),
+    })
 }
 
 /// A verdict with nothing to fill: one code, one sentence, no facts (verifactu#95).
@@ -1526,37 +1543,57 @@ mod tests {
     /// La distinción no se inventa aquí — el motor ya la hace en `aeat::transport_error`, que es
     /// lo que separa `Tls` de `Transmission`; esto solo la publica.
     ///
-    /// Y el texto técnico NO se tira: `error` sigue llevando el `to_string()` del transporte, que
-    /// es lo que soporte necesita para saber si el problema es el certificado, el proxy del
-    /// cliente o la sede. Es el mismo reparto que hace la caja de la pasarela con
-    /// `gateway_unreachable`: la frase del catálogo no interpola el error crudo, y el detalle se
-    /// pinta en su propio hueco.
+    /// Y el texto técnico NO se tira: viaja en `detail`, su propio hueco, que es lo que soporte
+    /// necesita para saber si el problema es el certificado, el proxy del cliente o la sede. Es el
+    /// mismo reparto que hace la caja de la pasarela con `gateway_unreachable`: la frase del
+    /// catálogo no interpola el error crudo, y el detalle se pinta aparte.
+    ///
+    /// **Por qué una clave NUEVA y no `error`:** en los dos brazos hermanos de esta misma vía
+    /// `error` es la PROSA del motor, y la pantalla del módulo está construida sobre eso. Meter
+    /// ahí el crudo lo deja invisible en el módulo nuevo (que compone la frase desde el código y
+    /// tira `error`) y convierte la caja en una fuga de castellano en el viejo. Por eso este test
+    /// afirma por CLAVES: `error` sigue siendo prosa, `detail` es el crudo.
     #[test]
     fn an_aeat_call_that_fails_publishes_a_code_beside_the_technical_detail_hub1580() {
         let unreachable = super::aeat_call_failed(&VerifactuError::Transmission(
             "error sending request for url (https://prewww1.aeat.es/…)".to_owned(),
         ));
+        assert_eq!(unreachable["ok"], json!(false), "{unreachable}");
         assert_eq!(
-            unreachable,
-            json!({
-                "ok": false,
-                "error": "transmisión AEAT: error sending request for url (https://prewww1.aeat.es/…)",
-                "reason": { "code": "aeat_unreachable" },
-            }),
-            "a network failure is waited out, and its raw text stays in its own slot"
+            unreachable["reason"],
+            json!({ "code": "aeat_unreachable" }),
+            "a network failure is waited out, not fixed: {unreachable}"
+        );
+        assert_eq!(
+            unreachable["detail"],
+            json!("transmisión AEAT: error sending request for url (https://prewww1.aeat.es/…)"),
+            "the raw transport text keeps a slot of its own — it is what support reads: {unreachable}"
+        );
+        assert!(
+            unreachable["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("vuelve a intentarlo")),
+            "`error` stays what the neighbouring arms make it — the engine's prose: {unreachable}"
         );
 
         let rejected = super::aeat_call_failed(&VerifactuError::Tls(
             "certificate verify failed".to_owned(),
         ));
         assert_eq!(
-            rejected,
-            json!({
-                "ok": false,
-                "error": "transmisión AEAT (TLS): certificate verify failed",
-                "reason": { "code": "aeat_tls_rejected" },
-            }),
-            "a refused secure channel is FIXED, and must not read as a passing outage"
+            rejected["reason"],
+            json!({ "code": "aeat_tls_rejected" }),
+            "a refused secure channel is FIXED, and must not read as a passing outage: {rejected}"
+        );
+        assert_eq!(
+            rejected["detail"],
+            json!("transmisión AEAT (TLS): certificate verify failed"),
+            "and the chain that names the certificate fault is the whole point of the slot: {rejected}"
+        );
+        assert!(
+            rejected["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("caducado")),
+            "`error` is prose here too, never the raw chain: {rejected}"
         );
     }
 
