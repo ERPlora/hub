@@ -1,6 +1,7 @@
 //! Diagnostics run and AEAT consult snapshot — split out of `lib.rs` verbatim (hub#1405).
 
 use crate::*;
+use erplora_runtime::producer_facts::ProducerFacts;
 
 /// Prueba de extremo a extremo SIN tocar la cadena: verifica que el certificado carga con su
 /// contraseña, genera una huella + QR de un registro de **muestra** y (si el cert es válido) hace
@@ -108,12 +109,22 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
 
     let mut cert_ok = false;
     let cert_message;
+    // WHY the test failed, as a code the module translates (hub#1575). The prose below is the
+    // same sentence it always was and keeps travelling as `cert_message`: it is what a hub on an
+    // older module version still paints, exactly like `message` since hub#1178.
+    // Since verifactu#95 EVERY road answers with one, success included, so there is no `None` to
+    // carry any more — it is assigned exactly like `cert_message` above, once per road.
+    let cert_reason: CertReason;
     let mut aeat = Json::Null;
     let mut gateway = Json::Null;
     // Whether the test stopped on a field of THIS hub instead of on the road (hub#1531). It is a
     // fact of its own because the two ask for opposite things from whoever reads the event: one is
     // a form to fill, the other a service to wait for.
     let mut missing_issuer_nif = false;
+    // And whether it stopped on the test RECORD this hub's own data produces (hub#1559). Same
+    // shape, same reason: «your configuration does not yield a valid record» asks for a form, «the
+    // gateway cannot transmit» asks for patience, and only one of them is true at a time.
+    let mut invalid_sample_record = false;
 
     // ── ¿POR DÓNDE sale este hub? (hub#1485) ─────────────────────────────────────────────────
     // Which road this hub is ON, in the CORE's words (`certificate::route_of`), so the screen
@@ -135,16 +146,40 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
         Ok(TransmitRoute::Direct { identity, holder }) => {
             let route = TransmitRoute::Direct { identity, holder };
             cert_ok = true;
-            cert_message = "Certificado cargado correctamente.".into();
+            let loaded = constant_reason("certificate_loaded", "Certificado cargado correctamente.");
+            cert_message = loaded.prose.clone();
+            cert_reason = loaded;
             if issuer_nif.is_empty() {
                 // Sin NIF del obligado no se puede enviar (la AEAT lo rechazaría por formato).
-                aeat = json!({ "ok": false, "error": "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba." });
+                // El código es el MISMO que la vía delegada ya publica para este hueco
+                // (hub#1578): para quien lo lee es el mismo campo que rellenar, y la vía por la
+                // que se topó con él no cambia la frase.
+                let missing = constant_reason(
+                    "issuer_nif_missing",
+                    "Configura el NIF del obligado tributario (emisor) antes de enviar la prueba.",
+                );
+                aeat = json!({
+                    "ok": false,
+                    "error": missing.prose,
+                    "reason": missing.as_details(),
+                });
             } else {
                 // Mismo gate que la transmisión real: la prueba tiene que fallar donde falla el
                 // envío de verdad, no ir a la AEAT a que lo diga con un 4102. Y si el sobre ni
                 // siquiera se puede construir (hub#324), el diagnóstico lo dice aquí.
                 match sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif) {
-                    Err(error) => aeat = json!({ "ok": false, "error": error }),
+                    // El motivo que `sample_envelope` ya calcula (hub#1575) viaja también aquí
+                    // como código (hub#1578). Por esta vía el certificado SÍ carga, así que el
+                    // veredicto de arriba sale en verde y lo que hay que arreglar cae en esta
+                    // caja: era la última que hablaba castellano en una pantalla en inglés, y es
+                    // la que dice qué tocar.
+                    Err(reason) => {
+                        aeat = json!({
+                            "ok": false,
+                            "error": reason.prose,
+                            "reason": reason.as_details(),
+                        })
+                    }
                     Ok(xml) => {
                         let TransmitRoute::Direct { identity, .. } = route else {
                             unreachable!("this arm matched Direct")
@@ -165,7 +200,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                                 });
                             }
                             Err(e) => {
-                                aeat = json!({ "ok": false, "error": e.to_string() });
+                                aeat = aeat_call_failed(&e);
                             }
                         }
                     }
@@ -203,19 +238,16 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                     if readiness.ready {
                         Ok(())
                     } else {
-                        Err(format!(
-                            "La pasarela fiscal no puede transmitir ahora mismo ({}).",
-                            if readiness.reason.is_empty() {
-                                readiness.status.clone()
-                            } else {
-                                readiness.reason.clone()
-                            }
-                        ))
+                        Err(gateway_not_ready_reason(&readiness))
                     }
                 }
                 Err(e) => {
                     gateway = json!({ "ok": false, "error": e.to_string() });
-                    Err(format!("No se pudo contactar con la pasarela fiscal: {e}"))
+                    Err(CertReason::new(
+                        "gateway_unreachable",
+                        json!({ "error": e.to_string() }),
+                        format!("No se pudo contactar con la pasarela fiscal: {e}"),
+                    ))
                 }
             };
 
@@ -224,20 +256,35 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             // su lugar lo manda a vigilar un servicio que no puede tocar (hub#1531).
             if issuer_nif.is_empty() {
                 missing_issuer_nif = true;
-                cert_message = "Configura el NIF del obligado tributario (emisor) antes de probar la conexión.".into();
-            } else if let Err(error) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
+                let missing = constant_reason(
+                    "issuer_nif_missing",
+                    "Configura el NIF del obligado tributario (emisor) antes de probar la conexión.",
+                );
+                cert_message = missing.prose.clone();
+                cert_reason = missing;
+            } else if let Err(reason) = sample_envelope(&sample, &config, &route, &ctx.hub_id, &issuer_nif)
             {
                 // El sobre se construye y se valida IGUAL que en la vía propia. Una config que no
                 // produce un registro conforme es un fallo de ESTE hub, y el diagnóstico es donde
                 // tiene que salir — solo que sin dárselo a Hacienda para que lo diga ella.
-                cert_message = error;
+                invalid_sample_record = true;
+                cert_message = reason.prose.clone();
+                cert_reason = reason;
             } else {
                 match cell {
                     Ok(()) => {
                         cert_ok = true;
-                        cert_message = "Pasarela fiscal disponible: ERPlora presenta por ti.".into();
+                        let ready = constant_reason(
+                            "gateway_ready",
+                            "Pasarela fiscal disponible: ERPlora presenta por ti.",
+                        );
+                        cert_message = ready.prose.clone();
+                        cert_reason = ready;
                     }
-                    Err(message) => cert_message = message,
+                    Err(reason) => {
+                        cert_message = reason.prose.clone();
+                        cert_reason = reason;
+                    }
                 }
             }
         }
@@ -245,19 +292,35 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
             // Sin vía NINGUNA. Con certificado del negocio el mensaje sigue hablando del
             // certificado, que es lo que hay que arreglar; sin él habla de la pasarela, porque
             // mandar a alguien a renovar un `.p12` que no tiene es el defecto de hub#1485 otra vez.
-            cert_message = if road == erplora_runtime::certificate::ROUTE_OWN {
-                format!("El certificado no carga o no está configurado: {e}")
+            let reason = if road == erplora_runtime::certificate::ROUTE_OWN {
+                CertReason::new(
+                    "certificate_unavailable",
+                    json!({ "error": e.to_string() }),
+                    format!("El certificado no carga o no está configurado: {e}"),
+                )
             } else {
-                format!("Este hub no tiene vía de transmisión: {e}")
+                CertReason::new(
+                    "no_transmission_route",
+                    json!({ "error": e.to_string() }),
+                    format!("Este hub no tiene vía de transmisión: {e}"),
+                )
             };
+            cert_message = reason.prose.clone();
+            cert_reason = reason;
         }
     }
 
     let details = json!({
         "cert_ok": cert_ok,
         "cert_message": cert_message,
-        // Por dónde sale este hub (hub#1485). Las palabras son las del core
-        // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) porque la pantalla programa contra ellas.
+        // The verdict behind the dash, as a CODE + facts (hub#1575), so the module's catalogue can
+        // say it in the language of the business instead of interpolating Spanish prose inside an
+        // English sentence. Since verifactu#95 the runs that SUCCEED carry one too: «it went well»
+        // was the last sentence a business read in Spanish, and it is the one it reads most often.
+        // There is no road left that answers nothing: the field is always an object.
+        "cert_reason": cert_reason.as_details(),
+        // Which road this hub files on (hub#1485). The words are the core's own
+        // (`certificate::ROUTE_OWN`/`ROUTE_DELEGATED`) because the screen programs against them.
         "route": road,
         "issuer_nif": issuer_nif,
         "invoice_type": invoice_type,
@@ -274,13 +337,17 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
     // que falla NO es un certificado que el negocio pueda arreglar, sino la pasarela — mandarle a
     // renovar un `.p12` que no tiene es el defecto original. Y desde hub#1531 un cuarto: cuando lo
     // que falta es un dato SUYO, culpar a la pasarela lo manda a vigilar un servicio que no puede
-    // tocar en vez de rellenar el campo que tiene delante.
+    // tocar en vez de rellenar el campo que tiene delante. Y desde hub#1559 un quinto: el NIF puede
+    // estar puesto y el registro de prueba no salir igual — culpar entonces a la pasarela nombra a
+    // un servicio al que ni se le ha pedido llevar ese registro.
     //
     // Por la vía propia el mismo hueco ya se cuenta bien sin clave nueva: el certificado carga
     // (`cert_ok`) y el bloque `aeat` lleva el «configura el NIF antes de enviar» que la pantalla
     // pinta en rojo, así que ahí la clave sigue siendo la de la prueba que corrió.
     let message_key = if missing_issuer_nif {
         "verifactu.diagnostic_issuer_nif_missing"
+    } else if invalid_sample_record {
+        "verifactu.diagnostic_sample_record_invalid"
     } else if cert_ok {
         "verifactu.diagnostic_ran"
     } else if road == erplora_runtime::certificate::ROUTE_OWN {
@@ -307,6 +374,9 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                 "verifactu.diagnostic_certificate_invalid" => {
                     "Prueba VeriFactu: certificado no válido".to_string()
                 }
+                "verifactu.diagnostic_sample_record_invalid" => {
+                    "Prueba VeriFactu: el registro de prueba no es válido".to_string()
+                }
                 _ => "Prueba VeriFactu: la pasarela fiscal no está disponible".to_string(),
             },
             "details": details_for(message_key, details),
@@ -331,11 +401,184 @@ fn sample_envelope(
     route: &TransmitRoute,
     hub_id: &str,
     issuer_nif: &str,
-) -> std::result::Result<String, String> {
-    let xml = aeat::build_soap(sample, config, None, hub_id).map_err(|e| e.to_string())?;
+) -> std::result::Result<String, CertReason> {
+    let xml = aeat::build_soap(sample, config, None, hub_id).map_err(|e| {
+        // WHICH of the two it is, asked of the CONFIG and never of the message (hub#1575): the
+        // prose belongs to the engine and would move with any reword, while whether the control
+        // plane has served the producer facts is a fact this hub can read. The two ask opposite
+        // things of the reader — one waits for the next heartbeat, the other has a form to fix.
+        let missing_facts = config
+            .get("producer_facts")
+            .and_then(ProducerFacts::parse)
+            .is_none();
+        CertReason::new(
+            if missing_facts {
+                "producer_facts_missing"
+            } else {
+                "sample_envelope_invalid"
+            },
+            json!({ "error": e.to_string() }),
+            e.to_string(),
+        )
+    })?;
     let xml = aeat::set_representative(&xml, route.presenter(), issuer_nif);
-    xsd::validate_registro(&xml).map_err(|e| format!("XML no conforme al esquema: {e}"))?;
+    xsd::validate_registro(&xml).map_err(|e| {
+        // The element the validator named travels on its own: it is the actionable half. Twice
+        // over since hub#1576 — as `detail`, the validator's Spanish sentence, which is what a hub
+        // on an older module still paints; and as `detail_reason`, the same refusal as a
+        // `{code, …facts}` the catalogue turns into a sentence in the reader's language.
+        //
+        // Absent when the refusal has no code of its own. Absent and not empty: the module asks
+        // «is there a code I know?», and an object with nothing in it would answer yes and paint a
+        // blank where the half that says what to fix used to be.
+        let mut facts = json!({ "detail": e.to_string() });
+        if let (Some(target), Some(nested)) = (facts.as_object_mut(), e.as_reason_details()) {
+            target.insert("detail_reason".to_owned(), nested);
+        }
+        CertReason::new(
+            "sample_record_schema_invalid",
+            facts,
+            format!("XML no conforme al esquema: {e}"),
+        )
+    })?;
     Ok(xml)
+}
+
+/// Why the test failed, as a **stable code + facts** — plus the Spanish prose that was the whole
+/// answer until hub#1575.
+///
+/// The verdict already travelled as a key (`message_key`, hub#1178) and the module translated it;
+/// the REASON behind the dash did not, so a business running in English read «…does not produce a
+/// valid test record — faltan los hechos del productor…»: half a sentence in a language it did not
+/// choose, and it was the half that says what to fix.
+///
+/// `prose` is **not** withdrawn: it is the fallback painted by a hub whose module does not know the
+/// code yet, exactly the contract `message` has had since hub#1178. Dropping it the day the code
+/// lands would leave those hubs with half an empty sentence, which is worse than a Spanish one.
+#[derive(Debug)]
+pub(crate) struct CertReason {
+    /// Stable: it is what the module's catalogue indexes. Never renamed without translating it.
+    code: &'static str,
+    /// The data the sentence needs, already split out of it. Always an object.
+    facts: Json,
+    /// The engine's own Spanish sentence, exactly as it has always been written.
+    prose: String,
+}
+
+impl CertReason {
+    fn new(code: &'static str, facts: Json, prose: impl Into<String>) -> Self {
+        Self {
+            code,
+            facts,
+            prose: prose.into(),
+        }
+    }
+
+    /// `{"code": …}` with the facts beside it — the shape `details` publishes and the module reads.
+    fn as_details(&self) -> Json {
+        let mut out = json!({ "code": self.code });
+        if let (Some(target), Some(source)) = (out.as_object_mut(), self.facts.as_object()) {
+            for (key, value) in source {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+        out
+    }
+}
+
+/// The `aeat` box when the call to Hacienda did not come back: the technical text in its own slot,
+/// plus the **stable code** the module turns into a sentence in the reader's language (hub#1580).
+///
+/// It was the last box of «Test connection» still answering only in Spanish. The other two
+/// refusals of this same road — the unset issuer NIF, the sample envelope that does not validate —
+/// have travelled with their `reason` since hub#1578; this one kept filing just the transport's
+/// own `to_string()`, so a business running in English read «transmisión AEAT (TLS): …» on a
+/// screen that is otherwise translated.
+///
+/// **Two codes, not one.** They ask opposite things of the reader: a secure channel the AEAT
+/// refused is FIXED — the certificate is expired, revoked or not accepted — and an unreachable
+/// AEAT is WAITED OUT. Merging them would put «try again in a few minutes» in front of somebody
+/// whose certificate expired last week. The distinction is not invented here: `aeat::transport_error`
+/// already draws it when it chooses between [`VerifactuError::Tls`] and
+/// [`VerifactuError::Transmission`], and this only publishes what the engine had already decided.
+///
+/// **Factless on purpose, and `error` is NOT withdrawn.** The alternative was one code with the
+/// raw failure interpolated into the sentence, and the module's catalogue forbids exactly that
+/// (its `never bakes the engine prose into a reason sentence` test): a translated sentence with an
+/// untranslatable `reqwest` chain inside it is half a sentence again, which is the defect being
+/// fixed. So the shape is the one the neighbouring box already uses for `gateway_unreachable` —
+/// constant sentence from the catalogue, technical detail painted beside it — and that detail is
+/// what support reads to tell a bad certificate from the customer's proxy.
+///
+/// **Two meanings needed two keys.** `error` could not be that slot: the two sibling arms of this
+/// same road file the engine's PROSE there (`missing.prose`, `reason.prose`), and the module's
+/// screen is built on that reading — `renderAeat` uses `error` only as the fallback for a code its
+/// catalogue cannot name. Reusing it for the raw chain would leak Spanish transport noise into a
+/// box whose whole point is that it stopped speaking Spanish. Hence `detail`, which no arm had.
+fn aeat_call_failed(e: &VerifactuError) -> Json {
+    let reason = if matches!(e, VerifactuError::Tls(_)) {
+        constant_reason(
+            "aeat_tls_rejected",
+            "La AEAT no ha aceptado el certificado al abrir el canal seguro: revisa que no esté \
+             caducado ni revocado.",
+        )
+    } else {
+        constant_reason(
+            "aeat_unreachable",
+            "No se ha podido contactar con la AEAT; vuelve a intentarlo en unos minutos.",
+        )
+    };
+    json!({
+        "ok": false,
+        // Prose, like the two arms beside this one: they file `missing.prose` / `reason.prose`
+        // here, and the module's screen is built on that (`renderAeat` drops `error` the moment it
+        // can compose the sentence). Putting the raw chain in this key would make the box read
+        // Spanish transport noise on the old module and nothing at all on the new one.
+        "error": reason.prose.clone(),
+        // The raw transport text, in a slot of its own: the only thing that tells a bad
+        // certificate from the customer's proxy or a quiet AEAT, so support cannot lose it.
+        "detail": e.to_string(),
+        "reason": reason.as_details(),
+    })
+}
+
+/// A verdict with nothing to fill: one code, one sentence, no facts (verifactu#95).
+///
+/// It exists so the runs that SUCCEED travel the same channel as the ones that fail. Until then the
+/// module had no code to look up on a good run and fell back to `cert_message`, which is the
+/// engine's Spanish — so the two runs a business sees most often were the two it could not read.
+fn constant_reason(code: &'static str, prose: &str) -> CertReason {
+    CertReason::new(code, json!({}), prose)
+}
+
+/// The cell answered and said no. Which of the two shapes it takes depends on whether it said WHY:
+/// a cell that gives a reason carries it in its sentence; one that does not — an older cell, an
+/// intermediary's error page — carries a sentence that stands on its own.
+///
+/// Two codes and not one with an empty hole, because a `{detail}` painted blank reads as a broken
+/// screen rather than as a service that kept quiet.
+fn gateway_not_ready_reason(readiness: &crate::gateway::GatewayReadiness) -> CertReason {
+    let detail = if readiness.reason.is_empty() {
+        readiness.status.clone()
+    } else {
+        readiness.reason.clone()
+    };
+    if detail.is_empty() {
+        return CertReason::new(
+            "gateway_not_ready_unspecified",
+            json!({}),
+            "La pasarela fiscal no puede transmitir ahora mismo.",
+        );
+    }
+    CertReason::new(
+        "gateway_not_ready",
+        json!({
+            "status": readiness.status,
+            "reason": readiness.reason,
+            "detail": detail,
+        }),
+        format!("La pasarela fiscal no puede transmitir ahora mismo ({detail})."),
+    )
 }
 
 // ── helpers de recuperación / consulta ────────────────────────────────────────
@@ -1029,6 +1272,910 @@ mod tests {
                 .as_str()
                 .is_some_and(|e| e.contains("pasarela")),
             "the failure has to name the leg that failed: {details}"
+        );
+    }
+
+    /// The same enrolled, certless hub as [`CellHost`] — obligado NIF filled in, cell identical —
+    /// except the producer facts this hub files with never arrived from the control plane, so the
+    /// test record cannot be built at all (`sistema_informatico` refuses: a legal declaration has
+    /// no defaults).
+    ///
+    /// It is the reachable half of `sample_envelope`. The other half — a record that builds and
+    /// then fails the XSD — is closed today from every input the diagnostic has: the sample is
+    /// hardcoded well-formed, `ProducerFacts::parse` already enforces the bounds the schema
+    /// checks, and `representative_block` refuses a half presenter rather than emit one. Both
+    /// halves leave through the SAME arm, so pinning this one pins the verdict for both.
+    struct CellHostWithoutProducerFacts;
+
+    #[async_trait::async_trait]
+    impl NativeHost for CellHostWithoutProducerFacts {
+        async fn read(&self, sql: &str, params: &Params) -> Result<Vec<Json>> {
+            CellHost.read(sql, params).await
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            Ok(None)
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            CellHost.machine_identity(hub_id).await
+        }
+        async fn cloud_call(
+            &self,
+            request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            CellHost.cloud_call(request).await
+        }
+    }
+
+    /// 🔴 **RED de hub#1559.** hub#1531 one box further along: the obligado NIF IS filled in, and
+    /// the test record still does not come out — so the diagnostic falls through to «the fiscal
+    /// gateway is unavailable», naming a service the business cannot touch and that was never even
+    /// asked to carry this record. The long text does explain the real error; the headline and the
+    /// KEY, which are what the screen programs against, blame the road.
+    #[tokio::test]
+    async fn a_sample_record_that_does_not_come_out_is_never_blamed_on_the_gateway_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        // The control has to catch the positive it claims to catch: this run stops on the RECORD,
+        // not on the cell. Both are false in this test, and only one of them is the verdict.
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("no se puede construir el registro"),
+            "this case has to stop on the sample record, not on the road: {details}"
+        );
+        assert_eq!(
+            details["message_key"],
+            json!("verifactu.diagnostic_sample_record_invalid"),
+            "a test record that does not come out is this hub's own verdict, not a gateway fault: \
+             {details}"
+        );
+    }
+
+    /// The event as filed, so a test can read the prose the screen paints while the module's
+    /// catalogue has not caught up with a key (hub#1178: `message` is the fallback, and for a hub
+    /// on an older module version it is the ONLY thing shown).
+    fn filed_event_message(out: &Output) -> String {
+        out.operations
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .and_then(|o| o.params.get("message"))
+            .and_then(Json::as_str)
+            .expect("the diagnostic always files its event with a sentence")
+            .to_string()
+    }
+
+    /// 🔒 The HEADLINE has to move with the key. `message_key` is what the module renders once its
+    /// catalogue knows the key; `message` is what every hub shows until then — leaving the prose on
+    /// the gateway would fix the code and change nothing on the screen.
+    #[tokio::test]
+    async fn the_headline_stops_naming_the_gateway_too_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let message = filed_event_message(&out);
+
+        assert!(
+            !message.contains("pasarela"),
+            "the headline must stop blaming a service that was never asked to carry this: {message}"
+        );
+        assert!(
+            message.contains("registro de prueba"),
+            "and it has to name what actually failed: {message}"
+        );
+    }
+
+    /// 🔒 And the sentence keeps carrying WHY the record was refused. A verdict of its own that
+    /// dropped the reason would trade one lie for a silence: the person would know it is not the
+    /// gateway and still not know what to fix.
+    #[tokio::test]
+    async fn the_verdict_still_carries_the_reason_the_record_was_refused_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(details["cert_ok"], json!(false), "{details}");
+        assert!(
+            !details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("pasarela"),
+            "the sentence must stop naming a service that was never asked to carry this: {details}"
+        );
+    }
+
+    /// 🔒 The same guard hub#1531 left for its own case: `/readyz` needs nothing from this hub, so
+    /// the cell is still probed and its block still filed. Otherwise the new verdict would buy a
+    /// truthful headline by hiding the state of the road — and an empty block reads exactly like a
+    /// probe nobody made.
+    #[tokio::test]
+    async fn the_cell_is_still_probed_when_the_sample_record_is_invalid_hub1559() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert!(
+            !details["gateway"].is_null(),
+            "the cell answers whatever this hub's config says, so its state belongs in the report: \
+             {details}"
+        );
+        assert_eq!(details["gateway"]["ok"], json!(false), "{details}");
+        // And nothing was filed: this road checks the road, it never uses it (ADR-0189).
+        assert!(
+            details["aeat"].is_null(),
+            "a diagnostic through the cell must never present a sample invoice: {details}"
+        );
+    }
+
+    // ── hub#1575: the reason behind the dash travels as a CODE ────────────────────────────────
+
+    /// A hub on the CELL road whose obligado NIF is set and whose sample record still does not
+    /// come out — the same host hub#1559 left, asked the question hub#1575 asks.
+    ///
+    /// 🔴 **RED de hub#1575.** The verdict already travels as a key the module translates
+    /// (`message_key`), but the REASON behind the dash is Spanish prose the engine wrote, and the
+    /// module interpolates it raw as `{cert_message}`. An English reader gets «…does not produce a
+    /// valid test record — faltan los hechos del productor…»: half a sentence in a language they
+    /// did not choose, and it is the half that says what to fix.
+    #[tokio::test]
+    async fn the_reason_a_test_failed_travels_as_a_code_hub1575() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("producer_facts_missing"),
+            "the reason has to be a code the module can translate, not prose: {details}"
+        );
+        // …and the FACTS travel with it. The catalogue sentences interpolate them by name, so a
+        // code that arrives bare prints `{error}` braces and all on a fiscal screen — the one
+        // shape worse than the Spanish it replaces. Caught by mutation: publishing only the code
+        // left all 208 tests green.
+        assert!(
+            details["cert_reason"]["error"]
+                .as_str()
+                .is_some_and(|e| !e.is_empty()),
+            "the facts the module's sentence needs have to travel with the code: {details}"
+        );
+    }
+
+    /// 🔒 The publisher itself, on its own: every fact goes out BESIDE the code, at the top level
+    /// of `cert_reason`, which is where the module reads them from.
+    ///
+    /// Nested or dropped, the catalogue would print its placeholders raw. This is the control that
+    /// caught it — the end-to-end test above only ever looked at `code`, so an `as_details` that
+    /// published nothing else passed the whole suite.
+    #[test]
+    fn the_published_reason_carries_its_facts_beside_the_code_hub1575() {
+        let reason = CertReason::new(
+            "gateway_not_ready",
+            json!({ "status": "expired", "reason": "", "detail": "expired" }),
+            "prose",
+        );
+
+        assert_eq!(
+            reason.as_details(),
+            json!({
+                "code": "gateway_not_ready",
+                "status": "expired",
+                "reason": "",
+                "detail": "expired",
+            }),
+            "the module reads the facts from the top level, next to the code"
+        );
+    }
+
+    /// 🔒 And the prose STAYS. It is the fallback a hub on an older module version paints — the
+    /// same contract `message` has carried since hub#1178. Dropping it the day the code lands
+    /// would leave those hubs with an empty half-sentence, which is worse than the Spanish one.
+    #[tokio::test]
+    async fn the_spanish_prose_stays_as_the_fallback_for_older_modules_hub1575() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-facts"),
+            &CellHostWithoutProducerFacts,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("no se puede construir el registro"),
+            "the prose is the fallback for a module that does not know the code yet: {details}"
+        );
+    }
+
+    /// A cell that cannot be reached is a road fault, and it says so with its own code: what the
+    /// business does about it (wait, retry) is the opposite of what a broken sample record asks
+    /// for (fix the settings), so the two cannot share a sentence.
+    #[tokio::test]
+    async fn an_unreachable_cell_reports_its_own_reason_code_hub1575() {
+        let out = run_diagnostics(&diagnostics_input("hub-cell"), &CellHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("gateway_unreachable"),
+            "{details}"
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#1580): cuando la llamada a la AEAT por la vía propia FALLA, la caja
+    /// `aeat` publica un **código** además del texto técnico.
+    ///
+    /// Era la última casilla de «Probar conexión» que solo hablaba castellano: las otras dos
+    /// negativas de esta misma vía —NIF sin configurar, sobre que no valida— ya viajaban con su
+    /// `reason` desde hub#1578, y esta se quedó filando únicamente `error: e.to_string()`, la
+    /// prosa del transporte. Un negocio en inglés leía «transmisión AEAT (TLS): …» en una
+    /// pantalla que por lo demás está traducida.
+    ///
+    /// **Dos códigos y no uno**, porque piden cosas OPUESTAS: un canal seguro rechazado se
+    /// ARREGLA (certificado caducado, revocado o no admitido) y una AEAT inalcanzable se ESPERA.
+    /// La distinción no se inventa aquí — el motor ya la hace en `aeat::transport_error`, que es
+    /// lo que separa `Tls` de `Transmission`; esto solo la publica.
+    ///
+    /// Y el texto técnico NO se tira: viaja en `detail`, su propio hueco, que es lo que soporte
+    /// necesita para saber si el problema es el certificado, el proxy del cliente o la sede. Es el
+    /// mismo reparto que hace la caja de la pasarela con `gateway_unreachable`: la frase del
+    /// catálogo no interpola el error crudo, y el detalle se pinta aparte.
+    ///
+    /// **Por qué una clave NUEVA y no `error`:** en los dos brazos hermanos de esta misma vía
+    /// `error` es la PROSA del motor, y la pantalla del módulo está construida sobre eso. Meter
+    /// ahí el crudo lo deja invisible en el módulo nuevo (que compone la frase desde el código y
+    /// tira `error`) y convierte la caja en una fuga de castellano en el viejo. Por eso este test
+    /// afirma por CLAVES: `error` sigue siendo prosa, `detail` es el crudo.
+    #[test]
+    fn an_aeat_call_that_fails_publishes_a_code_beside_the_technical_detail_hub1580() {
+        let unreachable = super::aeat_call_failed(&VerifactuError::Transmission(
+            "error sending request for url (https://prewww1.aeat.es/…)".to_owned(),
+        ));
+        assert_eq!(unreachable["ok"], json!(false), "{unreachable}");
+        assert_eq!(
+            unreachable["reason"],
+            json!({ "code": "aeat_unreachable" }),
+            "a network failure is waited out, not fixed: {unreachable}"
+        );
+        assert_eq!(
+            unreachable["detail"],
+            json!("transmisión AEAT: error sending request for url (https://prewww1.aeat.es/…)"),
+            "the raw transport text keeps a slot of its own — it is what support reads: {unreachable}"
+        );
+        assert!(
+            unreachable["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("vuelve a intentarlo")),
+            "`error` stays what the neighbouring arms make it — the engine's prose: {unreachable}"
+        );
+
+        let rejected = super::aeat_call_failed(&VerifactuError::Tls(
+            "certificate verify failed".to_owned(),
+        ));
+        assert_eq!(
+            rejected["reason"],
+            json!({ "code": "aeat_tls_rejected" }),
+            "a refused secure channel is FIXED, and must not read as a passing outage: {rejected}"
+        );
+        assert_eq!(
+            rejected["detail"],
+            json!("transmisión AEAT (TLS): certificate verify failed"),
+            "and the chain that names the certificate fault is the whole point of the slot: {rejected}"
+        );
+        assert!(
+            rejected["error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("caducado")),
+            "`error` is prose here too, never the raw chain: {rejected}"
+        );
+    }
+
+    /// A hub with NO road at all: not enrolled and with no `.p12` of its own. Its own code, for
+    /// the same reason hub#1485 gave it its own sentence — «renew your certificate» is
+    /// unfollowable advice for somebody who never had one.
+    #[tokio::test]
+    async fn a_hub_with_no_road_reports_the_missing_road_as_a_code_hub1575() {
+        struct NoRoadHost;
+        #[async_trait::async_trait]
+        impl NativeHost for NoRoadHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({
+                    "id": "cfg-1",
+                    "environment": "testing",
+                    "issuer_nif": "B12345678",
+                })])
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-nowhere"), &NoRoadHost)
+            .await
+            .expect("the diagnostic always answers, even with nowhere to go");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("no_transmission_route"),
+            "{details}"
+        );
+    }
+
+    /// The taxpayer's own road, with a container the core cannot open. Its own code too: this one
+    /// IS a certificate to renew, and it is the only reason of the five that says so.
+    #[tokio::test]
+    async fn an_own_certificate_that_does_not_load_reports_its_own_code_hub1575() {
+        struct BrokenCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for BrokenCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({
+                    "id": "cfg-1",
+                    "environment": "testing",
+                    "issuer_nif": "B12345678",
+                })])
+            }
+            async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+                Ok(Some("own".to_owned()))
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Err(RuntimeError::Certificate(
+                    "el .p12 no abre con la contraseña guardada".into(),
+                ))
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-broken-cert"), &BrokenCertHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["route"],
+            json!(erplora_runtime::certificate::ROUTE_OWN),
+            "{details}"
+        );
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("certificate_unavailable"),
+            "{details}"
+        );
+    }
+
+    /// The sample record that IS built and then refused by the schema. Distinct from
+    /// `producer_facts_missing` because the two ask opposite things of the reader: one waits for
+    /// ERPlora's next heartbeat, the other has a field to fix — so the element the schema named
+    /// travels with the code.
+    ///
+    /// Asked of [`sample_envelope`] directly: the diagnostic's own sample is synthetic and well
+    /// formed, so the only way through this arm from `run_diagnostics` would be producer facts
+    /// that parse and then break the schema — and `ProducerFacts::parse` already enforces the
+    /// bounds the schema checks. A host contrived past that would be testing the stub, not the map.
+    #[test]
+    fn a_sample_refused_by_the_schema_carries_the_element_it_named_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        // The diagnostic's own sample with ONE hole the schema refuses: `Descripcion` is
+        // mandatory and this one is empty.
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("an empty Descripcion is refused by the schema");
+
+        assert_eq!(reason.code, "sample_record_schema_invalid", "{reason:?}");
+        assert!(
+            reason.facts["detail"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("Descripcion"),
+            "the reason has to keep naming what to fix: {reason:?}"
+        );
+        // And the prose stays whole for a hub whose module does not know the code yet.
+        assert!(reason.prose.contains("XML no conforme al esquema"), "{reason:?}");
+    }
+
+    /// 🔴 **RED de hub#1576.** The element the schema named travels, and it travels in SPANISH:
+    /// `detail` is the validator's own sentence, and the module interpolates it whole into
+    /// `ui.evt.reason.sample_record_schema_invalid`. So an English hub read «…the AEAT schema
+    /// refused the test record: **Descripcion es obligatorio y viene vacío**» — the verdict in its
+    /// language and the only actionable half in one it did not choose.
+    ///
+    /// The reason therefore nests: `detail` stays as the fallback prose, and `detail_reason`
+    /// carries the validator's own `{code, …facts}` for the module to compose. Nested and not
+    /// flattened, because the two codes answer different questions — «the sample did not pass» and
+    /// «this element came in empty» — and flattening them would let one overwrite the other's
+    /// facts.
+    #[test]
+    fn the_reason_the_schema_gave_travels_as_a_code_of_its_own_hub1576() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("an empty Descripcion is refused by the schema");
+
+        assert_eq!(
+            reason.facts["detail_reason"]["code"],
+            json!("schema_element_empty"),
+            "the detail is the half that says what to fix, and it needs its own code: {reason:?}"
+        );
+        assert_eq!(
+            reason.facts["detail_reason"]["element"],
+            json!("DescripcionOperacion"),
+            "the element the schema named travels as DATA, not inside a sentence: {reason:?}"
+        );
+        assert!(
+            reason.facts["detail"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("Descripcion"),
+            "the Spanish detail stays as the fallback for a module that does not know the code: \
+             {reason:?}"
+        );
+    }
+
+    /// 🔒 And a refusal the validator cannot code publishes NO nested reason at all, rather than an
+    /// empty object. The module's fallback is «is there a code I know?», so an object with nothing
+    /// in it would read as «yes» and paint a blank where the actionable half was.
+    ///
+    /// Asserted on `as_reason_details` and not only on `as_reason` (hub#1579): the merge is now the
+    /// ONE door both call sites go through — the diagnostic's `detail_reason` and the
+    /// transmission's `validation_error_reason` — so a `Some(json!({}))` slipped in there would
+    /// hand an empty code to two screens at once, and the `Option` above would still read as
+    /// correct. Measured: with the merge returning `Some({})` for an uncoded error the whole
+    /// crate stayed green, which is what this line closes.
+    #[test]
+    fn a_refusal_with_no_code_of_its_own_publishes_no_nested_reason_hub1576() {
+        let plain = crate::VerifactuError::Payload("algo que este validador no clasifica".into());
+
+        assert!(
+            plain.as_reason().is_none(),
+            "only the refusals with a stable code publish one"
+        );
+        assert!(
+            plain.as_reason_details().is_none(),
+            "absent, never empty: an empty object answers «yes, I know this code» and paints a blank"
+        );
+    }
+
+    /// 🔒 The same envelope with nothing missing produces no reason at all — the control has to
+    /// catch the positive it claims to catch, or «refused by the schema» would be what this
+    /// builder answers to everything.
+    #[test]
+    fn a_complete_sample_is_not_refused_by_the_schema_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-04",
+            "invoice_date": "2026-09-04",
+            "invoice_type": "F2",
+            "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "total_amount": 12100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-04T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        assert!(
+            sample_envelope(&sample, &config, &route, "hub-1", "B12345678").is_ok(),
+            "the diagnostic's own sample has to pass, or the guard above proves nothing"
+        );
+    }
+
+    /// A cell that answers and says no gives its state as FACTS, not inside a sentence — that is
+    /// what lets the module put the sentence in the reader's language and keep the state.
+    #[test]
+    fn a_cell_that_cannot_file_reports_its_state_as_facts_hub1575() {
+        let reason = gateway_not_ready_reason(&crate::gateway::GatewayReadiness {
+            ready: false,
+            status: "expired".to_owned(),
+            reason: "seal expired on 2026-08-31".to_owned(),
+            transmission_enabled: true,
+            holder_nif: "B27593136".to_owned(),
+        });
+
+        assert_eq!(reason.code, "gateway_not_ready", "{reason:?}");
+        assert_eq!(reason.facts["status"], json!("expired"), "{reason:?}");
+        assert_eq!(
+            reason.facts["detail"],
+            json!("seal expired on 2026-08-31"),
+            "the sentence needs ONE value that is never empty: {reason:?}"
+        );
+    }
+
+    /// 🔒 And a cell that says nothing gets a sentence that stands on its own. A `{detail}` painted
+    /// blank reads like a broken screen, not like a service that stayed quiet — which is the same
+    /// trade hub#1531 made for the missing-NIF verdict.
+    #[test]
+    fn a_cell_that_gives_no_reason_gets_a_sentence_that_stands_alone_hub1575() {
+        let reason = gateway_not_ready_reason(&crate::gateway::GatewayReadiness {
+            ready: false,
+            status: String::new(),
+            reason: String::new(),
+            transmission_enabled: false,
+            holder_nif: String::new(),
+        });
+
+        assert_eq!(reason.code, "gateway_not_ready_unspecified", "{reason:?}");
+        assert!(!reason.prose.contains("()"), "{reason:?}");
+    }
+
+    /// 🔴 **RED de verifactu#95.** hub#1575 coded the reasons that VARY and left the three
+    /// CONSTANT sentences behind, so the two runs a business sees most often — «Certificado cargado
+    /// correctamente.» and «Pasarela fiscal disponible: ERPlora presenta por ti.» — stayed Spanish
+    /// inside an English screen. «It went well» was the last untranslated verdict.
+    ///
+    /// This test used to assert the opposite (`cert_reason` null on success, hub#1575), for a
+    /// reason that no longer holds: the fear was the module composing «the test ran — <reason>» out
+    /// of a stale field, and its own catalogue forbids that — `diagnostic_ran` interpolates no
+    /// `{cert_message}`, pinned by the module's placeholder parity test. What the code buys instead
+    /// is the Settings box saying «the certificate loaded correctly» in the reader's language.
+    #[tokio::test]
+    async fn a_test_that_passes_says_so_with_a_code_verifactu95() {
+        struct OwnCertHost;
+        #[async_trait::async_trait]
+        impl NativeHost for OwnCertHost {
+            async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+                Ok(vec![json!({ "id": "cfg-1", "environment": "testing" })])
+            }
+            async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+                Ok(Some("own".to_owned()))
+            }
+            async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+                Ok(throwaway_identity())
+            }
+        }
+
+        let out = run_diagnostics(&diagnostics_input("hub-own"), &OwnCertHost)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(details["cert_ok"], json!(true), "{details}");
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("certificate_loaded"),
+            "a verdict the business reads has to be a code the module can translate: {details}"
+        );
+        // …and the Spanish stays beside it, the fallback a hub on an older module still paints.
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .is_some_and(|m| m.contains("Certificado cargado")),
+            "the prose is the fallback for a module that does not know the code yet: {details}"
+        );
+    }
+
+    /// 🔒 The second constant: the field THIS hub never filled. It already had its own verdict key
+    /// (hub#1531) but no reason code, so the Settings box — which paints `cert_message` when no
+    /// reason resolves — was still handing an English reader «Configura el NIF del obligado
+    /// tributario (emisor)…».
+    #[tokio::test]
+    async fn a_missing_issuer_nif_travels_as_a_code_verifactu95() {
+        let out = run_diagnostics(
+            &diagnostics_input("hub-cell-no-nif"),
+            &CellHostWithoutIssuerNif,
+        )
+        .await
+        .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("issuer_nif_missing"),
+            "{details}"
+        );
+    }
+
+    /// 🔒 And the third: a cell that IS ready. This is the run a healthy delegated hub gets every
+    /// time it presses the button, and the one arm of `run_diagnostics` the suite had never walked —
+    /// every cell test so far pointed at `.example`, which fails DNS by design, so the success path
+    /// was reachable only in production.
+    #[tokio::test]
+    async fn a_ready_cell_says_so_with_a_code_verifactu95() {
+        let cell = canned_ready_cell().await;
+        let out = run_diagnostics(&diagnostics_input("hub-cell-ready"), &ReadyCellHost(cell))
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["gateway"]["ok"],
+            json!(true),
+            "the canned cell has to be reachable, or this test proves nothing: {details}"
+        );
+        assert_eq!(details["cert_ok"], json!(true), "{details}");
+        assert_eq!(
+            details["cert_reason"]["code"],
+            json!("gateway_ready"),
+            "{details}"
+        );
+        assert!(
+            details["cert_message"]
+                .as_str()
+                .is_some_and(|m| m.contains("Pasarela fiscal disponible")),
+            "the prose is the fallback for a module that does not know the code yet: {details}"
+        );
+    }
+
+    /// A cell that answers `/readyz` with the contract body, over plain HTTP.
+    ///
+    /// Same trade as `gateway::tests::canned_cell`: the mTLS handshake belongs to the REAL cell and
+    /// to the PRE end-to-end, and pinning it here would buy nothing this file measures. What it
+    /// buys is a success arm that can be walked at all.
+    async fn canned_ready_cell() -> String {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let mut buffer = [0u8; 4096];
+                let _ = socket.read(&mut buffer).await;
+                let body = json!({
+                    "status": "ready",
+                    "reason": "",
+                    "conditions": { "transmission_enabled": true },
+                    "holder_nif": "B27593136",
+                })
+                .to_string();
+                let answer = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = socket.write_all(answer.as_bytes()).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+        format!("http://{address}")
+    }
+
+    /// [`CellHost`] pointed at a cell that actually answers.
+    struct ReadyCellHost(String);
+
+    #[async_trait::async_trait]
+    impl NativeHost for ReadyCellHost {
+        async fn read(&self, sql: &str, params: &Params) -> Result<Vec<Json>> {
+            CellHost.read(sql, params).await
+        }
+        async fn producer_facts(&self) -> Result<Option<Json>> {
+            CellHost.producer_facts().await
+        }
+        async fn machine_identity(
+            &self,
+            hub_id: &str,
+        ) -> Result<Option<erplora_runtime::gateway_identity::MachineIdentity>> {
+            CellHost.machine_identity(hub_id).await
+        }
+        async fn cloud_call(
+            &self,
+            request: erplora_runtime::cloud_call::CloudRequest,
+        ) -> Result<Option<erplora_runtime::cloud_call::CloudResponse>> {
+            let mut answer = CellHost
+                .cloud_call(request)
+                .await?
+                .expect("the cell host always answers the mint");
+            let mut body: Json = serde_json::from_str(&answer.body).expect("the mint answers JSON");
+            body["gateway_url"] = json!(self.0);
+            answer.body = body.to_string();
+            Ok(Some(answer))
+        }
+    }
+
+    /// 🔒 The other half of the map: a sample the engine cannot wrap while the producer facts ARE
+    /// present is this hub's own record, not a missing heartbeat — the two ask opposite things of
+    /// the reader. Without this positive, «always `producer_facts_missing`» survived the suite, and
+    /// a business would have been told to wait for a sync that fixes nothing.
+    #[test]
+    fn a_sample_the_engine_cannot_wrap_with_facts_present_is_its_own_code_hub1575() {
+        let config = crate::aeat::test_config_with_producer_facts();
+        // The diagnostic's own sample with the ONE thing `build_soap` refuses before the schema
+        // ever sees it (hub#324): a total nobody wrote.
+        let sample = json!({
+            "record_type": "alta",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+            "invoice_number": "PRUEBA-2026-09-05",
+            "invoice_date": "2026-09-05",
+            "invoice_type": "F2",
+            "description": "Factura de PRUEBA (diagnóstico VeriFactu)",
+            "tax_rate": 21,
+            "tax_breakdown": r#"{"21.00":{"base":10000,"tax":2100}}"#,
+            "base_amount": 10000,
+            "tax_amount": 2100,
+            "recipient_nif": "",
+            "recipient_name": "",
+            "record_hash": "F".repeat(64),
+            "is_first_record": 1,
+            "generation_timestamp": "2026-09-05T10:00:00+02:00",
+        });
+        let route = TransmitRoute::Direct {
+            identity: throwaway_identity(),
+            holder: None,
+        };
+
+        let reason = sample_envelope(&sample, &config, &route, "hub-1", "B12345678")
+            .expect_err("a record with no total cannot be wrapped");
+
+        assert_eq!(reason.code, "sample_envelope_invalid", "{reason:?}");
+        assert!(
+            reason.facts["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("total_amount")),
+            "the reason has to keep naming what to fix: {reason:?}"
+        );
+    }
+
+    // ── hub#1578: the AEAT box of the OWN road ───────────────────────────────────────────────
+    //
+    // hub#1575 and verifactu#95 coded the certificate verdict. On the own road that verdict is
+    // «loaded ✓» — the `.p12` really does load — and what stops the run lands one field lower, in
+    // `aeat`, as Spanish prose the module pastes straight onto the screen. So the box that says
+    // WHAT TO FIX was the one still speaking a language the reader did not choose.
+    //
+    // Same channel, same shape: `aeat` gains a `reason` beside its `error`, and `error` keeps the
+    // prose exactly as it was — the fallback for a hub whose module does not know the code yet.
+
+    /// A hub that files with its OWN certificate and has not filled in the obligado's tax ID.
+    /// The `.p12` loads, so the fault is a field of this hub, and it is reported in the `aeat` box.
+    struct OwnRoadHost(Json);
+
+    #[async_trait::async_trait]
+    impl NativeHost for OwnRoadHost {
+        async fn read(&self, _sql: &str, _params: &Params) -> Result<Vec<Json>> {
+            Ok(vec![self.0.clone()])
+        }
+        async fn certificate_signing_kind(&self, _hub_id: &str) -> Result<Option<String>> {
+            Ok(Some("own".to_owned()))
+        }
+        async fn certificate_identity(&self, _hub_id: &str) -> Result<reqwest::Identity> {
+            Ok(throwaway_identity())
+        }
+    }
+
+    /// 🔴 **RED de hub#1578.** With no obligado tax ID the own road answers «Configura el NIF del
+    /// obligado tributario…» inside `aeat.error`, and that is all it answers. An English hub read
+    /// it in Spanish, in red, in the only box on the card that names something to do.
+    ///
+    /// The code is the SAME one the delegated road already files for this (`issuer_nif_missing`):
+    /// for whoever reads it, it is the same field to fill, and the road it happened on does not
+    /// change the sentence.
+    #[tokio::test]
+    async fn a_missing_issuer_nif_travels_as_a_code_on_the_own_road_too_hub1578() {
+        let host = OwnRoadHost(json!({ "id": "cfg-1", "environment": "testing" }));
+
+        let out = run_diagnostics(&diagnostics_input("hub-own-no-nif"), &host)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["aeat"]["reason"]["code"],
+            json!("issuer_nif_missing"),
+            "the AEAT box has to say WHY as a code, not only as prose: {details}"
+        );
+        assert!(
+            details["aeat"]["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("NIF del obligado")),
+            "the prose stays as the fallback for a module that does not know the code: {details}"
+        );
+    }
+
+    /// 🔴 **RED de hub#1578, la otra mitad.** The tax ID is filled in and the sample still cannot
+    /// be wrapped — here because the control plane has never served this hub its producer facts.
+    /// The reason `sample_envelope` already computes (hub#1575) is the one the box must carry:
+    /// «wait for the next sync» and «fix your data» ask opposite things of the reader, and until
+    /// now both arrived as one blob of Spanish.
+    #[tokio::test]
+    async fn a_sample_the_own_road_cannot_wrap_travels_as_a_code_hub1578() {
+        let host = OwnRoadHost(json!({
+            "id": "cfg-1",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "issuer_name": "PELUQUERIA LA MODERNA SL",
+        }));
+
+        let out = run_diagnostics(&diagnostics_input("hub-own-no-facts"), &host)
+            .await
+            .expect("the diagnostic always answers, on either road");
+        let details = filed_details(&out);
+
+        assert_eq!(
+            details["cert_ok"],
+            json!(true),
+            "the certificate DOES load on this road: the fault is the record, not the .p12: {details}"
+        );
+        assert_eq!(
+            details["aeat"]["reason"]["code"],
+            json!("producer_facts_missing"),
+            "waiting for a heartbeat and fixing a form are different answers: {details}"
+        );
+        assert!(
+            details["aeat"]["reason"]["error"].is_string(),
+            "the facts the sentence needs travel with the code: {details}"
+        );
+        assert!(
+            details["aeat"]["error"].as_str().is_some_and(|e| !e.is_empty()),
+            "the prose stays as the fallback: {details}"
         );
     }
 }

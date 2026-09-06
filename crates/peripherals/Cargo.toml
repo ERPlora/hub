@@ -1,6 +1,7 @@
-# erplora-peripherals — lógica de hardware POS reutilizable (red-only, ESC/POS sobre TCP:9100).
-# Consumido por la app instalable (apps/tauri) — llamadas in-process, sin servidor local.
-# ARQUITECTURA.md §2.7. Esqueleto: tipos + firmas; la implementación real es fase siguiente.
+# erplora-peripherals — lógica de hardware POS reutilizable. Renderiza ESC/POS y lo entrega por el
+# transporte que nombre el printer_id: red (TCP:9100), SPP en Android y la cola RAW del SO por USB
+# en escritorio (ARQUITECTURA.md §2.7). Consumido por la app instalable (apps/tauri) — llamadas
+# in-process, sin servidor local. Implementado: el detalle por módulo, en src/lib.rs y README.md.
 [package]
 name = "erplora-peripherals"
 edition.workspace = true

@@ -11,33 +11,21 @@ import { execSync } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 
 import { stripModuleVersion } from './src/lib/module-url';
+import { outfitkitVersionStamp, resolveOutfitkitVersion } from './outfitkit-version.ts';
 
 // Versión de la app, horneada en build → la lee el footer del sidebar vía `__APP_VERSION__`.
 // Orden de prioridad: env APP_VERSION (CI) > git tag más reciente > package.json.
 // package.json es "0.0.0" a propósito (monorepo); la versión real viene de los tags git.
-/** Versión de OutfitKit REALMENTE instalada (hub#1024). Vacío si no se puede resolver. */
-const OUTFITKIT_VERSION = (() => {
-  try {
-    return JSON.parse(
-      readFileSync(
-        fileURLToPath(new URL('./node_modules/@erplora/outfitkit/package.json', import.meta.url)),
-        'utf8',
-      ),
-    ).version as string;
-  } catch {
-    // pnpm deja el paquete en la raíz del workspace: segundo intento antes de rendirse.
-    try {
-      return JSON.parse(
-        readFileSync(
-          fileURLToPath(new URL('../../node_modules/@erplora/outfitkit/package.json', import.meta.url)),
-          'utf8',
-        ),
-      ).version as string;
-    } catch {
-      return '';
-    }
-  }
-})();
+/**
+ * Versión de OutfitKit REALMENTE instalada (hub#1024). Vacío si no se puede resolver.
+ *
+ * hub#1588 — la resolución vive en `outfitkit-version.ts` porque este número tiene ahora DOS
+ * consumidores: el `define` de abajo (lo que el shell reporta en runtime) y el sello que el build
+ * escribe en `dist/outfitkit-version.json` (lo que la imagen dice llevar). Una sola fuente, para
+ * que no puedan decir cosas distintas.
+ */
+const APP_DIR = fileURLToPath(new URL('.', import.meta.url));
+const OUTFITKIT_VERSION = resolveOutfitkitVersion(APP_DIR);
 
 const APP_VERSION = (() => {
   // 1. Env var inyectada por CI (build-hub.yml en tags v*).
@@ -151,6 +139,9 @@ export default defineConfig({
     // El shell los consume vía lib/icons.ts → <HubIcon>. Ver lib/icons.ts y components/HubIcon.vue.
     Icons({ compiler: 'raw' }),
     tailwindcss(),
+    // hub#1588 — el sello de versiones en `dist/outfitkit-version.json`: lo que ESTE build metió
+    // en la imagen, para que no haya que deducirlo de la fecha de construcción.
+    outfitkitVersionStamp({ outfitkit: OUTFITKIT_VERSION, hub: APP_VERSION }),
   ],
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
@@ -214,6 +205,7 @@ export default defineConfig({
       'src/**/*.test.ts',
       'sync-modules.test.mjs',
       'vite.config.test.ts',
+      'outfitkit-version.test.ts',
       'tests/playwright.config.test.ts',
       'tests/bench-ports.test.ts',
     ],

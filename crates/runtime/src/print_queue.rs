@@ -61,8 +61,10 @@
 //! parameter is not even a word any more. Same shape as the [`DOCUMENT_TYPES`] guard below,
 //! applied to the field that was missing it.
 //!
-//! This module is the queue only. Registering a print host for a role (hub#342), draining it over
-//! the WS (hub#343) and the `sdk.print` producer path (hub#344) are separate work.
+//! This module is the queue only. The rest of the chain lives elsewhere and is all as-built:
+//! registering a print host for a role in [`crate::print_hosts`] (hub#342), draining it over the WS
+//! in [`crate::print_drain`] + `crates/server/src/print_ws.rs` (hub#343), and the `sdk.print`
+//! producer in the shell's `apps/web/src/lib/print.ts` (hub#344).
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::json;
 

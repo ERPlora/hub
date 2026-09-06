@@ -108,6 +108,16 @@ on:
       - 'scripts/ci/no-short-circuit-pipes.sh'
       - '**/*.sh'
       - '.githooks/pre-push'
+      # La prosa de la cadena de impresión contra su CÓDIGO (hub#1593). El guardia mismo ya entra
+      # por el glob `scripts/tests/*.test.sh`; estas rutas son sus SUJETOS — lo que tiene que poder
+      # ponerlo en rojo. Sin ellas, la PR que reintroduce «Falta que `sdk.print` encole» en
+      # `ARQUITECTURA.md`, o la que borra el productor de `main.ts`, no ejecuta ningún caso: es
+      # exactamente la PR que dejó la doc mintiendo un mes.
+      - 'ARQUITECTURA.md'
+      - 'apps/web/src/main.ts'
+      - 'apps/web/src/lib/print.ts'
+      - 'crates/peripherals/**'
+      - 'crates/runtime/src/print_*.rs'
   workflow_dispatch:
 
 permissions:
@@ -341,3 +351,17 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/no-short-circuit-pipes.test.sh
+
+      # ── La prosa de la cadena de impresión concuerda con su código (hub#1593) ──────────
+      # ADR-0196 §6 cerró 4/4 el 2026-08-08 y `ARQUITECTURA.md` siguió casi un mes diciendo
+      # «Falta que `sdk.print` encole (hub#344)», con la misma frase copiada en tres comentarios
+      # de código; `peripherals.md` seguía dando el crate por compartido entre DOS consumidores.
+      # Quien lo leía concluía que la cola no existe: o la reconstruía, o la descartaba.
+      # Las dos afirmaciones se deciden desde este repo —el productor, leyendo `main.ts`; los
+      # consumidores, leyendo los `Cargo.toml` con las dev-dependencies fuera—, así que la prosa
+      # se ancla al código en vez de a la buena fe. Corre en los DOS sentidos: si mañana alguien
+      # borra el productor y deja la doc diciendo que funciona, también es rojo.
+      - name: "Contrato: la doc de la cadena de impresión concuerda con el código (hub#1593)"
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/print-chain-doc-truth.test.sh
