@@ -2604,6 +2604,124 @@
     {
       "item": [
         {
+          "name": "GET /api/hub/whatsapp/config",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "config"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/config"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/whatsapp/connect",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "connect"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/connect"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/hub/whatsapp/disconnect/:phone_number_id",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "disconnect",
+                "{{phone_number_id}}"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/disconnect/{{phone_number_id}}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/hub/whatsapp/numbers",
+          "request": {
+            "description": "auth: admin",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "whatsapp",
+                "numbers"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/whatsapp/numbers"
+            }
+          },
+          "response": []
+        }
+      ],
+      "name": "hub · whatsapp"
+    },
+    {
+      "item": [
+        {
           "name": "API keys of the hub (without secrets)",
           "request": {
             "description": "auth: admin",

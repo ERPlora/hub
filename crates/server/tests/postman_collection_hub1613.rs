@@ -367,6 +367,13 @@ fn requests_of(collection: &Value) -> BTreeSet<(String, String)> {
 }
 
 fn committed() -> Value {
+    // In UPDATE mode the file is being rewritten by `hub1613_postman_collection_matches…` in a
+    // sibling thread of this same run; reading it here races that write and fails on the stale
+    // copy. What the other tests want to check in that mode is the fresh generation — the next
+    // ordinary run is the one that verifies the file.
+    if std::env::var(UPDATE_ENV).as_deref() == Ok("1") {
+        return generate();
+    }
     let text = std::fs::read_to_string(repo(COLLECTION)).unwrap_or_else(|e| {
         panic!(
             "`{COLLECTION}` no se puede leer ({e}). Va COMMITEADO. Genéralo con:\n  \
