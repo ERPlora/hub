@@ -78,15 +78,16 @@ invoice/tests/from_sale.hub.test.py
 # ← services_package_redeem_e2e.rs (hub#1372) — el caso que destapó hub#1381
 services/tests/package_redeem.hub.test.py
 
+# ← appointments_availability_e2e.rs (appointments#117): las horas de apertura las configura
+#   `schedules` y nadie más, así que el e2e ya no podía sembrarlas con los commands de Citas.
+appointments/tests/availability.hub.test.py
+appointments/tests/create_overlap.hub.test.py
+
 # ── Baterías ATERRIZADAS cuyo e2e del hub SIGUE EN PIE ──────────────────────────────────────
 # La mitad aditiva ya está (las PRs de módulo son `+N/-0`), pero su línea sigue en la sección
 # «Pendientes de hub#1264» de `kernel-e2e-targets.txt`, así que hoy la cobertura se ejerce en el
 # kernel. Cuando el slice borre ese e2e, estas líneas pasan al bloque de arriba — y a partir de
 # ese momento dependen del corredor de hub#1381.
-
-# appointments_availability_e2e sigue en el hub (appointments#96)
-appointments/tests/availability.hub.test.py
-appointments/tests/create_overlap.hub.test.py
 
 # staff_commissions_e2e sigue en el hub (staff#49)
 staff/tests/commissions.hub.test.py
