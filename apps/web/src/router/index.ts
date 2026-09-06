@@ -200,6 +200,14 @@ router.onError((error, to, from) => {
     // code, so retrying it automatically is a boot loop with a shop waiting behind it; the only
     // retry offered is the button, which a person presses knowing what they are doing.
     if (isInitial) showViewLoadFailure({ kind: 'code' });
+    // hub#1590 — and with the app ALREADY open the very same bug was mute: the router aborts, the
+    // screen simply does not change, and the console is not where the person at the till is
+    // looking. A tap that does nothing reads as a dead button, so they tap it again.
+    //
+    // A toast and not the wall of text, because here nothing is blank: covering a live till would
+    // lose sight of the order being taken. Its OWN copy, never `failedToast` — that one says the
+    // connection dropped, which here is a lie that sends them to reboot a working router.
+    else void toastError(i18n.global.t('viewLoad.brokenToast'));
   }
   // A navigation that fails without a trace is a failure nobody sees: all four rungs report it.
   // `reportClientError` posts with `keepalive`, so it survives the reload of the first rung.
