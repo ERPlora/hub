@@ -4,14 +4,18 @@
   (`billing.tiers`) y el estado de suscripción actual (cloudModuleSubscription, JWT del usuario +
   X-Hub-Id).
 
-  El Hub NO vende, y desde hub#479 tampoco LLEVA a vender: los CTAs comprar/mejorar/cancelar abrían
-  un deep-link a la página del módulo en el SaaS —donde vive el checkout— y eso es exactamente el
-  steering que rechazan Google Play y Microsoft Store. Ya no existen. El panel MUESTRA: el estado de
-  la suscripción y qué tiers declara el manifest. Contratar o cambiar de tier se hace en erplora.com,
-  que es el único sitio donde ERPlora vende.
+  El Hub NO vende: los CTAs «comprar»/«mejorar» que abrían la FICHA DEL MARKETPLACE se fueron con
+  hub#479 y no vuelven — esa es la superficie promocional, y enlazarla desde dentro de la app es el
+  steering que rechazan Google Play y Microsoft Store.
 
-  El botón "comprobar" se queda, y ahora es el que importa: quien contrate desde el navegador vuelve
-  aquí y refresca el estado (además del recheck-on-focus, que sigue).
+  Lo que sí hay desde hub#1608 es «Gestionar plan», que aterriza en la CUENTA del cliente
+  (`/dashboard/hubs/<id>/modules/<slug>/plan/`, ERPlora/saas#1901). Es la misma línea que ya cruzó
+  el menú lateral con el plan del hub: gestión de lo que el cliente tiene, etiqueta neutra, y
+  oculto donde el revisor de Play lo leería como steering. Contratar y pagar sigue ocurriendo en
+  erplora.com, en el navegador.
+
+  El botón "comprobar" se queda: quien contrate desde el navegador vuelve aquí y refresca el estado
+  (además del recheck-on-focus, que sigue), y es el único control donde el enlace no se ofrece.
 
   El Cloud NO expone el slug del tier actual (ni module-subscription ni check_ownership lo traen),
   así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global.
@@ -54,16 +58,34 @@
         </p>
         <p v-else class="status-line opacity-70">{{ statusHint }}</p>
 
-        <!-- Dónde se gestiona. Frase, no enlace: la página del módulo en el SaaS tiene checkout y
-             llevar ahí desde dentro de la app es steering (hub#479). El enlace a la página de
-             CUENTA —que sí valdría— espera a que exista en el SaaS: ERPlora/saas#1901 y hub#1608. -->
+        <!-- Dónde se gestiona. La frase se queda aunque ahora haya botón: en Google Play el botón
+             no se ofrece (hub#756) y sin esta línea ahí no quedaría dicho dónde se hace. -->
         <p class="status-line opacity-70">{{ t('modulePlan.managedInAccount') }}</p>
       </template>
-      <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). -->
+      <!-- Gestión del plan, en la CUENTA del cliente (hub#1608). No es la ficha del marketplace
+           —esa es la superficie promocional que el guardia anti-steering prohíbe nombrar
+           (hub#479)—, sino la página que abrió ERPlora/saas#1901, con el hub y el módulo en la
+           ruta: por eso aquí no hay la ambigüedad del enlace del menú lateral, que no dice si el
+           plan es el del hub o el del módulo. Se oculta donde el revisor de Play lo leería como
+           steering, con el mismo gate que el menú (hub#756). -->
+      <ion-button
+        v-if="canOfferPlanManagement"
+        slot="actions"
+        size="small"
+        data-testid="module-manage-plan"
+        @click="onManagePlan"
+      >
+        <HubIcon name="open-outline" slot="start" />
+        {{ t('modulePlan.managePlan') }}
+      </ion-button>
+      <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). Se queda
+           SIEMPRE, también donde el enlace no se ofrece: quien contrató en el navegador necesita
+           poder refrescar. -->
       <ion-button
         slot="actions"
         size="small"
         fill="outline"
+        data-testid="module-check-purchase"
         :disabled="loadingStatus"
         @click="onCheckPurchase"
       >
@@ -112,7 +134,12 @@ import {
 import type { ModuleBilling, BillingTierDef } from '@erplora/module-types';
 import { formatAmount } from '../lib/money';
 import { formatDate } from '../lib/format-datetime';
+import { getDeviceContext } from '../lib/device';
+import { openExternal } from '../lib/open-external';
+import { saasDoor } from '../lib/saas-door';
+import { planUpgradeIsOfferable } from '../lib/upgrade-plan-link';
 import { loadModuleLocale } from '../lib/module-loader';
+import { modulePlanPath, modulePlanUrl } from '../lib/module-plan-link';
 import { moduleBase } from '../lib/module-url';
 import { quotaLabel as tierQuotaLabel, type ModuleBillingLocale } from '../lib/module-quota';
 
@@ -248,6 +275,21 @@ async function refreshLocale(): Promise<void> {
   billingLocale.value = file?.billing;
 }
 
+// ¿Se le ofrece el enlace a la copia que tiene delante el usuario? Mismo corte que el menú
+// lateral (`planUpgradeIsOfferable`, hub#756): manda la DISTRIBUCIÓN, no el sistema operativo, y
+// sin señal se ofrece. El razonamiento entero vive en `upgrade-plan-link.ts`.
+const canOfferPlanManagement = ref(true);
+
+/** Abre la gestión del plan de este módulo en la cuenta del cliente. */
+async function onManagePlan(): Promise<void> {
+  try {
+    const path = modulePlanPath(props.moduleId);
+    await openExternal(await saasDoor(path, modulePlanUrl(props.moduleId), 'module-plan'));
+  } catch {
+    notify(t('modulePlan.managePlanError'), 'danger');
+  }
+}
+
 /** Botón "ya lo he contratado — comprobar": re-consulta y avisa si el plan ya está activo. */
 async function onCheckPurchase(): Promise<void> {
   await loadStatus();
@@ -262,9 +304,11 @@ function onFocusRecheck(): void {
 
 watch(locale, () => void refreshLocale());
 
-onMounted(() => {
+onMounted(async () => {
   void loadStatus();
   void refreshLocale();
+  const context = await getDeviceContext();
+  canOfferPlanManagement.value = planUpgradeIsOfferable(context?.distribution);
   window.addEventListener('focus', onFocusRecheck);
   document.addEventListener('visibilitychange', onFocusRecheck);
 });
