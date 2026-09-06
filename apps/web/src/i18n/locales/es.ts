@@ -82,6 +82,13 @@ export default {
     blockedBody:
       'Se ha cortado la conexión mientras se cargaba esta pantalla. Revisa la conexión y vuelve a intentarlo.',
     blockedAction: 'Reintentar',
+    // hub#1524 — el otro motivo de la misma pantalla en blanco: ha reventado el código de la
+    // pantalla. Con sus propias palabras a propósito: decirle a alguien que se ha cortado la
+    // conexión cuando no es verdad lo manda a reiniciar un router que funciona.
+    brokenTitle: 'No se ha podido abrir esta pantalla',
+    brokenBody:
+      'Algo ha fallado dentro de ERPlora al abrir esta pantalla. Vuelve a intentarlo y, si sigue pasando, cierra ERPlora y ábrelo de nuevo.',
+    brokenAction: 'Reintentar',
   },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre

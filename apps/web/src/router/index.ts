@@ -163,6 +163,10 @@ router.beforeEach(authGate);
  *
  * The ladder, and why retrying the `import()` in place cannot work, live in
  * `./view-load-recovery`; the last-rung message in `./view-load-failure-notice`.
+ *
+ * hub#1524 — the same white page has a second cause: the screen's own code throwing. That one gets
+ * no ladder (a reload lands on the identical code) but it does get the message, because a person
+ * staring at nothing is the defect, not the reason behind it.
  */
 router.onError((error, to, from) => {
   // An empty `matched` is START_LOCATION: the document has not painted any route yet, which is the
@@ -185,7 +189,18 @@ router.onError((error, to, from) => {
   if (outcome === 'notify') void toastError(i18n.global.t('viewLoad.failedToast'));
   // Registering ANY error listener switches off vue-router's own `console.error`. Anything we did
   // not recognise as a missing file is a bug in the view itself and has to stay exactly as loud.
-  if (outcome === 'ignored') console.error(error);
+  if (outcome === 'ignored') {
+    console.error(error);
+    // hub#1524 — and on the FIRST navigation that bug leaves the very same white page hub#1518
+    // was about: nothing is mounted, so the console is the only place it was ever said, and the
+    // console is not where the person at the till is looking. Same wall of text, its OWN words
+    // (`kind: 'code'`): the connection is fine and blaming it would send them to reboot a router.
+    //
+    // No recovery rung here on purpose. A reload of a code failure comes back to the identical
+    // code, so retrying it automatically is a boot loop with a shop waiting behind it; the only
+    // retry offered is the button, which a person presses knowing what they are doing.
+    if (isInitial) showViewLoadFailure({ kind: 'code' });
+  }
   // A navigation that fails without a trace is a failure nobody sees: all four rungs report it.
   // `reportClientError` posts with `keepalive`, so it survives the reload of the first rung.
   reportClientError({
