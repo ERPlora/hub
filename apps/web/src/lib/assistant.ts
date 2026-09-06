@@ -212,7 +212,13 @@ interface FunctionCall {
   name: string;
   call_id: string;
   arguments: string; // JSON string of the arguments
-  kind?: string; // 'query' (read, auto) | 'command' (write, needs confirm), tagged by the runtime
+  kind?: string; // 'query' | 'command' — which dispatcher door the call goes through
+  /** Whether running this tool can change what the hub holds (hub#1594), resolved by the runtime
+   *  from the catalogue. `kind` says which door; THIS says whether the user confirms first — an
+   *  availability answer is declared as a `command` only because that is the one shape that can
+   *  cross another module's data, and asking a question is not a change. Only a literal `true`
+   *  skips the card: anything else (absent, a string, a number) is treated as a write. */
+  read_only?: unknown;
   /** How dangerous the module says this operation is (hub#1042). */
   risk?: string;
   /** Which arguments are money, resolved by the runtime from the command's schema (hub#1040).
@@ -382,12 +388,29 @@ async function streamRound(
         text += t;
         cb.onToken(t);
       } else if (evt.type === 'function_call') {
-        const fc = evt as { name?: string; call_id?: string; arguments?: string; kind?: string };
+        // Everything the runtime resolved about this tool travels WITH the call — the drawer has
+        // no catalogue of its own to look it up in. Dropping any of it here silently disarms the
+        // card: `risk` (hub#1042) and `money_fields` (hub#1040) were being parsed away, so the
+        // card had been rendering neither the destructive warning nor «15,00 €».
+        const fc = evt as {
+          name?: string;
+          call_id?: string;
+          arguments?: string;
+          kind?: string;
+          read_only?: unknown;
+          risk?: string;
+          money_fields?: unknown;
+        };
         functionCalls.push({
           name: fc.name ?? '',
           call_id: fc.call_id ?? '',
           arguments: typeof fc.arguments === 'string' ? fc.arguments : '{}',
           kind: typeof fc.kind === 'string' ? fc.kind : undefined,
+          read_only: fc.read_only,
+          risk: typeof fc.risk === 'string' ? fc.risk : undefined,
+          money_fields: Array.isArray(fc.money_fields)
+            ? fc.money_fields.filter((f): f is string => typeof f === 'string')
+            : undefined,
         });
       } else if (evt.type === 'usage') {
         // Contadores POST-turno (saas#1540, hub#1183). Nunca texto: es chrome del plan, no algo
@@ -447,11 +470,19 @@ async function streamRound(
 
 /** Ejecuta una tool call con la sesión del usuario y la envuelve como mensaje `tool`.
  *
- *  - LECTURA (`query`, o kind ausente): se corre directo (sin efectos), con el mismo gate
- *    de permisos que la UI (`getClient().query`).
- *  - ESCRITURA (`command`): pide confirmación con `onConfirm`; solo tras el `true` se
- *    ejecuta (`getClient().command`). Sin handler o si se cancela → NO se muta y se devuelve
- *    una nota `cancelled` para que el modelo se lo diga al usuario (seguro por defecto).
+ *  Dos decisiones INDEPENDIENTES, y confundirlas es lo que rompió hub#1594:
+ *
+ *  - **Por qué puerta va** la manda `kind`: `query` → `getClient().query`, `command` →
+ *    `getClient().command`. Es el dispatcher del runtime; una operación no puede entrar por la
+ *    otra puerta.
+ *  - **Si el usuario confirma antes** lo manda `read_only`: una ESCRITURA pide confirmación con
+ *    `onConfirm` y solo tras el `true` se ejecuta. Sin handler o si se cancela → NO se muta y se
+ *    devuelve una nota `cancelled` para que el modelo se lo diga al usuario (seguro por defecto).
+ *    Una LECTURA se corre directa, sea query o command: preguntar «¿qué huecos me quedan?» no es
+ *    un cambio, y la tarjeta se guarda para lo que sí lo es.
+ *
+ *  El gate de PERMISOS no vive aquí: es el `permission` de la operación, que el runtime revalida
+ *  server-side en cada llamada. La tarjeta evita la sorpresa, no la escalada.
  *
  *  Cualquier fallo degrada a una nota de error (nunca lanza): el turno sigue. */
 async function runToolCall(
@@ -459,7 +490,13 @@ async function runToolCall(
   cb: StreamCallbacks,
 ): Promise<{ message: WireMessage; executed: ExecutedTool }> {
   const params = safeParseArgs(fc.arguments);
-  const kind: ExecutedTool['kind'] = fc.kind === 'command' ? 'command' : 'query';
+  // Only a literal `true` is a read: an absent or malformed flag must never disarm the card.
+  const readOnly = fc.read_only === true;
+  const writes = fc.kind === 'command' && !readOnly;
+  // The receipt says READ or WRITE — not which door was used. The turn audit (hub#1038) reads it
+  // to decide whether the answer is allowed to claim a change happened, so a command that only
+  // answered must not count as one.
+  const kind: ExecutedTool['kind'] = writes ? 'command' : 'query';
   // The receipt the audit reads: a write only counts as done when the dispatcher answered
   // without error AND the user approved the card. Cancelled and failed are both "no effect".
   const receipt = (status: ExecutedTool['status'], result: unknown): ExecutedTool => ({
@@ -474,17 +511,19 @@ async function runToolCall(
   });
 
   if (fc.kind === 'command') {
-    const approved = cb.onConfirm
-      ? await cb.onConfirm({
-          name: fc.name,
-          arguments: fc.arguments,
-          kind: 'command',
-          risk: fc.risk,
-          moneyFields: fc.money_fields,
-        })
-      : false;
-    if (!approved) {
-      return done('cancelled', { status: 'cancelled', message: 'Action was not confirmed.' });
+    if (writes) {
+      const approved = cb.onConfirm
+        ? await cb.onConfirm({
+            name: fc.name,
+            arguments: fc.arguments,
+            kind: 'command',
+            risk: fc.risk,
+            moneyFields: fc.money_fields,
+          })
+        : false;
+      if (!approved) {
+        return done('cancelled', { status: 'cancelled', message: 'Action was not confirmed.' });
+      }
     }
     try {
       // Host tool mutante (hub#631): instalar va por el MISMO endpoint que el botón de Apps
