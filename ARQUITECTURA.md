@@ -132,12 +132,33 @@ productos ni una matriz de ejes `single`/`cloud` (framing previo retirado por
   vía `invoke` in-process. Si no lo necesita, imprime por PDF/email o impresora **ePOS-HTTP**
   (alcanzable por navegador).
 
-**Transportes de impresora** — ✅ **red (TCP/IP ESC/POS, puerto 9100) en todas las plataformas**;
-en **Android vuelve además el Bluetooth SPP** (ADR-0204, dentro de
-`crates/tauri-plugin-erplora-android`, pendiente hub#388). USB se sigue descartando. La **cola de
-impresión vive EN EL HUB** (ADR-0196 §6): el dispositivo con la app instalable la drena por el WS
-del runtime. En escritorio, el autostart de la app es un ajuste **OFF por defecto** (ADR-0204,
-pendiente hub#389).
+**Transportes de impresora** — **tres**. El renderizado ESC/POS es el mismo para los tres: lo
+único que cambia es por dónde salen los bytes, y quién lo decide es el `printer_id`
+(`crates/peripherals/src/discovery.rs`, `parse_print_target`):
+
+| `printer_id` | Transporte | Dónde |
+|---|---|---|
+| `network:{ip}:{port}` | ESC/POS por TCP al **9100** | todas las plataformas; la única vía con cola y reintentos propios del crate |
+| `bluetooth:{mac}` | **Bluetooth Classic SPP** por el plugin Kotlin `crates/tauri-plugin-erplora-android` (ADR-0204, hub#388) | **solo Android** |
+| `usb:{queue}` | la **cola RAW del sistema operativo** — `lp -d <cola> -o raw`, filtros fuera (hub#1083) | **solo escritorio** (macOS y Linux, vía CUPS) |
+
+El USB dejó de quedar fuera porque **el driver no es nuestro**: lo pone el fabricante (Star,
+Epson), el SO ya es dueño del cable y ESC/POS ya es el idioma que generamos. La razón que lo
+mantenía fuera —«un driver por SO no escala»— sigue siendo cierta y por eso el transporte genérico
+es **la cola, no una librería USB**. Esa cola no se usa a ciegas: se le pregunta el estado **antes**
+de enviar (`lpoptions -p`, atributos IPP —nunca la prosa de `lpstat -p`, que el SO traduce—,
+hub#1541) y se comprueba **después** que el trabajo salió de ella de verdad, cancelando el que se
+quedó retenido (hub#1564). Sin esas dos comprobaciones, una térmica sin papel daba el tique por
+impreso y lo escupía horas más tarde, con un número que la caja ya había dado por fallido.
+
+**Sigue fuera**: **Windows** (mismo diseño contra su spooler, pero sin máquina real donde
+verificarlo — hub#1269), el **USB en Android** (exigiría Kotlin, permiso por intent y cables OTG;
+ahí la impresora barata ya la cubre el SPP) y las vías `libusb`/WebUSB/OPOS, que reintroducen el
+driver por SO. El navegador, sin la app instalable, no abre ninguno de los tres (§2.7.1).
+
+La **cola de impresión vive EN EL HUB** (ADR-0196 §6): el dispositivo con la app instalable la
+drena por el WS del runtime. En escritorio, el autostart de la app es un ajuste **OFF por
+defecto** (ADR-0204, hub#389).
 
 **Qué se conserva** (en el crate **`crates/peripherals`**, consumido **in-process** por la app
 Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-0196 §6):
@@ -564,10 +585,11 @@ local.
 | Exports PDF/Excel | **HTTP** |
 | SaaS (marketplace, billing, embeddings/LLM) | **HTTP REST** (user-JWT + `X-Hub-Id`) |
 
-> **Canal de hardware (modelo decidido, [ADR-0050](../architecture/00-overview/decision-log.md)):**
-> el hardware lo aporta el **Bridge standalone** (red-only), alcanzado por `http://localhost` /
-> `ws://localhost` desde la web shell (§2.7). El navegador no abre TCP crudo (puerto 9100), USB ni
-> Bluetooth: por eso imprimir requiere el Bridge o una impresora **ePOS-HTTP**.
+> **Canal de hardware ([ADR-0196](../architecture/00-overview/decision-log.md), que sustituye al
+> modelo de ADR-0050):** lo aporta la **app instalable** `com.erplora.app` por `invoke`
+> in-process; el Bridge standalone se retiró (§2.7.1). El navegador no abre TCP crudo (puerto
+> 9100), USB ni Bluetooth: por eso imprimir desde una pestaña sin la app requiere una impresora
+> **ePOS-HTTP**.
 
 **Escala**: un hub tiene **1–5 usuarios (máx ~30)**, con tolerancia a crecer. A esa escala
 el rendimiento **no decide**; deciden resiliencia y simplicidad:
@@ -677,7 +699,7 @@ rechaza un tag no semver, ya publicado, no monótono o una rc de una versión ya
 | **Entrega/fiabilidad de eventos** | ✅ **Decidido (2026-06-09)**: **transactional outbox** — escritura atómica en `_event_outbox`, **relay asíncrono** at-least-once con backoff + dead-letter, idempotencia vía `_event_delivery` (§4.1). Sustituye el dispatch inline. **Implementado + verificado** (`crates/runtime/src/outbox.rs` + relay en server). |
 | **Documentos de venta / POS** | ✅ **Decidido (2026-06-09)**: tiquet/factura = **FORMATO** de render (`ok-receipt` 80mm / `ok-invoice` A4 en OutfitKit), no módulo; `sales` = libro mayor; pantallas POS **seleccionables** por el negocio; impresión térmica por bridge ESC/POS (§15). |
 | **Red saliente de módulos** | ✅ **Decidido (Opción A)**: `http.fetch` mediado (allowlist + creds inyectadas + auditoría §5.5) para terceros; **B (nativo)** para fiscal. |
-| **Hardware / Bridge** | ✅ **Decidido**: el `bridge/` **no** se elimina → componente de hardware **standalone (red-only)**, alcanzado por localhost HTTP/WS desde la web shell, §2.7. ✅ **Transporte: solo RED/LAN** (USB/Bluetooth **descartados** por drivers/mantenimiento). Abierto: multi-dispositivo (primary↔satellite). |
+| **Hardware / periféricos** | ✅ **Decidido (ADR-0196, sustituye a ADR-0050)**: el `bridge/` standalone **se retiró** (hub#340) → el hardware lo aporta la **app instalable** por `invoke` in-process, §2.7.1. ✅ **Tres transportes** (§2.7): red (TCP 9100) en todas las plataformas, **SPP en Android** (ADR-0204, hub#388) y la **cola RAW del SO** por USB en escritorio (hub#1083). Fuera: Windows (hub#1269), USB en Android, `libusb`/WebUSB. Abierto: multi-dispositivo (primary↔satellite). |
 | **Modelo de módulos** | ✅ **Decidido**: híbrido (declarativo + WASM + SDK). |
 | **Offline** | ✅ **Decidido (ADR-0154): un solo Hub, Cloud/Postgres, online-only.** Se retiró el producto **Hub Local** (SQLite, offline) — ya no hay dos productos ni motor de sync (ADR-0040 «sin sync» sigue en pie). Los backups son responsabilidad del Cloud (pgBackRest/PITR), no del Hub. |
 | **Login de usuario** | ✅ **Decidido**: 1er login email+password online → dispositivo de confianza → PIN (offline a futuro); usuarios cloud y solo-locales (§2.9). |
