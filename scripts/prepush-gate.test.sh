@@ -2502,6 +2502,46 @@ code=$(run_hook "$repo" "refs/heads/x $sha refs/heads/x $ZERO" \
     && ok "hub#1534: el arreglo con here-string pasa el gate" \
     || bad "hub#1534: el arreglo con here-string pasa el gate" "exit=$code out=$(cat "$repo/.out" 2>/dev/null)"
 
+# ── 55. hub#1602 — canonical installed copy → the warning must not DOWNGRADE ──
+#    Same state as 46 (installed copy IS the integration ref's blob, checkout is
+#    behind), but this pins the MESSAGE instead of the file. `install-hooks.sh`
+#    copies `$REPO_ROOT/.githooks/pre-push` — the WORKING TREE — into the shared
+#    `core.hooksPath`, so following that advice from a stale checkout installs the
+#    OLD gate for every worktree on the machine. And a stale checkout is the state
+#    that fires this warning most often: it fired on 06/09 during the release, on a
+#    machine whose installed hook was byte-identical to origin/develop.
+#    Warning: right. Remedy: backwards.
+repo=$(make_cargo_repo)
+git -C "$repo" config --bool hooks.hubPrepushGate true
+mkdir -p "$repo/.githooks"
+printf '%s\n' '#!/usr/bin/env bash' '# ancient gate: no self-heal here' 'exit 0' > "$repo/.githooks/pre-push"
+chmod +x "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "vendor the OLD hook"
+old_base=$(git -C "$repo" rev-parse HEAD)
+cp "$HOOK" "$repo/.githooks/pre-push"
+git -C "$repo" add -A && git -C "$repo" commit -qm "upgrade the gate"
+git -C "$repo" update-ref refs/remotes/origin/develop HEAD
+git -C "$repo" checkout -q "$old_base"
+git -C "$repo" checkout -qb feature
+sha=$(touch_and_commit "$repo" crates/c/src/lib.rs)
+mkdir -p "$repo/installed"
+cp "$HOOK" "$repo/installed/pre-push"
+chmod +x "$repo/installed/pre-push"
+( cd "$repo" && printf '%s\n' "refs/heads/feature $sha refs/heads/feature $ZERO" | env \
+    HUB_GATE_WITH_MODULES=0 HUB_GATE_STATE_DIR="$repo/.state" HUB_GATE_STATUS_CMD="true" \
+    HUB_GATE_TEST_CMD="true" \
+    bash "$repo/installed/pre-push" ) >"$repo/.out" 2>&1
+code=$?
+out=$(cat "$repo/.out" 2>/dev/null)
+errs=""
+[ "$code" = 0 ]                          || errs="$errs exit=$code(want 0)"
+grep -qi 'out of sync' <<<"$out"         || errs="$errs no-drift-warning"
+grep -qi 'canonical' <<<"$out"           || errs="$errs does-not-say-the-installed-copy-is-canonical"
+grep -q 'install-hooks.sh' <<<"$out"     && errs="$errs sends-you-to-downgrade-the-machine-wide-gate"
+[ -z "$errs" ] \
+    && ok "drift: a canonical installed copy is not sent to resync from a stale checkout" \
+    || bad "drift: a canonical installed copy is not sent to resync from a stale checkout" "$errs out=$(tr '\n' ' ' <<<"$out" | tail -c 300)"
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
