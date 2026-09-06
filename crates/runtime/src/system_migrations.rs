@@ -658,8 +658,8 @@ ALTER TABLE hub_trusted_device ADD CONSTRAINT hub_trusted_device_pkey \
     // formato viejo no se puede imprimir: dejarlo ahí lo haría reclamar por un host que no tiene con
     // qué renderizarlo, quemar sus cinco entregas y morir con un error que no explica nada. Aquí
     // muere una vez, con la frase que dice qué hacer (volver a imprimirlo desde la venta). En la
-    // práctica alcanza a cero filas —hoy ningún productor encola de verdad, `sdk.print` sigue siendo
-    // hub#344—, y por eso mismo es barato hacerlo bien.
+    // práctica alcanzó a cero filas —cuando se escribió esto ningún productor encolaba de verdad:
+    // `sdk.print` era todavía hub#344, cerrada después—, y por eso mismo fue barato hacerlo bien.
     //
     // ⚠️ **Re-ejecutable** (regla de hub#342/#483): `ADD COLUMN IF NOT EXISTS`, `DROP COLUMN IF
     // EXISTS` y un `UPDATE` acotado a `document_type = ''` — que solo pueden cumplir las filas
