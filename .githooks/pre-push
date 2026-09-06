@@ -227,13 +227,44 @@ hook_drift_check() {
     [ "$self_abs" = "$versioned_abs" ] && return 0
     if ! cmp -s "$SELF" "$versioned" 2>/dev/null; then
         versioned_id="$(git hash-object "$versioned" 2>/dev/null || true)"
+        # Is the copy that RUNS already the integration branch's? (hub#1602)
+        #
+        # `install-hooks.sh` copies `$REPO_ROOT/.githooks/pre-push` — the WORKING TREE — into
+        # `core.hooksPath`, which every worktree on the machine shares. So recommending it from
+        # a checkout that is merely BEHIND installs the older gate for all of them. And behind
+        # is the state that fires this warning most often: on 2026-09-06, mid-release, it fired
+        # on a machine whose installed hook was byte-identical to `origin/develop` and whose
+        # checkout was 87 lines older. The warning was right; the remedy pointed backwards.
+        #
+        # So the remedy is only offered when the installed copy is NOT the canonical one. When
+        # it IS, the difference lives in the checkout — a branch editing the gate on purpose,
+        # or a checkout that needs `git fetch` — and there is nothing to resync.
+        local canon canon_ref="" ref
+        canon="$(mktemp "${TMPDIR:-/tmp}/hub-gate-drift.XXXXXX" 2>/dev/null)" || canon=""
+        if [ -n "$canon" ]; then
+            for ref in $GATE_BASE_REFS; do
+                if git show "${ref}:.githooks/pre-push" >"$canon" 2>/dev/null; then
+                    canon_ref="$ref"
+                    break
+                fi
+            done
+        fi
         {
             echo "⚠️  pre-push: the INSTALLED hook is OUT OF SYNC with the versioned .githooks/pre-push."
             echo "    running   : $self_abs (hook ${HOOK_ID:-?})"
             echo "    versioned : $versioned_abs (hook ${versioned_id:0:12})"
-            echo "    The gate that decides this push is the INSTALLED copy. Unless this branch"
-            echo "    deliberately edits the hook itself, resync with:  bash scripts/install-hooks.sh"
+            if [ -n "$canon_ref" ] && cmp -s "$SELF" "$canon" 2>/dev/null; then
+                echo "    The copy that runs is IDENTICAL to ${canon_ref}:.githooks/pre-push — it is the"
+                echo "    CANONICAL gate, so there is nothing to resync. What differs is this CHECKOUT:"
+                echo "    either this branch edits the gate on purpose, or it is behind (git fetch)."
+                echo "    Do NOT install the checkout's copy: core.hooksPath is shared by every worktree"
+                echo "    on this machine, so an older checkout would downgrade the gate for all of them."
+            else
+                echo "    The gate that decides this push is the INSTALLED copy. Unless this branch"
+                echo "    deliberately edits the hook itself, resync with:  bash scripts/install-hooks.sh"
+            fi
         } >&2
+        [ -n "$canon" ] && rm -f "$canon" 2>/dev/null
     fi
 }
 hook_drift_check
