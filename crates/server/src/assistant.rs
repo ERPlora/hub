@@ -24,6 +24,18 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
         |required: &str| ctx.permissions.contains("*") || ctx.permissions.contains(required);
     let mut tools = Vec::new();
 
+    // Qué permiso le basta a cada módulo para LEER, tomado de sus propias queries (hub#1594).
+    // Es la mitad que hace segura la clasificación de abajo: la declara el módulo repartiendo sus
+    // permisos, no la adivina el core mirando nombres.
+    let mut read_permissions: std::collections::HashMap<&str, std::collections::HashSet<&str>> =
+        std::collections::HashMap::new();
+    for q in registry.queries.values() {
+        read_permissions
+            .entry(q.module_id.as_str())
+            .or_default()
+            .insert(q.def.permission.as_str());
+    }
+
     for (name, q) in &registry.queries {
         if !registry.is_active(&q.module_id) {
             continue;
@@ -37,6 +49,7 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     &q.module_id,
                     q.def.schema.as_deref(),
                     ai.risk,
+                    true,
                 ));
             }
         }
@@ -60,6 +73,11 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
                     &c.module_id,
                     c.def.schema.as_deref(),
                     ai.risk,
+                    command_only_answers(
+                        &c.def,
+                        ai.risk,
+                        read_permissions.get(c.module_id.as_str()),
+                    ),
                 ));
             }
         }
@@ -152,7 +170,15 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
             // explícitamente (el core no es un módulo y su ref_id nunca está en el índice).
             // Las tools de core no son destructivas por diseño (lo destructivo del host no se
             // ofrece jamás, y hay un barrido que lo garantiza), así que `normal` explícito.
-            tools.push(tool_def(name, description, kind, "hub", *schema, None));
+            tools.push(tool_def(
+                name,
+                description,
+                kind,
+                "hub",
+                *schema,
+                None,
+                *kind == "query",
+            ));
         }
     }
 
@@ -169,6 +195,46 @@ pub fn assemble_tools(registry: &Registry, ctx: &RequestContext) -> Vec<Value> {
 /// Construye la tool-spec de una operación. `module_id` lo usa el router vectorial (§9.2b) para
 /// prefiltrar por módulo ([`crate::router::filter_tools_by_modules`]); el Cloud lo ignora si no lo
 /// necesita (ya recibe `kind` de la misma forma).
+/// ¿Esta operación solo CONTESTA, o puede cambiar lo que el hub guarda? (hub#1594)
+///
+/// Existe porque preguntarle al asistente «¿qué huecos me quedan el lunes?» sacaba una tarjeta de
+/// confirmación: las tres respuestas de disponibilidad de `appointments` están declaradas como
+/// *commands* porque un command es la única forma que tiene una operación de cruzar datos de otro
+/// módulo (el horario vive en `schedules`), no porque toquen nada.
+///
+/// 🔴 **Las dos mitades hacen falta, y la del permiso es la que lo hace SEGURO.** Lo estructural
+/// —sin `sql`, sin `emit`, sin gate de filas— NO basta: un command de Tier 2 escribe devolviéndole
+/// al host una `Operation` que nombra un command hermano, y el core solo ve un `.wasm` compilado.
+/// Medido contra el manifest real de `appointments`: `appointments.appointments.bulk_create`
+/// («reserva varios huecos de golpe») tampoco declara `sql` ni `emit`, así que una regla solo
+/// estructural auto-ejecutaría una RESERVA sin tarjeta. Lo que las separa es el permiso que el
+/// módulo exige: una respuesta se paga con un permiso que el módulo también le pide a sus propias
+/// queries; la reserva exige `add_appointment`, que ninguna query del módulo pide jamás.
+///
+/// Y un `risk` declarado gana siempre: una contradicción del manifest se resuelve por el lado
+/// seguro, igual que un `risk` desconocido se trata como destructivo.
+///
+/// No es la puerta de seguridad —esa sigue siendo el `permission` de la operación, revalidado
+/// server-side en cada llamada—: decide solo si el usuario ve la tarjeta antes.
+fn command_only_answers(
+    def: &erplora_runtime::manifest::CommandDef,
+    risk: Option<erplora_runtime::manifest::AiRisk>,
+    module_read_permissions: Option<&std::collections::HashSet<&str>>,
+) -> bool {
+    use erplora_runtime::manifest::AiRisk;
+    if !matches!(risk, None | Some(AiRisk::Normal)) {
+        return false;
+    }
+    if !def.sql.is_empty()
+        || !def.emit.is_empty()
+        || def.min_affected_rows.is_some()
+        || def.expect_rows.is_some()
+    {
+        return false;
+    }
+    module_read_permissions.is_some_and(|perms| perms.contains(def.permission.as_str()))
+}
+
 fn tool_def(
     name: &str,
     description: &str,
@@ -176,6 +242,7 @@ fn tool_def(
     module_id: &str,
     schema: Option<&str>,
     risk: Option<erplora_runtime::manifest::AiRisk>,
+    read_only: bool,
 ) -> Value {
     // The operation's input schema (a JSON-Schema string) becomes the tool's
     // `parameters`, so the model calls with valid arguments. The Cloud reads it
@@ -193,6 +260,10 @@ fn tool_def(
         // Siempre presente, incluso sin declarar: el cliente aplica una política y no puede
         // depender de si alguien se acordó de escribir el campo.
         "risk": risk.unwrap_or(erplora_runtime::manifest::AiRisk::Normal).as_str(),
+        // Igual de incondicional (hub#1594): `kind` dice por qué puerta del dispatcher va la
+        // llamada, y esto si el usuario tiene que confirmarla antes. Ausente NO puede significar
+        // «es una lectura»: el cliente trata la ausencia como escritura.
+        "read_only": read_only,
     })
 }
 
@@ -620,6 +691,48 @@ pub fn translate_sse_line(
         }
         _ => None,
     }
+}
+
+/// Lo que el catálogo YA resolvió sobre cada tool, para anotar los eventos `function_call` que
+/// reenviamos. El drawer no tiene catálogo propio donde consultarlo, y nada de esto puede venir
+/// del modelo — son hechos del manifest:
+///
+///   · `kind`         — por qué puerta del dispatcher va la llamada (query/command).
+///   · `read_only`    — si el usuario tiene que confirmarla antes (hub#1594).
+///   · `risk`         — cuánto daño hace la operación (hub#1042).
+///   · `money_fields` — qué argumentos son dinero, para que la tarjeta enseñe «15,00 €» y no
+///                      `price_cents: 1500` (hub#1040): el único punto donde un humano puede
+///                      cazar un ×100, y el único del producto donde no salía en euros.
+pub(crate) fn tool_notes(tools: &[Value]) -> std::collections::HashMap<String, Value> {
+    tools
+        .iter()
+        .filter_map(|t| {
+            let name = t.get("name").and_then(Value::as_str)?;
+            let mut note = serde_json::Map::new();
+            if let Some(kind) = t.get("kind").and_then(Value::as_str) {
+                note.insert("kind".to_string(), json!(kind));
+            }
+            if let Some(risk) = t.get("risk").and_then(Value::as_str) {
+                note.insert("risk".to_string(), json!(risk));
+            }
+            // Incondicional a propósito (hub#1594): el drawer no puede leer una ausencia como
+            // «es una lectura» — un `false` explícito es lo que mantiene la tarjeta.
+            if let Some(read_only) = t.get("read_only").and_then(Value::as_bool) {
+                note.insert("read_only".to_string(), json!(read_only));
+            }
+            let money = t
+                .get("parameters")
+                .map(|p| money_fields(&p.to_string()))
+                .unwrap_or_default();
+            if !money.is_empty() {
+                note.insert("money_fields".to_string(), json!(money));
+            }
+            if note.is_empty() {
+                return None;
+            }
+            Some((name.to_string(), Value::Object(note)))
+        })
+        .collect()
 }
 
 /// Qué argumentos de un command son DINERO, leído de su JSON Schema (hub#1040).
@@ -1297,6 +1410,207 @@ mod tests {
         );
     }
 
+    /// **hub#1594.** Asking the assistant «what slots do I have free on Monday?» pushed a
+    /// confirmation card at the user: the answer to a QUESTION was gated behind «accept» before it
+    /// would even be read out. The three availability answers of `appointments` are declared as
+    /// *commands* only because a command is the one shape that can cross another module's data
+    /// (the opening hours live in `schedules`) — not because they change anything.
+    ///
+    /// So the catalogue states, per tool, whether running it can change what the hub holds. The
+    /// client uses it to skip the card on a read; it is NOT the security gate, which stays the
+    /// operation's own `permission`, revalidated server-side on every call.
+    ///
+    /// 🔴 **The half that makes this safe is the permission.** A structural reading alone —
+    /// «no SQL and no events, therefore a read» — is WRONG and dangerous here, because a Tier-2
+    /// command writes by handing the host an `Operation` naming a sibling command, and the core
+    /// only ever sees a compiled `.wasm`. Measured against the real manifest of `appointments`:
+    /// `appointments.appointments.bulk_create` («books several slots at once») declares no `sql`
+    /// and no `emit` either, so a structural rule would auto-run a BOOKING with no card. What
+    /// separates the two is what the module asks the user to hold: an answer costs only a
+    /// permission the module also grants to its own queries; the booking demands
+    /// `add_appointment`, which no query of the module ever requires.
+    #[test]
+    fn a_command_that_only_answers_is_offered_as_a_read_and_a_writer_is_not() {
+        let mut reg = Registry::new();
+        let m: erplora_runtime::manifest::Manifest = serde_json::from_value(json!({
+            "id": "appointments", "name": "Appointments", "version": "1.0.0",
+            "queries": {
+                // The module's own read door: this is what "a read permission of this module" means.
+                "appointments.availability.own_slots": {
+                    "permission": "appointments.view_schedule",
+                    "sql": "queries/own_slots.sql"
+                }
+            },
+            "commands": {
+                // The three shapes that must come out as READS: a handler that only computes.
+                "appointments.availability.slots": {
+                    "permission": "appointments.view_schedule",
+                    "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "available_slots" },
+                    "ai": { "description": "Lists the free booking slots of a given date." }
+                },
+                // The trap: structurally identical (no sql, no emit, a WASM handler) and it BOOKS.
+                "appointments.appointments.bulk_create": {
+                    "permission": "appointments.add_appointment",
+                    "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "bulk_create" },
+                    "ai": { "description": "Books several slots at once for the same customer." }
+                },
+                // A writer that shares the read permission but declares what it does: still a write.
+                "appointments.availability.touch": {
+                    "permission": "appointments.view_schedule",
+                    "sql": ["commands/touch.sql"],
+                    "emit": ["appointments.availability.touched"],
+                    "ai": { "description": "Writes something while asking only for the read permission." }
+                },
+                // Declaring a risk contradicts «read»; the safe side wins without arguing.
+                "appointments.availability.purge": {
+                    "permission": "appointments.view_schedule",
+                    "handler": { "type": "wasm", "file": "dist/handler.wasm", "function": "purge" },
+                    "ai": { "description": "Says it only reads but declares a destructive risk.",
+                            "risk": "destructive" }
+                }
+            }
+        }))
+        .expect("fixture manifest must parse");
+        reg.installed.push(m.clone());
+        for (name, def) in &m.queries {
+            reg.queries.insert(
+                name.clone(),
+                erplora_runtime::registry::RegisteredQuery {
+                    module_id: "appointments".to_string(),
+                    def: def.clone(),
+                    sql: "SELECT 1".to_string(),
+                    schema: None,
+                },
+            );
+        }
+        for (name, def) in &m.commands {
+            reg.commands.insert(
+                name.clone(),
+                erplora_runtime::registry::RegisteredCommand {
+                    module_id: "appointments".to_string(),
+                    def: def.clone(),
+                    sql: Vec::new(),
+                    wasm: None,
+                    schema: None,
+                },
+            );
+        }
+        reg.status.insert(
+            "appointments".to_string(),
+            erplora_runtime::registry::ModuleStatus::Active,
+        );
+
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&reg, &ctx);
+        let find = |name: &str| {
+            tools
+                .iter()
+                .find(|t| t["name"] == json!(name))
+                .unwrap_or_else(|| panic!("tool `{name}` must be offered — that is the point"))
+                .clone()
+        };
+
+        // A question answers itself: no card.
+        let slots = find("appointments.availability.slots");
+        assert_eq!(
+            slots["read_only"],
+            json!(true),
+            "an answer must not be gated behind a confirmation card: {slots}"
+        );
+        // …and it is still dispatched as the command it is: `kind` picks the door, not the card.
+        assert_eq!(
+            slots["kind"],
+            json!("command"),
+            "a read-only command is still executed through the command dispatcher: {slots}"
+        );
+
+        // The positive the control has to catch, both ways.
+        for name in [
+            "appointments.appointments.bulk_create",
+            "appointments.availability.touch",
+            "appointments.availability.purge",
+        ] {
+            let tool = find(name);
+            assert_eq!(
+                tool["read_only"],
+                json!(false),
+                "`{name}` changes what the hub holds: it keeps its confirmation card: {tool}"
+            );
+        }
+
+        // Always stated, never absent: the client applies a policy and cannot depend on whether
+        // somebody remembered to write the field (same contract as `risk`).
+        for tool in &tools {
+            assert!(
+                tool["read_only"].is_boolean(),
+                "every tool states whether it only reads: {tool}"
+            );
+        }
+    }
+
+    /// A query is a read by construction — the field says so instead of leaving the client to
+    /// re-derive it from `kind`, which is about which dispatcher door to use.
+    #[test]
+    fn a_query_is_always_offered_as_a_read() {
+        let ctx = RequestContext::new("h1", "u1", ["*".to_string()]);
+        let tools = assemble_tools(&Registry::new(), &ctx);
+        let setup = tools
+            .iter()
+            .find(|t| t["name"] == json!("hub.setup.status"))
+            .expect("the core query is offered");
+        assert_eq!(setup["read_only"], json!(true), "{setup}");
+
+        // And the core's own writers keep their card: installing is not a question.
+        for name in ["hub.modules.install", "hub.blueprints.apply"] {
+            let tool = tools
+                .iter()
+                .find(|t| t["name"] == json!(name))
+                .expect("the core command is offered to an admin");
+            assert_eq!(
+                tool["read_only"],
+                json!(false),
+                "`{name}` mutates the hub: it keeps its confirmation card: {tool}"
+            );
+        }
+    }
+
+    /// The note the drawer reads is built from the catalogue, and `read_only` has to be IN it
+    /// (hub#1594): `translate_sse_line` copies the note verbatim, so a field the note never
+    /// carries is a field the confirmation card never sees — and every command would keep asking.
+    #[test]
+    fn the_note_carries_whether_the_tool_only_reads() {
+        let notes = tool_notes(&[
+            json!({ "name": "appointments.availability.slots", "kind": "command",
+                    "risk": "normal", "read_only": true }),
+            json!({ "name": "appointments.appointments.create", "kind": "command",
+                    "risk": "normal", "read_only": false }),
+        ]);
+        assert_eq!(
+            notes["appointments.availability.slots"]["read_only"],
+            json!(true),
+            "a read must reach the drawer as a read: {notes:?}"
+        );
+        assert_eq!(
+            notes["appointments.appointments.create"]["read_only"],
+            json!(false),
+            "a write must reach the drawer as a write, stated rather than absent: {notes:?}"
+        );
+    }
+
+    /// The tag has to travel WITH the call, like `kind` and `risk` (hub#1042): the drawer has no
+    /// catalogue of its own to look it up in.
+    #[test]
+    fn translate_annotates_read_only() {
+        let mut notes = std::collections::HashMap::new();
+        notes.insert(
+            "appointments.availability.slots".to_string(),
+            json!({ "kind": "command", "read_only": true }),
+        );
+        let line = r#"data: {"type":"function_call","name":"appointments.availability.slots","call_id":"c1","arguments":"{}"}"#;
+        let out = translate_sse_line(line, &notes).expect("forwarded");
+        assert!(out.contains("\"read_only\":true"), "{out}");
+    }
+
     /// The policy line itself travels in the prompt: the model must know destructive actions are
     /// off the table BY DESIGN — so it explains honestly («eso lo haces tú desde la pantalla»)
     /// instead of inventing a security policy, which is exactly the failure this session caught.
@@ -1736,6 +2050,7 @@ mod tests {
             "sales",
             Some(schema),
             None,
+            true,
         );
         assert_eq!(t["parameters"]["properties"]["since"]["type"], "string");
         assert_eq!(t["parameters"]["required"][0], "since");
@@ -1810,11 +2125,11 @@ mod tests {
 
     #[test]
     fn tool_def_defaults_params_when_no_schema() {
-        let t = tool_def("x.y", "d", "query", "x", None, None);
+        let t = tool_def("x.y", "d", "query", "x", None, None, true);
         assert_eq!(t["parameters"]["type"], "object");
         assert_eq!(t["parameters"]["properties"], json!({}));
         // An unparseable schema also degrades to the empty object (never panics).
-        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"), None);
+        let bad = tool_def("x.y", "d", "query", "x", Some("{not json"), None, true);
         assert_eq!(bad["parameters"]["properties"], json!({}));
     }
 }

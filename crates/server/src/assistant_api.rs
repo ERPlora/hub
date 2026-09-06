@@ -156,30 +156,7 @@ pub(crate) async fn assistant_chat_stream(
     //   · `money_fields` — qué argumentos son dinero, para que la tarjeta enseñe «15,00 €» y no
     //                      `price_cents: 1500` (hub#1040): el único punto donde un humano puede
     //                      cazar un ×100, y el único del producto donde no salía en euros.
-    let tool_notes: std::collections::HashMap<String, serde_json::Value> = tools
-        .iter()
-        .filter_map(|t| {
-            let name = t.get("name").and_then(|v| v.as_str())?;
-            let mut note = serde_json::Map::new();
-            if let Some(kind) = t.get("kind").and_then(|v| v.as_str()) {
-                note.insert("kind".to_string(), serde_json::json!(kind));
-            }
-            if let Some(risk) = t.get("risk").and_then(|v| v.as_str()) {
-                note.insert("risk".to_string(), serde_json::json!(risk));
-            }
-            let money = t
-                .get("parameters")
-                .map(|p| assistant::money_fields(&p.to_string()))
-                .unwrap_or_default();
-            if !money.is_empty() {
-                note.insert("money_fields".to_string(), serde_json::json!(money));
-            }
-            if note.is_empty() {
-                return None;
-            }
-            Some((name.to_string(), serde_json::Value::Object(note)))
-        })
-        .collect();
+    let tool_notes = assistant::tool_notes(&tools);
 
     let body = assistant::build_cloud_body(&frontend, tools, Some(&active_user), &instructions);
 

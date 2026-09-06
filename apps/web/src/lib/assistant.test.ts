@@ -51,11 +51,19 @@ function run(
   onConfirm?: (call: { name: string; arguments: string; kind: string }) => Promise<boolean>,
 ) {
   const tokens: string[] = [];
-  return new Promise<{ tokens: string[]; error?: unknown }>((resolve) => {
+  let audit: { claimedWithoutEffect?: boolean } | undefined;
+  return new Promise<{
+    tokens: string[];
+    error?: unknown;
+    audit?: { claimedWithoutEffect?: boolean };
+  }>((resolve) => {
     streamAssistant(messages as never, {
       onToken: (t) => tokens.push(t),
-      onDone: () => resolve({ tokens }),
-      onError: (error) => resolve({ tokens, error }),
+      onDone: () => resolve({ tokens, audit }),
+      onError: (error) => resolve({ tokens, error, audit }),
+      onAudit: (a) => {
+        audit = a as { claimedWithoutEffect?: boolean };
+      },
       onConfirm,
     });
   });
@@ -182,5 +190,140 @@ describe('streamAssistant tool round-trip', () => {
     ]);
     await run([{ role: 'user', content: 'anula la venta' }]); // no onConfirm provided
     expect(commandMock).not.toHaveBeenCalled();
+  });
+
+  // ── hub#1594: a question is not a change ───────────────────────────────────────────────────
+  //
+  // Asking «what slots do I have free on Monday?» pushed a confirmation card at the user before
+  // the assistant would even read the agenda out. Those answers are declared as *commands* only
+  // because a command is the one shape that can cross another module's data — the runtime tags
+  // them `read_only` and the card is for what actually changes something.
+
+  it('a read-only command runs without a confirmation card', async () => {
+    commandMock.mockResolvedValue({ slots: ['10:00', '11:30'] });
+    mockFetchRounds([
+      [
+        sseLine({
+          type: 'function_call',
+          name: 'appointments.availability.slots',
+          call_id: 'r1',
+          arguments: JSON.stringify({ date: '2026-09-07' }),
+          kind: 'command',
+          read_only: true,
+        }),
+        sseLine({ type: 'done' }),
+      ],
+      [sseLine({ type: 'token', text: 'Tienes las 10:00 y las 11:30.' }), sseLine({ type: 'done' })],
+    ]);
+    const confirm = vi.fn().mockResolvedValue(true);
+
+    const { tokens } = await run([{ role: 'user', content: '¿qué huecos me quedan el lunes?' }], confirm);
+
+    expect(confirm).not.toHaveBeenCalled();
+    // …and it still goes through the COMMAND door: `kind` picks the dispatcher, `read_only` the card.
+    expect(commandMock).toHaveBeenCalledWith('appointments.availability.slots', { date: '2026-09-07' });
+    expect(queryMock).not.toHaveBeenCalled();
+    expect(tokens.join('')).toBe('Tienes las 10:00 y las 11:30.');
+  });
+
+  it('a write is still confirmed even when it is offered next to a read', async () => {
+    commandMock.mockResolvedValue({ id: 7 });
+    mockFetchRounds([
+      [
+        sseLine({
+          type: 'function_call',
+          name: 'appointments.appointments.bulk_create',
+          call_id: 'w9',
+          arguments: JSON.stringify({ count: 4 }),
+          kind: 'command',
+          read_only: false,
+        }),
+        sseLine({ type: 'done' }),
+      ],
+      [sseLine({ type: 'token', text: 'Reservado.' }), sseLine({ type: 'done' })],
+    ]);
+    const confirm = vi.fn().mockResolvedValue(false);
+
+    await run([{ role: 'user', content: 'resérvame cuatro huecos' }], confirm);
+
+    expect(confirm).toHaveBeenCalled();
+    expect(commandMock).not.toHaveBeenCalled();
+  });
+
+  it('only a literal `true` skips the card — an absent or malformed flag still confirms', async () => {
+    for (const readOnly of [undefined, 'true', 1, null]) {
+      commandMock.mockReset();
+      mockFetchRounds([
+        [
+          sseLine({
+            type: 'function_call',
+            name: 'pos.sale.void',
+            call_id: 'x1',
+            arguments: '{}',
+            kind: 'command',
+            read_only: readOnly,
+          }),
+          sseLine({ type: 'done' }),
+        ],
+        [sseLine({ type: 'token', text: 'ok' }), sseLine({ type: 'done' })],
+      ]);
+      await run([{ role: 'user', content: 'anula la venta' }]); // no onConfirm → safe default
+      expect(commandMock, `read_only=${String(readOnly)} must not skip the card`).not.toHaveBeenCalled();
+    }
+  });
+
+  it('a read-only command does not count as a write in the turn audit', async () => {
+    commandMock.mockResolvedValue({ slots: [] });
+    mockFetchRounds([
+      [
+        sseLine({
+          type: 'function_call',
+          name: 'appointments.availability.slots',
+          call_id: 'a1',
+          arguments: '{}',
+          kind: 'command',
+          read_only: true,
+        }),
+        sseLine({ type: 'done' }),
+      ],
+      // The model claims a change that never happened: the audit has to catch it, and it only
+      // can if the receipt of a read says «read» (hub#1038 reads `kind === 'command'`).
+      [sseLine({ type: 'token', text: 'Listo, ya te he creado la cita.' }), sseLine({ type: 'done' })],
+    ]);
+
+    const { audit } = await run([{ role: 'user', content: '¿qué huecos hay?' }]);
+
+    expect(audit?.claimedWithoutEffect).toBe(true);
+  });
+
+  // Same defect class as hub#1594, found next to it: `risk` (hub#1042) and `money_fields`
+  // (hub#1040) are what the card needs to warn about a destructive action and to print «15,00 €»
+  // instead of `price_cents: 1500`. The runtime sends both WITH the call, and the parser was
+  // dropping them on the floor — so the card had been receiving `undefined` for both.
+  it('the card receives the risk and the money fields the runtime sent', async () => {
+    commandMock.mockResolvedValue({ ok: true });
+    mockFetchRounds([
+      [
+        sseLine({
+          type: 'function_call',
+          name: 'services.services.create',
+          call_id: 'm1',
+          arguments: JSON.stringify({ price_cents: 1500 }),
+          kind: 'command',
+          read_only: false,
+          risk: 'destructive',
+          money_fields: ['price_cents'],
+        }),
+        sseLine({ type: 'done' }),
+      ],
+      [sseLine({ type: 'token', text: 'Hecho.' }), sseLine({ type: 'done' })],
+    ]);
+    const confirm = vi.fn().mockResolvedValue(true);
+
+    await run([{ role: 'user', content: 'crea el servicio' }], confirm);
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ risk: 'destructive', moneyFields: ['price_cents'] }),
+    );
   });
 });
