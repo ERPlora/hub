@@ -91,6 +91,10 @@ export default {
     brokenBody:
       'Something inside ERPlora failed while this screen was opening. Try again, and if it keeps happening, close ERPlora and open it again.',
     brokenAction: 'Try again',
+    // hub#1590 — the same code failure, but with the hub already open. There is nothing blank to
+    // rescue here, so it gets a toast and not the wall of text: covering a live till would lose
+    // sight of the order being taken. Its own words for the same reason as `broken*` above.
+    brokenToast: 'That section could not be opened. Something inside ERPlora failed — try again.',
   },
   // The installed app is older than the one we publish (hub#400). It is called ERPlora, never
   // "the app": "apps" is already the word for the things you add to your business (ADR-0254), and

@@ -89,6 +89,10 @@ export default {
     brokenBody:
       'Algo ha fallado dentro de ERPlora al abrir esta pantalla. Vuelve a intentarlo y, si sigue pasando, cierra ERPlora y ábrelo de nuevo.',
     brokenAction: 'Reintentar',
+    // hub#1590 — el mismo fallo de código, pero con el hub ya abierto. Aquí no hay nada en blanco
+    // que rescatar, así que lleva un aviso corto y no el muro de texto: tapar un TPV en marcha
+    // quitaría de vista la comanda que se está tomando. Con sus palabras, por lo mismo que arriba.
+    brokenToast: 'No se ha podido abrir esa sección. Algo ha fallado dentro de ERPlora; vuelve a intentarlo.',
   },
   // La app instalada es más antigua que la que publicamos (hub#400). Se la llama ERPlora, nunca
   // «la app»: «apps» ya es la palabra de lo que añades a tu negocio (ADR-0254), y un solo nombre

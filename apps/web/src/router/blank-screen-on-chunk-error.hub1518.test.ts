@@ -37,6 +37,7 @@ vi.mock('../lib/error-report', () => ({
   installErrorReporting: vi.fn(),
 }));
 
+import { i18n } from '../i18n';
 import { router } from './index';
 import { VIEW_LOAD_FAILURE_ID } from './view-load-failure-notice';
 import { VIEW_LOAD_RECOVERY_KEY } from './view-load-recovery';
@@ -144,7 +145,11 @@ describe('hub#1518 · a view whose file never arrives', () => {
     expect(consoleError).toHaveBeenCalledWith(bug);
     expect(reload).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(VIEW_LOAD_RECOVERY_KEY)).toBeNull();
-    expect(toastErrorSpy).not.toHaveBeenCalled();
+    // hub#1590 — this branch is no longer mute with the app open (a tap that does nothing reads
+    // as a dead button, so it now gets a toast of its own). What it must NEVER do is borrow the
+    // connection copy: "not mistaken for a network blink" is what this line was really pinning,
+    // and saying it that way keeps it true instead of freezing the silence it was written under.
+    expect(toastErrorSpy).not.toHaveBeenCalledWith(i18n.global.t('viewLoad.failedToast'));
     router.removeRoute('hub1518-bug');
   });
 });
