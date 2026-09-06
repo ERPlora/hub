@@ -35,14 +35,19 @@ vi.mock('./session', async () => {
   const { computed, ref } = await import('vue');
   const user = ref<{ permissions?: string[] } | null>(null);
   const credentialKind = ref('');
+  const hubSession = ref<string | null>(null);
   return {
     user,
     CREDENTIAL_CLOUD: 'cloud',
     openedWithCloudLogin: computed(() => credentialKind.value === 'cloud'),
     // Mirrors the real signature: omitting the kind is "it does not say", not "it was a password".
     setHubSession: (token: string | null, kind?: string | null) => {
+      hubSession.value = token;
       credentialKind.value = token ? (kind ?? '') : '';
     },
+    // The door out to erplora.com re-reads it when the pass lands, to refuse spending one minted
+    // for whoever was at the till before a hand-over (hub#1584).
+    getHubSession: () => hubSession.value,
     hasPermission: (permission: string) => {
       const granted = user.value?.permissions ?? [];
       return granted.includes('*') || granted.includes(permission);
