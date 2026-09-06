@@ -1774,6 +1774,7 @@ dependencies = [
  "erplora-source",
  "erplora-vector",
  "erplora-verifactu",
+ "erplora-wasm-host",
  "futures-util",
  "hex",
  "http-body-util",
