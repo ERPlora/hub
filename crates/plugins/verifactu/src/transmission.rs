@@ -67,6 +67,33 @@ pub(crate) async fn transmit_record(input: &Json, host: &dyn NativeHost) -> Resu
     Ok(out)
 }
 
+/// The facts of the `xsd_invalid` audit row: the validator's own Spanish prose, and — when the
+/// refusal has a code — the same refusal as `{code, …facts}` (hub#1579).
+///
+/// Two fields for one refusal because they serve two hubs. `validation_error` is what the Events
+/// screen has painted since hub#1178 and what a hub on an older module still paints, so it is not
+/// withdrawn; `validation_error_reason` is what a module turns into a sentence in the reader's
+/// language. The `_reason` suffix is the module's convention, not decoration: `localizedParams()`
+/// composes the nested reason and fills the `{validation_error}` hole of the sentence with it, so
+/// the two arrive already agreeing about which one wins.
+///
+/// **Absent, never empty**, per [`VerifactuError::as_reason_details`]: a refusal with no code of
+/// its own files no key at all. Today `validate_registro` codes every refusal it can file — the
+/// last three validators stopped falling back to bare prose in hub#1579 — but the engine's error
+/// type is wider than this one validator, and an empty object would make the module answer «yes, I
+/// know this code» and paint a blank.
+/// It stops at the facts and does NOT wrap them in `details_for`: the message key stays written at
+/// the call site, in the payload itself, because that is where the hub#1178 guard sweeps for it —
+/// an event whose key is one function call away reads to that guard exactly like an event with no
+/// key at all.
+fn xsd_invalid_facts(e: &VerifactuError) -> Json {
+    let mut facts = json!({ "validation_error": e.to_string() });
+    if let (Some(target), Some(nested)) = (facts.as_object_mut(), e.as_reason_details()) {
+        target.insert("validation_error_reason".to_owned(), nested);
+    }
+    facts
+}
+
 /// Núcleo de transmisión de **un** registro: lee el registro anterior (encadenamiento), construye
 /// el XML SOAP, firma con el PKCS#12 y hace POST TLS-mutua a la AEAT. Devuelve las intenciones
 /// (UPDATE registro + evento + resolver/encolar contingencia) y `true` si la AEAT lo aceptó.
@@ -195,6 +222,7 @@ pub(crate) async fn transmit_one(
     // de contingencia entera.
     if let Err(e) = xsd::validate_registro(&xml) {
         let reason = e.to_string();
+        let facts = xsd_invalid_facts(&e);
         return Ok((
             vec![
                 apply_transmission(
@@ -216,7 +244,7 @@ pub(crate) async fn transmit_one(
                         "event_type": "transmission_failure",
                         "severity": "error",
                         "message": format!("XML no conforme al esquema de la AEAT; no se ha transmitido: {reason}"),
-                        "details": details_for("verifactu.xsd_invalid", json!({ "validation_error": reason })),
+                        "details": details_for("verifactu.xsd_invalid", facts),
                         "timestamp": ctx.now,
                     }),
                 ),
@@ -1301,6 +1329,115 @@ pub(crate) mod tests {
                 .iter()
                 .any(|e| e.name == crate::events::EVENT_RECORD_REJECTED),
             "the rejection must be visible as an event"
+        );
+    }
+
+    /// The `details` of the `xsd_invalid` audit row a frozen, unvalidatable envelope produces.
+    ///
+    /// It drives the REAL call site and not the helper: `transmit_one` reuses a non-empty
+    /// `xml_content` and skips `build_soap` entirely, so a hand-written envelope reaches the
+    /// schema branch with nothing else mocked.
+    async fn xsd_invalid_details_of(xml_content: &str) -> Json {
+        let record = serde_json::json!({
+            "id": "rec-xsd-reason",
+            "record_type": "alta",
+            "environment": "testing",
+            "issuer_nif": "B12345678",
+            "is_first_record": 1,
+            "sequence_number": 1,
+            "xml_content": xml_content,
+        });
+        let ctx = crate::util::Ctx {
+            hub_id: "hub-no-road".to_owned(),
+            now: "2026-09-06T10:00:00Z".to_owned(),
+            new_ids: Vec::new(),
+        };
+        let (ops, _events, _success) = super::transmit_one(
+            &NoRoadHost,
+            &ctx,
+            &record,
+            &serde_json::json!({ "environment": "testing" }),
+            "event-1",
+            "queue-1",
+            "",
+            super::Remission::Punctual,
+        )
+        .await
+        .expect("an invalid envelope is a local outcome, never the route's error");
+
+        let event = ops
+            .iter()
+            .find(|o| o.command == "verifactu._insert_event")
+            .expect("a refused envelope must leave an audit row");
+        let raw = event
+            .params
+            .get("details")
+            .and_then(Json::as_str)
+            .expect("the audit row files its details as a JSON string");
+        serde_json::from_str(raw).expect("details is JSON")
+    }
+
+    /// 🔒 REGRESIÓN (hub#1579): el rechazo del esquema llega al evento `xsd_invalid` como
+    /// **código**, no solo como la frase castellana del validador.
+    ///
+    /// Es la mitad que hub#1576 dejó fuera. Codificó los rechazos, pero solo el DIAGNÓSTICO
+    /// («Probar conexión») los publicaba con su código; la superficie real —una transmisión que
+    /// el esquema rechaza, que es la que ve un negocio de verdad— seguía filando únicamente
+    /// `validation_error`, la prosa del motor, así que la pantalla **Eventos** de un hub en
+    /// inglés pintaba «XML no conforme al esquema…: falta Cabecera/ObligadoEmision».
+    ///
+    /// El sufijo `_reason` no es decorativo: es la convención por la que `localizedParams()` del
+    /// módulo compone la razón anidada y con ella rellena el hueco `{validation_error}` de la
+    /// frase. Y la prosa NO se retira: es el respaldo que pinta un hub cuyo módulo todavía no
+    /// conoce el código.
+    #[tokio::test]
+    async fn the_schema_refusal_of_a_transmission_travels_as_a_code_hub1579() {
+        let details =
+            xsd_invalid_details_of("<sum:RegFactuSistemaFacturacion></sum:RegFactuSistemaFacturacion>")
+                .await;
+
+        assert_eq!(
+            details["message_key"],
+            serde_json::json!("verifactu.xsd_invalid")
+        );
+        assert_eq!(
+            details["validation_error_reason"]["code"],
+            serde_json::json!("schema_header_issuer_missing"),
+            "the refusal must travel as the code the module's catalogue indexes: {details}"
+        );
+        assert!(
+            details["validation_error"]
+                .as_str()
+                .is_some_and(|prose| prose.contains("ObligadoEmision")),
+            "the engine's own prose stays as the fallback: {details}"
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#1579): y los HECHOS viajan al lado del código, en el mismo objeto.
+    ///
+    /// Sin ellos el código no compone nada: `schema_element_missing` sin `element` es «falta un
+    /// elemento obligatorio», que es justo la mitad accionable que el rechazo existe para dar.
+    /// Los nombres de etiqueta (`IDFactura`) siguen en castellano a propósito: son los de la
+    /// AEAT, fijados por ley, y viajan como DATO — que es lo que permite traducir la frase que
+    /// los rodea.
+    #[tokio::test]
+    async fn the_facts_of_a_schema_refusal_travel_beside_its_code_hub1579() {
+        let details = xsd_invalid_details_of(
+            "<sum:RegFactuSistemaFacturacion><sum1:Cabecera>\
+             <sum1:ObligadoEmision><sum1:NombreRazon>ACME SL</sum1:NombreRazon>\
+             <sum1:NIF>B12345678</sum1:NIF></sum1:ObligadoEmision></sum1:Cabecera>\
+             <sum:RegistroFactura><sum1:RegistroAlta></sum1:RegistroAlta></sum:RegistroFactura>\
+             </sum:RegFactuSistemaFacturacion>",
+        )
+        .await;
+
+        assert_eq!(
+            details["validation_error_reason"],
+            serde_json::json!({
+                "code": "schema_element_missing",
+                "element": "IDFactura",
+            }),
+            "code and facts travel merged, exactly as `reasonSentence` reads them: {details}"
         );
     }
 

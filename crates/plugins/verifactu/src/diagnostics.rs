@@ -200,7 +200,7 @@ pub(crate) async fn run_diagnostics(input: &Json, host: &dyn NativeHost) -> Resu
                                 });
                             }
                             Err(e) => {
-                                aeat = json!({ "ok": false, "error": e.to_string() });
+                                aeat = aeat_call_failed(&e);
                             }
                         }
                     }
@@ -432,13 +432,7 @@ fn sample_envelope(
         // «is there a code I know?», and an object with nothing in it would answer yes and paint a
         // blank where the half that says what to fix used to be.
         let mut facts = json!({ "detail": e.to_string() });
-        if let (Some(target), Some((code, detail_facts))) = (facts.as_object_mut(), e.as_reason()) {
-            let mut nested = json!({ "code": code });
-            if let (Some(into), Some(from)) = (nested.as_object_mut(), detail_facts.as_object()) {
-                for (key, value) in from {
-                    into.insert(key.clone(), value.clone());
-                }
-            }
+        if let (Some(target), Some(nested)) = (facts.as_object_mut(), e.as_reason_details()) {
             target.insert("detail_reason".to_owned(), nested);
         }
         CertReason::new(
@@ -490,6 +484,45 @@ impl CertReason {
         }
         out
     }
+}
+
+/// The `aeat` box when the call to Hacienda did not come back: the technical text in its own slot,
+/// plus the **stable code** the module turns into a sentence in the reader's language (hub#1580).
+///
+/// It was the last box of «Test connection» still answering only in Spanish. The other two
+/// refusals of this same road — the unset issuer NIF, the sample envelope that does not validate —
+/// have travelled with their `reason` since hub#1578; this one kept filing just the transport's
+/// own `to_string()`, so a business running in English read «transmisión AEAT (TLS): …» on a
+/// screen that is otherwise translated.
+///
+/// **Two codes, not one.** They ask opposite things of the reader: a secure channel the AEAT
+/// refused is FIXED — the certificate is expired, revoked or not accepted — and an unreachable
+/// AEAT is WAITED OUT. Merging them would put «try again in a few minutes» in front of somebody
+/// whose certificate expired last week. The distinction is not invented here: `aeat::transport_error`
+/// already draws it when it chooses between [`VerifactuError::Tls`] and
+/// [`VerifactuError::Transmission`], and this only publishes what the engine had already decided.
+///
+/// **Factless on purpose, and `error` is NOT withdrawn.** The alternative was one code with the
+/// raw failure interpolated into the sentence, and the module's catalogue forbids exactly that
+/// (its `never bakes the engine prose into a reason sentence` test): a translated sentence with an
+/// untranslatable `reqwest` chain inside it is half a sentence again, which is the defect being
+/// fixed. So the shape is the one the neighbouring box already uses for `gateway_unreachable` —
+/// constant sentence from the catalogue, technical detail painted beside it out of `error` — and
+/// that detail is what support reads to tell a bad certificate from the customer's proxy.
+fn aeat_call_failed(e: &VerifactuError) -> Json {
+    let reason = if matches!(e, VerifactuError::Tls(_)) {
+        constant_reason(
+            "aeat_tls_rejected",
+            "La AEAT no ha aceptado el certificado al abrir el canal seguro: revisa que no esté \
+             caducado ni revocado.",
+        )
+    } else {
+        constant_reason(
+            "aeat_unreachable",
+            "No se ha podido contactar con la AEAT; vuelve a intentarlo en unos minutos.",
+        )
+    };
+    json!({ "ok": false, "error": e.to_string(), "reason": reason.as_details() })
 }
 
 /// A verdict with nothing to fill: one code, one sentence, no facts (verifactu#95).
@@ -1476,6 +1509,54 @@ mod tests {
             details["cert_reason"]["code"],
             json!("gateway_unreachable"),
             "{details}"
+        );
+    }
+
+    /// 🔒 REGRESIÓN (hub#1580): cuando la llamada a la AEAT por la vía propia FALLA, la caja
+    /// `aeat` publica un **código** además del texto técnico.
+    ///
+    /// Era la última casilla de «Probar conexión» que solo hablaba castellano: las otras dos
+    /// negativas de esta misma vía —NIF sin configurar, sobre que no valida— ya viajaban con su
+    /// `reason` desde hub#1578, y esta se quedó filando únicamente `error: e.to_string()`, la
+    /// prosa del transporte. Un negocio en inglés leía «transmisión AEAT (TLS): …» en una
+    /// pantalla que por lo demás está traducida.
+    ///
+    /// **Dos códigos y no uno**, porque piden cosas OPUESTAS: un canal seguro rechazado se
+    /// ARREGLA (certificado caducado, revocado o no admitido) y una AEAT inalcanzable se ESPERA.
+    /// La distinción no se inventa aquí — el motor ya la hace en `aeat::transport_error`, que es
+    /// lo que separa `Tls` de `Transmission`; esto solo la publica.
+    ///
+    /// Y el texto técnico NO se tira: `error` sigue llevando el `to_string()` del transporte, que
+    /// es lo que soporte necesita para saber si el problema es el certificado, el proxy del
+    /// cliente o la sede. Es el mismo reparto que hace la caja de la pasarela con
+    /// `gateway_unreachable`: la frase del catálogo no interpola el error crudo, y el detalle se
+    /// pinta en su propio hueco.
+    #[test]
+    fn an_aeat_call_that_fails_publishes_a_code_beside_the_technical_detail_hub1580() {
+        let unreachable = super::aeat_call_failed(&VerifactuError::Transmission(
+            "error sending request for url (https://prewww1.aeat.es/…)".to_owned(),
+        ));
+        assert_eq!(
+            unreachable,
+            json!({
+                "ok": false,
+                "error": "transmisión AEAT: error sending request for url (https://prewww1.aeat.es/…)",
+                "reason": { "code": "aeat_unreachable" },
+            }),
+            "a network failure is waited out, and its raw text stays in its own slot"
+        );
+
+        let rejected = super::aeat_call_failed(&VerifactuError::Tls(
+            "certificate verify failed".to_owned(),
+        ));
+        assert_eq!(
+            rejected,
+            json!({
+                "ok": false,
+                "error": "transmisión AEAT (TLS): certificate verify failed",
+                "reason": { "code": "aeat_tls_rejected" },
+            }),
+            "a refused secure channel is FIXED, and must not read as a passing outage"
         );
     }
 

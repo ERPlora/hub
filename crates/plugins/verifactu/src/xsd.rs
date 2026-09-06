@@ -295,16 +295,14 @@ fn walk(xml: &str) -> Vec<(&str, &str, usize)> {
     out
 }
 
-fn err(msg: impl Into<String>) -> VerifactuError {
-    VerifactuError::Payload(msg.into())
-}
-
-/// The same refusal as [`err`], plus the **stable code + facts** a module can translate
-/// (hub#1576) — identical prose, identical `Display`, so nothing that reads the sentence moves.
+/// A refusal of the schema validator, carrying the **stable code + facts** a module can translate
+/// (hub#1576) beside the Spanish prose this file has always written.
 ///
-/// It is added beside `err` rather than replacing it: `err` still serves the validators of the
-/// desglose, the rectificativa and the F2 limit, which are unreachable from the diagnostic sample
-/// and stay on the fallback prose for now (hub#1579).
+/// `Display` still gives that prose byte-for-byte, so nothing that reads the sentence moves; what
+/// is new is the half a module can look up in its `en`/`es` catalogue. Since hub#1579 it is the
+/// ONLY way a refusal leaves this file: the desglose, the rectificativa and the F2 ceiling were
+/// the last validators still on the untranslatable prose, and the `err` helper that served them
+/// is gone — a refusal without a code is now a compile error, not a review one.
 fn named(code: &'static str, facts: Json, msg: impl Into<String>) -> VerifactuError {
     VerifactuError::Schema {
         code,
