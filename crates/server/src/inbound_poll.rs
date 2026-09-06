@@ -333,6 +333,12 @@ pub struct PollReport {
     pub ingested: usize,
     /// Messages the SaaS confirmed it will not serve again.
     pub acked: usize,
+    /// Things in the SaaS's answer this runtime did not understand — unknown field names and
+    /// `direction`/`source` values outside the contract (hub#1612). Never zero because the page
+    /// was fine and unnoticed at the same time: the tick counts them, names the new ones in the
+    /// log and carries the number to its caller, so the drift shows up in the ordinary tick line
+    /// as well as in the one-off warning.
+    pub unexpected: usize,
 }
 
 /// Why a tick could not complete. An ack that fails is **not** one of these: the events are
@@ -509,7 +515,7 @@ impl InboundPoller {
             return Ok(PollReport::default());
         }
         let fetched = messages.len();
-        self.report_contract_drift(&messages);
+        let unexpected = self.report_contract_drift(&messages);
 
         // ── Write FIRST (see the module docs on why the order is not negotiable) ────────────
         //
@@ -563,6 +569,7 @@ impl InboundPoller {
             fetched,
             ingested,
             acked,
+            unexpected,
         })
     }
 
@@ -577,11 +584,12 @@ impl InboundPoller {
     ///
     /// Nothing is thrown away here. The messages are ingested either way; what the line says is
     /// that part of the answer needs a runtime release before anything can act on it.
-    fn report_contract_drift(&self, messages: &[InboundMessage]) {
+    fn report_contract_drift(&self, messages: &[InboundMessage]) -> usize {
         let gaps: Vec<String> = messages.iter().flat_map(InboundMessage::unexpected).collect();
         if gaps.is_empty() {
-            return;
+            return 0;
         }
+        let count = gaps.len();
         // A poisoned lock must never silence the warning nor take the tick down: the tracker is
         // a noise filter, not correctness, so a poisoned one just means everything looks new.
         let fresh = match self.drift.lock() {
@@ -596,6 +604,7 @@ impl InboundPoller {
                 "inbound whatsapp: the SaaS answer carries things this runtime does not know; an unknown VALUE reaches the event as-is, an unknown FIELD does not travel at all — the runtime needs a release to use it"
             );
         }
+        count
     }
 
     /// `GET /api/v1/hub/device/whatsapp/inbox/` — everything still pending for this hub.
@@ -1410,6 +1419,11 @@ mod tests {
             .unwrap();
         assert_eq!(report.ingested, 1);
         assert_eq!(report.acked, 1);
+        assert_eq!(
+            report.unexpected, 1,
+            "the tick has to COUNT what it did not understand, or the gap is only visible to \
+             whoever happens to be reading the log at that second"
+        );
         assert_eq!(
             payloads_by_id(&runtime).await["wa-wamid.1"]["text"],
             json!("is the table free?")
