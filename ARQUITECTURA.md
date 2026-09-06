@@ -176,12 +176,17 @@ Tauri vía `invoke` — ADR-0196; la **cola de impresión se muda al hub**, ADR-
   admite **varios** hosts y un equipo varios roles; la vivacidad **no se almacena**, se deriva del
   último latido (sin noticias durante 3 latidos = no vivo), y el registro sobrevive al reinicio
   porque es configuración, no sesión. `coverage` responde «cuánto espera y cuántos hosts vivos hay»
-  por rol. **As-built (hub#343):** el drenaje por `GET /ws/print` (ADR-0262) — `print_drain.rs` +
-  `print_ws.rs` + `apps/web/src/lib/print-drain.ts`. **As-built (hub#501, ADR-0265):** el documento
+  por rol. **As-built (hub#343):** el drenaje por `GET /ws/print` (ADR-0262) —
+  `crates/runtime/src/print_drain.rs` + `crates/server/src/print_ws.rs` +
+  `apps/web/src/lib/print-drain.ts`. **As-built (hub#501, ADR-0265):** el documento
   viaja **ESTRUCTURADO** (`documentType` + `document`, migración de sistema **v25**; el `html` se
   borró) y **no se guarda: se regenera desde la venta**; `apps/web/src/lib/print-host.ts` lo entrega
   a `erplora_print` y el ciclo tique → host → papel está probado contra una térmica real
-  (`crates/server/tests/print_to_real_printer.rs`). Falta que `sdk.print` encole (hub#344). Diseño
+  (`crates/server/tests/print_to_real_printer.rs`). **As-built (hub#344):** `sdk.print` **ENCOLA**
+  — el shell cablea el productor en `apps/web/src/main.ts` (`POST /api/print/jobs`) y la cascada de
+  `apps/web/src/lib/print.ts` va bridge → **cola** → navegador: sin app instalada, o con la
+  impresora del rol caída, el tique térmico se encola en vez de perderse; el A4 no tiene cola
+  térmica y sigue yendo al navegador. Con eso la cadena 4/4 está cerrada. Diseño
   en [architecture/hub/print-queue.md](../architecture/hub/print-queue.md).
 - **Enrutado por rol** (recibo vs cocina) cuando un terminal tiene varias configuradas.
 

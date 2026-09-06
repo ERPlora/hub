@@ -175,7 +175,8 @@ let running: { stop(): void } | null = null;
  *
  * Diagnostics go to the console on purpose, for now. The screen the owner reads — "nothing is
  * printing the kitchen's tickets", with its English string and its `es` translation — belongs with
- * the coverage view in hub#344, which is also where `sdk.print` starts producing jobs.
+ * the coverage view, which is already built (`print-coverage.ts`, hub#800/#1107). `sdk.print`
+ * already produces the jobs this drain takes out (hub#344).
  */
 export async function bootPrintHost(
   client: PrintHostClient,
