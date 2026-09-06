@@ -30,7 +30,9 @@ vi.mock('../lib/cloud', () => ({ cloudModuleSubscription }));
 
 // Mocked whole, not spread over the real module: `module-loader` pulls the icon set in, and the
 // test environment refuses those virtual `~icons/*` ids. The panel only asks it for this one thing.
-const { loadModuleLocale } = vi.hoisted(() => ({ loadModuleLocale: vi.fn(async () => undefined) }));
+const { loadModuleLocale } = vi.hoisted(() => ({
+  loadModuleLocale: vi.fn(async (_base: string, _lang: string): Promise<unknown> => undefined),
+}));
 vi.mock('../lib/module-loader', () => ({ loadModuleLocale }));
 
 import ModulePlanPanel from './ModulePlanPanel.vue';
@@ -59,17 +61,22 @@ function visibleText(w: VueWrapper): string {
   return `${w.text()} ${fromProps}`;
 }
 
-function mountPanel(locale: 'es' | 'en') {
+function mountPanelWith(locale: 'es' | 'en', billing: ModuleBilling = BILLING) {
   const i18n = createI18n({
     legacy: false,
     locale,
     fallbackLocale: 'en',
     messages: { es, en } as never,
   });
-  return mount(ModulePlanPanel, {
-    props: { moduleId: 'whatsapp_inbox', billing: BILLING },
+  const w = mount(ModulePlanPanel, {
+    props: { moduleId: 'whatsapp_inbox', billing },
     global: { plugins: [i18n] },
   });
+  return { w, i18n };
+}
+
+function mountPanel(locale: 'es' | 'en') {
+  return mountPanelWith(locale).w;
 }
 
 beforeEach(() => {
@@ -99,6 +106,50 @@ describe('ModulePlanPanel — what a plan includes (hub#1604)', () => {
     // never reach the screen is the identifier itself, underscores and all.
     expect(visibleText(w)).toContain('Incluye 30 conversations per month');
     expect(visibleText(w)).not.toContain('conversations_per_month');
+  });
+
+  it('keeps the English of a metric the module locale does not name: older locale, newer metric', async () => {
+    // The locale shipped with an earlier release only knows `conversations_per_month`; the manifest
+    // now declares a second metric. That one comes out as English prose — never the raw identifier,
+    // never a bare number with nothing after it — while the known one stays translated.
+    loadModuleLocale.mockResolvedValue({
+      billing: { quota: { conversations_per_month: 'conversaciones al mes' } },
+    });
+    const billing = {
+      tiers: [
+        {
+          slug: 'free', name: 'WhatsApp Free', price: 0, interval: 'month',
+          quota: { conversations_per_month: 30, messages_per_month: 100 },
+        },
+      ],
+    } as unknown as ModuleBilling;
+
+    const { w } = mountPanelWith('es', billing);
+    await flushPromises();
+
+    expect(visibleText(w)).toContain('Incluye 30 conversaciones al mes · 100 messages per month');
+    expect(visibleText(w)).not.toContain('messages_per_month');
+  });
+
+  it('re-asks the module when the language on screen changes, like the settings screen does', async () => {
+    loadModuleLocale.mockImplementation(async (_base, lang) => ({
+      billing: {
+        quota: {
+          conversations_per_month: lang === 'es' ? 'conversaciones al mes' : 'chats per month',
+        },
+      },
+    }));
+    const { w, i18n } = mountPanelWith('es');
+    await flushPromises();
+    expect(visibleText(w)).toContain('Incluye 30 conversaciones al mes');
+
+    // Same screen, still open: the person switches the hub to English from the profile.
+    i18n.global.locale.value = 'en';
+    await flushPromises();
+
+    expect(loadModuleLocale).toHaveBeenLastCalledWith(expect.stringContaining('whatsapp_inbox'), 'en');
+    expect(visibleText(w)).toContain('Includes 30 chats per month');
+    expect(visibleText(w)).not.toContain('conversaciones al mes');
   });
 
   it('asks the module for the translations of the language actually on screen', async () => {
