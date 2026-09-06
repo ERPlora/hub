@@ -50,7 +50,11 @@ export function quotaMetricLabel(
   locale: ModuleBillingLocale | undefined,
   metric: string,
 ): string {
-  const translated = locale?.quota?.[metric]?.trim();
+  const raw = locale?.quota?.[metric];
+  // Only a string is a label. A module author who types the limit where the label goes
+  // (`"conversations_per_month": 30`) must not blank the whole tab with a render error: the runtime
+  // promises that an invalid locale never breaks a screen, so English takes over here as well.
+  const translated = typeof raw === 'string' ? raw.trim() : '';
   if (translated) return translated;
   // A metric made only of separators humanises to nothing; then its own name is the last resort,
   // because a bare number tells the customer even less than an ugly word does.

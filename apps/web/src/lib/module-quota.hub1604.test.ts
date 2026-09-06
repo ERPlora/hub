@@ -1,6 +1,11 @@
 // What a paid tier INCLUDES, in words the customer reads — hub#1604.
 import { describe, expect, it } from 'vitest';
-import { humanizeQuotaMetric, quotaLabel, quotaMetricLabel } from './module-quota';
+import {
+  humanizeQuotaMetric,
+  quotaLabel,
+  quotaMetricLabel,
+  type ModuleBillingLocale,
+} from './module-quota';
 import type { BillingTierDef } from '@erplora/module-types';
 
 const tier = (quota: unknown): BillingTierDef =>
@@ -21,6 +26,15 @@ describe('quotaMetricLabel', () => {
   it('treats a blank translation as absent: an empty label is worse than an English one', () => {
     expect(quotaMetricLabel({ quota: { conversations_per_month: '   ' } }, 'conversations_per_month'))
       .toBe('conversations per month');
+  });
+
+  it('falls back to English when the "translation" is not a string, instead of breaking the screen', () => {
+    // A module author who types the limit where the label goes (`"conversations_per_month": 30`)
+    // must not blank the whole «Plan» tab with a render error: the runtime promises that an invalid
+    // locale never breaks a screen (`load_locales` is best-effort), so English takes over here too.
+    const broken = { quota: { conversations_per_month: 30 } } as unknown as ModuleBillingLocale;
+
+    expect(quotaMetricLabel(broken, 'conversations_per_month')).toBe('conversations per month');
   });
 
   it('never hands back a metric that reads as an identifier', () => {
