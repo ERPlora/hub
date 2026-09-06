@@ -98,8 +98,12 @@ pub(crate) const CSP_BASE: &str = "default-src 'self'; \
 ///
 /// En un navegador a secas son inertes: `ipc:` no es un esquema navegable y `ipc.localhost` no
 /// resuelve. Cuestan cero fuera de la app.
-pub(crate) const CSP_CONNECT_BASE: &str =
-    "connect-src 'self' ipc: http://ipc.localhost https://*.facebook.com https://graph.facebook.com";
+pub(crate) const CSP_CONNECT_BASE: &str = "connect-src 'self' ipc: http://ipc.localhost";
+
+/// What Meta's JS SDK calls on its own once loaded (hub#1600): the handshake with its popup and
+/// its hidden frames on `*.facebook.com`, and the Graph. Appended AFTER the Cloud origin so the
+/// policy keeps reading «this hub, its Cloud, then Meta», and exact hosts, never `https:`.
+pub(crate) const CSP_CONNECT_META: &str = "https://*.facebook.com https://graph.facebook.com";
 
 /// La política que sirve este hub. Lo único que no puede ser constante es el **origen del Cloud**:
 /// el front habla directo con él para el login, el refresh de JWT y las facturas
@@ -111,8 +115,8 @@ pub(crate) const CSP_CONNECT_BASE: &str =
 /// Sin Cloud configurado (dev, binario suelto) la política se queda en `'self'`: nada que permitir.
 pub fn default_csp(cloud_base_url: &str) -> String {
     match cloud_origin(cloud_base_url) {
-        Some(origin) => format!("{CSP_BASE}; {CSP_CONNECT_BASE} {origin}"),
-        None => format!("{CSP_BASE}; {CSP_CONNECT_BASE}"),
+        Some(origin) => format!("{CSP_BASE}; {CSP_CONNECT_BASE} {origin} {CSP_CONNECT_META}"),
+        None => format!("{CSP_BASE}; {CSP_CONNECT_BASE} {CSP_CONNECT_META}"),
     }
 }
 
