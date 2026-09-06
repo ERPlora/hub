@@ -14,78 +14,81 @@
   aquí y refresca el estado (además del recheck-on-focus, que sigue).
 
   El Cloud NO expone el slug del tier actual (ni module-subscription ni check_ownership lo traen),
-  así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global y los CTAs se
-  habilitan según ese estado.
+  así que en v1 NO se resalta un tier concreto: se muestra solo el `status` global.
+
+  ## Por qué aquí no hay una tarjeta propia (hub#1605)
+
+  El panel pintaba sus tiers con `ion-card` + `ion-card-header` y una rejilla propia. Dos costes,
+  medidos sobre el hub real:
+
+  - `ion-card-header` y `ion-badge` son Shadow DOM y su padding vive en `:host`. El `padding: 0`
+    del preflight de Tailwind es una regla del DOCUMENTO, y esa gana siempre a `:host`, así que
+    títulos y badge quedaban pegados al borde mientras el cuerpo iba sangrado. Las pantallas que se
+    ven bien (Perfil) lo pagan escribiendo su propio padding a mano.
+  - Este panel se inyecta para cada módulo que declara `billing`, así que un defecto aquí no es una
+    pantalla: es una por cada módulo de pago.
+
+  OutfitKit ya trae las dos piezas —`ok-pricing-card` y `ok-status-pill`— y ambas llevan su padding
+  dentro de su propio shadow root, donde el preflight no llega. Reutilizar antes que crear.
 -->
 <template>
   <div class="plan-panel">
-    <!-- Estado de la suscripción actual -->
-    <ion-card class="status-card">
-      <ion-card-header>
-        <div class="status-head">
-          <ion-card-title>{{ t('modulePlan.statusTitle') }}</ion-card-title>
-          <ion-badge :color="statusColor">{{ statusLabel }}</ion-badge>
-        </div>
-      </ion-card-header>
-      <ion-card-content>
-        <div v-if="loadingStatus" class="flex items-center gap-2 opacity-70">
-          <ion-spinner name="crescent" /> {{ t('modulePlan.loadingStatus') }}
-        </div>
-        <template v-else>
-          <p v-if="sub && sub.status === 'trialing' && sub.trialEnd" class="status-line">
-            {{ t('modulePlan.trialEnds', { date: fmtDate(sub.trialEnd) }) }}
-          </p>
-          <p v-else-if="sub && sub.periodEnd && (sub.status === 'active' || sub.status === 'canceled')" class="status-line">
-            {{ sub.status === 'canceled'
-              ? t('modulePlan.cancelsOn', { date: fmtDate(sub.periodEnd) })
-              : t('modulePlan.renewsOn', { date: fmtDate(sub.periodEnd) }) }}
-          </p>
-          <p v-else class="status-line opacity-70">{{ statusHint }}</p>
+    <!-- Estado de la suscripción. `ok-inline-feedback` es la pieza que el shell ya usa para un
+         bloque con título, cuerpo y acciones (BillingPage, SetupBlockingStrip). -->
+    <ok-inline-feedback :tone="statusTone" :icon="statusIcon" :heading="t('modulePlan.statusTitle')">
+      <div v-if="loadingStatus" class="flex items-center gap-2 opacity-70">
+        <ion-spinner name="crescent" /> {{ t('modulePlan.loadingStatus') }}
+      </div>
+      <template v-else>
+        <ok-status-pill :tone="statusTone" :label="statusLabel" size="sm" />
+        <p v-if="sub && sub.status === 'trialing' && sub.trialEnd" class="status-line">
+          {{ t('modulePlan.trialEnds', { date: fmtDate(sub.trialEnd) }) }}
+        </p>
+        <p
+          v-else-if="sub && sub.periodEnd && (sub.status === 'active' || sub.status === 'canceled')"
+          class="status-line"
+        >
+          {{ sub.status === 'canceled'
+            ? t('modulePlan.cancelsOn', { date: fmtDate(sub.periodEnd) })
+            : t('modulePlan.renewsOn', { date: fmtDate(sub.periodEnd) }) }}
+        </p>
+        <p v-else class="status-line opacity-70">{{ statusHint }}</p>
 
-          <!-- Dónde se gestiona. Frase, no enlace: la página del módulo en el SaaS tiene checkout
-               y llevar ahí desde dentro de la app es steering (hub#479). El botón «Cancelar» que
-               había aquí abría ese mismo destino, así que se fue con los demás. -->
-          <p class="status-line opacity-70">{{ t('modulePlan.managedInAccount') }}</p>
-          <div class="status-actions">
-            <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). -->
-            <ion-button size="small" fill="outline" :disabled="loadingStatus" @click="onCheckPurchase">
-              <HubIcon name="refresh-outline" slot="start" />
-              {{ t('modulePlan.checkPurchase') }}
-            </ion-button>
-          </div>
-        </template>
-      </ion-card-content>
-    </ion-card>
+        <!-- Dónde se gestiona. Frase, no enlace: la página del módulo en el SaaS tiene checkout y
+             llevar ahí desde dentro de la app es steering (hub#479). El enlace a la página de
+             CUENTA —que sí valdría— espera a que exista en el SaaS: ERPlora/saas#1901 y hub#1608. -->
+        <p class="status-line opacity-70">{{ t('modulePlan.managedInAccount') }}</p>
+      </template>
+      <!-- Re-consulta manual: "ya lo he contratado" (además del recheck-on-focus). -->
+      <ion-button
+        slot="actions"
+        size="small"
+        fill="outline"
+        :disabled="loadingStatus"
+        @click="onCheckPurchase"
+      >
+        <HubIcon name="refresh-outline" slot="start" />
+        {{ t('modulePlan.checkPurchase') }}
+      </ion-button>
+    </ok-inline-feedback>
 
-    <!-- Tiers del manifest -->
-    <div v-if="tiers.length" class="tiers-grid">
-      <ion-card v-for="tier in tiers" :key="tier.slug" class="tier-card">
-        <ion-card-header>
-          <ion-card-title>{{ tier.name }}</ion-card-title>
-          <ion-card-subtitle>{{ priceLabel(tier) }}</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-          <ul class="tier-meta">
-            <li v-if="tier.trial_days">
-              <HubIcon name="time-outline" />
-              {{ t('modulePlan.trialDays', { n: tier.trial_days }) }}
-            </li>
-            <li v-if="quotaLabel(tier)">
-              <HubIcon name="cube-outline" />
-              {{ t('modulePlan.quota', { quota: quotaLabel(tier) }) }}
-            </li>
-            <li v-if="tier.metered && tier.overage_price != null">
-              <HubIcon name="cash-outline" />
-              {{ t('modulePlan.overage', { price: fmtMoney(tier.overage_price) }) }}
-            </li>
-          </ul>
-          <!-- Aquí vivía el botón «Comprar»/«Mejorar» (icono de carrito) que abría el checkout del
-               SaaS en el navegador. Los tiers se siguen VIENDO —saber qué incluye cada uno y qué
-               cuesta es información, no un camino al pago—, pero desde el hub no se contrata. -->
-        </ion-card-content>
-      </ion-card>
-    </div>
-    <p v-else class="opacity-70 py-6 text-center">{{ t('modulePlan.noTiers') }}</p>
+    <!-- Tiers del manifest: rejilla de Ionic, tarjeta de OutfitKit. Aquí vivía el botón
+         «Comprar»/«Mejorar» que abría el checkout del SaaS; los tiers se siguen VIENDO —qué incluye
+         cada uno y qué cuesta es información, no un camino al pago—, pero desde el hub no se
+         contrata. -->
+    <ion-grid v-if="tiers.length" class="ion-no-padding">
+      <ion-row>
+        <ion-col v-for="tier in tiers" :key="tier.slug" size="12" size-md="6" size-lg="3">
+          <ok-pricing-card
+            :name="tier.name"
+            :price="priceLabel(tier)"
+            :period="periodLabel(tier)"
+            :features.prop="tierFeatures(tier)"
+          />
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+    <ok-empty-state v-else icon="pricetag-outline" :heading="t('modulePlan.noTiers')" />
 
     <ion-toast
       :is-open="toastOpen"
@@ -100,10 +103,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import {
-  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
-  IonBadge, IonButton, IonSpinner, IonToast,
-} from '@ionic/vue';
+import { IonButton, IonCol, IonGrid, IonRow, IonSpinner, IonToast } from '@ionic/vue';
 import HubIcon from './HubIcon.vue';
 import {
   cloudModuleSubscription,
@@ -138,16 +138,25 @@ const isOwned = computed(() => {
 // `canCancel` gateaba el botón «Cancelar», retirado con el resto de controles que aterrizaban en el
 // checkout (hub#479). Cancelar sigue siendo posible: en erplora.com.
 
-// Estado → color del badge / etiqueta i18n.
-const STATUS_COLOR: Record<ModuleSubscriptionStatus, 'success' | 'warning' | 'danger' | 'medium'> = {
+/** Tono compartido por el bloque y la píldora: el vocabulario de OutfitKit, no los colores de Ionic. */
+type Tone = 'success' | 'warning' | 'danger' | 'neutral';
+const STATUS_TONE: Record<ModuleSubscriptionStatus, Tone> = {
   active: 'success',
   trialing: 'success',
   past_due: 'warning',
   canceled: 'warning',
   expired: 'danger',
-  none: 'medium',
+  // No tener plan no es un fallo, así que no toma un tono de alarma.
+  none: 'neutral',
 };
-const statusColor = computed(() => (sub.value ? STATUS_COLOR[sub.value.status] : 'medium'));
+const STATUS_ICON: Record<Tone, string> = {
+  success: 'checkmark-circle-outline',
+  warning: 'alert-circle-outline',
+  danger: 'close-circle-outline',
+  neutral: 'pricetag-outline',
+};
+const statusTone = computed<Tone>(() => (sub.value ? STATUS_TONE[sub.value.status] : 'neutral'));
+const statusIcon = computed(() => STATUS_ICON[statusTone.value]);
 const statusLabel = computed(() => {
   const s = sub.value?.status ?? 'none';
   return t(`modulePlan.status.${s}`);
@@ -177,12 +186,28 @@ function quotaLabel(tier: BillingTierDef): string {
     .join(' · ');
 }
 
+/** El importe. El periodo viaja aparte para que la tarjeta pueda componerlo a su manera. */
 function priceLabel(tier: BillingTierDef): string {
   if (!tier.price) return t('modulePlan.free');
-  const amount = fmtMoney(tier.price);
-  if (tier.interval === 'one_time') return amount;
-  const per = tier.interval === 'year' ? t('modulePlan.perYear') : t('modulePlan.perMonth');
-  return `${amount}${per}`;
+  return fmtMoney(tier.price);
+}
+
+/** «/mes», «/año» — vacío para un pago único y para el gratuito, que no repiten. */
+function periodLabel(tier: BillingTierDef): string {
+  if (!tier.price || tier.interval === 'one_time') return '';
+  return tier.interval === 'year' ? t('modulePlan.perYear') : t('modulePlan.perMonth');
+}
+
+/** Lo que incluye el tier, en la lista que pinta `ok-pricing-card`. */
+function tierFeatures(tier: BillingTierDef): string[] {
+  const out: string[] = [];
+  if (tier.trial_days) out.push(t('modulePlan.trialDays', { n: tier.trial_days }));
+  const quota = quotaLabel(tier);
+  if (quota) out.push(t('modulePlan.quota', { quota }));
+  if (tier.metered && tier.overage_price != null) {
+    out.push(t('modulePlan.overage', { price: fmtMoney(tier.overage_price) }));
+  }
+  return out;
 }
 
 function notify(msg: string, color: 'primary' | 'success' | 'danger'): void {
@@ -232,47 +257,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Fluid like every other shell surface: the page gutter is the only horizontal limit (hub#1605). */
+/* Fluido como el resto de superficies del shell: el único límite horizontal es el gutter de la
+   página (hub#1605). Lo demás lo ponen los componentes. */
 .plan-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
-.status-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
 .status-line {
   margin: 0;
-}
-.status-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-.tiers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-.tier-card {
-  margin: 0;
-}
-.tier-meta {
-  list-style: none;
-  margin: 0 0 1rem;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.tier-meta li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
 }
 </style>

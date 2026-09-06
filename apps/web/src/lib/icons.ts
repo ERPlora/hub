@@ -27,6 +27,7 @@ import cubeOutline from "~icons/ion/cube-outline?raw";
 import documentTextOutline from "~icons/ion/document-text-outline?raw";
 import downloadOutline from "~icons/ion/download-outline?raw";
 import ellipse from "~icons/ion/ellipse?raw";
+import pricetagOutline from "~icons/ion/pricetag-outline?raw";
 import removeOutline from "~icons/ion/remove-outline?raw";
 import extensionPuzzleOutline from "~icons/ion/extension-puzzle-outline?raw";
 import fingerPrintOutline from "~icons/ion/finger-print-outline?raw";
@@ -209,6 +210,8 @@ const SVGS: Record<string, string> = {
   "mail-outline": mailOutline,
   "people-outline": peopleOutline,
   "person-circle-outline": personCircleOutline,
+  // Estado «sin plan» y vacío de tiers en la pestaña «Plan» de un módulo (hub#1605).
+  "pricetag-outline": pricetagOutline,
   // Declared in TypeScript, not in the markup: these are the `icon:` of `ok-data-table` actions
   // (hub#793). The guard only scanned tags, so they had been coming out EMPTY for months — «Dar de
   // baja» in Employees was, literally, an invisible button.
