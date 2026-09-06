@@ -1596,6 +1596,8 @@ export default {
     cancelsOn: 'Se cancela el {date}',
     managedInAccount: 'Los planes de este módulo se gestionan desde tu cuenta de ERPlora, en erplora.com.',
     checkPurchase: 'Ya lo he contratado — comprobar',
+    managePlan: 'Gestionar plan',
+    managePlanError: 'No se pudo abrir la gestión del plan. Inténtalo de nuevo.',
     purchaseDetected: 'Confirmado. Tu plan se ha actualizado.',
     status: {
       active: 'Activo',

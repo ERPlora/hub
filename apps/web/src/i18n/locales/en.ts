@@ -1752,6 +1752,8 @@ export default {
     // buttons that carried them (hub#479).
     managedInAccount: 'Plans for this module are managed from your ERPlora account at erplora.com.',
     checkPurchase: 'I already subscribed — check',
+    managePlan: 'Manage plan',
+    managePlanError: 'Could not open plan management. Try again.',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
     status: {
       active: 'Active',
