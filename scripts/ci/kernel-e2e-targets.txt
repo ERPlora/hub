@@ -50,7 +50,6 @@ reset_undo_test
 # ── Pendientes de hub#1264 ─────────────────────────────────────────────────────────────────
 # Afirman comportamiento de UN módulo y se van con él cuando su slice aterrice. Cada slice borra
 # el `.rs` y su línea de aquí, en la misma PR. Cuando esta sección quede vacía, hub#1264 terminó.
-appointments_availability_e2e                    # → appointments
 reset_fiscal_test                                # → verifactu
 sale_charged_invoice_dead_e2e                    # → sales
 staff_commissions_e2e                            # → staff
