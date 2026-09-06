@@ -27,6 +27,13 @@
       "schema": "commands/booking_create.schema.json",
       "ai": { "description": "Book an appointment for a customer at a given slot." }
     },
+    "agenda.availability.check": {
+      "permission": "agenda.view",
+      "handler": { "type": "native", "function": "check_availability" },
+      "ai": {
+        "description": "Is a given slot still free? Answers a question about the diary; it books nothing and writes nothing."
+      }
+    },
     "agenda.booking.cancel": {
       "permission": "agenda.cancel",
       "transaction": true,

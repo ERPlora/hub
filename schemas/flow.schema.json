@@ -217,7 +217,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "Escrituras que el modelo puede PROPONER. Que se ejecuten o no lo decide `policy`."
+              "description": "Operaciones `command` que el modelo puede invocar. Las que CAMBIAN algo son propuestas: que se ejecuten o no lo decide `policy`. Las que solo CONTESTAN se ejecutan siempre en el turno y su respuesta vuelve al modelo, igual que una `query` (hub#1595) — un command puede ser una lectura porque contestar cruzando datos de otro módulo exige un handler, no porque escriba. Lo decide el hub con la misma regla que el asistente (`assistant::command_only_answers`): sin `sql`, sin `emit`, sin `min_affected_rows`/`expect_rows`, con `risk` normal, y pidiendo un permiso que el módulo también le pide a alguna de sus propias queries. La ausencia de señal se lee SIEMPRE como escritura."
             }
           }
         },
@@ -227,7 +227,7 @@
             "manual"
           ],
           "default": "manual",
-          "description": "Solo `kind: ai` — qué pasa con una escritura que propone el modelo (ADR-0283 D3). `manual` (POR DEFECTO): se convierte en una fila de `_flow_approvals` y el turno TERMINA; al aprobar se ejecuta EXACTAMENTE lo propuesto, con re-chequeo del grant en ese momento y sin volver a entrar al modelo. `auto`: se ejecuta en el turno, por la puerta de `Origin::Automation`. El defecto es el restrictivo a propósito: la opción permisiva es la que nadie escribe y todo el mundo asume, y aquí significaría un modelo escribiendo en la base de datos del negocio a las 3 de la mañana."
+          "description": "Solo `kind: ai` — qué pasa con una escritura que propone el modelo (ADR-0283 D3). Solo gobierna lo que CAMBIA algo: una operación que únicamente contesta se ejecuta en el turno con cualquiera de las dos políticas (hub#1595), porque una confirmación existe para evitar un cambio por sorpresa y ahí no hay cambio. `manual` (POR DEFECTO): la escritura se convierte en una fila de `_flow_approvals` y el turno TERMINA; al aprobar se ejecuta EXACTAMENTE lo propuesto, con re-chequeo del grant en ese momento y sin volver a entrar al modelo. `auto`: se ejecuta en el turno, por la puerta de `Origin::Automation`. El defecto es el restrictivo a propósito: la opción permisiva es la que nadie escribe y todo el mundo asume, y aquí significaría un modelo escribiendo en la base de datos del negocio a las 3 de la mañana."
         },
         "max_iters": {
           "type": "integer",
