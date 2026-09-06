@@ -842,6 +842,22 @@ function stop(): void {
   saveAssistantHistory();
 }
 
+// The thread REPLACED from outside while an answer is still arriving — `clearAssistantHistory()`
+// on the PIN hand-over (hub#1544) or on logout — takes the stream with it. `streamAssistant` runs
+// every tool call and every next round through `runtimeHeaders()`, i.e. through whoever holds the
+// session when that call is made: left running across a hand-over, the previous person's turn
+// would present ITS write-confirm card to the cashier who just arrived, execute the action under
+// her session, and keep the composer locked until an answer landed in a bubble nobody can see any
+// more. Not `stop()`: that re-saves the thread, and there is nothing to save over the key the
+// caller just removed. A ref only fires this on `.value` replacement — a turn pushing onto the
+// same array never does.
+watch(assistantMessages, () => {
+  if (!streaming.value) return;
+  abort?.();
+  abort = null;
+  streaming.value = false;
+});
+
 // ── Report an issue (hub#946) ───────────────────────────────────────────────────────────────────
 // Microsoft Store policy 11.16: the user must be able to report inappropriate AI-generated
 // content. Only FINISHED answers are reportable — the live bubble is still being written.
