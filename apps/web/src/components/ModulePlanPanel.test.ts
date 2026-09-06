@@ -14,11 +14,23 @@
 // OutfitKit already ships both pieces — `ok-pricing-card` (name/price/period/features) and
 // `ok-status-pill` — and they carry their padding inside their own shadow root, so the preflight
 // cannot flatten them. Reuse before create is the rule; this test is what keeps it.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 
 vi.mock('./HubIcon.vue', () => ({ default: { name: 'HubIcon', template: '<span />' } }));
+
+const { getDeviceContext, openExternal, saasDoor } = vi.hoisted(() => ({
+  getDeviceContext: vi.fn(async () => ({ distribution: 'web' })),
+  openExternal: vi.fn(async () => {}),
+  saasDoor: vi.fn(async (path: string) => `https://erplora.com${path}`),
+}));
+vi.mock('../lib/device', () => ({ getDeviceContext }));
+vi.mock('../lib/open-external', () => ({ openExternal }));
+vi.mock('../lib/saas-door', () => ({ saasDoor }));
+vi.mock('../lib/config', () => ({
+  config: { hubId: 'hub-1234', cloudApiUrl: 'https://erplora.com' },
+}));
 
 const { cloudModuleSubscription } = vi.hoisted(() => ({
   cloudModuleSubscription: vi.fn(async () => ({ status: 'none' })),
@@ -95,5 +107,46 @@ describe('ModulePlanPanel', () => {
     expect(w.find('ion-card').exists()).toBe(false);
     expect(w.find('ion-card-header').exists()).toBe(false);
     expect(w.find('ion-badge').exists()).toBe(false);
+  });
+});
+
+// ── El enlace a la gestión del plan (hub#1608) ─────────────────────────────────────────────────
+//
+// Faltaba: la pantalla decía «se gestionan en tu cuenta» y no llevaba a ninguna parte. El destino
+// permitido lo abrió ERPlora/saas#1901 — la página de cuenta del hub, no la ficha del marketplace,
+// que es la que `no-purchase-steering.test.ts` prohíbe nombrar.
+describe('ModulePlanPanel · gestión del plan', () => {
+  beforeEach(() => {
+    getDeviceContext.mockResolvedValue({ distribution: 'web' });
+    openExternal.mockClear();
+    saasDoor.mockClear();
+  });
+
+  it('offers the link and it lands on the account page of THIS hub and THIS module', async () => {
+    const w = mountPanel();
+    await flushPromises();
+
+    const button = w.find('[data-testid="module-manage-plan"]');
+    expect(button.exists()).toBe(true);
+
+    await button.trigger('click');
+    await flushPromises();
+
+    expect(saasDoor).toHaveBeenCalledWith(
+      '/dashboard/hubs/hub-1234/modules/whatsapp_inbox/plan/?utm_source=hub',
+      expect.stringContaining('/dashboard/hubs/hub-1234/modules/whatsapp_inbox/plan/'),
+      expect.any(String),
+    );
+    expect(openExternal).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not offered on Google Play, where the reviewer reads it as steering (hub#756)', async () => {
+    getDeviceContext.mockResolvedValue({ distribution: 'play' });
+    const w = mountPanel();
+    await flushPromises();
+
+    expect(w.find('[data-testid="module-manage-plan"]').exists()).toBe(false);
+    // Y el de comprobar SE QUEDA: sin él, quien contrató en el navegador no tiene cómo refrescar.
+    expect(w.find('[data-testid="module-check-purchase"]').exists()).toBe(true);
   });
 });
