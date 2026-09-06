@@ -1,0 +1,226 @@
+{
+  "GET /api/hub/context": {
+    "name": "Hub context — who am I talking to (public)",
+    "description": "The hub's identity and state before any session: hub_id, cloud_base_url, language, currency, whether a machine is registered, the PIN users. First request of every visit."
+  },
+  "POST /api/auth/cloud": {
+    "name": "Open a session with the SaaS JWT",
+    "description": "Send the SaaS user's JWT (`Authorization: Bearer {{access_token}}` — what the SaaS collection's Login saved). The hub verifies it (RS256), links or provisions the local user and opens a session. The response's `token` is saved as `hub_session`.",
+    "headers": {
+      "Authorization": "Bearer {{access_token}}"
+    },
+    "body": {
+      "name": "{{hub_user_name}}"
+    },
+    "test": [
+      "const j = pm.response.json();",
+      "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+      "if (j.token) save(\"hub_session\", j.token);",
+      "if (j.user && j.user.name) save(\"hub_user_name\", j.user.name);"
+    ]
+  },
+  "POST /api/auth/set-pin": {
+    "name": "Set (or change) my PIN",
+    "description": "Sets the PIN of the session's user — SIX digits. `current_pin` is required when the user already has one (hub#1430); omit it right after the first cloud login.",
+    "body": {
+      "pin": "{{hub_pin}}"
+    }
+  },
+  "POST /api/auth/pin": {
+    "name": "Open a session with name + PIN (the till's day-to-day login)",
+    "description": "Local login. The response's `token` is saved as `hub_session`. `device_id` identifies the client: the device-trust gate refuses a login that does not identify its device (`device_unidentified`).",
+    "body": {
+      "name": "{{hub_user_name}}",
+      "pin": "{{hub_pin}}",
+      "device_id": "{{device_id}}"
+    },
+    "test": [
+      "const j = pm.response.json();",
+      "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+      "if (j.token) save(\"hub_session\", j.token);"
+    ]
+  },
+  "POST /api/auth/badge": {
+    "name": "Open a session with a badge (keyboard-wedge reader or iButton)",
+    "body": {
+      "badge": "<badge>",
+      "device_id": "{{device_id}}"
+    },
+    "test": [
+      "const j = pm.response.json();",
+      "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+      "if (j.token) save(\"hub_session\", j.token);"
+    ]
+  },
+  "POST /api/auth/logout": {
+    "name": "Close the session of X-Hub-Session",
+    "headers": {
+      "X-Hub-Session": "{{hub_session}}"
+    }
+  },
+  "POST /api/keys": {
+    "name": "Create an API key (the secret is shown ONCE — saved as hub_api_key)",
+    "description": "Admin session. `access`: full · read_only · write_only · custom (then `scope` lists {module, read, write}). The secret starts with `erpl_live_` and is sent as `Authorization: Bearer` on `/api/v1/{module}/q|c/…` and on `/ws`.",
+    "body": {
+      "name": "Postman",
+      "access": "full",
+      "rate_limit_per_minute": 120
+    },
+    "test": [
+      "const j = pm.response.json();",
+      "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+      "const d = j.data || j;",
+      "if (d.secret) save(\"hub_api_key\", d.secret);"
+    ]
+  },
+  "POST /api/keys/:id/rotate": {
+    "name": "Rotate an API key (new secret, saved as hub_api_key)",
+    "test": [
+      "const j = pm.response.json();",
+      "const save = (k, v) => { pm.collectionVariables.set(k, v); if (pm.environment.name) pm.environment.set(k, v); };",
+      "const d = j.data || j;",
+      "if (d.secret) save(\"hub_api_key\", d.secret);"
+    ]
+  },
+  "GET /api/keys": {
+    "name": "API keys of the hub (without secrets)"
+  },
+  "DELETE /api/keys/:id": {
+    "name": "Revoke an API key"
+  },
+  "POST /api/query": {
+    "name": "Run a declarative query of a module",
+    "description": "`name` is `<module>.<query>` as declared in the module's manifest; `params` are its bound parameters. Answers `{ok, data: rows}`. Any credential: session or API key.",
+    "body": {
+      "name": "<module>.<query>",
+      "params": {}
+    }
+  },
+  "POST /api/command": {
+    "name": "Run a declarative command of a module",
+    "description": "`name` is `<module>.<command>`; `payload` follows the command's JSON Schema. Answers `{ok, data}` or `{ok: false, error: {code, message}}`. Any credential: session or API key.",
+    "body": {
+      "name": "<module>.<command>",
+      "payload": {}
+    }
+  },
+  "GET /api/v1/openapi.json": {
+    "name": "OpenAPI of THIS hub's modules — import it into Postman",
+    "description": "The `expose_api` operations of the modules installed on this hub (`/api/v1/{module}/q|c/…`), as OpenAPI 3.1. Per hub: install a module and the API grows. Needs the setting `api_docs_enabled` = true (404 otherwise) and a user session. Import the response into Postman and use `Authorization: Bearer {{hub_api_key}}` on the imported requests."
+  },
+  "GET /api/blueprints/catalog": {
+    "name": "Blueprint catalogue (proxied from the SaaS)",
+    "description": "The blueprints published in the marketplace, by sector. Needed once, to pick the one the bench is built from."
+  },
+  "GET /api/blueprints/:slug/download": {
+    "name": "Download a catalogue blueprint (zip)",
+    "description": "The `*.blueprint.zip` of `slug`. Save it and feed it to POST /api/hub/import/inspect."
+  },
+  "POST /api/hub/import/inspect": {
+    "name": "Inspect a blueprint zip before importing (binary body)",
+    "description": "Body = the zip bytes (`application/octet-stream`, pick the file in Postman). Validates it and stages it: the response's `upload_id` goes into POST /api/hub/import.",
+    "file": true
+  },
+  "POST /api/hub/import": {
+    "name": "Import a staged blueprint (migrate-style)",
+    "description": "`upload_id` from inspect; `selection` chooses what to apply; `origin` (catalogue slug + version) makes a partial import retryable. Missing modules are installed from the marketplace best-effort; fiscal material lands as `pending`.",
+    "body": {
+      "upload_id": "<upload_id from inspect>",
+      "selection": {
+        "users": true,
+        "settings": true,
+        "fiscal": false,
+        "media": true,
+        "modules": []
+      },
+      "origin": {
+        "slug": "",
+        "version": ""
+      }
+    }
+  },
+  "POST /api/hub/export": {
+    "name": "Export THIS hub as a blueprint zip",
+    "description": "The bench's identity for recreation: everything selected, as a `*.blueprint.zip`. `settings_items` narrows the settings keys (never widens them, ADR-0195).",
+    "body": {
+      "name": "banco-pre",
+      "locale": "es",
+      "selection": {
+        "users": true,
+        "settings": true,
+        "media": true,
+        "modules": []
+      }
+    }
+  },
+  "GET /api/hub/export/tables": {
+    "name": "Tables an export would cover"
+  },
+  "POST /api/members": {
+    "name": "Invite a SaaS user to this hub (per-hub membership, ADR-0201)",
+    "body": {
+      "email": "user@example.com",
+      "role": "admin"
+    }
+  },
+  "GET /api/members": {
+    "name": "SaaS users with a membership on this hub"
+  },
+  "DELETE /api/members/:email": {
+    "name": "Remove a membership"
+  },
+  "GET /api/settings": {
+    "name": "Hub settings (hub_settings keys)"
+  },
+  "PUT /api/settings": {
+    "name": "Update hub settings (partial object)",
+    "description": "An object of `hub_settings` keys to write. Admin session.",
+    "body": {
+      "<setting_key>": "<value>"
+    }
+  },
+  "GET /api/hub/users": {
+    "name": "Local users of the hub (PIN users)"
+  },
+  "POST /api/hub/users": {
+    "name": "Create a local user (PIN user)",
+    "description": "`NewHubUser` (crates/runtime/src/hub_users.rs): name, email, role, pin, badge. Admin session.",
+    "body": {
+      "name": "<name>",
+      "email": "",
+      "role": "cashier",
+      "pin": "1234",
+      "badge": ""
+    }
+  },
+  "PUT /api/devices/:device_id": {
+    "name": "Rename a device",
+    "body": {
+      "name": "<device name>"
+    }
+  },
+  "GET /api/devices": {
+    "name": "Devices that have logged into this hub"
+  },
+  "POST /api/hub/flows/:id/run": {
+    "name": "Run a flow by hand (the `manual` trigger) — returns the run id"
+  },
+  "GET /api/hub/flows/schema": {
+    "name": "The flow definition schema (triggers, steps, grants)"
+  },
+  "GET /api/hub/events": {
+    "name": "Recent events of the hub (the bus)"
+  },
+  "GET /api/hub/events/dead": {
+    "name": "Dead-lettered events"
+  },
+  "GET /healthz": {
+    "name": "Liveness (public)"
+  },
+  "GET /readyz": {
+    "name": "Readiness — what the container HEALTHCHECK reads (public)"
+  },
+  "GET /modules/:id/*path": {
+    "name": "Static asset of an installed module (public)"
+  }
+}
