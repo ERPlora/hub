@@ -454,7 +454,6 @@ async function downloadInvoice(invoice: CloudInvoice): Promise<void> {
 }
 
 .billing-feedback {
-  max-width: 48rem;
-  margin: 1rem auto;
+  margin: 1rem 0;
 }
 </style>

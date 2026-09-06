@@ -17,6 +17,7 @@
 //!   command can never disagree about what a permission means.
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -74,8 +75,38 @@ async fn tab_ids(app: axum::Router, permissions: &str) -> Vec<String> {
         .collect()
 }
 
+/// A scratch dir of this call's own (hub#1607).
+///
+/// It used to be derived from the process id alone, which is the SAME for every test in the
+/// binary: both tests below wiped it with `remove_dir_all` on their way in, so one's delete landed
+/// between the other's `create_dir_all` and its `fs::write` and the write died with `NotFound`.
+/// That is a red `cargo test --workspace` — the only gate before a merge — on a diff that never
+/// touched Rust, which is how a gate stops being read.
+fn scratch_dir() -> PathBuf {
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    // The pid keeps two `cargo test` processes apart; the counter keeps two tests of THIS one apart.
+    std::env::temp_dir().join(format!(
+        "erplora-nav-perm-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+/// hub#1607: two calls must not hand out the same directory.
+///
+/// Deterministic on purpose: the failure it guards is a race, and asserting on a race is how you
+/// get a test that passes on the machine that has the bug.
+#[test]
+fn hub1607_each_call_gets_its_own_scratch_dir() {
+    assert_ne!(
+        scratch_dir(),
+        scratch_dir(),
+        "concurrent tests share this dir and wipe it under each other"
+    );
+}
+
 async fn hub_with_reports() -> Runtime {
-    let tmp = std::env::temp_dir().join(format!("erplora-nav-perm-{}", std::process::id()));
+    let tmp = scratch_dir();
     let _ = fs::remove_dir_all(&tmp);
     let dir = write_module(&tmp);
     let mut rt = Runtime::new(Box::new(fresh_db().await));

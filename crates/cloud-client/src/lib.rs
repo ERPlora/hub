@@ -833,6 +833,49 @@ impl CloudClient {
         self.get("/api/v1/hub/device/whatsapp/plan/", auth)
     }
 
+    /// **What the till needs to open Meta's Embedded Signup popup** (hub#1600, ADR-0452):
+    /// `GET /api/v1/hub/device/whatsapp/config/` → `{configured, app_id, config_id, graph_version}`.
+    /// Public identifiers of the ERPlora app — the app secret and the verify token never leave
+    /// the SaaS. Machine credential: the button is drawn before any user has a cloud JWT.
+    pub fn whatsapp_config(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/config/", auth)
+    }
+
+    /// The numbers connected to THIS hub (`WhatsAppPhoneMapping`): what the «Channel» block of the
+    /// module's settings shows. Machine credential (same door as [`Self::whatsapp_plan`]).
+    pub fn whatsapp_numbers(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/numbers/", auth)
+    }
+
+    /// **Connect the number the popup returned** — `POST /api/v1/hub/device/whatsapp/connect/`.
+    /// The body (`{code, event, waba_id, phone_number_id, business_id}`) is the caller's to build,
+    /// verbatim from Meta's `message` event plus the login callback. The SaaS exchanges the code,
+    /// subscribes the WABA, registers (or, for a WhatsApp Business app number, syncs) and keeps the
+    /// token. Who was at the till has already been checked by the hub (owner/admin session), so the
+    /// machine credential is enough — a cashier signed in by PIN has no cloud JWT to lend.
+    pub fn whatsapp_connect(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/whatsapp/connect/", self.base_url),
+            auth,
+        )
+    }
+
+    /// Stop routing a number to this hub — `POST /api/v1/hub/device/whatsapp/disconnect/<id>/`.
+    /// The id ends up inside a Cloud path, so it is percent-encoded: a `/` typed into it must not
+    /// steer the request to another endpoint of the Cloud.
+    pub fn whatsapp_disconnect(&self, auth: &Auth, phone_number_id: &str) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!(
+                "{}/api/v1/hub/device/whatsapp/disconnect/{}/",
+                self.base_url,
+                encode_path_segment(phone_number_id)
+            ),
+            auth,
+        )
+    }
+
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
     /// registro del Hub reenvía aquí TODO error (core, módulos, panics, frontend), best-effort.
     /// `POST /api/v1/hub/device/error-report/` con la credencial de **máquina** del hub
@@ -1947,6 +1990,89 @@ mod tests {
         assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
         // Never the user JWT: a background tick has no session to borrow one from.
         assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// hub#1600 — what the till needs to open Meta's Embedded Signup popup: the app id and the
+    /// configuration id, PUBLIC ids of our app. Machine credential: the button is drawn before any
+    /// user has a cloud JWT in hand.
+    #[test]
+    fn whatsapp_config_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_config(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/config/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    #[test]
+    fn whatsapp_numbers_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_numbers(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/numbers/"
+        );
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    /// The code Meta's popup handed the till goes to the SaaS as a POST body the caller builds
+    /// (`{code, event, waba_id, phone_number_id, business_id}`); the SaaS exchanges it and keeps
+    /// the token. Who was at the till has already been checked by the hub, so the machine
+    /// credential is enough (ADR-0452).
+    #[test]
+    fn whatsapp_connect_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_connect(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/connect/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+    }
+
+    /// The phone_number_id ends up INSIDE a Cloud path, so it is percent-encoded here: a `/` or a
+    /// `..` typed into it must not steer the request to another endpoint of the Cloud.
+    #[test]
+    fn whatsapp_disconnect_posts_to_the_number_and_encodes_the_id() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_disconnect(&auth, "1122349777617204");
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/disconnect/1122349777617204/"
+        );
+        let hostile = c.whatsapp_disconnect(&auth, "../notify/whatsapp");
+        assert!(
+            !hostile.url.contains("/../"),
+            "an id with a path separator escaped the disconnect route: {}",
+            hostile.url
+        );
     }
 
     /// The ack is what ENDS the redelivery loop. Same machine credential; the body

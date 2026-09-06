@@ -176,6 +176,10 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+// «Connect WhatsApp» as a global element for the WhatsApp module's settings (hub#1600): registered
+// with the root component, so it exists before any module screen mounts. Here and not in
+// main.ts on purpose: main.ts is a source the module toolkit parses (canonical mirrors).
+import { registerWhatsAppConnectElement } from './elements/whatsapp-connect';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import {
@@ -217,6 +221,8 @@ import { refreshSetupStatus } from './lib/setup-status';
 import { bootAppUpdateWatch } from './lib/app-update';
 import { bootDeadLetterWatch } from './lib/dead-letter';
 import { bootUndrainedPrintingWatch } from './lib/print-alert';
+
+registerWhatsAppConnectElement();
 
 interface NavItem { path: string; labelKey: string; icon: string }
 interface NavSection { titleKey: string; items: NavItem[] }

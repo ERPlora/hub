@@ -170,11 +170,31 @@ fn the_app_can_neither_inline_nor_evaluate_script() {
 }
 
 #[test]
-fn the_app_frames_nothing_and_rebases_nowhere() {
+fn the_app_frames_only_meta_and_rebases_nowhere() {
+    // hub#1600: the ONE thing the page may frame is Meta — the hidden iframes its JS SDK uses to
+    // talk to the Embedded Signup popup («Connect WhatsApp»). Exact hosts, never `https:`; a
+    // second name on this line is a second decision somebody has to argue for here.
     let parsed = directives(&served());
     assert_eq!(parsed.get("object-src"), Some(&vec!["'none'".to_string()]));
-    assert_eq!(parsed.get("frame-src"), Some(&vec!["'none'".to_string()]));
+    assert_eq!(
+        parsed.get("frame-src"),
+        Some(&vec!["https://*.facebook.com".to_string()])
+    );
     assert_eq!(parsed.get("base-uri"), Some(&vec!["'self'".to_string()]));
+}
+
+#[test]
+fn the_only_foreign_script_is_metas_sdk() {
+    // `script-src` decides whether a module can run code that is not ours. The one exception is
+    // the SDK that opens Meta's popup (hub#1600), by exact host; anything else here is a hole.
+    let script = effective(&served(), "script-src");
+    assert_eq!(
+        script,
+        vec![
+            "'self'".to_string(),
+            "https://connect.facebook.net".to_string()
+        ]
+    );
 }
 
 #[test]
@@ -207,13 +227,23 @@ fn the_only_origins_besides_the_hub_are_its_cloud_and_the_tauri_ipc_channel() {
     // downloads (`apps/web/src/lib/cloud.ts`) — so `connect-src 'self'` alone logs everybody out
     // of the cloud half of the hub. Media and module bundles are NOT here: those the runtime
     // proxies (ADR-0047), which is what keeps this list to two names.
-    let allowed = ["http://ipc.localhost", CLOUD];
+    // …plus Meta, by exact host, for «Connect WhatsApp» (hub#1600): the SDK script, the frames
+    // it talks to its popup through, and the Graph calls it makes on its own.
+    let allowed: &[(&str, &str)] = &[
+        ("connect-src", "http://ipc.localhost"),
+        ("connect-src", CLOUD),
+        ("connect-src", "https://*.facebook.com"),
+        ("connect-src", "https://graph.facebook.com"),
+        ("script-src", "https://connect.facebook.net"),
+        ("frame-src", "https://*.facebook.com"),
+    ];
     for (directive, sources) in directives(&served()) {
         for source in sources.iter().filter(|s| s.contains("://")) {
             assert!(
-                directive == "connect-src" && allowed.contains(&source.as_str()),
+                allowed.contains(&(directive.as_str(), source.as_str())),
                 "{directive} reaches out to `{source}`; the browser talks to this hub, to its own \
-                 Cloud and to the Tauri IPC channel, and to nothing else"
+                 Cloud, to the Tauri IPC channel and to Meta's SDK for «Connect WhatsApp», and to \
+                 nothing else"
             );
         }
     }
@@ -291,6 +321,29 @@ fn the_cloud_origin_follows_the_configuration_instead_of_being_hardcoded() {
 /// app.
 const JUSTIFIED_WIDENINGS: &[(&str, &str, &str)] = &[
     (
+        "script-src",
+        "https://connect.facebook.net",
+        "hub#1600: Meta's JS SDK, the only way to open the Embedded Signup popup that connects the \
+         business's WhatsApp number from the hub. Exact host; the shell page has no such button",
+    ),
+    (
+        "connect-src",
+        "https://*.facebook.com",
+        "hub#1600: the SDK's own handshake with its popup and its hidden frames",
+    ),
+    (
+        "connect-src",
+        "https://graph.facebook.com",
+        "hub#1600: the Graph calls the SDK makes on its own once initialised",
+    ),
+    (
+        "frame-src",
+        "https://*.facebook.com",
+        "hub#1600: the hidden frames Meta's SDK talks to its popup through. The shell page frames \
+         nothing — it has no such button — so this stays a widening of the served policy alone \
+         instead of being copied into the shell to keep two lists equal",
+    ),
+    (
         "img-src",
         "blob:",
         "the file viewer and the avatar paint bytes the runtime already fetched, via \
@@ -365,15 +418,34 @@ fn every_way_the_served_policy_is_looser_than_the_shell_is_written_down() {
 
 #[test]
 fn the_served_policy_keeps_every_lock_the_shell_has() {
-    // The other direction: the shell may not be strictly tighter on the directives that decide
-    // whether a page is a sealed box. (It is allowed to be tighter where the widenings above say
-    // so, and those are checked by name.)
+    // The other direction: the served policy may not be looser than the shell on the directives
+    // that decide whether a page is a sealed box — except where JUSTIFIED_WIDENINGS says so, by
+    // name. Those sources are discounted here, so a widening the shell does not need (hub#1600:
+    // Meta's frames, for a popup the bundled page never opens) stays a widening of the served
+    // policy alone instead of being copied into the shell to keep two lists equal; and the shell
+    // cannot quietly carry one of them either, because it is compared against the list WITHOUT.
     let shell = shell_policy();
+    let shell = directives(&shell);
     let served = directives(&served());
     for directive in ["default-src", "object-src", "frame-src", "base-uri"] {
+        let mut kept: Vec<String> = served
+            .get(directive)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|s| {
+                !JUSTIFIED_WIDENINGS
+                    .iter()
+                    .any(|(d, w, _)| *d == directive && *w == s.as_str())
+            })
+            .collect();
+        // A source list emptied of its justified widenings allows nothing: that is `'none'`.
+        if kept.is_empty() {
+            kept = vec!["'none'".to_string()];
+        }
         assert_eq!(
-            served.get(directive),
-            directives(&shell).get(directive),
+            Some(&kept),
+            shell.get(directive),
             "{directive} drifted apart from the shell policy with no widening to justify it"
         );
     }
