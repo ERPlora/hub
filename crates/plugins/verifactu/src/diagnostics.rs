@@ -1744,9 +1744,16 @@ mod tests {
         );
     }
 
-    /// 🔒 And a refusal the validator cannot code publishes NO `detail_reason` at all, rather than
-    /// an empty object. The module's fallback is «is there a code I know?», so an object with
-    /// nothing in it would read as «yes» and paint a blank where the actionable half was.
+    /// 🔒 And a refusal the validator cannot code publishes NO nested reason at all, rather than an
+    /// empty object. The module's fallback is «is there a code I know?», so an object with nothing
+    /// in it would read as «yes» and paint a blank where the actionable half was.
+    ///
+    /// Asserted on `as_reason_details` and not only on `as_reason` (hub#1579): the merge is now the
+    /// ONE door both call sites go through — the diagnostic's `detail_reason` and the
+    /// transmission's `validation_error_reason` — so a `Some(json!({}))` slipped in there would
+    /// hand an empty code to two screens at once, and the `Option` above would still read as
+    /// correct. Measured: with the merge returning `Some({})` for an uncoded error the whole
+    /// crate stayed green, which is what this line closes.
     #[test]
     fn a_refusal_with_no_code_of_its_own_publishes_no_nested_reason_hub1576() {
         let plain = crate::VerifactuError::Payload("algo que este validador no clasifica".into());
@@ -1754,6 +1761,10 @@ mod tests {
         assert!(
             plain.as_reason().is_none(),
             "only the refusals with a stable code publish one"
+        );
+        assert!(
+            plain.as_reason_details().is_none(),
+            "absent, never empty: an empty object answers «yes, I know this code» and paints a blank"
         );
     }
 
