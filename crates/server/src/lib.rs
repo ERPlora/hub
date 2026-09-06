@@ -44,6 +44,8 @@ pub mod assistant;
 pub mod assistant_report;
 pub mod auth;
 pub mod boot_announce;
+pub mod call_budget;
+pub mod cloud_call;
 /// The other end of the hub's `report-uri`: what the browser refused, said out loud — hub#1447.
 pub mod csp_report;
 pub mod daily_usage;
@@ -58,12 +60,10 @@ pub mod entitlement;
 pub mod error_sink;
 pub mod event_stream;
 pub mod export_import;
-pub mod call_budget;
-pub mod gateway_enrolment;
-pub mod cloud_call;
 /// The I/O half of a flow step (hub#662): the call itself, outside the runtime's global lock.
 pub mod flow_io;
 pub mod flows_api;
+pub mod gateway_enrolment;
 pub mod hub_users;
 pub mod inbound_poll;
 pub mod ingest;
@@ -95,6 +95,7 @@ pub mod system_metrics;
 pub mod tenant;
 pub mod usage_series;
 pub mod version;
+pub mod whatsapp_connect;
 pub mod whatsapp_quota;
 
 pub use state::{
