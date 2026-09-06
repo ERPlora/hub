@@ -232,12 +232,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Fluid like every other shell surface: the page gutter is the only horizontal limit (hub#1605). */
 .plan-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 960px;
-  margin: 0 auto;
 }
 .status-head {
   display: flex;

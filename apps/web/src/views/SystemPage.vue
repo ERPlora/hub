@@ -1033,7 +1033,6 @@ onMounted(() => {
 
 /* ── Pestaña Actualizaciones ── */
 .updates-hint {
-  max-width: 36rem;
   margin: 0 0 16px;
 }
 
