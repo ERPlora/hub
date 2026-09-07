@@ -2156,9 +2156,11 @@ impl Manifest {
     /// re-defiende aquí; lo que sí se sostiene es que un paquete que **no** pasó por ahí no rompa
     /// nada.
     ///
-    /// 🔴 **La única excepción a «best-effort» es el pin de un grant** (hub#1654): un `payload` que
-    /// no sea un objeto tumba la familia entera, porque la alternativa —omitirlo y seguir— es
-    /// ensanchar un permiso en silencio, que es justo lo que ese campo existe para impedir.
+    /// 🔴 **Un pin ilegible tumba su familia, y NO se degrada** (hub#1654): un `payload` que no es
+    /// un objeto deja la plantilla fuera con [`DISCARD_INVALID_GRANT`], porque la alternativa
+    /// —omitirlo y seguir— es ensanchar un permiso en silencio, que es justo lo que ese campo
+    /// existe para impedir. Sigue siendo best-effort en el sentido de arriba: cae **esa** familia,
+    /// se dice por qué, y las demás del paquete se registran igual.
     ///
     /// El resultado va **ordenado por familia** para que la galería no baile entre dos arranques.
     ///
@@ -2234,12 +2236,15 @@ impl Manifest {
             if documents.is_empty() {
                 continue;
             }
-            let grants = sidecars
+            // El sidecar se lee en DOS tramos a propósito (hub#1654): «no está, o no es JSON» y
+            // «es JSON y uno de sus permisos no se sostiene» se arreglan de forma distinta, y
+            // desde hub#1649 el descarte es lo único que la autora del módulo va a leer. Mandarla
+            // a buscar un fichero que tiene delante es la confusión que hub#1649 vino a quitar.
+            let parsed = sidecars
                 .get(&family)
                 .and_then(|p| std::fs::read_to_string(p).ok())
-                .and_then(|t| serde_json::from_str::<FlowGrantsSidecar>(&t).ok())
-                .map(|s| s.grants);
-            let Some(grants) = grants else {
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+            let Some(parsed) = parsed else {
                 scan.discard(
                     &family,
                     DISCARD_MISSING_GRANTS,
@@ -2249,6 +2254,22 @@ impl Manifest {
                     ),
                 );
                 continue;
+            };
+            let grants = match serde_json::from_value::<FlowGrantsSidecar>(parsed) {
+                Ok(sidecar) => sidecar.grants,
+                Err(err) => {
+                    scan.discard(
+                        &family,
+                        DISCARD_INVALID_GRANT,
+                        format!(
+                            "`{family}.grants.json` se lee, pero uno de sus permisos no: {err}. La \
+                             plantilla no se ofrece: un permiso que no se entiende entero —un \
+                             `payload` que no es un objeto, por ejemplo— se acabaría concediendo \
+                             más ANCHO de lo que el módulo pidió"
+                        ),
+                    );
+                    continue;
+                }
             };
             // 🔴 El suelo falla CERRADO igual que en `Registry::flow_template_floor_is_met`: un
             // `requires.json` que ESTÁ y no se lee no puede valer «sin suelo», porque eso ofrecería
@@ -2361,8 +2382,13 @@ pub const DISCARD_INVALID_LANGUAGE: &str = "template_invalid_language";
 pub const DISCARD_UNREADABLE_DOCUMENT: &str = "template_unreadable_document";
 /// El documento se lee y no es JSON.
 pub const DISCARD_INVALID_DOCUMENT: &str = "template_invalid_document";
-/// Falta `<family>.grants.json`, o está y no se lee.
+/// Falta `<family>.grants.json`, o está y no se lee como JSON.
 pub const DISCARD_MISSING_GRANTS: &str = "template_missing_grants";
+/// `<family>.grants.json` **es** JSON, pero uno de sus permisos no se sostiene — el caso que abre
+/// hub#1654 es un `payload` que no es un objeto. Separado de [`DISCARD_MISSING_GRANTS`] porque el
+/// fichero está delante y se lee: decirle a quien publicó el módulo que «falta» lo manda a buscar
+/// lo que ya tiene.
+pub const DISCARD_INVALID_GRANT: &str = "template_invalid_grant";
 /// `<family>.requires.json` está y no se lee: el suelo no se puede comprobar (falla cerrado).
 pub const DISCARD_UNREADABLE_REQUIRES: &str = "template_unreadable_requires";
 
@@ -2421,9 +2447,10 @@ pub struct FlowTemplateGrant {
     /// pantalla enseñaba el permiso ancho y el dueño lo concedía así.
     ///
     /// El tipo es `Params` y no `Value` a propósito: un `payload` que no sea un objeto **tumba la
-    /// familia entera** en [`Manifest::load_flow_templates`] en vez de degradarse a «no fija
-    /// nada». Ensanchar un permiso por una errata del autor es el fallo que este campo existe
-    /// para evitar; dejar la plantilla fuera se ve, y `erplora validate` ya lo caza antes.
+    /// familia entera** en [`Manifest::scan_flow_templates`] —con [`DISCARD_INVALID_GRANT`], que
+    /// nombra el fichero y el motivo— en vez de degradarse a «no fija nada». Ensanchar un permiso
+    /// por una errata del autor es el fallo que este campo existe para evitar; dejar la plantilla
+    /// fuera se ve, y `erplora validate` ya lo caza antes de publicar.
     #[serde(default, skip_serializing_if = "Params::is_empty")]
     pub payload: Params,
 }

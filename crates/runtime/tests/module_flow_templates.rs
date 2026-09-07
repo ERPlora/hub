@@ -331,12 +331,12 @@ fn the_limit_a_module_puts_on_a_grant_reaches_the_hub() {
         ]),
     );
 
-    let found = Manifest::load_flow_templates(dir.as_path());
+    let found = Manifest::scan_flow_templates(dir.as_path());
 
     // Se afirma sobre la forma SERIALIZADA a propósito: es la que `GET /api/hub/flows/templates`
     // sirve tal cual, o sea el contrato que ve quien va a pedir el permiso. Un campo que existe en
     // el tipo pero no sale por el cable no acota nada.
-    let grants = serde_json::to_value(&found[0].grants).unwrap();
+    let grants = serde_json::to_value(&found.templates[0].grants).unwrap();
     let grants = grants.as_array().expect("los permisos viajan como lista");
     assert_eq!(grants.len(), 2, "los dos permisos que pedirá la plantilla");
     // El que no acota nada vale lo que valían todos antes de hub#1623: no fija ningún campo.
@@ -373,8 +373,22 @@ fn a_pin_that_cannot_be_read_leaves_the_family_out() {
         }]),
     );
 
+    let found = Manifest::scan_flow_templates(dir.as_path());
+
     assert!(
-        Manifest::load_flow_templates(dir.as_path()).is_empty(),
+        found.templates.is_empty(),
         "un pin ilegible no se degrada a permiso ancho: la familia no se ofrece"
+    );
+    // hub#1649 + hub#1654: y lo dice con SU motivo, no con el del vecino. El sidecar está en el
+    // paquete y se lee como JSON perfectamente; lo que no se sostiene es el pin. Contarlo como
+    // `template_missing_grants` mandaría a la autora del módulo a buscar un fichero que tiene
+    // delante, que es justo la confusión que hub#1649 vino a quitar.
+    assert_eq!(
+        found
+            .discards
+            .iter()
+            .map(|d| (d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [("appointment-from-whatsapp", "template_invalid_grant")]
     );
 }
