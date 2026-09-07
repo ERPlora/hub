@@ -165,6 +165,26 @@ fn scalar_text(value: &Json) -> Option<String> {
     }
 }
 
+/// One column of one row, or the refusal that the read does not select it.
+///
+/// Asked of EVERY column the options name, `description` included: whether the read selects a
+/// column is a question about the document, and it has the same answer whether the column is the
+/// required `title` or the optional second line. Skipping it for the optional one is how a typo
+/// stops saying anything — the line would simply never appear, in every message, forever.
+fn column_of<'a>(
+    step_id: &str,
+    row: &'a Map<String, Json>,
+    column: &str,
+    field: &str,
+) -> Result<&'a Json> {
+    row.get(column).ok_or_else(|| {
+        bad_option(format!(
+            "step `{step_id}`: the read has no column `{column}`, and the options say it is their \
+             `{field}`. The columns of an option are the ones the read selects."
+        ))
+    })
+}
+
 /// One REQUIRED column of one row, or the refusal that names it.
 fn required_text(
     step_id: &str,
@@ -173,12 +193,7 @@ fn required_text(
     field: &str,
     at: usize,
 ) -> Result<String> {
-    let Some(value) = row.get(column) else {
-        return Err(bad_option(format!(
-            "step `{step_id}`: the read has no column `{column}`, and the options say it is their \
-             `{field}`. The columns of an option are the ones the read selects."
-        )));
-    };
+    let value = column_of(step_id, row, column, field)?;
     scalar_text(value)
         .filter(|text| !text.is_empty())
         .ok_or_else(|| {
@@ -220,10 +235,11 @@ fn shape_options(step_id: &str, rows: &[Json], shape: &OptionShape) -> Result<Js
             json!(required_text(step_id, row, &shape.title, "title", at)?),
         );
         if let Some(column) = shape.description.as_deref() {
-            if let Some(text) = row.get(column).and_then(scalar_text) {
-                if !text.is_empty() {
-                    option.insert("description".into(), json!(text));
-                }
+            // The column has to BE there — a name the read does not select is a typo, not an
+            // empty line. What is benign is a row that leaves it empty, and that omits the key.
+            let value = column_of(step_id, row, column, "description")?;
+            if let Some(text) = scalar_text(value).filter(|text| !text.is_empty()) {
+                option.insert("description".into(), json!(text));
             }
         }
         options.push(Json::Object(option));
@@ -591,6 +607,36 @@ mod tests {
             "{err}"
         );
         assert!(format!("{err}").contains("titulo"), "{err}");
+    }
+
+    /// The SAME typo, in the OPTIONAL column, is the one that would never say anything: the
+    /// second line would simply not appear — in every message, forever — and the run history
+    /// would show a step that went fine. Which columns the read selects is the same question
+    /// whether the column is required or not, so it gets the same answer.
+    #[tokio::test]
+    async fn a_description_column_the_read_does_not_select_is_refused_too() {
+        let db = db().await;
+        sale_noted(&db, "s-1", "2026-08-15", "120.50", json!("con Ana")).await;
+        allow(&db, "sales.detail").await;
+
+        let err = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "total", "description": "staf" }
+            }),
+        )
+        .await
+        .expect_err("a second line nobody wrote is not an empty second line");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_BAD_OPTION),
+            "{err}"
+        );
+        assert!(
+            format!("{err}").contains("staf"),
+            "it names the column, like the required ones do: {err}"
+        );
     }
 
     /// `result: "count"` carries no row at all: «are there any, and how many».

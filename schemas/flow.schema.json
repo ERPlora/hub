@@ -170,7 +170,7 @@
             "description": {
               "type": "string",
               "minLength": 1,
-              "description": "NOMBRE de la columna de la segunda línea, opcional. Si la fila la trae vacía, la clave NO se envía: Meta rechaza un `description: null`."
+              "description": "NOMBRE de la columna de la segunda línea, opcional. Si la fila la trae vacía, la clave NO se envía: Meta rechaza un `description: null`. Una columna que la lectura NO selecciona se rechaza al ejecutar (`flow.query_bad_option`), igual que `id` y `title`: un typo aquí no dice nada por sí solo, la segunda línea simplemente no saldría nunca."
             }
           },
           "description": "Solo `kind: query` con `result: \"options\"` (hub#1641) — QUÉ COLUMNAS de cada fila componen la opción que se toca. Son NOMBRES de columna, no rutas ni plantillas, el mismo idioma que `to.field` de un `notify` (hub#821): componer un título con dos columnas es una forma que pertenece a la query, que es la misma respuesta que da `resolve_path` a «la tercera línea del tique». OBLIGATORIO con `result: \"options\"` (una lista de columnas de tabla no es algo que un mensaje pueda enviar) y RECHAZADO con cualquier otro `result` (un mapeo que nadie lee es una promesa que el kernel no cumple)."
