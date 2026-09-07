@@ -326,6 +326,17 @@ async fn approving_a_proposal_that_contradicts_the_pin_refuses_it_and_writes_not
         notes(&rt).await.is_empty(),
         "refused BEFORE the command ran: zero writes, exactly like the gate upstream"
     );
+    // And the proposal is still PENDING: refused before the door, so nobody is recorded as having
+    // decided something that never ran, and the person keeps her one clean exit (reject). This is
+    // the assertion that tells THIS door's check from the dispatcher's: without the check here the
+    // gate downstream refuses just the same — but only after stamping the row `approved` with an
+    // error, which is the record of a person authorising an action that never happened.
+    let still = rt.get_flow_approval(&proposal.id).await.unwrap();
+    assert_eq!(
+        still.status,
+        approvals::STATUS_PENDING,
+        "refused at the door, not after it: the proposal is still decidable"
+    );
 }
 
 /// 🔴 The other half of the same door, and the one that actually ties it: what MATCHES the pin has

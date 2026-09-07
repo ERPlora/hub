@@ -1211,6 +1211,64 @@ mod tests {
             .expect("what the grant did not fix, it did not forbid");
     }
 
+    /// hub#1623 — **the comparison is strict**, because every lenient reading is a way round the
+    /// pin: a different case, a different JSON type, the value wrapped one level down, a trailing
+    /// space, or the pinned key written twice so that «the last one wins» (which is how
+    /// `serde_json` reads a duplicate). All of them are «not the value the owner fixed», and all
+    /// of them are refused. Guarded here so nobody ever «relaxes» the match to be helpful. (The
+    /// other order of the duplicate — the honest value LAST — is not an evasion: the map the gate
+    /// judges is the very map the handler runs with, so what passes is what executes.)
+    #[tokio::test]
+    async fn the_pin_is_matched_strictly_case_type_shape_and_duplicate_keys() {
+        let db = db_with_schema().await;
+        let mut pinned = pin("channel", "customer");
+        pinned.insert("max_items".into(), json!(1));
+        pinned.insert("notify".into(), json!(true));
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pinned)],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let honest: Params =
+            serde_json::from_str(r#"{"channel":"customer","max_items":1,"notify":true}"#).unwrap();
+        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &honest)
+            .await
+            .expect("the exact values pass");
+
+        let evasions = [
+            ("case of the value", r#"{"channel":"Customer","max_items":1,"notify":true}"#),
+            ("case of the key", r#"{"Channel":"customer","max_items":1,"notify":true}"#),
+            ("trailing space", r#"{"channel":"customer ","max_items":1,"notify":true}"#),
+            ("number as a string", r#"{"channel":"customer","max_items":"1","notify":true}"#),
+            ("integer as a float", r#"{"channel":"customer","max_items":1.0,"notify":true}"#),
+            ("bool as a string", r#"{"channel":"customer","max_items":1,"notify":"true"}"#),
+            ("bool as a number", r#"{"channel":"customer","max_items":1,"notify":1}"#),
+            (
+                "value nested one level down",
+                r#"{"channel":{"value":"customer"},"max_items":1,"notify":true}"#,
+            ),
+            (
+                "pinned key written twice, the honest value first",
+                r#"{"channel":"customer","channel":"staff","max_items":1,"notify":true}"#,
+            ),
+        ];
+        for (how, raw) in evasions {
+            let payload: Params =
+                serde_json::from_str(raw).unwrap_or_else(|e| panic!("{how}: {e}"));
+            let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &payload)
+                .await
+                .err()
+                .unwrap_or_else(|| panic!("{how}: got through the pin"));
+            assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED, "{how}");
+        }
+    }
+
     /// hub#1623 — every grant written before this existed pins nothing, and must keep behaving
     /// exactly as it did: the NAME is the whole question. A regression here would break every flow
     /// in every hub at once.
