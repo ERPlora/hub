@@ -530,6 +530,46 @@ pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Respo
     .into_response()
 }
 
+/// `GET /api/hub/flows/templates` — las automatizaciones que traen DE FÁBRICA los módulos
+/// instalados (hub#1611).
+///
+/// La galería del módulo `flows` ofrecía solo las plantillas escritas dentro de sí misma, así que
+/// un negocio que instalaba el módulo de WhatsApp no encontraba la automatización que ese módulo
+/// trae consigo: había que construirla a mano, paso a paso. Los módulos ya la publican —la carpeta
+/// `flows/` viaja en el zip desde `module-toolkit#209`— y el runtime ya la registra al instalar;
+/// esto es lo que la saca a la pantalla.
+///
+/// Se sirve del **registro**, no del disco: la carga la hizo el instalador, y `rehydrate_installed`
+/// vuelve a pasar por él en cada arranque. Así esta ruta no toca el sistema de ficheros por
+/// petición, y un módulo pausado no ofrece plantillas porque no está activo en el registro.
+///
+/// Por plantilla: el **módulo de origen** (la galería tiene que decir de dónde sale lo que ofrece),
+/// la **familia**, los **documentos por idioma** (el `en` es la fuente, ADR-0055/0199; se sirven
+/// todos porque `erplora validate` garantizó que son la misma automatización con otras palabras),
+/// los **grants que pedirá** y el **suelo de versión por plantilla**.
+///
+/// 🔴 Los `grants` que van aquí son **una petición, no una concesión**: se le enseñan al dueño para
+/// que los autorice él. Una plantilla nace apagada y sin permisos, como cualquier otra.
+pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let (arc, _) = admin_session!(st, headers);
+    let rt = arc.read().await;
+    let data: Vec<_> = rt
+        .registry()
+        .flow_templates()
+        .into_iter()
+        .map(|(module_id, tpl)| {
+            json!({
+                "module": module_id,
+                "family": tpl.family,
+                "documents": tpl.documents,
+                "grants": tpl.grants,
+                "requires": tpl.requires,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": data })).into_response()
+}
+
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
 
 /// `GET /api/hub/flows/secrets` — **the names, never the values**.

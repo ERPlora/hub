@@ -381,6 +381,11 @@ pub fn app(state: AppState) -> Router {
         // same reason as `runs` — matchit resolves the static segment ahead of `:id`, and
         // `tests/flows_schema_route.rs` checks it against the real router.
         .route("/api/hub/flows/schema", get(flows_api::get_schema))
+        // `templates` — las automatizaciones de fábrica de los módulos instalados (hub#1611).
+        // Mismo caso que `schema` y `secrets`: segmento estático, gana al `:id` de abajo, y
+        // `tests/flow_templates_route.rs` lo comprueba contra el router real — si algún día se
+        // colara por `:id`, la respuesta sería «no existe ese flujo» en vez de la lista.
+        .route("/api/hub/flows/templates", get(flows_api::list_templates))
         // `secrets` es igual: segmento estático, gana al `:id` (hub#662). El GET devuelve NOMBRES —
         // no hay endpoint que devuelva un secreto, y esa ausencia es el diseño (ADR-0283 §4).
         .route("/api/hub/flows/secrets", get(flows_api::list_secrets))

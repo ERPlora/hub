@@ -116,6 +116,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
     'runs',
     'schema',
     'secrets',
+    'templates',
     'update',
   ]);
 
@@ -138,6 +139,7 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
   await flows.putSecret('API_KEY', 'sk-live-42');
   await flows.deleteSecret('API_KEY');
   await flows.schema();
+  await flows.templates();
 
   assert.deepEqual(
     calls.map((c) => `${c.method} ${c.url.replace('http://hub', '')}`),
@@ -159,6 +161,9 @@ test('hub#714: the surface is the FROZEN §9 route table and nothing else', asyn
       'PUT /api/hub/flows/secrets/API_KEY',
       'DELETE /api/hub/flows/secrets/API_KEY',
       'GET /api/hub/flows/schema',
+      // hub#1611 — the automations the installed modules ship. A static segment, so it never
+      // collides with `/flows/:id`; the hub side pins that against the real router.
+      'GET /api/hub/flows/templates',
     ],
   );
   for (const call of calls) {

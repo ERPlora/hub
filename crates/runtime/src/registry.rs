@@ -3,7 +3,7 @@
 //! INACTIVO; solo los activos exponen menú/queries/commands/eventos (hot-plug, §4 paso 11).
 use std::collections::{HashMap, HashSet};
 
-use crate::manifest::{CommandDef, Manifest, ModuleLocale, Nav, QueryDef};
+use crate::manifest::{CommandDef, Manifest, ModuleFlowTemplate, ModuleLocale, Nav, QueryDef};
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -339,6 +339,10 @@ pub struct Registry {
     /// `locales/*.json` del paquete al instalar/re-hidratar. Vacío = el módulo no trae i18n
     /// (se usan los valores del manifest, en inglés canónico).
     pub locales: HashMap<String, HashMap<String, ModuleLocale>>,
+    /// Automatizaciones de fábrica por módulo: `module_id → plantillas` (hub#1611). Se cargan de
+    /// `flows/` del paquete al instalar/re-hidratar, igual que `locales`. Vacío = el módulo no
+    /// trae ninguna, que es el caso de 26 de los 27 módulos de hoy.
+    pub flow_templates: HashMap<String, Vec<ModuleFlowTemplate>>,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
     /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
@@ -521,6 +525,36 @@ impl Registry {
         } else {
             self.locales.insert(module_id.to_string(), locales);
         }
+    }
+
+    /// Registra las automatizaciones de fábrica de un módulo (hub#1611). Vacío = se olvidan las
+    /// previas, que es lo que hace que **quitar** una plantilla de una versión nueva del módulo la
+    /// retire de la galería: si se acumularan, se seguiría ofreciendo una que su autor ya no
+    /// publica.
+    pub fn set_flow_templates(&mut self, module_id: &str, templates: Vec<ModuleFlowTemplate>) {
+        if templates.is_empty() {
+            self.flow_templates.remove(module_id);
+        } else {
+            self.flow_templates.insert(module_id.to_string(), templates);
+        }
+    }
+
+    /// Las plantillas de **todos** los módulos instalados y activos, con su módulo de origen
+    /// (hub#1611).
+    ///
+    /// Filtra por `is_active` con el mismo criterio que `navigation`: un módulo pausado no ofrece
+    /// pantallas, y tampoco debe ofrecer automatizaciones que nombran commands que ahora mismo no
+    /// se pueden ejecutar. El orden es estable (módulo, luego familia) para que la galería no baile
+    /// entre dos peticiones.
+    pub fn flow_templates(&self) -> Vec<(&str, &ModuleFlowTemplate)> {
+        let mut out: Vec<(&str, &ModuleFlowTemplate)> = self
+            .flow_templates
+            .iter()
+            .filter(|(module_id, _)| self.is_active(module_id))
+            .flat_map(|(module_id, tpls)| tpls.iter().map(move |t| (module_id.as_str(), t)))
+            .collect();
+        out.sort_by(|a, b| (a.0, &a.1.family).cmp(&(b.0, &b.1.family)));
+        out
     }
 
     /// Catálogo del idioma pedido para un módulo, con fallback `locale → en` (ADR-0055).
@@ -767,6 +801,9 @@ impl Registry {
         // así que esto es lo que garantiza que la versión nueva no ejecute el binario de la vieja.
         self.wasm_cache.forget_module(module_id);
         self.status.remove(module_id);
+        // hub#1611: sus automatizaciones de fábrica se van con él — una plantilla que sobreviviera
+        // a su módulo se ofrecería para siempre, nombrando commands que este hub ya no tiene.
+        self.flow_templates.remove(module_id);
         self.queries.retain(|_, q| q.module_id != module_id);
         self.commands.retain(|_, c| c.module_id != module_id);
         self.navigation.retain(|n| n.module_id != module_id);
@@ -814,6 +851,11 @@ impl Registry {
                 .cloned()
                 .collect(),
             locales: self.locales.get(module_id).cloned().unwrap_or_default(),
+            flow_templates: self
+                .flow_templates
+                .get(module_id)
+                .cloned()
+                .unwrap_or_default(),
             seed_natural_keys: self
                 .seed_natural_keys
                 .get(module_id)
@@ -862,6 +904,7 @@ impl Registry {
         self.commands.extend(snapshot.commands);
         self.navigation.extend(snapshot.navigation);
         self.set_locales(&module_id, snapshot.locales);
+        self.set_flow_templates(&module_id, snapshot.flow_templates);
         if !snapshot.seed_natural_keys.is_empty() {
             self.seed_natural_keys
                 .insert(module_id.clone(), snapshot.seed_natural_keys);
@@ -889,6 +932,10 @@ pub struct ModuleSnapshot {
     commands: Vec<(String, RegisteredCommand)>,
     navigation: Vec<NavEntry>,
     locales: HashMap<String, ModuleLocale>,
+    /// The factory automations that were registered (hub#1611). Without this, a failed
+    /// update would restore the module WITHOUT its templates: the rollback puts the till
+    /// back and silently drops the gallery entry until the next boot.
+    flow_templates: Vec<ModuleFlowTemplate>,
     /// `(event, command)` pairs whose command belongs to the module.
     listeners: Vec<(String, String)>,
     /// The natural keys the module's seed declares, per table (hub#842).

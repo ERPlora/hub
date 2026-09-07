@@ -1640,6 +1640,54 @@ export class FlowsApi {
   async schema(): Promise<FlowSchema> {
     return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/schema` }) as Promise<FlowSchema>;
   }
+
+  /**
+   * `GET /api/hub/flows/templates` — **the automations the installed modules ship** (hub#1611).
+   *
+   * The gallery used to offer only the templates written inside the `flows` module itself, so a
+   * business that installed the WhatsApp module could not find the automation that module brings
+   * with it: it had to be built by hand, step by step. The modules already publish them — the
+   * `flows/` folder travels in the zip since `module-toolkit#209` — and the runtime registers them
+   * on install; this is what puts them on the screen.
+   *
+   * Merge them with the module's own: `module` says where each one comes from, and `requires` is
+   * the **per-template** version floor, deliberately not the module's `depends_on` (a template is
+   * optional and its module works without it).
+   *
+   * The `grants` are what the template **will ask for**, never what it has. A template is created
+   * paused and with no permissions, and a person grants them — the same door as any other flow.
+   *
+   * A hub older than this route leaves the method **absent** rather than broken, like
+   * `events.list` (hub#823): the SDK travels with the hub, so `typeof flows.templates` is the
+   * probe, and the screen can say «this hub does not serve module templates yet» instead of
+   * showing an empty gallery that reads as «this module ships none».
+   */
+  async templates(): Promise<ModuleFlowTemplate[]> {
+    return this.send({ method: 'GET', path: `${FLOWS_BASE_PATH}/templates` }) as Promise<
+      ModuleFlowTemplate[]
+    >;
+  }
+}
+
+/**
+ * A factory automation shipped by an installed module (hub#1611).
+ *
+ * The document travels **per language** and uncollated: `erplora validate` already guarantees every
+ * language declares the same steps, in the same order, with the same machinery — only the prose
+ * differs — so serving the hub's language or falling back to `en` is serving the SAME automation in
+ * other words.
+ */
+export interface ModuleFlowTemplate {
+  /** The module that ships it, so the gallery can say where an entry comes from. */
+  module: string;
+  /** The shared prefix of the family's files (`appointment-from-whatsapp`). */
+  family: string;
+  /** `lang -> flow document`. Always carries `en`, the source language (ADR-0055/0199). */
+  documents: Record<string, unknown>;
+  /** What the template will ASK the owner for. Never what it already holds. */
+  grants: Array<{ kind: string; value: string }>;
+  /** Per-template version floor (`module -> SemVer`). Unmet -> do not offer it. */
+  requires: Record<string, string>;
 }
 
 /**
