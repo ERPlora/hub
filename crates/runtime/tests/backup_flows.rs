@@ -157,6 +157,56 @@ fn ensure_master_key() {
 /// 🟢 The trip that names the issue: a hub whose owner automated «note the big sales» is backed up,
 /// redeployed and restored — and the automation **runs again**.
 ///
+/// hub#1623 — **the PIN travels with the grant.** A grant that fixes part of the payload («may
+/// cancel appointments as the customer») is a NARROWER permission than the bare command, so a
+/// backup that carried only the pair would restore the WIDE one and say nothing. Restoring a copy
+/// must never hand back more authority than the copy was taken with.
+#[tokio::test]
+async fn a_backup_restores_the_pin_and_not_just_the_command() {
+    let origin = hub_with("h1", &["sales", "crm"]).await;
+    let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
+    let mut pin = erplora_db::Params::new();
+    pin.insert("customer_id".into(), json!("c-1"));
+    grant(
+        &origin,
+        &flow_id,
+        &[GrantSpec::pinned("crm.note.add", pin.clone())],
+    )
+    .await;
+
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
+    let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
+        .await
+        .expect("export");
+    assert_eq!(
+        bundle.manifest.flows[0].grants[0].payload, pin,
+        "the bundle carries what the grant FIXED, not just what it named"
+    );
+
+    let mut restored = hub_with("h1", &["sales", "crm"]).await;
+    import_sections(
+        &mut restored,
+        &bundle.manifest,
+        &bundle.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("the backup is accepted");
+
+    let flows = restored.list_flows().await.unwrap();
+    let grants = restored.list_flow_grants(&flows[0].id).await.unwrap();
+    assert_eq!(grants.len(), 1);
+    assert_eq!(
+        grants[0].payload,
+        json!({ "customer_id": "c-1" }),
+        "the restored grant is as NARROW as the one that was taken, or the backup widened it"
+    );
+}
+
 /// Proven by firing a REAL event, not by counting rows: the run has to be created by the relay from
 /// a sale nobody scripted, and the step has to pass the grant gate. Before this, `export_hub` never
 /// looked at `_flow`, so the restore came back with an empty flow list and the report said the

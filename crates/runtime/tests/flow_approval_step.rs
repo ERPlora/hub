@@ -267,6 +267,67 @@ async fn a_replayed_step_finds_the_question_it_already_asked_instead_of_asking_t
     );
 }
 
+/// hub#1623 — **the tray is not a way round the pin.** A `command` proposal waits hours between
+/// being written by a model and being executed by a person pressing «approve», and the payload it
+/// carries is the one the model wrote. If the grant FIXES part of that payload, the check has to
+/// happen on this door too, with the payload that will really run — otherwise the containment holds
+/// on the direct path and leaks on the one that goes through a person.
+#[tokio::test]
+async fn approving_a_proposal_that_contradicts_the_pin_refuses_it_and_writes_nothing() {
+    let rt = runtime().await;
+    let flow_id = rt
+        .create_flow(
+            &NewFlow {
+                name: "Asistente".into(),
+                enabled: true,
+                definition: definition(ask(json!({}))),
+            },
+            OWNER,
+        )
+        .await
+        .unwrap()
+        .id;
+    let mut pin = Params::new();
+    pin.insert("text".into(), json!("the write that waited"));
+    rt.replace_flow_grants(&flow_id, &[GrantSpec::pinned("crm.note.add", pin)], OWNER)
+        .await
+        .unwrap();
+    let run_id = rt
+        .start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
+    rt.process_flows().await.unwrap();
+
+    // The model proposes a write whose payload is NOT the one the owner fixed.
+    let proposal = rt
+        .request_flow_approval(&approvals::NewApproval {
+            run_id: run_id.clone(),
+            flow_id: flow_id.clone(),
+            step_id: "approve".into(),
+            command: "crm.note.add".into(),
+            payload: json!({ "text": "whatever the message asked for" }),
+            reason: "el asistente lo propuso".into(),
+            partial_output: json!({}),
+            on_reject: RejectPolicy::Cancel,
+        })
+        .await
+        .unwrap();
+
+    let err = rt
+        .decide_flow_approval(&proposal.id, true, OWNER, "")
+        .await
+        .expect_err("approving does not widen what the flow was granted");
+    assert!(
+        matches!(&err, erplora_runtime::RuntimeError::Domain { code, .. }
+            if code == erplora_runtime::flows::grants::ERR_GRANT_PAYLOAD_DENIED),
+        "the same CODE the direct path returns — the half the UI programs against: {err:?}"
+    );
+    assert!(
+        notes(&rt).await.is_empty(),
+        "refused BEFORE the command ran: zero writes, exactly like the gate upstream"
+    );
+}
+
 // ── approved ──────────────────────────────────────────────────────────────────────────────────
 
 /// The run carries on, and what the decision was is readable by every step written after it —
