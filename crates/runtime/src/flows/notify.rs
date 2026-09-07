@@ -812,6 +812,11 @@ mod tests {
             message.contains("`libres`"),
             "…and the step that was supposed to publish them: {message}"
         );
+        assert!(
+            message.contains("action.sections[0].rows"),
+            "…and where in the message the hole is, so a list with two sections says WHICH: \
+             {message}"
+        );
 
         // **The control**: the same document, with the step that publishes the list. If this one
         // did not queue, the assertion above would be about anything at all.
