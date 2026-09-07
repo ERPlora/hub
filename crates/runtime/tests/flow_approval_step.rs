@@ -383,6 +383,24 @@ async fn rejecting_with_on_reject_continue_carries_the_run_on_saying_it_was_reje
         vec!["the write that waited".to_string()],
         "`continue` means the document decides what a refusal costs, not the kernel"
     );
+    // **A question's answer is FOUR fields and nothing else** (hub#1622). When the `ai` step
+    // learned to say `on_reject: "continue"` it also learned to hand back the turn it had parked,
+    // and the two kinds share this one method: a `decision` must not start growing `status`,
+    // `approval_id` or a `command` it never had. The `condition` written after an `approval` reads
+    // `decision`, and the shape it reads is the shape the approve path leaves.
+    let mut keys: Vec<String> = output
+        .as_object()
+        .expect("the output of a question is an object")
+        .keys()
+        .cloned()
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec!["comment", "decided_at", "decided_by", "decision"],
+        "an `approval` step has no parked turn to hand over, so its refusal answers exactly what \
+         its approval answers"
+    );
 }
 
 // ── expired ───────────────────────────────────────────────────────────────────────────────────
