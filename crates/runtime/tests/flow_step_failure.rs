@@ -342,3 +342,66 @@ async fn approving_a_proposal_whose_command_breaks_still_reaches_the_person_who_
     );
     assert_eq!(run_of(&rt, &flow_id).await.status, store::STATUS_DONE);
 }
+
+/// **Fail CLOSED when the instructions cannot be read.** The policy is answered from the DOCUMENT
+/// at the moment the failure lands, so there is a window where the document is gone: the flow is
+/// deleted (or rolled back to a version this binary cannot parse) while its request is still in
+/// flight. `store::delete` deliberately leaves a run that holds a lease alone, so the answer to
+/// «does this run carry on?» is decided right here.
+///
+/// It must be «no». `continue` is an OPT-IN a document makes; a document nobody can read has not
+/// opted into anything, and inventing consent to carry on past a failure — running the steps after
+/// it, sending the messages they send — is the one answer a kernel may never guess.
+#[tokio::test]
+async fn a_failure_whose_document_is_gone_stops_the_run_instead_of_guessing_continue() {
+    let rt = runtime().await;
+    let flow_id = flow_with(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "call", "kind": "http", "method": "GET",
+                  "url": "https://api.example.com/slots", "on_error": "continue" },
+                telling_step("call")
+            ]
+        }),
+    )
+    .await;
+    rt.replace_flow_grants(
+        &flow_id,
+        &[
+            GrantSpec::pair(GrantKind::Command, "crm.note.add"),
+            GrantSpec::pair(GrantKind::Http, "https://api.example.com/slots"),
+        ],
+        OWNER,
+    )
+    .await
+    .unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
+    let pending = rt.process_flows().await.unwrap().pending_io;
+    assert_eq!(pending.len(), 1, "the call left the lock");
+
+    // The document disappears while the request is out. The run keeps its lease — `store::delete`
+    // leaves an in-flight run to this seam on purpose — so the failure below still lands here.
+    rt.delete_flow(&flow_id, OWNER).await.unwrap();
+
+    rt.complete_flow_io(
+        pending[0].run_id(),
+        pending[0].step_id(),
+        IoResult::Failed("flow.http_timeout: no answer in 10 s".into()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        run_of(&rt, &flow_id).await.status,
+        store::STATUS_FAILED,
+        "an unreadable document is `stop`, never a guessed `continue`"
+    );
+    assert!(
+        notes(&rt).await.is_empty(),
+        "the step after the dead call never ran"
+    );
+}
