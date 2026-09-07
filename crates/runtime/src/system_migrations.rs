@@ -3790,7 +3790,16 @@ mod kind_contract_tests {
         // `printer` y tiraba el nombre. `ALTER … ADD COLUMN IF NOT EXISTS`, re-ejecutable. Al
         // escribirla el máximo era la v57 en `origin/develop`, en TODAS las ramas remotas y en
         // todos los worktrees locales de la flota.
-        assert_eq!(MIGRATIONS.len(), 55, "el catálogo cambió de tamaño");
+        // + `flow_grant_payload_pin` (v59, hub#1623): la columna `payload` de `_flow_grants`, que
+        // deja a un grant de `command` FIJAR parte del payload — «puede anular citas COMO CLIENTE»
+        // en vez de «puede anular citas», que es lo que separa a un flujo cuyo payload lo redacta un
+        // modelo leyendo el mensaje de un desconocido de entregarle a ese desconocido todos los
+        // argumentos del command. `'{}'` = no fija nada, que es lo que tenía toda fila anterior, así
+        // que `ALTER … ADD COLUMN IF NOT EXISTS` con default es re-ejecutable y no reescribe nada.
+        // NO entra en `ux_flow_grant_live` a propósito (el porqué, en el bloque de la migración).
+        // Al escribirla el máximo era la v58 en `origin/develop`, en `main`, en las 87 ramas
+        // remotas que llevan el fichero y en todos los worktrees locales de la flota.
+        assert_eq!(MIGRATIONS.len(), 56, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

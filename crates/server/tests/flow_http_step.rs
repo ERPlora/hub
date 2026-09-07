@@ -17,7 +17,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{any, get};
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{IoResult, NewFlow, PendingIo};
 use erplora_runtime::Runtime;
 use erplora_server::flow_io::{self, Limits};
