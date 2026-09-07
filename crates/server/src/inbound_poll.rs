@@ -288,6 +288,10 @@ impl InboundMessage {
     /// customer's is the exact harm the SaaS's default exists to prevent, so guessing is worse
     /// than passing it through. Unknown fields are reported but NOT forwarded: a key the SaaS
     /// invents must never be able to overwrite `text` or `message` in the event payload.
+    ///
+    /// Each gap is spelled `field:<name>` for a field this runtime has no place for, or
+    /// `<field>=<value>` for a value outside the contract — what precedes the `=` is what
+    /// [`ContractDrift`] remembers it by, so the value only ever rides in the log line.
     pub fn unexpected(&self) -> Vec<String> {
         let mut gaps: Vec<String> = self
             .unknown
@@ -295,10 +299,10 @@ impl InboundMessage {
             .map(|field| format!("field:{}", detail(field)))
             .collect();
         if !self.direction.is_empty() && !DIRECTIONS.contains(&self.direction.as_str()) {
-            gaps.push(format!("direction:{}", detail(&self.direction)));
+            gaps.push(format!("direction={}", detail(&self.direction)));
         }
         if !self.source.is_empty() && !SOURCES.contains(&self.source.as_str()) {
-            gaps.push(format!("source:{}", detail(&self.source)));
+            gaps.push(format!("source={}", detail(&self.source)));
         }
         gaps
     }
@@ -672,6 +676,14 @@ fn non_empty(value: &str) -> Option<&str> {
     Some(value).filter(|v| !v.is_empty())
 }
 
+/// What makes two gaps THE SAME gap: the field, never the value. `field:reactions` is its own
+/// identity; `source=history-42` is the gap `source`, whatever came after the `=`. An
+/// out-of-contract value is remote data, so keying on it would hand [`ContractDrift`] a brand-new
+/// gap on every tick — and, once full, mute the first warning of anything that came after it.
+fn gap_identity(gap: &str) -> &str {
+    gap.split_once('=').map_or(gap, |(field, _)| field)
+}
+
 /// What the runtime has already complained about, so a SaaS that grew a field costs ONE log line
 /// and not 720 an hour.
 ///
@@ -686,13 +698,19 @@ pub struct ContractDrift {
 
 impl ContractDrift {
     /// Ceiling on how many distinct gaps are remembered. Sixty-four is far past the point where a
-    /// human has read the warnings and opened an issue, and it is what makes the sentence above
-    /// true rather than hopeful: an out-of-contract VALUE is remote data, so a SaaS that stamped
-    /// an id into one would otherwise hand this tracker a brand-new key every 5 s for as long as
-    /// the process lives.
+    /// human has read the warnings and opened an issue. A gap is identified by its FIELD (see
+    /// [`gap_identity`]), so a value that changes on every tick cannot fill this up — but a field
+    /// name is remote data too, and "the SaaS would never serve that many" is an assumption, not
+    /// a limit.
     pub const MAX_TRACKED: usize = 64;
 
     /// Record what a page carried and return only what is NEW — what is worth saying out loud.
+    ///
+    /// Two gaps are the same gap when [`gap_identity`] says so: the field, never the value. That
+    /// is what keeps the cap from ever muting a genuinely new gap — a SaaS stamping an id into an
+    /// out-of-contract value (`source=history-<batch>`) costs ONE line, whereas keyed by value it
+    /// would have filled the tracker in 64 ticks (five minutes) and silenced the first warning of
+    /// every field that came after it, for the life of the process.
     ///
     /// Once [`Self::MAX_TRACKED`] distinct gaps are remembered nothing else earns a line. That is
     /// the safe way round: the drift has already been warned about that many times, and
@@ -700,7 +718,10 @@ impl ContractDrift {
     /// number never goes mute — only the repetition does.
     pub fn observe<I: IntoIterator<Item = String>>(&mut self, gaps: I) -> Vec<String> {
         gaps.into_iter()
-            .filter(|gap| self.seen.len() < Self::MAX_TRACKED && self.seen.insert(gap.clone()))
+            .filter(|gap| {
+                let identity = gap_identity(gap);
+                self.seen.len() < Self::MAX_TRACKED && self.seen.insert(identity.to_string())
+            })
             .collect()
     }
 
@@ -1468,8 +1489,8 @@ mod tests {
         assert_eq!(
             message.unexpected(),
             vec![
-                "direction:sideways".to_string(),
-                "source:yesterday".to_string()
+                "direction=sideways".to_string(),
+                "source=yesterday".to_string()
             ]
         );
         assert_eq!(message.event_payload()["direction"], json!("sideways"));
@@ -1477,24 +1498,24 @@ mod tests {
     }
 
     /// **The noise filter cannot become the leak.** Every gap it remembers is a string the SaaS
-    /// served — an out-of-contract VALUE is remote data, so a SaaS that stamped an id into it
-    /// (`source:history-<batch>`) would hand this runtime a brand-new gap on every single tick,
-    /// for the whole lifetime of the process. The tracker keeps at most
-    /// [`ContractDrift::MAX_TRACKED`] distinct gaps; past that it says nothing more, which is the
-    /// right way round: by then the drift has already earned its warnings, and `PollReport
-    /// ::unexpected` still counts every one of them into the tick line, so nothing goes mute.
+    /// served, and a FIELD NAME is remote data as much as a value is: a SaaS that grew a field per
+    /// tick would hand this runtime a brand-new gap on every single tick, for the whole lifetime
+    /// of the process. The tracker keeps at most [`ContractDrift::MAX_TRACKED`] distinct gaps;
+    /// past that it says nothing more, which is the right way round: by then the drift has
+    /// already earned its warnings, and `PollReport::unexpected` still counts every one of them
+    /// into the tick line, so nothing goes mute.
     #[test]
     fn the_drift_tracker_cannot_grow_without_bound_however_odd_the_saas_gets() {
         let mut drift = ContractDrift::default();
 
         let reported: usize = (0..ContractDrift::MAX_TRACKED + 50)
-            .map(|n| drift.observe(vec![format!("source:history-{n}")]).len())
+            .map(|n| drift.observe(vec![format!("field:extra-{n}")]).len())
             .sum();
 
         assert_eq!(
             reported,
             ContractDrift::MAX_TRACKED,
-            "a SaaS inventing a value per tick stops earning lines once the tracker is full"
+            "a SaaS inventing a field per tick stops earning lines once the tracker is full"
         );
         assert_eq!(
             drift.tracked(),
@@ -1523,6 +1544,32 @@ mod tests {
             drift.observe(vec!["field:reactions".into(), "field:referral".into()]),
             vec!["field:referral".to_string()],
             "but a NEW gap is still worth a line"
+        );
+    }
+
+    /// 🔴 **The cap must never mute a NEW gap.** A gap is identified by its FIELD, never by its
+    /// value: a SaaS that stamps an id into an out-of-contract value (`source=history-<batch>`)
+    /// costs ONE line, so it can never fill the tracker — and a field the SaaS grows after five
+    /// minutes of that still earns its first warning. Keyed by value, 64 ticks of that SaaS would
+    /// have silenced every gap that came after it, for the life of the process.
+    #[test]
+    fn a_value_that_changes_every_tick_costs_one_line_and_never_mutes_a_new_gap() {
+        let mut drift = ContractDrift::default();
+
+        let lines: Vec<String> = (0..ContractDrift::MAX_TRACKED + 50)
+            .flat_map(|n| drift.observe(vec![format!("source=history-{n}")]))
+            .collect();
+        assert_eq!(
+            lines,
+            vec!["source=history-0".to_string()],
+            "one line for the field that drifted, carrying the first value seen"
+        );
+        assert_eq!(drift.tracked(), 1, "one gap remembered, however many values it took");
+
+        assert_eq!(
+            drift.observe(vec!["field:reactions".into()]),
+            vec!["field:reactions".to_string()],
+            "a field the SaaS grows AFTER that still earns its first line"
         );
     }
 
