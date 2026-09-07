@@ -15,9 +15,8 @@ use std::collections::BTreeSet;
 use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
     AiPolicy, ErrorPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind,
-    DEFAULT_APPROVAL_TTL_SECONDS,
-    DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS, MAX_DELAY_HORIZON,
-    MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
+    DEFAULT_APPROVAL_TTL_SECONDS, DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS,
+    MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -595,7 +594,11 @@ fn the_failure_policy_is_the_same_closed_vocabulary_on_both_sides() {
     assert!(step("query", serde_json::json!({ "query": "crm.note.list" })).is_ok());
     assert!(step("delay", serde_json::json!({ "seconds": 60 })).is_ok());
     assert!(
-        step("http", serde_json::json!({ "url": "https://example.com/x" })).is_ok(),
+        step(
+            "http",
+            serde_json::json!({ "url": "https://example.com/x" })
+        )
+        .is_ok(),
         "the two kinds that fail OUTSIDE the tick obey the same policy, or it would cover the \
          cheap half of the kernel and miss the one somebody is waiting on"
     );
@@ -611,6 +614,10 @@ fn the_failure_policy_is_the_same_closed_vocabulary_on_both_sides() {
 
     // …and refuses it where a failure cannot happen. A `condition` that does not match is the flow
     // working as written, and an `approval` answers with `on_reject`/`on_expire`.
-    assert!(step("condition", serde_json::json!({ "when": { "input.x": { "eq": 1 } } })).is_err());
+    assert!(step(
+        "condition",
+        serde_json::json!({ "when": { "input.x": { "eq": 1 } } })
+    )
+    .is_err());
     assert!(step("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_err());
 }

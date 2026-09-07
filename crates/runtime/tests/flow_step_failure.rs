@@ -66,7 +66,9 @@ async fn grant(rt: &Runtime, flow_id: &str, commands: &[&str]) {
         .iter()
         .map(|c| GrantSpec::pair(GrantKind::Command, *c))
         .collect();
-    rt.replace_flow_grants(flow_id, &pairs, OWNER).await.unwrap();
+    rt.replace_flow_grants(flow_id, &pairs, OWNER)
+        .await
+        .unwrap();
 }
 
 async fn notes(rt: &Runtime) -> Vec<String> {
@@ -91,7 +93,8 @@ async fn run_of(rt: &Runtime, flow_id: &str) -> store::FlowRun {
 /// the command fails at EXECUTION time — the honest shape of the bug, and not a payload the runner
 /// would have refused before ever proposing it.
 fn breaking_step(id: &str, on_error: Option<&str>) -> Value {
-    let mut step = json!({ "id": id, "kind": "command", "command": "crm.receipt.stamp", "params": {} });
+    let mut step =
+        json!({ "id": id, "kind": "command", "command": "crm.receipt.stamp", "params": {} });
     if let Some(policy) = on_error {
         step.as_object_mut()
             .unwrap()
@@ -126,7 +129,9 @@ async fn a_document_that_says_nothing_about_failure_still_stops_the_run() {
     )
     .await;
     grant(&rt, &flow_id, &["crm.receipt.stamp", "crm.note.add"]).await;
-    rt.start_flow_run(&flow_id, &json!({}), OWNER).await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
 
     let run = run_of(&rt, &flow_id).await;
@@ -185,11 +190,17 @@ async fn a_step_that_says_continue_lets_the_run_carry_on_and_says_why() {
     )
     .await;
     grant(&rt, &flow_id, &["crm.receipt.stamp", "crm.note.add"]).await;
-    rt.start_flow_run(&flow_id, &json!({}), OWNER).await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
 
     let told = notes(&rt).await;
-    assert_eq!(told.len(), 1, "the person who was waiting was told: {told:?}");
+    assert_eq!(
+        told.len(),
+        1,
+        "the person who was waiting was told: {told:?}"
+    );
     assert!(
         told[0].starts_with("no pudo ser (failed):"),
         "the step after it reads `steps.<id>.status`: {}",
@@ -246,7 +257,9 @@ async fn a_step_that_fails_outside_the_tick_obeys_the_same_policy() {
     )
     .await
     .unwrap();
-    rt.start_flow_run(&flow_id, &json!({}), OWNER).await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
     let pending = rt.process_flows().await.unwrap().pending_io;
     assert_eq!(pending.len(), 1, "the call left the lock");
 
@@ -260,7 +273,11 @@ async fn a_step_that_fails_outside_the_tick_obeys_the_same_policy() {
     rt.process_flows().await.unwrap();
 
     let told = notes(&rt).await;
-    assert_eq!(told.len(), 1, "the run carried on past the dead call: {told:?}");
+    assert_eq!(
+        told.len(),
+        1,
+        "the run carried on past the dead call: {told:?}"
+    );
     assert!(told[0].contains("http_timeout"), "{}", told[0]);
     assert_eq!(run_of(&rt, &flow_id).await.status, store::STATUS_DONE);
 }
@@ -289,7 +306,9 @@ async fn approving_a_proposal_whose_command_breaks_still_reaches_the_person_who_
     )
     .await;
     grant(&rt, &flow_id, &["crm.receipt.stamp", "crm.note.add"]).await;
-    rt.start_flow_run(&flow_id, &json!({}), OWNER).await.unwrap();
+    rt.start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
     let run = run_of(&rt, &flow_id).await;
 

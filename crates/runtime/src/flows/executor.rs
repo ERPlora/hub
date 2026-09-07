@@ -1282,7 +1282,11 @@ async fn step_error_policy(
 /// `on_reject: "continue"` hands it over (hub#1622). Without that, `{{steps.<id>.text}}` renders
 /// empty in the very message this primitive exists to send.
 fn failure_output(parked: Json, error: &str) -> Json {
-    let mut output = if parked.is_object() { parked } else { json!({}) };
+    let mut output = if parked.is_object() {
+        parked
+    } else {
+        json!({})
+    };
     let map = output.as_object_mut().expect("just made an object");
     map.insert("status".to_string(), json!(STEP_FAILED));
     map.insert("error".to_string(), json!(error));
@@ -2306,7 +2310,7 @@ mod tests {
         .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
-        // v1 is `on_error: stop`.
+        // This document says nothing about failure, so the default `on_error: stop` applies.
         let run = run_of(&db, &flow_id).await;
         assert_eq!(run.status, store::STATUS_FAILED);
         assert!(

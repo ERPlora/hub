@@ -136,9 +136,10 @@ pub fn dispatch(state: &AppState, pending: Vec<PendingIo>) {
 /// Performs one prepared request and turns it into what the next step reads.
 ///
 /// Output on success: `{status, ok, body_json | body_text}` (plus `truncated: true` when the answer
-/// was cut). A **non-2xx answer fails the step**: v1 flows are linear with `on_error: "stop"`, so
-/// there is nowhere to branch on a 500, and carrying on would be a flow that treats "the API
-/// refused" as "the API accepted".
+/// was cut). A **non-2xx answer fails the step**: treating "the API refused" as "the API accepted"
+/// would be a lie to every step downstream. What that failure then COSTS the run is the step's
+/// `on_error` (hub#1635) — `stop` unless the document asked to carry on — and not this function's
+/// business: it reports the failure, the executor prices it.
 pub async fn execute(request: &HttpRequest, limits: &Limits) -> IoResult {
     let outgoing = match wire_request(request, limits) {
         Ok(outgoing) => outgoing,

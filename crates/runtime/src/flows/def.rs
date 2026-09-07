@@ -4110,7 +4110,11 @@ mod tests {
             let kind = step["kind"].as_str().unwrap().to_string();
             let def = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
                 .unwrap_or_else(|e| panic!("`{kind}` may declare `on_error`: {e}"));
-            assert_eq!(def.steps[0].on_error, ErrorPolicy::Continue, "kind `{kind}`");
+            assert_eq!(
+                def.steps[0].on_error,
+                ErrorPolicy::Continue,
+                "kind `{kind}`"
+            );
         }
     }
 
@@ -4171,10 +4175,12 @@ mod tests {
         ] {
             let kind = step["kind"].as_str().unwrap().to_string();
             let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
-                .unwrap_or_else(|_| panic!("`{kind}` must refuse `on_error`"))
-                .steps
-                .len();
-            let _ = err;
+                .expect_err(&format!("`{kind}` must refuse `on_error`"));
+            let text = format!("{err}");
+            assert!(
+                text.contains("unknown key `on_error`"),
+                "`{kind}` refuses it as an unknown key: {text}"
+            );
         }
     }
 
