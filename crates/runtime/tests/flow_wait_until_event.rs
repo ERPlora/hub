@@ -891,13 +891,14 @@ async fn una_espera_rota_deja_su_motivo_legible_por_el_paso_siguiente() {
     )
     .await
     .unwrap();
-    rt.start_flow_run(
-        &flow_id,
-        &json!({ "appointment_at": appointment(), "appointment_id": "a-42" }),
-        OWNER,
-    )
-    .await
-    .unwrap();
+    let run_id = rt
+        .start_flow_run(
+            &flow_id,
+            &json!({ "appointment_at": appointment(), "appointment_id": "a-42" }),
+            OWNER,
+        )
+        .await
+        .unwrap();
     rt.process_flows().await.unwrap();
 
     deliver(
@@ -916,5 +917,22 @@ async fn una_espera_rota_deja_su_motivo_legible_por_el_paso_siguiente() {
         told[0].starts_with("no pudo ser (failed): step `wait`"),
         "el motivo llega entero y nombrado: {}",
         told[0]
+    );
+
+    // Y la HISTORIA no miente: el paso que se rompió queda `failed` con su motivo, no `sleeping`
+    // para siempre. `continue` habla del run, igual que en las otras dos costuras.
+    let steps = rt.get_flow_run(&run_id).await.unwrap().1;
+    let broken = steps
+        .iter()
+        .find(|s| s.step_id == "wait")
+        .expect("la espera dejó su fila");
+    assert_eq!(
+        broken.status, "failed",
+        "una espera rota que se quedara `sleeping` sería una historia que miente"
+    );
+    assert!(
+        broken.error.contains("mañana por la tarde"),
+        "{}",
+        broken.error
     );
 }
