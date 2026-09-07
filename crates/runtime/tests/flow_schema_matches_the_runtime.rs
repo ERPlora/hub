@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 
 use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
+    AiOutputKind, AiPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
     DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS, MAX_DELAY_HORIZON,
     MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
 };
@@ -426,6 +426,37 @@ fn the_ai_policies_are_the_same_two_on_both_sides_and_default_to_manual() {
     );
 }
 
+/// **The shapes a turn may leave behind, on both sides** (hub#1639). The editor writes `output`
+/// against this enum and the hub judges it against [`AiOutputKind`]; a schema that accepted a
+/// fourth shape would have an editor saving a document the hub then refuses at the till, which is
+/// hub#521 with the sides swapped.
+#[test]
+fn the_ai_output_shapes_are_the_same_on_both_sides() {
+    let schema = schema();
+    let declared = enum_at(
+        &schema,
+        "/$defs/step/properties/output/additionalProperties/properties/type",
+    );
+    let known: BTreeSet<String> = AiOutputKind::ALL
+        .iter()
+        .map(|k| k.as_str().to_string())
+        .collect();
+    assert_eq!(declared, known);
+    // Both halves of a field are required on both sides: a field with no `describe` is a field
+    // the model fills with whatever it likes, and the editor must refuse it where it is typed.
+    let required: BTreeSet<String> = schema
+        .pointer("/$defs/step/properties/output/additionalProperties/required")
+        .and_then(|v| v.as_array())
+        .unwrap_or_else(|| panic!("`output` fields declare what they require"))
+        .iter()
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect();
+    assert_eq!(
+        required,
+        BTreeSet::from(["describe".to_string(), "type".to_string()])
+    );
+}
+
 /// The loop bound is money — every turn is a metered call through the SaaS proxy — so the number
 /// the editor enforces and the number the hub enforces have to be the same number.
 #[test]
@@ -525,7 +556,7 @@ fn every_key_of_the_ai_step_is_declared_in_the_schema() {
             "the schema must declare `{key}` of a `notify` step; it has {declared:?}"
         );
     }
-    for key in ["prompt", "tools", "policy", "max_iters"] {
+    for key in ["prompt", "tools", "policy", "max_iters", "output"] {
         assert!(
             declared.contains(key),
             "the schema must declare `{key}` of an `ai` step; it has {declared:?}"
