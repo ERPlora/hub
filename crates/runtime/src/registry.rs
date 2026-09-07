@@ -3,7 +3,11 @@
 //! INACTIVO; solo los activos exponen menú/queries/commands/eventos (hot-plug, §4 paso 11).
 use std::collections::{HashMap, HashSet};
 
-use crate::manifest::{CommandDef, Manifest, ModuleFlowTemplate, ModuleLocale, Nav, QueryDef};
+use crate::manifest::{
+    CommandDef, FlowTemplateDiscard, FlowTemplateScan, Manifest, ModuleFlowTemplate, ModuleLocale,
+    Nav, QueryDef, FLOOR_MODULE_MISSING, FLOOR_MODULE_PAUSED, FLOOR_MODULE_TOO_OLD,
+    FLOOR_UNREADABLE, OWNER_PAUSED,
+};
 
 /// Estado de un módulo instalado en este hub (equivalente a la tabla `hub_module`, §2.5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -342,7 +346,7 @@ pub struct Registry {
     /// Automatizaciones de fábrica por módulo: `module_id → plantillas` (hub#1611). Se cargan de
     /// `flows/` del paquete al instalar/re-hidratar, igual que `locales`. Vacío = el módulo no
     /// trae ninguna, que es el caso de 26 de los 27 módulos de hoy.
-    pub flow_templates: HashMap<String, Vec<ModuleFlowTemplate>>,
+    pub flow_templates: HashMap<String, FlowTemplateScan>,
     /// Observador opcional de eventos (lo pone el server para el WS).
     pub event_sink: Option<std::sync::Arc<dyn EventSink>>,
     /// Plugins **nativos first-party** (ADR-0009): `module_id` → motor horneado en el
@@ -531,11 +535,11 @@ impl Registry {
     /// previas, que es lo que hace que **quitar** una plantilla de una versión nueva del módulo la
     /// retire de la galería: si se acumularan, se seguiría ofreciendo una que su autor ya no
     /// publica.
-    pub fn set_flow_templates(&mut self, module_id: &str, templates: Vec<ModuleFlowTemplate>) {
-        if templates.is_empty() {
+    pub fn set_flow_templates(&mut self, module_id: &str, scan: FlowTemplateScan) {
+        if scan.is_empty() {
             self.flow_templates.remove(module_id);
         } else {
-            self.flow_templates.insert(module_id.to_string(), templates);
+            self.flow_templates.insert(module_id.to_string(), scan);
         }
     }
 
@@ -547,7 +551,7 @@ impl Registry {
     /// se pueden ejecutar. El orden es estable (módulo, luego familia) para que la galería no baile
     /// entre dos peticiones.
     ///
-    /// Y filtra por el **suelo de versión de cada plantilla** ([`Self::flow_template_floor_is_met`]):
+    /// Y filtra por el **suelo de versión de cada plantilla** ([`Self::flow_template_floor_problem`]):
     /// una plantilla cuyo `requires.json` no se cumple no se ofrece, mientras el módulo que la trae
     /// sigue funcionando igual.
     pub fn flow_templates(&self) -> Vec<(&str, &ModuleFlowTemplate)> {
@@ -555,8 +559,10 @@ impl Registry {
             .flow_templates
             .iter()
             .filter(|(module_id, _)| self.is_active(module_id))
-            .flat_map(|(module_id, tpls)| tpls.iter().map(move |t| (module_id.as_str(), t)))
-            .filter(|(_, tpl)| self.flow_template_floor_is_met(tpl))
+            .flat_map(|(module_id, scan)| {
+                scan.templates.iter().map(move |t| (module_id.as_str(), t))
+            })
+            .filter(|(_, tpl)| self.flow_template_floor_problem(tpl).is_none())
             .collect();
         out.sort_by(|a, b| (a.0, &a.1.family).cmp(&(b.0, &b.1.family)));
         out
@@ -576,16 +582,102 @@ impl Registry {
     /// plantilla— deja la plantilla FUERA en vez de dentro: ofrecer una automatización cuyo suelo
     /// no se ha podido comprobar es ofrecer una que al ejecutarse nombra commands que este hub
     /// quizá no tiene, y el daño de no enseñarla es que el dueño no la ve.
-    fn flow_template_floor_is_met(&self, tpl: &ModuleFlowTemplate) -> bool {
-        tpl.requires.iter().all(|(module_id, floor)| {
+    fn flow_template_floor_problem(&self, tpl: &ModuleFlowTemplate) -> Option<FlowTemplateDiscard> {
+        // `requires` es un mapa: se recorre ORDENADO para que dos peticiones seguidas nombren
+        // siempre el mismo vecino cuando falla más de uno.
+        let mut needed: Vec<(&String, &String)> = tpl.requires.iter().collect();
+        needed.sort();
+        for (module_id, floor) in needed {
+            let discard = |code: &str, detail: String| {
+                Some(FlowTemplateDiscard {
+                    family: tpl.family.clone(),
+                    code: code.to_string(),
+                    detail,
+                })
+            };
+            if !self.is_installed(module_id) {
+                return discard(
+                    FLOOR_MODULE_MISSING,
+                    format!("necesita `{module_id}` >= {floor} y no está instalado"),
+                );
+            }
+            // 🔴 hub#1649: un vecino PAUSADO cuenta como AUSENTE. Sus commands no se pueden
+            // ejecutar ahora mismo, que es exactamente el motivo por el que un módulo pausado
+            // tampoco ofrece las plantillas que trae él.
+            if !self.is_active(module_id) {
+                return discard(
+                    FLOOR_MODULE_PAUSED,
+                    format!("necesita `{module_id}` >= {floor} y está pausado"),
+                );
+            }
+            let installed_version = self.module_version(module_id);
             match (
-                crate::core_version::version_triple(&self.module_version(module_id)),
+                crate::core_version::version_triple(&installed_version),
                 crate::core_version::version_triple(floor),
             ) {
-                (Some(installed), Some(needed)) => installed >= needed,
-                _ => false,
+                (Some(installed), Some(min)) if installed >= min => {}
+                (Some(_), Some(_)) => {
+                    return discard(
+                        FLOOR_MODULE_TOO_OLD,
+                        format!(
+                            "necesita `{module_id}` >= {floor} y hay {installed_version}"
+                        ),
+                    )
+                }
+                _ => {
+                    return discard(
+                        FLOOR_UNREADABLE,
+                        format!(
+                            "el suelo `{module_id}` >= {floor} no se lee como versión \
+                             (instalada: {installed_version})"
+                        ),
+                    )
+                }
             }
-        })
+        }
+        None
+    }
+
+    /// Las plantillas de fábrica que este hub **NO** ofrece, con su módulo de origen y su motivo
+    /// (hub#1649).
+    ///
+    /// Es la otra mitad de [`Self::flow_templates`] y se responde con ella: una galería que solo
+    /// dice lo que hay deja «este módulo no trae ninguna» y «la trae y el hub la ha descartado»
+    /// exactamente iguales, y desde ahí no hay nadie —dueño, soporte o la autora del módulo— que
+    /// pueda arreglar nada.
+    ///
+    /// Junta las dos familias de motivo, que se deciden en momentos distintos: lo que se descartó
+    /// al LEER la carpeta (guardado al instalar) y lo que se descarta al SERVIR, porque depende de
+    /// qué más hay instalado ahora mismo — el suelo de versión y el módulo pausado.
+    pub fn flow_template_discards(&self) -> Vec<(&str, FlowTemplateDiscard)> {
+        let mut out: Vec<(&str, FlowTemplateDiscard)> = Vec::new();
+        for (module_id, scan) in &self.flow_templates {
+            for discard in &scan.discards {
+                out.push((module_id.as_str(), discard.clone()));
+            }
+            if !self.is_active(module_id) {
+                // El módulo que las trae está pausado: sus plantillas no se ofrecen, y decirlo es
+                // lo que separa «pausé el módulo» de «se ha roto algo».
+                out.extend(scan.templates.iter().map(|tpl| {
+                    (
+                        module_id.as_str(),
+                        FlowTemplateDiscard {
+                            family: tpl.family.clone(),
+                            code: OWNER_PAUSED.to_string(),
+                            detail: format!("`{module_id}` está pausado"),
+                        },
+                    )
+                }));
+                continue;
+            }
+            for tpl in &scan.templates {
+                if let Some(discard) = self.flow_template_floor_problem(tpl) {
+                    out.push((module_id.as_str(), discard));
+                }
+            }
+        }
+        out.sort_by(|a, b| (a.0, &a.1.family, &a.1.code).cmp(&(b.0, &b.1.family, &b.1.code)));
+        out
     }
 
     /// Catálogo del idioma pedido para un módulo, con fallback `locale → en` (ADR-0055).
@@ -963,10 +1055,11 @@ pub struct ModuleSnapshot {
     commands: Vec<(String, RegisteredCommand)>,
     navigation: Vec<NavEntry>,
     locales: HashMap<String, ModuleLocale>,
-    /// The factory automations that were registered (hub#1611). Without this, a failed
-    /// update would restore the module WITHOUT its templates: the rollback puts the till
-    /// back and silently drops the gallery entry until the next boot.
-    flow_templates: Vec<ModuleFlowTemplate>,
+    /// The factory automations that were registered, and what the package's `flows/` folder
+    /// had to discard (hub#1611, hub#1649). Without this, a failed update would restore the
+    /// module WITHOUT its templates: the rollback puts the till back and silently drops the
+    /// gallery entry until the next boot.
+    flow_templates: FlowTemplateScan,
     /// `(event, command)` pairs whose command belongs to the module.
     listeners: Vec<(String, String)>,
     /// The natural keys the module's seed declares, per table (hub#842).

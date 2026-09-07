@@ -180,6 +180,7 @@ mod tests {
             notify::ERR_RECIPIENT_NOT_FOUND,
             notify::ERR_RECIPIENT_AMBIGUOUS,
             notify::ERR_RECIPIENT_INVALID,
+            notify::ERR_OPTIONS_NOT_FOUND,
             store::ERR_FLOW_NOT_FOUND,
             approvals::ERR_APPROVAL_NOT_FOUND,
             approvals::ERR_APPROVAL_ALREADY_DECIDED,

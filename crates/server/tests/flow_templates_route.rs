@@ -206,6 +206,13 @@ async fn the_gallery_gets_the_template_its_module_ships() {
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = body_json(response).await;
+    assert!(
+        body["discarded"]
+            .as_array()
+            .expect("la lista de descartes viaja siempre")
+            .is_empty(),
+        "control positivo (hub#1649): con todo en su sitio no se descarta nada"
+    );
     let items = body["data"].as_array().expect("una lista de plantillas");
     assert_eq!(items.len(), 1, "la familia de `whatsapp_inbox`");
     let tpl = &items[0];
@@ -355,5 +362,19 @@ async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
     assert!(
         body["data"].as_array().expect("una lista").is_empty(),
         "sin el módulo que pide el suelo, su plantilla no se ofrece"
+    );
+    // hub#1649: y la puerta DICE por qué. Una galería que solo enumera lo que hay deja «el módulo
+    // no trae ninguna» y «la trae y el hub la ha descartado» exactamente iguales en pantalla.
+    let discarded = body["discarded"].as_array().expect("una lista de descartes");
+    assert_eq!(discarded.len(), 1, "el descarte se cuenta: {discarded:?}");
+    assert_eq!(discarded[0]["module"], "whatsapp_inbox");
+    assert_eq!(discarded[0]["family"], "appointment-from-whatsapp");
+    assert_eq!(discarded[0]["code"], "template_floor_module_missing");
+    assert!(
+        discarded[0]["detail"]
+            .as_str()
+            .is_some_and(|d| d.contains("appointments")),
+        "el motivo nombra al vecino que falta: {:?}",
+        discarded[0]["detail"]
     );
 }

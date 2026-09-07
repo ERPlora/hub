@@ -218,4 +218,147 @@ async fn a_floor_that_cannot_be_read_leaves_the_template_out() {
         runtime.registry().flow_templates().is_empty(),
         "un suelo ilegible deja la plantilla fuera, no dentro"
     );
+    // hub#1649: y lo DICE. Es el tercero de los cinco motivos que la issue enumera, y el único
+    // que se emitía sin que ningún test leyera su código: un renombrado o un motivo cambiado por
+    // otro pasaba el gate en verde y volvía a dejar al dueño sin saber qué mirar.
+    let discards = runtime.registry().flow_template_discards();
+    assert_eq!(
+        discards
+            .iter()
+            .map(|(m, d)| (*m, d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [(
+            "whatsapp_inbox",
+            "appointment-from-whatsapp",
+            "template_floor_unreadable"
+        )]
+    );
+    assert!(
+        discards[0].1.detail.contains("appointments") && discards[0].1.detail.contains("latest"),
+        "el motivo nombra al vecino y el suelo que no se lee: {}",
+        discards[0].1.detail
+    );
+}
+
+#[tokio::test]
+async fn a_template_whose_required_module_is_paused_is_not_offered() {
+    // hub#1649. Un módulo PAUSADO no ejecuta sus commands: para el suelo de una plantilla cuenta
+    // como ausente, no como presente. Es el mismo criterio que `flow_templates()` ya aplica al
+    // módulo que TRAE la plantilla — ofrecerla porque el vecino está instalado, aunque esté
+    // pausado, es ofrecer una automatización que al ejecutarse llama a una puerta cerrada.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-paused");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.69"))
+        .await
+        .unwrap();
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "1.1.69"))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime.registry().flow_templates().len(),
+        1,
+        "control positivo: con el vecino ACTIVO la plantilla sí se ofrece"
+    );
+
+    runtime.deactivate("appointments").await.unwrap();
+
+    assert!(
+        runtime.registry().flow_templates().is_empty(),
+        "con el vecino pausado, su plantilla deja de ofrecerse"
+    );
+    // Y lo dice, que es la otra mitad de hub#1649: dejar de ofrecerla sin motivo es la
+    // desaparición muda que la issue describe.
+    let discards = runtime.registry().flow_template_discards();
+    assert_eq!(
+        discards
+            .iter()
+            .map(|(m, d)| (*m, d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [("whatsapp_inbox", "template_floor_module_paused")]
+    );
+    assert!(
+        discards[0].1.detail.contains("appointments"),
+        "el motivo nombra al vecino: {}",
+        discards[0].1.detail
+    );
+}
+
+#[tokio::test]
+async fn pausing_the_module_that_ships_the_template_says_so_too() {
+    // hub#1649. Un módulo pausado ya no ofrecía sus plantillas —correcto— pero tampoco lo decía,
+    // así que en la galería se veía igual que un módulo que no trae ninguna.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-owner-paused");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&fixture_with_templates("whatsapp_inbox"))
+        .await
+        .unwrap();
+    assert!(
+        runtime.registry().flow_template_discards().is_empty(),
+        "control positivo: con el módulo activo no se descarta nada"
+    );
+
+    runtime.deactivate("whatsapp_inbox").await.unwrap();
+
+    assert!(runtime.registry().flow_templates().is_empty());
+    assert_eq!(
+        runtime
+            .registry()
+            .flow_template_discards()
+            .iter()
+            .map(|(m, d)| (*m, d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [(
+            "whatsapp_inbox",
+            "appointment-from-whatsapp",
+            "template_owner_paused"
+        )]
+    );
+}
+
+#[tokio::test]
+async fn a_floor_that_is_not_met_says_which_neighbour_and_why() {
+    // hub#1649. Los dos motivos que dependen de qué más hay instalado —falta, o es viejo— se
+    // nombran por separado: «instala appointments» y «actualiza appointments» son dos arreglos
+    // distintos para el dueño.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-said");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "1.1.69"))
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime
+            .registry()
+            .flow_template_discards()
+            .iter()
+            .map(|(_, d)| d.code.as_str())
+            .collect::<Vec<_>>(),
+        ["template_floor_module_missing"]
+    );
+
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.68"))
+        .await
+        .unwrap();
+
+    let discards = runtime.registry().flow_template_discards();
+    assert_eq!(
+        discards
+            .iter()
+            .map(|(_, d)| d.code.as_str())
+            .collect::<Vec<_>>(),
+        ["template_floor_module_too_old"],
+        "instalado pero viejo es otro motivo que «no está»"
+    );
+    assert!(
+        discards[0].1.detail.contains("1.1.68") && discards[0].1.detail.contains("1.1.69"),
+        "dice qué hay y qué hace falta: {}",
+        discards[0].1.detail
+    );
 }

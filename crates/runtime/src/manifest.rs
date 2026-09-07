@@ -2108,10 +2108,22 @@ impl Manifest {
             let Some(lang) = path.file_stem().and_then(|s| s.to_str()) else {
                 continue;
             };
-            if let Ok(text) = std::fs::read_to_string(&path) {
-                if let Ok(loc) = serde_json::from_str::<ModuleLocale>(&text) {
-                    out.insert(lang.to_string(), loc);
-                }
+            // hub#1649: best-effort, pero no mudo. Un catálogo que no se lee deja al módulo
+            // sirviendo el inglés del manifest en un hub en español, y hasta hoy no lo decía nadie.
+            match std::fs::read_to_string(&path) {
+                Err(e) => eprintln!(
+                    "⚠ locales: `{}` no se puede leer ({e}) → ese idioma no se sirve",
+                    path.display()
+                ),
+                Ok(text) => match serde_json::from_str::<ModuleLocale>(&text) {
+                    Ok(loc) => {
+                        out.insert(lang.to_string(), loc);
+                    }
+                    Err(e) => eprintln!(
+                        "⚠ locales: `{}` no se lee como catálogo de traducciones ({e}) → ese idioma no se sirve",
+                        path.display()
+                    ),
+                },
             }
         }
         out
@@ -2149,9 +2161,16 @@ impl Manifest {
     /// ensanchar un permiso en silencio, que es justo lo que ese campo existe para impedir.
     ///
     /// El resultado va **ordenado por familia** para que la galería no baile entre dos arranques.
-    pub fn load_flow_templates(dir: &Path) -> Vec<ModuleFlowTemplate> {
+    ///
+    /// 🔴 **Best-effort no es mudo** (hub#1649): lo que se descarta sale en
+    /// [`FlowTemplateScan::discards`] con su código y su motivo. Sin eso, «este módulo no trae
+    /// ninguna automatización» y «la trae y el hub la ha descartado» se ven exactamente igual desde
+    /// el mostrador, y no hay nadie —ni el dueño, ni soporte, ni la autora del módulo— que pueda
+    /// distinguirlas.
+    pub fn scan_flow_templates(dir: &Path) -> FlowTemplateScan {
+        let mut scan = FlowTemplateScan::default();
         let Ok(entries) = std::fs::read_dir(dir.join("flows")) else {
-            return Vec::new();
+            return scan;
         };
 
         // 1ª pasada: agrupar los documentos por familia e idioma. `<family>.<lang>.flow.json`, y
@@ -2175,18 +2194,31 @@ impl Manifest {
             } else if let Some(stem) = name.strip_suffix(".flow.json") {
                 // `<family>.<lang>`: el idioma es la última etiqueta, la familia el resto.
                 let Some((family, lang)) = stem.rsplit_once('.') else {
+                    scan.discard(stem, DISCARD_NO_LANGUAGE, format!(
+                        "`{name}` no dice en qué idioma está: el nombre es `<familia>.<idioma>.flow.json`"
+                    ));
                     continue;
                 };
-                if family.is_empty()
-                    || lang.len() != 2
-                    || !lang.chars().all(|c| c.is_ascii_lowercase())
-                {
+                if family.is_empty() || !is_language_tag(lang) {
+                    scan.discard(stem, DISCARD_INVALID_LANGUAGE, format!(
+                        "`{name}`: `{lang}` no es una etiqueta de idioma como las de `locales/` (`en`, `es`, `pt-br`)"
+                    ));
                     continue;
                 }
                 let Ok(text) = std::fs::read_to_string(&path) else {
+                    scan.discard(
+                        family,
+                        DISCARD_UNREADABLE_DOCUMENT,
+                        format!("`{name}` no se puede leer del paquete"),
+                    );
                     continue;
                 };
                 let Ok(doc) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    scan.discard(
+                        family,
+                        DISCARD_INVALID_DOCUMENT,
+                        format!("`{name}` no se lee como JSON"),
+                    );
                     continue;
                 };
                 docs.entry(family.to_string())
@@ -2198,32 +2230,156 @@ impl Manifest {
         // 2ª pasada: una familia solo se ofrece si trae su `grants.json` legible. Un grant es lo
         // que abre la puerta de verdad (ADR-0283 §2): una plantilla que no puede decir qué va a
         // hacer no se ofrece, en vez de ofrecerse y pedirlo después.
-        docs.into_iter()
-            .filter_map(|(family, documents)| {
-                if documents.is_empty() {
-                    return None;
+        for (family, documents) in docs {
+            if documents.is_empty() {
+                continue;
+            }
+            let grants = sidecars
+                .get(&family)
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .and_then(|t| serde_json::from_str::<FlowGrantsSidecar>(&t).ok())
+                .map(|s| s.grants);
+            let Some(grants) = grants else {
+                scan.discard(
+                    &family,
+                    DISCARD_MISSING_GRANTS,
+                    format!(
+                        "falta `{family}.grants.json` o no se lee: una plantilla que no puede decir \
+                         qué va a hacer no se ofrece"
+                    ),
+                );
+                continue;
+            };
+            // 🔴 El suelo falla CERRADO igual que en `Registry::flow_template_floor_is_met`: un
+            // `requires.json` que ESTÁ y no se lee no puede valer «sin suelo», porque eso ofrecería
+            // la plantilla precisamente en el caso en que no se ha podido comprobar nada.
+            let requires = match requires.get(&family) {
+                None => HashMap::new(),
+                Some(path) => {
+                    let parsed = std::fs::read_to_string(path)
+                        .ok()
+                        .and_then(|t| serde_json::from_str::<FlowRequiresSidecar>(&t).ok());
+                    let Some(sidecar) = parsed else {
+                        scan.discard(
+                            &family,
+                            DISCARD_UNREADABLE_REQUIRES,
+                            format!(
+                                "`{family}.requires.json` no se lee: su suelo de versión no se puede \
+                                 comprobar, así que la plantilla no se ofrece"
+                            ),
+                        );
+                        continue;
+                    };
+                    sidecar.modules
                 }
-                let grants = sidecars
-                    .get(&family)
-                    .and_then(|p| std::fs::read_to_string(p).ok())
-                    .and_then(|t| serde_json::from_str::<FlowGrantsSidecar>(&t).ok())?
-                    .grants;
-                let requires = requires
-                    .get(&family)
-                    .and_then(|p| std::fs::read_to_string(p).ok())
-                    .and_then(|t| serde_json::from_str::<FlowRequiresSidecar>(&t).ok())
-                    .map(|r| r.modules)
-                    .unwrap_or_default();
-                Some(ModuleFlowTemplate {
-                    family,
-                    documents,
-                    grants,
-                    requires,
-                })
-            })
-            .collect()
+            };
+            scan.templates.push(ModuleFlowTemplate {
+                family,
+                documents,
+                grants,
+                requires,
+            });
+        }
+        scan.discards
+            .sort_by(|a, b| (&a.family, &a.code).cmp(&(&b.family, &b.code)));
+        scan
     }
 }
+
+/// ¿`tag` nombra un idioma, y no otra cosa? (hub#1649)
+///
+/// El mismo contrato que ya conoce quien escribe un módulo: el de `locales/<tag>.json`. hub#1611
+/// pedía aquí **dos letras minúsculas exactas**, así que un `pt-br` —que en `locales/` sí vale— se
+/// caía, y se caía callando. Esto acepta la etiqueta BCP-47 corta (`en`, `pt-br`, `pt-BR`,
+/// `zh-Hans`) y sigue rechazando lo que no es un idioma (`README`, `backup`), que es lo único que
+/// esta comprobación tiene que separar: los `.grants.json` y `.requires.json` ya se apartaron antes
+/// por su sufijo.
+fn is_language_tag(tag: &str) -> bool {
+    let mut parts = tag.split('-');
+    let Some(primary) = parts.next() else {
+        return false;
+    };
+    if !(2..=3).contains(&primary.len()) || !primary.chars().all(|c| c.is_ascii_lowercase()) {
+        return false;
+    }
+    parts.all(|p| (1..=8).contains(&p.len()) && p.chars().all(|c| c.is_ascii_alphanumeric()))
+}
+
+/// Lo que la carpeta `flows/` de un módulo aportó: lo que se registró y lo que **no**, con su
+/// motivo (hub#1611, hub#1649).
+///
+/// Van juntos a propósito. La carga es best-effort —esto es contenido de un zip de terceros y corre
+/// en cada arranque por `rehydrate_installed`, así que un paquete roto no puede tumbar el hub—,
+/// pero un descarte que no se cuenta en ningún sitio convierte «no trae ninguna» y «la trae y se ha
+/// descartado» en la misma pantalla vacía.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct FlowTemplateScan {
+    /// Las familias que este hub ofrecerá (sujetas además al suelo de versión, que se juzga en el
+    /// registro porque depende de qué más hay instalado).
+    pub templates: Vec<ModuleFlowTemplate>,
+    /// Lo que se quedó fuera al leer la carpeta, y por qué.
+    pub discards: Vec<FlowTemplateDiscard>,
+}
+
+impl FlowTemplateScan {
+    /// ¿La carpeta no aportó nada, ni bueno ni roto? Es el caso de los módulos que no traen
+    /// automatizaciones, que es la mayoría.
+    pub fn is_empty(&self) -> bool {
+        self.templates.is_empty() && self.discards.is_empty()
+    }
+
+    fn discard(&mut self, family: &str, code: &'static str, detail: String) {
+        self.discards.push(FlowTemplateDiscard {
+            family: family.to_string(),
+            code: code.to_string(),
+            detail,
+        });
+    }
+}
+
+/// Una automatización de fábrica que este hub **no** ofrece, y por qué (hub#1649).
+///
+/// Se responde en `GET /api/hub/flows/templates` junto a las que sí se ofrecen, porque la pantalla
+/// donde se nota que falta es esa. Lo que se lee es el `code`; el `detail` es prosa para una
+/// persona y no se compara nunca (ADR-0055).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct FlowTemplateDiscard {
+    /// La familia que se quedó fuera — o el nombre del fichero, cuando ni siquiera llega a nombrar
+    /// una familia y un idioma.
+    pub family: String,
+    /// Código estable del motivo. Es lo que leen los tests y la UI.
+    pub code: String,
+    /// Qué fichero y qué le pasa, en una frase sobre la que se puede actuar.
+    pub detail: String,
+}
+
+/// `<family>.<lang>.flow.json` sin idioma: el nombre no separa familia e idioma.
+pub const DISCARD_NO_LANGUAGE: &str = "template_no_language";
+/// La etiqueta de idioma del fichero no es un idioma.
+pub const DISCARD_INVALID_LANGUAGE: &str = "template_invalid_language";
+/// El documento está en el paquete y no se puede leer del disco.
+pub const DISCARD_UNREADABLE_DOCUMENT: &str = "template_unreadable_document";
+/// El documento se lee y no es JSON.
+pub const DISCARD_INVALID_DOCUMENT: &str = "template_invalid_document";
+/// Falta `<family>.grants.json`, o está y no se lee.
+pub const DISCARD_MISSING_GRANTS: &str = "template_missing_grants";
+/// `<family>.requires.json` está y no se lee: el suelo no se puede comprobar (falla cerrado).
+pub const DISCARD_UNREADABLE_REQUIRES: &str = "template_unreadable_requires";
+
+// Motivos que NO se deciden al leer la carpeta sino al servir, porque dependen de qué más hay
+// instalado en este hub ahora mismo (`Registry::flow_template_discards`). Viven aquí para que el
+// vocabulario de motivos esté en un solo sitio.
+
+/// El módulo que trae la plantilla está pausado.
+pub const OWNER_PAUSED: &str = "template_owner_paused";
+/// El suelo nombra un módulo que no está instalado.
+pub const FLOOR_MODULE_MISSING: &str = "template_floor_module_missing";
+/// El suelo nombra un módulo instalado pero **pausado**: cuenta como ausente (hub#1649).
+pub const FLOOR_MODULE_PAUSED: &str = "template_floor_module_paused";
+/// El módulo que el suelo nombra está, y es más viejo de lo que la plantilla pide.
+pub const FLOOR_MODULE_TOO_OLD: &str = "template_floor_module_too_old";
+/// Una de las dos versiones del suelo no se lee como `1.2.3`: falla cerrado.
+pub const FLOOR_UNREADABLE: &str = "template_floor_unreadable";
 
 /// Una automatización de fábrica de un módulo (`flows/<family>.*`, hub#1611).
 ///

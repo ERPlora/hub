@@ -360,7 +360,17 @@ async fn register_module(
     // (`Runtime::rehydrate_installed`), así que un paquete roto no puede impedir que el hub levante.
     // Que esté aquí es lo que hace que los módulos ya instalados publiquen sus plantillas en el
     // primer boot tras esta release, sin republicar ni reinstalar nada.
-    registry.set_flow_templates(&manifest.id, Manifest::load_flow_templates(dir));
+    let flow_templates = Manifest::scan_flow_templates(dir);
+    // hub#1649: un descarte deja rastro. Es best-effort a propósito, pero mudo no: sin esta línea,
+    // una plantilla que el paquete trae y el hub tira se ve igual que un módulo que no trae
+    // ninguna, y nadie —ni el dueño, ni soporte, ni la autora del módulo— puede saber cuál es.
+    for discard in &flow_templates.discards {
+        eprintln!(
+            "⚠ {}: flows/{}: {} — {}",
+            manifest.id, discard.family, discard.code, discard.detail
+        );
+    }
+    registry.set_flow_templates(&manifest.id, flow_templates);
 
     // Vuelca las scheduled tasks del manifest a `_scheduled_tasks` (ADR-0011). Idempotente:
     // preserva el reloj (next_run/last_run) de las tareas ya existentes en una reinstalación y

@@ -575,7 +575,24 @@ pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> R
             })
         })
         .collect();
-    Json(json!({ "ok": true, "data": data })).into_response()
+    // Y lo que este hub NO ofrece, con su motivo (hub#1649). Va en la misma respuesta a propósito:
+    // la pantalla donde se nota que una automatización falta es esta, y una galería que solo
+    // enumera lo que hay deja «el módulo no trae ninguna» y «la trae y el hub la ha descartado»
+    // exactamente iguales. Se lee el `code`; el `detail` es prosa para una persona (ADR-0055).
+    let discarded: Vec<_> = rt
+        .registry()
+        .flow_template_discards()
+        .into_iter()
+        .map(|(module_id, discard)| {
+            json!({
+                "module": module_id,
+                "family": discard.family,
+                "code": discard.code,
+                "detail": discard.detail,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": data, "discarded": discarded })).into_response()
 }
 
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
@@ -778,6 +795,10 @@ mod tests {
             (approvals::ERR_APPROVAL_NOT_FOUND, StatusCode::NOT_FOUND),
             (secrets::ERR_SECRET_NOT_FOUND, StatusCode::NOT_FOUND),
             (notify::ERR_RECIPIENT_NOT_FOUND, StatusCode::NOT_FOUND),
+            // The list a message promised, which the run never published (hub#1646): the same
+            // shape as a recipient nobody could be found for, and pinned here rather than left to
+            // the `not_found` suffix rule, so renaming it cannot silently turn it into a `400`.
+            (notify::ERR_OPTIONS_NOT_FOUND, StatusCode::NOT_FOUND),
             // Refused by an authority.
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),
