@@ -328,6 +328,67 @@ async fn approving_a_proposal_that_contradicts_the_pin_refuses_it_and_writes_not
     );
 }
 
+/// 🔴 The other half of the same door, and the one that actually ties it: what MATCHES the pin has
+/// to go THROUGH, and the write has to happen.
+///
+/// Without this case the negative one above passes for the wrong reason. A gate handed an EMPTY
+/// payload instead of the proposal's refuses just the same — the pinned field simply comes back as
+/// omitted, which is denied too — so «refused» proves nothing about the payload having been read.
+/// The positive is the only assertion the empty payload cannot satisfy.
+#[tokio::test]
+async fn approving_a_proposal_that_matches_the_pin_lets_it_through_and_writes() {
+    let rt = runtime().await;
+    let flow_id = rt
+        .create_flow(
+            &NewFlow {
+                name: "Asistente".into(),
+                enabled: true,
+                definition: definition(ask(json!({}))),
+            },
+            OWNER,
+        )
+        .await
+        .unwrap()
+        .id;
+    let mut pin = Params::new();
+    pin.insert("text".into(), json!("the write that waited"));
+    rt.replace_flow_grants(&flow_id, &[GrantSpec::pinned("crm.note.add", pin)], OWNER)
+        .await
+        .unwrap();
+    let run_id = rt
+        .start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
+    rt.process_flows().await.unwrap();
+
+    // The model proposes exactly what the owner fixed.
+    let proposal = rt
+        .request_flow_approval(&approvals::NewApproval {
+            run_id: run_id.clone(),
+            flow_id: flow_id.clone(),
+            step_id: "approve".into(),
+            command: "crm.note.add".into(),
+            payload: json!({ "text": "the write that waited" }),
+            reason: "el asistente lo propuso".into(),
+            partial_output: json!({}),
+            on_reject: RejectPolicy::Cancel,
+        })
+        .await
+        .unwrap();
+
+    let decided = rt
+        .decide_flow_approval(&proposal.id, true, OWNER, "")
+        .await
+        .expect("a proposal that honours the pin is approved, not refused as if it were empty");
+
+    assert_eq!(decided.status, approvals::STATUS_APPROVED);
+    assert_eq!(
+        notes(&rt).await,
+        vec!["the write that waited".to_string()],
+        "the proposal the owner approved is the one that RAN, with its own payload"
+    );
+}
+
 // ── approved ──────────────────────────────────────────────────────────────────────────────────
 
 /// The run carries on, and what the decision was is readable by every step written after it —
