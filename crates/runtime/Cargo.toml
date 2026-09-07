@@ -4,6 +4,10 @@ name = "erplora-runtime"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+# El script de build ES el módulo `core_version` (hub#1619), no un `build.rs` al lado: así la regla
+# que decide qué versión dice ser este binario se compila una vez y la ejercitan tests que `cargo
+# test` SÍ corre — los de un `build.rs` no los corre nadie.
+build = "src/core_version.rs"
 
 [dependencies]
 erplora-db = { path = "../db" }
