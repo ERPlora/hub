@@ -1684,8 +1684,16 @@ export interface ModuleFlowTemplate {
   family: string;
   /** `lang -> flow document`. Always carries `en`, the source language (ADR-0055/0199). */
   documents: Record<string, unknown>;
-  /** What the template will ASK the owner for. Never what it already holds. */
-  grants: Array<{ kind: string; value: string }>;
+  /**
+   * What the template will ASK the owner for. Never what it already holds.
+   *
+   * `payload` is the part of the call this permission **FIXES** (hub#1623, hub#1654): absent or
+   * empty fixes nothing, and `{ "channel": "customer" }` on `appointments.appointments.cancel`
+   * turns «may cancel appointments» into «may cancel appointments AS THE CUSTOMER». Paint it and
+   * hand it back on `PUT …/flows/<id>/grants` unchanged — a pin dropped between this list and the
+   * permission screen is a wide permission granted by an owner who believed they narrowed it.
+   */
+  grants: Array<{ kind: string; value: string; payload?: Record<string, unknown> }>;
   /** Per-template version floor (`module -> SemVer`). Unmet -> do not offer it. */
   requires: Record<string, string>;
 }

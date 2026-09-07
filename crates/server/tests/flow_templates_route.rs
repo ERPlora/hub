@@ -84,9 +84,11 @@ fn module_dir(root: &Path, id: &str, extra: Value, with_templates: bool) -> Path
             )
             .unwrap();
         }
+        // Dos permisos a propósito: uno ancho y uno ACOTADO (hub#1654). El acotado es el caso real
+        // de `whatsapp_inbox`: anular una cita **como clienta**, nunca de parte del salón.
         std::fs::write(
             dir.join("flows/appointment-from-whatsapp.grants.json"),
-            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"}]}"#,
+            r#"{"grants":[{"kind":"command","value":"appointments.appointments.create"},{"kind":"command","value":"appointments.appointments.cancel","payload":{"channel":"customer"}}]}"#,
         )
         .unwrap();
         std::fs::write(
@@ -231,6 +233,45 @@ async fn the_gallery_gets_the_template_its_module_ships() {
     );
     // El suelo de versión es por plantilla, no el `depends_on` del módulo.
     assert_eq!(tpl["requires"]["appointments"], "1.1.69");
+}
+
+#[tokio::test]
+async fn the_limit_the_module_put_on_a_permission_reaches_the_gallery() {
+    // hub#1654 — la pantalla de permisos pide lo que esta ruta le sirve, así que un pin que se
+    // pierda aquí es un permiso ANCHO concedido por un dueño que creyó estar acotándolo. El pin
+    // que el módulo escribió en su `<family>.grants.json` tiene que salir por el cable ENTERO:
+    // es lo que después exige `check_payload_pin` en el dispatcher (hub#1623).
+    let fx = fixture(true).await;
+
+    let response = send(
+        &fx.router,
+        request(TEMPLATES, Some(&fx.admin), Some(EDITOR)),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    let grants = body["data"][0]["grants"]
+        .as_array()
+        .expect("los permisos que la plantilla pedirá");
+    let pinned = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.cancel")
+        .expect("el permiso acotado se ofrece");
+    assert_eq!(
+        pinned["payload"],
+        json!({ "channel": "customer" }),
+        "«puede anular citas COMO CLIENTA» no puede llegar como «puede anular citas»"
+    );
+    // Y el que no acota nada sigue viajando como antes de hub#1623: sin `payload`, no con uno vacío.
+    let wide = grants
+        .iter()
+        .find(|g| g["value"] == "appointments.appointments.create")
+        .expect("el permiso ancho se ofrece igual");
+    assert!(
+        wide.get("payload").is_none(),
+        "un grant que no fija nada no estrena una clave que nadie escribió"
+    );
 }
 
 #[tokio::test]

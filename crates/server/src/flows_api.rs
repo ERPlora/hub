@@ -550,6 +550,14 @@ pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Respo
 ///
 /// 🔴 Los `grants` que van aquí son **una petición, no una concesión**: se le enseñan al dueño para
 /// que los autorice él. Una plantilla nace apagada y sin permisos, como cualquier otra.
+///
+/// Y viajan **con su `payload`** (hub#1623, hub#1654): el pin es parte de lo que el permiso DICE, no
+/// decoración — «puede anular citas» y «puede anular citas COMO CLIENTA» son permisos distintos, y
+/// solo el segundo es seguro en una receta cuyo payload redacta un modelo leyendo el mensaje de un
+/// desconocido. La galería lo pinta y lo devuelve tal cual en `PUT …/flows/{id}/grants`, que es
+/// donde acaba en la fila de `_flow_grants` que `check_payload_pin` exige después. Un pin perdido
+/// en este tramo es un permiso ANCHO concedido por un dueño que creyó estar acotándolo, y **sin un
+/// solo error en pantalla**.
 pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let (arc, _) = admin_session!(st, headers);
     let rt = arc.read().await;

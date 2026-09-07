@@ -3,6 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use erplora_db::Params;
+
 use crate::errors::{Result, RuntimeError};
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2139,7 +2141,8 @@ impl Manifest {
     ///
     /// Una **familia** es el conjunto de ficheros que comparten prefijo:
     /// `<family>.<lang>.flow.json` (el documento por idioma, `en` es la fuente — ADR-0055/0199),
-    /// `<family>.grants.json` (**obligatorio**: lo que la plantilla pedirá al dueño) y
+    /// `<family>.grants.json` (**obligatorio**: lo que la plantilla pedirá al dueño, con el
+    /// `payload` que cada permiso FIJA si lo acota — hub#1654) y
     /// `<family>.requires.json` (opcional: el suelo de versión **por plantilla**, que a propósito
     /// NO es el `depends_on` del módulo — `whatsapp_inbox` exige `appointments >= 1.1.69` para su
     /// plantilla y su `depends_on` es solo `["customers"]`, porque la plantilla es opcional y el
@@ -2152,6 +2155,12 @@ impl Manifest {
     /// familia trae `en` y `es`, y todos los idiomas declaran la misma maquinaria) no se
     /// re-defiende aquí; lo que sí se sostiene es que un paquete que **no** pasó por ahí no rompa
     /// nada.
+    ///
+    /// 🔴 **Un pin ilegible tumba su familia, y NO se degrada** (hub#1654): un `payload` que no es
+    /// un objeto deja la plantilla fuera con [`DISCARD_INVALID_GRANT`], porque la alternativa
+    /// —omitirlo y seguir— es ensanchar un permiso en silencio, que es justo lo que ese campo
+    /// existe para impedir. Sigue siendo best-effort en el sentido de arriba: cae **esa** familia,
+    /// se dice por qué, y las demás del paquete se registran igual.
     ///
     /// El resultado va **ordenado por familia** para que la galería no baile entre dos arranques.
     ///
@@ -2227,12 +2236,15 @@ impl Manifest {
             if documents.is_empty() {
                 continue;
             }
-            let grants = sidecars
+            // El sidecar se lee en DOS tramos a propósito (hub#1654): «no está, o no es JSON» y
+            // «es JSON y uno de sus permisos no se sostiene» se arreglan de forma distinta, y
+            // desde hub#1649 el descarte es lo único que la autora del módulo va a leer. Mandarla
+            // a buscar un fichero que tiene delante es la confusión que hub#1649 vino a quitar.
+            let parsed = sidecars
                 .get(&family)
                 .and_then(|p| std::fs::read_to_string(p).ok())
-                .and_then(|t| serde_json::from_str::<FlowGrantsSidecar>(&t).ok())
-                .map(|s| s.grants);
-            let Some(grants) = grants else {
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+            let Some(parsed) = parsed else {
                 scan.discard(
                     &family,
                     DISCARD_MISSING_GRANTS,
@@ -2242,6 +2254,22 @@ impl Manifest {
                     ),
                 );
                 continue;
+            };
+            let grants = match serde_json::from_value::<FlowGrantsSidecar>(parsed) {
+                Ok(sidecar) => sidecar.grants,
+                Err(err) => {
+                    scan.discard(
+                        &family,
+                        DISCARD_INVALID_GRANT,
+                        format!(
+                            "`{family}.grants.json` se lee, pero uno de sus permisos no: {err}. La \
+                             plantilla no se ofrece: un permiso que no se entiende entero —un \
+                             `payload` que no es un objeto, por ejemplo— se acabaría concediendo \
+                             más ANCHO de lo que el módulo pidió"
+                        ),
+                    );
+                    continue;
+                }
             };
             // 🔴 El suelo falla CERRADO igual que en `Registry::flow_template_floor_is_met`: un
             // `requires.json` que ESTÁ y no se lee no puede valer «sin suelo», porque eso ofrecería
@@ -2354,8 +2382,13 @@ pub const DISCARD_INVALID_LANGUAGE: &str = "template_invalid_language";
 pub const DISCARD_UNREADABLE_DOCUMENT: &str = "template_unreadable_document";
 /// El documento se lee y no es JSON.
 pub const DISCARD_INVALID_DOCUMENT: &str = "template_invalid_document";
-/// Falta `<family>.grants.json`, o está y no se lee.
+/// Falta `<family>.grants.json`, o está y no se lee como JSON.
 pub const DISCARD_MISSING_GRANTS: &str = "template_missing_grants";
+/// `<family>.grants.json` **es** JSON, pero uno de sus permisos no se sostiene — el caso que abre
+/// hub#1654 es un `payload` que no es un objeto. Separado de [`DISCARD_MISSING_GRANTS`] porque el
+/// fichero está delante y se lee: decirle a quien publicó el módulo que «falta» lo manda a buscar
+/// lo que ya tiene.
+pub const DISCARD_INVALID_GRANT: &str = "template_invalid_grant";
 /// `<family>.requires.json` está y no se lee: el suelo no se puede comprobar (falla cerrado).
 pub const DISCARD_UNREADABLE_REQUIRES: &str = "template_unreadable_requires";
 
@@ -2403,6 +2436,23 @@ pub struct ModuleFlowTemplate {
 pub struct FlowTemplateGrant {
     pub kind: String,
     pub value: String,
+    /// Los campos del payload que el grant **FIJA** (hub#1623, hub#1654). Vacío = no fija nada,
+    /// que es lo que valen todos los grants anteriores a hub#1623.
+    ///
+    /// 🔴 **Viaja porque es parte de lo que el permiso DICE**, no decoración: «puede anular citas»
+    /// y «puede anular citas COMO CLIENTA» son permisos distintos, y solo el segundo es seguro en
+    /// una automatización cuyo payload redacta un modelo leyendo el mensaje de un desconocido. El
+    /// tipo lo declaró `{kind, value}` hasta hub#1654 y serde tiraba la clave **sin decir nada**:
+    /// el módulo publicaba en verde —`erplora validate` ya había dado el pin por bueno—, la
+    /// pantalla enseñaba el permiso ancho y el dueño lo concedía así.
+    ///
+    /// El tipo es `Params` y no `Value` a propósito: un `payload` que no sea un objeto **tumba la
+    /// familia entera** en [`Manifest::scan_flow_templates`] —con [`DISCARD_INVALID_GRANT`], que
+    /// nombra el fichero y el motivo— en vez de degradarse a «no fija nada». Ensanchar un permiso
+    /// por una errata del autor es el fallo que este campo existe para evitar; dejar la plantilla
+    /// fuera se ve, y `erplora validate` ya lo caza antes de publicar.
+    #[serde(default, skip_serializing_if = "Params::is_empty")]
+    pub payload: Params,
 }
 
 /// `<family>.grants.json` — las claves `_*` del fichero son documentación y se ignoran.
