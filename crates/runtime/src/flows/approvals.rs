@@ -223,14 +223,14 @@ pub struct NewApproval {
     /// parked on the step row so that, when the approval is decided hours later, the step's
     /// output is the whole turn and not just its ending.
     pub partial_output: Json,
-    /// What the `ai` step said a «no» costs its run (hub#1622, `def::AiStep::on_reject`). It comes
-    /// from the document at PROPOSE time and is stored, for the same reason the payload is: what a
-    /// refusal means has to be what was in force when the question was asked.
     /// **What the step said a SILENCE costs the run** (hub#1634). Travels from the document like
     /// [`NewApproval::on_reject`] instead of being pinned here: the sweep reads the ROW hours
     /// later, so a proposal decides its own fate with the policy that was in force when it was
     /// made, not the one the document happens to say by then.
     pub on_expire: ExpiryPolicy,
+    /// What the `ai` step said a «no» costs its run (hub#1622, `def::AiStep::on_reject`). It comes
+    /// from the document at PROPOSE time and is stored, for the same reason the payload is: what a
+    /// refusal means has to be what was in force when the question was asked.
     pub on_reject: RejectPolicy,
 }
 

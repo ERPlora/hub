@@ -830,6 +830,87 @@ async fn hub1634_a_proposal_nobody_answers_carries_the_run_on_with_its_turn() {
     assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
 }
 
+/// **hub#1634 — and a document that says NOTHING about a silence still dies on the expiry.** The
+/// mirror of the test above, and the half its own review found missing: every mutant that shipped
+/// with hub#1634 moves `continue`, so `dispatch` pinned the OTHER way — to `Continue`, the
+/// direction that changes what an ALREADY DEPLOYED template does — survived the whole workspace
+/// green. `dispatch` is the only place that turns an `AiRequest` into a `NewApproval`, and the only
+/// sweep in this crate is the one above, which asks for `continue`.
+///
+/// Every flow running in a real salon today says nothing here. Reading that silence as anything but
+/// `reject` would carry runs past a proposal nobody ever agreed to, on hubs that never asked for
+/// it — so the default is guarded at the hop that had no test of its own, not only at the two ends.
+#[tokio::test]
+async fn hub1634_a_proposal_from_a_document_that_says_nothing_still_dies_on_the_expiry() {
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    // The shape every document already deployed has: it proposes, and it says not a word about
+    // what a silence costs.
+    let h = hub(
+        cloud.serve().await,
+        "expire-default",
+        agent_step("manual"),
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_expire,
+        approvals::ON_EXPIRE_REJECT,
+        "a document that asked for nothing gets the policy it has always had, carried through the \
+         request — `dispatch` must not decide this on its own"
+    );
+
+    // Nobody answers, and the 72 h pass.
+    {
+        let rt = h.state.runtime.read().await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(pending[0].id));
+        rt.db_for_test()
+            .execute(
+                "UPDATE _flow_approvals SET expires_at = '2020-01-01T00:00:00+00:00' \
+                 WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap();
+        let report = rt.sweep_expired_flow_approvals().await.unwrap();
+        assert_eq!(report.expired, 1);
+        assert_eq!(
+            report.runs_resumed, 0,
+            "`reject` is not `continue`: the run is NOT carried on: {report:?}"
+        );
+        assert_eq!(report.runs_stopped, 1, "it is ended: {report:?}");
+    }
+
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_CANCELLED,
+        "the behaviour every deployed flow has today, unchanged: a silence ends the run"
+    );
+    assert!(
+        bookings(&h).await.is_empty(),
+        "and an expiry executes nothing, whatever the policy says"
+    );
+}
+
 /// `policy: "auto"` is the owner saying, in writing, "do it". Then the command runs in the turn
 /// and the model is told what happened, so it can answer the customer.
 #[tokio::test]
