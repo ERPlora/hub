@@ -1855,24 +1855,25 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_at TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NULL DEFAULT '';",
     },
-    // ── v59 — hub#1623: un grant de `command` puede FIJAR parte del payload ───────────────────
-    // Hasta aquí la unidad de concesión era el NOMBRE del command, así que «puede anular citas» y
-    // «puede anular citas COMO CLIENTE» eran el mismo permiso. No lo son: un flujo cuyo payload lo
-    // redacta un modelo leyendo el mensaje de un desconocido necesita el segundo, porque el primero
-    // le entrega a ese desconocido todos los argumentos del command — incluido el que dice que la
-    // llamada viene del mostrador y que se salta las reglas de anulación del negocio.
+    // ── v59 — hub#1623: a `command` grant may FIX part of the payload ─────────────────────────
+    // Until here the unit of authorisation was the command's NAME, so «may cancel appointments» and
+    // «may cancel appointments AS THE CUSTOMER» were the same permission. They are not: a flow whose
+    // payload a model writes from a stranger's message needs the second one, because the first
+    // hands that stranger every argument of the command — including the one that says the call came
+    // from the counter and therefore skips the business's own cancellation rules.
     //
-    // `payload` guarda un objeto JSON como TEXT (la convención de `_flow_approvals.payload`), con
-    // `'{}'` = no fija nada, que es lo que tenía toda fila anterior a esta versión. Por eso NO
-    // entra en `ux_flow_grant_live`: la identidad de un grant sigue siendo `(hub, flow, kind,
-    // value)`, de modo que un command tiene como mucho UNA concesión viva y una sola frase que leer
-    // en la pantalla. Si el índice llevara el payload, convivirían «puede anular como cliente» y
-    // «puede anular» sin más, y ganaría la segunda: dos filas que se contradicen y la más ancha
-    // decide.
+    // `payload` stores a JSON object as TEXT (the convention of `_flow_approvals.payload`), with
+    // `'{}'` meaning it fixes nothing, which is what every row before this version had. That is why
+    // it does NOT join `ux_flow_grant_live`: the identity of a grant stays `(hub, flow, kind,
+    // value)`, so a command has at most ONE live authorisation and one single sentence to read on
+    // the screen. With the payload in the index, «may cancel as the customer» and «may cancel» full
+    // stop would coexist, and the second would win: two rows that contradict each other, and the
+    // WIDER one decides.
     //
-    // 🔴 El número es el SIGUIENTE AL MÁXIMO, nunca un hueco: al escribirla el máximo era v58 en
-    // `origin/develop`, en `main` y en las 54 ramas remotas (comprobado una a una). `apply` compara
-    // contra el máximo aplicado y una versión por debajo se salta EN SILENCIO.
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v58 on `origin/develop`, on `main` and across the remote branches (checked one by one).
+    // `apply` compares against the highest applied version, and a version below it is skipped
+    // SILENTLY.
     SystemMigration {
         version: 59,
         name: "flow_grant_payload_pin",
@@ -3790,15 +3791,15 @@ mod kind_contract_tests {
         // `printer` y tiraba el nombre. `ALTER … ADD COLUMN IF NOT EXISTS`, re-ejecutable. Al
         // escribirla el máximo era la v57 en `origin/develop`, en TODAS las ramas remotas y en
         // todos los worktrees locales de la flota.
-        // + `flow_grant_payload_pin` (v59, hub#1623): la columna `payload` de `_flow_grants`, que
-        // deja a un grant de `command` FIJAR parte del payload — «puede anular citas COMO CLIENTE»
-        // en vez de «puede anular citas», que es lo que separa a un flujo cuyo payload lo redacta un
-        // modelo leyendo el mensaje de un desconocido de entregarle a ese desconocido todos los
-        // argumentos del command. `'{}'` = no fija nada, que es lo que tenía toda fila anterior, así
-        // que `ALTER … ADD COLUMN IF NOT EXISTS` con default es re-ejecutable y no reescribe nada.
-        // NO entra en `ux_flow_grant_live` a propósito (el porqué, en el bloque de la migración).
-        // Al escribirla el máximo era la v58 en `origin/develop`, en `main`, en las 87 ramas
-        // remotas que llevan el fichero y en todos los worktrees locales de la flota.
+        // + `flow_grant_payload_pin` (v59, hub#1623): the `payload` column of `_flow_grants`, which
+        // lets a `command` grant FIX part of the payload — «may cancel appointments AS THE
+        // CUSTOMER» instead of «may cancel appointments». That is what separates a flow whose
+        // payload a model writes from a stranger's message from handing that stranger every
+        // argument of the command. `'{}'` fixes nothing, which is what every earlier row had, so
+        // `ALTER … ADD COLUMN IF NOT EXISTS` with a default is re-runnable and rewrites nothing. It
+        // deliberately does NOT join `ux_flow_grant_live` (the why is in the migration's own block).
+        // When it was written the maximum was v58 on `origin/develop`, on `main`, across the 87
+        // remote branches that carry the file and in every local worktree of the fleet.
         assert_eq!(MIGRATIONS.len(), 56, "el catálogo cambió de tamaño");
     }
 
