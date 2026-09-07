@@ -18,6 +18,7 @@ use erplora_db::DatabaseAdapter;
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
+use crate::flows::approvals::RejectPolicy;
 use crate::flows::def::{self, AiPolicy, FlowDefinition, StepSpec};
 use crate::flows::store;
 
@@ -41,6 +42,10 @@ pub struct AiRequest {
     pub commands: Vec<String>,
     pub policy: AiPolicy,
     pub max_iters: i64,
+    /// What the step said a «no» costs the run (hub#1622). Carried here for the same reason the
+    /// prompt is: the runner must not re-read the document to know what it was asked to do, and a
+    /// second read would be a second answer if the flow changed in between.
+    pub on_reject: RejectPolicy,
 }
 
 /// Reads the `ai` step a run is currently stopped on.
@@ -112,6 +117,7 @@ pub async fn prepare(
         commands: ai.commands.clone(),
         policy: ai.policy,
         max_iters: ai.max_iters,
+        on_reject: ai.on_reject,
     })
 }
 

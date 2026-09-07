@@ -573,6 +573,9 @@ async fn dispatch(
             command: call.name.clone(),
             payload: Value::Object(params),
             reason: self_reported_reason(&request.prompt),
+            // hub#1622 — the document's answer, copied into the row so the decision hours later
+            // reads what was in force when the question was asked.
+            on_reject: request.on_reject,
             partial_output: {
                 let mut parked = so_far.clone();
                 if let Some(map) = parked.as_object_mut() {

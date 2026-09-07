@@ -558,6 +558,20 @@ pub struct AiStep {
     pub commands: Vec<String>,
     pub policy: AiPolicy,
     pub max_iters: i64,
+    /// **What a «no» costs the run** (hub#1622). Only reachable under [`AiPolicy::Manual`], which
+    /// is the only policy that asks anybody: an `auto` step proposes nothing and there is nothing
+    /// to refuse.
+    ///
+    /// It exists here for the same reason it exists on [`ApprovalStep`], and it is the same
+    /// vocabulary: [`RejectPolicy::Cancel`] — the default, and what a rejection has always done —
+    /// or [`RejectPolicy::Continue`], which carries on to the next step so that a document can
+    /// answer the person who is waiting. Without it every step written after the proposal went
+    /// unrun on a refusal, including the one that says «we could not fit you in after all».
+    ///
+    /// Read from the flow at PROPOSE time and copied into the row; from then on the decision reads
+    /// the ROW (see [`crate::flows::approvals::RejectPolicy`]), so editing the document while
+    /// somebody is looking at the tray does not change what their refusal costs.
+    pub on_reject: RejectPolicy,
 }
 
 /// **What happens to a write the model proposes** (ADR-0283 D3).
@@ -1402,7 +1416,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "reschedule_on",
         ],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
-        StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
+        StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters", "on_reject"],
         StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
         StepKind::Approval => &[
             "id",
@@ -2130,12 +2144,33 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         ));
     }
 
+    // **What a refusal costs, said by the step that proposes** (hub#1622). Same closed vocabulary
+    // and same default as the `approval` step's: absent means [`RejectPolicy::Cancel`], which is
+    // what a rejection has always done, and an unrecognised value is refused where it was typed
+    // rather than read as either half of the choice.
+    let on_reject = match map.get("on_reject") {
+        None | Some(Json::Null) => RejectPolicy::Cancel,
+        Some(Json::String(s)) if RejectPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            RejectPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_reject` is one of {}",
+                    joined(RejectPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+
     Ok(AiStep {
         prompt,
         queries,
         commands,
         policy,
         max_iters,
+        on_reject,
     })
 }
 
@@ -3155,7 +3190,76 @@ mod tests {
             "writes wait for a person unless the owner opted out IN WRITING"
         );
         assert_eq!(ai.max_iters, DEFAULT_MAX_ITERS);
+        assert_eq!(
+            ai.on_reject,
+            RejectPolicy::Cancel,
+            "a «no» has always ended the run, and a document that says nothing must not change that"
+        );
         assert!(ai.queries.is_empty() && ai.commands.is_empty());
+    }
+
+    /// **The refusal stops being a dead end** (hub#1622). Under `manual` the write the model
+    /// proposes waits for a person, and until now saying «no» killed the run wherever it stood —
+    /// so every step written after it went unrun, including the one that tells the customer what
+    /// happened. `approval` steps have been able to say otherwise since hub#950; this is the same
+    /// sentence, in the step that actually proposes.
+    #[test]
+    fn an_ai_step_can_say_that_a_refusal_lets_the_run_carry_on() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "propose_appointment",
+                "kind": "ai",
+                "prompt": "Book what she asked for",
+                "tools": { "commands": ["appointments.appointments.create"] },
+                "policy": "manual",
+                "on_reject": "continue"
+            }]
+        }))
+        .expect("the shape the WhatsApp template writes so a rejection still answers the customer");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.on_reject, RejectPolicy::Continue);
+        assert_eq!(ai.policy, AiPolicy::Manual);
+    }
+
+    /// Same closed vocabulary as the `approval` step's, and refused for the same reason: `"reject"`
+    /// quietly reading as `cancel` would be merciful, and anything quietly reading as `continue`
+    /// would carry a run past a refusal — which is the one thing an approval exists to prevent.
+    #[test]
+    fn an_ai_steps_reject_policy_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["cancle", "reject", "continu", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "agent", "kind": "ai", "prompt": "hi", "on_reject": value
+                }]
+            }))
+            .expect_err("a policy this kernel cannot obey is refused where it was typed");
+            assert!(format!("{err}").contains("on_reject"), "{err}");
+        }
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "on_reject": true }]
+        }))
+        .expect_err("a policy is a string, not a flag");
+        assert!(format!("{err}").contains("on_reject"), "{err}");
+    }
+
+    /// The half deliberately NOT shipped with hub#1622: `on_expire` stays clamped to the row's
+    /// default for a model's proposal, so a document must not be able to claim otherwise and get
+    /// silence. It is whatsapp_inbox#70's kernel half, and it lands with its own behaviour.
+    #[test]
+    fn an_ai_step_still_refuses_the_expiry_policy_it_cannot_yet_honour() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": "continue"
+            }]
+        }))
+        .expect_err("a key nobody reads must not look like a setting (hub#521)");
+        assert!(format!("{err}").contains("on_expire"), "{err}");
     }
 
     /// Every turn of the loop costs a call through the SaaS proxy, which meters real money
