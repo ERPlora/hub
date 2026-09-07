@@ -1231,7 +1231,7 @@ fn error_text(error: &RuntimeError) -> String {
     }
 }
 
-fn parse_json(raw: &str) -> Json {
+pub(crate) fn parse_json(raw: &str) -> Json {
     serde_json::from_str(raw).unwrap_or_else(|_| json!({}))
 }
 
@@ -1252,7 +1252,7 @@ fn parse_json(raw: &str) -> Json {
 /// parse, an index past the end — is [`ErrorPolicy::Stop`]. Fail CLOSED: it is the answer this path
 /// has always given, and «carry on past a failure whose instructions I cannot read» is not one a
 /// kernel may guess.
-async fn step_error_policy(
+pub(crate) async fn step_error_policy(
     db: &dyn DatabaseAdapter,
     hub_id: &str,
     flow_id: &str,
@@ -1281,7 +1281,7 @@ async fn step_error_policy(
 /// `ai` step work: the turn parked when it stopped to ask is still there under them, exactly as
 /// `on_reject: "continue"` hands it over (hub#1622). Without that, `{{steps.<id>.text}}` renders
 /// empty in the very message this primitive exists to send.
-fn failure_output(parked: Json, error: &str) -> Json {
+pub(crate) fn failure_output(parked: Json, error: &str) -> Json {
     let mut output = if parked.is_object() {
         parked
     } else {
@@ -1293,7 +1293,7 @@ fn failure_output(parked: Json, error: &str) -> Json {
     output
 }
 
-fn set_step_output(vars: &mut Json, step_id: &str, output: Json) {
+pub(crate) fn set_step_output(vars: &mut Json, step_id: &str, output: Json) {
     if !vars.is_object() {
         *vars = json!({});
     }
