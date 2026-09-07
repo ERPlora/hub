@@ -37,6 +37,18 @@ const loadError = ref('');
 const loadRefused = ref(false);
 
 const configured = computed(() => config.value?.configured === true);
+/**
+ * The channel is down: Meta refused to renew the business token of at least one number and only the
+ * owner can put it right, by connecting again (hub#1626, fed by saas#1887).
+ *
+ * Read off the list rather than kept as state of its own, so it clears itself: the sweep drops the
+ * flag the moment an exchange works again, and the next `refresh()` — the one every connect and
+ * disconnect already does — paints the block green with nobody touching anything.
+ *
+ * Explicitly `=== true`, never truthiness: a SaaS from before the field sends no key at all, and
+ * `undefined` there means «we did not ask», not «broken».
+ */
+const needsReconnect = computed(() => numbers.value.some((n) => n.needs_reconnect === true));
 
 async function refresh(): Promise<void> {
   try {
@@ -120,7 +132,15 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
         <div class="whatsapp-connect__identity">
           <strong class="whatsapp-connect__phone">{{ number.display_phone }}</strong>
           <span class="whatsapp-connect__badges">
-            <ion-badge color="success">{{ t('whatsappConnect.connected') }}</ion-badge>
+            <!-- The badge marks WHICH number died; the sentence and the button below say what to do
+                 about it. Ionic colours this itself, which is what makes it survive being embedded
+                 in a module's shadow root, where the shell's stylesheet does not reach (hub#1614). -->
+            <ion-badge
+              data-test="whatsapp-status-badge"
+              :color.attr="number.needs_reconnect === true ? 'danger' : 'success'"
+            >
+              {{ number.needs_reconnect === true ? t('whatsappConnect.reconnectBadge') : t('whatsappConnect.connected') }}
+            </ion-badge>
             <ion-badge v-if="number.is_on_biz_app" color="medium">{{ t('whatsappConnect.businessApp') }}</ion-badge>
           </span>
         </div>
@@ -136,7 +156,31 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
           {{ t('whatsappConnect.disconnect') }}
         </ion-button>
       </div>
-      <p class="whatsapp-connect__help">{{ t('whatsappConnect.connectedHelp') }}</p>
+      <template v-if="needsReconnect">
+        <p
+          data-test="whatsapp-reconnect-needed"
+          class="whatsapp-connect__status whatsapp-connect__status--error"
+          role="alert"
+        >
+          {{ t('whatsappConnect.reconnectNeeded') }}
+        </p>
+        <!-- The same door as the first connection: Meta's embedded signup re-issues the permission
+             for the business, so there is nothing to undo first. Disconnect stays where it was, for
+             an owner who would rather stop than reconnect. -->
+        <ion-button
+          v-if="isAdmin"
+          data-test="whatsapp-reconnect-button"
+          :disabled="busy"
+          @click="connect"
+        >
+          <ion-icon slot="start" name="logo-whatsapp" aria-hidden="true" />
+          {{ t('whatsappConnect.reconnect') }}
+        </ion-button>
+        <p v-else class="whatsapp-connect__admin-only">{{ t('whatsappConnect.adminOnly') }}</p>
+      </template>
+      <!-- «Your customers' messages arrive here» is false while the permission is down, and it is
+           the sentence that keeps an owner from looking any further. -->
+      <p v-else class="whatsapp-connect__help">{{ t('whatsappConnect.connectedHelp') }}</p>
     </template>
     <template v-else>
       <p class="whatsapp-connect__intro">{{ t('whatsappConnect.intro') }}</p>

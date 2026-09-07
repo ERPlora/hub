@@ -824,6 +824,16 @@ export default {
     connected: 'Connected',
     businessApp: 'WhatsApp Business app',
     connectedHelp: 'Messages from your customers arrive in the Inbox, and the automations answer them.',
+    // hub#1626: the permission WhatsApp gives to write for a business lasts 60 days and runs out on
+    // its own. When Meta refuses to renew it, only the owner can fix it — so the sentence names what
+    // stopped working (both directions) and what to do, and never the word «token».
+    // NOT a bare «Disconnected»: hub#375 took that word out of the catalogues on purpose, because
+    // one word next to a heading reads as a verdict about the whole machine, and `system-health`
+    // guards it. This badge names the ONE thing the owner has to do instead.
+    reconnectBadge: 'Reconnect needed',
+    reconnectNeeded:
+      'WhatsApp has withdrawn the permission to write on behalf of your business. Your customers’ messages are not arriving and nothing you answer is going out. Connect your number again to get the channel back.',
+    reconnect: 'Reconnect WhatsApp',
     disconnect: 'Disconnect',
     disconnectConfirm: 'Disconnect this number? Messages will stop arriving here.',
     adminOnly: 'Only an owner or an administrator can connect the WhatsApp number.',
