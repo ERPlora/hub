@@ -139,6 +139,7 @@ async fn parked_proposal(rt: &Runtime) -> (String, approvals::Approval) {
             payload: json!({ "text": "the proposed note" }),
             reason: "the assistant proposed this at 3 AM".into(),
             partial_output: json!({ "text": "I will book it" }),
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();

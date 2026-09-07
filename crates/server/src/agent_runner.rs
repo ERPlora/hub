@@ -794,6 +794,7 @@ mod tests {
             commands: Vec::new(),
             policy,
             max_iters: 6,
+            on_reject: erplora_runtime::flows::approvals::RejectPolicy::Cancel,
         }
     }
 }
