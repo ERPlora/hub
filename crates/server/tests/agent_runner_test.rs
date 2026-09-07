@@ -1365,3 +1365,269 @@ async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
     assert_eq!(signed_in.status(), StatusCode::OK);
     assert_eq!(body_json(signed_in).await["data"], json!([]));
 }
+
+// ── hub#1639 — the turn leaves DATA behind, not only a sentence ────────────────────────────────
+
+/// The step of the WhatsApp recipe: read the diary, then answer with the slots as DATA so the
+/// next step can offer them as a list the customer taps (`interactive`, hub#1633).
+fn agent_step_that_leaves_data_behind() -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Offer her what is free.",
+        "tools": { "queries": ["agenda.slots.list"] },
+        "output": {
+            "slots": { "type": "options", "describe": "the free slots you found, one per row" },
+            "action": { "type": "text", "describe": "booked, cancelled or asking" }
+        }
+    })
+}
+
+/// A turn that writes prose AND finishes with a tool call, which is what a real provider emits
+/// when the model explains itself while answering. The recipe needs both halves: the sentence
+/// becomes the body of the WhatsApp message and the call becomes its rows.
+fn sse_text_and_call(text: &str, name: &str, call_id: &str, arguments: Value) -> Turn {
+    vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": name,
+            "call_id": call_id,
+            "arguments": arguments.to_string()
+        })
+    )]
+}
+
+/// Why the step failed, where production writes it.
+async fn last_error(h: &Hub, run_id: &str) -> String {
+    let rt = h.state.runtime.read().await;
+    rt.get_flow_run(run_id).await.unwrap().0.last_error
+}
+
+fn two_slots() -> Value {
+    json!([
+        { "id": "slot-1", "title": "Lunes 10:00", "description": "con Ana" },
+        { "id": "slot-2", "title": "Lunes 12:30", "description": "con Ana" }
+    ])
+}
+
+/// **The case of hub#1639.** Until now an `ai` step published `{text, tool_calls}` and nothing
+/// else, so the three free slots it had just found while talking to the customer could not become
+/// the list she taps: the options had to be typed by hand in the document, which is exactly what
+/// they existed to avoid. Here the document declares what the turn owes it, and the turn pays.
+#[tokio::test]
+async fn hub1639_the_turn_leaves_the_options_it_found_behind_for_the_next_step() {
+    let cloud = FakeCloud::with(vec![
+        sse_call("agenda.slots.list", "c1", json!({})),
+        sse_text_and_call(
+            "Tengo estos huecos libres",
+            "flow_answer",
+            "c2",
+            json!({ "slots": two_slots(), "action": "asking" }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "out",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    let out = step_output(&h, &run_id).await;
+    // What the step always published is still there and still means the same thing.
+    assert_eq!(out["text"], json!("Tengo estos huecos libres"));
+    assert_eq!(
+        out["tool_calls"].as_array().map(Vec::len),
+        Some(1),
+        "the read it did is still in the history: {out}"
+    );
+    // …and the data the document asked for is next to it, with its type intact — an ARRAY, not a
+    // string that looks like one, so `interactive.action.sections[].rows` can point straight at it.
+    assert!(out["slots"].is_array(), "the slots keep their type: {out}");
+    assert_eq!(out["slots"], two_slots());
+    assert_eq!(out["slots"][1]["id"], json!("slot-2"));
+    assert_eq!(out["action"], json!("asking"));
+
+    // The answering call is NOT logged as a tool the model ran: nothing happened in the business.
+    assert_eq!(out["tool_calls"][0]["name"], json!("agenda.slots.list"));
+    tick(&h).await;
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_DONE);
+}
+
+/// The answering tool exists only for a document that asked for data, and it names the fields it
+/// asked for. A turn offered it unconditionally would spend a metered call teaching every existing
+/// automation to answer with an empty object.
+#[tokio::test]
+async fn hub1639_the_answering_tool_is_offered_only_when_the_document_asked_for_data() {
+    let cloud = FakeCloud::with(vec![sse_text_and_call(
+        "listo",
+        "flow_answer",
+        "c1",
+        json!({ "slots": two_slots(), "action": "asking" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "off1",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "hola" })).await;
+    perform(&h, &run_id).await;
+
+    let offered = cloud.bodies()[0]["tools"].clone();
+    let answer = offered
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|t| t["name"] == json!("flow_answer"))
+        .unwrap_or_else(|| panic!("the answering tool must be offered: {offered}"));
+    let props = &answer["parameters"]["properties"];
+    assert_eq!(
+        props["slots"]["type"],
+        json!("array"),
+        "`options` is asked for as Meta's row shape: {answer}"
+    );
+    assert_eq!(props["slots"]["items"]["properties"]["id"]["type"], json!("string"));
+    assert_eq!(props["action"]["type"], json!("string"));
+    // The author's own words reach the model — they are the only thing it is told about the field.
+    assert_eq!(
+        props["slots"]["description"],
+        json!("the free slots you found, one per row")
+    );
+    let required: Vec<&str> = answer["parameters"]["required"]
+        .as_array()
+        .expect("required")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert_eq!(required, ["action", "slots"]);
+
+    // …and a step that declared nothing is offered no such tool.
+    let plain_cloud = FakeCloud::with(vec![sse_text("hecho")]);
+    let plain = hub(
+        plain_cloud.serve().await,
+        "off2",
+        agent_step("manual"),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let plain_run = start_run(&plain, json!({ "text": "hola" })).await;
+    perform(&plain, &plain_run).await;
+    let plain_tools = plain_cloud.bodies()[0]["tools"].clone();
+    assert!(
+        !plain_tools
+            .as_array()
+            .expect("tools")
+            .iter()
+            .any(|t| t["name"] == json!("flow_answer")),
+        "a document that asked for nothing is offered nothing: {plain_tools}"
+    );
+}
+
+/// **Fail-closed and LOUD.** A model that answers in prose when the document asked for data leaves
+/// the next step mapping `steps.agent.slots` to nothing — and a WhatsApp message with an empty list
+/// is one the customer cannot act on and nobody knows went out. The step fails instead, naming what
+/// was missing, so it is visible in the run history the next morning.
+#[tokio::test]
+async fn hub1639_a_turn_that_answers_in_words_instead_of_data_fails_saying_so() {
+    let cloud = FakeCloud::with(vec![sse_text("pues no sé, llámanos")]);
+    let h = hub(
+        cloud.serve().await,
+        "nodata",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_FAILED);
+    let reason = last_error(&h, &run_id).await;
+    assert!(
+        reason.contains(agent_runner::ERR_NO_OUTPUT),
+        "the failure carries a code, not prose (ADR-0055): {reason}"
+    );
+    assert!(
+        reason.contains("flow_answer"),
+        "and it says what the model was supposed to do: {reason}"
+    );
+}
+
+/// A field the document declared and the model left out is the same silent hole as no answer at
+/// all: `steps.agent.slots` resolves to nothing and the customer gets a list with no rows. It is
+/// refused by NAME so whoever reads the history knows which field to look at.
+#[tokio::test]
+async fn hub1639_a_declared_field_the_model_skipped_fails_by_name() {
+    let cloud = FakeCloud::with(vec![sse_text_and_call(
+        "ahí van",
+        "flow_answer",
+        "c1",
+        json!({ "action": "asking" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "missing",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_FAILED);
+    let reason = last_error(&h, &run_id).await;
+    assert!(reason.contains(agent_runner::ERR_BAD_OUTPUT), "{reason}");
+    assert!(
+        reason.contains("slots"),
+        "the field that was missing is named: {reason}"
+    );
+}
+
+/// The shapes are checked, not hoped for. `options` becomes the `rows` of a WhatsApp list and Meta
+/// refuses a row without `id`/`title` — refusing here says it in the run history instead of eight
+/// retries later in the outbox, which is the same reason `interactive` is validated at save.
+#[tokio::test]
+async fn hub1639_options_that_are_not_metas_row_shape_are_refused_before_they_are_sent() {
+    for bad in [
+        json!("Lunes 10:00, Lunes 12:30"),
+        json!([{ "title": "Lunes 10:00" }]),
+        json!([{ "id": "slot-1" }]),
+        json!([["slot-1", "Lunes 10:00"]]),
+    ] {
+        let cloud = FakeCloud::with(vec![sse_text_and_call(
+            "ahí van",
+            "flow_answer",
+            "c1",
+            json!({ "slots": bad, "action": "asking" }),
+        )]);
+        let h = hub(
+            cloud.serve().await,
+            "shape",
+            agent_step_that_leaves_data_behind(),
+            &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+        perform(&h, &run_id).await;
+        assert_eq!(
+            run_status(&h, &run_id).await,
+            store::STATUS_FAILED,
+            "a list Meta would refuse must not reach the outbox: {bad}"
+        );
+        let reason = last_error(&h, &run_id).await;
+        assert!(
+            reason.contains(agent_runner::ERR_BAD_OUTPUT),
+            "{bad}: {reason}"
+        );
+        assert!(reason.contains("slots"), "{bad}: {reason}");
+    }
+}

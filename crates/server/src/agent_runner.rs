@@ -57,10 +57,13 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use erplora_db::Params;
-use erplora_runtime::flows::{def::AiPolicy, AiRequest, IoResult, NewApproval};
+use erplora_runtime::flows::{
+    def::{AiOutputField, AiOutputKind, AiPolicy},
+    AiRequest, IoResult, NewApproval,
+};
 use erplora_runtime::RequestContext;
 use futures_util::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::assistant;
 use crate::auth;
@@ -73,7 +76,18 @@ const STEP_TIMEOUT: Duration = Duration::from_secs(60);
 /// One turn's HTTP timeout. Below [`STEP_TIMEOUT`] so a single hung call cannot eat the budget.
 const TURN_TIMEOUT: Duration = Duration::from_secs(45);
 
+/// The name of the tool a turn calls to hand back the data its document asked for (hub#1639).
+///
+/// Undotted on purpose: every tool assembled from the registry is `<module>.<operation>`, so this
+/// cannot be mistaken for one. It is only ever offered when the step declared `output`, and it is
+/// matched before the dispatcher's own lookup so a module that named a tool this cannot shadow it.
+pub const ANSWER_TOOL: &str = "flow_answer";
+
 pub const ERR_MAX_ITERS: &str = "flow.agent_max_iters";
+/// The document asked for data and the turn ended without any (hub#1639).
+pub const ERR_NO_OUTPUT: &str = "flow.agent_no_output";
+/// The turn answered, but not with the shape the document declared (hub#1639).
+pub const ERR_BAD_OUTPUT: &str = "flow.agent_bad_output";
 pub const ERR_TIMEOUT: &str = "flow.agent_timeout";
 pub const ERR_NO_CREDENTIAL: &str = "flow.agent_no_cloud_credential";
 pub const ERR_UPSTREAM: &str = "flow.agent_upstream";
@@ -142,6 +156,22 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
         answered = turn.text.clone();
 
         if turn.calls.is_empty() {
+            // **The document asked for data and got a sentence** (hub#1639). Publishing the turn
+            // anyway would leave the next step mapping `steps.<id>.<field>` to nothing: a WhatsApp
+            // list with no rows, sent, with nobody told. The step fails instead, and says what the
+            // turn was supposed to do.
+            if !request.output.is_empty() {
+                return Err(format!(
+                    "{ERR_NO_OUTPUT}: this step declared what its turn must leave behind ({}), and \
+                     the model answered in words without calling `{ANSWER_TOOL}`. Last text: {}",
+                    joined_fields(&request.output),
+                    if answered.is_empty() {
+                        "(none)"
+                    } else {
+                        &answered
+                    }
+                ));
+            }
             return Ok(IoResult::Done(
                 json!({ "text": answered, "tool_calls": calls_made }),
             ));
@@ -160,6 +190,22 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
         }));
 
         for call in &turn.calls {
+            // **The turn hands back what the document asked for and ENDS** (hub#1639). Checked
+            // before the dispatcher's own lookup: nothing in the business happens here, so it is
+            // deliberately not logged as a tool the model ran, and a module that happened to name
+            // an operation `flow_answer` cannot take its place.
+            if !request.output.is_empty() && call.name == ANSWER_TOOL {
+                let declared = collect_declared_output(
+                    &request.output,
+                    &parse_arguments(&call.arguments),
+                )?;
+                let mut out = Map::new();
+                out.insert("text".into(), json!(answered));
+                out.insert("tool_calls".into(), json!(calls_made));
+                out.extend(declared);
+                return Ok(IoResult::Done(Value::Object(out)));
+            }
+
             // Everything the turn has produced so far. It travels with an approval park so that a
             // decision taken hours later completes the WHOLE turn — the model's explanation and
             // the reads it did — and not just its ending.
@@ -197,6 +243,155 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
             &answered
         }
     ))
+}
+
+// ── the data the document asked for (hub#1639) ────────────────────────────────────────────────
+
+/// The declared field names, for a message a person reads.
+fn joined_fields(fields: &[AiOutputField]) -> String {
+    fields
+        .iter()
+        .map(|f| format!("`{}`", f.name))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// **The tool a turn calls to hand its data back**, built from what the document declared.
+///
+/// It is an ordinary tool spec because that is the only channel this hub has to ask a model for a
+/// shape: the SaaS proxy forwards `name`/`description`/`parameters` to the provider
+/// (`orchestrator._tools_from_hub`) and nothing else, so a `response_format` would have to be
+/// plumbed through the Cloud first. Function-calling is also what the market does for exactly this
+/// — n8n's structured-output parser, Zapier's output fields, Make's data-structure module all
+/// resolve to one forced function.
+///
+/// `describe` becomes each field's description because it is the ONLY thing the model is told
+/// about the field, which is why the parser refuses an empty one.
+fn answer_tool_spec(fields: &[AiOutputField]) -> Value {
+    let mut properties = Map::new();
+    let mut required = Vec::with_capacity(fields.len());
+    for field in fields {
+        let schema = match field.kind {
+            AiOutputKind::Text => json!({ "type": "string", "description": field.describe }),
+            AiOutputKind::Number => json!({ "type": "number", "description": field.describe }),
+            // Meta's own row shape (hub#1633): `id` and `title` are what a tappable row cannot be
+            // sent without, `description` is the optional second line.
+            AiOutputKind::Options => json!({
+                "type": "array",
+                "description": field.describe,
+                "items": {
+                    "type": "object",
+                    "required": ["id", "title"],
+                    "properties": {
+                        "id": { "type": "string", "description": "what comes back when she taps this row" },
+                        "title": { "type": "string", "description": "the row, in a few words" },
+                        "description": { "type": "string", "description": "an optional second line" }
+                    }
+                }
+            }),
+        };
+        properties.insert(field.name.clone(), schema);
+        required.push(field.name.clone());
+    }
+    json!({
+        "name": ANSWER_TOOL,
+        "description": format!(
+            "Finish your turn by recording what you found, as data. Call this EXACTLY ONCE, last, \
+             with every field filled: {}. Whatever you also write in words is kept separately as \
+             the message the customer reads. This changes nothing in the business.",
+            joined_fields(fields)
+        ),
+        // Not a door of the dispatcher: this call never reaches `execute_flow_query` or
+        // `execute_flow_command`. The proxy ignores the field; it is here so a body captured in a
+        // test or a log says what the tool is.
+        "kind": "answer",
+        "module_id": "",
+        "parameters": {
+            "type": "object",
+            "required": required,
+            "properties": properties
+        },
+        "risk": "normal",
+        "read_only": true,
+    })
+}
+
+/// Reads the fields the document declared out of the answering call, or says which one is wrong.
+///
+/// Every declared field is REQUIRED. A missing one resolves to nothing downstream — the silent
+/// hole the whole `output` vocabulary exists to close — so it is refused here, by name, where the
+/// run history will show it.
+fn collect_declared_output(
+    fields: &[AiOutputField],
+    args: &Params,
+) -> Result<Map<String, Value>, String> {
+    let mut out = Map::new();
+    for field in fields {
+        let name = &field.name;
+        let Some(value) = args.get(name).filter(|v| !v.is_null()) else {
+            return Err(format!(
+                "{ERR_BAD_OUTPUT}: the turn called `{ANSWER_TOOL}` without `{name}`, which this \
+                 step declared. A field left out resolves to nothing in the next step instead of \
+                 saying so."
+            ));
+        };
+        let checked = match field.kind {
+            AiOutputKind::Text => value
+                .as_str()
+                .map(|s| json!(s))
+                .ok_or_else(|| bad_shape(name, "a line of text", value)),
+            AiOutputKind::Number => value
+                .as_f64()
+                .map(|_| value.clone())
+                .ok_or_else(|| bad_shape(name, "a number", value)),
+            AiOutputKind::Options => check_options(name, value),
+        }?;
+        out.insert(name.clone(), checked);
+    }
+    Ok(out)
+}
+
+fn bad_shape(name: &str, wanted: &str, got: &Value) -> String {
+    format!(
+        "{ERR_BAD_OUTPUT}: `{name}` was declared as {wanted} and the turn answered with `{}`. \
+         Refused here rather than passed on: the next step would map it into a message nobody \
+         wrote.",
+        crate::agent_runner::abbreviated(got)
+    )
+}
+
+/// A short, log-safe rendering of what the model actually sent.
+fn abbreviated(value: &Value) -> String {
+    let mut text = value.to_string();
+    if text.chars().count() > 120 {
+        text = text.chars().take(120).collect::<String>() + "…";
+    }
+    text
+}
+
+/// `options` is what becomes the `rows` of a tappable list, and Meta refuses a row without `id`
+/// and `title` (`invalid_option`). Checking it here puts the refusal in the run history instead of
+/// in the outbox eight retries later — the same reason `interactive` is validated at save.
+fn check_options(name: &str, value: &Value) -> Result<Value, String> {
+    let Some(rows) = value.as_array() else {
+        return Err(bad_shape(name, "a list of options", value));
+    };
+    for (index, row) in rows.iter().enumerate() {
+        let ok = row.as_object().is_some_and(|r| {
+            ["id", "title"]
+                .iter()
+                .all(|k| r.get(*k).and_then(Value::as_str).is_some_and(|s| !s.trim().is_empty()))
+        });
+        if !ok {
+            return Err(format!(
+                "{ERR_BAD_OUTPUT}: `{name}` row {index} is not something the customer can tap. \
+                 Every option needs an `id` (what comes back when she taps it) and a `title` (what \
+                 she reads); got `{}`.",
+                abbreviated(row)
+            ));
+        }
+    }
+    Ok(value.clone())
 }
 
 // ── the tools ─────────────────────────────────────────────────────────────────────────────────
@@ -276,8 +471,19 @@ async fn prepare(st: &AppState, run_id: &str, step_id: &str) -> Result<(AiReques
         if only_answers(&tool) {
             answers_only.insert(name.to_string());
         }
+        // A module that named an operation `flow_answer` must not compete with the tool the
+        // kernel adds below: two tools with one name is a call nobody can attribute.
+        if !request.output.is_empty() && name == ANSWER_TOOL {
+            continue;
+        }
         kinds.insert(name.to_string(), kind.to_string());
         offered.push(tool);
+    }
+    // **The way back for the data the document asked for** (hub#1639). Added last so it reads as
+    // the closing move, and only for a step that declared `output`: offering it to every turn
+    // would teach every automation already in production to answer with an empty object.
+    if !request.output.is_empty() {
+        offered.push(answer_tool_spec(&request.output));
     }
     Ok((
         request,
@@ -319,6 +525,19 @@ fn automation_briefing(request: &AiRequest) -> String {
              time, a price, whether something is free — runs immediately and comes back to you, \
              even here. Ask everything you need before you propose anything.\n",
         ),
+    }
+    // **What this turn owes the flow** (hub#1639). Said in the briefing as well as in the tool's
+    // own description because the briefing is what the model reads before it decides how to
+    // finish, and finishing in prose is exactly the mistake that fails the step.
+    if !request.output.is_empty() {
+        s.push_str(&format!(
+            "- **Finish by calling `{ANSWER_TOOL}`.** This step has to hand data back to the \
+             automation: {}. Do all your reading first, then call it ONCE, last, with every field \
+             filled. Answering only in words fails the step — the rest of the flow would have \
+             nothing to work with. Anything you write in words is kept too, as the message the \
+             customer reads.\n",
+            joined_fields(&request.output)
+        ));
     }
     s
 }
