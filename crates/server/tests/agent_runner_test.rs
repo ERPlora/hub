@@ -738,6 +738,98 @@ async fn hub1622_a_refusal_the_document_lets_through_carries_the_run_on_with_its
     assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
 }
 
+/// **hub#1634 — the document's answer about a SILENCE reaches the row, and an expiry it lets
+/// through carries the run on with its turn.** The exact twin of the test above, and it exists
+/// because hub#1622's own review found that the two hops between the document and the row
+/// (`prepare` → `AiRequest`, `dispatch` → `NewApproval`) had no test: pinning either to `reject`
+/// leaves the whole kernel green while every template's `on_expire: "continue"` is a dead letter.
+///
+/// This is the customer-visible half of whatsapp_inbox#70: the salon never looks at the tray, the
+/// proposal expires at 72 h, and the woman who wrote at 3 AM has to be told — which cannot happen
+/// if the run dies in `cancelled` the moment the sweep touches it.
+#[tokio::test]
+async fn hub1634_a_proposal_nobody_answers_carries_the_run_on_with_its_turn() {
+    // The same shape a real turn has: the model WRITES the sentence a later step is meant to send
+    // on, and then proposes. One turn, two events.
+    let text = "No free slot on Friday; I can offer Monday at 10.";
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    let mut step = agent_step("manual");
+    step["on_expire"] = json!("continue");
+    let h = hub(
+        cloud.serve().await,
+        "expire-continue",
+        step,
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_expire,
+        approvals::ON_EXPIRE_CONTINUE,
+        "the row records what the DOCUMENT said about a silence, carried through the request — \
+         not the default the row used to be pinned to"
+    );
+
+    // Nobody answers, and the 72 h pass. The sweep is the only piece that reads the policy.
+    {
+        let rt = h.state.runtime.read().await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(pending[0].id));
+        rt.db_for_test()
+            .execute(
+                "UPDATE _flow_approvals SET expires_at = '2020-01-01T00:00:00+00:00' \
+                 WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap();
+        let report = rt.sweep_expired_flow_approvals().await.unwrap();
+        assert_eq!(report.expired, 1);
+        assert_eq!(
+            report.runs_resumed, 1,
+            "`continue` resumes the run instead of killing it: {report:?}"
+        );
+    }
+
+    assert!(
+        bookings(&h).await.is_empty(),
+        "an expiry is the opposite of an approval: nothing the model proposed is executed"
+    );
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_DONE,
+        "`continue` means the run finishes its remaining steps instead of dying in `cancelled`"
+    );
+    let output = step_output(&h, &run_id).await;
+    assert_eq!(output["status"], json!(approvals::STATUS_EXPIRED));
+    assert_eq!(
+        output["text"],
+        json!(text),
+        "the turn parked when the model stopped to ask is handed over, so the step written to \
+         answer the customer has something to say"
+    );
+    assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
+}
+
 /// `policy: "auto"` is the owner saying, in writing, "do it". Then the command runs in the turn
 /// and the model is told what happened, so it can answer the customer.
 #[tokio::test]

@@ -262,7 +262,7 @@
             "continue"
           ],
           "default": "reject",
-          "description": "Solo `kind: approval` — qué le pasa al RUN si nadie contesta antes de `expires_in`. El silencio es una RESPUESTA: `reject` (POR DEFECTO) lo trata como una negativa, que es la lectura conservadora porque los pasos escritos después asumían que se aprobó; `cancel` termina el run sin llamarlo negativa; `continue` sigue al paso siguiente con `steps.<id>.decision == \"expired\"` — el `Limit Wait Time` de n8n y su rama de «sin respuesta». Viaja en la FILA, no se relee del flujo: la política que se aplica es la que estaba en vigor cuando se hizo la pregunta."
+          "description": "`kind: approval` y `kind: ai` — qué le pasa al RUN si nadie contesta antes de `expires_in` (en un paso `ai`, antes de las 72 h de la propuesta). El silencio es una RESPUESTA: `reject` (POR DEFECTO) lo trata como una negativa, que es la lectura conservadora porque los pasos escritos después asumían que se aprobó; `cancel` termina el run sin llamarlo negativa; `continue` sigue al paso siguiente con `steps.<id>.decision == \"expired\"` — el `Limit Wait Time` de n8n y su rama de «sin respuesta». En un paso `ai`, además, el paso conserva el turno aparcado (`steps.<id>.text`) y añade `steps.<id>.status == \"expired\"`, igual que hace con un rechazo: así el paso siguiente puede avisar a quien lleva 72 h esperando. Nada de lo que el modelo propuso se ejecuta — caducar es lo contrario de aprobar. Viaja en la FILA, no se relee del flujo: la política que se aplica es la que estaba en vigor cuando se hizo la pregunta."
         },
         "on_reject": {
           "enum": [

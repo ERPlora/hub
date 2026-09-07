@@ -18,7 +18,7 @@ use erplora_db::DatabaseAdapter;
 use serde_json::{json, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
-use crate::flows::approvals::RejectPolicy;
+use crate::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use crate::flows::def::{self, AiPolicy, FlowDefinition, StepSpec};
 use crate::flows::store;
 
@@ -42,6 +42,10 @@ pub struct AiRequest {
     pub commands: Vec<String>,
     pub policy: AiPolicy,
     pub max_iters: i64,
+    /// What the step said a SILENCE costs the run (hub#1634) — a proposal nobody ever answers.
+    /// Carried for the same reason as [`AiRequest::on_reject`]: the runner copies it into the row
+    /// and the sweep reads it there, hours later, without the document in hand.
+    pub on_expire: ExpiryPolicy,
     /// What the step said a «no» costs the run (hub#1622). Carried here for the same reason the
     /// prompt is: the runner must not re-read the document to know what it was asked to do, and a
     /// second read would be a second answer if the flow changed in between.
@@ -117,6 +121,7 @@ pub async fn prepare(
         commands: ai.commands.clone(),
         policy: ai.policy,
         max_iters: ai.max_iters,
+        on_expire: ai.on_expire,
         on_reject: ai.on_reject,
     })
 }
@@ -235,6 +240,43 @@ mod tests {
             default.on_reject,
             RejectPolicy::Cancel,
             "a document that says nothing still ends the run on a refusal"
+        );
+    }
+
+    /// **What the step said a SILENCE costs travels with the request too** (hub#1634). The exact
+    /// twin of the test above, and it exists for the same measured reason: the runner copies
+    /// `AiRequest::on_expire` into the approval row without re-reading the document, so pinning it
+    /// to `reject` here would leave every template's `on_expire: "continue"` a dead letter with
+    /// every other test green — which is precisely how hub#1622's own review found two survivors.
+    #[tokio::test]
+    async fn the_request_carries_what_the_step_said_a_silence_costs() {
+        let db = db().await;
+        let run_id = parked_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "agent", "kind": "ai", "prompt": "book {{input.who}}",
+                      "tools": { "commands": ["crm.note.add"] }, "on_expire": "continue" }
+                ]
+            }),
+        )
+        .await;
+        let request = prepare(&db, HUB, &run_id, "agent").await.unwrap();
+        assert_eq!(
+            request.on_expire,
+            ExpiryPolicy::Continue,
+            "the document said an unanswered proposal lets the run carry on, and the request has \
+             to say the same"
+        );
+
+        let default = prepare(&db, HUB, &parked(&db).await, "agent")
+            .await
+            .unwrap();
+        assert_eq!(
+            default.on_expire,
+            ExpiryPolicy::Reject,
+            "a document that says nothing still ends the run when nobody answers"
         );
     }
 
