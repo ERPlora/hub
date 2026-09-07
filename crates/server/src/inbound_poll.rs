@@ -217,6 +217,15 @@ pub struct InboundMessage {
     /// (saas#1884). Read it through [`Self::source`].
     #[serde(default)]
     source: String,
+    /// The id of the option the customer TAPPED, as the SaaS lifted it out of Meta's shape
+    /// (saas#1894). Empty when the SaaS is older than that field, or when nothing was tapped —
+    /// read it through [`Self::reply`], which falls back to the verbatim payload.
+    #[serde(default)]
+    reply_id: String,
+    /// The LABEL of that option, the words the customer actually saw on the button. Same rules as
+    /// [`Self::reply_id`].
+    #[serde(default)]
+    reply_title: String,
     /// The message object from Meta's webhook, verbatim.
     #[serde(default)]
     pub payload: Value,
@@ -257,6 +266,9 @@ impl InboundMessage {
         payload.insert("contact".into(), json!(self.contact()));
         payload.insert("source".into(), json!(self.source()));
         payload.insert("text".into(), json!(self.text()));
+        let (reply_id, reply_title) = self.reply();
+        payload.insert("reply_id".into(), json!(reply_id));
+        payload.insert("reply_title".into(), json!(reply_title));
         payload.insert("received_at".into(), json!(self.received_at));
         payload.insert("message".into(), self.payload.clone());
         payload
@@ -307,6 +319,33 @@ impl InboundMessage {
         gaps
     }
 
+    /// **The option the customer TAPPED**: `(id, title)`, or two empty strings for anything else
+    /// (hub#1633).
+    ///
+    /// What the SaaS lifted wins: that is where the shape is checked and where Meta's next nesting
+    /// gets taught first, so overriding it here would pin the fleet to whichever side was staler.
+    /// When it says nothing — a SaaS older than saas#1894, or a row parked before it shipped,
+    /// including the coexistence backlog — the same answer is read off the verbatim payload, the
+    /// way [`Self::text`] has always read the body. Empty and never an `Option`, for the reason
+    /// `text` is: a flow comparing `reply_id` against something should simply not match a photo.
+    fn reply(&self) -> (String, String) {
+        if !self.reply_id.is_empty() {
+            return (self.reply_id.clone(), self.reply_title.clone());
+        }
+        for (path, id_key, title_key) in REPLY_SHAPES {
+            let Some(reply) = dig(&self.payload, path) else {
+                continue;
+            };
+            let Some(id) = reply.get(id_key).and_then(Value::as_str).filter(|s| !s.is_empty())
+            else {
+                continue;
+            };
+            let title = reply.get(title_key).and_then(Value::as_str).unwrap_or_default();
+            return (id.to_string(), title.to_string());
+        }
+        (String::new(), String::new())
+    }
+
     /// The body of a text message, or an empty string for any other kind. Deliberately not an
     /// `Option`: a flow comparing `text` against something should simply not match a photo.
     fn text(&self) -> String {
@@ -317,6 +356,29 @@ impl InboundMessage {
             .unwrap_or_default()
             .to_string()
     }
+}
+
+/// **Where Meta puts the option a customer tapped, and under which keys.** Three shapes for one
+/// idea: a list row, a reply button of an interactive message, and a quick-reply button of a
+/// TEMPLATE — the last one names the id `payload` and the label `text`. The SaaS knows the same
+/// three (`apps/whatsapp_inbox/api/inbox.py`); this is the half that keeps working against a SaaS
+/// that has not shipped them yet.
+const REPLY_SHAPES: [(&[&str], &str, &str); 3] = [
+    (&["interactive", "list_reply"], "id", "title"),
+    (&["interactive", "button_reply"], "id", "title"),
+    (&["button"], "payload", "text"),
+];
+
+/// Walks `path` through nested objects, or `None` the moment the shape is not that.
+///
+/// Meta's payload is stored verbatim, so anything it sends is a shape this may meet: a list where
+/// an object was expected, a null, a number. An unexpected shape is simply not a reply.
+fn dig<'a>(payload: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut cursor = payload;
+    for key in path {
+        cursor = cursor.as_object()?.get(*key)?;
+    }
+    cursor.as_object().map(|_| cursor)
 }
 
 /// One page of the inbox. `cursor` is deliberately not read — see [`InboundPoller::poll_once`].
@@ -1467,6 +1529,140 @@ mod tests {
             payloads_by_id(&runtime).await["wa-wamid.1"]["text"],
             json!("is the table free?")
         );
+    }
+
+    /// **What the customer TAPPED reaches the flow as a field with a name** (hub#1633).
+    ///
+    /// The tap always travelled — `payload` is verbatim — but a declarative flow condition reads
+    /// ONE path, and finding it inside `message` would make every recipe know the three different
+    /// nestings Meta uses for the same idea. Lifted here, `reply_id` is a condition a person can
+    /// read: «si tocó *Confirmar* → confirma la cita».
+    #[test]
+    fn what_the_customer_tapped_is_lifted_out_of_metas_shape_like_the_text_is() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "direction": "inbound",
+            "contact": CUSTOMER,
+            "source": "live",
+            "reply_id": "slot:2026-09-09T10:30",
+            "reply_title": "martes 10:30",
+            "payload": {"type": "interactive", "interactive": {
+                "type": "list_reply",
+                "list_reply": {"id": "slot:2026-09-09T10:30", "title": "martes 10:30"}
+            }},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .expect("the shape the SaaS serves since saas#1894");
+
+        let payload = message.event_payload();
+        assert_eq!(payload["reply_id"], json!("slot:2026-09-09T10:30"));
+        assert_eq!(payload["reply_title"], json!("martes 10:30"));
+        // Named fields now, so they stop being reported as drift the runtime cannot place.
+        assert!(
+            message.unexpected().is_empty(),
+            "a field this runtime understands is not a gap: {:?}",
+            message.unexpected()
+        );
+        // The verbatim object is still there for anything the two convenience fields miss.
+        assert_eq!(
+            payload["message"]["interactive"]["list_reply"]["id"],
+            json!("slot:2026-09-09T10:30")
+        );
+    }
+
+    /// **The three nestings Meta uses for one idea**, read off the verbatim payload when the SaaS
+    /// says nothing — which is every hub polling a SaaS that predates saas#1894, and every row
+    /// parked before it shipped, including the coexistence backlog. The hub already owns this kind
+    /// of knowledge for `text()`; owning it here is what makes the feature work on the day the hub
+    /// ships instead of the day the SaaS does.
+    #[test]
+    fn a_tap_is_understood_from_metas_own_payload_when_the_saas_does_not_name_it() {
+        let cases = [
+            (
+                json!({"type": "interactive", "interactive": {
+                    "type": "list_reply",
+                    "list_reply": {"id": "slot:1", "title": "martes 10:30"}
+                }}),
+                "slot:1",
+                "martes 10:30",
+            ),
+            (
+                json!({"type": "interactive", "interactive": {
+                    "type": "button_reply",
+                    "button_reply": {"id": "confirm", "title": "Sí"}
+                }}),
+                "confirm",
+                "Sí",
+            ),
+            // A template's quick-reply button: Meta calls the id `payload` and the label `text`.
+            (
+                json!({"type": "button", "button": {"payload": "cancel", "text": "Anular"}}),
+                "cancel",
+                "Anular",
+            ),
+        ];
+        for (payload, id, title) in cases {
+            let message: InboundMessage = serde_json::from_value(json!({
+                "wa_message_id": "wamid.1",
+                "from": CUSTOMER,
+                "payload": payload,
+                "received_at": "2026-09-07T10:00:00+00:00",
+            }))
+            .unwrap();
+            let event = message.event_payload();
+            assert_eq!(event["reply_id"], json!(id), "{payload}");
+            assert_eq!(event["reply_title"], json!(title), "{payload}");
+        }
+    }
+
+    /// **Empty and never absent**, exactly like `text()`: a flow comparing `reply_id` against
+    /// something should simply not match a photo, not have to test for absence first. And a shape
+    /// Meta never promised — a list where an object was expected, a null — is simply not a reply:
+    /// one odd row must not take a whole page down with it.
+    #[test]
+    fn anything_that_is_not_a_tap_reads_as_empty_rather_than_missing() {
+        for payload in [
+            json!({"type": "text", "text": {"body": "hola"}}),
+            json!({"type": "image", "image": {"id": "123"}}),
+            json!({"type": "interactive", "interactive": {"list_reply": ["not", "an", "object"]}}),
+            json!({"type": "interactive", "interactive": {"button_reply": {"id": 7}}}),
+            json!({"button": {"payload": "", "text": "Anular"}}),
+            json!(null),
+        ] {
+            let message: InboundMessage = serde_json::from_value(json!({
+                "wa_message_id": "wamid.1",
+                "from": CUSTOMER,
+                "payload": payload,
+                "received_at": "2026-09-07T10:00:00+00:00",
+            }))
+            .unwrap();
+            let event = message.event_payload();
+            assert_eq!(event["reply_id"], json!(""), "{payload}");
+            assert_eq!(event["reply_title"], json!(""), "{payload}");
+        }
+    }
+
+    /// What the SaaS says WINS over what the hub can work out. The SaaS is where the shape is
+    /// checked and where Meta's next nesting will be taught first, so a fallback that overrode it
+    /// would pin the whole fleet to whichever of the two was staler.
+    #[test]
+    fn the_saas_field_wins_over_what_the_hub_can_work_out_for_itself() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "reply_id": "from-the-saas",
+            "reply_title": "lo que dijo el SaaS",
+            "payload": {"type": "interactive", "interactive": {
+                "button_reply": {"id": "from-the-payload", "title": "lo que dijo Meta"}
+            }},
+            "received_at": "2026-09-07T10:00:00+00:00",
+        }))
+        .unwrap();
+
+        let event = message.event_payload();
+        assert_eq!(event["reply_id"], json!("from-the-saas"));
+        assert_eq!(event["reply_title"], json!("lo que dijo el SaaS"));
     }
 
     /// A `direction` outside the contract is **never** repainted as the customer's. Claiming the
