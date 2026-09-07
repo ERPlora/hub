@@ -482,7 +482,16 @@ mod tests {
         scope: &Json,
     ) -> Result<Prepared> {
         prepare(
-            db, &registry(), HUB, FLOW, "run-1", "", 0, step, scope, authority,
+            db,
+            &registry(),
+            HUB,
+            FLOW,
+            "run-1",
+            "",
+            0,
+            step,
+            scope,
+            authority,
         )
         .await
     }
@@ -862,7 +871,9 @@ mod tests {
         .steps
         .remove(0);
 
-        let err = prepare_in(&db, &step, &authority, &scope()).await.unwrap_err();
+        let err = prepare_in(&db, &step, &authority, &scope())
+            .await
+            .unwrap_err();
         assert!(
             matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_OPTIONS_NOT_FOUND),
             "{err}"
