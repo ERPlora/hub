@@ -159,7 +159,11 @@ fn main() {
             let tags = git(&dir, &["tag", "--list", "v*"])
                 .map(|out| tags_from_output(&out))
                 .unwrap_or_default();
-            decide(&package, &tags, git(&dir, &["rev-parse", "--short=8", "HEAD"]).as_deref())
+            decide(
+                &package,
+                &tags,
+                git(&dir, &["rev-parse", "--short=8", "HEAD"]).as_deref(),
+            )
         }
     };
 
@@ -204,7 +208,11 @@ mod tests {
     /// DEVELOPER'S OWN BUILD and the catalogue sweep read that refusal as a broken manifest.
     #[test]
     fn a_source_build_reports_the_newest_release_not_the_placeholder_hub1619() {
-        let decided = decide("1.0.0", &tags(&["v1.1.14", "v1.1.15", "v1.1.7"]), Some("1c50d429"));
+        let decided = decide(
+            "1.0.0",
+            &tags(&["v1.1.14", "v1.1.15", "v1.1.7"]),
+            Some("1c50d429"),
+        );
         assert_eq!(decided.version, "1.1.15-source+g1c50d429");
         assert!(decided.corroborated);
         assert!(
@@ -218,7 +226,11 @@ mod tests {
     /// lexicographic order, and picking it would put the build back below the fleet.
     #[test]
     fn the_newest_tag_is_the_highest_version_not_the_last_string_hub1619() {
-        let decided = decide("1.0.0", &tags(&["v1.1.9", "v1.1.15", "v1.2.0"]), Some("abc1234"));
+        let decided = decide(
+            "1.0.0",
+            &tags(&["v1.1.9", "v1.1.15", "v1.2.0"]),
+            Some("abc1234"),
+        );
         assert_eq!(decided.version, "1.2.0-source+gabc1234");
     }
 

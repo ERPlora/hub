@@ -145,6 +145,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Tags completos, y no el checkout superficial por defecto (hub#1619): sin ellos este
+          # job no sabe qué versión de hub ES —cae al placeholder de `[workspace.package]`, que
+          # está por debajo de toda la flota— y refusaría cualquier módulo que declare
+          # `compatibility.min_erplora_version`, leyendo su propio despiste como un manifest roto.
+          # El barrido lo detecta y se pone ROJO en voz alta si esto falta, en vez de dejar de
+          # comprobar los suelos en silencio.
+          fetch-depth: 0
+          fetch-tags: true
 
       # Un aviso sin `module` correría como una pasada nocturna anónima: el run no diría a quién
       # culpar y la issue de alerta tampoco. Se rechaza en voz alta, que es barato (el emisor lo
