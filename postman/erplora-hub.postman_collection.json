@@ -1921,6 +1921,34 @@
           "response": []
         },
         {
+          "name": "GET /api/hub/flows/templates",
+          "request": {
+            "description": "auth: admin+capability",
+            "header": [
+              {
+                "key": "X-Hub-Session",
+                "type": "text",
+                "value": "{{hub_session}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{hub_url}}"
+              ],
+              "path": [
+                "api",
+                "hub",
+                "flows",
+                "templates"
+              ],
+              "query": [],
+              "raw": "{{hub_url}}/api/hub/flows/templates"
+            }
+          },
+          "response": []
+        },
+        {
           "name": "GET /api/hub/flows/:id",
           "request": {
             "description": "auth: admin+capability",

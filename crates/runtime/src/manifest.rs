@@ -1,7 +1,7 @@
 //! Parseo de `module.json` (el contrato declarativo del módulo). Espejo del JSON Schema
 //! en `schemas/module.schema.json`. ARQUITECTURA.md §5.2.
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::errors::{Result, RuntimeError};
 
@@ -2114,6 +2114,153 @@ impl Manifest {
         }
         out
     }
+
+    /// Carga las automatizaciones de fábrica del módulo desde `<dir>/flows/` (hub#1611).
+    ///
+    /// **Convención de carpeta, NO una clave del manifest**, y es deliberado: la raíz del manifest
+    /// es un contrato cerrado (`additionalProperties: false`, ADR-0286), así que una clave `flows`
+    /// nueva le pondría un suelo de versión de hub a cada módulo que la declarase y haría avisar a
+    /// toda la flota anterior. Por carpeta —igual que `locales/`— un módulo publica hoy sus
+    /// plantillas sin suelo y sin un solo aviso, y **aparecen solas** en el primer arranque tras
+    /// esta release: [`crate::Runtime::rehydrate_installed`] vuelve a pasar por el instalador en
+    /// cada boot, así que no hay que reinstalar ni republicar nada.
+    ///
+    /// Una **familia** es el conjunto de ficheros que comparten prefijo:
+    /// `<family>.<lang>.flow.json` (el documento por idioma, `en` es la fuente — ADR-0055/0199),
+    /// `<family>.grants.json` (**obligatorio**: lo que la plantilla pedirá al dueño) y
+    /// `<family>.requires.json` (opcional: el suelo de versión **por plantilla**, que a propósito
+    /// NO es el `depends_on` del módulo — `whatsapp_inbox` exige `appointments >= 1.1.69` para su
+    /// plantilla y su `depends_on` es solo `["customers"]`, porque la plantilla es opcional y el
+    /// módulo funciona sin ella).
+    ///
+    /// **Best-effort, como `load_locales`**, y aquí importa más: esto se lee de un zip de terceros
+    /// y corre en cada arranque. Lo ilegible se omite y lo válido sobrevive — un paquete roto no
+    /// puede dejar sin automatizaciones a los demás módulos ni impedir que el hub levante. Lo que
+    /// `erplora validate` ya garantizó antes de publicar (el documento cumple el schema, toda
+    /// familia trae `en` y `es`, y todos los idiomas declaran la misma maquinaria) no se
+    /// re-defiende aquí; lo que sí se sostiene es que un paquete que **no** pasó por ahí no rompa
+    /// nada.
+    ///
+    /// El resultado va **ordenado por familia** para que la galería no baile entre dos arranques.
+    pub fn load_flow_templates(dir: &Path) -> Vec<ModuleFlowTemplate> {
+        let Ok(entries) = std::fs::read_dir(dir.join("flows")) else {
+            return Vec::new();
+        };
+
+        // 1ª pasada: agrupar los documentos por familia e idioma. `<family>.<lang>.flow.json`, y
+        // el `family` puede llevar guiones, así que se corta por la DERECHA: lo que queda antes de
+        // `.<lang>.flow.json` es la familia entera.
+        let mut docs: BTreeMap<String, HashMap<String, serde_json::Value>> = BTreeMap::new();
+        let mut sidecars: HashMap<String, PathBuf> = HashMap::new();
+        let mut requires: HashMap<String, PathBuf> = HashMap::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if let Some(family) = name.strip_suffix(".grants.json") {
+                sidecars.insert(family.to_string(), path);
+            } else if let Some(family) = name.strip_suffix(".requires.json") {
+                requires.insert(family.to_string(), path);
+            } else if let Some(stem) = name.strip_suffix(".flow.json") {
+                // `<family>.<lang>`: el idioma es la última etiqueta, la familia el resto.
+                let Some((family, lang)) = stem.rsplit_once('.') else {
+                    continue;
+                };
+                if family.is_empty()
+                    || lang.len() != 2
+                    || !lang.chars().all(|c| c.is_ascii_lowercase())
+                {
+                    continue;
+                }
+                let Ok(text) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
+                let Ok(doc) = serde_json::from_str::<serde_json::Value>(&text) else {
+                    continue;
+                };
+                docs.entry(family.to_string())
+                    .or_default()
+                    .insert(lang.to_string(), doc);
+            }
+        }
+
+        // 2ª pasada: una familia solo se ofrece si trae su `grants.json` legible. Un grant es lo
+        // que abre la puerta de verdad (ADR-0283 §2): una plantilla que no puede decir qué va a
+        // hacer no se ofrece, en vez de ofrecerse y pedirlo después.
+        docs.into_iter()
+            .filter_map(|(family, documents)| {
+                if documents.is_empty() {
+                    return None;
+                }
+                let grants = sidecars
+                    .get(&family)
+                    .and_then(|p| std::fs::read_to_string(p).ok())
+                    .and_then(|t| serde_json::from_str::<FlowGrantsSidecar>(&t).ok())?
+                    .grants;
+                let requires = requires
+                    .get(&family)
+                    .and_then(|p| std::fs::read_to_string(p).ok())
+                    .and_then(|t| serde_json::from_str::<FlowRequiresSidecar>(&t).ok())
+                    .map(|r| r.modules)
+                    .unwrap_or_default();
+                Some(ModuleFlowTemplate {
+                    family,
+                    documents,
+                    grants,
+                    requires,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Una automatización de fábrica de un módulo (`flows/<family>.*`, hub#1611).
+///
+/// El documento viaja **por idioma** y sin cotejar entre ellos: `erplora validate` ya garantiza
+/// que todos declaran los mismos pasos, en el mismo orden y con la misma maquinaria —entre el `en`
+/// y el `es` solo cambia la prosa—, así que servir el idioma del hub o su caída al `en` es servir
+/// **la misma automatización** con otras palabras.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModuleFlowTemplate {
+    /// El prefijo compartido de los ficheros de la familia (`appointment-from-whatsapp`).
+    pub family: String,
+    /// `lang → documento del flujo`. Siempre trae `en` (idioma fuente, ADR-0055/0199).
+    pub documents: HashMap<String, serde_json::Value>,
+    /// Los permisos que la plantilla pedirá al dueño cuando la instale. **Nunca se conceden aquí**:
+    /// una plantilla nace apagada y sin grants, como cualquier otra (§9.3).
+    pub grants: Vec<FlowTemplateGrant>,
+    /// Suelo de versión **por plantilla** (`módulo → SemVer`). Si no se cumple, la plantilla no se
+    /// ofrece; el módulo que la trae sigue funcionando.
+    pub requires: HashMap<String, String>,
+}
+
+/// Un grant que una plantilla declara que va a necesitar (`<family>.grants.json`).
+///
+/// Es el mismo vocabulario congelado de `_flow_grants` (ADR-0283 §2), pero aquí es **una petición,
+/// no una concesión**: lo que este tipo describe es lo que la pantalla le va a enseñar al dueño
+/// para que lo autorice él.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct FlowTemplateGrant {
+    pub kind: String,
+    pub value: String,
+}
+
+/// `<family>.grants.json` — las claves `_*` del fichero son documentación y se ignoran.
+#[derive(Debug, serde::Deserialize)]
+struct FlowGrantsSidecar {
+    #[serde(default)]
+    grants: Vec<FlowTemplateGrant>,
+}
+
+/// `<family>.requires.json` — el suelo de versión por plantilla.
+#[derive(Debug, serde::Deserialize)]
+struct FlowRequiresSidecar {
+    #[serde(default)]
+    modules: HashMap<String, String>,
 }
 
 /// Catálogo de traducciones de un módulo para UN idioma (`locales/<lang>.json`, ADR-0055). El
