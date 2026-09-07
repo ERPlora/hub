@@ -1181,7 +1181,7 @@ mod tests {
             HUB,
             &flow.id,
             &reg,
-            &[(grants::GrantKind::Command, "sales.sale.create".into())],
+            &[grants::GrantSpec::pair(grants::GrantKind::Command, "sales.sale.create")],
             "hub_user:1",
         )
         .await

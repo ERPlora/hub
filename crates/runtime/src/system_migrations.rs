@@ -1855,6 +1855,31 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_at TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NULL DEFAULT '';",
     },
+    // ── v59 — hub#1623: un grant de `command` puede FIJAR parte del payload ───────────────────
+    // Hasta aquí la unidad de concesión era el NOMBRE del command, así que «puede anular citas» y
+    // «puede anular citas COMO CLIENTE» eran el mismo permiso. No lo son: un flujo cuyo payload lo
+    // redacta un modelo leyendo el mensaje de un desconocido necesita el segundo, porque el primero
+    // le entrega a ese desconocido todos los argumentos del command — incluido el que dice que la
+    // llamada viene del mostrador y que se salta las reglas de anulación del negocio.
+    //
+    // `payload` guarda un objeto JSON como TEXT (la convención de `_flow_approvals.payload`), con
+    // `'{}'` = no fija nada, que es lo que tenía toda fila anterior a esta versión. Por eso NO
+    // entra en `ux_flow_grant_live`: la identidad de un grant sigue siendo `(hub, flow, kind,
+    // value)`, de modo que un command tiene como mucho UNA concesión viva y una sola frase que leer
+    // en la pantalla. Si el índice llevara el payload, convivirían «puede anular como cliente» y
+    // «puede anular» sin más, y ganaría la segunda: dos filas que se contradicen y la más ancha
+    // decide.
+    //
+    // 🔴 El número es el SIGUIENTE AL MÁXIMO, nunca un hueco: al escribirla el máximo era v58 en
+    // `origin/develop`, en `main` y en las 54 ramas remotas (comprobado una a una). `apply` compara
+    // contra el máximo aplicado y una versión por debajo se salta EN SILENCIO.
+    SystemMigration {
+        version: 59,
+        name: "flow_grant_payload_pin",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT '{}';",
+    },
 
 ];
 

@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::flows::approvals;
 use erplora_runtime::flows::executor::PendingIo;
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::{Runtime, RuntimeError};
 use serde_json::{json, Value};
@@ -72,7 +72,7 @@ async fn flow_with(rt: &Runtime, definition: Value) -> String {
     .id
 }
 
-async fn grant(rt: &Runtime, flow_id: &str, pairs: &[(GrantKind, String)]) {
+async fn grant(rt: &Runtime, flow_id: &str, pairs: &[GrantSpec]) {
     rt.replace_flow_grants(flow_id, pairs, "hub_user:owner")
         .await
         .unwrap();
@@ -117,7 +117,7 @@ async fn an_ai_step_is_handed_to_the_server_instead_of_being_run_inside_the_tick
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
 
@@ -156,7 +156,7 @@ async fn the_request_carries_the_resolved_prompt_the_tools_and_the_policy() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -193,7 +193,7 @@ async fn a_manual_proposal_creates_an_approval_and_writes_nothing_to_the_busines
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -252,7 +252,7 @@ async fn approving_executes_exactly_the_proposed_command_and_the_run_continues()
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({})).await;
@@ -319,7 +319,7 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({})).await;
@@ -382,7 +382,7 @@ async fn a_refusal_that_lets_the_run_carry_on_still_hands_over_the_turn_it_parke
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({})).await;
@@ -434,7 +434,7 @@ async fn a_grant_revoked_between_the_proposal_and_the_approval_refuses_the_appro
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -482,7 +482,7 @@ async fn an_approval_is_decided_once() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -528,7 +528,7 @@ async fn an_approval_is_decided_once() {
 async fn a_flow_may_only_run_the_queries_it_was_granted() {
     let rt = runtime().await;
     let flow_id = flow_with(&rt, agent_definition("manual")).await;
-    grant(&rt, &flow_id, &[(GrantKind::Query, "crm.note.list".into())]).await;
+    grant(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Query, "crm.note.list")]).await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
     let run = run_of(&rt, &flow_id).await;
 
@@ -554,7 +554,7 @@ async fn an_approval_of_another_hub_is_not_visible_here() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -601,7 +601,7 @@ async fn the_tray_lists_what_is_waiting_with_the_command_and_its_payload() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;

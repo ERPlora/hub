@@ -169,7 +169,7 @@ async fn flow_calling(rt: &Runtime, url: &str, timeout: u64) -> String {
 async fn allow(rt: &Runtime, flow_id: &str, pattern: &str) {
     rt.replace_flow_grants(
         flow_id,
-        &[(GrantKind::Http, pattern.to_string())],
+        &[GrantSpec::pair(GrantKind::Http, pattern.to_string())],
         "hub_user:1",
     )
     .await

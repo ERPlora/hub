@@ -26,7 +26,7 @@ use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, FLOWS_SECTION};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::NewFlow;
 use erplora_runtime::import::{import_sections, ImportReport, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -95,9 +95,8 @@ async fn create_flow(rt: &Runtime, name: &str, definition: Value, enabled: bool)
     .id
 }
 
-async fn grant(rt: &Runtime, flow_id: &str, pairs: &[(GrantKind, &str)]) {
-    let wanted: Vec<(GrantKind, String)> = pairs.iter().map(|(k, v)| (*k, v.to_string())).collect();
-    rt.replace_flow_grants(flow_id, &wanted, OWNER)
+async fn grant(rt: &Runtime, flow_id: &str, wanted: &[GrantSpec]) {
+    rt.replace_flow_grants(flow_id, wanted, OWNER)
         .await
         .expect("the owner grants the flow what it may do");
 }
@@ -166,7 +165,7 @@ fn ensure_master_key() {
 async fn a_backup_restores_the_flows_and_they_run_again() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
@@ -343,7 +342,7 @@ async fn a_flow_secret_never_leaves_the_hub_in_any_form() {
         .await
         .expect("the owner stores the credential of an `http` step");
     let flow_id = create_flow(&origin, "Reorder", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
@@ -374,7 +373,7 @@ async fn a_flow_secret_never_leaves_the_hub_in_any_form() {
 async fn the_execution_history_does_not_travel() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     complete_sale(&origin, "h1", "120.50").await;
     origin.drain_outbox().await.unwrap();
     origin.process_flows().await.unwrap();
@@ -436,7 +435,7 @@ async fn the_execution_history_does_not_travel() {
 async fn a_template_carries_no_flows() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Template,
@@ -512,7 +511,7 @@ async fn the_export_carries_only_the_flows_of_its_own_hub() {
 async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
         ..Default::default()
@@ -579,7 +578,7 @@ async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused(
 async fn a_bundle_of_unknown_origin_regrants_nothing() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let mut bundle = export_hub(
         &origin,
         "h1",
@@ -628,7 +627,7 @@ async fn a_bundle_of_unknown_origin_regrants_nothing() {
 async fn a_flow_whose_grant_cannot_be_regranted_arrives_disabled() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
         ..Default::default()
@@ -687,9 +686,9 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         &origin,
         &flow_id,
         &[
-            (GrantKind::Command, "crm.note.add"),
-            (GrantKind::Query, "crm.customer.list"),
-            (GrantKind::Http, "https://supplier.example/orders*"),
+            GrantSpec::pair(GrantKind::Command, "crm.note.add"),
+            GrantSpec::pair(GrantKind::Query, "crm.customer.list"),
+            GrantSpec::pair(GrantKind::Http, "https://supplier.example/orders*"),
         ],
     )
     .await;
@@ -711,6 +710,7 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         .push(erplora_runtime::export::FlowGrantSpec {
             kind: "command".into(),
             value: "ghost.module.act".into(),
+            payload: Default::default(),
         });
 
     let report = import_sections(
@@ -823,7 +823,7 @@ async fn a_document_the_save_door_refuses_does_not_get_in_through_a_backup() {
 async fn restoring_the_same_backup_twice_does_not_duplicate_the_flows() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let bundle = export_hub(
         &origin,
         "h1",

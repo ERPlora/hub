@@ -182,7 +182,7 @@ pub(crate) async fn execute_flow_query_page(
 mod tests {
     use super::*;
     use crate::flows::def::FlowDefinition;
-    use crate::flows::grants::GrantKind;
+    use crate::flows::grants::{GrantKind, GrantSpec};
     use crate::flows::test_support;
     use crate::registry::ModuleStatus;
     use erplora_db::testutil::fresh_db;
@@ -243,7 +243,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Query, query.to_string())],
+            &[GrantSpec::pair(GrantKind::Query, query.to_string())],
             "hub_user:1",
         )
         .await
@@ -436,7 +436,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Query, "sales.strict".to_string())],
+            &[GrantSpec::pair(GrantKind::Query, "sales.strict")],
             "hub_user:1",
         )
         .await
@@ -492,7 +492,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Query, "sales.shadow".to_string())],
+            &[GrantSpec::pair(GrantKind::Query, "sales.shadow")],
             "hub_user:1",
         )
         .await

@@ -88,7 +88,7 @@ impl Runtime {
     pub async fn replace_flow_grants(
         &self,
         flow_id: &str,
-        wanted: &[(flows::grants::GrantKind, String)],
+        wanted: &[flows::grants::GrantSpec],
         granted_by: &str,
     ) -> Result<()> {
         // 404 first: granting to a flow that is not here must not create rows for a ghost.
@@ -487,11 +487,16 @@ impl Runtime {
 
         // Step 2 — the gate, NOW. Deliberately before anything is written: nothing about this
         // approval changes if the answer is no.
+        // hub#1623 — with the payload that will really run: the one stored verbatim when the model
+        // proposed it. A grant that FIXES part of the payload has to be applied on this door too,
+        // or approving would be the way around the pin — the tray is the one place a payload waits
+        // hours between being written and being executed.
         flows::grants::check_command_grant(
             self.db.as_ref(),
             &self.hub_id,
             &approval.flow_id,
             &approval.command,
+            &approval.payload.as_object().cloned().unwrap_or_default(),
         )
         .await?;
 

@@ -29,7 +29,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value};
@@ -135,7 +135,7 @@ async fn create_flow(rt: &Runtime, definition: Value) -> String {
 async fn grant(rt: &Runtime, flow_id: &str, command: &str) {
     rt.replace_flow_grants(
         flow_id,
-        &[(GrantKind::Command, command.to_string())],
+        &[GrantSpec::pair(GrantKind::Command, command.to_string())],
         "hub_user:owner",
     )
     .await
@@ -452,7 +452,7 @@ async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
     let refused = rt
         .replace_flow_grants(
             &flow_id,
-            &[(GrantKind::Command, "crm._purge_notes".to_string())],
+            &[GrantSpec::pair(GrantKind::Command, "crm._purge_notes")],
             "hub_user:owner",
         )
         .await

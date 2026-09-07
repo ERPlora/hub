@@ -24,7 +24,7 @@ use std::path::PathBuf;
 
 use erplora_db::{testutil::TestDb, Params};
 use erplora_runtime::flows::approvals::{self, ExpiryPolicy, RejectPolicy};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::hub_users::NewHubUser;
 use erplora_runtime::Runtime;
@@ -92,7 +92,7 @@ async fn parked(rt: &Runtime, approval: Value) -> (String, String) {
         .id;
     rt.replace_flow_grants(
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
         OWNER,
     )
     .await
