@@ -18,7 +18,7 @@
 //! 3. **No elevation.** A grant opens the gate for the command it names and nothing else. It does
 //!    not add a permission to a session, and a flow runs as [`crate::registry::Principal::Machine`],
 //!    which can never be offered the manager's PIN (hub#361).
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Value as Json};
@@ -38,6 +38,16 @@ pub const ERR_INVALID_NOTIFY_GRANT: &str = "flow.invalid_notify_grant";
 pub const ERR_INVALID_RECIPIENT_GRANT: &str = "flow.invalid_recipient_grant";
 /// hub#824 — a command a flow can never invoke, named where a flow names commands.
 pub const ERR_INTERNAL_COMMAND: &str = "flow.internal_command";
+/// hub#1623 — the command IS granted, but the grant PINS part of its payload and this call
+/// contradicts the pin. A separate code from [`ERR_GRANT_DENIED`] on purpose: «this flow may not
+/// cancel appointments» and «this flow may only cancel them as the customer» are different
+/// sentences on the grants screen, and the second one is the one that tells an owner their
+/// containment worked.
+pub const ERR_GRANT_PAYLOAD_DENIED: &str = "flow.grant_payload_denied";
+/// hub#1623 — a `payload` pin that cannot be stored: one on a kind that carries no payload, or one
+/// that is not an object. Refused rather than stored as a restriction nothing can enforce, the same
+/// rule [`GrantKind::is_available`] enforces for the kinds.
+pub const ERR_INVALID_GRANT_PAYLOAD: &str = "flow.invalid_grant_payload";
 
 /// The five kinds of ADR-0283 §2. The vocabulary is frozen here; what grows is which of them can
 /// be CREATED, because a grant for something the kernel cannot do yet would tell an owner that
@@ -105,8 +115,55 @@ pub struct Grant {
     pub id: String,
     pub kind: String,
     pub value: String,
+    /// hub#1623 — the payload fields this grant FIXES, `{}` when it fixes none. It is part of what
+    /// the grant says, so it travels with it: a screen that showed «may cancel appointments» for a
+    /// grant that really says «may cancel appointments as the customer» would describe a wider
+    /// permission than the one that was given.
+    pub payload: Json,
     pub granted_by: String,
     pub created_at: String,
+}
+
+/// One grant **as it is asked for** — the pair, plus the payload a `command` grant pins.
+///
+/// hub#1623: until this existed the unit of authorisation was the command NAME, so «may cancel
+/// appointments» and «may cancel appointments as the customer» were the same grant. They are not.
+/// A flow whose payload is written by a model reading a stranger's message needs the second one,
+/// because the first one hands that stranger every argument the command takes.
+///
+/// The pin is an **allow-list of fixed values**, not a list of forbidden fields, and that choice is
+/// the same one the rest of this file makes everywhere: a forbidden-field list authorises every
+/// field nobody thought of, so the day a module adds an argument the grant silently widens. A fixed
+/// value covers exactly what it says and nothing else, and it reads on the screen as the sentence
+/// the owner meant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrantSpec {
+    pub kind: GrantKind,
+    pub value: String,
+    /// Top-level payload fields this grant fixes. Empty = fixes nothing, which is every grant that
+    /// existed before hub#1623 and every grant of a kind that carries no payload.
+    pub payload: Params,
+}
+
+impl GrantSpec {
+    /// A grant that pins nothing — the shape every kind other than `command` has, and the default
+    /// for a `command` too.
+    pub fn pair(kind: GrantKind, value: impl Into<String>) -> Self {
+        Self {
+            kind,
+            value: value.into(),
+            payload: Params::new(),
+        }
+    }
+
+    /// A `command` grant that fixes part of the payload (hub#1623).
+    pub fn pinned(command: impl Into<String>, payload: Params) -> Self {
+        Self {
+            kind: GrantKind::Command,
+            value: command.into(),
+            payload,
+        }
+    }
 }
 
 /// The live grants of one flow, read once. Everything the gate and the context need comes from
@@ -114,6 +171,9 @@ pub struct Grant {
 #[derive(Debug, Clone, Default)]
 pub struct Authority {
     granted: HashSet<(GrantKind, String)>,
+    /// hub#1623 — command name → the payload fields its grant fixes. A command absent from here is
+    /// a command whose grant pins nothing; it is NOT «denied», which is what `granted` answers.
+    pins: HashMap<String, Params>,
 }
 
 impl Authority {
@@ -122,6 +182,17 @@ impl Authority {
     pub fn allows_command(&self, command: &str) -> bool {
         self.granted
             .contains(&(GrantKind::Command, command.to_string()))
+    }
+
+    /// The payload fields this flow's grant for `command` FIXES (hub#1623), or `None` when the
+    /// grant pins nothing.
+    ///
+    /// Separate from [`Authority::allows_command`] deliberately: the pin narrows a grant that
+    /// EXISTS, so a caller that forgets to ask this gets a command that is granted and unpinned —
+    /// the pre-hub#1623 answer — and never a command that is denied. Which is why the enforcement
+    /// does not live here but in [`check_command_grant`], the one door the dispatcher goes through.
+    pub fn command_pin(&self, command: &str) -> Option<&Params> {
+        self.pins.get(command).filter(|p| !p.is_empty())
     }
 
     /// May this flow run this query RIGHT NOW? Same default-deny, same freshness. A read is not
@@ -451,20 +522,76 @@ pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) ->
     p.insert("flow_id".into(), json!(flow_id));
     let res = db
         .query(
-            "SELECT kind, value FROM _flow_grants \
+            "SELECT kind, value, payload FROM _flow_grants \
              WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL",
             &p,
         )
         .await?;
-    let granted = res
-        .rows
-        .iter()
-        .filter_map(|r| {
-            let kind = GrantKind::parse(r["kind"].as_str().unwrap_or_default())?;
-            Some((kind, r["value"].as_str().unwrap_or_default().to_string()))
-        })
-        .collect();
-    Ok(Authority { granted })
+    let mut granted = HashSet::new();
+    let mut pins: HashMap<String, Params> = HashMap::new();
+    for r in &res.rows {
+        let Some(kind) = GrantKind::parse(r["kind"].as_str().unwrap_or_default()) else {
+            continue;
+        };
+        let value = r["value"].as_str().unwrap_or_default().to_string();
+        // A pin only means something for a command, and only when it parses. A row that somehow
+        // holds garbage in `payload` pins NOTHING rather than everything: this is a snapshot the
+        // gate reads, and an unreadable restriction must not become an unreadable authorisation.
+        // `replace` is what refuses garbage; by the time it is stored it has been checked.
+        if kind == GrantKind::Command {
+            if let Some(pin) = parse_pin(&r["payload"]) {
+                if !pin.is_empty() {
+                    pins.insert(value.clone(), pin);
+                }
+            }
+        }
+        granted.insert((kind, value));
+    }
+    Ok(Authority { granted, pins })
+}
+
+/// The stored `payload` column back into the map the gate compares against. Stored as TEXT holding
+/// a JSON object (the `_flow_approvals.payload` convention), so both the string and the already
+/// decoded object are accepted — SQLite and Postgres do not agree on which one a driver hands back.
+fn parse_pin(raw: &Json) -> Option<Params> {
+    match raw {
+        Json::Object(map) => Some(map.clone()),
+        Json::String(text) => serde_json::from_str::<Json>(text)
+            .ok()
+            .and_then(|v| v.as_object().cloned()),
+        _ => None,
+    }
+}
+
+/// Does `payload` honour what the grant FIXED? (hub#1623)
+///
+/// Every pinned field must be **present and equal**. Absence is a refusal and not a pass, because
+/// the field the pin names is exactly the one whose default the caller must not get to choose: a
+/// grant that said «as the customer» and let an omitted `channel` through would be bypassed by
+/// leaving it out, which is easier than contradicting it.
+///
+/// Fields the pin does NOT name are free. The pin narrows a grant; it is not a schema, and the
+/// command's own schema is still the thing that decides whether the rest of the payload is valid.
+fn check_payload_pin(flow_id: &str, command: &str, pin: &Params, payload: &Params) -> Result<()> {
+    for (field, fixed) in pin {
+        let sent = payload.get(field);
+        if sent == Some(fixed) {
+            continue;
+        }
+        return Err(RuntimeError::Domain {
+            code: ERR_GRANT_PAYLOAD_DENIED.to_string(),
+            message: format!(
+                "flow `{flow_id}` may run `{command}` only with `{field}` = {fixed}, and this call \
+                 {}. A grant fixes what it fixes; the payload does not get to argue with it \
+                 (ADR-0283 §2).",
+                match sent {
+                    Some(v) => format!("sent {v}"),
+                    None => "omitted it".to_string(),
+                }
+            ),
+        });
+    }
+    Ok(())
 }
 
 /// **The gate**, as the dispatcher calls it (`commands::execute_at` under
@@ -475,11 +602,16 @@ pub async fn check_command_grant(
     hub_id: &str,
     flow_id: &str,
     command: &str,
+    payload: &Params,
 ) -> Result<()> {
-    if authority(db, hub_id, flow_id)
-        .await?
-        .allows_command(command)
-    {
+    let authority = authority(db, hub_id, flow_id).await?;
+    if authority.allows_command(command) {
+        // hub#1623 — granted is only half the question when the grant FIXED part of the payload.
+        // Asked HERE, in the same read, so a caller cannot get the name checked and skip the pin:
+        // the dispatcher calls this one function and there is no second door.
+        if let Some(pin) = authority.command_pin(command) {
+            check_payload_pin(flow_id, command, pin, payload)?;
+        }
         return Ok(());
     }
     Err(RuntimeError::Domain {
@@ -661,10 +793,15 @@ pub async fn replace(
     hub_id: &str,
     flow_id: &str,
     registry: &Registry,
-    wanted: &[(GrantKind, String)],
+    wanted: &[GrantSpec],
     granted_by: &str,
 ) -> Result<()> {
-    for (kind, value) in wanted {
+    for GrantSpec {
+        kind,
+        value,
+        payload,
+    } in wanted
+    {
         // The five kinds of ADR-0283 §2 are all real since hub#821, so nothing lands here any
         // more. The guard stays because the rule it enforces is the one that got them here one at a
         // time: a grant is stored only when something enforces it.
@@ -700,44 +837,74 @@ pub async fn replace(
         if *kind == GrantKind::RecipientQuery {
             check_recipient_pattern(registry, value)?;
         }
+        // hub#1623 — a pin is only enforced for a `command`, because `check_command_grant` is the
+        // only gate that is handed a payload. Storing one anywhere else would put a restriction on
+        // the screen that nothing applies, which is the exact failure `is_available` exists to
+        // prevent one kind at a time.
+        if !payload.is_empty() && *kind != GrantKind::Command {
+            return Err(RuntimeError::Domain {
+                code: ERR_INVALID_GRANT_PAYLOAD.to_string(),
+                message: format!(
+                    "only a `command` grant can fix payload values; a `{}` grant carries no \
+                     payload, so the fixed fields would restrict nothing.",
+                    kind.as_str()
+                ),
+            });
+        }
     }
 
     let live = list(db, hub_id, flow_id).await?;
     let now = now_rfc3339();
 
     for grant in &live {
-        let still_wanted = wanted
-            .iter()
-            .any(|(k, v)| k.as_str() == grant.kind && v == &grant.value);
+        // hub#1623 — the PIN is part of the grant, so a grant whose pin changed is not «still
+        // wanted»: it is revoked and re-granted below. That is the honest audit trail (the old
+        // authorisation ended, with its `revoked_by` and its timestamp) and it is also the only
+        // safe order — silently keeping the row would leave the OLD pin enforcing while the screen
+        // showed the new one, and widening a grant is what this whole feature exists to stop.
+        let still_wanted = wanted.iter().any(|w| {
+            w.kind.as_str() == grant.kind && w.value == grant.value && pin_of(grant) == w.payload
+        });
         if !still_wanted {
             let (sql, p) = revoke_op(hub_id, &grant.id, &now, granted_by);
             db.execute(&sql, &p).await?;
         }
     }
 
-    for (kind, value) in wanted {
-        if live
-            .iter()
-            .any(|g| g.kind == kind.as_str() && &g.value == value)
-        {
-            continue; // already live: keep the original `granted_by`/`created_at`.
+    for spec in wanted {
+        if live.iter().any(|g| {
+            g.kind == spec.kind.as_str() && g.value == spec.value && pin_of(g) == spec.payload
+        }) {
+            continue; // already live, pin included: keep the original `granted_by`/`created_at`.
         }
         let mut p = Params::new();
         p.insert("id".into(), json!(new_id()));
         p.insert("hub_id".into(), json!(hub_id));
         p.insert("flow_id".into(), json!(flow_id));
-        p.insert("kind".into(), json!(kind.as_str()));
-        p.insert("value".into(), json!(value));
+        p.insert("kind".into(), json!(spec.kind.as_str()));
+        p.insert("value".into(), json!(spec.value));
+        // TEXT holding a JSON object, the `_flow_approvals.payload` convention. `{}` for a grant
+        // that fixes nothing, so the column is never NULL and every reader has one shape to handle.
+        p.insert(
+            "payload".into(),
+            json!(Json::Object(spec.payload.clone()).to_string()),
+        );
         p.insert("now".into(), json!(now));
         p.insert("by".into(), json!(granted_by));
         db.execute(
-            "INSERT INTO _flow_grants (id, hub_id, flow_id, kind, value, created_at, granted_by) \
-             VALUES (:id, :hub_id, :flow_id, :kind, :value, :now, :by)",
+            "INSERT INTO _flow_grants \
+               (id, hub_id, flow_id, kind, value, payload, created_at, granted_by) \
+             VALUES (:id, :hub_id, :flow_id, :kind, :value, :payload, :now, :by)",
             &p,
         )
         .await?;
     }
     Ok(())
+}
+
+/// The pin of a stored grant, in the shape `GrantSpec::payload` has, so the two can be compared.
+fn pin_of(grant: &Grant) -> Params {
+    grant.payload.as_object().cloned().unwrap_or_default()
 }
 
 /// The `UPDATE` that revokes ONE grant, as a statement a caller can execute or put in its own
@@ -775,7 +942,7 @@ pub async fn list(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) -> Resu
     p.insert("flow_id".into(), json!(flow_id));
     let res = db
         .query(
-            "SELECT id, kind, value, granted_by, created_at FROM _flow_grants \
+            "SELECT id, kind, value, payload, granted_by, created_at FROM _flow_grants \
              WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL \
              ORDER BY created_at, id",
             &p,
@@ -812,6 +979,10 @@ fn grant_row(row: &Json) -> Grant {
         id: text("id"),
         kind: text("kind"),
         value: text("value"),
+        // hub#1623 — as an OBJECT, never the raw TEXT: a screen that got `"{\"channel\":…}"` as a
+        // string would print the quotes, and the grants screen is the one place this has to read
+        // like the sentence it is.
+        payload: Json::Object(parse_pin(&row["payload"]).unwrap_or_default()),
         granted_by: text("granted_by"),
         created_at: text("created_at"),
     }
@@ -820,7 +991,7 @@ fn grant_row(row: &Json) -> Grant {
 /// Parses the `{kind, value}` pairs of a `PUT …/grants` body. An unknown kind is refused by name:
 /// a typo that silently dropped a grant would be read as "denied" and the flow would fail later,
 /// far from the screen where it was typed.
-pub fn parse_pairs(body: &Json) -> Result<Vec<(GrantKind, String)>> {
+pub fn parse_pairs(body: &Json) -> Result<Vec<GrantSpec>> {
     let Some(items) = body.as_array() else {
         return Err(RuntimeError::Domain {
             code: ERR_UNKNOWN_GRANT_KIND.to_string(),
@@ -856,7 +1027,26 @@ pub fn parse_pairs(body: &Json) -> Result<Vec<(GrantKind, String)>> {
                 message: format!("a `{}` grant needs a value", kind.as_str()),
             });
         }
-        out.push((kind, value));
+        // hub#1623 — the optional `payload`: the fields this grant FIXES. Absent is the old shape
+        // and means «fixes nothing»; present and not an object is refused rather than ignored,
+        // because a pin that is silently dropped is a containment the owner believes they gave.
+        let payload = match item.get("payload") {
+            None | Some(Json::Null) => Params::new(),
+            Some(Json::Object(map)) => map.clone(),
+            Some(other) => {
+                return Err(RuntimeError::Domain {
+                    code: ERR_INVALID_GRANT_PAYLOAD.to_string(),
+                    message: format!(
+                        "a grant `payload` is an object of the fields it fixes, got {other}"
+                    ),
+                })
+            }
+        };
+        out.push(GrantSpec {
+            kind,
+            value,
+            payload,
+        });
     }
     Ok(out)
 }
@@ -924,10 +1114,346 @@ mod tests {
         net::parse(raw).unwrap_or_else(|e| panic!("`{raw}`: {e}"))
     }
 
+    /// A pin, as an owner gives one: «may cancel appointments **as the customer**».
+    fn pin(field: &str, value: &str) -> Params {
+        let mut p = Params::new();
+        p.insert(field.into(), json!(value));
+        p
+    }
+
+    /// The payload a step really sends.
+    fn sent(field: &str, value: &str) -> Params {
+        pin(field, value)
+    }
+
+    /// hub#1623 — **the issue, in one test.** A flow whose payload is written by a model reading a
+    /// stranger's WhatsApp message asks to cancel «on behalf of the salon». The command is granted;
+    /// the CHANNEL is not, and the channel is what decides whether the salon's own cancellation
+    /// rules (and the ownership check of appointments#140) apply at all.
+    #[tokio::test]
+    async fn a_pinned_grant_refuses_the_payload_that_contradicts_it() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+            .await
+            .expect_err("«de parte del salón» is not what was granted");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+        // The refusal names the field, because the owner's screen has to be able to say WHICH part
+        // of the grant was contradicted, not just that something was.
+        assert!(format!("{err}").contains("channel"), "{err}");
+
+        check_command_grant(
+            &db,
+            HUB,
+            FLOW,
+            "sales.sale.void",
+            &sent("channel", "customer"),
+        )
+        .await
+        .expect("the very same command, asked for the way it was granted, runs");
+    }
+
+    /// hub#1623 — omitting the pinned field is **not** a way round the pin. Leaving `channel` out
+    /// is easier than contradicting it, and it would hand the decision back to the module's own
+    /// default — the exact thing the pin exists to take away from a stranger's message.
+    #[tokio::test]
+    async fn a_pinned_field_the_payload_omits_is_refused() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &Params::new())
+            .await
+            .expect_err("absence is not agreement");
+        assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED);
+        assert!(format!("{err}").contains("omitted it"), "{err}");
+    }
+
+    /// hub#1623 — the pin narrows, it does not become a schema. A field the grant does not name is
+    /// none of its business; the command's own schema still judges the rest of the payload.
+    #[tokio::test]
+    async fn fields_the_pin_does_not_name_stay_free() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let mut payload = sent("channel", "customer");
+        payload.insert("appointment_id".into(), json!("appt-7"));
+        payload.insert("reason".into(), json!("me ha surgido algo"));
+        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &payload)
+            .await
+            .expect("what the grant did not fix, it did not forbid");
+    }
+
+    /// hub#1623 — **the comparison is strict**, because every lenient reading is a way round the
+    /// pin: a different case, a different JSON type, the value wrapped one level down, a trailing
+    /// space, or the pinned key written twice so that «the last one wins» (which is how
+    /// `serde_json` reads a duplicate). All of them are «not the value the owner fixed», and all
+    /// of them are refused. Guarded here so nobody ever «relaxes» the match to be helpful. (The
+    /// other order of the duplicate — the honest value LAST — is not an evasion: the map the gate
+    /// judges is the very map the handler runs with, so what passes is what executes.)
+    #[tokio::test]
+    async fn the_pin_is_matched_strictly_case_type_shape_and_duplicate_keys() {
+        let db = db_with_schema().await;
+        let mut pinned = pin("channel", "customer");
+        pinned.insert("max_items".into(), json!(1));
+        pinned.insert("notify".into(), json!(true));
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pinned("sales.sale.void", pinned)],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        let honest: Params =
+            serde_json::from_str(r#"{"channel":"customer","max_items":1,"notify":true}"#).unwrap();
+        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &honest)
+            .await
+            .expect("the exact values pass");
+
+        let evasions = [
+            ("case of the value", r#"{"channel":"Customer","max_items":1,"notify":true}"#),
+            ("case of the key", r#"{"Channel":"customer","max_items":1,"notify":true}"#),
+            ("trailing space", r#"{"channel":"customer ","max_items":1,"notify":true}"#),
+            ("number as a string", r#"{"channel":"customer","max_items":"1","notify":true}"#),
+            ("integer as a float", r#"{"channel":"customer","max_items":1.0,"notify":true}"#),
+            ("bool as a string", r#"{"channel":"customer","max_items":1,"notify":"true"}"#),
+            ("bool as a number", r#"{"channel":"customer","max_items":1,"notify":1}"#),
+            (
+                "value nested one level down",
+                r#"{"channel":{"value":"customer"},"max_items":1,"notify":true}"#,
+            ),
+            (
+                "pinned key written twice, the honest value first",
+                r#"{"channel":"customer","channel":"staff","max_items":1,"notify":true}"#,
+            ),
+        ];
+        for (how, raw) in evasions {
+            let payload: Params =
+                serde_json::from_str(raw).unwrap_or_else(|e| panic!("{how}: {e}"));
+            let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &payload)
+                .await
+                .err()
+                .unwrap_or_else(|| panic!("{how}: got through the pin"));
+            assert_eq!(code_of(&err), ERR_GRANT_PAYLOAD_DENIED, "{how}");
+        }
+    }
+
+    /// hub#1623 — every grant written before this existed pins nothing, and must keep behaving
+    /// exactly as it did: the NAME is the whole question. A regression here would break every flow
+    /// in every hub at once.
+    #[tokio::test]
+    async fn a_grant_that_pins_nothing_still_accepts_any_payload() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.void")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+
+        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+            .await
+            .expect("an unpinned grant is the pre-hub#1623 grant, and it judges the name");
+    }
+
+    /// hub#1623 — the pin is part of the grant, so narrowing (or widening) one is a REVOCATION plus
+    /// a new grant, not a quiet edit of the live row. Otherwise the screen and the gate would
+    /// disagree: the owner would read the new sentence while the old one was still being enforced.
+    #[tokio::test]
+    async fn changing_the_pin_revokes_the_old_grant_and_writes_a_new_one() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.void")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let before = list(&db, HUB, FLOW).await.unwrap();
+        assert_eq!(before.len(), 1);
+
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:2",
+        )
+        .await
+        .unwrap();
+
+        let after = list(&db, HUB, FLOW).await.unwrap();
+        assert_eq!(after.len(), 1, "one live grant per command, pin included");
+        assert_ne!(after[0].id, before[0].id, "the narrowed grant is a NEW row");
+        assert_eq!(after[0].payload, json!({"channel": "customer"}));
+        // And the gate follows the new row, not the old one.
+        assert_eq!(
+            code_of(
+                &check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+                    .await
+                    .expect_err("the widened call is refused from now on")
+            ),
+            ERR_GRANT_PAYLOAD_DENIED
+        );
+    }
+
+    /// hub#1623 — re-saving the SAME pin is still a no-op, so the owner pressing save twice does not
+    /// churn `granted_by`/`created_at`. The property `replace` already had, now including the pin.
+    #[tokio::test]
+    async fn re_saving_the_same_pin_keeps_the_original_row() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        let wanted = [GrantSpec::pinned(
+            "sales.sale.void",
+            pin("channel", "customer"),
+        )];
+        replace(&db, HUB, FLOW, &reg, &wanted, "hub_user:1")
+            .await
+            .unwrap();
+        let first = list(&db, HUB, FLOW).await.unwrap();
+        replace(&db, HUB, FLOW, &reg, &wanted, "hub_user:2")
+            .await
+            .unwrap();
+        let second = list(&db, HUB, FLOW).await.unwrap();
+        assert_eq!(second.len(), 1);
+        assert_eq!(second[0].id, first[0].id, "saving twice is not a re-grant");
+        assert_eq!(second[0].granted_by, "hub_user:1");
+    }
+
+    /// hub#1623 — a pin is only enforced where a payload is judged, which is a `command`. Storing
+    /// one on any other kind would put a restriction on the screen that nothing applies — the same
+    /// rule `is_available` enforces for the kinds themselves.
+    #[tokio::test]
+    async fn a_pin_is_refused_on_a_kind_that_carries_no_payload() {
+        let db = db_with_schema().await;
+        let err = replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec {
+                kind: GrantKind::Query,
+                value: "sales.sale.list".into(),
+                payload: pin("channel", "customer"),
+            }],
+            "hub_user:1",
+        )
+        .await
+        .expect_err("a query takes no payload, so the pin would restrict nothing");
+        assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD);
+        assert!(list(&db, HUB, FLOW).await.unwrap().is_empty(), "and nothing was stored");
+    }
+
+    /// hub#1623 — the pin survives the trip through the `PUT …/grants` body, and a `payload` that
+    /// is not an object is REFUSED rather than dropped: a pin silently ignored is a containment the
+    /// owner believes they gave.
+    #[test]
+    fn parse_pairs_reads_the_pin_and_refuses_one_that_is_not_an_object() {
+        let parsed = parse_pairs(&json!([
+            {"kind": "command", "value": "sales.sale.void", "payload": {"channel": "customer"}},
+            {"kind": "command", "value": "sales.sale.create"}
+        ]))
+        .expect("both shapes are valid");
+        assert_eq!(parsed[0].payload, pin("channel", "customer"));
+        assert!(parsed[1].payload.is_empty(), "absent means «fixes nothing»");
+
+        let err = parse_pairs(&json!([
+            {"kind": "command", "value": "sales.sale.void", "payload": "channel=customer"}
+        ]))
+        .expect_err("a pin that cannot be read is refused, never ignored");
+        assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD);
+    }
+
+    /// hub#1623 — revoking a pinned grant is the same soft-delete as any other, and the gate stops
+    /// answering for it. Belt and braces on the freshness property the file's header promises.
+    #[tokio::test]
+    async fn revoking_a_pinned_grant_closes_it_like_any_other() {
+        let db = db_with_schema().await;
+        let reg = registry();
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &reg,
+            &[GrantSpec::pinned("sales.sale.void", pin("channel", "customer"))],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        check_command_grant(
+            &db,
+            HUB,
+            FLOW,
+            "sales.sale.void",
+            &sent("channel", "customer"),
+        )
+        .await
+        .unwrap();
+
+        replace(&db, HUB, FLOW, &reg, &[], "hub_user:1")
+            .await
+            .unwrap();
+        assert_eq!(
+            code_of(
+                &check_command_grant(
+                    &db,
+                    HUB,
+                    FLOW,
+                    "sales.sale.void",
+                    &sent("channel", "customer"),
+                )
+                .await
+                .expect_err("revoked is revoked, pinned or not")
+            ),
+            ERR_GRANT_DENIED,
+            "and it reads as «no grant», not as «wrong payload»"
+        );
+    }
+
     #[tokio::test]
     async fn a_flow_with_no_grants_may_run_nothing() {
         let db = db_with_schema().await;
-        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+        let err = check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
             .await
             .expect_err("default-deny: absence is the answer, not an empty allow-list");
         assert!(format!("{err}").contains("sales.sale.create"), "{err}");
@@ -942,18 +1468,18 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Command, "sales.sale.create".into())],
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.create")],
             "hub_user:1",
         )
         .await
         .unwrap();
 
-        check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+        check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
             .await
             .expect("the granted command runs");
         // A sibling command of the same module is a different question with the same answer as
         // before: no.
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.void")
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.void", &Params::new())
             .await
             .is_err());
     }
@@ -967,20 +1493,20 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Command, "sales.sale.create".into())],
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.create")],
             "hub_user:1",
         )
         .await
         .unwrap();
 
         assert!(
-            check_command_grant(&db, HUB, "flow-2", "sales.sale.create")
+            check_command_grant(&db, HUB, "flow-2", "sales.sale.create", &Params::new())
                 .await
                 .is_err(),
             "another flow of the same hub is not covered"
         );
         assert!(
-            check_command_grant(&db, "hub-other", FLOW, "sales.sale.create")
+            check_command_grant(&db, "hub-other", FLOW, "sales.sale.create", &Params::new())
                 .await
                 .is_err(),
             "the same flow id in another tenant is not covered"
@@ -991,11 +1517,11 @@ mod tests {
     async fn revoking_is_a_soft_delete_and_takes_effect_on_the_next_read() {
         let db = db_with_schema().await;
         let reg = registry();
-        let grants = [(GrantKind::Command, "sales.sale.create".to_string())];
+        let grants = [GrantSpec::pair(GrantKind::Command, "sales.sale.create")];
         replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
             .await
             .unwrap();
-        check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+        check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
             .await
             .unwrap();
 
@@ -1004,7 +1530,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
             .await
             .is_err());
         assert!(list(&db, HUB, FLOW).await.unwrap().is_empty());
@@ -1025,7 +1551,7 @@ mod tests {
     async fn re_saving_the_same_list_keeps_the_original_attribution() {
         let db = db_with_schema().await;
         let reg = registry();
-        let grants = [(GrantKind::Command, "sales.sale.create".to_string())];
+        let grants = [GrantSpec::pair(GrantKind::Command, "sales.sale.create")];
         replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
             .await
             .unwrap();
@@ -1050,7 +1576,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Command, "ghost.command".into())],
+            &[GrantSpec::pair(GrantKind::Command, "ghost.command")],
             "hub_user:1",
         )
         .await
@@ -1075,7 +1601,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::Command, internal.into())],
+                &[GrantSpec::pair(GrantKind::Command, internal)],
                 "hub_user:1",
             )
             .await
@@ -1099,8 +1625,8 @@ mod tests {
             FLOW,
             &registry(),
             &[
-                (GrantKind::Command, "sales.sale.create".into()),
-                (GrantKind::Command, "sales._insert_sale".into()),
+                GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+                GrantSpec::pair(GrantKind::Command, "sales._insert_sale"),
             ],
             "hub_user:1",
         )
@@ -1117,7 +1643,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Command, "sales.sale.create".into())],
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.create")],
             "hub_user:1",
         )
         .await
@@ -1134,23 +1660,17 @@ mod tests {
     #[tokio::test]
     async fn every_kind_of_the_frozen_vocabulary_is_creatable_now() {
         let db = db_with_schema().await;
-        for (kind, value) in [
-            (GrantKind::Command, "sales.sale.create"),
-            (GrantKind::Query, "sales.sale.list"),
-            (GrantKind::Http, "https://api.example.com/v1/send*"),
-            (GrantKind::Notify, "whatsapp"),
-            (GrantKind::RecipientQuery, "sales.sale.list#email"),
+        for spec in [
+            GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+            GrantSpec::pair(GrantKind::Query, "sales.sale.list"),
+            GrantSpec::pair(GrantKind::Http, "https://api.example.com/v1/send*"),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#email"),
         ] {
-            replace(
-                &db,
-                HUB,
-                FLOW,
-                &registry(),
-                &[(kind, value.into())],
-                "hub_user:1",
-            )
-            .await
-            .unwrap_or_else(|e| panic!("`{}` is enforced by this kernel: {e}", kind.as_str()));
+            let kind = spec.kind;
+            replace(&db, HUB, FLOW, &registry(), &[spec], "hub_user:1")
+                .await
+                .unwrap_or_else(|e| panic!("`{}` is enforced by this kernel: {e}", kind.as_str()));
         }
         assert!(GrantKind::ALL.iter().all(|k| k.is_available()));
     }
@@ -1169,8 +1689,8 @@ mod tests {
             FLOW,
             &registry(),
             &[
-                (GrantKind::Notify, "email".into()),
-                (GrantKind::RecipientQuery, "sales.sale.list#email".into()),
+                GrantSpec::pair(GrantKind::Notify, "email"),
+                GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#email"),
             ],
             "hub_user:1",
         )
@@ -1202,11 +1722,8 @@ mod tests {
     async fn the_step_gate_returns_the_id_of_the_grant_that_authorised_the_recipient() {
         let db = db_with_schema().await;
         let grants = [
-            (GrantKind::Notify, "whatsapp".to_string()),
-            (
-                GrantKind::RecipientQuery,
-                "sales.sale.list#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#phone"),
         ];
         replace(&db, HUB, FLOW, &registry(), &grants, "hub_user:1")
             .await
@@ -1263,11 +1780,8 @@ mod tests {
         let db = db_with_schema().await;
         let reg = registry();
         let grants = [
-            (GrantKind::Notify, "whatsapp".to_string()),
-            (
-                GrantKind::RecipientQuery,
-                "sales.sale.list#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#phone"),
         ];
         replace(&db, HUB, FLOW, &reg, &grants, "hub_user:1")
             .await
@@ -1324,7 +1838,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Notify, "whatsapp".to_string())],
+            &[GrantSpec::pair(GrantKind::Notify, "whatsapp")],
             "hub_user:2",
         )
         .await
@@ -1356,10 +1870,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(
-                GrantKind::RecipientQuery,
-                "sales.sale.list#phone".to_string(),
-            )],
+            &[GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#phone")],
             "hub_user:4",
         )
         .await
@@ -1384,7 +1895,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::Notify, value.into())],
+                &[GrantSpec::pair(GrantKind::Notify, value)],
                 "hub_user:1",
             )
             .await
@@ -1414,7 +1925,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::RecipientQuery, value.into())],
+                &[GrantSpec::pair(GrantKind::RecipientQuery, value)],
                 "hub_user:1",
             )
             .await
@@ -1438,7 +1949,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::RecipientQuery, "sales.sale.list#email".into())],
+            &[GrantSpec::pair(GrantKind::RecipientQuery, "sales.sale.list#email")],
             "hub_user:1",
         )
         .await
@@ -1457,10 +1968,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(
-                GrantKind::Http,
-                "https://api.example.com/v1/messages*".into(),
-            )],
+            &[GrantSpec::pair(GrantKind::Http, "https://api.example.com/v1/messages*")],
             "hub_user:1",
         )
         .await
@@ -1501,7 +2009,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Http, "https://api.example.com/v1/send*".into())],
+            &[GrantSpec::pair(GrantKind::Http, "https://api.example.com/v1/send*")],
             "hub_user:1",
         )
         .await
@@ -1570,7 +2078,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::Http, pattern.into())],
+                &[GrantSpec::pair(GrantKind::Http, pattern)],
                 "hub_user:1",
             )
             .await
@@ -1590,10 +2098,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(
-                GrantKind::Http,
-                "https://user:pass@api.example.com/v1*".into(),
-            )],
+            &[GrantSpec::pair(GrantKind::Http, "https://user:pass@api.example.com/v1*")],
             "hub_user:1",
         )
         .await
@@ -1613,7 +2118,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::Http, ok.into())],
+                &[GrantSpec::pair(GrantKind::Http, ok)],
                 "hub_user:1",
             )
             .await
@@ -1637,7 +2142,7 @@ mod tests {
                 HUB,
                 FLOW,
                 &registry(),
-                &[(GrantKind::Http, pattern.into())],
+                &[GrantSpec::pair(GrantKind::Http, pattern)],
                 "hub_user:1",
             )
             .await
@@ -1663,7 +2168,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Query, "sales.sale.list".into())],
+            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
             "hub_user:1",
         )
         .await
@@ -1679,7 +2184,7 @@ mod tests {
             "a sibling query is a different question with the same default answer: no"
         );
         // And granting a READ never opens a WRITE, whatever they share.
-        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create")
+        assert!(check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
             .await
             .is_err());
     }
@@ -1692,7 +2197,7 @@ mod tests {
             HUB,
             FLOW,
             &registry(),
-            &[(GrantKind::Query, "ghost.query".into())],
+            &[GrantSpec::pair(GrantKind::Query, "ghost.query")],
             "hub_user:1",
         )
         .await
@@ -1712,7 +2217,7 @@ mod tests {
             HUB,
             FLOW,
             &reg,
-            &[(GrantKind::Query, "sales.sale.list".into())],
+            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
             "hub_user:1",
         )
         .await
@@ -1731,8 +2236,8 @@ mod tests {
             FLOW,
             &reg,
             &[
-                (GrantKind::Command, "sales.sale.create".into()),
-                (GrantKind::Command, "sales.sale.void".into()),
+                GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+                GrantSpec::pair(GrantKind::Command, "sales.sale.void"),
             ],
             "hub_user:1",
         )
@@ -1769,7 +2274,7 @@ mod tests {
             hub,
             flow,
             &registry(),
-            &[(GrantKind::Command, "sales.sale.create".to_string())],
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.create")],
             "hub_user:1",
         )
         .await

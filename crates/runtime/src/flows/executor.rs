@@ -1430,7 +1430,7 @@ pub async fn start_manual_run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flows::grants::GrantKind;
+    use crate::flows::grants::{GrantKind, GrantSpec};
     use crate::flows::store::NewFlow;
     use crate::flows::test_support;
     use crate::registry::ModuleStatus;
@@ -1498,7 +1498,7 @@ mod tests {
             HUB,
             flow_id,
             &registry(),
-            &[(GrantKind::Command, command.to_string())],
+            &[GrantSpec::pair(GrantKind::Command, command.to_string())],
             "hub_user:1",
         )
         .await
@@ -1528,7 +1528,7 @@ mod tests {
             HUB,
             flow_id,
             &registry(),
-            &[(GrantKind::Http, pattern.to_string())],
+            &[GrantSpec::pair(GrantKind::Http, pattern.to_string())],
             "hub_user:1",
         )
         .await
@@ -1703,8 +1703,8 @@ mod tests {
             &flow_id,
             &registry(),
             &[
-                (GrantKind::Command, "notes.note.add".to_string()),
-                (GrantKind::Query, "notes.note.find".to_string()),
+                GrantSpec::pair(GrantKind::Command, "notes.note.add"),
+                GrantSpec::pair(GrantKind::Query, "notes.note.find"),
             ],
             "hub_user:1",
         )
@@ -1797,8 +1797,8 @@ mod tests {
             &flow_id,
             &registry(),
             &[
-                (GrantKind::Command, "notes.note.add".to_string()),
-                (GrantKind::Query, "notes.note.find".to_string()),
+                GrantSpec::pair(GrantKind::Command, "notes.note.add"),
+                GrantSpec::pair(GrantKind::Query, "notes.note.find"),
             ],
             "hub_user:1",
         )
@@ -2016,7 +2016,7 @@ mod tests {
             HUB,
             &flow_id,
             &reg,
-            &[(GrantKind::Command, "notes.audited.add".into())],
+            &[GrantSpec::pair(GrantKind::Command, "notes.audited.add")],
             "hub_user:1",
         )
         .await
@@ -2131,8 +2131,8 @@ mod tests {
             &flow_id,
             &registry(),
             &[
-                (GrantKind::Http, "https://api.example.com/v1/*".into()),
-                (GrantKind::Command, "notes.note.add".into()),
+                GrantSpec::pair(GrantKind::Http, "https://api.example.com/v1/*"),
+                GrantSpec::pair(GrantKind::Command, "notes.note.add"),
             ],
             "hub_user:1",
         )
@@ -2179,8 +2179,8 @@ mod tests {
             &flow_id,
             &registry(),
             &[
-                (GrantKind::Http, "https://api.example.com/v1/*".into()),
-                (GrantKind::Command, "notes.note.add".into()),
+                GrantSpec::pair(GrantKind::Http, "https://api.example.com/v1/*"),
+                GrantSpec::pair(GrantKind::Command, "notes.note.add"),
             ],
             "hub_user:1",
         )
@@ -2417,7 +2417,7 @@ mod tests {
             OTHER,
             &their_flow,
             &reg,
-            &[(GrantKind::Command, "notes.note.add".to_string())],
+            &[GrantSpec::pair(GrantKind::Command, "notes.note.add")],
             "hub_user:9",
         )
         .await

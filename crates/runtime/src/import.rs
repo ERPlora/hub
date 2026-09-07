@@ -385,7 +385,7 @@ async fn apply_flows(
     target_hub_id: &str,
     same_hub: bool,
 ) -> (SectionStatus, u32) {
-    use crate::flows::grants::GrantKind;
+    use crate::flows::grants::{GrantKind, GrantSpec};
 
     let db = rt.db();
     let registry = rt.registry();
@@ -454,14 +454,28 @@ async fn apply_flows(
                     authority_complete = false;
                     continue;
                 };
-                let mut candidate: Vec<(GrantKind, String)> =
+                // hub#1623 — the live grants are offered back WITH their pins. Rebuilding them as
+                // bare pairs would make every extra pair of the bundle re-grant the previous ones
+                // unpinned, so restoring a backup would quietly widen the very permissions it is
+                // supposed to put back exactly as they were.
+                let mut candidate: Vec<GrantSpec> =
                     crate::flows::grants::list(db, target_hub_id, &flow.id)
                         .await
                         .unwrap_or_default()
                         .into_iter()
-                        .filter_map(|g| GrantKind::parse(&g.kind).map(|k| (k, g.value)))
+                        .filter_map(|g| {
+                            GrantKind::parse(&g.kind).map(|kind| GrantSpec {
+                                kind,
+                                payload: g.payload.as_object().cloned().unwrap_or_default(),
+                                value: g.value,
+                            })
+                        })
                         .collect();
-                candidate.push((kind, wanted.value.clone()));
+                candidate.push(GrantSpec {
+                    kind,
+                    value: wanted.value.clone(),
+                    payload: wanted.payload.clone(),
+                });
                 match crate::flows::grants::replace(
                     db,
                     target_hub_id,

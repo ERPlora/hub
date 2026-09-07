@@ -150,7 +150,7 @@
         },
         "command": {
           "type": "string",
-          "description": "Solo `kind: command` — nombre del command. Debe tener un grant vivo (`_flow_grants`) en el momento de ejecutarse; los commands internos (`_`/`internal:true`) están prohibidos, igual que para un caller externo."
+          "description": "Solo `kind: command` — nombre del command. Debe tener un grant vivo (`_flow_grants`) en el momento de ejecutarse; los commands internos (`_`/`internal:true`) están prohibidos, igual que para un caller externo. Desde hub#1623 el grant puede además FIJAR campos del payload (`payload` del grant): si el paso manda un valor distinto —o se deja el campo fuera— el run termina en `flow.grant_payload_denied` sin escribir nada. Es la contención que necesita un `params` redactado por un paso `ai`, porque ahí los argumentos los elige un modelo leyendo un mensaje de fuera."
         },
         "params": {
           "$ref": "#/$defs/mapping",

@@ -394,8 +394,17 @@ pub(crate) async fn execute_at(
                 ),
             });
         };
-        crate::flows::grants::check_command_grant(db, &ctx.hub_id, &automation.flow_id, name)
-            .await?;
+        // hub#1623 — the payload goes in with the name. A grant may FIX part of it («may cancel
+        // appointments as the customer»), and this is the door where that is applied: before the
+        // schema work, before the handler and before the outbox, so a refusal leaves ZERO writes.
+        crate::flows::grants::check_command_grant(
+            db,
+            &ctx.hub_id,
+            &automation.flow_id,
+            name,
+            payload,
+        )
+        .await?;
         ctx
     } else {
         match permissions::check_command(registry, ctx, &cmd.def.permission) {

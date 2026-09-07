@@ -249,7 +249,7 @@ fn as_text(value: &Json) -> String {
 mod tests {
     use super::*;
     use crate::flows::def::FlowDefinition;
-    use crate::flows::grants::GrantKind;
+    use crate::flows::grants::{GrantKind, GrantSpec};
     use crate::flows::test_support;
     use crate::registry::ModuleStatus;
     use erplora_db::testutil::fresh_db;
@@ -306,20 +306,17 @@ mod tests {
         .unwrap();
     }
 
-    async fn allow(db: &dyn DatabaseAdapter, wanted: &[(GrantKind, String)]) -> Authority {
+    async fn allow(db: &dyn DatabaseAdapter, wanted: &[GrantSpec]) -> Authority {
         grants::replace(db, HUB, FLOW, &registry(), wanted, "hub_user:1")
             .await
             .unwrap();
         grants::authority(db, HUB, FLOW).await.unwrap()
     }
 
-    fn both(query: &str, field: &str, channel: &str) -> Vec<(GrantKind, String)> {
+    fn both(query: &str, field: &str, channel: &str) -> Vec<GrantSpec> {
         vec![
-            (GrantKind::Notify, channel.to_string()),
-            (
-                GrantKind::RecipientQuery,
-                grants::recipient_value(query, field),
-            ),
+            GrantSpec::pair(GrantKind::Notify, channel.to_string()),
+            GrantSpec::pair(GrantKind::RecipientQuery, grants::recipient_value(query, field)),
         ]
     }
 
@@ -448,17 +445,14 @@ mod tests {
         assert!(prepare_step(&db, &step, &none).await.is_err());
 
         // The channel but not the recipient…
-        let only_channel = allow(&db, &[(GrantKind::Notify, "whatsapp".into())]).await;
+        let only_channel = allow(&db, &[GrantSpec::pair(GrantKind::Notify, "whatsapp")]).await;
         let err = prepare_step(&db, &step, &only_channel).await.unwrap_err();
         assert!(format!("{err}").contains("recipient_query"), "{err}");
 
         // …and the recipient but not the channel.
         let only_recipient = allow(
             &db,
-            &[(
-                GrantKind::RecipientQuery,
-                "crm.customer.get#phone".to_string(),
-            )],
+            &[GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone")],
         )
         .await;
         let err = prepare_step(&db, &step, &only_recipient).await.unwrap_err();

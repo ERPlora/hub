@@ -32,7 +32,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::host_notify::MockTransport;
 use erplora_runtime::{RequestContext, Runtime};
@@ -108,19 +108,16 @@ async fn create_flow(rt: &Runtime, definition: Value) -> String {
     .id
 }
 
-async fn set_grants(rt: &Runtime, flow_id: &str, wanted: &[(GrantKind, String)]) {
+async fn set_grants(rt: &Runtime, flow_id: &str, wanted: &[GrantSpec]) {
     rt.replace_flow_grants(flow_id, wanted, "hub_user:owner")
         .await
         .unwrap();
 }
 
-fn both_grants() -> Vec<(GrantKind, String)> {
+fn both_grants() -> Vec<GrantSpec> {
     vec![
-        (GrantKind::Notify, "whatsapp".to_string()),
-        (
-            GrantKind::RecipientQuery,
-            "crm.customer.get#phone".to_string(),
-        ),
+        GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+        GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone"),
     ]
 }
 
@@ -166,7 +163,7 @@ async fn without_the_recipient_grant_nothing_is_sent_and_with_it_exactly_one_mes
     let (rt, transport) = runtime().await;
     let flow_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
     // The channel, but not whose address: the two questions are two grants.
-    set_grants(&rt, &flow_id, &[(GrantKind::Notify, "whatsapp".into())]).await;
+    set_grants(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Notify, "whatsapp")]).await;
 
     let run_id = run_flow(&rt, &flow_id).await;
 
@@ -213,17 +210,14 @@ async fn without_the_recipient_grant_nothing_is_sent_and_with_it_exactly_one_mes
 #[tokio::test]
 async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
     let (rt, transport) = runtime().await;
-    let phone_grant = (
-        GrantKind::RecipientQuery,
-        "crm.customer.get#phone".to_string(),
-    );
+    let phone_grant = GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone");
 
     // Another FIELD of the granted query: the customer's email is not their phone.
     let by_email = create_flow(&rt, reminder("email", "crm.customer.get", "email")).await;
     set_grants(
         &rt,
         &by_email,
-        &[(GrantKind::Notify, "email".into()), phone_grant.clone()],
+        &[GrantSpec::pair(GrantKind::Notify, "email"), phone_grant.clone()],
     )
     .await;
     let run_id = run_flow(&rt, &by_email).await;
@@ -241,11 +235,8 @@ async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
         &rt,
         &other_query,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.get#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone"),
         ],
     )
     .await;
@@ -284,7 +275,7 @@ async fn revoking_the_recipient_grant_cuts_a_message_that_is_already_queued() {
     assert!(transport.sent().is_empty(), "nothing has left yet");
 
     // The owner changes their mind while the relay has not run.
-    set_grants(&rt, &flow_id, &[(GrantKind::Notify, "whatsapp".into())]).await;
+    set_grants(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Notify, "whatsapp")]).await;
     rt.drain_outbox().await.unwrap();
 
     assert!(
@@ -321,10 +312,7 @@ async fn revoking_the_channel_grant_also_cuts_a_message_that_is_already_queued()
     set_grants(
         &rt,
         &flow_id,
-        &[(
-            GrantKind::RecipientQuery,
-            "crm.customer.get#phone".to_string(),
-        )],
+        &[GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone")],
     )
     .await;
     rt.drain_outbox().await.unwrap();
@@ -416,7 +404,7 @@ async fn a_module_cannot_borrow_a_flows_release_by_copying_it_into_its_payload()
     set_grants(
         &rt,
         &laundering,
-        &[(GrantKind::Command, "crm.reminder.send".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.reminder.send")],
     )
     .await;
     rt.start_flow_run(&laundering, &json!({}), "hub_user:owner")
@@ -511,11 +499,8 @@ async fn no_recipient_and_several_recipients_both_stop_the_step_instead_of_guess
         &rt,
         &many,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.list#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.list#phone"),
         ],
     )
     .await;
@@ -549,11 +534,8 @@ async fn a_field_that_does_not_look_like_a_phone_is_refused_before_anything_is_q
         &rt,
         &flow_id,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.get#email".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#email"),
         ],
     )
     .await;

@@ -175,6 +175,8 @@ mod tests {
             grants::ERR_INVALID_NOTIFY_GRANT,
             grants::ERR_INVALID_RECIPIENT_GRANT,
             grants::ERR_INTERNAL_COMMAND,
+            grants::ERR_GRANT_PAYLOAD_DENIED,
+            grants::ERR_INVALID_GRANT_PAYLOAD,
             notify::ERR_RECIPIENT_NOT_FOUND,
             notify::ERR_RECIPIENT_AMBIGUOUS,
             notify::ERR_RECIPIENT_INVALID,

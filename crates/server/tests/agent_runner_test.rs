@@ -34,7 +34,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response as AxumResponse;
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{approvals, store, NewFlow};
 use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Runtime;
@@ -216,7 +216,7 @@ async fn hub(
     cloud_base_url: String,
     tag: &str,
     step: Value,
-    grants: &[(GrantKind, String)],
+    grants: &[GrantSpec],
 ) -> Hub {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
@@ -387,8 +387,8 @@ async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person(
         "star",
         agent_step("manual"),
         &[
-            (GrantKind::Query, "agenda.slots.list".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -483,8 +483,8 @@ async fn a_question_the_automation_asks_is_answered_in_the_turn_and_only_the_wri
         "asks",
         agent_step_that_asks_before_it_writes("manual"),
         &[
-            (GrantKind::Command, "agenda.availability.check".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Command, "agenda.availability.check"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -556,7 +556,7 @@ async fn approving_from_the_tray_books_the_appointment_without_asking_the_model_
         cloud.serve().await,
         "approve",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -628,7 +628,7 @@ async fn rejecting_from_the_tray_books_nothing() {
         cloud.serve().await,
         "reject",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -687,7 +687,7 @@ async fn hub1622_a_refusal_the_document_lets_through_carries_the_run_on_with_its
         cloud.serve().await,
         "reject-continue",
         step,
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -754,7 +754,7 @@ async fn under_policy_auto_the_command_runs_in_the_turn() {
         cloud.serve().await,
         "auto",
         agent_step("auto"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -788,7 +788,7 @@ async fn a_command_without_a_grant_is_refused_even_under_policy_auto() {
             // The document DECLARES the tool; the grant is what is missing.
             "tools": { "commands": ["agenda.booking.cancel"] }
         }),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -825,9 +825,9 @@ async fn the_model_is_offered_the_intersection_of_the_registry_the_step_and_the_
             "tools": { "queries": ["agenda.slots.list"] }
         }),
         &[
-            (GrantKind::Query, "agenda.slots.list".into()),
-            (GrantKind::Query, "agenda.bookings.list".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Query, "agenda.bookings.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -871,7 +871,7 @@ async fn a_tool_call_split_across_tcp_chunks_is_reassembled_not_lost() {
         cloud.serve().await,
         "chunked",
         agent_step("auto"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -904,7 +904,7 @@ async fn max_iters_stops_a_runaway_loop_and_fails_the_step() {
             "max_iters": 3,
             "tools": { "queries": ["agenda.slots.list"] }
         }),
-        &[(GrantKind::Query, "agenda.slots.list".into())],
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -968,7 +968,7 @@ async fn an_invalid_proposal_never_reaches_the_tray_and_the_model_corrects_it_in
             cloud.serve().await,
             "invalid-proposal",
             agent_step("manual"),
-            &[(GrantKind::Command, "agenda.booking.create".into())],
+            &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
         )
         .await;
         let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -1035,7 +1035,7 @@ async fn a_model_that_never_gets_the_payload_right_ends_in_words_not_in_the_tray
         cloud.serve().await,
         "gives-up",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -1078,7 +1078,7 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
         cloud.serve().await,
         "schema-moved",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -1166,7 +1166,7 @@ async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
         cloud.serve().await,
         "door",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
 
