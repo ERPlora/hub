@@ -348,6 +348,277 @@ async fn a_published_manifest_without_a_compatibility_block_installs_clean() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+/// What a catalogue sweep does when `Manifest::load` refuses a module the fleet already ships
+/// (hub#1619).
+#[derive(Debug, PartialEq, Eq)]
+enum LoadFailure {
+    /// Red. Either the manifest is broken, or it declares a floor no hub in existence satisfies.
+    Fatal(String),
+    /// Say it out loud and keep sweeping: the refusal is this BUILD's fault, not the manifest's.
+    Tolerated(String),
+}
+
+/// Decides which of the two a refusal is.
+///
+/// 🔴 The distinction hub#1619 is about. Until now any error at all was a `panic!`, and the most
+/// likely error stopped being "this manifest is broken": a hub compiled from source reported the
+/// `[workspace.package]` placeholder, which is below every hub that exists, so it refused ANY
+/// module declaring `compatibility.min_erplora_version` and the sweep read the refusal as a broken
+/// catalogue. The cost landed on the whole fleet — the first module to declare its floor would put
+/// `local-gate` and `test-hub-modules` red for everybody — so the rational move was to never
+/// declare one, and 0 of 27 published modules did.
+///
+/// What decides it is [`erplora_runtime::CORE_VERSION_CORROBORATED`]: whether a `v*` tag backed
+/// this build's own number up. A build that KNOWS its version and still refuses the module is
+/// reporting a real defect (a floor above the newest release is a module asking for a hub nobody
+/// can install — the ADR-0269 guard, kept whole). A build that does NOT know its version is in no
+/// position to call anybody else wrong. In CI that ignorance is itself the bug and goes red
+/// naming its cause, because a job that cannot see the tags silently stops checking the floor.
+fn load_failure(
+    module: &str,
+    error: &erplora_runtime::RuntimeError,
+    corroborated: bool,
+    in_ci: bool,
+) -> LoadFailure {
+    let erplora_runtime::RuntimeError::CoreVersionTooOld { required, core, .. } = error else {
+        return LoadFailure::Fatal(format!(
+            "`{module}` is PUBLISHED and must keep loading: {error}"
+        ));
+    };
+    if corroborated {
+        return LoadFailure::Fatal(format!(
+            "`{module}` declares a core floor of {required} and this hub is {core}, which is the \
+             newest release that exists: no hub could install it. Lower the floor, or cut the \
+             release before declaring it (ADR-0269)."
+        ));
+    }
+    if in_ci {
+        return LoadFailure::Fatal(format!(
+            "this job does not know its own version — it reports {core} and no `v*` tag \
+             corroborates it — so it cannot judge the floor of {required} that `{module}` \
+             declares. The checkout is missing `fetch-depth: 0` (hub#1619)."
+        ));
+    }
+    LoadFailure::Tolerated(format!(
+        "⏭  `{module}` requires ERPlora {required} and this build reports {core}, which no `v*` \
+         tag corroborates (a shallow clone, a tarball, no git): SKIPPED rather than called wrong \
+         — run `git fetch --tags` to check it for real (hub#1619)."
+    ))
+}
+
+/// Reads `CI` the way every runner sets it: present and not empty.
+fn in_ci() -> bool {
+    std::env::var("CI").is_ok_and(|value| !value.trim().is_empty())
+}
+
+#[cfg(test)]
+mod load_failure_tests {
+    use super::*;
+    use erplora_runtime::RuntimeError;
+
+    fn too_old(module: &str, required: &str, core: &str) -> RuntimeError {
+        RuntimeError::CoreVersionTooOld {
+            module: module.to_string(),
+            required: required.to_string(),
+            core: core.to_string(),
+        }
+    }
+
+    /// 🔴 hub#1619, the case that blocked `whatsapp_inbox#78`: a developer's build that cannot see
+    /// a tag must not turn "I do not know my version" into "your module is broken".
+    #[test]
+    fn an_uncorroborated_build_does_not_call_a_declared_floor_wrong_hub1619() {
+        let verdict = load_failure(
+            "whatsapp_inbox",
+            &too_old("whatsapp_inbox", "1.1.15", "1.0.0"),
+            false,
+            false,
+        );
+        let LoadFailure::Tolerated(message) = verdict else {
+            panic!(
+                "a build that does not know its own version must not fail the sweep: {verdict:?}"
+            )
+        };
+        assert!(message.contains("whatsapp_inbox"), "{message}");
+        assert!(message.contains("1.1.15"), "{message}");
+    }
+
+    /// The other half, and the reason this is not just "ignore the error": a build that DOES know
+    /// its version is the newest release and still refuses the module has found a real defect —
+    /// a module asking for a hub that nobody can install (ADR-0269). That stays red.
+    #[test]
+    fn a_corroborated_build_still_refuses_a_floor_above_every_release_hub1619() {
+        let verdict = load_failure(
+            "whatsapp_inbox",
+            &too_old("whatsapp_inbox", "9.9.9", "1.1.15"),
+            true,
+            false,
+        );
+        let LoadFailure::Fatal(message) = verdict else {
+            panic!("a floor above the newest release must stay red: {verdict:?}")
+        };
+        assert!(message.contains("whatsapp_inbox"), "{message}");
+        assert!(message.contains("9.9.9"), "{message}");
+    }
+
+    /// In CI a build that cannot see the tags is not a tolerable state: it would silently stop
+    /// checking every floor in the catalogue. It goes red naming what to fix.
+    #[test]
+    fn in_ci_a_build_that_cannot_see_its_tags_is_itself_the_defect_hub1619() {
+        let verdict = load_failure(
+            "whatsapp_inbox",
+            &too_old("whatsapp_inbox", "1.1.15", "1.0.0"),
+            false,
+            true,
+        );
+        let LoadFailure::Fatal(message) = verdict else {
+            panic!("CI must not silently skip the floor check: {verdict:?}")
+        };
+        assert!(message.contains("fetch-depth"), "{message}");
+    }
+
+    /// Everything that is NOT the version comparison keeps the behaviour this sweep was written
+    /// for: a manifest the contract refuses is red, whatever this build thinks it is called.
+    #[test]
+    fn any_other_refusal_is_still_fatal_hub1619() {
+        let unreadable = RuntimeError::ManifestCoreFloorUnreadable {
+            module: "whatsapp_inbox".to_string(),
+            declared: "next".to_string(),
+        };
+        for corroborated in [true, false] {
+            for ci in [true, false] {
+                let verdict = load_failure("whatsapp_inbox", &unreadable, corroborated, ci);
+                let LoadFailure::Fatal(message) = verdict else {
+                    panic!("a manifest the contract refuses is always red: {verdict:?}")
+                };
+                assert!(message.contains("must keep loading"), "{message}");
+            }
+        }
+    }
+}
+
+/// 🔴 hub#1619 — the regression guard: this build knows its own version, so the sweeps below can
+/// be trusted when they judge a module's declared floor.
+///
+/// This is the test that was failing on 2026-09-07 and the reason the whole change exists.
+/// `CORE_VERSION` was `env!("CARGO_PKG_VERSION")`, i.e. the `[workspace.package]` placeholder
+/// `1.0.0` that only the release CI rewrites, while the newest release was `v1.1.15`. A hub
+/// compiled from source therefore refused every module declaring
+/// `compatibility.min_erplora_version` — and the sweeps read that as a broken catalogue, so the
+/// first module to declare its floor (`whatsapp_inbox`, wi#78) would have put `local-gate` and
+/// `test-hub-modules` red for the entire fleet.
+///
+/// The floor asserted here is the newest `v*` tag the repository HOLDS, not what `git describe`
+/// answers: `main` is an orphan branch (releases are promoted with `commit-tree`), so from
+/// `develop` describe reports `v1.1.7` — eight releases stale. What corroborates a version is the
+/// tag existing, not it being an ancestor.
+#[test]
+fn this_build_knows_at_least_the_newest_release_it_can_see_hub1619() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    // Bound and not read inline: `assert!` on a `const` path is `clippy::assertions_on_constants`,
+    // and a new warning in the gate's log is a warning somebody learns to scroll past.
+    let corroborated = erplora_runtime::CORE_VERSION_CORROBORATED;
+    let Ok(output) = std::process::Command::new("git")
+        .args(["-C", repo, "tag", "--list", "v*"])
+        .output()
+    else {
+        println!("⏭  no git here, nothing to compare this build's version against");
+        return;
+    };
+    let tags =
+        erplora_runtime::core_version::tags_from_output(&String::from_utf8_lossy(&output.stdout));
+    let newest = tags
+        .iter()
+        .filter_map(|tag| {
+            Some((
+                erplora_runtime::core_version::version_triple(tag.trim_start_matches('v'))?,
+                tag,
+            ))
+        })
+        .max_by(|a, b| a.0.cmp(&b.0));
+    // A shallow clone or a tarball has no tags: there is nothing to compare against, and the
+    // sweeps already handle that state through `CORE_VERSION_CORROBORATED` (see `load_failure`).
+    let Some((newest_triple, newest_tag)) = newest else {
+        assert!(
+            !corroborated,
+            "no `v*` tag in {repo} and yet this build claims its version {} is corroborated",
+            erplora_runtime::CORE_VERSION
+        );
+        println!("⏭  no `v*` tag in this checkout — run `git fetch --tags` to check this for real");
+        return;
+    };
+
+    let core = erplora_runtime::core_version::version_triple(erplora_runtime::CORE_VERSION)
+        .unwrap_or_else(|| {
+            panic!(
+                "this hub reports `{}`, which is not a version anything can compare",
+                erplora_runtime::CORE_VERSION
+            )
+        });
+    assert!(
+        core >= newest_triple,
+        "this build says it is ERPlora {} and the newest release it can see is {newest_tag}: it \
+         would refuse every module declaring a floor up to that release, and the catalogue sweeps \
+         would read the refusal as a broken manifest (hub#1619)",
+        erplora_runtime::CORE_VERSION
+    );
+    assert!(
+        corroborated,
+        "a build that can see {newest_tag} must not report its version as uncorroborated"
+    );
+}
+
+/// 🔴 The sweeps below must still go RED on a manifest that is broken for real (hub#1619).
+///
+/// `load_failure` decides and is tested on its own, but the WIRING — `Fatal` ends in `panic!` —
+/// is two lines no test touched: with them swapped for a `println!` + `continue` this whole file
+/// stayed green (17/17, measured in review), because the `loaded >= 20` floor is satisfied by the
+/// other 26 modules of the real catalogue. So this runs the sweep in a child process against a
+/// catalogue of that shape — twenty manifests that load and one that cannot be parsed — and
+/// demands the failure, naming the module.
+#[test]
+fn the_catalogue_sweep_still_goes_red_on_a_broken_manifest_hub1619() {
+    let root = std::env::temp_dir().join(format!("erplora-sweep-guard-{}", uuid::Uuid::new_v4()));
+    for n in 1..=20 {
+        let dir = root.join(format!("m{n:02}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("module.json"),
+            format!(r#"{{"id":"m{n:02}","name":"M{n}","version":"1.0.0"}}"#),
+        )
+        .unwrap();
+    }
+    std::fs::create_dir_all(root.join("broken")).unwrap();
+    std::fs::write(root.join("broken").join("module.json"), "{").unwrap();
+
+    let exe = std::env::current_exe().expect("this test binary knows its own path");
+    let output = std::process::Command::new(exe)
+        .args([
+            "--exact",
+            "no_published_manifest_is_refused_by_the_contract",
+            "--nocapture",
+        ])
+        .env("ERPLORA_MODULES_DIR", &root)
+        .env("ERPLORA_E2E_REQUIRE_MODULES", "1")
+        .output()
+        .expect("the sweep runs as a child process");
+    std::fs::remove_dir_all(&root).unwrap();
+
+    let printed = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output.status.success(),
+        "a catalogue with an unparseable manifest must fail the sweep, and it passed:\n{printed}"
+    );
+    assert!(
+        printed.contains("`broken` is PUBLISHED and must keep loading"),
+        "the failure must name the module and the refusal:\n{printed}"
+    );
+}
+
 /// 🔴 The guard on the whole feature: **no module the fleet already runs may be refused by it.**
 ///
 /// A refusal at `Manifest::load` is not only "this install fails" — the boot scan re-registers
@@ -367,9 +638,26 @@ fn no_published_manifest_is_refused_by_the_contract() {
     let mut loaded = 0;
     // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
     // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    let mut skipped = 0;
     for (module, dir) in erplora_runtime::published_module_dirs() {
-        let manifest = erplora_runtime::Manifest::load(&dir)
-            .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
+        let manifest = match erplora_runtime::Manifest::load(&dir) {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                match load_failure(
+                    &module,
+                    &error,
+                    erplora_runtime::CORE_VERSION_CORROBORATED,
+                    in_ci(),
+                ) {
+                    LoadFailure::Fatal(message) => panic!("{message}"),
+                    LoadFailure::Tolerated(message) => {
+                        println!("{message}");
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+        };
         for warning in &manifest.warnings {
             println!("⚠  {module}: `{}` — {}", warning.path, warning.detail);
         }
@@ -377,7 +665,8 @@ fn no_published_manifest_is_refused_by_the_contract() {
     }
     assert!(
         loaded >= 20,
-        "expected the published catalogue (~24 modules), only {loaded} loaded from {}",
+        "expected the published catalogue (~24 modules), only {loaded} loaded from {} \
+         ({skipped} skipped by a build that cannot corroborate its own version — hub#1619)",
         root.display()
     );
 }
@@ -404,9 +693,26 @@ fn no_published_manifest_hides_an_event_it_emits() {
     let mut loaded = 0;
     // `published_module_dirs` and not `read_dir`: the fleet keeps its worktrees inside
     // `modules-workspace/modules` and each one carries a copy of its module's manifest (hub#1448).
+    let mut skipped = 0;
     for (module, dir) in erplora_runtime::published_module_dirs() {
-        let manifest = erplora_runtime::Manifest::load(&dir)
-            .unwrap_or_else(|e| panic!("`{module}` is PUBLISHED and must keep loading: {e}"));
+        let manifest = match erplora_runtime::Manifest::load(&dir) {
+            Ok(manifest) => manifest,
+            Err(error) => {
+                match load_failure(
+                    &module,
+                    &error,
+                    erplora_runtime::CORE_VERSION_CORROBORATED,
+                    in_ci(),
+                ) {
+                    LoadFailure::Fatal(message) => panic!("{message}"),
+                    LoadFailure::Tolerated(message) => {
+                        println!("{message}");
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            }
+        };
         for warning in &manifest.warnings {
             if warning.path == "events.emits" {
                 holes.push(format!("  {module}: {}", warning.detail));
@@ -416,7 +722,8 @@ fn no_published_manifest_hides_an_event_it_emits() {
     }
     assert!(
         loaded >= 20,
-        "expected the published catalogue (~24 modules), only {loaded} loaded from {}",
+        "expected the published catalogue (~24 modules), only {loaded} loaded from {} \
+         ({skipped} skipped by a build that cannot corroborate its own version — hub#1619)",
         root.display()
     );
     assert!(

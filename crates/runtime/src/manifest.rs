@@ -457,14 +457,29 @@ pub struct ManifestWarning {
     pub detail: String,
 }
 
-/// The version of the core this binary IS (`1.0.0`), the number a manifest's
+/// The version of the core this binary IS, the number a manifest's
 /// `compatibility.min_erplora_version` is compared against (hub#521).
 ///
 /// Same source as everything else that reports it: `[workspace.package] version`, which the release
 /// CI rewrites from the `v*` tag (ADR-0280 — the tag is what decides). `crates/server` re-exports
 /// this as `HUB_VERSION` rather than reading its own `CARGO_PKG_VERSION`, so the number the hub
 /// reports on the wire and the number it refuses a module with can never be two different things.
-pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
+///
+/// It goes through the build script ([`crate::core_version`]) instead of straight to
+/// `CARGO_PKG_VERSION` since hub#1619: a hub compiled from source used to answer `1.0.0` — the
+/// placeholder only the release CI rewrites — which is BELOW every hub that exists, so it refused
+/// any module declaring a floor and the catalogue sweeps read that refusal as a broken manifest.
+/// A published image is untouched by this: its version was stamped before the build and the
+/// script leaves a stamped number exactly as it found it.
+pub const CORE_VERSION: &str = env!("ERPLORA_CORE_VERSION");
+
+/// Whether a release tag backed [`CORE_VERSION`] up (hub#1619).
+///
+/// `false` = the build could not see a single `v*` tag (a shallow clone, a tarball, no git at
+/// all), so it does not know its own place in the fleet. Read by the catalogue sweeps: a build in
+/// that state must not be the thing that declares a module's floor wrong.
+pub const CORE_VERSION_CORROBORATED: bool =
+    env!("ERPLORA_CORE_VERSION_CORROBORATED").as_bytes()[0] == b'1';
 
 /// Bloque `fiscal_regime` del manifest (ADR-0273 D6): qué régimen fiscal, y de qué país, cumple
 /// este módulo. `{ "country": "ES", "regime": "verifactu" }`.
@@ -1821,18 +1836,12 @@ fn refuses_unknown_fields(path: &str) -> bool {
     )
 }
 
-/// Reads a version as a comparable triple. A pre-release/build suffix is dropped (`1.2.3-rc1`
-/// floors at `1.2.3`) and missing components read as zero (`2` = `2.0.0`): this compares a FLOOR,
-/// so being generous about the shape is right, while a fourth component or a non-numeric one is
-/// not a version anybody released and returns `None`.
-pub(crate) fn version_triple(value: &str) -> Option<(u64, u64, u64)> {
-    let core = value.trim().split(['-', '+']).next()?;
-    let mut parts = core.split('.');
-    let major = parts.next()?.parse().ok()?;
-    let minor = parts.next().unwrap_or("0").parse().ok()?;
-    let patch = parts.next().unwrap_or("0").parse().ok()?;
-    parts.next().is_none().then_some((major, minor, patch))
-}
+/// Reads a version as a comparable triple — see [`crate::core_version::version_triple`].
+///
+/// It moved next to the rule that DECIDES [`CORE_VERSION`] (hub#1619) because the build script
+/// needs the same arithmetic and a build script cannot call back into the crate. Re-exported here
+/// so every caller of the floor comparison keeps its path.
+pub(crate) use crate::core_version::version_triple;
 
 impl Manifest {
     /// Lee y parsea `<dir>/module.json`, y **audita lo que no entiende** (hub#521).
@@ -2643,6 +2652,8 @@ mod tests {
         // A pre-release floors at its release: `1.2.3-rc1` requires at least 1.2.3.
         assert_eq!(version_triple("1.2.3-rc1"), Some((1, 2, 3)));
         assert_eq!(version_triple("1.2.3+build.7"), Some((1, 2, 3)));
+        // And the shape a source build now reports (hub#1619).
+        assert_eq!(version_triple("1.1.15-source+g1c50d429"), Some((1, 1, 15)));
         // Ordering is numeric, not lexicographic — the trap `"10" < "9"` as text.
         assert!(version_triple("1.10.0") > version_triple("1.9.0"));
         // Not versions.

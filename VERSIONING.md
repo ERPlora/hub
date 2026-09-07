@@ -15,9 +15,16 @@ versión nueva. Tampoco se puede ofrecer «vuelve a la última `1.x`» ni compar
 - **`[workspace.package].version`** en `Cargo.toml` es la versión del hub. Todos los crates la
   heredan vía `version.workspace = true`, así que el número **que el CI estampa desde el tag** fluye
   a runtime, server, db, etc. (no lo escribe una persona — ver «Cómo sacar una release»).
-- El runtime la reporta con `env!("CARGO_PKG_VERSION")`: `/api/system` → `hubVersion`, y el
-  error-sink hacia el Cloud.
-- **En `main`** ese valor es la versión «en desarrollo» (la siguiente).
+- El runtime la reporta como `CORE_VERSION`, que decide el script de build del crate
+  (`crates/runtime/src/core_version.rs`): `/readyz`, `/api/hub/context`, el latido, el error-sink
+  hacia el Cloud y el bloque `SistemaInformatico` que va a la AEAT.
+- **En un build de fuente** (`cargo build`/`cargo test` en un checkout) ese valor **no** es el hueco
+  `1.0.0` del `[workspace.package]`: el script lo sustituye por `<tag v* más nuevo del repo>-source`
+  (hub#1619), para que satisfaga el suelo `compatibility.min_erplora_version` de un módulo sin
+  hacerse pasar por la release del mismo nombre. Los tags se leen con `git tag --list`, no con
+  `git describe`: `main` es huérfano y desde `develop` los tags de release no son alcanzables. Una
+  versión ya estampada (una release, o el sufijo del canal `:dev`) no se toca jamás; dentro de la
+  imagen publicada ni siquiera hay `.git`, así que ahí el script no puede cambiar nada.
 - **En una release** (tag `v*`), el CI de `build-hub.yml` **reescribe** ese valor desde el tag antes
   del build (paso *Stamp Cargo version from tag*), igual que `tauri-release.yml` hace con
   `tauri.conf.json`. Así la imagen publicada reporta `1.2.3`, no `0.1.0-en-desarrollo`.
