@@ -107,3 +107,115 @@ async fn uninstalling_the_module_takes_its_automations_with_it() {
         "al desinstalar el módulo, sus plantillas se van con él"
     );
 }
+
+/// Un módulo mínimo SIN plantillas, en la versión que se le pida — el vecino que un suelo nombra.
+fn plain_module(id: &str, version: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("erplora-flowtpl-plain-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        format!(r#"{{"id":"{id}","name":"{id}","version":"{version}"}}"#),
+    )
+    .unwrap();
+    dir
+}
+
+/// Como [`fixture_with_templates`], pero la familia declara un **suelo de versión por plantilla**
+/// en su `requires.json` — el caso real de `whatsapp_inbox`, que fija `appointments >= 1.1.69`
+/// para su plantilla mientras su `depends_on` es solo `["customers"]`.
+fn fixture_requiring(id: &str, module: &str, floor: &str) -> std::path::PathBuf {
+    let dir = fixture_with_templates(id);
+    std::fs::write(
+        dir.join("flows/appointment-from-whatsapp.requires.json"),
+        format!(r#"{{"modules":{{"{module}":"{floor}"}}}}"#),
+    )
+    .unwrap();
+    dir
+}
+
+#[tokio::test]
+async fn a_template_whose_required_module_is_missing_is_not_offered() {
+    // El suelo es POR PLANTILLA y a propósito no es el `depends_on` del módulo: la plantilla es
+    // opcional, así que el módulo se instala igual y lo único que no pasa es que se ofrezca una
+    // automatización que nombraría commands de un módulo que este hub no tiene.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-missing");
+    runtime.ensure_system_tables().await.unwrap();
+
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "1.1.69"))
+        .await
+        .unwrap();
+
+    assert!(
+        runtime.registry().flow_templates().is_empty(),
+        "sin `appointments` instalado, su plantilla no se ofrece"
+    );
+}
+
+#[tokio::test]
+async fn a_template_whose_required_module_is_too_old_is_not_offered() {
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-old");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.68"))
+        .await
+        .unwrap();
+
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "1.1.69"))
+        .await
+        .unwrap();
+
+    assert!(
+        runtime.registry().flow_templates().is_empty(),
+        "1.1.68 < 1.1.69: el suelo no se cumple y la plantilla no se ofrece"
+    );
+}
+
+#[tokio::test]
+async fn a_template_whose_floor_is_met_is_offered() {
+    // 🔴 El control POSITIVO del filtro. Sin él, un filtro que devolviera SIEMPRE vacío dejaría
+    // verdes los dos tests de arriba: es la diferencia entre «filtra» y «no ofrece nada nunca».
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-met");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.69"))
+        .await
+        .unwrap();
+
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "1.1.69"))
+        .await
+        .unwrap();
+
+    let offered = runtime.registry().flow_templates();
+    assert_eq!(offered.len(), 1, "cumplido el suelo, la plantilla se ofrece");
+    assert_eq!(offered[0].1.family, "appointment-from-whatsapp");
+}
+
+#[tokio::test]
+async fn a_floor_that_cannot_be_read_leaves_the_template_out() {
+    // `requires.json` es contenido de un zip de TERCEROS. Si el suelo no se lee como triple, la
+    // plantilla se queda fuera: ofrecer una automatización cuyo suelo no se ha podido comprobar es
+    // ofrecer una que al ejecutarse nombra commands que este hub quizá no tiene.
+    let db = fresh_db().await;
+    let mut runtime = Runtime::with_hub_id(Box::new(db), "hub-flow-tpl-floor-unreadable");
+    runtime.ensure_system_tables().await.unwrap();
+    runtime
+        .install_from_dir(&plain_module("appointments", "1.1.69"))
+        .await
+        .unwrap();
+
+    runtime
+        .install_from_dir(&fixture_requiring("whatsapp_inbox", "appointments", "latest"))
+        .await
+        .unwrap();
+
+    assert!(
+        runtime.registry().flow_templates().is_empty(),
+        "un suelo ilegible deja la plantilla fuera, no dentro"
+    );
+}

@@ -546,15 +546,46 @@ impl Registry {
     /// pantallas, y tampoco debe ofrecer automatizaciones que nombran commands que ahora mismo no
     /// se pueden ejecutar. El orden es estable (módulo, luego familia) para que la galería no baile
     /// entre dos peticiones.
+    ///
+    /// Y filtra por el **suelo de versión de cada plantilla** ([`Self::flow_template_floor_is_met`]):
+    /// una plantilla cuyo `requires.json` no se cumple no se ofrece, mientras el módulo que la trae
+    /// sigue funcionando igual.
     pub fn flow_templates(&self) -> Vec<(&str, &ModuleFlowTemplate)> {
         let mut out: Vec<(&str, &ModuleFlowTemplate)> = self
             .flow_templates
             .iter()
             .filter(|(module_id, _)| self.is_active(module_id))
             .flat_map(|(module_id, tpls)| tpls.iter().map(move |t| (module_id.as_str(), t)))
+            .filter(|(_, tpl)| self.flow_template_floor_is_met(tpl))
             .collect();
         out.sort_by(|a, b| (a.0, &a.1.family).cmp(&(b.0, &b.1.family)));
         out
+    }
+
+    /// ¿Se cumple el suelo de versión que declara esta plantilla? (hub#1611)
+    ///
+    /// El suelo es **por plantilla** y a propósito NO es el `depends_on` del módulo: `whatsapp_inbox`
+    /// fija `appointments >= 1.1.69` para su plantilla y su `depends_on` es solo `["customers"]`,
+    /// porque la plantilla es opcional y el módulo funciona sin ella. Por eso esto decide si se
+    /// OFRECE, y nunca si el módulo se instala.
+    ///
+    /// Un módulo que no está instalado vale `0.0.0` ([`Self::module_version`]), así que «no está»
+    /// y «está pero es viejo» son el mismo «no se ofrece» sin un caso aparte.
+    ///
+    /// 🔴 **Falla cerrado.** Una versión que no se lee como triple —la del hub o la que pide la
+    /// plantilla— deja la plantilla FUERA en vez de dentro: ofrecer una automatización cuyo suelo
+    /// no se ha podido comprobar es ofrecer una que al ejecutarse nombra commands que este hub
+    /// quizá no tiene, y el daño de no enseñarla es que el dueño no la ve.
+    fn flow_template_floor_is_met(&self, tpl: &ModuleFlowTemplate) -> bool {
+        tpl.requires.iter().all(|(module_id, floor)| {
+            match (
+                crate::core_version::version_triple(&self.module_version(module_id)),
+                crate::core_version::version_triple(floor),
+            ) {
+                (Some(installed), Some(needed)) => installed >= needed,
+                _ => false,
+            }
+        })
     }
 
     /// Catálogo del idioma pedido para un módulo, con fallback `locale → en` (ADR-0055).
