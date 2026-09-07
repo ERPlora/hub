@@ -39,7 +39,7 @@ mod tests {
     /// that survives the stamper cannot be one this rejects.
     ///
     /// The suffix is optional but REAL: the `:dev` channel stamps `1.1.7-dev.305+g1c50d429` and a
-    /// source build stamps `1.1.15-source+gd7d8d547` (hub#1619). What is refused is anything that
+    /// source build stamps `1.1.15-source` (hub#1619). What is refused is anything that
     /// is not three numbers up front — two components, four, a `v` prefix, a letter.
     fn is_a_version_number(value: &str) -> bool {
         let core = value.split(['-', '+']).next().unwrap_or_default();
@@ -87,7 +87,7 @@ mod tests {
         // A published release, and the two suffixed channels that exist.
         assert!(is_a_version_number("1.1.15"));
         assert!(is_a_version_number("1.1.7-dev.305+g1c50d429"));
-        assert!(is_a_version_number("1.1.15-source+gd7d8d547"));
+        assert!(is_a_version_number("1.1.15-source"));
         // Still not versions: the shape has to be three numbers before any suffix.
         assert!(!is_a_version_number("1.1"));
         assert!(!is_a_version_number("1.1.15.2"));

@@ -568,6 +568,57 @@ fn this_build_knows_at_least_the_newest_release_it_can_see_hub1619() {
     );
 }
 
+/// 🔴 The sweeps below must still go RED on a manifest that is broken for real (hub#1619).
+///
+/// `load_failure` decides and is tested on its own, but the WIRING — `Fatal` ends in `panic!` —
+/// is two lines no test touched: with them swapped for a `println!` + `continue` this whole file
+/// stayed green (17/17, measured in review), because the `loaded >= 20` floor is satisfied by the
+/// other 26 modules of the real catalogue. So this runs the sweep in a child process against a
+/// catalogue of that shape — twenty manifests that load and one that cannot be parsed — and
+/// demands the failure, naming the module.
+#[test]
+fn the_catalogue_sweep_still_goes_red_on_a_broken_manifest_hub1619() {
+    let root = std::env::temp_dir().join(format!("erplora-sweep-guard-{}", uuid::Uuid::new_v4()));
+    for n in 1..=20 {
+        let dir = root.join(format!("m{n:02}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("module.json"),
+            format!(r#"{{"id":"m{n:02}","name":"M{n}","version":"1.0.0"}}"#),
+        )
+        .unwrap();
+    }
+    std::fs::create_dir_all(root.join("broken")).unwrap();
+    std::fs::write(root.join("broken").join("module.json"), "{").unwrap();
+
+    let exe = std::env::current_exe().expect("this test binary knows its own path");
+    let output = std::process::Command::new(exe)
+        .args([
+            "--exact",
+            "no_published_manifest_is_refused_by_the_contract",
+            "--nocapture",
+        ])
+        .env("ERPLORA_MODULES_DIR", &root)
+        .env("ERPLORA_E2E_REQUIRE_MODULES", "1")
+        .output()
+        .expect("the sweep runs as a child process");
+    std::fs::remove_dir_all(&root).unwrap();
+
+    let printed = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !output.status.success(),
+        "a catalogue with an unparseable manifest must fail the sweep, and it passed:\n{printed}"
+    );
+    assert!(
+        printed.contains("`broken` is PUBLISHED and must keep loading"),
+        "the failure must name the module and the refusal:\n{printed}"
+    );
+}
+
 /// 🔴 The guard on the whole feature: **no module the fleet already runs may be refused by it.**
 ///
 /// A refusal at `Manifest::load` is not only "this install fails" — the boot scan re-registers

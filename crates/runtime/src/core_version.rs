@@ -69,7 +69,12 @@ pub struct CoreVersion {
 /// a release that exists. That one is the placeholder, and it is replaced by the newest release
 /// plus a `-source` marker, so the number satisfies a declared floor without ever passing itself
 /// off as the published release of the same name.
-pub fn decide(package_version: &str, tags: &[String], head_sha: Option<&str>) -> CoreVersion {
+///
+/// No commit sha in the marker, on purpose: the stamp is baked in with `env!`, so anything in it
+/// that moves with HEAD would recompile this crate — and everything downstream of it — on every
+/// commit of every worktree of the fleet, and nothing consumes the sha (`git rev-parse HEAD` is
+/// right there for whoever wants it).
+pub fn decide(package_version: &str, tags: &[String]) -> CoreVersion {
     // `version_triple` refuses a leading `v` on purpose (it reads a module's declared floor, and
     // `v1.2.3` is not what anybody declares there); a git tag always carries one.
     let newest = tags
@@ -98,13 +103,8 @@ pub fn decide(package_version: &str, tags: &[String], head_sha: Option<&str>) ->
         };
     }
 
-    let base = newest_tag.trim_start_matches('v');
-    let version = match head_sha {
-        Some(sha) if !sha.is_empty() => format!("{base}-source+g{sha}"),
-        _ => format!("{base}-source"),
-    };
     CoreVersion {
-        version,
+        version: format!("{}-source", newest_tag.trim_start_matches('v')),
         corroborated: true,
     }
 }
@@ -117,6 +117,34 @@ pub fn tags_from_output(output: &str) -> Vec<String> {
         .filter(|line| !line.is_empty())
         .map(str::to_string)
         .collect()
+}
+
+/// The git files whose change can change the answer — and ONLY the ones that exist.
+///
+/// 🔴 A `cargo:rerun-if-changed` on a path that does not exist makes cargo treat this build script
+/// as stale on EVERY invocation, and a stale build script recompiles this crate and everything
+/// downstream of it each time. Measured on a worktree during the hub#1619 review:
+/// `<git-dir>/packed-refs` never exists there (only the common dir has one), and an unchanged
+/// `cargo test` recompiled `erplora-runtime` every single time.
+///
+/// `HEAD` is deliberately not among them: the stamp does not depend on it.
+pub fn watched_git_inputs(git_dirs: &[String]) -> Vec<String> {
+    let mut watched = Vec::new();
+    let mut seen: Vec<&String> = Vec::new();
+    for dir in git_dirs {
+        // A plain checkout answers the same dir for `--git-common-dir` and `--git-dir`.
+        if seen.contains(&dir) {
+            continue;
+        }
+        seen.push(dir);
+        for input in ["packed-refs", "refs/tags"] {
+            let path = format!("{dir}/{input}");
+            if std::path::Path::new(&path).exists() {
+                watched.push(path);
+            }
+        }
+    }
+    watched
 }
 
 // ── The build script (`build = "src/core_version.rs"`) ───────────────────────────────────────
@@ -137,16 +165,15 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ERPLORA_CORE_VERSION");
 
     let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    // A tag arriving (or HEAD moving) changes the answer and nothing in this package does, so the
-    // git refs are the inputs to watch. A path that does not exist reads as "changed", which only
-    // costs re-running this script — cargo does not rebuild the crate unless the stamp differs.
-    // Both dirs: in a worktree `--git-dir` is the worktree's own and the tags live in the common one.
-    for reference in ["--git-common-dir", "--git-dir"] {
-        if let Some(path) = git(&dir, &["rev-parse", "--path-format=absolute", reference]) {
-            for input in ["packed-refs", "refs/tags", "HEAD"] {
-                println!("cargo:rerun-if-changed={path}/{input}");
-            }
-        }
+    // A tag arriving changes the answer and nothing in this package does, so the tag refs are the
+    // inputs to watch — both dirs, because in a worktree `--git-dir` is the worktree's own and the
+    // tags live in the common one. Only the paths that EXIST (see [`watched_git_inputs`]).
+    let git_dirs: Vec<String> = ["--git-common-dir", "--git-dir"]
+        .iter()
+        .filter_map(|reference| git(&dir, &["rev-parse", "--path-format=absolute", reference]))
+        .collect();
+    for input in watched_git_inputs(&git_dirs) {
+        println!("cargo:rerun-if-changed={input}");
     }
 
     let package = std::env::var("CARGO_PKG_VERSION").unwrap_or_default();
@@ -159,11 +186,7 @@ fn main() {
             let tags = git(&dir, &["tag", "--list", "v*"])
                 .map(|out| tags_from_output(&out))
                 .unwrap_or_default();
-            decide(
-                &package,
-                &tags,
-                git(&dir, &["rev-parse", "--short=8", "HEAD"]).as_deref(),
-            )
+            decide(&package, &tags)
         }
     };
 
@@ -208,12 +231,8 @@ mod tests {
     /// DEVELOPER'S OWN BUILD and the catalogue sweep read that refusal as a broken manifest.
     #[test]
     fn a_source_build_reports_the_newest_release_not_the_placeholder_hub1619() {
-        let decided = decide(
-            "1.0.0",
-            &tags(&["v1.1.14", "v1.1.15", "v1.1.7"]),
-            Some("1c50d429"),
-        );
-        assert_eq!(decided.version, "1.1.15-source+g1c50d429");
+        let decided = decide("1.0.0", &tags(&["v1.1.14", "v1.1.15", "v1.1.7"]));
+        assert_eq!(decided.version, "1.1.15-source");
         assert!(decided.corroborated);
         assert!(
             version_triple(&decided.version) >= version_triple("1.1.15"),
@@ -226,12 +245,8 @@ mod tests {
     /// lexicographic order, and picking it would put the build back below the fleet.
     #[test]
     fn the_newest_tag_is_the_highest_version_not_the_last_string_hub1619() {
-        let decided = decide(
-            "1.0.0",
-            &tags(&["v1.1.9", "v1.1.15", "v1.2.0"]),
-            Some("abc1234"),
-        );
-        assert_eq!(decided.version, "1.2.0-source+gabc1234");
+        let decided = decide("1.0.0", &tags(&["v1.1.9", "v1.1.15", "v1.2.0"]));
+        assert_eq!(decided.version, "1.2.0-source");
     }
 
     /// The `-source` marker is not decoration: without it a developer's build would be
@@ -240,9 +255,9 @@ mod tests {
     /// flipped — a build claiming a version it is not.
     #[test]
     fn a_source_build_never_passes_itself_off_as_the_release_hub1619() {
-        let decided = decide("1.0.0", &tags(&["v1.1.15"]), Some("1c50d429"));
+        let decided = decide("1.0.0", &tags(&["v1.1.15"]));
         assert_ne!(decided.version, "1.1.15");
-        assert!(decided.version.starts_with("1.1.15-source"));
+        assert_eq!(decided.version, "1.1.15-source");
     }
 
     /// A release build is stamped from its tag by `scripts/stamp-version.sh` BEFORE compiling, so
@@ -250,7 +265,7 @@ mod tests {
     /// tag exists in the checkout (re-running an older release's build).
     #[test]
     fn a_stamped_release_version_is_never_rewritten_hub1619() {
-        let decided = decide("1.1.10", &tags(&["v1.1.10", "v1.1.15"]), Some("abc1234"));
+        let decided = decide("1.1.10", &tags(&["v1.1.10", "v1.1.15"]));
         assert_eq!(decided.version, "1.1.10");
         assert!(decided.corroborated);
     }
@@ -260,11 +275,7 @@ mod tests {
     /// reports two different things — the exact drift `crates/server/src/version.rs` documents.
     #[test]
     fn a_stamped_prerelease_is_never_rewritten_hub1619() {
-        let decided = decide(
-            "1.1.7-dev.305+g1c50d429",
-            &tags(&["v1.1.15"]),
-            Some("1c50d429"),
-        );
+        let decided = decide("1.1.7-dev.305+g1c50d429", &tags(&["v1.1.15"]));
         assert_eq!(decided.version, "1.1.7-dev.305+g1c50d429");
         assert!(decided.corroborated);
     }
@@ -273,7 +284,7 @@ mod tests {
     /// the most specific statement available and is left alone.
     #[test]
     fn a_package_version_above_every_tag_is_left_alone_hub1619() {
-        let decided = decide("1.2.0", &tags(&["v1.1.15"]), Some("abc1234"));
+        let decided = decide("1.2.0", &tags(&["v1.1.15"]));
         assert_eq!(decided.version, "1.2.0");
         assert!(decided.corroborated);
     }
@@ -285,7 +296,7 @@ mod tests {
     /// know its own place in the fleet.
     #[test]
     fn without_tags_the_build_cannot_corroborate_its_version_hub1619() {
-        let decided = decide("1.0.0", &[], Some("abc1234"));
+        let decided = decide("1.0.0", &[]);
         assert_eq!(decided.version, "1.0.0");
         assert!(!decided.corroborated);
     }
@@ -293,17 +304,50 @@ mod tests {
     /// Tags that are not versions do not count as tags.
     #[test]
     fn a_tag_that_is_not_a_version_does_not_corroborate_anything_hub1619() {
-        let decided = decide("1.0.0", &tags(&["vnext", "v-broken"]), None);
+        let decided = decide("1.0.0", &tags(&["vnext", "v-broken"]));
         assert_eq!(decided.version, "1.0.0");
         assert!(!decided.corroborated);
     }
 
-    /// Without a sha (git present, HEAD unreadable) the marker still lands: the version is what
-    /// the floor comparison needs, the sha is only there to say WHICH source build.
+    /// 🔴 Only git inputs that EXIST are watched, and `HEAD` never is. A `rerun-if-changed` on a
+    /// missing path makes cargo re-run this script — and recompile this crate plus everything
+    /// downstream — on every invocation; a worktree has no `packed-refs` of its own, so that was
+    /// every `cargo test` of every `hub-wt-*` (measured in the hub#1619 review).
     #[test]
-    fn the_sha_is_optional_hub1619() {
-        let decided = decide("1.0.0", &tags(&["v1.1.15"]), None);
-        assert_eq!(decided.version, "1.1.15-source");
+    fn only_git_inputs_that_exist_are_watched_and_head_never_is_hub1619() {
+        let root = std::env::temp_dir().join(format!(
+            "erplora-core-version-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let common = root.join("common");
+        let worktree = root.join("worktrees").join("wt");
+        std::fs::create_dir_all(common.join("refs/tags")).unwrap();
+        std::fs::write(common.join("packed-refs"), "").unwrap();
+        std::fs::write(common.join("HEAD"), "ref: refs/heads/develop\n").unwrap();
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join("HEAD"), "abc\n").unwrap();
+
+        let dirs = [common.display().to_string(), worktree.display().to_string()];
+        let watched = watched_git_inputs(&dirs);
+        // A plain checkout answers the same dir for `--git-common-dir` and `--git-dir`: each path
+        // is watched once.
+        let twice = watched_git_inputs(&[dirs[0].clone(), dirs[0].clone()]);
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(
+            watched,
+            vec![
+                format!("{}/packed-refs", common.display()),
+                format!("{}/refs/tags", common.display()),
+            ],
+            "the worktree dir has neither file and HEAD is never an input"
+        );
+        assert_eq!(twice, watched);
+        assert_eq!(watched_git_inputs(&[]), Vec::<String>::new());
     }
 
     /// A checkout with no tags prints NOTHING, and an empty line is not a tag: read as one, it
