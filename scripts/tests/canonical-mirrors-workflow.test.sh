@@ -32,17 +32,22 @@ repo_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 workflow="$repo_root/.github/workflows/canonical-mirrors.yml"
 caller="$repo_root/.github/workflows/actionlint.yml"
 verdict="$repo_root/scripts/canonical-mirrors-verdict.sh"
+# The workflow that PUBLISHES a hub tag. It is a subject of this contract since
+# ERPlora/module-toolkit#226: releasing is what leaves the toolkit's `HUB_OUTFITKIT` behind, so
+# releasing is what has to ask.
+release="$repo_root/.github/workflows/build-hub.yml"
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --workflow) workflow="$2"; shift 2 ;;
         --caller) caller="$2"; shift 2 ;;
         --verdict) verdict="$2"; shift 2 ;;
-        *) printf 'usage: %s [--workflow <path>] [--caller <path>] [--verdict <path>]\n' "$0" >&2; exit 2 ;;
+        --release) release="$2"; shift 2 ;;
+        *) printf 'usage: %s [--workflow <path>] [--caller <path>] [--verdict <path>] [--release <path>]\n' "$0" >&2; exit 2 ;;
     esac
 done
 
-for f in "$workflow" "$caller" "$verdict"; do
+for f in "$workflow" "$caller" "$verdict" "$release"; do
     if [ ! -f "$f" ]; then
         printf 'FAIL: no such workflow: %s\n' "$f" >&2
         exit 1
@@ -63,7 +68,7 @@ parsed_sources=$(bash "$verdict" --print-parsed-sources) || {
     exit 1
 }
 
-WORKFLOW="$workflow" CALLER="$caller" VERDICT="$verdict" PARSED_SOURCES="$parsed_sources" python3 - <<'PY'
+WORKFLOW="$workflow" CALLER="$caller" VERDICT="$verdict" RELEASE="$release" PARSED_SOURCES="$parsed_sources" python3 - <<'PY'
 import os
 import sys
 
@@ -72,12 +77,15 @@ import yaml
 path = os.environ["WORKFLOW"]
 caller_path = os.environ["CALLER"]
 verdict_path = os.environ["VERDICT"]
+release_path = os.environ["RELEASE"]
 parsed_sources = [s for s in os.environ["PARSED_SOURCES"].splitlines() if s.strip()]
 
 with open(path, encoding="utf-8") as fh:
     doc = yaml.safe_load(fh)
 with open(caller_path, encoding="utf-8") as fh:
     caller = yaml.safe_load(fh)
+with open(release_path, encoding="utf-8") as fh:
+    release = yaml.safe_load(fh)
 
 failures = []
 passed = 0
@@ -295,6 +303,127 @@ for wanted in (VERDICT_TEST, VERDICT):
         wanted in caller_paths,
         f"paths are {caller_paths} — a PR touching only it would not run its tests",
     )
+
+# ── 5 · PUBLISHING a hub is what asks whether the toolkit knows it (module-toolkit#226) ──
+#
+# Everything above hangs off `paths:`, and that filter answers "somebody EDITED a mirrored file".
+# There is a second way a mirror rots that no path can see: nobody edits anything and the HUB
+# SHIPS. `module-toolkit`'s `HUB_OUTFITKIT` says which OutfitKit each hub image carries, one row
+# per release tag, and `erplora validate` measures every module's screens against it. Cut `v1.1.16`
+# and the newest row is `v1.1.15`: the toolkit no longer knows the fleet those modules are about to
+# run on, so the check stops checking and degrades to a ⚠ that blocks nothing. Measured on
+# 2026-09-07, with `v1.1.16` already published:
+#
+#     ✖ the NEWEST hub tag is in HUB_OUTFITKIT: publishing the hub adds its row (#201)
+#     ℹ tests 20 · pass 19 · fail 1
+#
+# That assertion already existed and was already correct. What it lacked was anywhere to run:
+#
+#   · in the toolkit's own CI it SKIPS, and honestly — tags are refs, and the hub reaches that
+#     runner as an action TARBALL with no `.git` (`module-toolkit/test/hub-mirror.mjs::hubTags`).
+#     The org is on the free plan, so no credential can check a private ERPlora/hub out either;
+#   · here it runs, but only when this workflow's `paths:` filter fires — and cutting a tag edits
+#     none of those files.
+#
+# So between publishing a release and the next PR that happened to touch a mirrored path, the alarm
+# rang nowhere. `build-hub.yml` is the one workflow that DOES run on `v*`, so that is where the
+# question belongs, and this section pins the four things that decide whether it is a guard or a
+# decoration.
+RELEASE_NAME = os.path.basename(release_path)
+
+release_triggers = triggers_of(release)
+release_tags = ((release_triggers.get("push") or {}).get("tags")) or []
+check(
+    f"`{RELEASE_NAME}` fires on release tags",
+    any(str(t).startswith("v") for t in release_tags),
+    f"tags are {release_tags} — without a tag trigger there is no run to hang the mirror off",
+)
+
+release_jobs = release.get("jobs") or {}
+tag_jobs = {
+    name: job
+    for name, job in release_jobs.items()
+    if any(ACTION in str(s.get("uses", "")) for s in (job.get("steps") or []))
+}
+check(
+    f"`{RELEASE_NAME}` runs `{ACTION}` when it publishes a tag",
+    len(tag_jobs) == 1,
+    f"{len(tag_jobs)} jobs run it — publishing a tag is what leaves `HUB_OUTFITKIT` behind, and "
+    "nothing else in this repository runs on `v*` (module-toolkit#226)",
+)
+
+if tag_jobs:
+    job_name, job = next(iter(tag_jobs.items()))
+    job_steps = job.get("steps") or []
+
+    # `needs:` is a string when there is one dependency and a list when there are several —
+    # `publish-module-sdk` uses the scalar form. Testing membership on the string does SUBSTRING
+    # matching, which answered False to a real `needs: canonical-mirrors` and let the mutant of
+    # 2026-09-07 through; it would also match a job merely NAMED like this one.
+    def needs_of(job_spec):
+        raw = job_spec.get("needs") or []
+        return [raw] if isinstance(raw, str) else list(raw)
+
+    # Gated to tags: this workflow also runs on every push to `develop`, and there the table is
+    # RIGHT not to know a tag that does not exist yet. Firing on branches would make the job red
+    # on every integration push — noise first, deletion second.
+    check(
+        f"the `{job_name}` job only runs on a tag (`startsWith(github.ref, 'refs/tags/`)",
+        "refs/tags/" in str(job.get("if", "")),
+        f"if: {job.get('if')!r} — on a branch push there is no new tag, so it would be red for nothing",
+    )
+
+    # 🔴 THE PRECONDITION. The mirror this job exists for reads TAGS, which are refs, and
+    # `actions/checkout` fetches none by default. Without them `hubTags` skips the case — honestly,
+    # and green — so the job would report success having compared nothing: the exact silent guard
+    # it replaces, wearing a passing badge.
+    checkout_steps = [s for s in job_steps if "actions/checkout" in str(s.get("uses", ""))]
+    withs = [(s.get("with") or {}) for s in checkout_steps]
+    check(
+        f"the `{job_name}` job checks out WITH TAGS (`fetch-tags: true`)",
+        any(str(w.get("fetch-tags")).lower() == "true" for w in withs),
+        f"checkout inputs are {withs} — no tags means the tag mirror skips itself and the job is green on nothing",
+    )
+    check(
+        f"the `{job_name}` job checks out the full history (`fetch-depth: 0`)",
+        any(str(w.get("fetch-depth")) == "0" for w in withs),
+        f"checkout inputs are {withs} — `fetch-tags` on a shallow clone still misses the tag being published",
+    )
+
+    # 🔴 THE ANSWER IS READ RAW. `canonical-mirrors.yml` deliberately does NOT publish the action's
+    # outcome: `canonical-mirrors-verdict.sh` re-reads it and downgrades the failure to a notice
+    # whenever a vendored copy is behind (hub#1296) — right for a contract PR, ruinous here, since
+    # the toolkit lagging is its normal state for hours and that downgrade would swallow the
+    # missing row along with it. On a release there is no in-flight contract PR to protect.
+    step_uses = [s for s in job_steps if ACTION in str(s.get("uses", ""))]
+    mirror_step = step_uses[0] if step_uses else {}
+    check(
+        f"the `{job_name}` job does not mute the mirror (`continue-on-error`)",
+        mirror_step.get("continue-on-error") is not True
+        and job.get("continue-on-error") is not True,
+        "a red release run is the whole signal; muted, this is the silent guard it replaces",
+    )
+    check(
+        f"the `{job_name}` job does not route its answer through `{os.path.basename(verdict_path)}`",
+        not any(os.path.basename(verdict_path) in str(s.get("run", "")) for s in job_steps),
+        "that classifier downgrades a failing mirror to a notice whenever a copy is behind, which "
+        "is exactly how the missing row would go quiet again (hub#1296 applies to PRs, not releases)",
+    )
+
+    # The release must never wait on another repository's table, in either direction.
+    check(
+        f"the `{job_name}` job does not wait for the image build",
+        not needs_of(job),
+        f"needs: {job.get('needs')!r} — the mirror answers about a tag that already exists; "
+        "chaining it behind the build only delays the answer",
+    )
+    blocked = [n for n, j in release_jobs.items() if job_name in needs_of(j)]
+    check(
+        f"no job waits for `{job_name}`: a stale row never withholds an image",
+        not blocked,
+        f"{blocked} would not publish while another repository's table is behind (hub#1296)",
+    )
+
 
 if failures:
     print(f"FAIL: {len(failures)} contract case(s) on {path}", file=sys.stderr)
