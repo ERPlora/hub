@@ -522,7 +522,10 @@ pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) ->
     p.insert("flow_id".into(), json!(flow_id));
     let res = db
         .query(
-            "SELECT kind, value, payload FROM _flow_grants \
+            // `id` travels because of what happens when a row cannot be read: the report has to
+            // name the row an owner must revoke and grant again, and «one of this flow's grants»
+            // is not something anybody can act on.
+            "SELECT id, kind, value, payload FROM _flow_grants \
              WHERE hub_id = :hub_id AND flow_id = :flow_id AND deleted_at IS NULL",
             &p,
         )
@@ -534,20 +537,77 @@ pub async fn authority(db: &dyn DatabaseAdapter, hub_id: &str, flow_id: &str) ->
             continue;
         };
         let value = r["value"].as_str().unwrap_or_default().to_string();
-        // A pin only means something for a command, and only when it parses. A row that somehow
-        // holds garbage in `payload` pins NOTHING rather than everything: this is a snapshot the
-        // gate reads, and an unreadable restriction must not become an unreadable authorisation.
-        // `replace` is what refuses garbage; by the time it is stored it has been checked.
+        // A pin only means something for a command, and only when it parses (hub#1623). What a row
+        // holding garbage in `payload` means is hub#1636: **nothing**. It used to pin nothing and
+        // still be granted, so an unreadable RESTRICTION became a wider AUTHORISATION — the one
+        // direction a permission may never move on its own, and the opposite of the rule the gate
+        // reads by ("the safe reading of a bug on an authorisation path is deny").
+        //
+        // So the row is dropped: default-deny by absence, exactly as the header of this file
+        // states. Only for a `command`, because only a `command` carries a pin — `replace` refuses
+        // a payload on every other kind, so denying a read over a column nothing consults would
+        // stop a flow for no gain in containment.
+        //
+        // Nothing reachable produces this state (the column is `NOT NULL DEFAULT '{}'`, `replace`
+        // serialises an object and `parse_pairs` refuses anything else), which is precisely why it
+        // is REPORTED and not only refused: an owner whose automation stopped at 3 AM has no other
+        // thread back to a row their permissions screen still shows as granted.
         if kind == GrantKind::Command {
-            if let Some(pin) = parse_pin(&r["payload"]) {
-                if !pin.is_empty() {
-                    pins.insert(value.clone(), pin);
+            match parse_pin(&r["payload"]) {
+                Some(pin) => {
+                    if !pin.is_empty() {
+                        pins.insert(value.clone(), pin);
+                    }
+                }
+                None => {
+                    let id = r["id"].as_str().unwrap_or_default();
+                    let event = unreadable_pin_event(id, flow_id, &value);
+                    eprintln!("✗ {}", event.message);
+                    crate::error_registry::ErrorRegistry::global().report(event);
+                    continue;
                 }
             }
         }
         granted.insert((kind, value));
     }
     Ok(Authority { granted, pins })
+}
+
+/// hub#1636 — the stable code of «a grant row holds a pin nobody can read». Not a `flow.…` refusal
+/// code: nothing is being said to the caller here (the caller is told [`ERR_GRANT_DENIED`], which is
+/// the truth from where it stands). This is the code the ALERT and the support filter are programmed
+/// against, in the `error_registry` namespace the rest of the hub's reports use.
+pub const ERR_UNREADABLE_GRANT_PAYLOAD_EVENT: &str = "flow_grant_payload_unreadable";
+
+/// The report of a grant whose stored pin cannot be read.
+///
+/// Separate from the place that sends it so a test can pin its CONTENT — the stable code and the row
+/// it names — instead of pinning that a global sink was called (`failed_install_event`, hub#1477).
+/// And it is a report and not only a log for the reason that issue wrote down: a log inside a
+/// container is read by nobody, and this one is the only thread connecting «the automation stopped»
+/// to «this row has to be granted again».
+fn unreadable_pin_event(
+    grant_id: &str,
+    flow_id: &str,
+    command: &str,
+) -> crate::error_registry::ErrorEvent {
+    use crate::error_registry::{severity, source, ErrorEvent};
+
+    ErrorEvent::new(
+        source::HUB,
+        ERR_UNREADABLE_GRANT_PAYLOAD_EVENT,
+        format!(
+            "the grant `{grant_id}` of flow `{flow_id}` for command `{command}` holds a `payload` \
+             that is not a readable JSON object; it authorises NOTHING until it is revoked and \
+             granted again"
+        ),
+        severity::UNEXPECTED,
+    )
+    .with_context(serde_json::json!({
+        "grant_id": grant_id,
+        "flow_id": flow_id,
+        "command": command,
+    }))
 }
 
 /// The stored `payload` column back into the map the gate compares against. Stored as TEXT holding
@@ -1402,6 +1462,156 @@ mod tests {
         ]))
         .expect_err("a pin that cannot be read is refused, never ignored");
         assert_eq!(code_of(&err), ERR_INVALID_GRANT_PAYLOAD);
+    }
+
+    /// A row whose stored pin stopped being READABLE. No door of this kernel can produce one — the
+    /// column is `NOT NULL DEFAULT '{}'`, `replace` always serialises an object and `parse_pairs`
+    /// refuses anything else — so it is written here by SQL on purpose: the guard has to hold for a
+    /// row that got there some other way (edited by hand, a botched column change, a mangled
+    /// restore), which is the only way this state exists at all.
+    async fn corrupt_the_stored_pin(db: &dyn DatabaseAdapter, command: &str, raw: &str) {
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("flow_id".into(), json!(FLOW));
+        p.insert("value".into(), json!(command));
+        p.insert("payload".into(), json!(raw));
+        db.execute(
+            "UPDATE _flow_grants SET payload = :payload \
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND kind = 'command' \
+               AND value = :value AND deleted_at IS NULL",
+            &p,
+        )
+        .await
+        .expect("the fixture writes the row this guard exists for");
+    }
+
+    /// hub#1636 — **the residual risk hub#1623 left behind, in one test.** A `command` grant carries
+    /// its pin in a TEXT column. When that text stopped being readable the gate read it as «this
+    /// grant fixes nothing» and let the call through UNPINNED: an unreadable RESTRICTION became a
+    /// wider AUTHORISATION, which is the one direction a permission may never move on its own.
+    ///
+    /// Now the row is not a grant at all — default-deny by absence, the rule the header of this file
+    /// states — so the refusal is [`ERR_GRANT_DENIED`] and not [`ERR_GRANT_PAYLOAD_DENIED`]: there
+    /// is no pin to contradict, there is a grant that cannot be read.
+    #[tokio::test]
+    async fn a_grant_whose_stored_pin_cannot_be_read_authorises_nothing() {
+        // Every shape `parse_pin` cannot turn into an object, including the two that LOOK like
+        // JSON: `null` and `[]` parse fine and are still not a set of fixed fields.
+        for raw in ["garbage", "", "null", "[]", "7", "\"channel=customer\""] {
+            let db = db_with_schema().await;
+            let reg = registry();
+            replace(
+                &db,
+                HUB,
+                FLOW,
+                &reg,
+                &[
+                    GrantSpec::pinned("sales.sale.void", pin("channel", "customer")),
+                    GrantSpec::pair(GrantKind::Command, "sales.sale.create"),
+                ],
+                "hub_user:1",
+            )
+            .await
+            .unwrap();
+            corrupt_the_stored_pin(&db, "sales.sale.void", raw).await;
+
+            // Not the payload the pin asked for, not one that contradicts it, and not the empty one
+            // that a grant fixing nothing would wave through. The row says nothing the gate can
+            // honour, so it authorises nothing.
+            for attempt in [
+                sent("channel", "customer"),
+                sent("channel", "staff"),
+                Params::new(),
+            ] {
+                let err = check_command_grant(&db, HUB, FLOW, "sales.sale.void", &attempt)
+                    .await
+                    .expect_err("an unreadable grant is not an unrestricted one");
+                assert_eq!(code_of(&err), ERR_GRANT_DENIED, "payload `{raw}`");
+            }
+
+            // And ONE broken row is one denial, not an authority wiped clean: the other grants of
+            // the same flow still answer, or a single mangled byte would silently stop every
+            // automation the owner has.
+            check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
+                .await
+                .unwrap_or_else(|e| {
+                    panic!("payload `{raw}`: the readable grant still answers: {e}")
+                });
+        }
+    }
+
+    /// The control for the test above: `{}` is READABLE and means «fixes nothing», so it has to keep
+    /// authorising every payload. Without this, a gate that denied every `command` grant outright
+    /// would pass the guard while breaking every flow in the hub.
+    #[tokio::test]
+    async fn a_readable_empty_pin_still_means_fixes_nothing() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Command, "sales.sale.void")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        corrupt_the_stored_pin(&db, "sales.sale.void", "{}").await;
+
+        check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
+            .await
+            .expect("`{}` fixes nothing, so nothing is contradicted");
+    }
+
+    /// hub#1636 — the guard is scoped to `command`, and that scope is a decision, not an oversight.
+    /// Only a `command` grant carries a pin (`replace` refuses a payload on every other kind), so a
+    /// `query` row whose `payload` column is unreadable holds nothing the gate ever consults.
+    /// Denying the read would stop the flow over a column that decides nothing — containment
+    /// bought with availability and paid for with neither.
+    #[tokio::test]
+    async fn an_unreadable_payload_on_a_kind_that_has_no_pin_does_not_close_the_read() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("flow_id".into(), json!(FLOW));
+        db.execute(
+            "UPDATE _flow_grants SET payload = 'garbage' \
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND kind = 'query'",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+            .await
+            .expect("a query grant says what it says in `value`; its `payload` decides nothing");
+    }
+
+    /// hub#1636 — a broken authorisation row that only failed at 3 AM would be a mystery: the flow
+    /// stops, the permissions screen still shows the grant, and nothing connects the two. So the
+    /// denial is also REPORTED, naming the row that has to be revoked and granted again.
+    ///
+    /// Pinned on the event BUILDER and not on the sink, like `failed_install_event` (hub#1477): what
+    /// is programmed against is the stable code and the row it names, not that a global was called.
+    #[test]
+    fn the_report_of_an_unreadable_pin_names_the_row_to_re_grant() {
+        let event = unreadable_pin_event("g-7", FLOW, "sales.sale.void");
+        assert_eq!(event.error_code, ERR_UNREADABLE_GRANT_PAYLOAD_EVENT);
+        assert_eq!(event.severity, crate::error_registry::severity::UNEXPECTED);
+        assert_eq!(event.source, crate::error_registry::source::HUB);
+        assert_eq!(event.context["grant_id"], json!("g-7"));
+        assert_eq!(event.context["flow_id"], json!(FLOW));
+        assert_eq!(event.context["command"], json!("sales.sale.void"));
     }
 
     /// hub#1623 — revoking a pinned grant is the same soft-delete as any other, and the gate stops
