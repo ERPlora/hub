@@ -350,8 +350,18 @@ fn missing_options(written: &Json, filled: &Json) -> Option<MissingOptions> {
     // item by item, so the two sit at the same index.
     let written_sections = written_action.get("sections")?.as_array()?;
     for (i, section) in action.get("sections")?.as_array()?.iter().enumerate() {
+        let written_section = written_sections.get(i);
+        // The section mapped WHOLE, and not only its rows: `interactive` has no inner shape in
+        // the schema, so a document may hand the titled block over to a step the same way it
+        // hands over the rows — and a `null` left in the array is the same message with nothing
+        // to tap, one level up.
+        if section.is_null() {
+            if let Some(written_at) = written_section {
+                return Some(missing(&format!("action.sections[{i}]"), written_at));
+            }
+        }
         match (
-            written_sections.get(i).and_then(|s| s.get("rows")),
+            written_section.and_then(|s| s.get("rows")),
             section.get("rows"),
         ) {
             (Some(written_at), Some(rows)) if rows.is_null() => {
@@ -936,5 +946,80 @@ mod tests {
         prepare_in(&db, &asking("steps.libres.options"), &authority, &over)
             .await
             .expect("how many rows Meta holds is the proxy's question, not this one's");
+    }
+
+    /// **A whole SECTION nobody published is the same hole as its rows** (hub#1646).
+    ///
+    /// `interactive` has no inner shape in `flow.schema.json`, so a document is free to map a
+    /// section whole instead of only its rows — an `ai` turn that hands back a titled block. When
+    /// the step that owed it never published, `resolve` leaves a `null` sitting in the array and
+    /// the message used to be queued as `sections: [null]`: a list with nothing to tap, refused by
+    /// the proxy hours later, which is exactly what this door exists to stop.
+    #[tokio::test]
+    async fn a_whole_section_nobody_published_stops_the_step_like_its_rows_would() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let mapped_whole = |sections: Json| {
+            FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "ask", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                            "field": "phone" },
+                    "interactive": {
+                        "type": "list",
+                        "body": { "text": "¿Qué hueco te viene bien?" },
+                        "action": { "button": "Ver huecos", "sections": sections }
+                    }
+                }]
+            }))
+            .unwrap()
+            .steps
+            .remove(0)
+        };
+
+        let err = prepare_in(
+            &db,
+            &mapped_whole(json!(["steps.libres.section"])),
+            &authority,
+            &scope(),
+        )
+        .await
+        .unwrap_err();
+        let RuntimeError::Domain { code, message } = &err else {
+            panic!("a promised section that is not there is a domain refusal: {err}");
+        };
+        assert_eq!(code, ERR_OPTIONS_NOT_FOUND);
+        assert!(
+            message.contains("action.sections[0]"),
+            "the refusal says which section is the hole: {message}"
+        );
+        assert!(
+            message.contains("`libres`"),
+            "…and the step that was supposed to publish it: {message}"
+        );
+
+        // **The control**: the same document with the section published queues, and a section that
+        // is there with an EMPTY list of rows is still not a missing one (hub#1641).
+        let published = json!({
+            "input": { "customer_id": "c-1", "name": "Marta" },
+            "steps": { "libres": { "section": { "title": "Huecos", "rows": [] } } }
+        });
+        let prepared = prepare_in(
+            &db,
+            &mapped_whole(json!(["steps.libres.section"])),
+            &authority,
+            &published,
+        )
+        .await
+        .expect("a section that IS there is queued, empty rows and all");
+        let payload: Json =
+            serde_json::from_str(prepared.queue_op.1["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            payload["interactive"]["action"]["sections"][0]["title"],
+            json!("Huecos")
+        );
     }
 }
