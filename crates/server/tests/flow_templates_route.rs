@@ -34,6 +34,9 @@ const MODULE_HEADER: &str = "x-erplora-module";
 const EDITOR: &str = "flows";
 /// Un módulo corriente que además trae una automatización de fábrica.
 const WHATSAPP: &str = "whatsapp_inbox";
+/// El vecino que el suelo de esa plantilla nombra (`requires.json`), y que NO es el `depends_on`
+/// del módulo: la plantilla es opcional y `whatsapp_inbox` funciona sin él.
+const REQUIRED: &str = "appointments";
 const TEMPLATES: &str = "/api/hub/flows/templates";
 
 struct Fixture {
@@ -97,6 +100,13 @@ fn module_dir(root: &Path, id: &str, extra: Value, with_templates: bool) -> Path
 
 /// `granted` = el dueño marcó `manage_flows` para el editor en Ajustes → Permisos.
 async fn fixture(granted: bool) -> Fixture {
+    fixture_with(granted, true).await
+}
+
+/// `appointments_installed` = está el vecino que el suelo de la plantilla nombra
+/// (`requires.json` pide `appointments >= 1.1.69`). Con `false`, el suelo NO se cumple y la
+/// plantilla no debe ofrecerse, que es la otra mitad del contrato de la carpeta.
+async fn fixture_with(granted: bool, appointments_installed: bool) -> Fixture {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
     rt.ensure_system_tables().await.unwrap();
@@ -123,6 +133,18 @@ async fn fixture(granted: bool) -> Fixture {
     ))
     .await
     .unwrap();
+    if appointments_installed {
+        // Justo EN el suelo (`1.1.69`), no por encima: así este fixture también fija que la
+        // comparación es `>=` y no `>`.
+        rt.install_from_dir(&module_dir(
+            &modules,
+            REQUIRED,
+            json!({ "version": "1.1.69" }),
+            false,
+        ))
+        .await
+        .unwrap();
+    }
     rt.install_from_dir(&module_dir(&modules, WHATSAPP, json!({}), true))
         .await
         .unwrap();
@@ -272,4 +294,25 @@ async fn the_shell_reads_it_with_the_session_alone() {
     let response = send(&fx.router, request(TEMPLATES, Some(&fx.admin), None)).await;
 
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn the_gallery_is_not_offered_a_template_whose_floor_is_not_met() {
+    // La otra mitad del contrato de `requires.json`, fijada EN LA PUERTA: el filtro vive en el
+    // registro, y esto es lo que impide que alguien vuelva a servir el mapa en crudo más adelante.
+    // Mismo hub que el test de arriba, sin `appointments` instalado.
+    let fx = fixture_with(true, false).await;
+
+    let response = send(
+        &fx.router,
+        request(TEMPLATES, Some(&fx.admin), Some(EDITOR)),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK, "la ruta responde igual");
+    let body = body_json(response).await;
+    assert!(
+        body["data"].as_array().expect("una lista").is_empty(),
+        "sin el módulo que pide el suelo, su plantilla no se ofrece"
+    );
 }
