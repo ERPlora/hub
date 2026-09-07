@@ -182,6 +182,24 @@ describe('the runtime doors', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/hub/whatsapp/numbers');
   });
 
+  it('carries the flag that says the channel died on its own', async () => {
+    // The runtime hands the front the SaaS's JSON verbatim (`cloud_proxy::cloud_json_passthrough`),
+    // so `needs_reconnect` only had to be READ — and it was not, which is how a dead channel kept
+    // showing up as connected (hub#1626). A number an older SaaS answers about carries no field at
+    // all, and that has to stay `undefined`, never `false` invented here.
+    answer(200, {
+      numbers: [
+        { phone_number_id: 'down', display_phone: '+34 600 000 001', is_active: true, needs_reconnect: true, token_expires_at: '2026-05-25T10:00:00Z' },
+        { phone_number_id: 'old', display_phone: '+34 600 000 002', is_active: true },
+      ],
+    });
+
+    const numbers = await fetchWhatsAppNumbers();
+
+    expect(numbers[0].needs_reconnect).toBe(true);
+    expect(numbers[1].needs_reconnect).toBeUndefined();
+  });
+
   it('posts the popup result verbatim and never a bearer of its own', async () => {
     answer(200, { phone_number_id: 'phone_123', display_phone: '+34 612 345 678', is_on_biz_app: true });
     const popup = { code: 'oauth-code', event: 'FINISH', waba_id: 'w', phone_number_id: 'p', business_id: 'b' };

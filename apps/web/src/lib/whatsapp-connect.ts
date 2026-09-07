@@ -27,6 +27,16 @@ export interface WhatsAppNumber {
   display_phone: string;
   is_active: boolean;
   is_on_biz_app?: boolean;
+  /**
+   * Meta refused to renew the business token and only the owner can fix it, by connecting again
+   * (saas#1887). Optional on purpose: a hub talking to a SaaS from before that change gets no field
+   * at all, and «we do not know» has to read as «fine» — an alarm raised by a missing key would fire
+   * on every healthy channel the day an older SaaS answers.
+   *
+   * It says nothing about `is_active`: the sweep flags the mapping and leaves that column alone, so
+   * the number stays in this list and keeps being the one the messages would arrive at.
+   */
+  needs_reconnect?: boolean;
 }
 
 /** What the popup handed back: the code plus the ids Meta posted (empty when it posted none). */

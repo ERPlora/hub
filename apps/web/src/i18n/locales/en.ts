@@ -824,6 +824,13 @@ export default {
     connected: 'Connected',
     businessApp: 'WhatsApp Business app',
     connectedHelp: 'Messages from your customers arrive in the Inbox, and the automations answer them.',
+    // hub#1626: the permission WhatsApp gives to write for a business lasts 60 days and runs out on
+    // its own. When Meta refuses to renew it, only the owner can fix it — so the sentence names what
+    // stopped working (both directions) and what to do, and never the word «token».
+    disconnected: 'Disconnected',
+    reconnectNeeded:
+      'WhatsApp has withdrawn the permission to write on behalf of your business. Your customers’ messages are not arriving and nothing you answer is going out. Connect your number again to get the channel back.',
+    reconnect: 'Reconnect WhatsApp',
     disconnect: 'Disconnect',
     disconnectConfirm: 'Disconnect this number? Messages will stop arriving here.',
     adminOnly: 'Only an owner or an administrator can connect the WhatsApp number.',

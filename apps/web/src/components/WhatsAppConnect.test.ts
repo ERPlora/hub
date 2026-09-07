@@ -48,6 +48,10 @@ import es from '../i18n/locales/es';
 
 const CONFIG = { configured: true, app_id: '1534856651538860', config_id: 'cfg_987', graph_version: 'v25.0' };
 const NUMBER = { phone_number_id: 'phone_123', display_phone: '+34 612 345 678', is_active: true, is_on_biz_app: true };
+// The same number after Meta refused to renew its token (saas#1887): still `is_active`, because
+// `_mark_needs_reconnect` never touches that column — which is exactly why the block used to keep
+// painting it green.
+const DOWN = { ...NUMBER, needs_reconnect: true };
 
 function mountBlock(locale: 'en' | 'es' = 'es') {
   const i18n = createI18n({ legacy: false, locale, fallbackLocale: 'en', missingWarn: false, fallbackWarn: false, messages: { en, es } });
@@ -202,5 +206,120 @@ describe('connecting', () => {
 
     expect(vi.mocked(disconnectWhatsApp)).toHaveBeenCalledWith('phone_123');
     expect(wrapper.find('[data-test="whatsapp-connect-button"]').exists()).toBe(true);
+  });
+});
+
+describe('when Meta drops the permission (hub#1626)', () => {
+  // The channel dies on its own: the 60-day business token expires, Meta revokes it, or the owner
+  // unlinks the number from their phone. The SaaS notices in its daily sweep, flags the number and
+  // emails the owner once — but the number stays `is_active`, so this block kept saying «Connected»
+  // while nothing arrived and nothing went out. An owner who comes here to find out why their
+  // business has gone quiet must read what happened and be able to fix it WITHOUT leaving.
+
+  it('says the channel is down instead of connected', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(es.whatsappConnect.disconnected);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.connected);
+    // The number stays: with two numbers connected, «one of them is down» is useless without it.
+    expect(wrapper.text()).toContain('+34 612 345 678');
+  });
+
+  it('explains what happened and puts the button that fixes it right there', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(es.whatsappConnect.reconnectNeeded);
+    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(true);
+  });
+
+  it('and in English for an English till', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('en');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(en.whatsappConnect.reconnectNeeded);
+    expect(wrapper.text()).toContain(en.whatsappConnect.reconnect);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.reconnectNeeded);
+  });
+
+  it('stops promising that the customers’ messages are arriving', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.connectedHelp);
+  });
+
+  it('carries its own alarm, so it still reads as broken inside a module’s shadow root', async () => {
+    // hub#1614: this element is embedded in the WhatsApp module's settings, whose LitElement has a
+    // shadow root the shell's global stylesheet does not cross. A `<p class="…--error">` is grey in
+    // there. So what says «broken» is Ionic's own colouring plus `role="alert"`, which travel with
+    // the element — never a scoped class of ours.
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="whatsapp-status-badge"]').attributes('color')).toBe('danger');
+    expect(wrapper.find('[data-test="whatsapp-reconnect-needed"]').attributes('role')).toBe('alert');
+  });
+
+  it('tells a cashier what is wrong, without a button they cannot use', async () => {
+    (isAdmin as unknown as { value: boolean }).value = false;
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(es.whatsappConnect.reconnectNeeded);
+    expect(wrapper.text()).toContain(es.whatsappConnect.adminOnly);
+    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
+  });
+
+  it('reconnects through the same door as the first connection, and the alarm clears', async () => {
+    const popup = { code: 'oauth-code', event: 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING', waba_id: 'w', phone_number_id: 'phone_123', business_id: 'b' };
+    vi.mocked(openEmbeddedSignup).mockResolvedValue(popup);
+    vi.mocked(connectWhatsApp).mockResolvedValue({ phone_number_id: 'phone_123', display_phone: '+34 612 345 678', is_on_biz_app: true });
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValueOnce([DOWN]).mockResolvedValueOnce([NUMBER]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    await wrapper.find('[data-test="whatsapp-reconnect-button"]').trigger('click');
+    await flushPromises();
+
+    expect(vi.mocked(connectWhatsApp)).toHaveBeenCalledWith(popup);
+    expect(wrapper.text()).toContain(es.whatsappConnect.connected);
+    expect(wrapper.text()).not.toContain(es.whatsappConnect.reconnectNeeded);
+    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
+  });
+
+  it('says why a reconnection failed instead of going quiet', async () => {
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([DOWN]);
+    vi.mocked(openEmbeddedSignup).mockRejectedValue(new WhatsAppConnectError('sdk_unavailable', 0));
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    await wrapper.find('[data-test="whatsapp-reconnect-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(es.whatsappConnect.errors.sdk_unavailable);
+    expect(wrapper.text()).not.toContain('sdk_unavailable');
+    // The way out stays open: a failed retry that hides its own button strands the owner.
+    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(true);
+  });
+
+  it('leaves a healthy number alone', async () => {
+    // The flag clears itself the moment a later exchange works (`token_refresh._clear`), so the
+    // green state has to come back on its own — and a hub whose SaaS is older sends no field at all.
+    vi.mocked(fetchWhatsAppNumbers).mockResolvedValue([{ ...NUMBER, needs_reconnect: false }]);
+    const wrapper = mountBlock('es');
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(es.whatsappConnect.connected);
+    expect(wrapper.text()).toContain(es.whatsappConnect.connectedHelp);
+    expect(wrapper.find('[data-test="whatsapp-reconnect-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="whatsapp-status-badge"]').attributes('color')).toBe('success');
   });
 });
