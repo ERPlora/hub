@@ -308,6 +308,7 @@ async fn approving_a_proposal_that_contradicts_the_pin_refuses_it_and_writes_not
             payload: json!({ "text": "whatever the message asked for" }),
             reason: "el asistente lo propuso".into(),
             partial_output: json!({}),
+            on_expire: ExpiryPolicy::Reject,
             on_reject: RejectPolicy::Cancel,
         })
         .await
@@ -382,6 +383,7 @@ async fn approving_a_proposal_that_matches_the_pin_lets_it_through_and_writes() 
             payload: json!({ "text": "the write that waited" }),
             reason: "el asistente lo propuso".into(),
             partial_output: json!({}),
+            on_expire: ExpiryPolicy::Reject,
             on_reject: RejectPolicy::Cancel,
         })
         .await

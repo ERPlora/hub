@@ -573,8 +573,10 @@ async fn dispatch(
             command: call.name.clone(),
             payload: Value::Object(params),
             reason: self_reported_reason(&request.prompt),
-            // hub#1622 — the document's answer, copied into the row so the decision hours later
-            // reads what was in force when the question was asked.
+            // hub#1622 / hub#1634 — the document's answers, copied into the row so the decision
+            // hours later (or the sweep that finds nobody made one) reads what was in force when
+            // the question was asked.
+            on_expire: request.on_expire,
             on_reject: request.on_reject,
             partial_output: {
                 let mut parked = so_far.clone();
@@ -794,6 +796,7 @@ mod tests {
             commands: Vec::new(),
             policy,
             max_iters: 6,
+            on_expire: erplora_runtime::flows::approvals::ExpiryPolicy::Reject,
             on_reject: erplora_runtime::flows::approvals::RejectPolicy::Cancel,
         }
     }

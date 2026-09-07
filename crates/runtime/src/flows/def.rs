@@ -561,6 +561,19 @@ pub struct AiStep {
     pub commands: Vec<String>,
     pub policy: AiPolicy,
     pub max_iters: i64,
+    /// **What a SILENCE costs the run** (hub#1634). The sister of [`AiStep::on_reject`], and
+    /// reachable under the same policy: a proposal nobody ever answers expires at 72 h, and until
+    /// this key existed that always ended the run — so the step written to tell the customer
+    /// nobody got back to her went unrun, which is the whole bug.
+    ///
+    /// Same closed vocabulary as [`ApprovalStep::on_expire`] and the same default,
+    /// [`ExpiryPolicy::Reject`]: every document already deployed says nothing here, and a silence
+    /// is read as a refusal because the steps after a proposal assumed it acted.
+    ///
+    /// Read from the flow at PROPOSE time and copied into the row, exactly like `on_reject`; from
+    /// then on the sweep reads the ROW (see [`crate::flows::approvals::ExpiryPolicy`]), so editing
+    /// the document while a question is sitting in the tray does not change what its silence costs.
+    pub on_expire: ExpiryPolicy,
     /// **What a «no» costs the run** (hub#1622). Only reachable under [`AiPolicy::Manual`], which
     /// is the only policy that asks anybody: an `auto` step proposes nothing and there is nothing
     /// to refuse.
@@ -1426,7 +1439,16 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "reschedule_on",
         ],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
-        StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters", "on_reject"],
+        StepKind::Ai => &[
+            "id",
+            "kind",
+            "prompt",
+            "tools",
+            "policy",
+            "max_iters",
+            "on_expire",
+            "on_reject",
+        ],
         StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars", "interactive"],
         StepKind::Approval => &[
             "id",
@@ -2208,6 +2230,26 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         ));
     }
 
+    // **What a silence costs, said by the step that proposes** (hub#1634). The sister of
+    // `on_reject` below, and parsed the same way: absent means [`ExpiryPolicy::Reject`], which is
+    // what an unanswered proposal has always done, and an unrecognised value is refused where it
+    // was typed rather than read as one of the three.
+    let on_expire = match map.get("on_expire") {
+        None | Some(Json::Null) => ExpiryPolicy::Reject,
+        Some(Json::String(s)) if ExpiryPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            ExpiryPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_expire` is one of {}",
+                    joined(ExpiryPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+
     // **What a refusal costs, said by the step that proposes** (hub#1622). Same closed vocabulary
     // and same default as the `approval` step's: absent means [`RejectPolicy::Cancel`], which is
     // what a rejection has always done, and an unrecognised value is refused where it was typed
@@ -2234,6 +2276,7 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         commands,
         policy,
         max_iters,
+        on_expire,
         on_reject,
     })
 }
@@ -3451,18 +3494,72 @@ mod tests {
         assert!(format!("{err}").contains("on_reject"), "{err}");
     }
 
-    /// The half deliberately NOT shipped with hub#1622: `on_expire` stays clamped to the row's
-    /// default for a model's proposal, so a document must not be able to claim otherwise and get
-    /// silence. It is whatsapp_inbox#70's kernel half, and it lands with its own behaviour.
+    /// **The silence stops being a dead end** (hub#1634 — the half deliberately NOT shipped with
+    /// hub#1622). A proposal nobody answers expires at 72 h, and until now that killed the run
+    /// wherever it stood: every step written after it went unrun, including the one that tells the
+    /// customer nobody got back to her. `approval` steps have been able to say otherwise since
+    /// hub#950; this is the same sentence, in the step that actually proposes.
     #[test]
-    fn an_ai_step_still_refuses_the_expiry_policy_it_cannot_yet_honour() {
-        let err = FlowDefinition::parse(&json!({
+    fn an_ai_step_can_say_that_a_silence_lets_the_run_carry_on() {
+        let def = FlowDefinition::parse(&json!({
             "schema_version": 1,
             "steps": [{
-                "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": "continue"
+                "id": "propose_appointment",
+                "kind": "ai",
+                "prompt": "Book what she asked for",
+                "tools": { "commands": ["appointments.appointments.create"] },
+                "policy": "manual",
+                "on_expire": "continue"
             }]
         }))
-        .expect_err("a key nobody reads must not look like a setting (hub#521)");
+        .expect("the shape the WhatsApp template writes so an expiry still answers the customer");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.on_expire, ExpiryPolicy::Continue);
+        assert_eq!(ai.policy, AiPolicy::Manual);
+    }
+
+    /// The DEFAULT is the one that must not move: every document already deployed says nothing
+    /// here, and reading that silence as anything but `reject` would change what a proposal
+    /// nobody answered does — on hubs that never asked for it.
+    #[test]
+    fn an_ai_step_that_says_nothing_still_dies_on_an_expiry() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi" }]
+        }))
+        .expect("the shape every deployed document has");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(
+            ai.on_expire,
+            ExpiryPolicy::Reject,
+            "silence is read as a refusal, because the steps after a proposal assumed it acted"
+        );
+    }
+
+    /// Same closed vocabulary as the `approval` step's, and refused for the same reason as
+    /// `on_reject`: anything quietly reading as `continue` would carry a run past a proposal
+    /// nobody ever agreed to.
+    #[test]
+    fn an_ai_steps_expiry_policy_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["cancle", "continu", "rejected", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": value
+                }]
+            }))
+            .expect_err("a policy this kernel cannot obey is refused where it was typed");
+            assert!(format!("{err}").contains("on_expire"), "{err}");
+        }
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": true }]
+        }))
+        .expect_err("a policy is a string, not a flag");
         assert!(format!("{err}").contains("on_expire"), "{err}");
     }
 

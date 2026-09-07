@@ -223,6 +223,11 @@ pub struct NewApproval {
     /// parked on the step row so that, when the approval is decided hours later, the step's
     /// output is the whole turn and not just its ending.
     pub partial_output: Json,
+    /// **What the step said a SILENCE costs the run** (hub#1634). Travels from the document like
+    /// [`NewApproval::on_reject`] instead of being pinned here: the sweep reads the ROW hours
+    /// later, so a proposal decides its own fate with the policy that was in force when it was
+    /// made, not the one the document happens to say by then.
+    pub on_expire: ExpiryPolicy,
     /// What the `ai` step said a «no» costs its run (hub#1622, `def::AiStep::on_reject`). It comes
     /// from the document at PROPOSE time and is stored, for the same reason the payload is: what a
     /// refusal means has to be what was in force when the question was asked.
@@ -331,7 +336,12 @@ pub async fn create(db: &dyn DatabaseAdapter, hub_id: &str, new: &NewApproval) -
             assignee_role: "",
             expires_at: (chrono::Utc::now() + chrono::Duration::hours(DEFAULT_TTL_HOURS))
                 .to_rfc3339(),
-            on_expire: ExpiryPolicy::Reject,
+            // The `ai` step's own answer since hub#1634; before that it was pinned here to
+            // `reject`, so a proposal nobody answered always killed the run and the step written
+            // to tell the customer never ran. It still DEFAULTS to `reject` — the document has to
+            // opt in — and the sweep reads it from the ROW for the same reason `on_reject` is
+            // read there: the policy that applies is the one in force when the question was asked.
+            on_expire: new.on_expire,
             // The `ai` step's own answer since hub#1622; before that it was pinned here to
             // `cancel`, and every step written after a proposal went unrun on a refusal. It still
             // DEFAULTS to `cancel` — the document has to opt in. Reading it from the row rather
@@ -749,6 +759,7 @@ mod tests {
             payload: json!({ "customer": "Marta", "minutes": 45 }),
             reason: "the customer asked for a colour, which takes 45 minutes".into(),
             partial_output: json!({ "text": "I will book it" }),
+            on_expire: ExpiryPolicy::Reject,
             on_reject: RejectPolicy::Cancel,
         }
     }
@@ -783,6 +794,39 @@ mod tests {
         assert_eq!(
             default.on_reject, ON_REJECT_CANCEL,
             "a document that says nothing still ends the run, as it always has"
+        );
+    }
+
+    /// **And so does its answer about a SILENCE** (hub#1634). The twin of the test above: until
+    /// now `create` pinned `reject` whatever the document said, so a proposal nobody answered
+    /// always killed the run — and the step written to tell the customer never ran. The row is
+    /// what the SWEEP reads, hours later, with no document in hand.
+    #[tokio::test]
+    async fn a_proposal_records_what_its_step_said_a_silence_costs() {
+        let db = db().await;
+        let carry_on = create(
+            &db,
+            HUB,
+            &NewApproval {
+                on_expire: ExpiryPolicy::Continue,
+                ..proposal("agenda.booking.create")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(carry_on.on_expire, ON_EXPIRE_CONTINUE);
+        assert_eq!(
+            get(&db, HUB, &carry_on.id).await.unwrap().on_expire,
+            ON_EXPIRE_CONTINUE,
+            "read back from the row, not from the value we happened to be holding"
+        );
+
+        let default = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        assert_eq!(
+            default.on_expire, ON_EXPIRE_REJECT,
+            "a document that says nothing still dies on an expiry, as it always has"
         );
     }
 

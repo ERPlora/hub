@@ -208,6 +208,7 @@ async fn a_manual_proposal_creates_an_approval_and_writes_nothing_to_the_busines
             payload: json!({ "text": "3 AM booking" }),
             reason: "the assistant proposed this".into(),
             partial_output: json!({ "text": "I will book it" }),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -266,6 +267,7 @@ async fn approving_executes_exactly_the_proposed_command_and_the_run_continues()
             payload: json!({ "text": "aaa the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -333,6 +335,7 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
             payload: json!({ "text": "the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -398,6 +401,7 @@ async fn a_refusal_that_lets_the_run_carry_on_still_hands_over_the_turn_it_parke
             // What the model had already written when it stopped to ask — the sentence a later
             // step is meant to send on.
             partial_output: json!({ "text": "no free slot on Friday" }),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Continue,
         })
         .await
@@ -448,6 +452,7 @@ async fn a_grant_revoked_between_the_proposal_and_the_approval_refuses_the_appro
             payload: json!({ "text": "the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -496,6 +501,7 @@ async fn an_approval_is_decided_once() {
             payload: json!({ "text": "one booking" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -568,6 +574,7 @@ async fn an_approval_of_another_hub_is_not_visible_here() {
             payload: json!({}),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
             on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
@@ -614,6 +621,7 @@ async fn the_tray_lists_what_is_waiting_with_the_command_and_its_payload() {
         payload: json!({ "text": "book Marta at 10:00" }),
         reason: "proposed by the assistant".into(),
         partial_output: json!({}),
+        on_expire: approvals::ExpiryPolicy::Reject,
         on_reject: approvals::RejectPolicy::Cancel,
     })
     .await
