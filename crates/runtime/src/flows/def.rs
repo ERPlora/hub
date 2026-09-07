@@ -230,6 +230,59 @@ impl StepKind {
     ];
 }
 
+/// **What a FAILURE costs the run** — the value of a step's `on_error` (hub#1635).
+///
+/// Until this existed the answer was hard-wired: a step that failed ended the run, and the steps
+/// written after it never ran. That is the right DEFAULT and it stays the default — a linear
+/// document whose write did not happen has no business carrying on as if it had. What it is not is
+/// the right ANSWER for every document: the steps written after a booking are the ones that TELL
+/// the person who asked for it, so «stop» means the customer waits for a confirmation that will
+/// never come while the salon reads the failure in its tray.
+///
+/// 🔴 **The vocabulary is closed at two values, and `retry` is deliberately not one of them.**
+/// ADR-0283 §1 is not being reversed here: re-running a business command on the kernel's own
+/// initiative is how a sale gets charged twice, and no value of this enum can ask for it.
+/// [`ErrorPolicy::Continue`] runs NOTHING again — it moves to the NEXT step, which is a different
+/// instruction the document already contains. That distinction is the whole decision.
+pub const ON_ERROR_STOP: &str = "stop";
+pub const ON_ERROR_CONTINUE: &str = "continue";
+
+/// The parsed form of that key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ErrorPolicy {
+    /// End the run as `failed` — **the DEFAULT, and what a failure has always done**.
+    #[default]
+    Stop,
+    /// Carry on to the next step. The step itself is still `failed` and still records why; what
+    /// changes is the RUN. The next step reads how this one ended with `{{steps.<id>.status}}`
+    /// (`"failed"`) and `{{steps.<id>.error}}` — the same shape `on_reject: "continue"` hands over
+    /// (hub#1622), so a document that already knows how to word a refusal knows how to word this.
+    Continue,
+}
+
+impl ErrorPolicy {
+    /// Anything unrecognised degrades to [`ErrorPolicy::Stop`] — fail CLOSED, the same rule
+    /// [`crate::flows::approvals::ExpiryPolicy::parse`] follows. Documents are validated before
+    /// they are stored, so this only answers for a row written by a NEWER version of the hub, and
+    /// «carry on past a failure I do not understand» is not an answer this binary may guess.
+    pub fn parse(raw: &str) -> Self {
+        match raw {
+            ON_ERROR_CONTINUE => Self::Continue,
+            _ => Self::Stop,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stop => ON_ERROR_STOP,
+            Self::Continue => ON_ERROR_CONTINUE,
+        }
+    }
+
+    /// Every value, in document order. Mirrored by `schemas/flow.schema.json`.
+    pub const ALL: &'static [ErrorPolicy] = &[Self::Stop, Self::Continue];
+}
+
 /// What a step does, once its kind is known. The kind-specific keys are parsed **strictly** for
 /// the kinds that run; for the reserved ones nothing is parsed, because guessing the shape of a
 /// step this kernel cannot execute would freeze a contract nobody has validated.
@@ -695,6 +748,11 @@ pub struct StepDef {
     pub id: String,
     pub kind: StepKind,
     pub spec: StepSpec,
+    /// What a FAILURE of this step costs the run (hub#1635). Only the kinds that CAN fail accept
+    /// the key; for the rest it is an unknown key, refused like any other — a `condition` that
+    /// does not match is the flow working, not an error, and offering a policy for a failure that
+    /// cannot happen is a guard nobody executes.
+    pub on_error: ErrorPolicy,
 }
 
 impl StepDef {
@@ -1492,8 +1550,8 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     })?;
 
     let allowed: &[&str] = match kind {
-        StepKind::Command => &["id", "kind", "command", "params"],
-        StepKind::Query => &["id", "kind", "query", "params", "result", "limit"],
+        StepKind::Command => &["id", "kind", "command", "params", "on_error"],
+        StepKind::Query => &["id", "kind", "query", "params", "result", "limit", "on_error"],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &[
             "id",
@@ -1505,8 +1563,11 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "past_due_policy",
             "cancel_on",
             "reschedule_on",
+            "on_error",
         ],
-        StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
+        StepKind::Http => &[
+            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error",
+        ],
         StepKind::Ai => &[
             "id",
             "kind",
@@ -1516,9 +1577,19 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "max_iters",
             "on_expire",
             "on_reject",
+            "on_error",
             "output",
         ],
-        StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars", "interactive"],
+        StepKind::Notify => &[
+            "id",
+            "kind",
+            "channel",
+            "to",
+            "template",
+            "vars",
+            "interactive",
+            "on_error",
+        ],
         StepKind::Approval => &[
             "id",
             "kind",
@@ -1542,6 +1613,31 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             ));
         }
     }
+
+    // **What a FAILURE costs the run** (hub#1635), read where it was typed rather than where it is
+    // obeyed. Same closed vocabulary and same fail-closed default as `on_expire`/`on_reject`:
+    // absent means [`ErrorPolicy::Stop`] — what a failure has always done — and a value outside the
+    // vocabulary is refused at SAVE time naming both, so nobody discovers at 3 AM that the word
+    // they wrote (`retry`, the one this kernel will never have) was read as «stop».
+    //
+    // Only for the kinds that can actually fail: the allow-list above leaves it off `condition`
+    // (which stops the run by DESIGN when it does not match, and never fails) and off `approval`
+    // (whose own outcomes are `on_reject`/`on_expire`, and whose failures are not the step's).
+    let on_error = match map.get("on_error") {
+        None | Some(Json::Null) => ErrorPolicy::Stop,
+        Some(Json::String(s)) if ErrorPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            ErrorPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_error` is one of {}",
+                    joined(ErrorPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
 
     let spec = match kind {
         StepKind::Command => {
@@ -1661,7 +1757,12 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Approval => StepSpec::Approval(parse_approval(&id, map)?),
     };
 
-    Ok(StepDef { id, kind, spec })
+    Ok(StepDef {
+        id,
+        kind,
+        spec,
+        on_error,
+    })
 }
 
 /// The keys of a `delay` step (hub#951).
@@ -4366,5 +4467,114 @@ mod tests {
                 .unwrap()
                 .matches(&scope)
         );
+    }
+
+    // ── what a FAILURE costs the run (hub#1635) ────────────────────────────────────────────────
+
+    /// The opt-in, parsed where it was typed. Every kind that can fail accepts it, because the
+    /// message that tells somebody «no pudo ser» is written after whichever of them broke.
+    #[test]
+    fn a_step_that_can_fail_may_say_what_a_failure_costs() {
+        for step in [
+            json!({ "id": "s", "kind": "command", "command": "crm.note.add", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "query", "query": "crm.note.list", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "delay", "seconds": 60, "on_error": "continue" }),
+            json!({ "id": "s", "kind": "http", "url": "https://x.example/y", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "ai", "prompt": "book it", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "notify", "channel": "email", "template": "t",
+                    "to": { "query": "crm.customer.get", "field": "email" },
+                    "on_error": "continue" }),
+        ] {
+            let kind = step["kind"].as_str().unwrap().to_string();
+            let def = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .unwrap_or_else(|e| panic!("`{kind}` may declare `on_error`: {e}"));
+            assert_eq!(
+                def.steps[0].on_error,
+                ErrorPolicy::Continue,
+                "kind `{kind}`"
+            );
+        }
+    }
+
+    /// The DEFAULT, which is the half that must not move: every document already deployed says
+    /// nothing here, and silence has to keep meaning what a failure has always meant.
+    #[test]
+    fn a_step_that_says_nothing_about_failure_still_stops_the_run() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "crm.note.add" }]
+        }))
+        .unwrap();
+        assert_eq!(def.steps[0].on_error, ErrorPolicy::Stop);
+        assert_eq!(ErrorPolicy::default(), ErrorPolicy::Stop);
+    }
+
+    /// 🔴 The value the vocabulary deliberately does not have. Refused at SAVE time and naming what
+    /// may be written instead, so nobody discovers at 3 AM that the word they typed was read as
+    /// «stop» — and so no document can ever ask this kernel to re-run a business command by itself
+    /// (ADR-0283 §1).
+    #[test]
+    fn asking_the_hub_to_retry_a_failed_step_is_refused_naming_the_vocabulary() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "sales.sale.create",
+                        "on_error": "retry" }]
+        }))
+        .expect_err("`retry` is not a policy this kernel has");
+        let text = format!("{err}");
+        assert!(
+            text.contains("`on_error` is one of stop, continue"),
+            "the refusal names the vocabulary: {text}"
+        );
+    }
+
+    /// …and a value of the wrong TYPE is refused too, rather than degrading to the default. A
+    /// `true` read as «stop» is a document whose author believes they said something.
+    #[test]
+    fn a_failure_policy_that_is_not_even_a_word_is_refused() {
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "crm.note.add",
+                        "on_error": true }]
+        }))
+        .is_err());
+    }
+
+    /// The kinds that CANNOT fail do not accept the key, and the refusal is the ordinary
+    /// unknown-key one. A `condition` that does not match is the flow working exactly as written —
+    /// offering it a failure policy would be a guard nobody ever executes — and an `approval`
+    /// answers with `on_reject`/`on_expire`, which are about a PERSON and not about a breakage.
+    #[test]
+    fn a_step_that_cannot_fail_does_not_accept_a_failure_policy() {
+        for step in [
+            json!({ "id": "s", "kind": "condition", "when": { "input.x": { "eq": 1 } },
+                    "on_error": "continue" }),
+            json!({ "id": "s", "kind": "approval", "title": "¿Seguimos?", "on_error": "continue" }),
+        ] {
+            let kind = step["kind"].as_str().unwrap().to_string();
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err(&format!("`{kind}` must refuse `on_error`"));
+            let text = format!("{err}");
+            assert!(
+                text.contains("unknown key `on_error`"),
+                "`{kind}` refuses it as an unknown key: {text}"
+            );
+        }
+    }
+
+    /// A row written by a NEWER hub degrades to the conservative answer instead of being guessed
+    /// at. `parse` is fail-closed for the same reason `ExpiryPolicy::parse` is: «carry on past a
+    /// failure whose instructions I cannot read» is not an answer this binary may invent.
+    #[test]
+    fn a_failure_policy_this_binary_does_not_know_reads_as_stop() {
+        assert_eq!(ErrorPolicy::parse("continue"), ErrorPolicy::Continue);
+        assert_eq!(ErrorPolicy::parse("stop"), ErrorPolicy::Stop);
+        for unknown in ["retry", "", "CONTINUE", "skip"] {
+            assert_eq!(
+                ErrorPolicy::parse(unknown),
+                ErrorPolicy::Stop,
+                "`{unknown}` must not talk this hub into carrying on"
+            );
+        }
     }
 }

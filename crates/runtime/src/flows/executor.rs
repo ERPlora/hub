@@ -35,7 +35,7 @@ use serde_json::{json, Map, Value as Json};
 
 use crate::commands::{self, Origin};
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::{self, FlowDefinition, PastDuePolicy, StepDef, StepSpec};
+use crate::flows::def::{self, ErrorPolicy, FlowDefinition, PastDuePolicy, StepDef, StepSpec};
 use crate::flows::http::HttpRequest;
 use crate::flows::{approvals, grants, http, notify, query, store, triggers, waits};
 use crate::registry::{new_id, now_rfc3339, AutomationCtx, Registry, RequestContext};
@@ -333,13 +333,28 @@ async fn advance_run(
                     .await
                     .map(|()| None)
             }
-            Outcome::Failed { error } => {
-                // v1 is `on_error: "stop"` (ADR-0283 §1): a linear flow has nowhere else to go,
-                // and retrying a business command by itself is how a sale gets charged twice.
-                return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error)
-                    .await
-                    .map(|()| None);
-            }
+            // **What a failure costs is the STEP's answer, not this loop's** (hub#1635). The
+            // default is still `stop` — a linear document whose write did not happen has no
+            // business carrying on as if it had — and a document that says `on_error: "continue"`
+            // gets exactly one thing more: the NEXT step, with how this one ended readable at
+            // `steps.<id>`. Nothing is re-run; ADR-0283 §1 stands, and `retry` is not in the
+            // vocabulary.
+            Outcome::Failed { error } => match step.on_error {
+                ErrorPolicy::Stop => {
+                    return finish(db, hub_id, &run_id, store::STATUS_FAILED, &error)
+                        .await
+                        .map(|()| None);
+                }
+                ErrorPolicy::Continue => {
+                    // The step row is already `failed` with its reason (every arm of `run_step`
+                    // writes it before returning `Failed`), and it STAYS failed: `continue` is
+                    // about the run, and a history that called it done would be a lie the tray
+                    // reads.
+                    set_step_output(&mut vars, &step.id, failure_output(json!({}), &error));
+                    index += 1;
+                    persist_vars(db, hub_id, &run_id, index, &vars).await?;
+                }
+            },
             // The question is asked; the run leaves the queue until somebody answers it. It goes
             // out through `complete_io` — the same door the `ai` step's proposal parks through —
             // so `waiting_approval` is written in exactly one place, and the resume path
@@ -1216,11 +1231,69 @@ fn error_text(error: &RuntimeError) -> String {
     }
 }
 
-fn parse_json(raw: &str) -> Json {
+pub(crate) fn parse_json(raw: &str) -> Json {
     serde_json::from_str(raw).unwrap_or_else(|_| json!({}))
 }
 
-fn set_step_output(vars: &mut Json, step_id: &str, output: Json) {
+/// The `on_error` of the step at `index`, read from the DOCUMENT at the moment a failure that
+/// happened outside the tick is answered (hub#1635).
+///
+/// **From the document and not from a row**, which is where it differs from `on_reject`/`on_expire`
+/// (hub#950, hub#1622) — and the difference is WHO answers. Those two are answered by a person
+/// hours later, or by her silence, so what governs has to be the document that was in force when
+/// she was ASKED, and it travels on the proposal: editing the flow while somebody is looking at the
+/// tray must not change what her refusal costs. `on_error` is answered by the RUN itself, at the
+/// same instant every other step of that run reads the document — `advance_run` re-parses
+/// `flow.definition` on EVERY tick, and the step this policy sends the run to is parsed from the
+/// version that is current then. Freezing this one key would be the inconsistency, not the
+/// safeguard.
+///
+/// Anything unreadable — a flow deleted or disabled mid-call, a document this binary can no longer
+/// parse, an index past the end — is [`ErrorPolicy::Stop`]. Fail CLOSED: it is the answer this path
+/// has always given, and «carry on past a failure whose instructions I cannot read» is not one a
+/// kernel may guess.
+pub(crate) async fn step_error_policy(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    flow_id: &str,
+    index: i64,
+) -> ErrorPolicy {
+    let Ok(flow) = store::get(db, hub_id, flow_id).await else {
+        return ErrorPolicy::Stop;
+    };
+    let Ok(def) = FlowDefinition::parse(&flow.definition) else {
+        return ErrorPolicy::Stop;
+    };
+    def.steps
+        .get(index as usize)
+        .map(|s| s.on_error)
+        .unwrap_or(ErrorPolicy::Stop)
+}
+
+/// What a step that FAILED leaves in `steps.<id>` when the document said `on_error: "continue"`
+/// (hub#1635).
+///
+/// Two keys, whichever kind failed and whichever side of the seam it failed on: `status` — the same
+/// word the step row now carries, so the step written after it reads ONE key however the one before
+/// went — and `error`, the reason, because a message that cannot say WHY is not worth sending.
+///
+/// They are written OVER whatever the step had already produced, which is the half that makes the
+/// `ai` step work: the turn parked when it stopped to ask is still there under them, exactly as
+/// `on_reject: "continue"` hands it over (hub#1622). Without that, `{{steps.<id>.text}}` renders
+/// empty in the very message this primitive exists to send.
+pub(crate) fn failure_output(parked: Json, error: &str) -> Json {
+    let mut output = if parked.is_object() {
+        parked
+    } else {
+        json!({})
+    };
+    let map = output.as_object_mut().expect("just made an object");
+    map.insert("status".to_string(), json!(STEP_FAILED));
+    map.insert("error".to_string(), json!(error));
+    output
+}
+
+pub(crate) fn set_step_output(vars: &mut Json, step_id: &str, output: Json) {
     if !vars.is_object() {
         *vars = json!({});
     }
@@ -1263,7 +1336,7 @@ pub async fn complete_io(
     p.insert("hub_id".into(), json!(hub_id));
     let res = db
         .query(
-            "SELECT current_step, vars, status FROM _flow_runs \
+            "SELECT current_step, vars, status, flow_id FROM _flow_runs \
              WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
             &p,
         )
@@ -1276,6 +1349,7 @@ pub async fn complete_io(
     };
     let index = run["current_step"].as_i64().unwrap_or(0);
     let mut vars: Json = parse_json(run["vars"].as_str().unwrap_or("{}"));
+    let flow_id = run["flow_id"].as_str().unwrap_or_default().to_string();
 
     // The step this run is waiting on, and its status. Anything else means the answer is stale.
     let mut p = Params::new();
@@ -1284,7 +1358,7 @@ pub async fn complete_io(
     p.insert("step_index".into(), json!(index));
     let step_row = db
         .query(
-            "SELECT step_id, status FROM _flow_run_steps \
+            "SELECT step_id, status, output FROM _flow_run_steps \
              WHERE run_id = :run_id AND hub_id = :hub_id AND step_index = :step_index \
                AND deleted_at IS NULL",
             &p,
@@ -1340,6 +1414,16 @@ pub async fn complete_io(
             .await?;
         }
         IoResult::Failed(error) => {
+            // What the turn had already produced, read BEFORE the row is overwritten: for an `ai`
+            // step this is the answer parked when it stopped to ask, and the message this run is
+            // about to send renders it with `{{steps.<id>.text}}`.
+            let parked = parse_json(
+                step_row
+                    .rows
+                    .first()
+                    .and_then(|r| r["output"].as_str())
+                    .unwrap_or("{}"),
+            );
             let mut p = Params::new();
             p.insert("hub_id".into(), json!(hub_id));
             p.insert("run_id".into(), json!(run_id));
@@ -1353,8 +1437,32 @@ pub async fn complete_io(
                 &p,
             )
             .await?;
-            // v1 is `on_error: "stop"` — the same answer a failed command gets.
-            finish(db, hub_id, run_id, store::STATUS_FAILED, &error).await?;
+            // **The same question the tick asks** (hub#1635), on the far side of the seam: what a
+            // failure costs the run is the STEP's answer. The default — and the answer whenever the
+            // document cannot be read, which is where a deleted or rolled-back flow lands — is the
+            // one this arm has always given: the run fails here.
+            match step_error_policy(db, hub_id, &flow_id, index).await {
+                ErrorPolicy::Stop => {
+                    finish(db, hub_id, run_id, store::STATUS_FAILED, &error).await?;
+                }
+                ErrorPolicy::Continue => {
+                    set_step_output(&mut vars, step_id, failure_output(parked, &error));
+                    persist_vars(db, hub_id, run_id, index + 1, &vars).await?;
+                    // Back in the queue with the lease released, exactly like a call that WORKED:
+                    // the next tick runs the step that tells whoever was waiting.
+                    let mut p = Params::new();
+                    p.insert("id".into(), json!(run_id));
+                    p.insert("hub_id".into(), json!(hub_id));
+                    p.insert("now".into(), json!(now));
+                    db.execute(
+                        "UPDATE _flow_runs SET status = 'pending', claim_expires_at = NULL, \
+                                               updated_at = :now \
+                         WHERE id = :id AND hub_id = :hub_id AND deleted_at IS NULL",
+                        &p,
+                    )
+                    .await?;
+                }
+            }
         }
         // The turn stopped on a write a person has to authorise. What it produced so far is kept
         // on the step, so a decision taken hours later completes the WHOLE turn and not just its
@@ -2202,7 +2310,7 @@ mod tests {
         .unwrap();
         tick(&db, &registry(), HUB).await.unwrap();
 
-        // v1 is `on_error: stop`.
+        // This document says nothing about failure, so the default `on_error: stop` applies.
         let run = run_of(&db, &flow_id).await;
         assert_eq!(run.status, store::STATUS_FAILED);
         assert!(

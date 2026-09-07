@@ -298,7 +298,10 @@ async fn a_server_that_never_answers_fails_the_step_and_stops_the_run() {
     assert!(elapsed.as_secs() < 10, "it gave up on time ({elapsed:?})");
     assert_eq!(server.hits(), 1, "the request did go out");
     let (status, error) = run_status(&rt, &flow_id).await;
-    assert_eq!(status, "failed", "v1 is `on_error: stop`");
+    assert_eq!(
+        status, "failed",
+        "this document says nothing about failure, so the default `on_error: stop` applies"
+    );
     assert!(error.contains("flow.http_timeout"), "{error}");
 }
 
