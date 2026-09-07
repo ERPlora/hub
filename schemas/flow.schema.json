@@ -270,7 +270,7 @@
             "continue"
           ],
           "default": "cancel",
-          "description": "Solo `kind: approval` — qué le cuesta al run un «no». `cancel` (POR DEFECTO) termina el run como `cancelled`, que es lo que un rechazo hace hoy; `continue` sigue con `steps.<id>.decision == \"rejected\"`. **Con `continue` + un `condition` las tres ramas (aprobado/rechazado/vencido) se componen a partir de primitivas ya congeladas, sin necesidad de una v2 con branching** — que es la misma jugada del step `query`. Viaja en la fila por el mismo motivo que `on_expire`."
+          "description": "`kind: approval` y `kind: ai` — qué le cuesta al run un «no». `cancel` (POR DEFECTO) termina el run como `cancelled`, que es lo que un rechazo hace hoy; `continue` sigue con `steps.<id>.decision == \"rejected\"`. En un paso `ai`, además, el paso conserva el turno aparcado (`steps.<id>.text`) y añade `steps.<id>.status == \"rejected\"`, igual que hace la aprobación: así el paso siguiente puede contarle a alguien cómo acabó. **Con `continue` + un `condition` las tres ramas (aprobado/rechazado/vencido) se componen a partir de primitivas ya congeladas, sin necesidad de una v2 con branching** — que es la misma jugada del step `query`. Viaja en la fila por el mismo motivo que `on_expire`."
         },
         "channel": {
           "enum": [
