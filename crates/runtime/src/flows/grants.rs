@@ -1534,7 +1534,9 @@ mod tests {
             // automation the owner has.
             check_command_grant(&db, HUB, FLOW, "sales.sale.create", &Params::new())
                 .await
-                .unwrap_or_else(|e| panic!("payload `{raw}`: the readable grant still answers: {e}"));
+                .unwrap_or_else(|e| {
+                    panic!("payload `{raw}`: the readable grant still answers: {e}")
+                });
         }
     }
 
@@ -1559,6 +1561,40 @@ mod tests {
         check_command_grant(&db, HUB, FLOW, "sales.sale.void", &sent("channel", "staff"))
             .await
             .expect("`{}` fixes nothing, so nothing is contradicted");
+    }
+
+    /// hub#1636 — the guard is scoped to `command`, and that scope is a decision, not an oversight.
+    /// Only a `command` grant carries a pin (`replace` refuses a payload on every other kind), so a
+    /// `query` row whose `payload` column is unreadable holds nothing the gate ever consults.
+    /// Denying the read would stop the flow over a column that decides nothing — containment
+    /// bought with availability and paid for with neither.
+    #[tokio::test]
+    async fn an_unreadable_payload_on_a_kind_that_has_no_pin_does_not_close_the_read() {
+        let db = db_with_schema().await;
+        replace(
+            &db,
+            HUB,
+            FLOW,
+            &registry(),
+            &[GrantSpec::pair(GrantKind::Query, "sales.sale.list")],
+            "hub_user:1",
+        )
+        .await
+        .unwrap();
+        let mut p = Params::new();
+        p.insert("hub_id".into(), json!(HUB));
+        p.insert("flow_id".into(), json!(FLOW));
+        db.execute(
+            "UPDATE _flow_grants SET payload = 'garbage' \
+             WHERE hub_id = :hub_id AND flow_id = :flow_id AND kind = 'query'",
+            &p,
+        )
+        .await
+        .unwrap();
+
+        check_query_grant(&db, HUB, FLOW, "sales.sale.list")
+            .await
+            .expect("a query grant says what it says in `value`; its `payload` decides nothing");
     }
 
     /// hub#1636 — a broken authorisation row that only failed at 3 AM would be a mystery: the flow
