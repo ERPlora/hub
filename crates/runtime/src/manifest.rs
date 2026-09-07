@@ -3,6 +3,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use erplora_db::Params;
+
 use crate::errors::{Result, RuntimeError};
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -2127,7 +2129,8 @@ impl Manifest {
     ///
     /// Una **familia** es el conjunto de ficheros que comparten prefijo:
     /// `<family>.<lang>.flow.json` (el documento por idioma, `en` es la fuente — ADR-0055/0199),
-    /// `<family>.grants.json` (**obligatorio**: lo que la plantilla pedirá al dueño) y
+    /// `<family>.grants.json` (**obligatorio**: lo que la plantilla pedirá al dueño, con el
+    /// `payload` que cada permiso FIJA si lo acota — hub#1654) y
     /// `<family>.requires.json` (opcional: el suelo de versión **por plantilla**, que a propósito
     /// NO es el `depends_on` del módulo — `whatsapp_inbox` exige `appointments >= 1.1.69` para su
     /// plantilla y su `depends_on` es solo `["customers"]`, porque la plantilla es opcional y el
@@ -2140,6 +2143,10 @@ impl Manifest {
     /// familia trae `en` y `es`, y todos los idiomas declaran la misma maquinaria) no se
     /// re-defiende aquí; lo que sí se sostiene es que un paquete que **no** pasó por ahí no rompa
     /// nada.
+    ///
+    /// 🔴 **La única excepción a «best-effort» es el pin de un grant** (hub#1654): un `payload` que
+    /// no sea un objeto tumba la familia entera, porque la alternativa —omitirlo y seguir— es
+    /// ensanchar un permiso en silencio, que es justo lo que ese campo existe para impedir.
     ///
     /// El resultado va **ordenado por familia** para que la galería no baile entre dos arranques.
     pub fn load_flow_templates(dir: &Path) -> Vec<ModuleFlowTemplate> {
@@ -2247,6 +2254,22 @@ pub struct ModuleFlowTemplate {
 pub struct FlowTemplateGrant {
     pub kind: String,
     pub value: String,
+    /// Los campos del payload que el grant **FIJA** (hub#1623, hub#1654). Vacío = no fija nada,
+    /// que es lo que valen todos los grants anteriores a hub#1623.
+    ///
+    /// 🔴 **Viaja porque es parte de lo que el permiso DICE**, no decoración: «puede anular citas»
+    /// y «puede anular citas COMO CLIENTA» son permisos distintos, y solo el segundo es seguro en
+    /// una automatización cuyo payload redacta un modelo leyendo el mensaje de un desconocido. El
+    /// tipo lo declaró `{kind, value}` hasta hub#1654 y serde tiraba la clave **sin decir nada**:
+    /// el módulo publicaba en verde —`erplora validate` ya había dado el pin por bueno—, la
+    /// pantalla enseñaba el permiso ancho y el dueño lo concedía así.
+    ///
+    /// El tipo es `Params` y no `Value` a propósito: un `payload` que no sea un objeto **tumba la
+    /// familia entera** en [`Manifest::load_flow_templates`] en vez de degradarse a «no fija
+    /// nada». Ensanchar un permiso por una errata del autor es el fallo que este campo existe
+    /// para evitar; dejar la plantilla fuera se ve, y `erplora validate` ya lo caza antes.
+    #[serde(default, skip_serializing_if = "Params::is_empty")]
+    pub payload: Params,
 }
 
 /// `<family>.grants.json` — las claves `_*` del fichero son documentación y se ignoran.

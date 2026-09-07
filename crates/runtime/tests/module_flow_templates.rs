@@ -19,7 +19,7 @@
 //!   <family>.en.flow.json     documento, idioma FUENTE (ADR-0055/0199)      OBLIGATORIO
 //!   <family>.es.flow.json     su traducción                                 OBLIGATORIO
 //!   <family>.<lang>.flow.json más idiomas                                   opcional
-//!   <family>.grants.json      { "grants": [ { kind, value }, … ] }          OBLIGATORIO
+//!   <family>.grants.json      { "grants": [ { kind, value, payload? }, … ] } OBLIGATORIO
 //!   <family>.requires.json    { "modules": { "<id>": "<SemVer>" } }         opcional
 //!   *.md                      documentación                                 opcional
 //! ```
@@ -172,4 +172,86 @@ fn a_module_without_the_folder_reads_as_no_templates() {
     // El caso de los 26 módulos que hoy no traen ninguna: ausencia, no error.
     let dir = tmp_module();
     assert!(Manifest::load_flow_templates(dir.as_path()).is_empty());
+}
+
+/// Escribe el `grants.json` de una familia ya escrita, sustituyendo el que dejó `write_family`.
+fn write_grants(dir: &Path, family: &str, grants: serde_json::Value) {
+    fs::write(
+        dir.join("flows").join(format!("{family}.grants.json")),
+        serde_json::to_string(&serde_json::json!({ "grants": grants })).unwrap(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn the_limit_a_module_puts_on_a_grant_reaches_the_hub() {
+    // hub#1654 — un `payload` en el sidecar ACOTA el permiso (hub#1623): no «puede anular citas»
+    // sino «puede anular citas COMO CLIENTA». Es lo único que impide que un modelo que redacta el
+    // payload leyendo el WhatsApp de una desconocida anule de parte del salón, saltándose la
+    // ventana de antelación y sin comprobar de quién es la cita.
+    //
+    // Si el lector se queda solo con `{kind, value}`, la plantilla se registra pidiendo el permiso
+    // ANCHO y **nadie se entera**: `erplora validate` ya dio el pin por bueno, la pantalla de
+    // permisos enseña «puede anular citas» sin acotar y el dueño lo concede así.
+    let dir = tmp_module();
+    write_family(dir.as_path(), "appointment-from-whatsapp");
+    write_grants(
+        dir.as_path(),
+        "appointment-from-whatsapp",
+        serde_json::json!([
+            { "kind": "command", "value": "appointments.appointments.create" },
+            {
+                "kind": "command",
+                "value": "appointments.appointments.cancel",
+                "payload": { "channel": "customer" }
+            }
+        ]),
+    );
+
+    let found = Manifest::load_flow_templates(dir.as_path());
+
+    // Se afirma sobre la forma SERIALIZADA a propósito: es la que `GET /api/hub/flows/templates`
+    // sirve tal cual, o sea el contrato que ve quien va a pedir el permiso. Un campo que existe en
+    // el tipo pero no sale por el cable no acota nada.
+    let grants = serde_json::to_value(&found[0].grants).unwrap();
+    let grants = grants.as_array().expect("los permisos viajan como lista");
+    assert_eq!(grants.len(), 2, "los dos permisos que pedirá la plantilla");
+    // El que no acota nada vale lo que valían todos antes de hub#1623: no fija ningún campo.
+    assert_eq!(grants[0]["value"], "appointments.appointments.create");
+    assert_eq!(
+        grants[0].get("payload").and_then(|p| p.as_object()),
+        None,
+        "un grant sin `payload` no fija nada, y no se inventa uno"
+    );
+    // Y el acotado llega ENTERO: es el campo que `check_payload_pin` va a exigir después.
+    assert_eq!(grants[1]["value"], "appointments.appointments.cancel");
+    assert_eq!(
+        grants[1]["payload"],
+        serde_json::json!({ "channel": "customer" }),
+        "el límite que el módulo declaró llega al hub"
+    );
+}
+
+#[test]
+fn a_pin_that_cannot_be_read_leaves_the_family_out() {
+    // Un `payload` que no es un objeto NO puede leerse como «no fija nada»: eso convierte una
+    // errata del autor en el permiso ANCHO, en silencio, que es exactamente el fallo que este
+    // camino existe para evitar. Se cae la familia entera, como cualquier otro sidecar ilegible
+    // (`a_family_without_its_grants_sidecar_is_not_offered`): la puerta se cierra, no se ensancha.
+    let dir = tmp_module();
+    write_family(dir.as_path(), "appointment-from-whatsapp");
+    write_grants(
+        dir.as_path(),
+        "appointment-from-whatsapp",
+        serde_json::json!([{
+            "kind": "command",
+            "value": "appointments.appointments.cancel",
+            "payload": "channel=customer"
+        }]),
+    );
+
+    assert!(
+        Manifest::load_flow_templates(dir.as_path()).is_empty(),
+        "un pin ilegible no se degrada a permiso ancho: la familia no se ofrece"
+    );
 }
