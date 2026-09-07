@@ -588,6 +588,74 @@ pub struct AiStep {
     /// the ROW (see [`crate::flows::approvals::RejectPolicy`]), so editing the document while
     /// somebody is looking at the tray does not change what their refusal costs.
     pub on_reject: RejectPolicy,
+    /// **The data the turn leaves behind, declared by the author** (hub#1639). Empty — the default
+    /// and what every flow in production is written against — means the step publishes what it
+    /// always has: `{text, tool_calls}`.
+    ///
+    /// A declared field becomes `steps.<id>.<name>` next to those two, so the options the model
+    /// found mid-conversation can be the rows of the list the customer taps
+    /// ([`NotifyStep::interactive`], hub#1633) and a later step can branch on what the turn
+    /// actually did.
+    ///
+    /// A `Vec` and not a map because the runner turns it into a SEQUENCE the model is asked for,
+    /// and that sequence has to be the same on every save: the kernel's JSON object is ordered by
+    /// key, so parsing the same document twice asks for the same fields in the same order.
+    pub output: Vec<AiOutputField>,
+}
+
+/// One field an [`AiStep`] promises to leave behind (hub#1639).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiOutputField {
+    /// Addressable by the mapping language: letters, digits and `_`, starting with a letter.
+    /// [`resolve_path`] splits on `.`, so a dotted name would address a level that does not exist
+    /// and resolve to nothing — silently, which is why `rows` was kept out of v1 in the first
+    /// place.
+    pub name: String,
+    pub kind: AiOutputKind,
+    /// What the model is told this field is for. Required, because it is the ONLY thing it reads
+    /// about the field: a field with nothing to read is a field filled with whatever the model
+    /// likes.
+    pub describe: String,
+}
+
+/// **What shape a declared output field may be** (hub#1639).
+///
+/// Closed, and deliberately short. This is not a schema language: it is the three shapes the hub
+/// can answer for on the way out. `Options` is Meta's own row shape for the same reason
+/// [`NotifyStep::interactive`] is Meta's own object (hub#1633) — the kernel grows the shape the
+/// transport already knows instead of a general one it would then have to translate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiOutputKind {
+    /// One line of prose.
+    Text,
+    /// A number, as a number — so a later `condition` compares it as one.
+    Number,
+    /// The tappable list: `[{id, title, description}]`, ready to be the `rows` of an
+    /// `interactive` send without anything in between reshaping it.
+    Options,
+}
+
+impl AiOutputKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiOutputKind::Text => "text",
+            AiOutputKind::Number => "number",
+            AiOutputKind::Options => "options",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "text" => Some(AiOutputKind::Text),
+            "number" => Some(AiOutputKind::Number),
+            "options" => Some(AiOutputKind::Options),
+            _ => None,
+        }
+    }
+    pub const ALL: &'static [AiOutputKind] = &[
+        AiOutputKind::Text,
+        AiOutputKind::Number,
+        AiOutputKind::Options,
+    ];
 }
 
 /// **What happens to a write the model proposes** (ADR-0283 D3).
@@ -1448,6 +1516,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "max_iters",
             "on_expire",
             "on_reject",
+            "output",
         ],
         StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars", "interactive"],
         StepKind::Approval => &[
@@ -2270,6 +2339,8 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         }
     };
 
+    let output = parse_ai_output(id, map.get("output"))?;
+
     Ok(AiStep {
         prompt,
         queries,
@@ -2278,7 +2349,122 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         max_iters,
         on_expire,
         on_reject,
+        output,
     })
+}
+
+/// **What the turn promises to leave behind** (hub#1639), in declaration order.
+///
+/// Absent is the default and means «what an `ai` step has always published»: every flow already in
+/// production is written against `{text, tool_calls}` and must keep resolving the same way.
+///
+/// Everything here is refused at SAVE time rather than discovered at 3 AM. The whole reason a
+/// document declares its output instead of the runner guessing it is that a mapping which resolves
+/// to nothing does so *silently* — the same failure that kept `rows` out of v1.
+fn parse_ai_output(id: &str, raw: Option<&Json>) -> Result<Vec<AiOutputField>> {
+    let fields = match raw {
+        None | Some(Json::Null) => return Ok(Vec::new()),
+        Some(Json::Object(m)) => m,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output` is `{{<name>: {{type, describe}}}}` — the fields this \
+                     turn leaves behind, each with words saying what goes in it"
+                ),
+            ))
+        }
+    };
+
+    let mut parsed = Vec::with_capacity(fields.len());
+    for (name, spec) in fields {
+        // The turn's own two keys. `{{steps.<id>.text}}` means «the sentence the model wrote» in
+        // every flow already written; letting a document take that name would change what an
+        // existing mapping resolves to without anybody touching the mapping.
+        if matches!(name.as_str(), "text" | "tool_calls") {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}` is what the turn itself publishes, so it is not \
+                     the document's to redefine. Give the field another name."
+                ),
+            ));
+        }
+        // `steps.<id>.<name>` is walked by `resolve_path`, which splits on `.`: a dotted or spaced
+        // name would address a level that is not there and resolve to null with no complaint.
+        if !is_addressable_name(name) {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output` field `{name}` cannot be addressed by the mapping \
+                     language. A name is a letter followed by letters, digits or `_` — anything \
+                     else makes `steps.{id}.{name}` resolve to nothing without saying so."
+                ),
+            ));
+        }
+
+        let Json::Object(spec) = spec else {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `output.{name}` is `{{type, describe}}`"),
+            ));
+        };
+        for key in spec.keys() {
+            if !matches!(key.as_str(), "type" | "describe") {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!("step `{id}`: unknown key `{key}` in `output.{name}`"),
+                ));
+            }
+        }
+
+        let kind = match spec.get("type") {
+            Some(Json::String(s)) => AiOutputKind::parse(s),
+            _ => None,
+        }
+        .ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}.type` is one of {}",
+                    joined(AiOutputKind::ALL.iter().map(|k| k.as_str()))
+                ),
+            )
+        })?;
+
+        // The description is the ONLY thing the model is told about the field. Empty means a field
+        // filled with whatever it likes, which is precisely the silent wrong answer this
+        // vocabulary exists to prevent — so it is required, not defaulted to the field name.
+        let describe = spec
+            .get("describe")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if describe.is_empty() {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}` needs `describe` — words telling the model what \
+                     goes in this field. It is the only thing it reads about it."
+                ),
+            ));
+        }
+
+        parsed.push(AiOutputField {
+            name: name.clone(),
+            kind,
+            describe,
+        });
+    }
+    Ok(parsed)
+}
+
+/// Can `resolve_path` reach `steps.<id>.<name>`? A letter, then letters, digits or `_`.
+fn is_addressable_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// The keys of an `approval` step (hub#950).
@@ -3561,6 +3747,189 @@ mod tests {
         }))
         .expect_err("a policy is a string, not a flag");
         assert!(format!("{err}").contains("on_expire"), "{err}");
+    }
+
+    /// **The turn can leave DATA behind, not only a sentence** (hub#1639). Until now an `ai` step
+    /// published `{text, tool_calls}` and nothing else, so the three free slots it had just found
+    /// while talking to the customer could not become the list she taps — the options had to be
+    /// written by hand in the document, which is exactly what they existed to avoid.
+    #[test]
+    fn an_ai_step_can_declare_the_data_its_turn_leaves_behind() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick",
+                "kind": "ai",
+                "prompt": "Find her three slots",
+                "tools": { "queries": ["appointments.free_slots"] },
+                "output": {
+                    "slots": { "type": "options", "describe": "the free slots you found" },
+                    "action": { "type": "text", "describe": "booked, cancelled or asking" }
+                }
+            }]
+        }))
+        .expect("the shape the WhatsApp recipe needs to offer slots it discovered mid-conversation");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.output.len(), 2);
+        let slots = ai.output.iter().find(|f| f.name == "slots").expect("slots");
+        assert_eq!(slots.kind, AiOutputKind::Options);
+        assert_eq!(slots.describe, "the free slots you found");
+        let action = ai.output.iter().find(|f| f.name == "action").expect("action");
+        assert_eq!(action.kind, AiOutputKind::Text);
+        // The runner asks the model for these as a SEQUENCE, so the sequence must not move between
+        // saves. The kernel's JSON object is ordered by key, so the order is that one — the point
+        // of the assertion is that it is FIXED, not which end `slots` lands on.
+        let order: Vec<&str> = ai.output.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(order, ["action", "slots"]);
+        let again = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick", "kind": "ai", "prompt": "Find her three slots",
+                "output": {
+                    "action": { "type": "text", "describe": "booked, cancelled or asking" },
+                    "slots": { "type": "options", "describe": "the free slots you found" }
+                }
+            }]
+        }))
+        .expect("the same fields written in the other order");
+        let StepSpec::Ai(reordered) = &again.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(
+            reordered
+                .output
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>(),
+            order,
+            "the model is asked for the same fields in the same order however they were typed"
+        );
+    }
+
+    /// A step that declares nothing keeps the output it has always had. The absent case is the one
+    /// every flow already in production is written against.
+    #[test]
+    fn an_ai_step_that_declares_no_output_is_unchanged() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi" }]
+        }))
+        .expect("the shape every flow in production is written against");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert!(ai.output.is_empty());
+    }
+
+    /// Same discipline as `policy` and `on_reject`: a closed vocabulary, refused where it was
+    /// typed. A `"type": "list"` quietly read as `options` would publish Meta's row shape for a
+    /// field the author meant as prose, and the customer would get a message nobody wrote.
+    #[test]
+    fn an_ai_outputs_type_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["list", "string", "array", "rows", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { "slots": { "type": value, "describe": "d" } }
+                }]
+            }))
+            .expect_err("a shape this kernel cannot publish is refused where it was typed");
+            assert!(format!("{err}").contains("type"), "{err}");
+        }
+    }
+
+    /// `describe` is not decoration: it is the only thing the model is told about the field. A
+    /// field with nothing to read is a field the model fills with whatever it likes, which is the
+    /// silent-wrong-answer this vocabulary exists to prevent.
+    #[test]
+    fn an_ai_output_field_needs_words_saying_what_goes_in_it() {
+        for bad in [json!({ "type": "text" }), json!({ "type": "text", "describe": "  " })] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi", "output": { "action": bad }
+                }]
+            }))
+            .expect_err("the description IS the instruction the model reads");
+            assert!(format!("{err}").contains("describe"), "{err}");
+        }
+    }
+
+    /// The turn's own two keys are not available to redefine. `{{steps.pick.text}}` means the
+    /// sentence the model wrote in every flow already written; a document that could take that
+    /// name would change what an existing mapping resolves to without touching the mapping.
+    #[test]
+    fn an_ai_output_cannot_take_the_name_of_what_the_turn_already_publishes() {
+        for reserved in ["text", "tool_calls"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { reserved: { "type": "text", "describe": "d" } }
+                }]
+            }))
+            .expect_err("the turn's own keys are not the author's to redefine");
+            let text = format!("{err}");
+            assert!(text.contains(reserved), "{text}");
+        }
+    }
+
+    /// A field name travels into `steps.<id>.<name>`, and [`resolve_path`] splits on `.`. A name
+    /// with a dot in it would address a level that does not exist and resolve to nothing —
+    /// silently, which is the failure mode `rows` was kept out of v1 to avoid.
+    #[test]
+    fn an_ai_output_name_must_be_addressable_by_the_mapping_language() {
+        for bad in ["my.slots", "", " ", "slots-a", "1st"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { bad: { "type": "text", "describe": "d" } }
+                }]
+            }))
+            .unwrap_err();
+            assert!(format!("{err}").contains("output"), "name `{bad}`: {err}");
+        }
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick", "kind": "ai", "prompt": "hi",
+                "output": { "free_slots2": { "type": "text", "describe": "d" } }
+            }]
+        }))
+        .expect("letters, digits and `_` are what the mapping language can address");
+    }
+
+    /// The whole point of the change, checked where it lands: a bare path inside `interactive`
+    /// resolves to the ARRAY the turn published, with its type intact — so the rows of the list
+    /// are the slots the model found, not a string that looks like one.
+    #[test]
+    fn the_options_an_ai_turn_published_become_the_rows_of_a_tappable_list() {
+        let scope = json!({
+            "steps": {
+                "pick": {
+                    "text": "Estos son los huecos",
+                    "slots": [
+                        { "id": "s1", "title": "10:00", "description": "con Ana" },
+                        { "id": "s2", "title": "12:30", "description": "con Ana" }
+                    ]
+                }
+            }
+        });
+        let interactive = json!({
+            "type": "list",
+            "body": { "text": "{{steps.pick.text}}" },
+            "action": { "sections": [{ "title": "Huecos", "rows": "steps.pick.slots" }] }
+        });
+        let filled = resolve(&interactive, &scope);
+        let rows = &filled["action"]["sections"][0]["rows"];
+        assert!(rows.is_array(), "the rows keep their type: {filled}");
+        assert_eq!(rows.as_array().expect("array").len(), 2);
+        assert_eq!(rows[1]["id"], json!("s2"));
+        assert_eq!(filled["body"]["text"], json!("Estos son los huecos"));
     }
 
     /// Every turn of the loop costs a call through the SaaS proxy, which meters real money
