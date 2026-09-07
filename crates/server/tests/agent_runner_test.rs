@@ -660,6 +660,84 @@ async fn rejecting_from_the_tray_books_nothing() {
     assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
 }
 
+/// **hub#1622 — the document's answer reaches the row, and a refusal it lets through carries the
+/// run on with its turn.** Between the document and the approval row there are two hops the kernel
+/// tests never drive — `prepare` copies `on_reject` into the `AiRequest`, `dispatch` copies it into
+/// the `NewApproval` — and pinning either to `cancel` left every other test green while every
+/// template's `on_reject: "continue"` became a dead letter. This drives the REAL runner against a
+/// scripted SaaS, then says no from the tray.
+#[tokio::test]
+async fn hub1622_a_refusal_the_document_lets_through_carries_the_run_on_with_its_turn() {
+    // The shape a real turn has: the model WRITES (the sentence a later step is meant to send
+    // on) and then proposes. One turn, two events.
+    let text = "No free slot on Friday; I can offer Monday at 10.";
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    let mut step = agent_step("manual");
+    step["on_reject"] = json!("continue");
+    let h = hub(
+        cloud.serve().await,
+        "reject-continue",
+        step,
+        &[(GrantKind::Command, "agenda.booking.create".into())],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_reject,
+        approvals::ON_REJECT_CONTINUE,
+        "the row records what the DOCUMENT said, carried through the request — not the default"
+    );
+
+    let response = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{}/reject", pending[0].id),
+            Some(&h.admin_session),
+            Some(json!({ "comment": "we are full that day" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    assert!(bookings(&h).await.is_empty(), "a rejection writes nothing");
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_DONE,
+        "`continue` means the run finishes its remaining steps instead of dying in `cancelled`"
+    );
+    let output = step_output(&h, &run_id).await;
+    assert_eq!(output["status"], json!(approvals::STATUS_REJECTED));
+    assert_eq!(output["decision"], json!(approvals::STATUS_REJECTED));
+    assert_eq!(output["comment"], json!("we are full that day"));
+    assert_eq!(
+        output["text"],
+        json!(text),
+        "the turn parked when the model stopped to ask is handed over, not just how it ended"
+    );
+    assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
+}
+
 /// `policy: "auto"` is the owner saying, in writing, "do it". Then the command runs in the turn
 /// and the model is told what happened, so it can answer the customer.
 #[tokio::test]

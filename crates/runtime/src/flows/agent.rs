@@ -151,6 +151,11 @@ mod tests {
 
     /// Parks a run on its `ai` step, exactly as the tick does, and returns its id.
     async fn parked(db: &dyn DatabaseAdapter) -> String {
+        parked_with(db, definition()).await
+    }
+
+    /// Same, for a document the test writes itself.
+    async fn parked_with(db: &dyn DatabaseAdapter, definition: Json) -> String {
         let flow = store::create(
             db,
             HUB,
@@ -158,7 +163,7 @@ mod tests {
             &NewFlow {
                 name: "A".into(),
                 enabled: true,
-                definition: definition(),
+                definition,
             },
             "hub_user:1",
         )
@@ -195,6 +200,42 @@ mod tests {
             "the default (ADR-0283 D3)"
         );
         assert_eq!(request.max_iters, def::DEFAULT_MAX_ITERS);
+    }
+
+    /// **What the step said a refusal costs travels with the request** (hub#1622). The runner
+    /// copies `AiRequest::on_reject` into the approval row without re-reading the document, so
+    /// this is the ONLY place the document's answer can be lost: a request that always said
+    /// `cancel` would leave every template's `on_reject: "continue"` a dead letter, with every
+    /// other test green.
+    #[tokio::test]
+    async fn the_request_carries_what_the_step_said_a_refusal_costs() {
+        let db = db().await;
+        let run_id = parked_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "agent", "kind": "ai", "prompt": "book {{input.who}}",
+                      "tools": { "commands": ["crm.note.add"] }, "on_reject": "continue" }
+                ]
+            }),
+        )
+        .await;
+        let request = prepare(&db, HUB, &run_id, "agent").await.unwrap();
+        assert_eq!(
+            request.on_reject,
+            RejectPolicy::Continue,
+            "the document said a «no» lets the run carry on, and the request has to say the same"
+        );
+
+        let default = prepare(&db, HUB, &parked(&db).await, "agent")
+            .await
+            .unwrap();
+        assert_eq!(
+            default.on_reject,
+            RejectPolicy::Cancel,
+            "a document that says nothing still ends the run on a refusal"
+        );
     }
 
     /// A caller that could resume an arbitrary run would be a way around the claim, and the claim
