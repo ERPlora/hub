@@ -123,14 +123,11 @@ fn flow_template_files(family: &str) -> Vec<(String, String)> {
     for (lang, name) in [("en", "Restock parts"), ("es", "Reponer piezas")] {
         let doc = json!({
             "schema_version": 1,
-            "name": name,
+            "name": format!("{name} ({family})"),
             "triggers": [{ "kind": "manual" }],
             "steps": [{ "id": "s1", "kind": "command", "command": "parts.parts.restock" }]
         });
-        files.push((
-            format!("flows/{family}.{lang}.flow.json"),
-            doc.to_string(),
-        ));
+        files.push((format!("flows/{family}.{lang}.flow.json"), doc.to_string()));
     }
     files.push((
         format!("flows/{family}.grants.json"),
@@ -233,9 +230,13 @@ async fn an_update_applies_only_the_migrations_the_new_version_adds() {
 #[tokio::test]
 async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     let root = scratch("fails");
-    // v1 ships a factory automation (hub#1611). The rollback has to bring it back with the module:
-    // otherwise the entry vanishes from Automations until the next boot and the owner sees a
-    // template disappear because of an update that, on screen, never happened (hub#1650).
+    // v1 ships two factory automations (hub#1611). The rollback has to bring them back with the
+    // module: otherwise the entry vanishes from Automations until the next boot and the owner sees
+    // a template disappear because of an update that, on screen, never happened (hub#1650).
+    //
+    // TWO and not one on purpose: with a single family, a snapshot that kept only PART of the
+    // module's list — the first one, the ones matching some filter — would look identical to one
+    // that kept everything, and the owner would lose an automation without a single test noticing.
     let mut v1_files: Vec<(String, String)> = vec![
         (
             "migrations/postgres/001_init.sql".to_string(),
@@ -244,6 +245,7 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
         ("sql/list.sql".to_string(), V1_LIST.to_string()),
     ];
     v1_files.extend(flow_template_files("parts-restock"));
+    v1_files.extend(flow_template_files("parts-audit"));
     let v1_refs: Vec<(&str, &str)> = v1_files
         .iter()
         .map(|(a, b)| (a.as_str(), b.as_str()))
@@ -289,8 +291,8 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     // otherwise make the post-rollback check pass while proving nothing.
     assert_eq!(
         offered_families(&rt),
-        vec!["parts-restock".to_string()],
-        "v1's factory automation is offered before the update is even attempted"
+        vec!["parts-audit".to_string(), "parts-restock".to_string()],
+        "v1's factory automations are offered before the update is even attempted"
     );
 
     let error = rt
@@ -353,9 +355,9 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     // snapshot carried them — nothing else repopulates them until the next boot.
     assert_eq!(
         offered_families(&rt),
-        vec!["parts-restock".to_string()],
-        "v1's factory automation is offered again after the failed update, and it is v1's — \
-         not the family the version that failed declared"
+        vec!["parts-audit".to_string(), "parts-restock".to_string()],
+        "v1's factory automations are ALL offered again after the failed update, and they are \
+         v1's — not the family the version that failed declared"
     );
 
     let _ = fs::remove_dir_all(&root);
