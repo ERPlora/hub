@@ -195,10 +195,8 @@ async fn drive(st: &AppState, run_id: &str, step_id: &str) -> Result<IoResult, S
             // deliberately not logged as a tool the model ran, and a module that happened to name
             // an operation `flow_answer` cannot take its place.
             if !request.output.is_empty() && call.name == ANSWER_TOOL {
-                let declared = collect_declared_output(
-                    &request.output,
-                    &parse_arguments(&call.arguments),
-                )?;
+                let declared =
+                    collect_declared_output(&request.output, &parse_arguments(&call.arguments))?;
                 let mut out = Map::new();
                 out.insert("text".into(), json!(answered));
                 out.insert("tool_calls".into(), json!(calls_made));
@@ -378,9 +376,11 @@ fn check_options(name: &str, value: &Value) -> Result<Value, String> {
     };
     for (index, row) in rows.iter().enumerate() {
         let ok = row.as_object().is_some_and(|r| {
-            ["id", "title"]
-                .iter()
-                .all(|k| r.get(*k).and_then(Value::as_str).is_some_and(|s| !s.trim().is_empty()))
+            ["id", "title"].iter().all(|k| {
+                r.get(*k)
+                    .and_then(Value::as_str)
+                    .is_some_and(|s| !s.trim().is_empty())
+            })
         });
         if !ok {
             return Err(format!(
@@ -1017,6 +1017,7 @@ mod tests {
             max_iters: 6,
             on_expire: erplora_runtime::flows::approvals::ExpiryPolicy::Reject,
             on_reject: erplora_runtime::flows::approvals::RejectPolicy::Cancel,
+            output: Vec::new(),
         }
     }
 }

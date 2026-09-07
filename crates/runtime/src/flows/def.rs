@@ -3768,7 +3768,9 @@ mod tests {
                 }
             }]
         }))
-        .expect("the shape the WhatsApp recipe needs to offer slots it discovered mid-conversation");
+        .expect(
+            "the shape the WhatsApp recipe needs to offer slots it discovered mid-conversation",
+        );
         let StepSpec::Ai(ai) = &def.steps[0].spec else {
             panic!("ai spec");
         };
@@ -3776,7 +3778,11 @@ mod tests {
         let slots = ai.output.iter().find(|f| f.name == "slots").expect("slots");
         assert_eq!(slots.kind, AiOutputKind::Options);
         assert_eq!(slots.describe, "the free slots you found");
-        let action = ai.output.iter().find(|f| f.name == "action").expect("action");
+        let action = ai
+            .output
+            .iter()
+            .find(|f| f.name == "action")
+            .expect("action");
         assert_eq!(action.kind, AiOutputKind::Text);
         // The runner asks the model for these as a SEQUENCE, so the sequence must not move between
         // saves. The kernel's JSON object is ordered by key, so the order is that one — the point
@@ -3846,7 +3852,10 @@ mod tests {
     /// silent-wrong-answer this vocabulary exists to prevent.
     #[test]
     fn an_ai_output_field_needs_words_saying_what_goes_in_it() {
-        for bad in [json!({ "type": "text" }), json!({ "type": "text", "describe": "  " })] {
+        for bad in [
+            json!({ "type": "text" }),
+            json!({ "type": "text", "describe": "  " }),
+        ] {
             let err = FlowDefinition::parse(&json!({
                 "schema_version": 1,
                 "steps": [{

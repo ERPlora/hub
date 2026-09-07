@@ -1494,7 +1494,10 @@ async fn hub1639_the_answering_tool_is_offered_only_when_the_document_asked_for_
         json!("array"),
         "`options` is asked for as Meta's row shape: {answer}"
     );
-    assert_eq!(props["slots"]["items"]["properties"]["id"]["type"], json!("string"));
+    assert_eq!(
+        props["slots"]["items"]["properties"]["id"]["type"],
+        json!("string")
+    );
     assert_eq!(props["action"]["type"], json!("string"));
     // The author's own words reach the model — they are the only thing it is told about the field.
     assert_eq!(
