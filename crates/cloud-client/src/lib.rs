@@ -196,6 +196,10 @@ impl CatalogQuery {
     }
 }
 
+/// The whole conversation, both directions and both sources — see [`CloudClient::whatsapp_inbox`]
+/// for why the endpoint's own defaults are narrower than what this runtime wants (hub#1612).
+const WHATSAPP_INBOX_FILTERS: &str = "direction=all&source=all";
+
 /// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
 /// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
 /// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
@@ -785,19 +789,28 @@ impl CloudClient {
     /// `X-Hub-Id`, `IsHubMachine`): the caller is the runtime's poller, with nobody logged in.
     ///
     /// Response (contract verified against `saas/apps/whatsapp_inbox/api/inbox.py`):
-    /// `{"messages": [{"wa_message_id", "from", "payload", "received_at"}, …], "cursor": "<iso>"}`,
-    /// oldest first, at most 100 per call.
+    /// `{"messages": [{"wa_message_id", "from", "direction", "contact", "source", "payload",
+    /// "received_at"}, …], "cursor": "<iso>"}`, oldest first, at most 100 per call.
+    ///
+    /// **Both filters are asked for by name** (hub#1612). `direction` and `source` default to
+    /// `inbound`/`live` on the SaaS, which is yesterday's answer on purpose: a hub that predates
+    /// them would paint the owner's own reply as if the customer had written it, and would let
+    /// its automation answer a question out of the 180-day backlog Meta pushes after a
+    /// coexistence connect. This runtime is not that hub — it carries `direction` and `source`
+    /// all the way to the event, so it takes the whole conversation and lets the module decide
+    /// what to paint and what to answer. Leave them out and the owner's replies simply never
+    /// arrive.
     ///
     /// `after` is an **optional resume cursor**, never a substitute for the ack: the SaaS already
     /// filters out what this hub acked. Passing it means "skip everything at or before this
     /// instant", which is only safe for a deliberate replay — see [`CloudClient::whatsapp_inbox_ack`].
     pub fn whatsapp_inbox(&self, auth: &Auth, after: Option<&str>) -> PreparedRequest {
-        let query = match after.map(str::trim).filter(|s| !s.is_empty()) {
-            // The cursor is ISO-8601, so it carries `:` and (with an offset) `+`. A raw `+` in a
-            // query string decodes to a SPACE, which `parse_datetime` rejects with a 400.
-            Some(cursor) => format!("?after={}", encode_path_segment(cursor)),
-            None => String::new(),
-        };
+        let mut query = format!("?{WHATSAPP_INBOX_FILTERS}");
+        // The cursor is ISO-8601, so it carries `:` and (with an offset) `+`. A raw `+` in a
+        // query string decodes to a SPACE, which `parse_datetime` rejects with a 400.
+        if let Some(cursor) = after.map(str::trim).filter(|s| !s.is_empty()) {
+            query.push_str(&format!("&after={}", encode_path_segment(cursor)));
+        }
         self.get(&format!("/api/v1/hub/device/whatsapp/inbox/{query}"), auth)
     }
 
@@ -1940,7 +1953,7 @@ mod tests {
         assert_eq!(r.method, "GET");
         assert_eq!(
             r.url,
-            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/"
+            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/?direction=all&source=all"
         );
         assert!(r
             .headers
@@ -1964,8 +1977,36 @@ mod tests {
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/hub/device/whatsapp/inbox/\
-             ?after=2026-08-09T10%3A00%3A00%2B00%3A00"
+             ?direction=all&source=all&after=2026-08-09T10%3A00%3A00%2B00%3A00"
         );
+    }
+
+    /// **The poller asks for the whole conversation, both directions and both sources**
+    /// (hub#1612). Both filters default to yesterday's shape on the SaaS — `direction=inbound`,
+    /// `source=live` — to protect a hub that predates them from painting the owner's own reply as
+    /// if the customer had written it, or from answering a question from March. This runtime is
+    /// not that hub: it knows about `direction` and `source` and carries them to the event, so it
+    /// asks by name and lets the module decide what to paint and what to answer. Leave them out
+    /// and the owner's replies never reach the hub at all — the SaaS serves inbound only.
+    #[test]
+    fn whatsapp_inbox_asks_for_both_directions_and_both_sources() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h".into(),
+            token: "t".into(),
+        };
+
+        for after in [None, Some("2026-08-09T10:00:00+00:00")] {
+            let url = c.whatsapp_inbox(&auth, after).url;
+            assert!(
+                url.contains("direction=all"),
+                "the owner's own replies are asked for by name: {url}"
+            );
+            assert!(
+                url.contains("source=all"),
+                "the coexistence backlog is asked for by name: {url}"
+            );
+        }
     }
 
     /// The channel's plan + live usage (hub#1089). MACHINE credential, like its two siblings

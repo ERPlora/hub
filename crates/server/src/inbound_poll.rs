@@ -54,6 +54,7 @@
 //! succeeds resumes the normal tick at once. Any other failure (timeouts, 5xx) keeps the plain
 //! retry-next-tick behaviour — transient trouble is exactly what a fixed tick handles well.
 
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use cloud_client::{Auth, CloudClient};
@@ -75,6 +76,18 @@ pub const EVENT_NAME: &str = "hub.whatsapp.message_received";
 /// Namespace of the outbox primary key, so `wa-<wa_message_id>` can never collide with the
 /// random ids the command path mints.
 pub const EVENT_ID_PREFIX: &str = "wa-";
+
+/// What a message means when the SaaS says nothing about it. Both mirror the defaults of
+/// `apps/whatsapp_inbox/api/inbox.py`, and for the same reason: before saas#1883/#1884 every row
+/// the endpoint could serve was a customer's, live. A row without the columns IS that row, so
+/// nothing downstream ever has to interpret an empty string.
+pub const DEFAULT_DIRECTION: &str = "inbound";
+pub const DEFAULT_SOURCE: &str = "live";
+
+/// The values the contract defines. Anything else is reported rather than normalised — see
+/// [`InboundMessage::unexpected`].
+const DIRECTIONS: [&str; 2] = ["inbound", "outbound"];
+const SOURCES: [&str; 2] = ["live", "history"];
 
 /// Tick of the poller (ADR-0283 K1c). Five seconds is the latency a person waiting for an answer
 /// on WhatsApp will not notice.
@@ -190,12 +203,33 @@ pub struct InboundMessage {
     /// Sender's phone number as Meta reports it (no `+` prefix).
     #[serde(default, rename = "from")]
     pub from_number: String,
+    /// Who spoke: `inbound` (the customer) or `outbound` (the owner, from their own phone on a
+    /// coexistence number — saas#1883). Raw, straight off the wire: read it through
+    /// [`Self::direction`], which applies the meaning an empty value has.
+    #[serde(default)]
+    direction: String,
+    /// The number at the OTHER end, whichever way the message went. On an echo Meta's `from` is
+    /// the shop itself, so threading a conversation by `from` would file every reply the owner
+    /// ever wrote under the shop's own number. Read it through [`Self::contact`].
+    #[serde(default)]
+    contact: String,
+    /// `live`, or `history` for the 180-day backlog Meta pushes after a coexistence connect
+    /// (saas#1884). Read it through [`Self::source`].
+    #[serde(default)]
+    source: String,
     /// The message object from Meta's webhook, verbatim.
     #[serde(default)]
     pub payload: Value,
     /// When the SaaS stored it (ISO-8601).
     #[serde(default)]
     pub received_at: String,
+    /// **Everything else the SaaS served.** The three fields above arrived precisely because
+    /// nobody could see them arrive: this struct named its fields one by one, so serde dropped
+    /// the new ones without an error, without a log and without a trace — the SaaS believed it
+    /// had delivered a feature that did not exist downstream (hub#1612). Whatever the SaaS grows
+    /// next lands here instead of in the bin, and [`InboundMessage::unexpected`] names it.
+    #[serde(flatten)]
+    unknown: Map<String, Value>,
 }
 
 impl InboundMessage {
@@ -210,14 +244,67 @@ impl InboundMessage {
     /// flow condition reads; `message` keeps the original object so anything the two convenience
     /// fields do not cover (media, interactive replies, referrals) is still reachable without a
     /// new runtime release.
+    ///
+    /// `direction`, `contact` and `source` are what let the module show a whole conversation
+    /// instead of half of one (hub#1612): who spoke, whose conversation it is, and whether this
+    /// is live traffic or the coexistence backlog. `from` stays exactly what Meta said — on an
+    /// echo that is the shop's own number — so a consumer that needs Meta's word still has it.
     pub fn event_payload(&self) -> Map<String, Value> {
         let mut payload = Map::new();
         payload.insert("wa_message_id".into(), json!(self.wa_message_id));
         payload.insert("from".into(), json!(self.from_number));
+        payload.insert("direction".into(), json!(self.direction()));
+        payload.insert("contact".into(), json!(self.contact()));
+        payload.insert("source".into(), json!(self.source()));
         payload.insert("text".into(), json!(self.text()));
         payload.insert("received_at".into(), json!(self.received_at));
         payload.insert("message".into(), self.payload.clone());
         payload
+    }
+
+    /// Who spoke, with the meaning an empty value carries: a SaaS that predates the column only
+    /// ever stored what the customer sent.
+    pub fn direction(&self) -> &str {
+        non_empty(&self.direction).unwrap_or(DEFAULT_DIRECTION)
+    }
+
+    /// Whose conversation this is — the number at the other end. Falls back to the sender, which
+    /// is what `contact` means for every message a pre-saas#1883 SaaS could serve (all inbound).
+    pub fn contact(&self) -> &str {
+        non_empty(&self.contact).unwrap_or(&self.from_number)
+    }
+
+    /// Live traffic, or the coexistence backlog.
+    pub fn source(&self) -> &str {
+        non_empty(&self.source).unwrap_or(DEFAULT_SOURCE)
+    }
+
+    /// **What this runtime did not understand about the SaaS's answer** — field names it has no
+    /// place for, and `direction`/`source` values outside the contract.
+    ///
+    /// Nothing here is dropped in silence, which is the whole point (hub#1612): an unknown field
+    /// is named in the log instead of vanishing, and an unknown VALUE travels to the event as-is
+    /// rather than being normalised into `inbound` — painting the owner's own reply as the
+    /// customer's is the exact harm the SaaS's default exists to prevent, so guessing is worse
+    /// than passing it through. Unknown fields are reported but NOT forwarded: a key the SaaS
+    /// invents must never be able to overwrite `text` or `message` in the event payload.
+    ///
+    /// Each gap is spelled `field:<name>` for a field this runtime has no place for, or
+    /// `<field>=<value>` for a value outside the contract — what precedes the `=` is what
+    /// [`ContractDrift`] remembers it by, so the value only ever rides in the log line.
+    pub fn unexpected(&self) -> Vec<String> {
+        let mut gaps: Vec<String> = self
+            .unknown
+            .keys()
+            .map(|field| format!("field:{}", detail(field)))
+            .collect();
+        if !self.direction.is_empty() && !DIRECTIONS.contains(&self.direction.as_str()) {
+            gaps.push(format!("direction={}", detail(&self.direction)));
+        }
+        if !self.source.is_empty() && !SOURCES.contains(&self.source.as_str()) {
+            gaps.push(format!("source={}", detail(&self.source)));
+        }
+        gaps
     }
 
     /// The body of a text message, or an empty string for any other kind. Deliberately not an
@@ -250,6 +337,12 @@ pub struct PollReport {
     pub ingested: usize,
     /// Messages the SaaS confirmed it will not serve again.
     pub acked: usize,
+    /// Things in the SaaS's answer this runtime did not understand — unknown field names and
+    /// `direction`/`source` values outside the contract (hub#1612). Never zero because the page
+    /// was fine and unnoticed at the same time: the tick counts them, names the new ones in the
+    /// log and carries the number to its caller, so the drift shows up in the ordinary tick line
+    /// as well as in the one-off warning.
+    pub unexpected: usize,
 }
 
 /// Why a tick could not complete. An ack that fails is **not** one of these: the events are
@@ -284,6 +377,9 @@ pub struct InboundPoller {
     /// Quiet-down state for a refused credential (hub#733). `std::sync::Mutex` on purpose: it is
     /// only ever held for a few field reads/writes, never across an `.await`.
     auth_backoff: std::sync::Mutex<AuthBackoff>,
+    /// What this poller has already said out loud about a SaaS answer it does not fully
+    /// understand (hub#1612). Same lock discipline as `auth_backoff`.
+    drift: std::sync::Mutex<ContractDrift>,
 }
 
 /// Hand-written so the machine token can never reach a log line: a failing tick prints the poller.
@@ -308,6 +404,7 @@ impl InboundPoller {
             hub_id,
             machine_token,
             auth_backoff: std::sync::Mutex::new(AuthBackoff::default()),
+            drift: std::sync::Mutex::new(ContractDrift::default()),
         }
     }
 
@@ -422,6 +519,7 @@ impl InboundPoller {
             return Ok(PollReport::default());
         }
         let fetched = messages.len();
+        let unexpected = self.report_contract_drift(&messages);
 
         // ── Write FIRST (see the module docs on why the order is not negotiable) ────────────
         //
@@ -475,7 +573,42 @@ impl InboundPoller {
             fetched,
             ingested,
             acked,
+            unexpected,
         })
+    }
+
+    /// **Say out loud what this runtime did not understand** (hub#1612).
+    ///
+    /// This is the guard for the class of bug, not just its first instance: the SaaS grew
+    /// `direction`, `contact` and `source`, and the runtime dropped all three without an error,
+    /// without a log and without a trace — the feature looked delivered from the other side while
+    /// the person in front of the hub still saw half a conversation. A gap that nobody can see is
+    /// a gap nobody fixes, so each distinct one earns exactly one WARN (and DEBUG from then on:
+    /// the tick runs every 5 s and 720 identical lines an hour are as good as silence).
+    ///
+    /// Nothing is thrown away here. The messages are ingested either way; what the line says is
+    /// that part of the answer needs a runtime release before anything can act on it.
+    fn report_contract_drift(&self, messages: &[InboundMessage]) -> usize {
+        let gaps: Vec<String> = messages.iter().flat_map(InboundMessage::unexpected).collect();
+        if gaps.is_empty() {
+            return 0;
+        }
+        let count = gaps.len();
+        // A poisoned lock must never silence the warning nor take the tick down: the tracker is
+        // a noise filter, not correctness, so a poisoned one just means everything looks new.
+        let fresh = match self.drift.lock() {
+            Ok(mut drift) => drift.observe(gaps),
+            Err(poisoned) => poisoned.into_inner().observe(gaps),
+        };
+        if fresh.is_empty() {
+            tracing::debug!("inbound whatsapp: the SaaS answer still carries fields this runtime does not know");
+        } else {
+            tracing::warn!(
+                unknown = %fresh.join(", "),
+                "inbound whatsapp: the SaaS answer carries things this runtime does not know; an unknown VALUE reaches the event as-is, an unknown FIELD does not travel at all — the runtime needs a release to use it"
+            );
+        }
+        count
     }
 
     /// `GET /api/v1/hub/device/whatsapp/inbox/` — everything still pending for this hub.
@@ -534,6 +667,67 @@ impl InboundPoller {
             .ok()
             .and_then(|v| v["acked"].as_u64())
             .unwrap_or(0) as usize)
+    }
+}
+
+/// `Some(value)` for anything but the empty string — the shape every default in
+/// [`InboundMessage`] is built on.
+fn non_empty(value: &str) -> Option<&str> {
+    Some(value).filter(|v| !v.is_empty())
+}
+
+/// What makes two gaps THE SAME gap: the field, never the value. `field:reactions` is its own
+/// identity; `source=history-42` is the gap `source`, whatever came after the `=`. An
+/// out-of-contract value is remote data, so keying on it would hand [`ContractDrift`] a brand-new
+/// gap on every tick — and, once full, mute the first warning of anything that came after it.
+fn gap_identity(gap: &str) -> &str {
+    gap.split_once('=').map_or(gap, |(field, _)| field)
+}
+
+/// What the runtime has already complained about, so a SaaS that grew a field costs ONE log line
+/// and not 720 an hour.
+///
+/// Same shape as [`AuthBackoff`] and for the same reason: the tick runs every 5 s, and a warning
+/// repeated on every one of them is a warning nobody reads. Hard-bounded at
+/// [`ContractDrift::MAX_TRACKED`] distinct gaps: what it remembers comes off the wire, so
+/// "the SaaS would never serve that many" is an assumption and not a limit.
+#[derive(Debug, Default)]
+pub struct ContractDrift {
+    seen: BTreeSet<String>,
+}
+
+impl ContractDrift {
+    /// Ceiling on how many distinct gaps are remembered. Sixty-four is far past the point where a
+    /// human has read the warnings and opened an issue. A gap is identified by its FIELD (see
+    /// [`gap_identity`]), so a value that changes on every tick cannot fill this up — but a field
+    /// name is remote data too, and "the SaaS would never serve that many" is an assumption, not
+    /// a limit.
+    pub const MAX_TRACKED: usize = 64;
+
+    /// Record what a page carried and return only what is NEW — what is worth saying out loud.
+    ///
+    /// Two gaps are the same gap when [`gap_identity`] says so: the field, never the value. That
+    /// is what keeps the cap from ever muting a genuinely new gap — a SaaS stamping an id into an
+    /// out-of-contract value (`source=history-<batch>`) costs ONE line, whereas keyed by value it
+    /// would have filled the tracker in 64 ticks (five minutes) and silenced the first warning of
+    /// every field that came after it, for the life of the process.
+    ///
+    /// Once [`Self::MAX_TRACKED`] distinct gaps are remembered nothing else earns a line. That is
+    /// the safe way round: the drift has already been warned about that many times, and
+    /// [`PollReport::unexpected`] keeps counting every gap into the ordinary tick line, so the
+    /// number never goes mute — only the repetition does.
+    pub fn observe<I: IntoIterator<Item = String>>(&mut self, gaps: I) -> Vec<String> {
+        gaps.into_iter()
+            .filter(|gap| {
+                let identity = gap_identity(gap);
+                self.seen.len() < Self::MAX_TRACKED && self.seen.insert(identity.to_string())
+            })
+            .collect()
+    }
+
+    /// How many distinct gaps are being remembered.
+    pub fn tracked(&self) -> usize {
+        self.seen.len()
     }
 }
 
@@ -630,14 +824,37 @@ mod tests {
         }
     }
 
-    /// One message as `apps/whatsapp_inbox/api/inbox.py::_serialize` writes it.
+    /// How one poll shows up in [`FakeCloud::paths`]. That the filters are there at all is
+    /// asserted where the URL is built (`cloud_client::whatsapp_inbox`) and, end to end, by
+    /// `the_owners_own_reply_reaches_the_hub_and_says_who_spoke`; here what matters is the ORDER.
+    const GET_INBOX: &str = "GET inbox?direction=all&source=all";
+
+    /// The customer's number, and the salon's own — the one Meta puts in `from` when it echoes
+    /// back what the owner typed on their own phone.
+    const CUSTOMER: &str = "34600999888";
+    const SHOP: &str = "34911222333";
+
+    /// One message as `apps/whatsapp_inbox/api/inbox.py::_serialize` writes it TODAY: since
+    /// saas#1883/#1884 every row also says who spoke, whose number the conversation is with, and
+    /// whether it is live traffic or the backlog Meta pushed after a coexistence connect.
     fn message(wa_message_id: &str, text: &str) -> Value {
+        let mut message = legacy_message(wa_message_id, text);
+        message["direction"] = json!("inbound");
+        message["contact"] = json!(CUSTOMER);
+        message["source"] = json!("live");
+        message
+    }
+
+    /// The same message as a SaaS that predates those columns served it (saas#1353): no
+    /// `direction`, no `contact`, no `source`. A hub meets this shape for as long as it takes the
+    /// SaaS half to reach its own deployment.
+    fn legacy_message(wa_message_id: &str, text: &str) -> Value {
         json!({
             "wa_message_id": wa_message_id,
-            "from": "34600999888",
+            "from": CUSTOMER,
             "payload": {
                 "id": wa_message_id,
-                "from": "34600999888",
+                "from": CUSTOMER,
                 "timestamp": "1785153600",
                 "type": "text",
                 "text": {"body": text},
@@ -646,15 +863,36 @@ mod tests {
         })
     }
 
+    /// What the OWNER typed on their own phone, echoed back by Meta on a coexistence number
+    /// (saas#1883). `from` is the shop itself — threading by it would file every reply the owner
+    /// ever wrote under the shop's own number — and `contact` is the customer at the other end.
+    fn echo(wa_message_id: &str, text: &str) -> Value {
+        let mut message = message(wa_message_id, text);
+        message["from"] = json!(SHOP);
+        message["payload"]["from"] = json!(SHOP);
+        message["direction"] = json!("outbound");
+        message
+    }
+
+    /// A message out of the 180-day backlog Meta pushes after a coexistence connect (saas#1884).
+    fn from_history(mut message: Value) -> Value {
+        message["source"] = json!("history");
+        message
+    }
+
     async fn fake_cloud(messages: Vec<Value>) -> FakeCloud {
         async fn inbox(
             State(st): State<FakeInbox>,
             Query(params): Query<HashMap<String, String>>,
             headers: HeaderMap,
         ) -> (StatusCode, Json<Value>) {
-            let path = match params.get("after") {
-                Some(after) => format!("GET inbox?after={after}"),
-                None => "GET inbox".to_string(),
+            let mut query: Vec<String> =
+                params.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            query.sort();
+            let path = if query.is_empty() {
+                "GET inbox".to_string()
+            } else {
+                format!("GET inbox?{}", query.join("&"))
             };
             st.calls.lock().unwrap().push((path, headers, None));
             let status = *st.inbox_status.lock().unwrap();
@@ -665,7 +903,50 @@ mod tests {
                     Json(json!({"detail": "Authentication credentials were not provided."})),
                 );
             }
-            let pending = st.pending.lock().unwrap().clone();
+
+            // ── The two filters of `api/inbox.py`, defaults included ────────────────────────
+            //
+            // A caller that does not name them gets exactly what the endpoint served before
+            // saas#1883/#1884: the customer's live messages and nothing else. That default is
+            // deliberate on the SaaS side, so a fake that ignored it would let a poller which
+            // asks for nothing look like one that asks for everything — which is the bug.
+            let filter = |name: &str, fallback: &str| -> String {
+                params
+                    .get(name)
+                    .map(|v| v.trim())
+                    .filter(|v| !v.is_empty())
+                    .unwrap_or(fallback)
+                    .to_string()
+            };
+            let direction = filter("direction", DEFAULT_DIRECTION);
+            let source = filter("source", DEFAULT_SOURCE);
+            if !["inbound", "outbound", "all"].contains(&direction.as_str()) {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "invalid_direction"})),
+                );
+            }
+            if !["live", "history", "all"].contains(&source.as_str()) {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({"error": "invalid_source"})),
+                );
+            }
+
+            let pending: Vec<Value> = st
+                .pending
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|m| {
+                    let served_direction =
+                        m["direction"].as_str().unwrap_or(DEFAULT_DIRECTION).to_string();
+                    let served_source = m["source"].as_str().unwrap_or(DEFAULT_SOURCE).to_string();
+                    (direction == "all" || direction == served_direction)
+                        && (source == "all" || source == served_source)
+                })
+                .cloned()
+                .collect();
             let cursor = pending
                 .last()
                 .map(|m| m["received_at"].clone())
@@ -787,6 +1068,20 @@ mod tests {
             .rows
     }
 
+    /// Every event this hub wrote, keyed by its outbox id, with the payload already parsed.
+    async fn payloads_by_id(runtime: &SharedRuntime) -> HashMap<String, Value> {
+        outbox_rows(runtime)
+            .await
+            .into_iter()
+            .map(|row| {
+                let id = row["id"].as_str().unwrap_or_default().to_string();
+                let payload: Value =
+                    serde_json::from_str(row["payload"].as_str().unwrap()).unwrap();
+                (id, payload)
+            })
+            .collect()
+    }
+
     // ── Tests ────────────────────────────────────────────────────────────────────────────────
 
     /// The whole point: a message that reached the SaaS reaches the hub, as ONE core event a
@@ -893,7 +1188,7 @@ mod tests {
         );
         assert_eq!(
             cloud.paths(),
-            vec!["GET inbox".to_string(), "POST ack".to_string()],
+            vec![GET_INBOX.to_string(), "POST ack".to_string()],
             "fetch, then ack — and the write happened in between"
         );
     }
@@ -926,7 +1221,7 @@ mod tests {
 
         assert_eq!(
             cloud.paths(),
-            vec!["GET inbox".to_string()],
+            vec![GET_INBOX.to_string()],
             "the ack must not even be attempted for a message the hub does not hold"
         );
         assert_eq!(
@@ -1027,6 +1322,257 @@ mod tests {
         assert!(cloud.paths().is_empty(), "no credential, no request");
     }
 
+    /// 🔴 **The symptom of hub#1612**: the owner keeps answering from their own phone, as they
+    /// always did, and the hub shows HALF a conversation — the customer's questions, none of the
+    /// owner's replies. Two separate things had to be true for that, and this test holds both:
+    /// the poller has to ASK for the other direction (the SaaS serves inbound only unless told
+    /// otherwise, on purpose) and the runtime has to CARRY the fields home (it declares them one
+    /// by one, so serde dropped the new ones without a word).
+    #[tokio::test]
+    async fn the_owners_own_reply_reaches_the_hub_and_says_who_spoke() {
+        let cloud = fake_cloud(vec![
+            message("wamid.1", "do you have a slot at five?"),
+            echo("wamid.2", "yes, see you at five"),
+        ])
+        .await;
+        let runtime = hub_with_module(true).await;
+
+        let report = poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+        assert_eq!(
+            report.ingested, 2,
+            "both halves of the conversation, not just the customer's"
+        );
+
+        let payloads = payloads_by_id(&runtime).await;
+        let question = &payloads["wa-wamid.1"];
+        assert_eq!(question["direction"], json!("inbound"));
+        assert_eq!(question["contact"], json!(CUSTOMER));
+
+        let reply = &payloads["wa-wamid.2"];
+        assert_eq!(
+            reply["direction"],
+            json!("outbound"),
+            "the module has to be able to tell who spoke"
+        );
+        assert_eq!(
+            reply["contact"],
+            json!(CUSTOMER),
+            "threaded by the OTHER number, never by the shop's own"
+        );
+        assert_eq!(
+            reply["from"],
+            json!(SHOP),
+            "Meta's `from` still travels verbatim"
+        );
+        assert_eq!(reply["source"], json!("live"));
+    }
+
+    /// The 180-day backlog Meta pushes after a coexistence connect (saas#1884) reaches the hub
+    /// too — an inbox that opens on a blank chat for a number the salon has used for years is
+    /// not an inbox — but it arrives LABELLED, so the module can paint it without letting the
+    /// automation answer a question from March.
+    #[tokio::test]
+    async fn the_coexistence_backlog_reaches_the_hub_labelled_as_history() {
+        let cloud = fake_cloud(vec![
+            from_history(message("wamid.old", "are you open on sunday?")),
+            message("wamid.1", "do you have a slot at five?"),
+        ])
+        .await;
+        let runtime = hub_with_module(true).await;
+
+        let report = poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+        assert_eq!(report.ingested, 2, "the backlog is not left behind");
+
+        let payloads = payloads_by_id(&runtime).await;
+        assert_eq!(payloads["wa-wamid.old"]["source"], json!("history"));
+        assert_eq!(payloads["wa-wamid.1"]["source"], json!("live"));
+    }
+
+    /// A SaaS that predates the three columns says nothing about direction, contact or source.
+    /// The runtime must not hand the module an empty string to interpret: what such a SaaS
+    /// serves IS the customer's live message — which is exactly what the endpoint's own defaults
+    /// say — so that is what travels.
+    #[tokio::test]
+    async fn a_message_without_the_new_fields_means_what_it_has_always_meant() {
+        let cloud = fake_cloud(vec![legacy_message("wamid.1", "is the table free?")]).await;
+        let runtime = hub_with_module(true).await;
+
+        poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+
+        let payload = payloads_by_id(&runtime).await["wa-wamid.1"].clone();
+        assert_eq!(payload["direction"], json!(DEFAULT_DIRECTION));
+        assert_eq!(payload["source"], json!(DEFAULT_SOURCE));
+        assert_eq!(
+            payload["contact"],
+            json!(CUSTOMER),
+            "with everything inbound, the conversation IS the sender"
+        );
+    }
+
+    /// 🔴 **The class of the bug, not just this instance.** The SaaS grew three fields and the
+    /// runtime dropped them *without a word* — no error, no log, the data simply did not exist
+    /// downstream, and the feature looked delivered from the SaaS side. Whatever the SaaS grows
+    /// NEXT gets named instead of vanishing.
+    #[test]
+    fn a_field_this_runtime_does_not_know_is_named_not_dropped_in_silence() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "direction": "inbound",
+            "contact": CUSTOMER,
+            "source": "live",
+            "payload": {"type": "text", "text": {"body": "hi"}},
+            "received_at": "2026-08-09T10:00:00+00:00",
+            "reactions": [{"emoji": "👍"}],
+        }))
+        .expect("an unknown field must never fail the whole page");
+
+        assert_eq!(message.unexpected(), vec!["field:reactions".to_string()]);
+        assert!(
+            !message.event_payload().contains_key("reactions"),
+            "reported, not forwarded: a key from the SaaS must not be able to overwrite `text`"
+        );
+    }
+
+    /// And the message it rides on is still ingested WHOLE: naming the gap must not cost the
+    /// customer their message.
+    #[tokio::test]
+    async fn a_message_carrying_an_unknown_field_is_still_ingested() {
+        let mut unknown = message("wamid.1", "is the table free?");
+        unknown["reactions"] = json!([{"emoji": "👍"}]);
+        let cloud = fake_cloud(vec![unknown]).await;
+        let runtime = hub_with_module(true).await;
+
+        let report = poller(&cloud.base_url, Some("machine-tok"))
+            .poll_once(&runtime, &entitled())
+            .await
+            .unwrap();
+        assert_eq!(report.ingested, 1);
+        assert_eq!(report.acked, 1);
+        assert_eq!(
+            report.unexpected, 1,
+            "the tick has to COUNT what it did not understand, or the gap is only visible to \
+             whoever happens to be reading the log at that second"
+        );
+        assert_eq!(
+            payloads_by_id(&runtime).await["wa-wamid.1"]["text"],
+            json!("is the table free?")
+        );
+    }
+
+    /// A `direction` outside the contract is **never** repainted as the customer's. Claiming the
+    /// customer wrote what the owner wrote is the exact harm the SaaS default protects against,
+    /// so an unknown value travels as-is — and gets named — instead of being quietly normalised
+    /// into the one answer that does damage.
+    #[test]
+    fn an_out_of_contract_direction_is_reported_never_repainted_as_the_customer() {
+        let message: InboundMessage = serde_json::from_value(json!({
+            "wa_message_id": "wamid.1",
+            "from": CUSTOMER,
+            "direction": "sideways",
+            "contact": CUSTOMER,
+            "source": "yesterday",
+            "payload": {},
+            "received_at": "2026-08-09T10:00:00+00:00",
+        }))
+        .unwrap();
+
+        assert_eq!(
+            message.unexpected(),
+            vec![
+                "direction=sideways".to_string(),
+                "source=yesterday".to_string()
+            ]
+        );
+        assert_eq!(message.event_payload()["direction"], json!("sideways"));
+        assert_eq!(message.event_payload()["source"], json!("yesterday"));
+    }
+
+    /// **The noise filter cannot become the leak.** Every gap it remembers is a string the SaaS
+    /// served, and a FIELD NAME is remote data as much as a value is: a SaaS that grew a field per
+    /// tick would hand this runtime a brand-new gap on every single tick, for the whole lifetime
+    /// of the process. The tracker keeps at most [`ContractDrift::MAX_TRACKED`] distinct gaps;
+    /// past that it says nothing more, which is the right way round: by then the drift has
+    /// already earned its warnings, and `PollReport::unexpected` still counts every one of them
+    /// into the tick line, so nothing goes mute.
+    #[test]
+    fn the_drift_tracker_cannot_grow_without_bound_however_odd_the_saas_gets() {
+        let mut drift = ContractDrift::default();
+
+        let reported: usize = (0..ContractDrift::MAX_TRACKED + 50)
+            .map(|n| drift.observe(vec![format!("field:extra-{n}")]).len())
+            .sum();
+
+        assert_eq!(
+            reported,
+            ContractDrift::MAX_TRACKED,
+            "a SaaS inventing a field per tick stops earning lines once the tracker is full"
+        );
+        assert_eq!(
+            drift.tracked(),
+            ContractDrift::MAX_TRACKED,
+            "and the tracker stops growing with it"
+        );
+    }
+
+    /// The tick runs every 5 s. A drift that warned on every one of them would be 720 lines an
+    /// hour and nobody would read the 721st — the same reason the credential backoff above says
+    /// it once and then stays quiet. Each distinct gap earns exactly one line.
+    #[test]
+    fn contract_drift_is_reported_the_first_time_and_then_stays_quiet() {
+        let mut drift = ContractDrift::default();
+
+        assert_eq!(
+            drift.observe(vec!["field:reactions".into(), "field:reactions".into()]),
+            vec!["field:reactions".to_string()],
+            "one line even when a whole page carries it"
+        );
+        assert!(
+            drift.observe(vec!["field:reactions".into()]).is_empty(),
+            "the second tick says nothing"
+        );
+        assert_eq!(
+            drift.observe(vec!["field:reactions".into(), "field:referral".into()]),
+            vec!["field:referral".to_string()],
+            "but a NEW gap is still worth a line"
+        );
+    }
+
+    /// 🔴 **The cap must never mute a NEW gap.** A gap is identified by its FIELD, never by its
+    /// value: a SaaS that stamps an id into an out-of-contract value (`source=history-<batch>`)
+    /// costs ONE line, so it can never fill the tracker — and a field the SaaS grows after five
+    /// minutes of that still earns its first warning. Keyed by value, 64 ticks of that SaaS would
+    /// have silenced every gap that came after it, for the life of the process.
+    #[test]
+    fn a_value_that_changes_every_tick_costs_one_line_and_never_mutes_a_new_gap() {
+        let mut drift = ContractDrift::default();
+
+        let lines: Vec<String> = (0..ContractDrift::MAX_TRACKED + 50)
+            .flat_map(|n| drift.observe(vec![format!("source=history-{n}")]))
+            .collect();
+        assert_eq!(
+            lines,
+            vec!["source=history-0".to_string()],
+            "one line for the field that drifted, carrying the first value seen"
+        );
+        assert_eq!(drift.tracked(), 1, "one gap remembered, however many values it took");
+
+        assert_eq!(
+            drift.observe(vec!["field:reactions".into()]),
+            vec!["field:reactions".to_string()],
+            "a field the SaaS grows AFTER that still earns its first line"
+        );
+    }
+
     /// **No cursor.** `after` skips everything at or before an instant, and the SaaS already
     /// filters out what this hub acked — so a remembered cursor could only ever hide a message
     /// (Meta redelivers out of order; `received_at` is the SaaS's clock, not Meta's). The ack is
@@ -1046,10 +1592,7 @@ mod tests {
         poller.poll_once(&runtime, &entitled()).await.unwrap();
 
         assert!(
-            cloud
-                .paths()
-                .iter()
-                .all(|p| p != "GET inbox?after=" && !p.starts_with("GET inbox?after=")),
+            cloud.paths().iter().all(|p| !p.contains("after=")),
             "no cursor ever travels: {:?}",
             cloud.paths()
         );
@@ -1216,10 +1759,10 @@ mod tests {
         assert_eq!(
             cloud.paths(),
             vec![
-                "GET inbox".to_string(), // refused
-                "GET inbox".to_string(), // the probe…
-                "POST ack".to_string(),  // …which acked what it wrote
-                "GET inbox".to_string(), // and the next tick polls again, unsuppressed
+                GET_INBOX.to_string(), // refused
+                GET_INBOX.to_string(),  // the probe…
+                "POST ack".to_string(), // …which acked what it wrote
+                GET_INBOX.to_string(),  // and the next tick polls again, unsuppressed
             ]
         );
         assert_eq!(outbox_rows(&runtime).await.len(), 1);
