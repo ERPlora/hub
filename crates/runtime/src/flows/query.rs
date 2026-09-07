@@ -35,7 +35,7 @@ use erplora_db::{DatabaseAdapter, Params};
 use serde_json::{json, Map, Value as Json};
 
 use crate::errors::{Result, RuntimeError};
-use crate::flows::def::{self, QueryResult, StepDef, StepSpec};
+use crate::flows::def::{self, OptionShape, QueryResult, StepDef, StepSpec};
 use crate::flows::grants;
 use crate::queries::{self, QueryPage};
 use crate::registry::{AutomationCtx, Registry, RequestContext};
@@ -93,6 +93,23 @@ pub(crate) async fn run(
     let found = count > 0;
     let output = match spec.result {
         QueryResult::Count => json!({ "count": count, "found": found }),
+        // hub#1641 — the list travels WHOLE, already in the transport's row shape, and is
+        // addressed as one value (`steps.<id>.options`). Nothing indexes it, which is why this
+        // needed nothing from `resolve_path`.
+        QueryResult::Options => {
+            let shape = spec.options.as_ref().ok_or_else(|| {
+                bad_option(format!(
+                    "step `{}`: a read that publishes `options` carries the columns that make \
+                     them up; this one parsed without them.",
+                    step.id
+                ))
+            })?;
+            json!({
+                "options": shape_options(&step.id, &page.rows, shape)?,
+                "found": found,
+                "count": count,
+            })
+        }
         QueryResult::First => {
             let mut fields = page
                 .rows
@@ -114,9 +131,104 @@ pub(crate) async fn run(
             "params": Json::Object(params),
             "result": spec.result.as_str(),
             "limit": spec.limit,
+            "options": spec.options.as_ref().map(|o| json!({
+                "id": o.id, "title": o.title, "description": o.description,
+            })),
         }),
         output,
     })
+}
+
+/// hub#1641 — a row could not be turned into the option it promised to be.
+///
+/// It is a RUN-time failure and not a save-time one on purpose: the column names are checked when
+/// the document is written (`def::parse_option_shape`), but whether a row actually HAS something
+/// in them is data, and data is only known here. It lands on the step like any other refusal, so
+/// the run history names the column instead of leaving an empty list to be refused by the proxy.
+pub const ERR_BAD_OPTION: &str = "flow.query_bad_option";
+
+fn bad_option(message: String) -> RuntimeError {
+    RuntimeError::Domain {
+        code: ERR_BAD_OPTION.to_string(),
+        message,
+    }
+}
+
+/// A column's value as the text a tappable row carries. `None` for anything that is not one
+/// scalar: a `null`, an object or an array is not something a customer can read off a row.
+fn scalar_text(value: &Json) -> Option<String> {
+    match value {
+        Json::String(s) => Some(s.trim().to_string()),
+        Json::Number(n) => Some(n.to_string()),
+        Json::Bool(b) => Some(b.to_string()),
+        Json::Null | Json::Object(_) | Json::Array(_) => None,
+    }
+}
+
+/// One REQUIRED column of one row, or the refusal that names it.
+fn required_text(
+    step_id: &str,
+    row: &Map<String, Json>,
+    column: &str,
+    field: &str,
+    at: usize,
+) -> Result<String> {
+    let Some(value) = row.get(column) else {
+        return Err(bad_option(format!(
+            "step `{step_id}`: the read has no column `{column}`, and the options say it is their \
+             `{field}`. The columns of an option are the ones the read selects."
+        )));
+    };
+    scalar_text(value)
+        .filter(|text| !text.is_empty())
+        .ok_or_else(|| {
+            bad_option(format!(
+                "step `{step_id}`: row {at} has nothing in `{column}` for the option's `{field}`. \
+                 A row with no `{field}` is a row nobody can tap, and a message that carries it is \
+                 refused whole — so the read is narrowed to the rows that have one."
+            ))
+        })
+}
+
+/// **The rows, in the shape the transport receives** (hub#1641).
+///
+/// `id` and `title` are what Meta cannot send a tappable row without, so a row missing either is
+/// a refusal that names the column. `description` is the optional second line and an empty one is
+/// simply LEFT OUT rather than sent as an empty string: Meta refuses a `description: null`, and a
+/// row that shows a blank line under the title is worse than a row that shows none.
+///
+/// Meta's own limits on the message — three buttons, ten rows across sections, the length of each
+/// title — stay where they already live, in the SaaS proxy that composes the send. Writing them
+/// twice is how two validators drift apart. What is guaranteed HERE is the shape of each row.
+fn shape_options(step_id: &str, rows: &[Json], shape: &OptionShape) -> Result<Json> {
+    let mut options = Vec::with_capacity(rows.len());
+    for (index, row) in rows.iter().enumerate() {
+        let at = index + 1;
+        let Some(row) = row.as_object() else {
+            return Err(bad_option(format!(
+                "step `{step_id}`: row {at} of the read is not a row of columns, so there is \
+                 nothing to read an option out of."
+            )));
+        };
+        let mut option = Map::new();
+        option.insert(
+            "id".into(),
+            json!(required_text(step_id, row, &shape.id, "id", at)?),
+        );
+        option.insert(
+            "title".into(),
+            json!(required_text(step_id, row, &shape.title, "title", at)?),
+        );
+        if let Some(column) = shape.description.as_deref() {
+            if let Some(text) = row.get(column).and_then(scalar_text) {
+                if !text.is_empty() {
+                    option.insert("description".into(), json!(text));
+                }
+            }
+        }
+        options.push(Json::Object(option));
+    }
+    Ok(Json::Array(options))
 }
 
 /// **The paginated sibling of `Runtime::execute_flow_query`** (hub#954), with the same gate.
@@ -209,6 +321,16 @@ mod tests {
                 "SELECT id, total FROM sale ORDER BY id",
             ),
         );
+        // A read with a NULLABLE column, which is the only way to test what an option does when
+        // the row simply has nothing in the column the document named.
+        reg.queries.insert(
+            "sales.detail".into(),
+            test_support::query(
+                "sales",
+                "sales.view_sale",
+                "SELECT id, day, total, note FROM sale ORDER BY id",
+            ),
+        );
         reg
     }
 
@@ -217,7 +339,7 @@ mod tests {
         test_support::ensure_schema(&db, HUB).await;
         db.execute_batch(
             "CREATE TABLE IF NOT EXISTS sale (id TEXT PRIMARY KEY, day TEXT NOT NULL, \
-             total TEXT NOT NULL);",
+             total TEXT NOT NULL, note TEXT);",
         )
         .await
         .unwrap();
@@ -225,12 +347,17 @@ mod tests {
     }
 
     async fn sale(db: &dyn DatabaseAdapter, id: &str, day: &str, total: &str) {
+        sale_noted(db, id, day, total, Json::Null).await;
+    }
+
+    async fn sale_noted(db: &dyn DatabaseAdapter, id: &str, day: &str, total: &str, note: Json) {
         let mut p = Params::new();
         p.insert("id".into(), json!(id));
         p.insert("day".into(), json!(day));
         p.insert("total".into(), json!(total));
+        p.insert("note".into(), note);
         db.execute(
-            "INSERT INTO sale (id, day, total) VALUES (:id, :day, :total)",
+            "INSERT INTO sale (id, day, total, note) VALUES (:id, :day, :total, :note)",
             &p,
         )
         .await
@@ -298,6 +425,172 @@ mod tests {
         );
         assert_eq!(read.recorded_input["query"], json!("sales.summary"));
         assert_eq!(read.recorded_input["params"]["day"], json!("2026-08-15"));
+    }
+
+    // ── `result: "options"` — the list that TRAVELS (hub#1641) ────────────────────────────────
+
+    /// **What the issue asked for.** The list is already in the database, so nobody has to pay a
+    /// language model to read it out loud: the read publishes it whole, already in the row shape
+    /// an `interactive` send receives, under ONE addressable name (`steps.<id>.options`).
+    #[tokio::test]
+    async fn a_read_publishes_the_whole_list_in_the_shape_a_tappable_message_receives() {
+        let db = db().await;
+        sale_noted(&db, "s-1", "2026-08-15", "120.50", json!("con Ana")).await;
+        sale_noted(&db, "s-2", "2026-08-15", "80.00", json!("con Marta")).await;
+        allow(&db, "sales.detail").await;
+
+        let read = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "total", "description": "note" }
+            }),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            read.output["options"],
+            json!([
+                { "id": "s-1", "title": "120.50", "description": "con Ana" },
+                { "id": "s-2", "title": "80.00", "description": "con Marta" }
+            ]),
+            "the rows come out as Meta's own row shape, ready to be the `rows` of a list"
+        );
+        assert_eq!(read.output["found"], json!(true));
+        assert_eq!(read.output["count"], json!(2));
+        // The history says which columns were asked for, the same way it says which read was.
+        assert_eq!(read.recorded_input["options"]["title"], json!("total"));
+
+        // And the whole point: the mapping language reaches it as ONE value, with its type
+        // intact, without indexing anything — which is what `resolve_path` refuses to do.
+        let scope = json!({ "steps": { "free": read.output } });
+        let filled = def::resolve(
+            &json!({ "action": { "sections": [{ "rows": "steps.free.options" }] } }),
+            &scope,
+        );
+        let rows = &filled["action"]["sections"][0]["rows"];
+        assert!(rows.is_array(), "the list keeps its type: {filled}");
+        assert_eq!(rows[1]["title"], json!("80.00"));
+        assert_eq!(
+            def::resolve_path("steps.free.options.0.title", &scope),
+            None,
+            "and it is still NOT indexable: v1's refusal is untouched"
+        );
+    }
+
+    /// Zero rows is not a failure here either — `found: false` and an EMPTY list, so a `condition`
+    /// the author can see decides what to say instead of a message going out with nothing to tap.
+    #[tokio::test]
+    async fn a_read_that_finds_nothing_publishes_an_empty_list_and_says_so() {
+        let db = db().await;
+        allow(&db, "sales.detail").await;
+
+        let read = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "total" }
+            }),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(read.output["options"], json!([]));
+        assert_eq!(read.output["found"], json!(false));
+        assert_eq!(read.output["count"], json!(0));
+    }
+
+    /// The optional second line is LEFT OUT when the row has nothing in it, never sent blank:
+    /// Meta refuses a `description: null`, and a row with an empty line under the title reads as
+    /// broken. The row that DOES have one keeps it, so the zero means something.
+    #[tokio::test]
+    async fn an_empty_second_line_is_left_out_instead_of_sent_blank() {
+        let db = db().await;
+        sale_noted(&db, "s-1", "2026-08-15", "120.50", Json::Null).await;
+        sale_noted(&db, "s-2", "2026-08-15", "80.00", json!("   ")).await;
+        sale_noted(&db, "s-3", "2026-08-15", "12.00", json!("con Ana")).await;
+        allow(&db, "sales.detail").await;
+
+        let read = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "total", "description": "note" }
+            }),
+        )
+        .await
+        .unwrap();
+
+        let options = read.output["options"].as_array().expect("a list").clone();
+        assert!(
+            options[0].get("description").is_none(),
+            "a NULL second line is not a key: {:?}",
+            options[0]
+        );
+        assert!(
+            options[1].get("description").is_none(),
+            "nor is one that is only spaces: {:?}",
+            options[1]
+        );
+        assert_eq!(options[2]["description"], json!("con Ana"));
+    }
+
+    /// A row with nothing to tap stops the step NAMING the column. The alternative is a message
+    /// the proxy refuses whole, in a background tick, with the customer already waiting — and the
+    /// run history saying only that the send failed.
+    #[tokio::test]
+    async fn a_row_with_no_id_or_no_title_stops_the_step_naming_the_column() {
+        let db = db().await;
+        sale_noted(&db, "s-1", "2026-08-15", "120.50", json!("con Ana")).await;
+        sale_noted(&db, "s-2", "2026-08-15", "80.00", Json::Null).await;
+        allow(&db, "sales.detail").await;
+
+        let err = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "note" }
+            }),
+        )
+        .await
+        .expect_err("a row nobody can tap is not an option");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_BAD_OPTION),
+            "{err}"
+        );
+        let text = format!("{err}");
+        assert!(text.contains("note"), "it names the column: {text}");
+        assert!(text.contains('2'), "and which row it was: {text}");
+    }
+
+    /// A column the read does not select is the typo every author makes once. It is a refusal
+    /// about the DOCUMENT, not about a row, so it says so without a row number.
+    #[tokio::test]
+    async fn a_column_the_read_does_not_select_is_refused_naming_it() {
+        let db = db().await;
+        sale(&db, "s-1", "2026-08-15", "120.50").await;
+        allow(&db, "sales.detail").await;
+
+        let err = read(
+            &db,
+            json!({
+                "id": "free", "kind": "query", "query": "sales.detail",
+                "result": "options",
+                "options": { "id": "id", "title": "titulo" }
+            }),
+        )
+        .await
+        .expect_err("the columns of an option are the ones the read selects");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_BAD_OPTION),
+            "{err}"
+        );
+        assert!(format!("{err}").contains("titulo"), "{err}");
     }
 
     /// `result: "count"` carries no row at all: «are there any, and how many».

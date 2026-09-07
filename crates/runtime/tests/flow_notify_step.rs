@@ -735,3 +735,95 @@ async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_
         sent[1].0.interactive
     );
 }
+
+/// **The whole point of hub#1641, end to end**: the list is ALREADY in the database, so nothing
+/// asks a language model to read it out loud. A `query` step publishes it whole, and the tappable
+/// message names it with ONE bare path — `steps.<id>.options` — which is exactly the mapping the
+/// kernel could already resolve. Nothing indexes an array anywhere along the road.
+///
+/// What this proves that a unit test cannot: the list survives the run scope, the outbox row and
+/// the relay, and reaches the transport as the rows Meta will paint.
+#[tokio::test]
+async fn a_read_fills_the_tappable_list_and_it_reaches_the_transport_whole() {
+    let (rt, transport) = runtime().await;
+    for (id, text) in [("n-1", "martes 10:30"), ("n-2", "martes 12:00")] {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub".into(), json!(HUB));
+        p.insert("text".into(), json!(text));
+        rt.db_for_test()
+            .execute(
+                "INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) \
+                 VALUES (:id, :hub, 'seed', 'c-1', :text)",
+                &p,
+            )
+            .await
+            .unwrap();
+    }
+
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "free", "kind": "query", "query": "crm.note.list", "limit": 5,
+                  "result": "options",
+                  "options": { "id": "id", "title": "text", "description": "customer_id" } },
+                { "id": "ask", "kind": "notify", "channel": "whatsapp",
+                  "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                          "field": "phone" },
+                  "interactive": {
+                      "type": "list",
+                      "body": { "text": "Estos son los huecos del {{input.when}}" },
+                      "action": {
+                          "button": "Ver huecos",
+                          "sections": [{ "title": "Mañana", "rows": "steps.free.options" }]
+                      }
+                  } }
+            ]
+        }),
+    )
+    .await;
+    let mut grants = both_grants();
+    grants.push(GrantSpec::pair(GrantKind::Query, "crm.note.list"));
+    set_grants(&rt, &flow_id, &grants).await;
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let rows = &sent[0].0.interactive["action"]["sections"][0]["rows"];
+    assert!(
+        rows.is_array(),
+        "the list travelled as a list, not as a string that looks like one: {rows}"
+    );
+    assert_eq!(
+        rows,
+        &json!([
+            { "id": "n-1", "title": "martes 10:30", "description": "c-1" },
+            { "id": "n-2", "title": "martes 12:00", "description": "c-1" }
+        ]),
+        "the rows the read found are the rows Meta will paint"
+    );
+    assert_eq!(
+        sent[0].0.interactive["body"]["text"],
+        json!("Estos son los huecos del martes"),
+        "and the rest of the message is rendered as it always was"
+    );
+
+    // The control, so the assertion above is about the read and not about anything a message now
+    // grows on its own: with the notes gone, the same flow sends the same message with no rows.
+    rt.db_for_test()
+        .execute("DELETE FROM crm_note", &Params::new())
+        .await
+        .unwrap();
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(
+        sent[1].0.interactive["action"]["sections"][0]["rows"],
+        json!([]),
+        "an empty read is an empty list, and the run does not fail over it"
+    );
+}
