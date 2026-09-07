@@ -78,10 +78,11 @@ fn a_module_ships_its_automations_and_the_runtime_reads_them() {
     let dir = tmp_module();
     write_family(dir.as_path(), "appointment-from-whatsapp");
 
-    let found = Manifest::load_flow_templates(dir.as_path());
+    let found = Manifest::scan_flow_templates(dir.as_path());
 
-    assert_eq!(found.len(), 1, "la familia de la carpeta se lee");
-    let tpl = &found[0];
+    assert_eq!(found.templates.len(), 1, "la familia de la carpeta se lee");
+    assert!(found.discards.is_empty(), "y no se descarta nada");
+    let tpl = &found.templates[0];
     assert_eq!(tpl.family, "appointment-from-whatsapp");
     // Los dos idiomas obligatorios llegan, y el nombre sale del documento de CADA uno: es lo que
     // deja al hub servir el idioma del negocio sin cotejar nada.
@@ -109,10 +110,13 @@ fn the_version_floor_is_per_template_and_never_the_modules_depends_on() {
     )
     .unwrap();
 
-    let found = Manifest::load_flow_templates(dir.as_path());
+    let found = Manifest::scan_flow_templates(dir.as_path());
 
     assert_eq!(
-        found[0].requires.get("appointments").map(String::as_str),
+        found.templates[0]
+            .requires
+            .get("appointments")
+            .map(String::as_str),
         Some("1.1.69"),
         "el suelo de versión es POR PLANTILLA"
     );
@@ -138,9 +142,21 @@ fn a_family_without_its_grants_sidecar_is_not_offered() {
         .unwrap();
     }
 
+    let found = Manifest::scan_flow_templates(dir.as_path());
+
     assert!(
-        Manifest::load_flow_templates(dir.as_path()).is_empty(),
+        found.templates.is_empty(),
         "sin `grants.json` la familia no se ofrece"
+    );
+    // hub#1649: y lo DICE. Que no se ofrezca es correcto; que desaparezca sin motivo es lo que
+    // deja a la autora del módulo sin nada que mirar.
+    assert_eq!(
+        found
+            .discards
+            .iter()
+            .map(|d| (d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [("lonely", "template_missing_grants")]
     );
 }
 
@@ -161,15 +177,122 @@ fn a_broken_package_never_breaks_the_boot() {
     )
     .unwrap();
 
-    let found = Manifest::load_flow_templates(dir.as_path());
+    let found = Manifest::scan_flow_templates(dir.as_path());
 
-    let families: Vec<&str> = found.iter().map(|t| t.family.as_str()).collect();
+    let families: Vec<&str> = found.templates.iter().map(|t| t.family.as_str()).collect();
     assert_eq!(families, ["good"], "lo roto se omite y lo bueno sobrevive");
+    // hub#1649: omitido no es lo mismo que invisible. El documento ilegible y la familia que se
+    // queda sin grants por culpa de él salen los dos nombrados.
+    assert_eq!(
+        found
+            .discards
+            .iter()
+            .map(|d| (d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("broken", "template_invalid_document"),
+            ("broken", "template_invalid_document"),
+        ],
+        "cada documento que no se lee como JSON se nombra"
+    );
 }
 
 #[test]
 fn a_module_without_the_folder_reads_as_no_templates() {
     // El caso de los 26 módulos que hoy no traen ninguna: ausencia, no error.
     let dir = tmp_module();
-    assert!(Manifest::load_flow_templates(dir.as_path()).is_empty());
+    assert!(Manifest::scan_flow_templates(dir.as_path()).is_empty());
+}
+
+#[test]
+fn a_regional_language_is_read_like_the_modules_translations_are() {
+    // hub#1649. Un módulo publica `locales/pt-br.json` y el hub lo lee; publica
+    // `flows/x.pt-br.flow.json` y el hub lo tira. Es la misma etiqueta de idioma y el mismo
+    // paquete, así que el mismo contrato: lo que vale para las traducciones vale para las
+    // automatizaciones. Sin esto, un módulo con soporte regional pierde su plantilla en silencio.
+    let dir = tmp_module();
+    write_family(dir.as_path(), "appointment-from-whatsapp");
+    let doc = serde_json::json!({
+        "schema_version": 1,
+        "name": "Agendar pelo WhatsApp",
+        "triggers": [{ "kind": "manual" }],
+        "steps": [{ "id": "s1", "kind": "command", "command": "tasks.tasks.create" }]
+    });
+    fs::write(
+        dir.as_path()
+            .join("flows/appointment-from-whatsapp.pt-br.flow.json"),
+        serde_json::to_string(&doc).unwrap(),
+    )
+    .unwrap();
+
+    let found = Manifest::scan_flow_templates(dir.as_path());
+
+    assert_eq!(found.templates.len(), 1);
+    assert!(
+        found.templates[0].documents.contains_key("pt-br"),
+        "un idioma con región se lee igual que en `locales/`, no se descarta; llegaron: {:?}",
+        found.templates[0].documents.keys().collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_file_that_is_not_a_language_says_so_instead_of_vanishing() {
+    // hub#1649. Lo que NO es un idioma se sigue descartando —`README.md` no es una plantilla— pero
+    // ahora con nombre y motivo, que es lo que separa «el módulo no trae ninguna» de «la trae y el
+    // hub la ha tirado».
+    let dir = tmp_module();
+    let flows = dir.as_path().join("flows");
+    fs::create_dir_all(&flows).unwrap();
+    fs::write(flows.join("appointment.backup.flow.json"), b"{}").unwrap();
+    fs::write(flows.join("nolang.flow.json"), b"{}").unwrap();
+
+    let found = Manifest::scan_flow_templates(dir.as_path());
+
+    assert!(found.templates.is_empty());
+    assert_eq!(
+        found
+            .discards
+            .iter()
+            .map(|d| (d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("appointment.backup", "template_invalid_language"),
+            ("nolang", "template_no_language"),
+        ]
+    );
+    assert!(
+        found.discards[0].detail.contains("backup"),
+        "el motivo nombra el fichero que se cayó: {}",
+        found.discards[0].detail
+    );
+}
+
+#[test]
+fn a_version_floor_that_cannot_be_read_keeps_the_family_out_and_says_why() {
+    // hub#1649. Un `requires.json` que ESTÁ y no se lee valía «sin suelo», así que la plantilla se
+    // ofrecía precisamente en el caso en que no se ha podido comprobar nada. Falla cerrado, igual
+    // que una versión ilegible dentro del fichero (`Registry::flow_template_floor_problem`).
+    let dir = tmp_module();
+    write_family(dir.as_path(), "appointment-from-whatsapp");
+    fs::write(
+        dir.as_path()
+            .join("flows/appointment-from-whatsapp.requires.json"),
+        b"{ tampoco soy json",
+    )
+    .unwrap();
+
+    let found = Manifest::scan_flow_templates(dir.as_path());
+
+    assert!(
+        found.templates.is_empty(),
+        "un suelo que no se puede comprobar no se ofrece como si no existiera"
+    );
+    assert_eq!(
+        found
+            .discards
+            .iter()
+            .map(|d| d.code.as_str())
+            .collect::<Vec<_>>(),
+        ["template_unreadable_requires"]
+    );
 }
