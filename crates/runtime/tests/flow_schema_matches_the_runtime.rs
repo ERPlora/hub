@@ -16,7 +16,8 @@ use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
     AiOutputKind, AiPolicy, ErrorPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind,
     DEFAULT_APPROVAL_TTL_SECONDS, DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS,
-    MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
+    MAX_DELAY_HORIZON, MAX_ITERS_CAP, MAX_OPTION_ROWS, MAX_QUERY_ROWS, MAX_WAIT_HOOKS,
+    SCHEMA_VERSION,
 };
 use erplora_runtime::host_notify::Channel;
 
@@ -104,7 +105,7 @@ fn the_keys_of_an_http_step_are_declared_on_both_sides() {
 fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes() {
     let schema = schema();
     let declared = keys_at(&schema, "/$defs/step/properties");
-    for key in ["query", "params", "result", "limit"] {
+    for key in ["query", "params", "result", "limit", "options"] {
         assert!(
             declared.contains(key),
             "the schema must declare `{key}` of a `query` step; it has {declared:?}"
@@ -118,7 +119,8 @@ fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes()
             .map(|r| r.as_str().to_string())
             .collect::<BTreeSet<String>>(),
         "`rows` is not in v1 on either side: `resolve_path` cannot walk `steps.x.rows.0.total`, \
-         and a mapping the kernel resolves to nothing is a lie the editor would help write"
+         and a mapping the kernel resolves to nothing is a lie the editor would help write. \
+         `options` (hub#1641) is what it is missing FOR, and it is on both sides or on neither"
     );
     assert_eq!(
         schema.pointer("/$defs/step/properties/result/default"),
@@ -153,6 +155,82 @@ fn the_query_step_is_declared_with_the_same_ceiling_and_the_same_result_shapes()
     assert!(step(serde_json::json!({ "result": "count" })).is_ok());
     assert!(step(serde_json::json!({ "result": "rows" })).is_err());
     assert!(step(serde_json::json!({ "limit": MAX_QUERY_ROWS + 1 })).is_err());
+}
+
+/// hub#1641 — `result: "options"` and its `options` block. The halves that have to agree are the
+/// two the runtime refuses on, and BOTH of them are conditional on `result`, so the schema says
+/// them with an `if`/`then` instead of a flat `required`:
+///
+/// - `options` is **required** with that result and **refused** without it — a schema that let
+///   either through would have the editor saving a document the hub rejects at save;
+/// - the **row ceiling drops to [`MAX_OPTION_ROWS`]**, because these rows have one destination and
+///   Meta holds ten. A schema that still allowed 200 would move that refusal off the screen.
+#[test]
+fn a_read_that_publishes_options_is_declared_the_same_on_both_sides() {
+    let schema = schema();
+    let conditional = schema
+        .pointer("/$defs/step/allOf/0")
+        .expect("the schema states what `result: \"options\"` requires");
+    assert_eq!(
+        conditional.pointer("/if/properties/result/const"),
+        Some(&serde_json::json!(QueryResult::Options.as_str()))
+    );
+    assert_eq!(
+        conditional.pointer("/then/required"),
+        Some(&serde_json::json!(["options"])),
+        "a read that publishes options carries the columns they are made of"
+    );
+    assert_eq!(
+        conditional.pointer("/then/properties/limit/maximum"),
+        Some(&serde_json::json!(MAX_OPTION_ROWS)),
+        "the runtime caps an options read at what a tappable message can carry"
+    );
+    assert_eq!(
+        conditional.pointer("/else/not/required"),
+        Some(&serde_json::json!(["options"])),
+        "a mapping nothing reads is refused by the runtime, so the editor must not offer it"
+    );
+    assert_eq!(
+        keys_at(&schema, "/$defs/step/properties/options/properties"),
+        BTreeSet::from([
+            "id".to_string(),
+            "title".to_string(),
+            "description".to_string(),
+        ]),
+        "the three a tappable row has, and no fourth"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/options/required"),
+        Some(&serde_json::json!(["id", "title"])),
+        "`description` is the optional second line; the other two are what Meta cannot send \
+         a row without"
+    );
+
+    // And the runtime really does refuse each half the schema promises it refuses.
+    let step = |extra: serde_json::Value| {
+        let mut base = serde_json::json!({
+            "id": "free", "kind": "query", "query": "appointments.free_slots"
+        });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    let shape = serde_json::json!({ "id": "slot_id", "title": "label" });
+    assert!(step(serde_json::json!({ "result": "options", "options": shape })).is_ok());
+    assert!(step(serde_json::json!({ "result": "options" })).is_err());
+    assert!(step(serde_json::json!({ "options": shape })).is_err());
+    assert!(step(serde_json::json!({
+        "result": "options", "options": shape, "limit": MAX_OPTION_ROWS + 1
+    }))
+    .is_err());
+    assert!(step(serde_json::json!({
+        "result": "options", "options": shape, "limit": MAX_OPTION_ROWS
+    }))
+    .is_ok());
 }
 
 /// hub#951 — the extended `delay`. Four halves have to agree, and each for its own reason:
