@@ -787,6 +787,10 @@ mod tests {
             (approvals::ERR_APPROVAL_NOT_FOUND, StatusCode::NOT_FOUND),
             (secrets::ERR_SECRET_NOT_FOUND, StatusCode::NOT_FOUND),
             (notify::ERR_RECIPIENT_NOT_FOUND, StatusCode::NOT_FOUND),
+            // The list a message promised, which the run never published (hub#1646): the same
+            // shape as a recipient nobody could be found for, and pinned here rather than left to
+            // the `not_found` suffix rule, so renaming it cannot silently turn it into a `400`.
+            (notify::ERR_OPTIONS_NOT_FOUND, StatusCode::NOT_FOUND),
             // Refused by an authority.
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),
