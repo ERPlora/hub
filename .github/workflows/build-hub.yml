@@ -192,6 +192,55 @@ jobs:
           echo "(:latest/:stable = hubs reales, solo desde main o un tag vX.Y.Z · :canary = tag rc · :dev = develop → pre)"
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
 
+  # ── ¿Sabe el toolkit qué flota acaba de salir? (ERPlora/module-toolkit#226) ────────────────
+  #
+  # `module-toolkit` lleva `HUB_OUTFITKIT`: una fila por tag de release con el OutfitKit que carga
+  # esa imagen, y `erplora validate` mide contra ella las pantallas de los 27 módulos. La fila solo
+  # se puede escribir DESPUÉS de crear el tag, así que publicar es exactamente lo que la deja
+  # obsoleta — y lo que sale entonces no es un fallo sino un aviso que no bloquea: la comprobación
+  # deja de hacerse y no se entera nadie. Medido el 07/09, con `v1.1.16` ya publicado:
+  #
+  #     ✖ the NEWEST hub tag is in HUB_OUTFITKIT: publishing the hub adds its row (#201)
+  #     ℹ tests 20 · pass 19 · fail 1
+  #
+  # Esa afirmación ya existía y ya era correcta. Lo que no tenía era dónde correr: en la CI del
+  # toolkit se SALTA —los tags son refs y allí el hub llega como TARBALL de action, sin `.git`— y
+  # `canonical-mirrors.yml` solo dispara por su filtro de `paths`, que crear un tag no toca. Entre
+  # publicar la release y la siguiente PR que roce una ruta espejada, la alarma no sonaba en ningún
+  # sitio. `build-hub.yml` es el único que corre con `v*`, y ya hace checkout con `fetch-tags: true`,
+  # que es justo lo que el espejo de tags necesita para existir.
+  #
+  # 🔴 POR QUÉ NO REUSA `canonical-mirrors.yml`. Ese workflow no publica su propio veredicto: lo
+  # reescribe `scripts/canonical-mirrors-verdict.sh` (hub#1296), que degrada el fallo de la action
+  # a AVISO en cuanto alguna copia vendorizada va por detrás. Correcto para una PR de contrato —la
+  # copia vive en otro repo y no puede ir por delante—, y ruinoso aquí: el día que el toolkit vaya
+  # rezagado (que es su estado normal durante horas), esa degradación se tragaría TAMBIÉN la fila
+  # que falta y volveríamos al fallo mudo que este job viene a cerrar. En una release no hay PR de
+  # contrato en vuelo, así que el reparto de hub#1296 no aplica: aquí la comparación se lee cruda.
+  #
+  # 🔴 Y NO BLOQUEA LA RELEASE: sin `needs`, corre en paralelo a `build-and-push` y nadie lo espera.
+  # Retener una imagen que la flota aguarda porque la tabla de OTRO repo va por detrás sería la
+  # forma más rápida de que este job acabe borrado. Rojo = señal, no puerta.
+  canonical-mirrors:
+    name: la tabla del toolkit conoce este tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      # `fetch-tags` es la precondición del espejo, no un detalle: los tags son refs, y sin ellos
+      # `hubTags` se salta el caso —honestamente, pero se lo salta— y el job saldría verde sin
+      # haber comparado nada.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Sin `with: token`: la action se resuelve por el Actions-sharing de module-toolkit con la
+      # organización. Si eso desapareciera, este paso falla en ROJO en vez de degradar a verde.
+      - uses: ERPlora/module-toolkit/.github/actions/check-canonical-mirrors@main
+        with:
+          hub-dir: ${{ github.workspace }}
+
   # ============================================================================
   # `@erplora/module-sdk` → GitHub Packages, en cada tag `v*` (hub#1236)
   # ============================================================================
