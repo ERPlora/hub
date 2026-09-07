@@ -785,6 +785,32 @@ async fn dispatch(
             return Ok(Dispatched::Result(json!({ "error": format!("{e}") })));
         }
 
+        // **A step that owes DATA cannot end by parking** (hub#1639). This is the third way out of
+        // `drive`, and the only one from which the declared fields can never arrive: a proposal
+        // ENDS the turn, so `flow_answer` is never called, and approving it hours later publishes
+        // `{text, tool_calls}` plus the decision with the declared names simply ABSENT. Downstream
+        // that is silent — `resolve_path` yields nothing, and `notify` puts the resolved
+        // `interactive` in the outbox without looking again, so `rows` leaves for Meta as `null`:
+        // exactly the shape `check_options` refuses one branch away.
+        //
+        // Refused HERE, before the row exists, so no person is handed a decision whose approval
+        // could not complete the step. It goes back as a tool RESULT like every other refusal on
+        // this path — the model corrects itself in the same turn, the way it already does for a
+        // payload the schema rejects. Deliberately NOT banned at save time: an answer-only command
+        // (hub#1595) never reaches this branch, and the parser cannot tell the two apart, so
+        // refusing `output` next to `tools.commands` would ban the shape the recipe needs.
+        if !request.output.is_empty() {
+            return Ok(Dispatched::Result(json!({
+                "error": format!(
+                    "this step answers with data, so it cannot propose `{}` for a person to \
+                     approve: a proposal ends the turn and {} would never be filled. Finish by \
+                     calling `{ANSWER_TOOL}` with what you found.",
+                    call.name,
+                    joined_fields(&request.output)
+                )
+            })));
+        }
+
         rt.request_flow_approval(&NewApproval {
             run_id: request.run_id.clone(),
             flow_id: request.flow_id.clone(),

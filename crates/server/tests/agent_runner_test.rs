@@ -1370,6 +1370,23 @@ async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
 
 /// The step of the WhatsApp recipe: read the diary, then answer with the slots as DATA so the
 /// next step can offer them as a list the customer taps (`interactive`, hub#1633).
+/// The same step, but it may also WRITE. Legal on purpose: hub#1595 lets a command that only
+/// ANSWERS run inside the turn, and the parser cannot tell those from the ones that write, so
+/// forbidding `output` next to `tools.commands` would ban the very shape the WhatsApp recipe needs
+/// («is that slot still free?» → offer what is left).
+fn agent_step_that_leaves_data_behind_and_may_write() -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Offer her what is free.",
+        "tools": { "queries": ["agenda.slots.list"], "commands": ["agenda.booking.create"] },
+        "output": {
+            "slots": { "type": "options", "describe": "the free slots you found, one per row" },
+            "action": { "type": "text", "describe": "booked, cancelled or asking" }
+        }
+    })
+}
+
 fn agent_step_that_leaves_data_behind() -> Value {
     json!({
         "id": "agent",
@@ -1633,4 +1650,114 @@ async fn hub1639_options_that_are_not_metas_row_shape_are_refused_before_they_ar
         );
         assert!(reason.contains("slots"), "{bad}: {reason}");
     }
+}
+
+/// **The THIRD way out of a turn** (hub#1639). `drive` can end three ways, and the first two were
+/// guarded: answering with the data, and answering in words without it. The third is a PROPOSAL —
+/// the model asks for a write and the turn parks for a person.
+///
+/// That one is reachable with the DEFAULT policy (`manual`), and it used to park carrying only
+/// `{text, tool_calls}`. Approving it hours later published those two plus the decision, and the
+/// fields the document declared were simply **absent**: `steps.agent.slots` resolved to nothing,
+/// and `notify` puts the resolved `interactive` in the outbox without looking again, so `rows`
+/// left for Meta as `null` — the exact shape `check_options` refuses one branch away.
+///
+/// So a proposal is refused HERE, before the row exists, and comes back to the model as a tool
+/// result like every other refusal on this path: it can correct itself inside the same turn, which
+/// is what the schema-validation refusal above already does. Nothing is banned at save time —
+/// `output` next to `tools.commands` stays legal, because an answer-only command never reaches
+/// this branch.
+#[tokio::test]
+async fn hub1639_a_step_that_owes_data_cannot_end_by_parking_a_proposal() {
+    let cloud = FakeCloud::with(vec![
+        sse_call(
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+        sse_text_and_call(
+            "Estos son los huecos que quedan",
+            "flow_answer",
+            "c2",
+            json!({ "slots": two_slots(), "action": "asking" }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "parkowed",
+        agent_step_that_leaves_data_behind_and_may_write(),
+        &[
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
+        ],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    // NOTHING is parked: a row in the tray would be a decision whose approval could never fill the
+    // fields, because a proposal ends the turn.
+    let rt = h.state.runtime.read().await;
+    let pending = rt
+        .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+        .await
+        .unwrap();
+    drop(rt);
+    assert!(
+        pending.is_empty(),
+        "a step that owes data must not leave a proposal a person can approve: {pending:?}"
+    );
+    assert_ne!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL,
+        "the run is not left waiting for a decision that cannot complete it"
+    );
+
+    // The model was TOLD, in the same turn, and answered properly the second time.
+    assert_eq!(
+        cloud.turns(),
+        2,
+        "the refusal goes back as a tool result and the turn continues"
+    );
+    let second = &cloud.bodies()[1];
+    let told = second["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["role"] == json!("tool"))
+        .map(|m| m["content"].as_str().unwrap_or_default().to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        told.contains("flow_answer"),
+        "the model is told what this step wants instead of a proposal: {told}"
+    );
+
+    // …and the declared fields ARE published, with their type intact.
+    let out = step_output(&h, &run_id).await;
+    assert!(out["slots"].is_array(), "the slots keep their type: {out}");
+    assert_eq!(out["action"], json!("asking"));
+    // The attempt stays in the history WITH its refusal — the same way a payload the schema
+    // rejects does, because a run history that hides what the model tried cannot explain itself.
+    // What must be true is not that the attempt vanished, but that it never RAN.
+    let proposal = out["tool_calls"]
+        .as_array()
+        .and_then(|c| {
+            c.iter()
+                .find(|t| t["name"] == json!("agenda.booking.create"))
+        })
+        .unwrap_or_else(|| panic!("the attempt is recorded: {out}"));
+    assert!(
+        proposal["result"]["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(agent_runner::ANSWER_TOOL),
+        "and it is recorded as REFUSED, saying what to do instead: {proposal}"
+    );
+    assert!(
+        bookings(&h).await.is_empty(),
+        "nothing was written to the business database"
+    );
 }
