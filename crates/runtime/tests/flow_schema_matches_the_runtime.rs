@@ -14,7 +14,8 @@ use std::collections::BTreeSet;
 
 use erplora_runtime::flows::approvals::{ExpiryPolicy, RejectPolicy};
 use erplora_runtime::flows::def::{
-    AiPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind, DEFAULT_APPROVAL_TTL_SECONDS,
+    AiPolicy, ErrorPolicy, Op, PastDuePolicy, QueryResult, StepKind, TriggerKind,
+    DEFAULT_APPROVAL_TTL_SECONDS,
     DEFAULT_MAX_ITERS, MAX_APPROVAL_TTL_SECONDS, MAX_CORRELATE_PAIRS, MAX_DELAY_HORIZON,
     MAX_ITERS_CAP, MAX_QUERY_ROWS, MAX_WAIT_HOOKS, SCHEMA_VERSION,
 };
@@ -543,4 +544,73 @@ fn every_key_of_the_ai_step_is_declared_in_the_schema() {
             .and_then(|v| v.as_bool()),
         Some(false)
     );
+}
+
+/// **What a FAILURE costs the run** (hub#1635), on both sides. `on_error` is the third policy of
+/// this contract and the one with the widest reach: `on_expire`/`on_reject` belong to the two kinds
+/// that wait for a person, and this one belongs to every kind that can fail.
+///
+/// The vocabulary matters more here than anywhere else, because of the value that is deliberately
+/// NOT in it. A schema that offered `retry` would have an editor promising the hub will re-run a
+/// business command on its own — which is how a sale gets charged twice (ADR-0283 §1) — and the
+/// runtime would degrade it to `stop` in silence.
+#[test]
+fn the_failure_policy_is_the_same_closed_vocabulary_on_both_sides() {
+    let schema = schema();
+    assert!(
+        keys_at(&schema, "/$defs/step/properties").contains("on_error"),
+        "the schema must declare `on_error`: the runtime accepts it on every kind that can fail"
+    );
+    assert_eq!(
+        enum_at(&schema, "/$defs/step/properties/on_error"),
+        ErrorPolicy::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect::<BTreeSet<String>>()
+    );
+    assert!(
+        !enum_at(&schema, "/$defs/step/properties/on_error").contains("retry"),
+        "`retry` is not a policy this kernel has, and a schema offering it would promise a branch \
+         the runtime would silently degrade to `stop`"
+    );
+    assert_eq!(
+        schema.pointer("/$defs/step/properties/on_error/default"),
+        Some(&serde_json::json!(ErrorPolicy::Stop.as_str())),
+        "a document that says nothing still stops: the steps written after a write assumed it \
+         happened"
+    );
+
+    // And the runtime really does accept it exactly where the schema's description says it does.
+    let step = |kind: &str, extra: serde_json::Value| {
+        let mut base = serde_json::json!({ "id": "s", "kind": kind, "on_error": "continue" });
+        let map = base.as_object_mut().unwrap();
+        for (k, v) in extra.as_object().unwrap() {
+            map.insert(k.clone(), v.clone());
+        }
+        erplora_runtime::flows::FlowDefinition::parse(&serde_json::json!({
+            "schema_version": 1, "steps": [base]
+        }))
+    };
+    assert!(step("command", serde_json::json!({ "command": "crm.note.add" })).is_ok());
+    assert!(step("query", serde_json::json!({ "query": "crm.note.list" })).is_ok());
+    assert!(step("delay", serde_json::json!({ "seconds": 60 })).is_ok());
+    assert!(
+        step("http", serde_json::json!({ "url": "https://example.com/x" })).is_ok(),
+        "the two kinds that fail OUTSIDE the tick obey the same policy, or it would cover the \
+         cheap half of the kernel and miss the one somebody is waiting on"
+    );
+    assert!(step("ai", serde_json::json!({ "prompt": "book it" })).is_ok());
+    assert!(step(
+        "notify",
+        serde_json::json!({
+            "channel": "email", "template": "t",
+            "to": { "query": "crm.customer.get", "field": "email" }
+        })
+    )
+    .is_ok());
+
+    // …and refuses it where a failure cannot happen. A `condition` that does not match is the flow
+    // working as written, and an `approval` answers with `on_reject`/`on_expire`.
+    assert!(step("condition", serde_json::json!({ "when": { "input.x": { "eq": 1 } } })).is_err());
+    assert!(step("approval", serde_json::json!({ "title": "¿Seguimos?" })).is_err());
 }

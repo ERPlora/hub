@@ -28,7 +28,7 @@
     "steps": {
       "type": "array",
       "minItems": 1,
-      "description": "Los pasos, EN ORDEN. v1 es lineal y `on_error` es siempre `stop`: un fallo detiene el run (reintentar un command de negocio por su cuenta es como se cobra dos veces una venta).",
+      "description": "Los pasos, EN ORDEN. v1 es lineal: un fallo detiene el run POR DEFECTO (`on_error: \"stop\"`), y un paso puede decir `on_error: \"continue\"` para que el run siga por el paso siguiente contando cómo terminó (hub#1635). Lo que NO existe ni va a existir es `retry`: reintentar un command de negocio por su cuenta es como se cobra dos veces una venta.",
       "items": {
         "$ref": "#/$defs/step"
       }
@@ -271,6 +271,14 @@
           ],
           "default": "cancel",
           "description": "`kind: approval` y `kind: ai` — qué le cuesta al run un «no». `cancel` (POR DEFECTO) termina el run como `cancelled`, que es lo que un rechazo hace hoy; `continue` sigue con `steps.<id>.decision == \"rejected\"`. En un paso `ai`, además, el paso conserva el turno aparcado (`steps.<id>.text`) y añade `steps.<id>.status == \"rejected\"`, igual que hace la aprobación: así el paso siguiente puede contarle a alguien cómo acabó. **Con `continue` + un `condition` las tres ramas (aprobado/rechazado/vencido) se componen a partir de primitivas ya congeladas, sin necesidad de una v2 con branching** — que es la misma jugada del step `query`. Viaja en la fila por el mismo motivo que `on_expire`."
+        },
+        "on_error": {
+          "enum": [
+            "stop",
+            "continue"
+          ],
+          "default": "stop",
+          "description": "Todos los pasos que PUEDEN fallar (`command`, `query`, `delay`, `http`, `ai`, `notify`) — qué le cuesta al run que este paso falle. `stop` (POR DEFECTO, y lo que un fallo ha hecho siempre) termina el run como `failed` y los pasos escritos después no corren; `continue` sigue por el paso siguiente con `steps.<id>.status == \"failed\"` y `steps.<id>.error` con el motivo — la misma forma que `on_reject: \"continue\"` (en un paso `ai` conserva además el turno aparcado, `steps.<id>.text`). El paso sigue constando como `failed` en el historial: `continue` es del RUN. 🔴 El vocabulario está CERRADO en esos dos y `retry` no está ni va a estar (ADR-0283 §1): continuar no es reintentar — no se vuelve a ejecutar nada, se pasa a la instrucción siguiente, que el documento ya trae escrita. `condition` no lo acepta (no falla: no casar es el flujo funcionando) ni `approval` (sus salidas son `on_reject`/`on_expire`)."
         },
         "channel": {
           "enum": [
