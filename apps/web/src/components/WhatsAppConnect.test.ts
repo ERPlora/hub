@@ -221,7 +221,7 @@ describe('when Meta drops the permission (hub#1626)', () => {
     const wrapper = mountBlock('es');
     await flushPromises();
 
-    expect(wrapper.text()).toContain(es.whatsappConnect.disconnected);
+    expect(wrapper.text()).toContain(es.whatsappConnect.reconnectBadge);
     expect(wrapper.text()).not.toContain(es.whatsappConnect.connected);
     // The number stays: with two numbers connected, «one of them is down» is useless without it.
     expect(wrapper.text()).toContain('+34 612 345 678');

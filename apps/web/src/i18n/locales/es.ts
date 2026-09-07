@@ -763,7 +763,7 @@ export default {
     connected: 'Conectado',
     businessApp: 'App de WhatsApp Business',
     connectedHelp: 'Los mensajes de tus clientes llegan a la Bandeja y las automatizaciones los contestan.',
-    disconnected: 'Desconectado',
+    reconnectBadge: 'Hay que reconectar',
     reconnectNeeded:
       'WhatsApp ha retirado el permiso para escribir en nombre de tu negocio. Los mensajes de tus clientes no están llegando y nada de lo que contestes sale. Vuelve a conectar tu número para recuperar el canal.',
     reconnect: 'Volver a conectar WhatsApp',

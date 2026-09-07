@@ -139,7 +139,7 @@ async function disconnect(number: WhatsAppNumber): Promise<void> {
               data-test="whatsapp-status-badge"
               :color.attr="number.needs_reconnect === true ? 'danger' : 'success'"
             >
-              {{ number.needs_reconnect === true ? t('whatsappConnect.disconnected') : t('whatsappConnect.connected') }}
+              {{ number.needs_reconnect === true ? t('whatsappConnect.reconnectBadge') : t('whatsappConnect.connected') }}
             </ion-badge>
             <ion-badge v-if="number.is_on_biz_app" color="medium">{{ t('whatsappConnect.businessApp') }}</ion-badge>
           </span>
