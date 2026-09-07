@@ -115,6 +115,11 @@ pub struct NotifyIntent {
     /// Variables de la plantilla.
     #[serde(default)]
     pub vars: Json,
+    /// **Opciones que el cliente TOCA** (hub#1633): el objeto `interactive` de Meta, tal cual, para
+    /// que el transporte lo lleve sin traducir. `Null` (lo normal) = mensaje corriente. Solo tiene
+    /// sentido en WhatsApp: el resto de canales no tienen nada que tocar.
+    #[serde(default)]
+    pub interactive: Json,
 }
 
 impl NotifyIntent {
@@ -480,6 +485,7 @@ mod tests {
             to: to.to_string(),
             template: "t".into(),
             vars: json!({}),
+            interactive: Json::Null,
         }
     }
 

@@ -139,7 +139,7 @@
     },
     "flowGrantSpec": {
       "type": "object",
-      "description": "Un permiso de un flujo, con la misma forma `{kind, value}` que manda la pantalla a `PUT …/flows/<id>/grants`.",
+      "description": "Un permiso de un flujo, con la misma forma `{kind, value}` —más el `payload` opcional— que manda la pantalla a `PUT …/flows/<id>/grants`.",
       "required": ["kind", "value"],
       "additionalProperties": false,
       "properties": {
@@ -150,6 +150,11 @@
         "value": {
           "type": "string",
           "description": "Qué se le permite: el comando (`crm.note.add`), la lectura (`crm.customer.list`), el canal (`email`), el patrón de URL (`https://host/path*`) o el `<query>#<campo>` del destinatario."
+        },
+        "payload": {
+          "type": "object",
+          "default": {},
+          "description": "Solo `kind: command` (hub#1623) — los campos del payload que el grant FIJA. Con `{\"channel\": \"customer\"}` la concesión ya no es «puede anular citas» sino «puede anular citas COMO CLIENTE», y el dispatcher rechaza (`flow.grant_payload_denied`) la llamada que mande otra cosa o que omita el campo, ANTES de tocar el módulo. Existe porque el payload de un paso `ai` lo redacta un modelo leyendo el mensaje de un desconocido: sin fijarlo, ese mensaje elige todos los argumentos del command. Es una lista de valores FIJADOS, no de campos prohibidos — una lista de prohibidos autoriza cada campo que se añada después. **Viaja en el bundle** porque, si no, restaurar una copia volvería a conceder el permiso ANCHO sin decirlo. Ausente = no fija nada, que es lo que valen todos los grants anteriores a hub#1623."
         }
       }
     },

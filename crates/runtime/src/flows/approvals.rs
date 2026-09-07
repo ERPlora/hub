@@ -90,9 +90,9 @@ pub const ON_EXPIRE_CONTINUE: &str = "continue";
 pub enum ExpiryPolicy {
     /// Treat the silence as a **refusal** — the DEFAULT, and the conservative reading. The steps
     /// written after an `ai` step assumed it acted; carrying on as if it had would be the one
-    /// mistake an approval exists to prevent. Today a rejection ends the run (§14.7), so this and
-    /// [`ExpiryPolicy::Cancel`] land in the same place; they stop being synonyms the day `on_reject`
-    /// exists, and the row already says which one was meant.
+    /// mistake an approval exists to prevent. It lands in the same place as [`ExpiryPolicy::Cancel`]
+    /// — ending the run — and the row keeps saying which of the two was meant, which is what makes
+    /// «nobody answered» distinguishable from «somebody said no» in the audit.
     Reject,
     /// End the run, without calling it a refusal.
     Cancel,
@@ -223,6 +223,15 @@ pub struct NewApproval {
     /// parked on the step row so that, when the approval is decided hours later, the step's
     /// output is the whole turn and not just its ending.
     pub partial_output: Json,
+    /// **What the step said a SILENCE costs the run** (hub#1634). Travels from the document like
+    /// [`NewApproval::on_reject`] instead of being pinned here: the sweep reads the ROW hours
+    /// later, so a proposal decides its own fate with the policy that was in force when it was
+    /// made, not the one the document happens to say by then.
+    pub on_expire: ExpiryPolicy,
+    /// What the `ai` step said a «no» costs its run (hub#1622, `def::AiStep::on_reject`). It comes
+    /// from the document at PROPOSE time and is stored, for the same reason the payload is: what a
+    /// refusal means has to be what was in force when the question was asked.
+    pub on_reject: RejectPolicy,
 }
 
 fn not_found(id: &str) -> RuntimeError {
@@ -327,11 +336,18 @@ pub async fn create(db: &dyn DatabaseAdapter, hub_id: &str, new: &NewApproval) -
             assignee_role: "",
             expires_at: (chrono::Utc::now() + chrono::Duration::hours(DEFAULT_TTL_HOURS))
                 .to_rfc3339(),
-            on_expire: ExpiryPolicy::Reject,
-            // An `ai` step has no way to say otherwise, so this is exactly what a rejection has
-            // always done. Reading it from the row rather than branching on the kind is what keeps
-            // `decide_flow_approval` one method with one rule.
-            on_reject: RejectPolicy::Cancel,
+            // The `ai` step's own answer since hub#1634; before that it was pinned here to
+            // `reject`, so a proposal nobody answered always killed the run and the step written
+            // to tell the customer never ran. It still DEFAULTS to `reject` — the document has to
+            // opt in — and the sweep reads it from the ROW for the same reason `on_reject` is
+            // read there: the policy that applies is the one in force when the question was asked.
+            on_expire: new.on_expire,
+            // The `ai` step's own answer since hub#1622; before that it was pinned here to
+            // `cancel`, and every step written after a proposal went unrun on a refusal. It still
+            // DEFAULTS to `cancel` — the document has to opt in. Reading it from the row rather
+            // than branching on the kind is what keeps `decide_flow_approval` one method with one
+            // rule.
+            on_reject: new.on_reject,
         },
     )
     .await
@@ -743,7 +759,75 @@ mod tests {
             payload: json!({ "customer": "Marta", "minutes": 45 }),
             reason: "the customer asked for a colour, which takes 45 minutes".into(),
             partial_output: json!({ "text": "I will book it" }),
+            on_expire: ExpiryPolicy::Reject,
+            on_reject: RejectPolicy::Cancel,
         }
+    }
+
+    /// **The `ai` step's answer travels in the row too** (hub#1622). Until now `create` wrote
+    /// `cancel` no matter what the document said, because the step had no way to say otherwise;
+    /// now it has, and the row is what the decision reads — so editing the flow while somebody is
+    /// looking at the tray still cannot change what their «no» costs.
+    #[tokio::test]
+    async fn a_proposal_records_what_its_step_said_a_refusal_costs() {
+        let db = db().await;
+        let carry_on = create(
+            &db,
+            HUB,
+            &NewApproval {
+                on_reject: RejectPolicy::Continue,
+                ..proposal("agenda.booking.create")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(carry_on.on_reject, ON_REJECT_CONTINUE);
+        assert_eq!(
+            get(&db, HUB, &carry_on.id).await.unwrap().on_reject,
+            ON_REJECT_CONTINUE,
+            "read back from the row, not from the value we happened to be holding"
+        );
+
+        let default = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        assert_eq!(
+            default.on_reject, ON_REJECT_CANCEL,
+            "a document that says nothing still ends the run, as it always has"
+        );
+    }
+
+    /// **And so does its answer about a SILENCE** (hub#1634). The twin of the test above: until
+    /// now `create` pinned `reject` whatever the document said, so a proposal nobody answered
+    /// always killed the run — and the step written to tell the customer never ran. The row is
+    /// what the SWEEP reads, hours later, with no document in hand.
+    #[tokio::test]
+    async fn a_proposal_records_what_its_step_said_a_silence_costs() {
+        let db = db().await;
+        let carry_on = create(
+            &db,
+            HUB,
+            &NewApproval {
+                on_expire: ExpiryPolicy::Continue,
+                ..proposal("agenda.booking.create")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(carry_on.on_expire, ON_EXPIRE_CONTINUE);
+        assert_eq!(
+            get(&db, HUB, &carry_on.id).await.unwrap().on_expire,
+            ON_EXPIRE_CONTINUE,
+            "read back from the row, not from the value we happened to be holding"
+        );
+
+        let default = create(&db, HUB, &proposal("agenda.booking.create"))
+            .await
+            .unwrap();
+        assert_eq!(
+            default.on_expire, ON_EXPIRE_REJECT,
+            "a document that says nothing still dies on an expiry, as it always has"
+        );
     }
 
     /// The payload is stored VERBATIM, because it is what «approve» means. A tray that showed a

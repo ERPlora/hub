@@ -46,9 +46,10 @@ use erplora_db::{DatabaseAdapter, Params};
 
 use crate::errors::{Result, RuntimeError};
 use crate::flows::def::{
-    self, Condition, DelayStep, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON, ERR_MAX_RESCHEDULES,
-    MAX_RESCHEDULES,
+    self, Condition, DelayStep, ErrorPolicy, PastDuePolicy, WaitKind, ERR_DELAY_HORIZON,
+    ERR_MAX_RESCHEDULES, MAX_RESCHEDULES,
 };
+use crate::flows::executor;
 use crate::flows::store;
 use crate::registry::{new_id, now_rfc3339};
 
@@ -238,7 +239,10 @@ pub async fn on_event(
 
         let ops = match WaitKind::parse(&text(row, "kind")) {
             Some(WaitKind::Cancel) => cancel_ops(hub_id, row),
-            Some(WaitKind::Reschedule) => reschedule_ops(hub_id, row, &scope),
+            Some(WaitKind::Reschedule) => match reschedule_ops(hub_id, row, &scope) {
+                Reschedule::Ops(ops) => ops,
+                Reschedule::Failed(reason) => failure_ops(db, hub_id, row, &reason).await?,
+            },
             None => {
                 // A kind this binary does not know: a rollback below the version that wrote it.
                 // Disarming beats guessing — the run keeps its clock and nothing silently fires.
@@ -362,13 +366,123 @@ fn cancel_ops(hub_id: &str, row: &Json) -> Vec<(String, Params)> {
     )]
 }
 
+/// What a reschedule decided, so that **who prices a failure** is not this function's business.
+///
+/// A broken wait is a step that FAILED, and what a failure costs the run is the step's `on_error`
+/// (hub#1635) — the same question the tick and `complete_io` each ask at their own seam. Answering
+/// it needs the DOCUMENT, and reading the document needs the database, so the pure op-builder says
+/// what broke and [`failure_ops`] says what it costs.
+enum Reschedule {
+    /// The wait moves, or the run ends for a reason that is NOT a failure (`past_due_policy:
+    /// "skip"` finishes it `done`, and a `done` run has nothing to carry on to).
+    Ops(Vec<(String, Params)>),
+    /// The wait broke, and this is why, in the words the run's `last_error` would have carried.
+    Failed(String),
+}
+
+/// **What a broken wait costs the run** (hub#1635) — the THIRD seam, after the tick and
+/// `complete_io`, and the one that had been missed: `delay` accepts `on_error` and the schema
+/// promises it by name, so four of its five exits were honouring a key nobody read.
+///
+/// Same question and same answer as the other two, deliberately: the policy comes from the
+/// DOCUMENT (via [`executor::step_error_policy`], which is fail-CLOSED when it cannot be read),
+/// `stop` is the default, and `continue` NEVER re-runs anything — it moves to the step after this
+/// one so that whoever was waiting gets told.
+async fn failure_ops(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    row: &Json,
+    reason: &str,
+) -> Result<Vec<(String, Params)>> {
+    // 🔴 **The wait is parked one step PAST the `delay` that armed it.** The step counter advances
+    // with the sleep (`executor`: «waking resumes AFTER the delay»), so `step_index` on this row is
+    // where the run will RESUME, and the step whose `on_error` governs is the one before it. Asking
+    // the wrong index reads the policy of the step that has not run yet — which is exactly how this
+    // key becomes a silent no-op, the bug being fixed here.
+    let Some(delay_index) = row["step_index"].as_i64().and_then(|i| i.checked_sub(1)) else {
+        return Ok(vec![finish_ops(hub_id, row, store::STATUS_FAILED, reason)]);
+    };
+    match executor::step_error_policy(db, hub_id, &text(row, "flow_id"), delay_index).await {
+        ErrorPolicy::Stop => Ok(vec![finish_ops(hub_id, row, store::STATUS_FAILED, reason)]),
+        ErrorPolicy::Continue => Ok(vec![
+            continue_op(db, hub_id, row, delay_index, reason).await?,
+        ]),
+    }
+}
+
+/// The `continue` half: the run leaves the wait for the step AFTER it, with how this one ended
+/// readable at `steps.<id>` — the same two keys (`status`, `error`) the other two seams write, so
+/// the step that tells somebody reads ONE shape however the failure happened.
+///
+/// It keeps the conditional-`UPDATE` shape of [`finish_ops`] for the same reason: the condition
+/// that decides the race also decides the disarm. `status = 'pending'` (not `sleeping`) with
+/// `wake_at` cleared is what puts it back in the queue; the index moves BEFORE anything else, so
+/// there is no reading of this row that could run the broken wait a second time — carrying on is
+/// not retrying.
+async fn continue_op(
+    db: &dyn DatabaseAdapter,
+    hub_id: &str,
+    row: &Json,
+    delay_index: i64,
+    reason: &str,
+) -> Result<(String, Params)> {
+    let mut q = Params::new();
+    q.insert("run_id".into(), json!(text(row, "run_id")));
+    q.insert("hub_id".into(), json!(hub_id));
+    let res = db
+        .query(
+            "SELECT vars FROM _flow_runs \
+              WHERE id = :run_id AND hub_id = :hub_id AND deleted_at IS NULL",
+            &q,
+        )
+        .await?;
+    let mut vars = executor::parse_json(
+        res.rows
+            .first()
+            .and_then(|r| r["vars"].as_str())
+            .unwrap_or("{}"),
+    );
+    executor::set_step_output(
+        &mut vars,
+        &text(row, "step_id"),
+        executor::failure_output(json!({}), reason),
+    );
+
+    let mut p = base_params(hub_id, row);
+    p.insert("delay_index".into(), json!(delay_index));
+    p.insert("vars".into(), json!(vars.to_string()));
+    p.insert("reason".into(), json!(reason));
+    // **The index is NOT moved here — it already moved.** It advanced when the run went to sleep,
+    // so `current_step` is the step AFTER the delay and carrying on is `status = 'pending'` with
+    // the clock cleared. Moving it again would SKIP the step that tells somebody, which is the very
+    // step this primitive exists to reach. Nothing is re-run either way: continuing is not retrying.
+    Ok((
+        "WITH won AS (\
+           UPDATE _flow_runs SET status = 'pending', vars = :vars, wake_at = NULL, \
+                  claim_expires_at = NULL, updated_at = :now \
+            WHERE id = :run_id AND hub_id = :hub_id AND status = 'sleeping' \
+              AND current_step = :step_index AND deleted_at IS NULL \
+           RETURNING id\
+         ), stepped AS (\
+           UPDATE _flow_run_steps SET status = 'failed', error = :reason, finished_at = :now \
+            WHERE hub_id = :hub_id AND run_id = :run_id AND step_index = :delay_index \
+              AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM won)\
+         ) \
+         UPDATE _flow_run_waits SET status = 'disarmed', deleted_at = :now, updated_at = :now \
+          WHERE hub_id = :hub_id AND run_id = :run_id AND status = 'armed' \
+            AND EXISTS (SELECT 1 FROM won)"
+            .to_string(),
+        p,
+    ))
+}
+
 /// **Reschedule.** The new instant comes from the ARRIVING event, with the step's own
 /// `offset_seconds` re-applied — «24 h before» stays «24 h before» when the appointment moves.
 ///
 /// There is no old timer to cancel, and that is a property of the design rather than a claim: a
 /// sleeping run has ONE `wake_at`, not a queue of scheduled jobs, so moving the wait is writing a
 /// column. Whatever else this run's waits are, they keep pointing at the same row.
-fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params)> {
+fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Reschedule {
     let step_id = text(row, "step_id");
     let policy = PastDuePolicy::parse(&text(row, "past_due_policy")).unwrap_or_default();
     let done = row["reschedules"].as_i64().unwrap_or(0);
@@ -376,16 +490,10 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
     // The runaway guard. An event that keeps arriving would push the same wait forward forever and
     // the run would never end — the same shape as `MAX_RUNS_PER_MINUTE`, one level down.
     if done + 1 > MAX_RESCHEDULES {
-        return vec![finish_ops(
-            hub_id,
-            row,
-            store::STATUS_FAILED,
-            &format!(
-                "{ERR_MAX_RESCHEDULES}: step `{step_id}` was moved {MAX_RESCHEDULES} times and \
-                 stopped being moved. A wait that keeps being pushed forward is a run that never \
-                 ends."
-            ),
-        )];
+        return Reschedule::Failed(format!(
+            "{ERR_MAX_RESCHEDULES}: step `{step_id}` was moved {MAX_RESCHEDULES} times and \
+             stopped being moved. A wait that keeps being pushed forward is a run that never ends."
+        ));
     }
 
     let until_path = text(row, "until_path");
@@ -394,15 +502,10 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
         .as_str()
         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
     else {
-        return vec![finish_ops(
-            hub_id,
-            row,
-            store::STATUS_FAILED,
-            &format!(
-                "step `{step_id}`: the event that should have moved this wait resolves \
-                 `{until_path}` to {resolved}, which is not an RFC-3339 instant"
-            ),
-        )];
+        return Reschedule::Failed(format!(
+            "step `{step_id}`: the event that should have moved this wait resolves \
+             `{until_path}` to {resolved}, which is not an RFC-3339 instant"
+        ));
     };
 
     let offset = row["offset_seconds"].as_i64().unwrap_or(0);
@@ -411,16 +514,11 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
     let horizon = row["max_wait"].as_i64().unwrap_or(def::MAX_DELAY_HORIZON);
 
     if wake_at > now + chrono::Duration::seconds(horizon) {
-        return vec![finish_ops(
-            hub_id,
-            row,
-            store::STATUS_FAILED,
-            &format!(
-                "{ERR_DELAY_HORIZON}: step `{step_id}` was moved to {}, past the {horizon} s this \
-                 wait may cover",
-                wake_at.to_rfc3339()
-            ),
-        )];
+        return Reschedule::Failed(format!(
+            "{ERR_DELAY_HORIZON}: step `{step_id}` was moved to {}, past the {horizon} s this \
+             wait may cover",
+            wake_at.to_rfc3339()
+        ));
     }
 
     // The instant it was moved TO has already gone by. The same three answers as entering the step
@@ -429,7 +527,7 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
     if wake_at <= now {
         match policy {
             PastDuePolicy::Skip => {
-                return vec![finish_ops(
+                return Reschedule::Ops(vec![finish_ops(
                     hub_id,
                     row,
                     store::STATUS_DONE,
@@ -437,19 +535,14 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
                         "step `{step_id}`: the wait was moved to an instant that had already \
                          passed and `past_due_policy` is `skip`"
                     ),
-                )]
+                )])
             }
             PastDuePolicy::Fail => {
-                return vec![finish_ops(
-                    hub_id,
-                    row,
-                    store::STATUS_FAILED,
-                    &format!(
-                        "{}: step `{step_id}` was moved to {}, which had already passed",
-                        def::ERR_DELAY_PAST_DUE,
-                        wake_at.to_rfc3339()
-                    ),
-                )]
+                return Reschedule::Failed(format!(
+                    "{}: step `{step_id}` was moved to {}, which had already passed",
+                    def::ERR_DELAY_PAST_DUE,
+                    wake_at.to_rfc3339()
+                ))
             }
             // `continue_now` needs nothing special: a `wake_at` in the past is what the timer is
             // for, and the next tick picks the run up.
@@ -459,7 +552,7 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
 
     let mut p = base_params(hub_id, row);
     p.insert("wake_at".into(), json!(wake_at.to_rfc3339()));
-    vec![(
+    Reschedule::Ops(vec![(
         "WITH won AS (\
            UPDATE _flow_runs SET wake_at = :wake_at, updated_at = :now \
             WHERE id = :run_id AND hub_id = :hub_id AND status = 'sleeping' \
@@ -471,7 +564,7 @@ fn reschedule_ops(hub_id: &str, row: &Json, scope: &Json) -> Vec<(String, Params
             AND EXISTS (SELECT 1 FROM won)"
             .to_string(),
         p,
-    )]
+    )])
 }
 
 /// Ends the run and disarms every wait it has, conditional on it still being asleep at this step.

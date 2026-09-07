@@ -223,6 +223,14 @@ pub struct FlowGrantSpec {
     /// `command`, `query`, `notify`, `http`, `recipient_query` (`flows::grants::GrantKind`).
     pub kind: String,
     pub value: String,
+    /// hub#1623 — the payload fields the grant FIXES, `{}` when it fixes none.
+    ///
+    /// It travels because leaving it out would make a backup a way to WIDEN a permission: the
+    /// restore would re-grant «may cancel appointments» where the owner had given «may cancel
+    /// appointments as the customer», and nothing would say so. `default` because every bundle
+    /// written before this existed has no such key and means exactly `{}`.
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub payload: serde_json::Map<String, serde_json::Value>,
 }
 
 /// One automation as it travels in a **backup** (hub#986): the document its owner wrote, plus the
@@ -718,6 +726,7 @@ async fn collect_flows(db: &dyn erplora_db::DatabaseAdapter, hub_id: &str) -> Ve
             .map(|g| FlowGrantSpec {
                 kind: g.kind,
                 value: g.value,
+                payload: g.payload.as_object().cloned().unwrap_or_default(),
             })
             .collect();
         out.push(FlowSpec {

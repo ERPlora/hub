@@ -17,6 +17,7 @@ pub mod api_keys;
 pub mod capabilities;
 pub mod certificate;
 pub mod commands;
+pub mod core_version;
 pub mod device_mode;
 pub mod devices;
 pub mod e2e_support;
@@ -77,7 +78,7 @@ pub mod wasm_cache;
 
 pub use error_registry::{ErrorEvent, ErrorRegistry, ErrorSink};
 pub use errors::{DemoLock, Result, RuntimeError};
-pub use manifest::{Manifest, ManifestWarning, CORE_VERSION};
+pub use manifest::{Manifest, ManifestWarning, CORE_VERSION, CORE_VERSION_CORROBORATED};
 pub use module_update::ModuleUpdate;
 pub use registry::{
     AutomationCtx, EventSink, EventSource, ModuleSnapshot, ModuleStatus, NavEntry, Principal,

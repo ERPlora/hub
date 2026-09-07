@@ -83,6 +83,9 @@ import '@erplora/outfitkit/ok-stat';
 import '@erplora/outfitkit/ok-sparkline';
 import '@erplora/outfitkit/ok-status-pill';
 import '@erplora/outfitkit/ok-empty-state';
+// Tarjeta de plan de los tiers de un módulo (pestaña «Plan», hub#1605): la pieza compartida en
+// vez de una tarjeta a mano por panel.
+import '@erplora/outfitkit/ok-pricing-card';
 // Usuarios → API keys: aviso "el secreto no se volverá a mostrar" en el modal del token.
 import '@erplora/outfitkit/ok-inline-feedback';
 // Ajustes → selector de tema compartido Cloud↔Hub (paleta + modo, ADR-0138).

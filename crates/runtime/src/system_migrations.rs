@@ -1855,6 +1855,32 @@ ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_at TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by TEXT;\
 ALTER TABLE _print_queue ADD COLUMN IF NOT EXISTS retried_by_module TEXT NOT NULL DEFAULT '';",
     },
+    // ── v59 — hub#1623: a `command` grant may FIX part of the payload ─────────────────────────
+    // Until here the unit of authorisation was the command's NAME, so «may cancel appointments» and
+    // «may cancel appointments AS THE CUSTOMER» were the same permission. They are not: a flow whose
+    // payload a model writes from a stranger's message needs the second one, because the first
+    // hands that stranger every argument of the command — including the one that says the call came
+    // from the counter and therefore skips the business's own cancellation rules.
+    //
+    // `payload` stores a JSON object as TEXT (the convention of `_flow_approvals.payload`), with
+    // `'{}'` meaning it fixes nothing, which is what every row before this version had. That is why
+    // it does NOT join `ux_flow_grant_live`: the identity of a grant stays `(hub, flow, kind,
+    // value)`, so a command has at most ONE live authorisation and one single sentence to read on
+    // the screen. With the payload in the index, «may cancel as the customer» and «may cancel» full
+    // stop would coexist, and the second would win: two rows that contradict each other, and the
+    // WIDER one decides.
+    //
+    // 🔴 The number is the NEXT ONE AFTER THE MAXIMUM, never a gap: when it was written the maximum
+    // was v58 on `origin/develop`, on `main` and across the remote branches (checked one by one).
+    // `apply` compares against the highest applied version, and a version below it is skipped
+    // SILENTLY.
+    SystemMigration {
+        version: 59,
+        name: "flow_grant_payload_pin",
+        kind: Kind::Expand,
+        postgres: "\
+ALTER TABLE _flow_grants ADD COLUMN IF NOT EXISTS payload TEXT NOT NULL DEFAULT '{}';",
+    },
 
 ];
 
@@ -3765,7 +3791,16 @@ mod kind_contract_tests {
         // `printer` y tiraba el nombre. `ALTER … ADD COLUMN IF NOT EXISTS`, re-ejecutable. Al
         // escribirla el máximo era la v57 en `origin/develop`, en TODAS las ramas remotas y en
         // todos los worktrees locales de la flota.
-        assert_eq!(MIGRATIONS.len(), 55, "el catálogo cambió de tamaño");
+        // + `flow_grant_payload_pin` (v59, hub#1623): the `payload` column of `_flow_grants`, which
+        // lets a `command` grant FIX part of the payload — «may cancel appointments AS THE
+        // CUSTOMER» instead of «may cancel appointments». That is what separates a flow whose
+        // payload a model writes from a stranger's message from handing that stranger every
+        // argument of the command. `'{}'` fixes nothing, which is what every earlier row had, so
+        // `ALTER … ADD COLUMN IF NOT EXISTS` with a default is re-runnable and rewrites nothing. It
+        // deliberately does NOT join `ux_flow_grant_live` (the why is in the migration's own block).
+        // When it was written the maximum was v58 on `origin/develop`, on `main`, across the 87
+        // remote branches that carry the file and in every local worktree of the fleet.
+        assert_eq!(MIGRATIONS.len(), 56, "el catálogo cambió de tamaño");
     }
 
     /// Columnas que una migración añade a `hub_user` y que los unit tests de `identity` NO

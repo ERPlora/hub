@@ -23,7 +23,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::TestDb, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{def, store, waits, NewFlow};
 use erplora_runtime::Runtime;
 use serde_json::{json, Value};
@@ -123,7 +123,7 @@ async fn sleeping_with(rt: &Runtime, step: Value, input: Value) -> (String, Stri
         .id;
     rt.replace_flow_grants(
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
         OWNER,
     )
     .await
@@ -717,4 +717,222 @@ async fn la_idempotencia_se_reserva_bajo_un_listener_que_ningun_modulo_puede_usa
     assert_eq!(status(&rt, &run_id).await, store::STATUS_CANCELLED);
     // Y el nombre es el que dice el módulo, para que un lector del contrato lo reconozca.
     assert_eq!(waits::synthetic_listener("x"), "_flow_wait:x");
+}
+
+// ── un fallo de la ESPERA también puede tener quien lo cuente (hub#1635) ───────────────────────
+
+/// La tercera salida de fallo del kernel, la que vive en `waits.rs` (hub#1635, revisión de #1643).
+/// El paso `delay` admite `on_error` —está en su allowlist y el schema lo promete por su nombre—,
+/// pero `on_event` → `reschedule_ops` termina el run con `finish_ops(STATUS_FAILED)` en sus cuatro
+/// salidas de avería sin mirar la política. Prometer por el nombre algo que no se cumple es peor
+/// que no ofrecerlo.
+///
+/// El caso es literalmente la receta de esta familia: «recuérdame 24 h antes de la cita, salvo que
+/// se mueva». Si el evento no para de llegar, la guarda de reprogramaciones para el run — y el
+/// paso que AVISA es el de después, así que a la clienta no la avisa nadie.
+#[tokio::test]
+async fn una_espera_que_deja_de_moverse_puede_avisar_a_quien_esperaba() {
+    let rt = runtime().await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook(), "on_error": "continue" })),
+    )
+    .await;
+
+    for i in 0..=def::MAX_RESCHEDULES {
+        deliver(
+            &rt,
+            HUB,
+            &format!("evt-move-{i}"),
+            "appointment.rescheduled",
+            json!({ "id": "a-42", "appointment_at": appointment() }),
+        )
+        .await;
+    }
+    rt.process_flows().await.unwrap();
+
+    assert_eq!(
+        notes(&rt).await.len(),
+        1,
+        "el paso que avisa SÍ corre: el run siguió por el step siguiente"
+    );
+    assert_eq!(
+        status(&rt, &run_id).await,
+        store::STATUS_DONE,
+        "y el run termina por su propio pie, no muerto en la espera"
+    );
+    assert_eq!(armed(&rt, &run_id).await, 0, "y deja de escuchar");
+}
+
+/// Las otras tres averías de una espera que se MUEVE, por la misma puerta y con la misma política.
+/// Se recorren una por una porque cada una es un `return` distinto de `reschedule_ops`, y cubrir
+/// solo la primera dejaría tres no-ops mudos exactamente iguales al que originó esto.
+#[tokio::test]
+async fn las_demas_averias_de_una_espera_movida_tambien_pueden_avisar() {
+    // (a) El evento que debía moverla no trae un instante que se pueda leer.
+    let rt = runtime().await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook(), "on_error": "continue" })),
+    )
+    .await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-basura",
+        "appointment.rescheduled",
+        json!({ "id": "a-42", "appointment_at": "mañana por la tarde" }),
+    )
+    .await;
+    rt.process_flows().await.unwrap();
+    assert_eq!(notes(&rt).await.len(), 1, "(a) el aviso sale");
+    assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE);
+
+    // (b) La mueven más allá del horizonte que esta espera puede cubrir.
+    let rt = runtime().await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook(), "on_error": "continue" })),
+    )
+    .await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-lejos",
+        "appointment.rescheduled",
+        json!({ "id": "a-42", "appointment_at": BEYOND_THE_HORIZON }),
+    )
+    .await;
+    rt.process_flows().await.unwrap();
+    assert_eq!(notes(&rt).await.len(), 1, "(b) el aviso sale");
+    assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE);
+
+    // (c) La mueven a un instante que ya pasó, y el documento dice que eso es un fallo.
+    let rt = runtime().await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({
+            "reschedule_on": reschedule_hook(),
+            "past_due_policy": "fail",
+            "on_error": "continue"
+        })),
+    )
+    .await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-ayer",
+        "appointment.rescheduled",
+        json!({ "id": "a-42",
+                "appointment_at": (chrono::Utc::now() - chrono::Duration::days(2)).to_rfc3339() }),
+    )
+    .await;
+    rt.process_flows().await.unwrap();
+    assert_eq!(notes(&rt).await.len(), 1, "(c) el aviso sale");
+    assert_eq!(status(&rt, &run_id).await, store::STATUS_DONE);
+}
+
+/// El guardia de lo que NO se ha movido: sin `on_error`, una espera rota sigue parando el run
+/// exactamente como antes de hub#1635. El defecto es `stop` también en esta tercera costura.
+#[tokio::test]
+async fn una_espera_rota_sin_politica_sigue_parando_el_run() {
+    let rt = runtime().await;
+    let (_, run_id) = sleeping(
+        &rt,
+        wait_step(json!({ "reschedule_on": reschedule_hook() })),
+    )
+    .await;
+    deliver(
+        &rt,
+        HUB,
+        "evt-basura",
+        "appointment.rescheduled",
+        json!({ "id": "a-42", "appointment_at": "mañana por la tarde" }),
+    )
+    .await;
+    rt.process_flows().await.unwrap();
+
+    assert_eq!(status(&rt, &run_id).await, store::STATUS_FAILED);
+    assert!(notes(&rt).await.is_empty(), "y nadie avisa a nadie");
+    assert_eq!(armed(&rt, &run_id).await, 0);
+}
+
+/// Y lo que la espera rota deja escrito es lo MISMO que dejan las otras dos costuras: `status` y
+/// `error` bajo `steps.<id>`, para que el paso que avisa lea UNA forma pase lo que pase. Sin esto,
+/// `{{steps.wait.error}}` renderizaría vacío y el aviso saldría en blanco.
+#[tokio::test]
+async fn una_espera_rota_deja_su_motivo_legible_por_el_paso_siguiente() {
+    let rt = runtime().await;
+    let flow_id = rt
+        .create_flow(
+            &NewFlow {
+                name: "Recordar cita".into(),
+                enabled: true,
+                definition: json!({
+                    "schema_version": 1,
+                    "steps": [
+                        wait_step(json!({
+                            "reschedule_on": reschedule_hook(), "on_error": "continue"
+                        })),
+                        { "id": "remind", "kind": "command", "command": "crm.note.add",
+                          "params": { "text": "no pudo ser ({{steps.wait.status}}): {{steps.wait.error}}" } }
+                    ]
+                }),
+            },
+            OWNER,
+        )
+        .await
+        .unwrap()
+        .id;
+    rt.replace_flow_grants(
+        &flow_id,
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
+        OWNER,
+    )
+    .await
+    .unwrap();
+    let run_id = rt
+        .start_flow_run(
+            &flow_id,
+            &json!({ "appointment_at": appointment(), "appointment_id": "a-42" }),
+            OWNER,
+        )
+        .await
+        .unwrap();
+    rt.process_flows().await.unwrap();
+
+    deliver(
+        &rt,
+        HUB,
+        "evt-basura",
+        "appointment.rescheduled",
+        json!({ "id": "a-42", "appointment_at": "mañana por la tarde" }),
+    )
+    .await;
+    rt.process_flows().await.unwrap();
+
+    let told = notes(&rt).await;
+    assert_eq!(told.len(), 1, "{told:?}");
+    assert!(
+        told[0].starts_with("no pudo ser (failed): step `wait`"),
+        "el motivo llega entero y nombrado: {}",
+        told[0]
+    );
+
+    // Y la HISTORIA no miente: el paso que se rompió queda `failed` con su motivo, no `sleeping`
+    // para siempre. `continue` habla del run, igual que en las otras dos costuras.
+    let steps = rt.get_flow_run(&run_id).await.unwrap().1;
+    let broken = steps
+        .iter()
+        .find(|s| s.step_id == "wait")
+        .expect("la espera dejó su fila");
+    assert_eq!(
+        broken.status, "failed",
+        "una espera rota que se quedara `sleeping` sería una historia que miente"
+    );
+    assert!(
+        broken.error.contains("mañana por la tarde"),
+        "{}",
+        broken.error
+    );
 }

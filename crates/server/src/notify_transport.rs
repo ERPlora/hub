@@ -213,6 +213,16 @@ fn var_str<'a>(intent: &'a NotifyIntent, key: &str) -> Option<&'a str> {
 ///
 /// `from`/`reply_to` are deliberately absent — the SaaS resolves both, and it must stay that way.
 fn email_body(intent: &NotifyIntent) -> Result<Value> {
+    // An email has nothing to tap (hub#1633). Said out loud instead of dropped: a bare email where
+    // somebody meant to ask a question is a message nobody wrote, and it still reaches a customer.
+    if !intent.interactive.is_null() {
+        return Err(RuntimeError::Notify(
+            "email notification carrying `interactive`: options to tap are a whatsapp shape and \
+             an email has nothing to tap. Send them on the whatsapp channel, or say it in the text"
+                .to_string(),
+        ));
+    }
+
     let subject = var_str(intent, "subject").unwrap_or_else(|| intent.template.trim());
     if subject.is_empty() {
         return Err(RuntimeError::Notify(
@@ -249,6 +259,25 @@ fn whatsapp_body(intent: &NotifyIntent) -> Result<Value> {
     // Optional: one of THIS hub's numbers. A foreign one is a 404 at the proxy, by design.
     if let Some(phone_number_id) = var_str(intent, "phone_number_id") {
         body["phone_number_id"] = json!(phone_number_id);
+    }
+
+    // **Options the customer TAPS** (hub#1633). Meta's shape is the wire shape: the proxy checks it
+    // against Meta's limits and forwards it verbatim, so translating it here would be a second
+    // contract to keep in step with Meta. It wins over copy because a Meta message has ONE `type`
+    // and the proxy answers a request carrying two with `conflicting_message_type` — a paid round
+    // trip spent to be told what is knowable here. A flow can never reach that pairing (
+    // `flows::def` refuses it at save time); a module emitting the same intent can.
+    if !intent.interactive.is_null() {
+        if !intent.interactive.is_object() {
+            return Err(RuntimeError::Notify(
+                "whatsapp notification whose `interactive` is not an object: the options are \
+                 Meta's own shape (`{type, body, action}`), and anything else comes back from \
+                 Meta as an opaque 400 once the call has already been paid for"
+                    .to_string(),
+            ));
+        }
+        body["interactive"] = intent.interactive.clone();
+        return Ok(body);
     }
 
     let name = intent.template.trim();
@@ -441,7 +470,27 @@ mod tests {
             to: to.to_string(),
             template: template.to_string(),
             vars,
+            interactive: Value::Null,
         }
+    }
+
+    /// The same intent, plus the options the customer will tap.
+    fn tappable(to: &str, interactive: Value) -> NotifyIntent {
+        NotifyIntent {
+            interactive,
+            ..intent(Channel::Whatsapp, to, "", json!({}))
+        }
+    }
+
+    fn buttons() -> Value {
+        json!({
+            "type": "button",
+            "body": { "text": "¿Confirmas la cita del martes a las 10:30?" },
+            "action": { "buttons": [
+                { "type": "reply", "reply": { "id": "confirm", "title": "Sí" } },
+                { "type": "reply", "reply": { "id": "cancel", "title": "No" } }
+            ] }
+        })
     }
 
     /// The email proxy gets exactly the body `apps/notify/api/views.py` validates — and the hub's
@@ -743,5 +792,62 @@ mod tests {
             format!("{real:?}").starts_with("CloudNotifyTransport"),
             "{real:?}"
         );
+    }
+
+    /// **Options travel to the proxy unchanged** (hub#1633).
+    ///
+    /// Meta's shape is the wire shape: the SaaS checks it against Meta's limits and forwards it
+    /// verbatim, so a second shape here would be a translation layer that has to grow every time
+    /// Meta adds a field — and the hub would be writing to a contract that exists nowhere else.
+    #[test]
+    fn whatsapp_sends_the_options_the_customer_taps_and_nothing_else() {
+        let body = whatsapp_body(&tappable("+34600111222", buttons())).unwrap();
+        assert_eq!(body["to"], "+34600111222");
+        assert_eq!(body["interactive"], buttons());
+        // A Meta message has ONE type. Sending copy alongside would be `conflicting_message_type`
+        // at the proxy — a paid round trip spent to be told what was knowable here.
+        assert!(body.get("body").is_none(), "{body}");
+        assert!(body.get("template").is_none(), "{body}");
+    }
+
+    /// Which of THIS hub's numbers sends is not copy, so it still rides next to the options.
+    #[test]
+    fn whatsapp_options_still_choose_the_sending_number() {
+        let with_number = NotifyIntent {
+            vars: json!({ "phone_number_id": "123456" }),
+            ..tappable("+34600111222", buttons())
+        };
+        let body = whatsapp_body(&with_number).unwrap();
+        assert_eq!(body["phone_number_id"], "123456");
+        assert_eq!(body["interactive"], buttons());
+    }
+
+    /// An `interactive` that is not an object is a typo, and forwarding it would come back as an
+    /// opaque 400 from Meta after the call was already paid for.
+    #[test]
+    fn whatsapp_refuses_options_that_are_not_an_object_before_the_network() {
+        for bad in [json!("button"), json!(["confirm"]), json!(7)] {
+            let err = whatsapp_body(&tappable("+34600111222", bad.clone()))
+                .expect_err("the options are an object of Meta's own shape");
+            assert!(format!("{err}").contains("interactive"), "{err} for {bad}");
+        }
+    }
+
+    /// An email has nothing to tap. A flow can never get here — `flows::def` refuses the pairing at
+    /// save time — but a MODULE emits the same intent from `host.notify`, and dropping the options
+    /// silently would send a bare email where somebody meant to ask a question.
+    #[test]
+    fn email_refuses_options_instead_of_dropping_them() {
+        let err = email_body(&NotifyIntent {
+            interactive: buttons(),
+            ..intent(
+                Channel::Email,
+                "cliente@x.com",
+                "reminder",
+                json!({ "text": "Te esperamos" }),
+            )
+        })
+        .expect_err("an email has nothing to tap");
+        assert!(format!("{err}").contains("interactive"), "{err}");
     }
 }

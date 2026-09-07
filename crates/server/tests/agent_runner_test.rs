@@ -34,7 +34,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response as AxumResponse;
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{approvals, store, NewFlow};
 use erplora_runtime::native::{NativeHandler, NativeHost};
 use erplora_runtime::Runtime;
@@ -216,7 +216,7 @@ async fn hub(
     cloud_base_url: String,
     tag: &str,
     step: Value,
-    grants: &[(GrantKind, String)],
+    grants: &[GrantSpec],
 ) -> Hub {
     let db = fresh_db().await;
     let mut rt = Runtime::with_hub_id(Box::new(db), HUB);
@@ -387,8 +387,8 @@ async fn the_agent_reads_the_diary_by_itself_and_the_booking_waits_for_a_person(
         "star",
         agent_step("manual"),
         &[
-            (GrantKind::Query, "agenda.slots.list".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -483,8 +483,8 @@ async fn a_question_the_automation_asks_is_answered_in_the_turn_and_only_the_wri
         "asks",
         agent_step_that_asks_before_it_writes("manual"),
         &[
-            (GrantKind::Command, "agenda.availability.check".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Command, "agenda.availability.check"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -556,7 +556,7 @@ async fn approving_from_the_tray_books_the_appointment_without_asking_the_model_
         cloud.serve().await,
         "approve",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -628,7 +628,7 @@ async fn rejecting_from_the_tray_books_nothing() {
         cloud.serve().await,
         "reject",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -660,6 +660,257 @@ async fn rejecting_from_the_tray_books_nothing() {
     assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
 }
 
+/// **hub#1622 — the document's answer reaches the row, and a refusal it lets through carries the
+/// run on with its turn.** Between the document and the approval row there are two hops the kernel
+/// tests never drive — `prepare` copies `on_reject` into the `AiRequest`, `dispatch` copies it into
+/// the `NewApproval` — and pinning either to `cancel` left every other test green while every
+/// template's `on_reject: "continue"` became a dead letter. This drives the REAL runner against a
+/// scripted SaaS, then says no from the tray.
+#[tokio::test]
+async fn hub1622_a_refusal_the_document_lets_through_carries_the_run_on_with_its_turn() {
+    // The shape a real turn has: the model WRITES (the sentence a later step is meant to send
+    // on) and then proposes. One turn, two events.
+    let text = "No free slot on Friday; I can offer Monday at 10.";
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    let mut step = agent_step("manual");
+    step["on_reject"] = json!("continue");
+    let h = hub(
+        cloud.serve().await,
+        "reject-continue",
+        step,
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_reject,
+        approvals::ON_REJECT_CONTINUE,
+        "the row records what the DOCUMENT said, carried through the request — not the default"
+    );
+
+    let response = h
+        .router
+        .clone()
+        .oneshot(request(
+            "POST",
+            &format!("/api/hub/flows/approvals/{}/reject", pending[0].id),
+            Some(&h.admin_session),
+            Some(json!({ "comment": "we are full that day" })),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    assert!(bookings(&h).await.is_empty(), "a rejection writes nothing");
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_DONE,
+        "`continue` means the run finishes its remaining steps instead of dying in `cancelled`"
+    );
+    let output = step_output(&h, &run_id).await;
+    assert_eq!(output["status"], json!(approvals::STATUS_REJECTED));
+    assert_eq!(output["decision"], json!(approvals::STATUS_REJECTED));
+    assert_eq!(output["comment"], json!("we are full that day"));
+    assert_eq!(
+        output["text"],
+        json!(text),
+        "the turn parked when the model stopped to ask is handed over, not just how it ended"
+    );
+    assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
+}
+
+/// **hub#1634 — the document's answer about a SILENCE reaches the row, and an expiry it lets
+/// through carries the run on with its turn.** The exact twin of the test above, and it exists
+/// because hub#1622's own review found that the two hops between the document and the row
+/// (`prepare` → `AiRequest`, `dispatch` → `NewApproval`) had no test: pinning either to `reject`
+/// leaves the whole kernel green while every template's `on_expire: "continue"` is a dead letter.
+///
+/// This is the customer-visible half of whatsapp_inbox#70: the salon never looks at the tray, the
+/// proposal expires at 72 h, and the woman who wrote at 3 AM has to be told — which cannot happen
+/// if the run dies in `cancelled` the moment the sweep touches it.
+#[tokio::test]
+async fn hub1634_a_proposal_nobody_answers_carries_the_run_on_with_its_turn() {
+    // The same shape a real turn has: the model WRITES the sentence a later step is meant to send
+    // on, and then proposes. One turn, two events.
+    let text = "No free slot on Friday; I can offer Monday at 10.";
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    let mut step = agent_step("manual");
+    step["on_expire"] = json!("continue");
+    let h = hub(
+        cloud.serve().await,
+        "expire-continue",
+        step,
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_expire,
+        approvals::ON_EXPIRE_CONTINUE,
+        "the row records what the DOCUMENT said about a silence, carried through the request — \
+         not the default the row used to be pinned to"
+    );
+
+    // Nobody answers, and the 72 h pass. The sweep is the only piece that reads the policy.
+    {
+        let rt = h.state.runtime.read().await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(pending[0].id));
+        rt.db_for_test()
+            .execute(
+                "UPDATE _flow_approvals SET expires_at = '2020-01-01T00:00:00+00:00' \
+                 WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap();
+        let report = rt.sweep_expired_flow_approvals().await.unwrap();
+        assert_eq!(report.expired, 1);
+        assert_eq!(
+            report.runs_resumed, 1,
+            "`continue` resumes the run instead of killing it: {report:?}"
+        );
+    }
+
+    assert!(
+        bookings(&h).await.is_empty(),
+        "an expiry is the opposite of an approval: nothing the model proposed is executed"
+    );
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_DONE,
+        "`continue` means the run finishes its remaining steps instead of dying in `cancelled`"
+    );
+    let output = step_output(&h, &run_id).await;
+    assert_eq!(output["status"], json!(approvals::STATUS_EXPIRED));
+    assert_eq!(
+        output["text"],
+        json!(text),
+        "the turn parked when the model stopped to ask is handed over, so the step written to \
+         answer the customer has something to say"
+    );
+    assert_eq!(cloud.turns(), 1, "and the model is not asked to try again");
+}
+
+/// **hub#1634 — and a document that says NOTHING about a silence still dies on the expiry.** The
+/// mirror of the test above, and the half its own review found missing: every mutant that shipped
+/// with hub#1634 moves `continue`, so `dispatch` pinned the OTHER way — to `Continue`, the
+/// direction that changes what an ALREADY DEPLOYED template does — survived the whole workspace
+/// green. `dispatch` is the only place that turns an `AiRequest` into a `NewApproval`, and the only
+/// sweep in this crate is the one above, which asks for `continue`.
+///
+/// Every flow running in a real salon today says nothing here. Reading that silence as anything but
+/// `reject` would carry runs past a proposal nobody ever agreed to, on hubs that never asked for
+/// it — so the default is guarded at the hop that had no test of its own, not only at the two ends.
+#[tokio::test]
+async fn hub1634_a_proposal_from_a_document_that_says_nothing_still_dies_on_the_expiry() {
+    let cloud = FakeCloud::with(vec![vec![format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        json!({
+            "type": "function_call",
+            "name": "agenda.booking.create",
+            "call_id": "c1",
+            "arguments": json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z" }).to_string()
+        })
+    )]]);
+    // The shape every document already deployed has: it proposes, and it says not a word about
+    // what a silence costs.
+    let h = hub(
+        cloud.serve().await,
+        "expire-default",
+        agent_step("manual"),
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "book me" })).await;
+    perform(&h, &run_id).await;
+
+    let pending = {
+        let rt = h.state.runtime.read().await;
+        rt.list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+            .await
+            .unwrap()
+    };
+    assert_eq!(pending.len(), 1, "the write waits for a person");
+    assert_eq!(
+        pending[0].on_expire,
+        approvals::ON_EXPIRE_REJECT,
+        "a document that asked for nothing gets the policy it has always had, carried through the \
+         request — `dispatch` must not decide this on its own"
+    );
+
+    // Nobody answers, and the 72 h pass.
+    {
+        let rt = h.state.runtime.read().await;
+        let mut p = Params::new();
+        p.insert("id".into(), json!(pending[0].id));
+        rt.db_for_test()
+            .execute(
+                "UPDATE _flow_approvals SET expires_at = '2020-01-01T00:00:00+00:00' \
+                 WHERE id = :id",
+                &p,
+            )
+            .await
+            .unwrap();
+        let report = rt.sweep_expired_flow_approvals().await.unwrap();
+        assert_eq!(report.expired, 1);
+        assert_eq!(
+            report.runs_resumed, 0,
+            "`reject` is not `continue`: the run is NOT carried on: {report:?}"
+        );
+        assert_eq!(report.runs_stopped, 1, "it is ended: {report:?}");
+    }
+
+    tick(&h).await;
+    assert_eq!(
+        run_status(&h, &run_id).await,
+        store::STATUS_CANCELLED,
+        "the behaviour every deployed flow has today, unchanged: a silence ends the run"
+    );
+    assert!(
+        bookings(&h).await.is_empty(),
+        "and an expiry executes nothing, whatever the policy says"
+    );
+}
+
 /// `policy: "auto"` is the owner saying, in writing, "do it". Then the command runs in the turn
 /// and the model is told what happened, so it can answer the customer.
 #[tokio::test]
@@ -676,7 +927,7 @@ async fn under_policy_auto_the_command_runs_in_the_turn() {
         cloud.serve().await,
         "auto",
         agent_step("auto"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -710,7 +961,7 @@ async fn a_command_without_a_grant_is_refused_even_under_policy_auto() {
             // The document DECLARES the tool; the grant is what is missing.
             "tools": { "commands": ["agenda.booking.cancel"] }
         }),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -747,9 +998,9 @@ async fn the_model_is_offered_the_intersection_of_the_registry_the_step_and_the_
             "tools": { "queries": ["agenda.slots.list"] }
         }),
         &[
-            (GrantKind::Query, "agenda.slots.list".into()),
-            (GrantKind::Query, "agenda.bookings.list".into()),
-            (GrantKind::Command, "agenda.booking.create".into()),
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Query, "agenda.bookings.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
         ],
     )
     .await;
@@ -793,7 +1044,7 @@ async fn a_tool_call_split_across_tcp_chunks_is_reassembled_not_lost() {
         cloud.serve().await,
         "chunked",
         agent_step("auto"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -826,7 +1077,7 @@ async fn max_iters_stops_a_runaway_loop_and_fails_the_step() {
             "max_iters": 3,
             "tools": { "queries": ["agenda.slots.list"] }
         }),
-        &[(GrantKind::Query, "agenda.slots.list".into())],
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
     )
     .await;
     let run_id = start_run(&h, json!({})).await;
@@ -890,7 +1141,7 @@ async fn an_invalid_proposal_never_reaches_the_tray_and_the_model_corrects_it_in
             cloud.serve().await,
             "invalid-proposal",
             agent_step("manual"),
-            &[(GrantKind::Command, "agenda.booking.create".into())],
+            &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
         )
         .await;
         let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -957,7 +1208,7 @@ async fn a_model_that_never_gets_the_payload_right_ends_in_words_not_in_the_tray
         cloud.serve().await,
         "gives-up",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -1000,7 +1251,7 @@ async fn a_schema_that_changed_after_the_proposal_refuses_the_approval_without_b
         cloud.serve().await,
         "schema-moved",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
     let run_id = start_run(&h, json!({ "text": "book me" })).await;
@@ -1088,7 +1339,7 @@ async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
         cloud.serve().await,
         "door",
         agent_step("manual"),
-        &[(GrantKind::Command, "agenda.booking.create".into())],
+        &[GrantSpec::pair(GrantKind::Command, "agenda.booking.create")],
     )
     .await;
 
@@ -1113,4 +1364,400 @@ async fn the_approval_tray_takes_an_admin_session_and_nothing_else() {
         .unwrap();
     assert_eq!(signed_in.status(), StatusCode::OK);
     assert_eq!(body_json(signed_in).await["data"], json!([]));
+}
+
+// ── hub#1639 — the turn leaves DATA behind, not only a sentence ────────────────────────────────
+
+/// The step of the WhatsApp recipe: read the diary, then answer with the slots as DATA so the
+/// next step can offer them as a list the customer taps (`interactive`, hub#1633).
+/// The same step, but it may also WRITE. Legal on purpose: hub#1595 lets a command that only
+/// ANSWERS run inside the turn, and the parser cannot tell those from the ones that write, so
+/// forbidding `output` next to `tools.commands` would ban the very shape the WhatsApp recipe needs
+/// («is that slot still free?» → offer what is left).
+fn agent_step_that_leaves_data_behind_and_may_write() -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Offer her what is free.",
+        "tools": { "queries": ["agenda.slots.list"], "commands": ["agenda.booking.create"] },
+        "output": {
+            "slots": { "type": "options", "describe": "the free slots you found, one per row" },
+            "action": { "type": "text", "describe": "booked, cancelled or asking" }
+        }
+    })
+}
+
+fn agent_step_that_leaves_data_behind() -> Value {
+    json!({
+        "id": "agent",
+        "kind": "ai",
+        "prompt": "A customer wrote at 3 AM: «{{input.text}}». Offer her what is free.",
+        "tools": { "queries": ["agenda.slots.list"] },
+        "output": {
+            "slots": { "type": "options", "describe": "the free slots you found, one per row" },
+            "action": { "type": "text", "describe": "booked, cancelled or asking" }
+        }
+    })
+}
+
+/// A turn that writes prose AND finishes with a tool call, which is what a real provider emits
+/// when the model explains itself while answering. The recipe needs both halves: the sentence
+/// becomes the body of the WhatsApp message and the call becomes its rows.
+fn sse_text_and_call(text: &str, name: &str, call_id: &str, arguments: Value) -> Turn {
+    vec![format!(
+        "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+        json!({ "type": "text_delta", "text": text }),
+        json!({
+            "type": "function_call",
+            "name": name,
+            "call_id": call_id,
+            "arguments": arguments.to_string()
+        })
+    )]
+}
+
+/// Why the step failed, where production writes it.
+async fn last_error(h: &Hub, run_id: &str) -> String {
+    let rt = h.state.runtime.read().await;
+    rt.get_flow_run(run_id).await.unwrap().0.last_error
+}
+
+fn two_slots() -> Value {
+    json!([
+        { "id": "slot-1", "title": "Lunes 10:00", "description": "con Ana" },
+        { "id": "slot-2", "title": "Lunes 12:30", "description": "con Ana" }
+    ])
+}
+
+/// **The case of hub#1639.** Until now an `ai` step published `{text, tool_calls}` and nothing
+/// else, so the three free slots it had just found while talking to the customer could not become
+/// the list she taps: the options had to be typed by hand in the document, which is exactly what
+/// they existed to avoid. Here the document declares what the turn owes it, and the turn pays.
+#[tokio::test]
+async fn hub1639_the_turn_leaves_the_options_it_found_behind_for_the_next_step() {
+    let cloud = FakeCloud::with(vec![
+        sse_call("agenda.slots.list", "c1", json!({})),
+        sse_text_and_call(
+            "Tengo estos huecos libres",
+            "flow_answer",
+            "c2",
+            json!({ "slots": two_slots(), "action": "asking" }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "out",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    let out = step_output(&h, &run_id).await;
+    // What the step always published is still there and still means the same thing.
+    assert_eq!(out["text"], json!("Tengo estos huecos libres"));
+    assert_eq!(
+        out["tool_calls"].as_array().map(Vec::len),
+        Some(1),
+        "the read it did is still in the history: {out}"
+    );
+    // …and the data the document asked for is next to it, with its type intact — an ARRAY, not a
+    // string that looks like one, so `interactive.action.sections[].rows` can point straight at it.
+    assert!(out["slots"].is_array(), "the slots keep their type: {out}");
+    assert_eq!(out["slots"], two_slots());
+    assert_eq!(out["slots"][1]["id"], json!("slot-2"));
+    assert_eq!(out["action"], json!("asking"));
+
+    // The answering call is NOT logged as a tool the model ran: nothing happened in the business.
+    assert_eq!(out["tool_calls"][0]["name"], json!("agenda.slots.list"));
+    tick(&h).await;
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_DONE);
+}
+
+/// The answering tool exists only for a document that asked for data, and it names the fields it
+/// asked for. A turn offered it unconditionally would spend a metered call teaching every existing
+/// automation to answer with an empty object.
+#[tokio::test]
+async fn hub1639_the_answering_tool_is_offered_only_when_the_document_asked_for_data() {
+    let cloud = FakeCloud::with(vec![sse_text_and_call(
+        "listo",
+        "flow_answer",
+        "c1",
+        json!({ "slots": two_slots(), "action": "asking" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "off1",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "hola" })).await;
+    perform(&h, &run_id).await;
+
+    let offered = cloud.bodies()[0]["tools"].clone();
+    let answer = offered
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|t| t["name"] == json!("flow_answer"))
+        .unwrap_or_else(|| panic!("the answering tool must be offered: {offered}"));
+    let props = &answer["parameters"]["properties"];
+    assert_eq!(
+        props["slots"]["type"],
+        json!("array"),
+        "`options` is asked for as Meta's row shape: {answer}"
+    );
+    assert_eq!(
+        props["slots"]["items"]["properties"]["id"]["type"],
+        json!("string")
+    );
+    assert_eq!(props["action"]["type"], json!("string"));
+    // The author's own words reach the model — they are the only thing it is told about the field.
+    assert_eq!(
+        props["slots"]["description"],
+        json!("the free slots you found, one per row")
+    );
+    let required: Vec<&str> = answer["parameters"]["required"]
+        .as_array()
+        .expect("required")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+    assert_eq!(required, ["action", "slots"]);
+
+    // …and a step that declared nothing is offered no such tool.
+    let plain_cloud = FakeCloud::with(vec![sse_text("hecho")]);
+    let plain = hub(
+        plain_cloud.serve().await,
+        "off2",
+        agent_step("manual"),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let plain_run = start_run(&plain, json!({ "text": "hola" })).await;
+    perform(&plain, &plain_run).await;
+    let plain_tools = plain_cloud.bodies()[0]["tools"].clone();
+    assert!(
+        !plain_tools
+            .as_array()
+            .expect("tools")
+            .iter()
+            .any(|t| t["name"] == json!("flow_answer")),
+        "a document that asked for nothing is offered nothing: {plain_tools}"
+    );
+}
+
+/// **Fail-closed and LOUD.** A model that answers in prose when the document asked for data leaves
+/// the next step mapping `steps.agent.slots` to nothing — and a WhatsApp message with an empty list
+/// is one the customer cannot act on and nobody knows went out. The step fails instead, naming what
+/// was missing, so it is visible in the run history the next morning.
+#[tokio::test]
+async fn hub1639_a_turn_that_answers_in_words_instead_of_data_fails_saying_so() {
+    let cloud = FakeCloud::with(vec![sse_text("pues no sé, llámanos")]);
+    let h = hub(
+        cloud.serve().await,
+        "nodata",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_FAILED);
+    let reason = last_error(&h, &run_id).await;
+    assert!(
+        reason.contains(agent_runner::ERR_NO_OUTPUT),
+        "the failure carries a code, not prose (ADR-0055): {reason}"
+    );
+    assert!(
+        reason.contains("flow_answer"),
+        "and it says what the model was supposed to do: {reason}"
+    );
+}
+
+/// A field the document declared and the model left out is the same silent hole as no answer at
+/// all: `steps.agent.slots` resolves to nothing and the customer gets a list with no rows. It is
+/// refused by NAME so whoever reads the history knows which field to look at.
+#[tokio::test]
+async fn hub1639_a_declared_field_the_model_skipped_fails_by_name() {
+    let cloud = FakeCloud::with(vec![sse_text_and_call(
+        "ahí van",
+        "flow_answer",
+        "c1",
+        json!({ "action": "asking" }),
+    )]);
+    let h = hub(
+        cloud.serve().await,
+        "missing",
+        agent_step_that_leaves_data_behind(),
+        &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+    )
+    .await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    assert_eq!(run_status(&h, &run_id).await, store::STATUS_FAILED);
+    let reason = last_error(&h, &run_id).await;
+    assert!(reason.contains(agent_runner::ERR_BAD_OUTPUT), "{reason}");
+    assert!(
+        reason.contains("slots"),
+        "the field that was missing is named: {reason}"
+    );
+}
+
+/// The shapes are checked, not hoped for. `options` becomes the `rows` of a WhatsApp list and Meta
+/// refuses a row without `id`/`title` — refusing here says it in the run history instead of eight
+/// retries later in the outbox, which is the same reason `interactive` is validated at save.
+#[tokio::test]
+async fn hub1639_options_that_are_not_metas_row_shape_are_refused_before_they_are_sent() {
+    for bad in [
+        json!("Lunes 10:00, Lunes 12:30"),
+        json!([{ "title": "Lunes 10:00" }]),
+        json!([{ "id": "slot-1" }]),
+        json!([["slot-1", "Lunes 10:00"]]),
+    ] {
+        let cloud = FakeCloud::with(vec![sse_text_and_call(
+            "ahí van",
+            "flow_answer",
+            "c1",
+            json!({ "slots": bad, "action": "asking" }),
+        )]);
+        let h = hub(
+            cloud.serve().await,
+            "shape",
+            agent_step_that_leaves_data_behind(),
+            &[GrantSpec::pair(GrantKind::Query, "agenda.slots.list")],
+        )
+        .await;
+        let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+        perform(&h, &run_id).await;
+        assert_eq!(
+            run_status(&h, &run_id).await,
+            store::STATUS_FAILED,
+            "a list Meta would refuse must not reach the outbox: {bad}"
+        );
+        let reason = last_error(&h, &run_id).await;
+        assert!(
+            reason.contains(agent_runner::ERR_BAD_OUTPUT),
+            "{bad}: {reason}"
+        );
+        assert!(reason.contains("slots"), "{bad}: {reason}");
+    }
+}
+
+/// **The THIRD way out of a turn** (hub#1639). `drive` can end three ways, and the first two were
+/// guarded: answering with the data, and answering in words without it. The third is a PROPOSAL —
+/// the model asks for a write and the turn parks for a person.
+///
+/// That one is reachable with the DEFAULT policy (`manual`), and it used to park carrying only
+/// `{text, tool_calls}`. Approving it hours later published those two plus the decision, and the
+/// fields the document declared were simply **absent**: `steps.agent.slots` resolved to nothing,
+/// and `notify` puts the resolved `interactive` in the outbox without looking again, so `rows`
+/// left for Meta as `null` — the exact shape `check_options` refuses one branch away.
+///
+/// So a proposal is refused HERE, before the row exists, and comes back to the model as a tool
+/// result like every other refusal on this path: it can correct itself inside the same turn, which
+/// is what the schema-validation refusal above already does. Nothing is banned at save time —
+/// `output` next to `tools.commands` stays legal, because an answer-only command never reaches
+/// this branch.
+#[tokio::test]
+async fn hub1639_a_step_that_owes_data_cannot_end_by_parking_a_proposal() {
+    let cloud = FakeCloud::with(vec![
+        sse_call(
+            "agenda.booking.create",
+            "c1",
+            json!({ "customer": "Marta", "starts_at": "2026-08-10T10:00:00Z", "minutes": 30 }),
+        ),
+        sse_text_and_call(
+            "Estos son los huecos que quedan",
+            "flow_answer",
+            "c2",
+            json!({ "slots": two_slots(), "action": "asking" }),
+        ),
+    ]);
+    let h = hub(
+        cloud.serve().await,
+        "parkowed",
+        agent_step_that_leaves_data_behind_and_may_write(),
+        &[
+            GrantSpec::pair(GrantKind::Query, "agenda.slots.list"),
+            GrantSpec::pair(GrantKind::Command, "agenda.booking.create"),
+        ],
+    )
+    .await;
+    seed_slots(&h).await;
+    let run_id = start_run(&h, json!({ "text": "quiero cita" })).await;
+
+    perform(&h, &run_id).await;
+
+    // NOTHING is parked: a row in the tray would be a decision whose approval could never fill the
+    // fields, because a proposal ends the turn.
+    let rt = h.state.runtime.read().await;
+    let pending = rt
+        .list_flow_approvals(Some(approvals::STATUS_PENDING), 50)
+        .await
+        .unwrap();
+    drop(rt);
+    assert!(
+        pending.is_empty(),
+        "a step that owes data must not leave a proposal a person can approve: {pending:?}"
+    );
+    assert_ne!(
+        run_status(&h, &run_id).await,
+        store::STATUS_WAITING_APPROVAL,
+        "the run is not left waiting for a decision that cannot complete it"
+    );
+
+    // The model was TOLD, in the same turn, and answered properly the second time.
+    assert_eq!(
+        cloud.turns(),
+        2,
+        "the refusal goes back as a tool result and the turn continues"
+    );
+    let second = &cloud.bodies()[1];
+    let told = second["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|m| m["role"] == json!("tool"))
+        .map(|m| m["content"].as_str().unwrap_or_default().to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        told.contains("flow_answer"),
+        "the model is told what this step wants instead of a proposal: {told}"
+    );
+
+    // …and the declared fields ARE published, with their type intact.
+    let out = step_output(&h, &run_id).await;
+    assert!(out["slots"].is_array(), "the slots keep their type: {out}");
+    assert_eq!(out["action"], json!("asking"));
+    // The attempt stays in the history WITH its refusal — the same way a payload the schema
+    // rejects does, because a run history that hides what the model tried cannot explain itself.
+    // What must be true is not that the attempt vanished, but that it never RAN.
+    let proposal = out["tool_calls"]
+        .as_array()
+        .and_then(|c| {
+            c.iter()
+                .find(|t| t["name"] == json!("agenda.booking.create"))
+        })
+        .unwrap_or_else(|| panic!("the attempt is recorded: {out}"));
+    assert!(
+        proposal["result"]["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(agent_runner::ANSWER_TOOL),
+        "and it is recorded as REFUSED, saying what to do instead: {proposal}"
+    );
+    assert!(
+        bookings(&h).await.is_empty(),
+        "nothing was written to the business database"
+    );
 }

@@ -88,7 +88,7 @@ impl Runtime {
     pub async fn replace_flow_grants(
         &self,
         flow_id: &str,
-        wanted: &[(flows::grants::GrantKind, String)],
+        wanted: &[flows::grants::GrantSpec],
         granted_by: &str,
     ) -> Result<()> {
         // 404 first: granting to a flow that is not here must not create rows for a ghost.
@@ -345,6 +345,42 @@ impl Runtime {
         })
     }
 
+    /// What a REFUSAL leaves in `steps.<id>` when the step said `on_reject: "continue"` — the
+    /// mirror of what an approval leaves (§ the `Ok(result)` arm below), minus the `result` there
+    /// never was because nothing ran.
+    ///
+    /// Why the two kinds differ (hub#1622): a `decision` is a question an `approval` step asked and
+    /// its output IS the answer — there is no parked turn to hand over, and the four fields are
+    /// what the `condition` written after it reads. A `command` is a write a MODEL proposed, and
+    /// the turn it had already produced was parked on the step row when it stopped to ask; without
+    /// it, `{{steps.<id>.text}}` renders empty and the step written to tell somebody how it ended
+    /// says nothing — which is the whole bug. `status` and `decision` both say `rejected` on
+    /// purpose: `status` mirrors the approved branch (a step reads one key whichever way it went)
+    /// and `decision` keeps the contract `on_reject: "continue"` already has for `approval` steps,
+    /// so a `condition` on `steps.<id>.decision` works for both kinds.
+    async fn rejected_step_output(
+        &self,
+        approval: &flows::Approval,
+        decided: &flows::Approval,
+    ) -> Json {
+        let decision = self.decision_output(decided);
+        if approval.kind == flows::approvals::KIND_DECISION {
+            return decision;
+        }
+        let mut output = self.parked_step_output(&approval.run_id).await;
+        if let Some(map) = output.as_object_mut() {
+            map.insert("status".into(), json!(flows::approvals::STATUS_REJECTED));
+            map.insert("approval_id".into(), json!(approval.id));
+            map.insert("command".into(), json!(approval.command));
+            if let Some(fields) = decision.as_object() {
+                for (key, value) in fields {
+                    map.insert(key.clone(), value.clone());
+                }
+            }
+        }
+        output
+    }
+
     pub async fn list_flow_approvals(
         &self,
         status: Option<&str>,
@@ -403,13 +439,14 @@ impl Runtime {
                 comment,
             )
             .await?;
-            // **What a refusal costs is the ROW's answer, not this method's** (hub#950). For a
-            // model's proposal it is always `cancel`, which is exactly what a rejection has always
-            // done; for an `approval` step the document chose, and `continue` is what makes the
-            // «rejected» branch composable out of a linear document.
+            // **What a refusal costs is the ROW's answer, not this method's** (hub#950, widened to
+            // the `ai` step in hub#1622). For an `approval` step the document always chose; for a
+            // model's proposal it used to be hard-wired to `cancel`, and now the `ai` step chooses
+            // too. `continue` is what makes the «rejected» branch composable out of a linear
+            // document.
             let result = match flows::approvals::RejectPolicy::parse(&approval.on_reject) {
                 flows::approvals::RejectPolicy::Continue => {
-                    flows::IoResult::Done(self.decision_output(&decided))
+                    flows::IoResult::Done(self.rejected_step_output(&approval, &decided).await)
                 }
                 flows::approvals::RejectPolicy::Cancel => flows::IoResult::Cancelled(
                     if approval.kind == flows::approvals::KIND_DECISION {
@@ -450,11 +487,16 @@ impl Runtime {
 
         // Step 2 — the gate, NOW. Deliberately before anything is written: nothing about this
         // approval changes if the answer is no.
+        // hub#1623 — with the payload that will really run: the one stored verbatim when the model
+        // proposed it. A grant that FIXES part of the payload has to be applied on this door too,
+        // or approving would be the way around the pin — the tray is the one place a payload waits
+        // hours between being written and being executed.
         flows::grants::check_command_grant(
             self.db.as_ref(),
             &self.hub_id,
             &approval.flow_id,
             &approval.command,
+            &approval.payload.as_object().cloned().unwrap_or_default(),
         )
         .await?;
 

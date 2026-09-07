@@ -230,6 +230,59 @@ impl StepKind {
     ];
 }
 
+/// **What a FAILURE costs the run** — the value of a step's `on_error` (hub#1635).
+///
+/// Until this existed the answer was hard-wired: a step that failed ended the run, and the steps
+/// written after it never ran. That is the right DEFAULT and it stays the default — a linear
+/// document whose write did not happen has no business carrying on as if it had. What it is not is
+/// the right ANSWER for every document: the steps written after a booking are the ones that TELL
+/// the person who asked for it, so «stop» means the customer waits for a confirmation that will
+/// never come while the salon reads the failure in its tray.
+///
+/// 🔴 **The vocabulary is closed at two values, and `retry` is deliberately not one of them.**
+/// ADR-0283 §1 is not being reversed here: re-running a business command on the kernel's own
+/// initiative is how a sale gets charged twice, and no value of this enum can ask for it.
+/// [`ErrorPolicy::Continue`] runs NOTHING again — it moves to the NEXT step, which is a different
+/// instruction the document already contains. That distinction is the whole decision.
+pub const ON_ERROR_STOP: &str = "stop";
+pub const ON_ERROR_CONTINUE: &str = "continue";
+
+/// The parsed form of that key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ErrorPolicy {
+    /// End the run as `failed` — **the DEFAULT, and what a failure has always done**.
+    #[default]
+    Stop,
+    /// Carry on to the next step. The step itself is still `failed` and still records why; what
+    /// changes is the RUN. The next step reads how this one ended with `{{steps.<id>.status}}`
+    /// (`"failed"`) and `{{steps.<id>.error}}` — the same shape `on_reject: "continue"` hands over
+    /// (hub#1622), so a document that already knows how to word a refusal knows how to word this.
+    Continue,
+}
+
+impl ErrorPolicy {
+    /// Anything unrecognised degrades to [`ErrorPolicy::Stop`] — fail CLOSED, the same rule
+    /// [`crate::flows::approvals::ExpiryPolicy::parse`] follows. Documents are validated before
+    /// they are stored, so this only answers for a row written by a NEWER version of the hub, and
+    /// «carry on past a failure I do not understand» is not an answer this binary may guess.
+    pub fn parse(raw: &str) -> Self {
+        match raw {
+            ON_ERROR_CONTINUE => Self::Continue,
+            _ => Self::Stop,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stop => ON_ERROR_STOP,
+            Self::Continue => ON_ERROR_CONTINUE,
+        }
+    }
+
+    /// Every value, in document order. Mirrored by `schemas/flow.schema.json`.
+    pub const ALL: &'static [ErrorPolicy] = &[Self::Stop, Self::Continue];
+}
+
 /// What a step does, once its kind is known. The kind-specific keys are parsed **strictly** for
 /// the kinds that run; for the reserved ones nothing is parsed, because guessing the shape of a
 /// step this kernel cannot execute would freeze a contract nobody has validated.
@@ -489,6 +542,9 @@ pub struct NotifyStep {
     /// The copy, mapped against the run. `vars.text` is what an email or a free WhatsApp message
     /// says; the transport refuses an intent with nothing to say rather than inventing it.
     pub vars: Map<String, Json>,
+    /// **Options the customer TAPS** (hub#1633): Meta's own `interactive` object, mapped against
+    /// the run like the copy and carried to the proxy unchanged. `None` is the ordinary message.
+    pub interactive: Option<Map<String, Json>>,
 }
 
 /// **A read a flow performs itself** (hub#954), shaped after Salesforce Flow's *Get Records* —
@@ -558,6 +614,101 @@ pub struct AiStep {
     pub commands: Vec<String>,
     pub policy: AiPolicy,
     pub max_iters: i64,
+    /// **What a SILENCE costs the run** (hub#1634). The sister of [`AiStep::on_reject`], and
+    /// reachable under the same policy: a proposal nobody ever answers expires at 72 h, and until
+    /// this key existed that always ended the run — so the step written to tell the customer
+    /// nobody got back to her went unrun, which is the whole bug.
+    ///
+    /// Same closed vocabulary as [`ApprovalStep::on_expire`] and the same default,
+    /// [`ExpiryPolicy::Reject`]: every document already deployed says nothing here, and a silence
+    /// is read as a refusal because the steps after a proposal assumed it acted.
+    ///
+    /// Read from the flow at PROPOSE time and copied into the row, exactly like `on_reject`; from
+    /// then on the sweep reads the ROW (see [`crate::flows::approvals::ExpiryPolicy`]), so editing
+    /// the document while a question is sitting in the tray does not change what its silence costs.
+    pub on_expire: ExpiryPolicy,
+    /// **What a «no» costs the run** (hub#1622). Only reachable under [`AiPolicy::Manual`], which
+    /// is the only policy that asks anybody: an `auto` step proposes nothing and there is nothing
+    /// to refuse.
+    ///
+    /// It exists here for the same reason it exists on [`ApprovalStep`], and it is the same
+    /// vocabulary: [`RejectPolicy::Cancel`] — the default, and what a rejection has always done —
+    /// or [`RejectPolicy::Continue`], which carries on to the next step so that a document can
+    /// answer the person who is waiting. Without it every step written after the proposal went
+    /// unrun on a refusal, including the one that says «we could not fit you in after all».
+    ///
+    /// Read from the flow at PROPOSE time and copied into the row; from then on the decision reads
+    /// the ROW (see [`crate::flows::approvals::RejectPolicy`]), so editing the document while
+    /// somebody is looking at the tray does not change what their refusal costs.
+    pub on_reject: RejectPolicy,
+    /// **The data the turn leaves behind, declared by the author** (hub#1639). Empty — the default
+    /// and what every flow in production is written against — means the step publishes what it
+    /// always has: `{text, tool_calls}`.
+    ///
+    /// A declared field becomes `steps.<id>.<name>` next to those two, so the options the model
+    /// found mid-conversation can be the rows of the list the customer taps
+    /// ([`NotifyStep::interactive`], hub#1633) and a later step can branch on what the turn
+    /// actually did.
+    ///
+    /// A `Vec` and not a map because the runner turns it into a SEQUENCE the model is asked for,
+    /// and that sequence has to be the same on every save: the kernel's JSON object is ordered by
+    /// key, so parsing the same document twice asks for the same fields in the same order.
+    pub output: Vec<AiOutputField>,
+}
+
+/// One field an [`AiStep`] promises to leave behind (hub#1639).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AiOutputField {
+    /// Addressable by the mapping language: letters, digits and `_`, starting with a letter.
+    /// [`resolve_path`] splits on `.`, so a dotted name would address a level that does not exist
+    /// and resolve to nothing — silently, which is why `rows` was kept out of v1 in the first
+    /// place.
+    pub name: String,
+    pub kind: AiOutputKind,
+    /// What the model is told this field is for. Required, because it is the ONLY thing it reads
+    /// about the field: a field with nothing to read is a field filled with whatever the model
+    /// likes.
+    pub describe: String,
+}
+
+/// **What shape a declared output field may be** (hub#1639).
+///
+/// Closed, and deliberately short. This is not a schema language: it is the three shapes the hub
+/// can answer for on the way out. `Options` is Meta's own row shape for the same reason
+/// [`NotifyStep::interactive`] is Meta's own object (hub#1633) — the kernel grows the shape the
+/// transport already knows instead of a general one it would then have to translate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiOutputKind {
+    /// One line of prose.
+    Text,
+    /// A number, as a number — so a later `condition` compares it as one.
+    Number,
+    /// The tappable list: `[{id, title, description}]`, ready to be the `rows` of an
+    /// `interactive` send without anything in between reshaping it.
+    Options,
+}
+
+impl AiOutputKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiOutputKind::Text => "text",
+            AiOutputKind::Number => "number",
+            AiOutputKind::Options => "options",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "text" => Some(AiOutputKind::Text),
+            "number" => Some(AiOutputKind::Number),
+            "options" => Some(AiOutputKind::Options),
+            _ => None,
+        }
+    }
+    pub const ALL: &'static [AiOutputKind] = &[
+        AiOutputKind::Text,
+        AiOutputKind::Number,
+        AiOutputKind::Options,
+    ];
 }
 
 /// **What happens to a write the model proposes** (ADR-0283 D3).
@@ -597,6 +748,11 @@ pub struct StepDef {
     pub id: String,
     pub kind: StepKind,
     pub spec: StepSpec,
+    /// What a FAILURE of this step costs the run (hub#1635). Only the kinds that CAN fail accept
+    /// the key; for the rest it is an unknown key, refused like any other — a `condition` that
+    /// does not match is the flow working, not an error, and offering a policy for a failure that
+    /// cannot happen is a guard nobody executes.
+    pub on_error: ErrorPolicy,
 }
 
 impl StepDef {
@@ -644,11 +800,18 @@ impl StepDef {
             // `secret.…` refusal of hub#662 has to reach both — a credential interpolated into a
             // message would be sent to a customer, and one interpolated into the params of the read
             // would be handed to a module's table.
-            StepSpec::Notify(n) => vec![
-                Json::Object(n.params.clone()),
-                Json::Object(n.vars.clone()),
-                json_str(&n.template),
-            ],
+            // …and INSIDE the tappable options (hub#1633), for the most literal reason of all:
+            // a credential interpolated into a button's title is printed on a customer's phone.
+            // `resolve` recurses, so the scan has to as well or a secret hides two objects deep.
+            StepSpec::Notify(n) => {
+                let mut out = vec![
+                    Json::Object(n.params.clone()),
+                    Json::Object(n.vars.clone()),
+                    json_str(&n.template),
+                ];
+                out.extend(n.interactive.clone().map(Json::Object));
+                out
+            }
             // The question a person reads. The `secret.…` refusal has to reach it for the most
             // literal reason of all: the tray is a SCREEN, and a credential interpolated into a
             // title would be printed on it for anybody who can open the approvals list.
@@ -1387,8 +1550,8 @@ fn parse_step(value: &Json) -> Result<StepDef> {
     })?;
 
     let allowed: &[&str] = match kind {
-        StepKind::Command => &["id", "kind", "command", "params"],
-        StepKind::Query => &["id", "kind", "query", "params", "result", "limit"],
+        StepKind::Command => &["id", "kind", "command", "params", "on_error"],
+        StepKind::Query => &["id", "kind", "query", "params", "result", "limit", "on_error"],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &[
             "id",
@@ -1400,10 +1563,33 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             "past_due_policy",
             "cancel_on",
             "reschedule_on",
+            "on_error",
         ],
-        StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
-        StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters"],
-        StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
+        StepKind::Http => &[
+            "id", "kind", "method", "url", "headers", "body", "timeout", "on_error",
+        ],
+        StepKind::Ai => &[
+            "id",
+            "kind",
+            "prompt",
+            "tools",
+            "policy",
+            "max_iters",
+            "on_expire",
+            "on_reject",
+            "on_error",
+            "output",
+        ],
+        StepKind::Notify => &[
+            "id",
+            "kind",
+            "channel",
+            "to",
+            "template",
+            "vars",
+            "interactive",
+            "on_error",
+        ],
         StepKind::Approval => &[
             "id",
             "kind",
@@ -1427,6 +1613,31 @@ fn parse_step(value: &Json) -> Result<StepDef> {
             ));
         }
     }
+
+    // **What a FAILURE costs the run** (hub#1635), read where it was typed rather than where it is
+    // obeyed. Same closed vocabulary and same fail-closed default as `on_expire`/`on_reject`:
+    // absent means [`ErrorPolicy::Stop`] — what a failure has always done — and a value outside the
+    // vocabulary is refused at SAVE time naming both, so nobody discovers at 3 AM that the word
+    // they wrote (`retry`, the one this kernel will never have) was read as «stop».
+    //
+    // Only for the kinds that can actually fail: the allow-list above leaves it off `condition`
+    // (which stops the run by DESIGN when it does not match, and never fails) and off `approval`
+    // (whose own outcomes are `on_reject`/`on_expire`, and whose failures are not the step's).
+    let on_error = match map.get("on_error") {
+        None | Some(Json::Null) => ErrorPolicy::Stop,
+        Some(Json::String(s)) if ErrorPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            ErrorPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_error` is one of {}",
+                    joined(ErrorPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
 
     let spec = match kind {
         StepKind::Command => {
@@ -1546,7 +1757,12 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         StepKind::Approval => StepSpec::Approval(parse_approval(&id, map)?),
     };
 
-    Ok(StepDef { id, kind, spec })
+    Ok(StepDef {
+        id,
+        kind,
+        spec,
+        on_error,
+    })
 }
 
 /// The keys of a `delay` step (hub#951).
@@ -2031,18 +2247,72 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     };
     let vars = object("vars", "vars")?;
+    let template_name = map
+        .get("template")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    // **Options the customer TAPS** (hub#1633). Meta's own object, carried to the proxy unchanged:
+    // the SaaS checks it against Meta's limits before a paid call leaves the building
+    // (`too_many_options`, `duplicate_option_id`…), so what belongs here is only what the hub can
+    // answer for — the channel it is sent on, and that it is not competing with other copy.
+    let interactive = match map.get("interactive") {
+        None | Some(Json::Null) => None,
+        Some(Json::Object(m)) => Some(m.clone()),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` is an object of Meta's own shape \
+                     (`{{type, body, action}}`), not a bare value"
+                ),
+            ))
+        }
+    };
+    if interactive.is_some() {
+        if channel != Channel::Whatsapp {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` is a whatsapp shape — an email has nothing to tap, \
+                     so options on `{}` would be dropped on the way out",
+                    channel.as_str()
+                ),
+            ));
+        }
+        // Meta's message has ONE type, and the proxy answers a request with two by name
+        // (`conflicting_message_type`). Refusing here says it where it was typed instead of eight
+        // retries later, and resolving it by precedence would send a message nobody wrote.
+        let competing = if !template_name.is_empty() {
+            Some("template")
+        } else if vars.contains_key("text") {
+            Some("vars.text")
+        } else if vars.contains_key("body") {
+            Some("vars.body")
+        } else {
+            None
+        };
+        if let Some(other) = competing {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` and `{other}` are two messages and one send. The \
+                     copy of a tappable message lives in `interactive.body.text`; keeping both \
+                     would silently drop one of them"
+                ),
+            ));
+        }
+    }
 
     Ok(NotifyStep {
+        interactive,
         channel,
         query,
         params,
         field,
-        template: map
-            .get("template")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .trim()
-            .to_string(),
+        template: template_name,
         vars,
     })
 }
@@ -2130,13 +2400,172 @@ fn parse_ai(id: &str, map: &Map<String, Json>) -> Result<AiStep> {
         ));
     }
 
+    // **What a silence costs, said by the step that proposes** (hub#1634). The sister of
+    // `on_reject` below, and parsed the same way: absent means [`ExpiryPolicy::Reject`], which is
+    // what an unanswered proposal has always done, and an unrecognised value is refused where it
+    // was typed rather than read as one of the three.
+    let on_expire = match map.get("on_expire") {
+        None | Some(Json::Null) => ExpiryPolicy::Reject,
+        Some(Json::String(s)) if ExpiryPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            ExpiryPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_expire` is one of {}",
+                    joined(ExpiryPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+
+    // **What a refusal costs, said by the step that proposes** (hub#1622). Same closed vocabulary
+    // and same default as the `approval` step's: absent means [`RejectPolicy::Cancel`], which is
+    // what a rejection has always done, and an unrecognised value is refused where it was typed
+    // rather than read as either half of the choice.
+    let on_reject = match map.get("on_reject") {
+        None | Some(Json::Null) => RejectPolicy::Cancel,
+        Some(Json::String(s)) if RejectPolicy::ALL.iter().any(|p| p.as_str() == s) => {
+            RejectPolicy::parse(s)
+        }
+        _ => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `on_reject` is one of {}",
+                    joined(RejectPolicy::ALL.iter().map(|p| p.as_str()))
+                ),
+            ))
+        }
+    };
+
+    let output = parse_ai_output(id, map.get("output"))?;
+
     Ok(AiStep {
         prompt,
         queries,
         commands,
         policy,
         max_iters,
+        on_expire,
+        on_reject,
+        output,
     })
+}
+
+/// **What the turn promises to leave behind** (hub#1639), in declaration order.
+///
+/// Absent is the default and means «what an `ai` step has always published»: every flow already in
+/// production is written against `{text, tool_calls}` and must keep resolving the same way.
+///
+/// Everything here is refused at SAVE time rather than discovered at 3 AM. The whole reason a
+/// document declares its output instead of the runner guessing it is that a mapping which resolves
+/// to nothing does so *silently* — the same failure that kept `rows` out of v1.
+fn parse_ai_output(id: &str, raw: Option<&Json>) -> Result<Vec<AiOutputField>> {
+    let fields = match raw {
+        None | Some(Json::Null) => return Ok(Vec::new()),
+        Some(Json::Object(m)) => m,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output` is `{{<name>: {{type, describe}}}}` — the fields this \
+                     turn leaves behind, each with words saying what goes in it"
+                ),
+            ))
+        }
+    };
+
+    let mut parsed = Vec::with_capacity(fields.len());
+    for (name, spec) in fields {
+        // The turn's own two keys. `{{steps.<id>.text}}` means «the sentence the model wrote» in
+        // every flow already written; letting a document take that name would change what an
+        // existing mapping resolves to without anybody touching the mapping.
+        if matches!(name.as_str(), "text" | "tool_calls") {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}` is what the turn itself publishes, so it is not \
+                     the document's to redefine. Give the field another name."
+                ),
+            ));
+        }
+        // `steps.<id>.<name>` is walked by `resolve_path`, which splits on `.`: a dotted or spaced
+        // name would address a level that is not there and resolve to null with no complaint.
+        if !is_addressable_name(name) {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output` field `{name}` cannot be addressed by the mapping \
+                     language. A name is a letter followed by letters, digits or `_` — anything \
+                     else makes `steps.{id}.{name}` resolve to nothing without saying so."
+                ),
+            ));
+        }
+
+        let Json::Object(spec) = spec else {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `output.{name}` is `{{type, describe}}`"),
+            ));
+        };
+        for key in spec.keys() {
+            if !matches!(key.as_str(), "type" | "describe") {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!("step `{id}`: unknown key `{key}` in `output.{name}`"),
+                ));
+            }
+        }
+
+        let kind = match spec.get("type") {
+            Some(Json::String(s)) => AiOutputKind::parse(s),
+            _ => None,
+        }
+        .ok_or_else(|| {
+            invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}.type` is one of {}",
+                    joined(AiOutputKind::ALL.iter().map(|k| k.as_str()))
+                ),
+            )
+        })?;
+
+        // The description is the ONLY thing the model is told about the field. Empty means a field
+        // filled with whatever it likes, which is precisely the silent wrong answer this
+        // vocabulary exists to prevent — so it is required, not defaulted to the field name.
+        let describe = spec
+            .get("describe")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if describe.is_empty() {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `output.{name}` needs `describe` — words telling the model what \
+                     goes in this field. It is the only thing it reads about it."
+                ),
+            ));
+        }
+
+        parsed.push(AiOutputField {
+            name: name.clone(),
+            kind,
+            describe,
+        });
+    }
+    Ok(parsed)
+}
+
+/// Can `resolve_path` reach `steps.<id>.<name>`? A letter, then letters, digits or `_`.
+fn is_addressable_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// The keys of an `approval` step (hub#950).
@@ -2443,6 +2872,146 @@ mod tests {
             let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
                 .expect_err("a credential must never be interpolated into a message");
             assert!(format!("{err}").contains("API_KEY"), "{err}");
+        }
+    }
+
+    /// **Options the customer TAPS instead of a number they retype** (hub#1633).
+    ///
+    /// The step carries Meta's own `interactive` object and it is mapped against the run like the
+    /// rest of the copy, so the slots a previous step read become the rows of the list.
+    #[test]
+    fn a_notify_step_can_offer_options_to_tap_and_maps_them_against_the_run() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "¿Confirmas la cita del {{input.when}}?" },
+                    "action": { "buttons": [
+                        { "type": "reply", "reply": { "id": "confirm", "title": "Sí" } },
+                        { "type": "reply", "reply": { "id": "cancel", "title": "No" } }
+                    ] }
+                }
+            }]
+        }))
+        .expect("the shape the appointment confirmation is written in");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        let interactive = step.interactive.as_ref().expect("the options travel with the step");
+        assert_eq!(interactive["type"], json!("button"));
+
+        // Mapped like `vars`: the templates inside resolve against the run, however deep they sit.
+        let scope = json!({ "input": { "when": "martes a las 10:30" } });
+        let resolved = resolve(&Json::Object(interactive.clone()), &scope);
+        assert_eq!(
+            resolved["body"]["text"],
+            json!("¿Confirmas la cita del martes a las 10:30?")
+        );
+        assert_eq!(resolved["action"]["buttons"][0]["reply"]["id"], json!("confirm"));
+    }
+
+    /// A tappable option is a WhatsApp shape. Email has no buttons, so a step asking for them on
+    /// that channel is refused where it was typed — the same criterion `sms` gets.
+    #[test]
+    fn options_to_tap_are_refused_on_a_channel_that_has_none() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "email",
+                "to": { "query": "q.x", "field": "email" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            }]
+        }))
+        .expect_err("email has no tappable options");
+        let text = format!("{err}");
+        // Refused for having no buttons, NOT for being a key the step vocabulary never heard of:
+        // the second reason would make this test pass before the feature existed.
+        assert!(text.contains("interactive") && text.contains("whatsapp"), "{text}");
+        assert!(!text.contains("unknown key"), "{text}");
+    }
+
+    /// Meta's message has ONE type. Asking for two is named rather than resolved by precedence:
+    /// picking one silently would send a message nobody wrote — the SaaS answers the same request
+    /// with `conflicting_message_type`, and finding out at save time is cheaper than at send time.
+    #[test]
+    fn options_to_tap_next_to_other_copy_are_refused_instead_of_one_being_dropped() {
+        for extra in [
+            json!({ "template": "appointment_reminder" }),
+            json!({ "vars": { "text": "Te esperamos" } }),
+            json!({ "vars": { "body": "Te esperamos" } }),
+        ] {
+            let mut step = json!({
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            });
+            for (k, v) in extra.as_object().unwrap() {
+                step[k] = v.clone();
+            }
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err("one message carries one kind of content");
+            let text = format!("{err}");
+            assert!(text.contains("interactive"), "{text}");
+            assert!(!text.contains("unknown key"), "{text}");
+        }
+
+        // …and what is NOT copy still travels next to the options: `phone_number_id` picks which
+        // of this hub's numbers sends, and it is not something the customer ever reads.
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "vars": { "phone_number_id": "123" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            }]
+        }))
+        .expect("a transport hint is not copy");
+    }
+
+    /// The `secret.…` refusal of hub#662 reaches INSIDE the options for the same reason it reaches
+    /// `vars`: a credential interpolated into a button's title would be printed on a customer's
+    /// phone. Scanning only the top level would let one hide two objects deep.
+    #[test]
+    fn a_notify_step_cannot_read_a_flow_secret_from_inside_its_options() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "Confirma" },
+                    "action": { "buttons": [
+                        { "type": "reply", "reply": { "id": "ok", "title": "{{secret.API_KEY}}" } }
+                    ] }
+                }
+            }]
+        }))
+        .expect_err("a credential must never be interpolated into a message");
+        assert!(format!("{err}").contains("API_KEY"), "{err}");
+    }
+
+    /// `interactive` is an object of Meta's own shape. A string or a list is a typo that would
+    /// otherwise reach the proxy and come back as an opaque refusal.
+    #[test]
+    fn options_to_tap_have_to_be_an_object() {
+        for bad in [json!("button"), json!(["confirm"]), json!(3)] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "ask", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "q.x", "field": "phone" },
+                    "interactive": bad
+                }]
+            }))
+            .expect_err("the options are an object");
+            let text = format!("{err}");
+            assert!(text.contains("interactive") && text.contains("object"), "{text}");
+            assert!(!text.contains("unknown key"), "{text}");
         }
     }
 
@@ -3155,7 +3724,322 @@ mod tests {
             "writes wait for a person unless the owner opted out IN WRITING"
         );
         assert_eq!(ai.max_iters, DEFAULT_MAX_ITERS);
+        assert_eq!(
+            ai.on_reject,
+            RejectPolicy::Cancel,
+            "a «no» has always ended the run, and a document that says nothing must not change that"
+        );
         assert!(ai.queries.is_empty() && ai.commands.is_empty());
+    }
+
+    /// **The refusal stops being a dead end** (hub#1622). Under `manual` the write the model
+    /// proposes waits for a person, and until now saying «no» killed the run wherever it stood —
+    /// so every step written after it went unrun, including the one that tells the customer what
+    /// happened. `approval` steps have been able to say otherwise since hub#950; this is the same
+    /// sentence, in the step that actually proposes.
+    #[test]
+    fn an_ai_step_can_say_that_a_refusal_lets_the_run_carry_on() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "propose_appointment",
+                "kind": "ai",
+                "prompt": "Book what she asked for",
+                "tools": { "commands": ["appointments.appointments.create"] },
+                "policy": "manual",
+                "on_reject": "continue"
+            }]
+        }))
+        .expect("the shape the WhatsApp template writes so a rejection still answers the customer");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.on_reject, RejectPolicy::Continue);
+        assert_eq!(ai.policy, AiPolicy::Manual);
+    }
+
+    /// Same closed vocabulary as the `approval` step's, and refused for the same reason: `"reject"`
+    /// quietly reading as `cancel` would be merciful, and anything quietly reading as `continue`
+    /// would carry a run past a refusal — which is the one thing an approval exists to prevent.
+    #[test]
+    fn an_ai_steps_reject_policy_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["cancle", "reject", "continu", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "agent", "kind": "ai", "prompt": "hi", "on_reject": value
+                }]
+            }))
+            .expect_err("a policy this kernel cannot obey is refused where it was typed");
+            assert!(format!("{err}").contains("on_reject"), "{err}");
+        }
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "on_reject": true }]
+        }))
+        .expect_err("a policy is a string, not a flag");
+        assert!(format!("{err}").contains("on_reject"), "{err}");
+    }
+
+    /// **The silence stops being a dead end** (hub#1634 — the half deliberately NOT shipped with
+    /// hub#1622). A proposal nobody answers expires at 72 h, and until now that killed the run
+    /// wherever it stood: every step written after it went unrun, including the one that tells the
+    /// customer nobody got back to her. `approval` steps have been able to say otherwise since
+    /// hub#950; this is the same sentence, in the step that actually proposes.
+    #[test]
+    fn an_ai_step_can_say_that_a_silence_lets_the_run_carry_on() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "propose_appointment",
+                "kind": "ai",
+                "prompt": "Book what she asked for",
+                "tools": { "commands": ["appointments.appointments.create"] },
+                "policy": "manual",
+                "on_expire": "continue"
+            }]
+        }))
+        .expect("the shape the WhatsApp template writes so an expiry still answers the customer");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.on_expire, ExpiryPolicy::Continue);
+        assert_eq!(ai.policy, AiPolicy::Manual);
+    }
+
+    /// The DEFAULT is the one that must not move: every document already deployed says nothing
+    /// here, and reading that silence as anything but `reject` would change what a proposal
+    /// nobody answered does — on hubs that never asked for it.
+    #[test]
+    fn an_ai_step_that_says_nothing_still_dies_on_an_expiry() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi" }]
+        }))
+        .expect("the shape every deployed document has");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(
+            ai.on_expire,
+            ExpiryPolicy::Reject,
+            "silence is read as a refusal, because the steps after a proposal assumed it acted"
+        );
+    }
+
+    /// Same closed vocabulary as the `approval` step's, and refused for the same reason as
+    /// `on_reject`: anything quietly reading as `continue` would carry a run past a proposal
+    /// nobody ever agreed to.
+    #[test]
+    fn an_ai_steps_expiry_policy_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["cancle", "continu", "rejected", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": value
+                }]
+            }))
+            .expect_err("a policy this kernel cannot obey is refused where it was typed");
+            assert!(format!("{err}").contains("on_expire"), "{err}");
+        }
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi", "on_expire": true }]
+        }))
+        .expect_err("a policy is a string, not a flag");
+        assert!(format!("{err}").contains("on_expire"), "{err}");
+    }
+
+    /// **The turn can leave DATA behind, not only a sentence** (hub#1639). Until now an `ai` step
+    /// published `{text, tool_calls}` and nothing else, so the three free slots it had just found
+    /// while talking to the customer could not become the list she taps — the options had to be
+    /// written by hand in the document, which is exactly what they existed to avoid.
+    #[test]
+    fn an_ai_step_can_declare_the_data_its_turn_leaves_behind() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick",
+                "kind": "ai",
+                "prompt": "Find her three slots",
+                "tools": { "queries": ["appointments.free_slots"] },
+                "output": {
+                    "slots": { "type": "options", "describe": "the free slots you found" },
+                    "action": { "type": "text", "describe": "booked, cancelled or asking" }
+                }
+            }]
+        }))
+        .expect(
+            "the shape the WhatsApp recipe needs to offer slots it discovered mid-conversation",
+        );
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(ai.output.len(), 2);
+        let slots = ai.output.iter().find(|f| f.name == "slots").expect("slots");
+        assert_eq!(slots.kind, AiOutputKind::Options);
+        assert_eq!(slots.describe, "the free slots you found");
+        let action = ai
+            .output
+            .iter()
+            .find(|f| f.name == "action")
+            .expect("action");
+        assert_eq!(action.kind, AiOutputKind::Text);
+        // The runner asks the model for these as a SEQUENCE, so the sequence must not move between
+        // saves. The kernel's JSON object is ordered by key, so the order is that one — the point
+        // of the assertion is that it is FIXED, not which end `slots` lands on.
+        let order: Vec<&str> = ai.output.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(order, ["action", "slots"]);
+        let again = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick", "kind": "ai", "prompt": "Find her three slots",
+                "output": {
+                    "action": { "type": "text", "describe": "booked, cancelled or asking" },
+                    "slots": { "type": "options", "describe": "the free slots you found" }
+                }
+            }]
+        }))
+        .expect("the same fields written in the other order");
+        let StepSpec::Ai(reordered) = &again.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert_eq!(
+            reordered
+                .output
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>(),
+            order,
+            "the model is asked for the same fields in the same order however they were typed"
+        );
+    }
+
+    /// A step that declares nothing keeps the output it has always had. The absent case is the one
+    /// every flow already in production is written against.
+    #[test]
+    fn an_ai_step_that_declares_no_output_is_unchanged() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "agent", "kind": "ai", "prompt": "hi" }]
+        }))
+        .expect("the shape every flow in production is written against");
+        let StepSpec::Ai(ai) = &def.steps[0].spec else {
+            panic!("ai spec");
+        };
+        assert!(ai.output.is_empty());
+    }
+
+    /// Same discipline as `policy` and `on_reject`: a closed vocabulary, refused where it was
+    /// typed. A `"type": "list"` quietly read as `options` would publish Meta's row shape for a
+    /// field the author meant as prose, and the customer would get a message nobody wrote.
+    #[test]
+    fn an_ai_outputs_type_is_a_closed_vocabulary_and_a_typo_does_not_save() {
+        for value in ["list", "string", "array", "rows", ""] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { "slots": { "type": value, "describe": "d" } }
+                }]
+            }))
+            .expect_err("a shape this kernel cannot publish is refused where it was typed");
+            assert!(format!("{err}").contains("type"), "{err}");
+        }
+    }
+
+    /// `describe` is not decoration: it is the only thing the model is told about the field. A
+    /// field with nothing to read is a field the model fills with whatever it likes, which is the
+    /// silent-wrong-answer this vocabulary exists to prevent.
+    #[test]
+    fn an_ai_output_field_needs_words_saying_what_goes_in_it() {
+        for bad in [
+            json!({ "type": "text" }),
+            json!({ "type": "text", "describe": "  " }),
+        ] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi", "output": { "action": bad }
+                }]
+            }))
+            .expect_err("the description IS the instruction the model reads");
+            assert!(format!("{err}").contains("describe"), "{err}");
+        }
+    }
+
+    /// The turn's own two keys are not available to redefine. `{{steps.pick.text}}` means the
+    /// sentence the model wrote in every flow already written; a document that could take that
+    /// name would change what an existing mapping resolves to without touching the mapping.
+    #[test]
+    fn an_ai_output_cannot_take_the_name_of_what_the_turn_already_publishes() {
+        for reserved in ["text", "tool_calls"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { reserved: { "type": "text", "describe": "d" } }
+                }]
+            }))
+            .expect_err("the turn's own keys are not the author's to redefine");
+            let text = format!("{err}");
+            assert!(text.contains(reserved), "{text}");
+        }
+    }
+
+    /// A field name travels into `steps.<id>.<name>`, and [`resolve_path`] splits on `.`. A name
+    /// with a dot in it would address a level that does not exist and resolve to nothing —
+    /// silently, which is the failure mode `rows` was kept out of v1 to avoid.
+    #[test]
+    fn an_ai_output_name_must_be_addressable_by_the_mapping_language() {
+        for bad in ["my.slots", "", " ", "slots-a", "1st"] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "pick", "kind": "ai", "prompt": "hi",
+                    "output": { bad: { "type": "text", "describe": "d" } }
+                }]
+            }))
+            .unwrap_err();
+            assert!(format!("{err}").contains("output"), "name `{bad}`: {err}");
+        }
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "pick", "kind": "ai", "prompt": "hi",
+                "output": { "free_slots2": { "type": "text", "describe": "d" } }
+            }]
+        }))
+        .expect("letters, digits and `_` are what the mapping language can address");
+    }
+
+    /// The whole point of the change, checked where it lands: a bare path inside `interactive`
+    /// resolves to the ARRAY the turn published, with its type intact — so the rows of the list
+    /// are the slots the model found, not a string that looks like one.
+    #[test]
+    fn the_options_an_ai_turn_published_become_the_rows_of_a_tappable_list() {
+        let scope = json!({
+            "steps": {
+                "pick": {
+                    "text": "Estos son los huecos",
+                    "slots": [
+                        { "id": "s1", "title": "10:00", "description": "con Ana" },
+                        { "id": "s2", "title": "12:30", "description": "con Ana" }
+                    ]
+                }
+            }
+        });
+        let interactive = json!({
+            "type": "list",
+            "body": { "text": "{{steps.pick.text}}" },
+            "action": { "sections": [{ "title": "Huecos", "rows": "steps.pick.slots" }] }
+        });
+        let filled = resolve(&interactive, &scope);
+        let rows = &filled["action"]["sections"][0]["rows"];
+        assert!(rows.is_array(), "the rows keep their type: {filled}");
+        assert_eq!(rows.as_array().expect("array").len(), 2);
+        assert_eq!(rows[1]["id"], json!("s2"));
+        assert_eq!(filled["body"]["text"], json!("Estos son los huecos"));
     }
 
     /// Every turn of the loop costs a call through the SaaS proxy, which meters real money
@@ -3583,5 +4467,114 @@ mod tests {
                 .unwrap()
                 .matches(&scope)
         );
+    }
+
+    // ── what a FAILURE costs the run (hub#1635) ────────────────────────────────────────────────
+
+    /// The opt-in, parsed where it was typed. Every kind that can fail accepts it, because the
+    /// message that tells somebody «no pudo ser» is written after whichever of them broke.
+    #[test]
+    fn a_step_that_can_fail_may_say_what_a_failure_costs() {
+        for step in [
+            json!({ "id": "s", "kind": "command", "command": "crm.note.add", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "query", "query": "crm.note.list", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "delay", "seconds": 60, "on_error": "continue" }),
+            json!({ "id": "s", "kind": "http", "url": "https://x.example/y", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "ai", "prompt": "book it", "on_error": "continue" }),
+            json!({ "id": "s", "kind": "notify", "channel": "email", "template": "t",
+                    "to": { "query": "crm.customer.get", "field": "email" },
+                    "on_error": "continue" }),
+        ] {
+            let kind = step["kind"].as_str().unwrap().to_string();
+            let def = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .unwrap_or_else(|e| panic!("`{kind}` may declare `on_error`: {e}"));
+            assert_eq!(
+                def.steps[0].on_error,
+                ErrorPolicy::Continue,
+                "kind `{kind}`"
+            );
+        }
+    }
+
+    /// The DEFAULT, which is the half that must not move: every document already deployed says
+    /// nothing here, and silence has to keep meaning what a failure has always meant.
+    #[test]
+    fn a_step_that_says_nothing_about_failure_still_stops_the_run() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "crm.note.add" }]
+        }))
+        .unwrap();
+        assert_eq!(def.steps[0].on_error, ErrorPolicy::Stop);
+        assert_eq!(ErrorPolicy::default(), ErrorPolicy::Stop);
+    }
+
+    /// 🔴 The value the vocabulary deliberately does not have. Refused at SAVE time and naming what
+    /// may be written instead, so nobody discovers at 3 AM that the word they typed was read as
+    /// «stop» — and so no document can ever ask this kernel to re-run a business command by itself
+    /// (ADR-0283 §1).
+    #[test]
+    fn asking_the_hub_to_retry_a_failed_step_is_refused_naming_the_vocabulary() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "sales.sale.create",
+                        "on_error": "retry" }]
+        }))
+        .expect_err("`retry` is not a policy this kernel has");
+        let text = format!("{err}");
+        assert!(
+            text.contains("`on_error` is one of stop, continue"),
+            "the refusal names the vocabulary: {text}"
+        );
+    }
+
+    /// …and a value of the wrong TYPE is refused too, rather than degrading to the default. A
+    /// `true` read as «stop» is a document whose author believes they said something.
+    #[test]
+    fn a_failure_policy_that_is_not_even_a_word_is_refused() {
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "s", "kind": "command", "command": "crm.note.add",
+                        "on_error": true }]
+        }))
+        .is_err());
+    }
+
+    /// The kinds that CANNOT fail do not accept the key, and the refusal is the ordinary
+    /// unknown-key one. A `condition` that does not match is the flow working exactly as written —
+    /// offering it a failure policy would be a guard nobody ever executes — and an `approval`
+    /// answers with `on_reject`/`on_expire`, which are about a PERSON and not about a breakage.
+    #[test]
+    fn a_step_that_cannot_fail_does_not_accept_a_failure_policy() {
+        for step in [
+            json!({ "id": "s", "kind": "condition", "when": { "input.x": { "eq": 1 } },
+                    "on_error": "continue" }),
+            json!({ "id": "s", "kind": "approval", "title": "¿Seguimos?", "on_error": "continue" }),
+        ] {
+            let kind = step["kind"].as_str().unwrap().to_string();
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err(&format!("`{kind}` must refuse `on_error`"));
+            let text = format!("{err}");
+            assert!(
+                text.contains("unknown key `on_error`"),
+                "`{kind}` refuses it as an unknown key: {text}"
+            );
+        }
+    }
+
+    /// A row written by a NEWER hub degrades to the conservative answer instead of being guessed
+    /// at. `parse` is fail-closed for the same reason `ExpiryPolicy::parse` is: «carry on past a
+    /// failure whose instructions I cannot read» is not an answer this binary may invent.
+    #[test]
+    fn a_failure_policy_this_binary_does_not_know_reads_as_stop() {
+        assert_eq!(ErrorPolicy::parse("continue"), ErrorPolicy::Continue);
+        assert_eq!(ErrorPolicy::parse("stop"), ErrorPolicy::Stop);
+        for unknown in ["retry", "", "CONTINUE", "skip"] {
+            assert_eq!(
+                ErrorPolicy::parse(unknown),
+                ErrorPolicy::Stop,
+                "`{unknown}` must not talk this hub into carrying on"
+            );
+        }
     }
 }

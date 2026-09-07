@@ -808,6 +808,10 @@ pub async fn serve(mut cfg: ServeConfig) -> Result<(), Box<dyn std::error::Error
                     Ok(report) if report.ingested > 0 => tracing::info!(
                         ingested = report.ingested,
                         acked = report.acked,
+                        // Lo que el SaaS sirvió y este runtime no entendió (hub#1612): cero es
+                        // lo normal, y un número aquí dice que falta release de runtime para
+                        // aprovechar algo que el SaaS ya está entregando.
+                        unexpected = report.unexpected,
                         "whatsapp entrante: mensajes ingeridos como evento core"
                     ),
                     Ok(_) => {}

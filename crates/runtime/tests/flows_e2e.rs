@@ -29,7 +29,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::{RequestContext, Runtime};
 use serde_json::{json, Value};
@@ -135,7 +135,7 @@ async fn create_flow(rt: &Runtime, definition: Value) -> String {
 async fn grant(rt: &Runtime, flow_id: &str, command: &str) {
     rt.replace_flow_grants(
         flow_id,
-        &[(GrantKind::Command, command.to_string())],
+        &[GrantSpec::pair(GrantKind::Command, command.to_string())],
         "hub_user:owner",
     )
     .await
@@ -396,6 +396,63 @@ async fn without_a_grant_the_flow_runs_and_writes_nothing() {
     );
 }
 
+/// hub#1623 — **the payload of the step is judged, not just its name.** The flow is granted
+/// `crm.note.add` and its grant FIXES `customer_id` to `c-1`; the step composes that field from the
+/// EVENT, which is the shape the real case has (there the field is composed by an `ai` step reading
+/// a stranger's WhatsApp message). An event naming another customer is refused by the kernel, and
+/// what proves it is the refusal AND the table: **zero writes**.
+#[tokio::test]
+async fn a_pinned_grant_stops_the_step_that_contradicts_it_before_anything_is_written() {
+    let rt = runtime().await;
+    let flow_id = create_flow(&rt, welcome_definition()).await;
+    let mut pin = Params::new();
+    pin.insert("customer_id".into(), json!("c-1"));
+    rt.replace_flow_grants(
+        &flow_id,
+        &[GrantSpec::pinned("crm.note.add", pin)],
+        "hub_user:owner",
+    )
+    .await
+    .unwrap();
+
+    // The event carries somebody else's customer — the part of the payload that comes from outside.
+    let mut p = Params::new();
+    p.insert("total".into(), json!("120.50"));
+    p.insert("customer_id".into(), json!("c-2"));
+    rt.execute_command("sales.sale.complete", &p, &cashier())
+        .await
+        .unwrap();
+    rt.drain_outbox().await.unwrap();
+    rt.process_flows().await.unwrap();
+
+    assert_eq!(
+        count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await,
+        0,
+        "refused BEFORE the module ran: the gate is upstream of the handler and of the outbox"
+    );
+    let run = rt
+        .list_flow_runs(&flow_id, 10, None)
+        .await
+        .unwrap()
+        .remove(0);
+    assert_eq!(run.status, store::STATUS_FAILED);
+    assert!(
+        run.last_error.contains("flow.grant_payload_denied"),
+        "its own code, so the UI can say «this flow may only do it for c-1» and not just «denied»: {}",
+        run.last_error
+    );
+
+    // And the same flow, same grant, doing what it WAS allowed to do, still works end to end.
+    complete_sale(&rt, "120.50").await;
+    rt.drain_outbox().await.unwrap();
+    rt.process_flows().await.unwrap();
+    assert_eq!(
+        count(&rt, "SELECT COUNT(*) AS c FROM crm_note").await,
+        1,
+        "the pin narrows the grant; it does not close it"
+    );
+}
+
 #[tokio::test]
 async fn a_grant_for_one_command_does_not_open_its_neighbour() {
     let rt = runtime().await;
@@ -452,7 +509,7 @@ async fn an_internal_command_is_refused_at_the_door_and_still_at_the_gate() {
     let refused = rt
         .replace_flow_grants(
             &flow_id,
-            &[(GrantKind::Command, "crm._purge_notes".to_string())],
+            &[GrantSpec::pair(GrantKind::Command, "crm._purge_notes")],
             "hub_user:owner",
         )
         .await

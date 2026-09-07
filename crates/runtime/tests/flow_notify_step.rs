@@ -32,7 +32,7 @@
 use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::host_notify::MockTransport;
 use erplora_runtime::{RequestContext, Runtime};
@@ -108,19 +108,16 @@ async fn create_flow(rt: &Runtime, definition: Value) -> String {
     .id
 }
 
-async fn set_grants(rt: &Runtime, flow_id: &str, wanted: &[(GrantKind, String)]) {
+async fn set_grants(rt: &Runtime, flow_id: &str, wanted: &[GrantSpec]) {
     rt.replace_flow_grants(flow_id, wanted, "hub_user:owner")
         .await
         .unwrap();
 }
 
-fn both_grants() -> Vec<(GrantKind, String)> {
+fn both_grants() -> Vec<GrantSpec> {
     vec![
-        (GrantKind::Notify, "whatsapp".to_string()),
-        (
-            GrantKind::RecipientQuery,
-            "crm.customer.get#phone".to_string(),
-        ),
+        GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+        GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone"),
     ]
 }
 
@@ -166,7 +163,7 @@ async fn without_the_recipient_grant_nothing_is_sent_and_with_it_exactly_one_mes
     let (rt, transport) = runtime().await;
     let flow_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
     // The channel, but not whose address: the two questions are two grants.
-    set_grants(&rt, &flow_id, &[(GrantKind::Notify, "whatsapp".into())]).await;
+    set_grants(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Notify, "whatsapp")]).await;
 
     let run_id = run_flow(&rt, &flow_id).await;
 
@@ -213,17 +210,14 @@ async fn without_the_recipient_grant_nothing_is_sent_and_with_it_exactly_one_mes
 #[tokio::test]
 async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
     let (rt, transport) = runtime().await;
-    let phone_grant = (
-        GrantKind::RecipientQuery,
-        "crm.customer.get#phone".to_string(),
-    );
+    let phone_grant = GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone");
 
     // Another FIELD of the granted query: the customer's email is not their phone.
     let by_email = create_flow(&rt, reminder("email", "crm.customer.get", "email")).await;
     set_grants(
         &rt,
         &by_email,
-        &[(GrantKind::Notify, "email".into()), phone_grant.clone()],
+        &[GrantSpec::pair(GrantKind::Notify, "email"), phone_grant.clone()],
     )
     .await;
     let run_id = run_flow(&rt, &by_email).await;
@@ -241,11 +235,8 @@ async fn the_grant_covers_one_field_of_one_query_and_nothing_next_to_it() {
         &rt,
         &other_query,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.get#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone"),
         ],
     )
     .await;
@@ -284,7 +275,7 @@ async fn revoking_the_recipient_grant_cuts_a_message_that_is_already_queued() {
     assert!(transport.sent().is_empty(), "nothing has left yet");
 
     // The owner changes their mind while the relay has not run.
-    set_grants(&rt, &flow_id, &[(GrantKind::Notify, "whatsapp".into())]).await;
+    set_grants(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Notify, "whatsapp")]).await;
     rt.drain_outbox().await.unwrap();
 
     assert!(
@@ -321,10 +312,7 @@ async fn revoking_the_channel_grant_also_cuts_a_message_that_is_already_queued()
     set_grants(
         &rt,
         &flow_id,
-        &[(
-            GrantKind::RecipientQuery,
-            "crm.customer.get#phone".to_string(),
-        )],
+        &[GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#phone")],
     )
     .await;
     rt.drain_outbox().await.unwrap();
@@ -416,7 +404,7 @@ async fn a_module_cannot_borrow_a_flows_release_by_copying_it_into_its_payload()
     set_grants(
         &rt,
         &laundering,
-        &[(GrantKind::Command, "crm.reminder.send".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.reminder.send")],
     )
     .await;
     rt.start_flow_run(&laundering, &json!({}), "hub_user:owner")
@@ -511,11 +499,8 @@ async fn no_recipient_and_several_recipients_both_stop_the_step_instead_of_guess
         &rt,
         &many,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.list#phone".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.list#phone"),
         ],
     )
     .await;
@@ -549,11 +534,8 @@ async fn a_field_that_does_not_look_like_a_phone_is_refused_before_anything_is_q
         &rt,
         &flow_id,
         &[
-            (GrantKind::Notify, "whatsapp".into()),
-            (
-                GrantKind::RecipientQuery,
-                "crm.customer.get#email".to_string(),
-            ),
+            GrantSpec::pair(GrantKind::Notify, "whatsapp"),
+            GrantSpec::pair(GrantKind::RecipientQuery, "crm.customer.get#email"),
         ],
     )
     .await;
@@ -675,4 +657,81 @@ async fn a_transport_that_merely_fails_still_climbs_the_ladder() {
     .await;
     assert_eq!(queued[0]["status"], json!("pending"), "{:?}", queued[0]);
     assert_eq!(queued[0]["attempts"], json!(1));
+}
+
+
+/// **The whole point of hub#1633, end to end**: the salon's automation offers the free slots as
+/// something the customer TAPS, and what comes out of the hub is the message Meta will paint.
+///
+/// It runs the same road as any other reminder — grants, the recipient read, the outbox — because
+/// the options are copy, not a second kind of send. What this proves is the half a unit test
+/// cannot: that the object survives the queue row and reaches the transport rendered, and that
+/// nothing else about the message changed on the way.
+#[tokio::test]
+async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_rendered() {
+    let (rt, transport) = runtime().await;
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask",
+                "kind": "notify",
+                "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "interactive": {
+                    "type": "list",
+                    "body": { "text": "Estos son los huecos del {{input.when}}" },
+                    "action": {
+                        "button": "Ver huecos",
+                        "sections": [{ "title": "Mañana", "rows": [
+                            { "id": "slot:10:30", "title": "{{input.when}} 10:30" },
+                            { "id": "slot:12:00", "title": "{{input.when}} 12:00" }
+                        ] }]
+                    }
+                }
+            }]
+        }),
+    )
+    .await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let intent = &sent[0].0;
+    assert_eq!(intent.to, PHONE);
+    assert_eq!(
+        intent.interactive["body"]["text"],
+        json!("Estos son los huecos del martes"),
+        "the copy of a tappable message is rendered against the run like any other"
+    );
+    assert_eq!(
+        intent.interactive["action"]["sections"][0]["rows"][0]["title"],
+        json!("martes 10:30"),
+        "the templates INSIDE the options resolve too, however deep they sit"
+    );
+    assert_eq!(
+        intent.interactive["action"]["sections"][0]["rows"][0]["id"],
+        json!("slot:10:30"),
+        "the id is what comes back as `reply_id`, so it must survive untouched"
+    );
+
+    // The control: an ordinary reminder still carries no options at all, so the assertion above
+    // is about what this flow asked for and not about something every message now grows.
+    let plain_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
+    set_grants(&rt, &plain_id, &both_grants()).await;
+    run_flow(&rt, &plain_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent[1].0.interactive.is_null(),
+        "a plain reminder offers nothing to tap: {:?}",
+        sent[1].0.interactive
+    );
 }

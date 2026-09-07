@@ -17,7 +17,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{any, get};
 use erplora_db::testutil::fresh_db;
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{IoResult, NewFlow, PendingIo};
 use erplora_runtime::Runtime;
 use erplora_server::flow_io::{self, Limits};
@@ -169,7 +169,7 @@ async fn flow_calling(rt: &Runtime, url: &str, timeout: u64) -> String {
 async fn allow(rt: &Runtime, flow_id: &str, pattern: &str) {
     rt.replace_flow_grants(
         flow_id,
-        &[(GrantKind::Http, pattern.to_string())],
+        &[GrantSpec::pair(GrantKind::Http, pattern.to_string())],
         "hub_user:1",
     )
     .await
@@ -298,7 +298,10 @@ async fn a_server_that_never_answers_fails_the_step_and_stops_the_run() {
     assert!(elapsed.as_secs() < 10, "it gave up on time ({elapsed:?})");
     assert_eq!(server.hits(), 1, "the request did go out");
     let (status, error) = run_status(&rt, &flow_id).await;
-    assert_eq!(status, "failed", "v1 is `on_error: stop`");
+    assert_eq!(
+        status, "failed",
+        "this document says nothing about failure, so the default `on_error: stop` applies"
+    );
     assert!(error.contains("flow.http_timeout"), "{error}");
 }
 

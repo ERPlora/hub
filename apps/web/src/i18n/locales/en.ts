@@ -815,6 +815,42 @@ export default {
   // hub#365 — this screen is the far end of the apps door, so it speaks the noun hub#367 chose:
   // «apps», never «modules». The KEYS keep saying module (`colModule`, `moduleInstalled`): they are
   // the manifest's word and renaming them would break nothing here and everything elsewhere.
+  // «Connect WhatsApp» — the block the WhatsApp module embeds as <erp-whatsapp-connect> (hub#1600).
+  // The owner connects the number of the business from here: Meta's popup, a QR scanned with the
+  // WhatsApp Business app. Errors are sentences a person can act on, keyed by the SaaS's code.
+  whatsappConnect: {
+    intro: 'Connect the WhatsApp number of your business. You will sign in with Facebook and scan a QR code with the WhatsApp Business app on your phone.',
+    connect: 'Connect WhatsApp',
+    connected: 'Connected',
+    businessApp: 'WhatsApp Business app',
+    connectedHelp: 'Messages from your customers arrive in the Inbox, and the automations answer them.',
+    // hub#1626: the permission WhatsApp gives to write for a business lasts 60 days and runs out on
+    // its own. When Meta refuses to renew it, only the owner can fix it — so the sentence names what
+    // stopped working (both directions) and what to do, and never the word «token».
+    // NOT a bare «Disconnected»: hub#375 took that word out of the catalogues on purpose, because
+    // one word next to a heading reads as a verdict about the whole machine, and `system-health`
+    // guards it. This badge names the ONE thing the owner has to do instead.
+    reconnectBadge: 'Reconnect needed',
+    reconnectNeeded:
+      'WhatsApp has withdrawn the permission to write on behalf of your business. Your customers’ messages are not arriving and nothing you answer is going out. Connect your number again to get the channel back.',
+    reconnect: 'Reconnect WhatsApp',
+    disconnect: 'Disconnect',
+    disconnectConfirm: 'Disconnect this number? Messages will stop arriving here.',
+    adminOnly: 'Only an owner or an administrator can connect the WhatsApp number.',
+    loading: 'Opening the WhatsApp connection…',
+    connecting: 'Connecting your number…',
+    retry: 'Retry',
+    errors: {
+      cancelled: 'The connection was cancelled before finishing.',
+      no_phone_number: 'No phone number was added. Open the connection again and add or choose a number.',
+      no_business_account: 'Facebook did not return a WhatsApp Business account. Try again and pick your business in the window.',
+      not_configured: 'WhatsApp is not available on this hub yet. Contact support.',
+      sdk_unavailable: 'The Facebook window could not open. Allow pop-ups for this site and try again.',
+      unreachable: 'Your hub could not reach erplora.com. Check the connection and try again.',
+      forbidden: 'Only an owner or an administrator can connect the WhatsApp number.',
+      default: 'Something went wrong while connecting. Try again in a minute.',
+    },
+  },
   apps: {
     searchInstalled: 'Search your apps…',
     searchCatalog: 'Search apps to add…',
@@ -1726,6 +1762,8 @@ export default {
     // buttons that carried them (hub#479).
     managedInAccount: 'Plans for this module are managed from your ERPlora account at erplora.com.',
     checkPurchase: 'I already subscribed — check',
+    managePlan: 'Manage plan',
+    managePlanError: 'Could not open plan management. Try again.',
     purchaseDetected: 'Confirmed. Your plan has been updated.',
     status: {
       active: 'Active',

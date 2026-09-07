@@ -277,7 +277,7 @@ fn as_text(value: &Json) -> String {
 mod tests {
     use super::*;
     use crate::flows::def::FlowDefinition;
-    use crate::flows::grants::{self, GrantKind};
+    use crate::flows::grants::{self, GrantKind, GrantSpec};
     use crate::flows::test_support;
     use crate::registry::Registry;
     use crate::secret_box::test_support::{env_lock, test_key_b64, EnvVarGuard};
@@ -298,7 +298,7 @@ mod tests {
             HUB,
             FLOW,
             &Registry::new(),
-            &[(GrantKind::Http, pattern.to_string())],
+            &[GrantSpec::pair(GrantKind::Http, pattern.to_string())],
             "hub_user:1",
         )
         .await

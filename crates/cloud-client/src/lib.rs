@@ -196,6 +196,10 @@ impl CatalogQuery {
     }
 }
 
+/// The whole conversation, both directions and both sources — see [`CloudClient::whatsapp_inbox`]
+/// for why the endpoint's own defaults are narrower than what this runtime wants (hub#1612).
+const WHATSAPP_INBOX_FILTERS: &str = "direction=all&source=all";
+
 /// Percent-encode de un valor que va en **un segmento de path** (RFC 3986). Deja intacto el
 /// conjunto *unreserved* (`A-Z a-z 0-9 - . _ ~`) y codifica el resto como `%XX`. Sin dependencias
 /// (el crate no arrastra `url`/`percent-encoding`). Lo usa `members_remove` para poner el email en
@@ -785,19 +789,28 @@ impl CloudClient {
     /// `X-Hub-Id`, `IsHubMachine`): the caller is the runtime's poller, with nobody logged in.
     ///
     /// Response (contract verified against `saas/apps/whatsapp_inbox/api/inbox.py`):
-    /// `{"messages": [{"wa_message_id", "from", "payload", "received_at"}, …], "cursor": "<iso>"}`,
-    /// oldest first, at most 100 per call.
+    /// `{"messages": [{"wa_message_id", "from", "direction", "contact", "source", "payload",
+    /// "received_at"}, …], "cursor": "<iso>"}`, oldest first, at most 100 per call.
+    ///
+    /// **Both filters are asked for by name** (hub#1612). `direction` and `source` default to
+    /// `inbound`/`live` on the SaaS, which is yesterday's answer on purpose: a hub that predates
+    /// them would paint the owner's own reply as if the customer had written it, and would let
+    /// its automation answer a question out of the 180-day backlog Meta pushes after a
+    /// coexistence connect. This runtime is not that hub — it carries `direction` and `source`
+    /// all the way to the event, so it takes the whole conversation and lets the module decide
+    /// what to paint and what to answer. Leave them out and the owner's replies simply never
+    /// arrive.
     ///
     /// `after` is an **optional resume cursor**, never a substitute for the ack: the SaaS already
     /// filters out what this hub acked. Passing it means "skip everything at or before this
     /// instant", which is only safe for a deliberate replay — see [`CloudClient::whatsapp_inbox_ack`].
     pub fn whatsapp_inbox(&self, auth: &Auth, after: Option<&str>) -> PreparedRequest {
-        let query = match after.map(str::trim).filter(|s| !s.is_empty()) {
-            // The cursor is ISO-8601, so it carries `:` and (with an offset) `+`. A raw `+` in a
-            // query string decodes to a SPACE, which `parse_datetime` rejects with a 400.
-            Some(cursor) => format!("?after={}", encode_path_segment(cursor)),
-            None => String::new(),
-        };
+        let mut query = format!("?{WHATSAPP_INBOX_FILTERS}");
+        // The cursor is ISO-8601, so it carries `:` and (with an offset) `+`. A raw `+` in a
+        // query string decodes to a SPACE, which `parse_datetime` rejects with a 400.
+        if let Some(cursor) = after.map(str::trim).filter(|s| !s.is_empty()) {
+            query.push_str(&format!("&after={}", encode_path_segment(cursor)));
+        }
         self.get(&format!("/api/v1/hub/device/whatsapp/inbox/{query}"), auth)
     }
 
@@ -831,6 +844,49 @@ impl CloudClient {
     /// sitios es como acaban divergiendo.
     pub fn whatsapp_plan(&self, auth: &Auth) -> PreparedRequest {
         self.get("/api/v1/hub/device/whatsapp/plan/", auth)
+    }
+
+    /// **What the till needs to open Meta's Embedded Signup popup** (hub#1600, ADR-0452):
+    /// `GET /api/v1/hub/device/whatsapp/config/` → `{configured, app_id, config_id, graph_version}`.
+    /// Public identifiers of the ERPlora app — the app secret and the verify token never leave
+    /// the SaaS. Machine credential: the button is drawn before any user has a cloud JWT.
+    pub fn whatsapp_config(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/config/", auth)
+    }
+
+    /// The numbers connected to THIS hub (`WhatsAppPhoneMapping`): what the «Channel» block of the
+    /// module's settings shows. Machine credential (same door as [`Self::whatsapp_plan`]).
+    pub fn whatsapp_numbers(&self, auth: &Auth) -> PreparedRequest {
+        self.get("/api/v1/hub/device/whatsapp/numbers/", auth)
+    }
+
+    /// **Connect the number the popup returned** — `POST /api/v1/hub/device/whatsapp/connect/`.
+    /// The body (`{code, event, waba_id, phone_number_id, business_id}`) is the caller's to build,
+    /// verbatim from Meta's `message` event plus the login callback. The SaaS exchanges the code,
+    /// subscribes the WABA, registers (or, for a WhatsApp Business app number, syncs) and keeps the
+    /// token. Who was at the till has already been checked by the hub (owner/admin session), so the
+    /// machine credential is enough — a cashier signed in by PIN has no cloud JWT to lend.
+    pub fn whatsapp_connect(&self, auth: &Auth) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!("{}/api/v1/hub/device/whatsapp/connect/", self.base_url),
+            auth,
+        )
+    }
+
+    /// Stop routing a number to this hub — `POST /api/v1/hub/device/whatsapp/disconnect/<id>/`.
+    /// The id ends up inside a Cloud path, so it is percent-encoded: a `/` typed into it must not
+    /// steer the request to another endpoint of the Cloud.
+    pub fn whatsapp_disconnect(&self, auth: &Auth, phone_number_id: &str) -> PreparedRequest {
+        self.signed(
+            "POST",
+            format!(
+                "{}/api/v1/hub/device/whatsapp/disconnect/{}/",
+                self.base_url,
+                encode_path_segment(phone_number_id)
+            ),
+            auth,
+        )
     }
 
     /// **Reporte de error del Hub → Cloud** (registro global de errores, "todo controlado"). El
@@ -1897,7 +1953,7 @@ mod tests {
         assert_eq!(r.method, "GET");
         assert_eq!(
             r.url,
-            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/"
+            "https://erplora.com/api/v1/hub/device/whatsapp/inbox/?direction=all&source=all"
         );
         assert!(r
             .headers
@@ -1921,8 +1977,36 @@ mod tests {
         assert_eq!(
             r.url,
             "https://erplora.com/api/v1/hub/device/whatsapp/inbox/\
-             ?after=2026-08-09T10%3A00%3A00%2B00%3A00"
+             ?direction=all&source=all&after=2026-08-09T10%3A00%3A00%2B00%3A00"
         );
+    }
+
+    /// **The poller asks for the whole conversation, both directions and both sources**
+    /// (hub#1612). Both filters default to yesterday's shape on the SaaS — `direction=inbound`,
+    /// `source=live` — to protect a hub that predates them from painting the owner's own reply as
+    /// if the customer had written it, or from answering a question from March. This runtime is
+    /// not that hub: it knows about `direction` and `source` and carries them to the event, so it
+    /// asks by name and lets the module decide what to paint and what to answer. Leave them out
+    /// and the owner's replies never reach the hub at all — the SaaS serves inbound only.
+    #[test]
+    fn whatsapp_inbox_asks_for_both_directions_and_both_sources() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "h".into(),
+            token: "t".into(),
+        };
+
+        for after in [None, Some("2026-08-09T10:00:00+00:00")] {
+            let url = c.whatsapp_inbox(&auth, after).url;
+            assert!(
+                url.contains("direction=all"),
+                "the owner's own replies are asked for by name: {url}"
+            );
+            assert!(
+                url.contains("source=all"),
+                "the coexistence backlog is asked for by name: {url}"
+            );
+        }
     }
 
     /// The channel's plan + live usage (hub#1089). MACHINE credential, like its two siblings
@@ -1947,6 +2031,89 @@ mod tests {
         assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
         // Never the user JWT: a background tick has no session to borrow one from.
         assert!(!r.headers.iter().any(|(k, _)| *k == "Authorization"));
+    }
+
+    /// hub#1600 — what the till needs to open Meta's Embedded Signup popup: the app id and the
+    /// configuration id, PUBLIC ids of our app. Machine credential: the button is drawn before any
+    /// user has a cloud JWT in hand.
+    #[test]
+    fn whatsapp_config_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_config(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/config/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    #[test]
+    fn whatsapp_numbers_is_a_machine_authenticated_get() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_numbers(&auth);
+        assert_eq!(r.method, "GET");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/numbers/"
+        );
+        assert!(r.headers.contains(&("X-Hub-Id", "hub-1".to_string())));
+    }
+
+    /// The code Meta's popup handed the till goes to the SaaS as a POST body the caller builds
+    /// (`{code, event, waba_id, phone_number_id, business_id}`); the SaaS exchanges it and keeps
+    /// the token. Who was at the till has already been checked by the hub, so the machine
+    /// credential is enough (ADR-0452).
+    #[test]
+    fn whatsapp_connect_is_a_machine_authenticated_post() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_connect(&auth);
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/connect/"
+        );
+        assert!(r
+            .headers
+            .contains(&("X-Hub-Token", "machine-secret".to_string())));
+    }
+
+    /// The phone_number_id ends up INSIDE a Cloud path, so it is percent-encoded here: a `/` or a
+    /// `..` typed into it must not steer the request to another endpoint of the Cloud.
+    #[test]
+    fn whatsapp_disconnect_posts_to_the_number_and_encodes_the_id() {
+        let c = CloudClient::new("https://erplora.com");
+        let auth = Auth::HubToken {
+            hub_id: "hub-1".into(),
+            token: "machine-secret".into(),
+        };
+        let r = c.whatsapp_disconnect(&auth, "1122349777617204");
+        assert_eq!(r.method, "POST");
+        assert_eq!(
+            r.url,
+            "https://erplora.com/api/v1/hub/device/whatsapp/disconnect/1122349777617204/"
+        );
+        let hostile = c.whatsapp_disconnect(&auth, "../notify/whatsapp");
+        assert!(
+            !hostile.url.contains("/../"),
+            "an id with a path separator escaped the disconnect route: {}",
+            hostile.url
+        );
     }
 
     /// The ack is what ENDS the redelivery loop. Same machine credential; the body

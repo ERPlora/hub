@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::flows::approvals;
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::registry::{EventSink, EventSource};
 use erplora_runtime::{retention, Runtime};
@@ -120,7 +120,7 @@ async fn parked_proposal(rt: &Runtime) -> (String, approvals::Approval) {
         .id;
     rt.replace_flow_grants(
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
         "hub_user:owner",
     )
     .await
@@ -139,6 +139,10 @@ async fn parked_proposal(rt: &Runtime) -> (String, approvals::Approval) {
             payload: json!({ "text": "the proposed note" }),
             reason: "the assistant proposed this at 3 AM".into(),
             partial_output: json!({ "text": "I will book it" }),
+            // The default this file has always exercised: the tests below then UPDATE the ROW,
+            // because the sweep reads the row and never the document.
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();

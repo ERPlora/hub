@@ -24,7 +24,7 @@ use std::path::PathBuf;
 
 use erplora_db::{testutil::TestDb, Params};
 use erplora_runtime::flows::approvals::{self, ExpiryPolicy, RejectPolicy};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::hub_users::NewHubUser;
 use erplora_runtime::Runtime;
@@ -92,7 +92,7 @@ async fn parked(rt: &Runtime, approval: Value) -> (String, String) {
         .id;
     rt.replace_flow_grants(
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
         OWNER,
     )
     .await
@@ -267,6 +267,141 @@ async fn a_replayed_step_finds_the_question_it_already_asked_instead_of_asking_t
     );
 }
 
+/// hub#1623 — **the tray is not a way round the pin.** A `command` proposal waits hours between
+/// being written by a model and being executed by a person pressing «approve», and the payload it
+/// carries is the one the model wrote. If the grant FIXES part of that payload, the check has to
+/// happen on this door too, with the payload that will really run — otherwise the containment holds
+/// on the direct path and leaks on the one that goes through a person.
+#[tokio::test]
+async fn approving_a_proposal_that_contradicts_the_pin_refuses_it_and_writes_nothing() {
+    let rt = runtime().await;
+    let flow_id = rt
+        .create_flow(
+            &NewFlow {
+                name: "Asistente".into(),
+                enabled: true,
+                definition: definition(ask(json!({}))),
+            },
+            OWNER,
+        )
+        .await
+        .unwrap()
+        .id;
+    let mut pin = Params::new();
+    pin.insert("text".into(), json!("the write that waited"));
+    rt.replace_flow_grants(&flow_id, &[GrantSpec::pinned("crm.note.add", pin)], OWNER)
+        .await
+        .unwrap();
+    let run_id = rt
+        .start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
+    rt.process_flows().await.unwrap();
+
+    // The model proposes a write whose payload is NOT the one the owner fixed.
+    let proposal = rt
+        .request_flow_approval(&approvals::NewApproval {
+            run_id: run_id.clone(),
+            flow_id: flow_id.clone(),
+            step_id: "approve".into(),
+            command: "crm.note.add".into(),
+            payload: json!({ "text": "whatever the message asked for" }),
+            reason: "el asistente lo propuso".into(),
+            partial_output: json!({}),
+            on_expire: ExpiryPolicy::Reject,
+            on_reject: RejectPolicy::Cancel,
+        })
+        .await
+        .unwrap();
+
+    let err = rt
+        .decide_flow_approval(&proposal.id, true, OWNER, "")
+        .await
+        .expect_err("approving does not widen what the flow was granted");
+    assert!(
+        matches!(&err, erplora_runtime::RuntimeError::Domain { code, .. }
+            if code == erplora_runtime::flows::grants::ERR_GRANT_PAYLOAD_DENIED),
+        "the same CODE the direct path returns — the half the UI programs against: {err:?}"
+    );
+    assert!(
+        notes(&rt).await.is_empty(),
+        "refused BEFORE the command ran: zero writes, exactly like the gate upstream"
+    );
+    // And the proposal is still PENDING: refused before the door, so nobody is recorded as having
+    // decided something that never ran, and the person keeps her one clean exit (reject). This is
+    // the assertion that tells THIS door's check from the dispatcher's: without the check here the
+    // gate downstream refuses just the same — but only after stamping the row `approved` with an
+    // error, which is the record of a person authorising an action that never happened.
+    let still = rt.get_flow_approval(&proposal.id).await.unwrap();
+    assert_eq!(
+        still.status,
+        approvals::STATUS_PENDING,
+        "refused at the door, not after it: the proposal is still decidable"
+    );
+}
+
+/// 🔴 The other half of the same door, and the one that actually ties it: what MATCHES the pin has
+/// to go THROUGH, and the write has to happen.
+///
+/// Without this case the negative one above passes for the wrong reason. A gate handed an EMPTY
+/// payload instead of the proposal's refuses just the same — the pinned field simply comes back as
+/// omitted, which is denied too — so «refused» proves nothing about the payload having been read.
+/// The positive is the only assertion the empty payload cannot satisfy.
+#[tokio::test]
+async fn approving_a_proposal_that_matches_the_pin_lets_it_through_and_writes() {
+    let rt = runtime().await;
+    let flow_id = rt
+        .create_flow(
+            &NewFlow {
+                name: "Asistente".into(),
+                enabled: true,
+                definition: definition(ask(json!({}))),
+            },
+            OWNER,
+        )
+        .await
+        .unwrap()
+        .id;
+    let mut pin = Params::new();
+    pin.insert("text".into(), json!("the write that waited"));
+    rt.replace_flow_grants(&flow_id, &[GrantSpec::pinned("crm.note.add", pin)], OWNER)
+        .await
+        .unwrap();
+    let run_id = rt
+        .start_flow_run(&flow_id, &json!({}), OWNER)
+        .await
+        .unwrap();
+    rt.process_flows().await.unwrap();
+
+    // The model proposes exactly what the owner fixed.
+    let proposal = rt
+        .request_flow_approval(&approvals::NewApproval {
+            run_id: run_id.clone(),
+            flow_id: flow_id.clone(),
+            step_id: "approve".into(),
+            command: "crm.note.add".into(),
+            payload: json!({ "text": "the write that waited" }),
+            reason: "el asistente lo propuso".into(),
+            partial_output: json!({}),
+            on_expire: ExpiryPolicy::Reject,
+            on_reject: RejectPolicy::Cancel,
+        })
+        .await
+        .unwrap();
+
+    let decided = rt
+        .decide_flow_approval(&proposal.id, true, OWNER, "")
+        .await
+        .expect("a proposal that honours the pin is approved, not refused as if it were empty");
+
+    assert_eq!(decided.status, approvals::STATUS_APPROVED);
+    assert_eq!(
+        notes(&rt).await,
+        vec!["the write that waited".to_string()],
+        "the proposal the owner approved is the one that RAN, with its own payload"
+    );
+}
+
 // ── approved ──────────────────────────────────────────────────────────────────────────────────
 
 /// The run carries on, and what the decision was is readable by every step written after it —
@@ -382,6 +517,24 @@ async fn rejecting_with_on_reject_continue_carries_the_run_on_saying_it_was_reje
         notes(&rt).await,
         vec!["the write that waited".to_string()],
         "`continue` means the document decides what a refusal costs, not the kernel"
+    );
+    // **A question's answer is FOUR fields and nothing else** (hub#1622). When the `ai` step
+    // learned to say `on_reject: "continue"` it also learned to hand back the turn it had parked,
+    // and the two kinds share this one method: a `decision` must not start growing `status`,
+    // `approval_id` or a `command` it never had. The `condition` written after an `approval` reads
+    // `decision`, and the shape it reads is the shape the approve path leaves.
+    let mut keys: Vec<String> = output
+        .as_object()
+        .expect("the output of a question is an object")
+        .keys()
+        .cloned()
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        vec!["comment", "decided_at", "decided_by", "decision"],
+        "an `approval` step has no parked turn to hand over, so its refusal answers exactly what \
+         its approval answers"
     );
 }
 

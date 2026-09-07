@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::flows::approvals;
 use erplora_runtime::flows::executor::PendingIo;
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::{store, NewFlow};
 use erplora_runtime::{Runtime, RuntimeError};
 use serde_json::{json, Value};
@@ -72,7 +72,7 @@ async fn flow_with(rt: &Runtime, definition: Value) -> String {
     .id
 }
 
-async fn grant(rt: &Runtime, flow_id: &str, pairs: &[(GrantKind, String)]) {
+async fn grant(rt: &Runtime, flow_id: &str, pairs: &[GrantSpec]) {
     rt.replace_flow_grants(flow_id, pairs, "hub_user:owner")
         .await
         .unwrap();
@@ -117,7 +117,7 @@ async fn an_ai_step_is_handed_to_the_server_instead_of_being_run_inside_the_tick
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
 
@@ -156,7 +156,7 @@ async fn the_request_carries_the_resolved_prompt_the_tools_and_the_policy() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -193,7 +193,7 @@ async fn a_manual_proposal_creates_an_approval_and_writes_nothing_to_the_busines
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -208,6 +208,8 @@ async fn a_manual_proposal_creates_an_approval_and_writes_nothing_to_the_busines
             payload: json!({ "text": "3 AM booking" }),
             reason: "the assistant proposed this".into(),
             partial_output: json!({ "text": "I will book it" }),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -251,7 +253,7 @@ async fn approving_executes_exactly_the_proposed_command_and_the_run_continues()
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({})).await;
@@ -265,6 +267,8 @@ async fn approving_executes_exactly_the_proposed_command_and_the_run_continues()
             payload: json!({ "text": "aaa the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -317,7 +321,7 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({})).await;
@@ -331,6 +335,8 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
             payload: json!({ "text": "the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -354,6 +360,74 @@ async fn rejecting_executes_nothing_and_stops_the_run() {
     );
 }
 
+/// **The other half of `on_reject: "continue"`** (hub#1622): carrying on is worth nothing if the
+/// step that carried on left no trace of the turn. A rejection used to close the step with the four
+/// decision fields ONLY, so `{{steps.agent.text}}` — what the model had already written when it
+/// stopped to ask — rendered EMPTY, and any step written to tell somebody how it ended said
+/// nothing. The output of a refusal is the same shape as the output of an approval, minus the
+/// `result` there never was.
+#[tokio::test]
+async fn a_refusal_that_lets_the_run_carry_on_still_hands_over_the_turn_it_parked() {
+    let rt = runtime().await;
+    let flow_id = flow_with(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "agent", "kind": "ai", "prompt": "book it", "on_reject": "continue",
+                  "tools": { "commands": ["crm.note.add"] } },
+                { "id": "after", "kind": "command", "command": "crm.note.add",
+                  "params": { "text": "{{steps.agent.status}}|{{steps.agent.text}}|{{steps.agent.decision}}|{{steps.agent.comment}}" } }
+            ]
+        }),
+    )
+    .await;
+    grant(
+        &rt,
+        &flow_id,
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
+    )
+    .await;
+    start_and_tick(&rt, &flow_id, json!({})).await;
+    let run = run_of(&rt, &flow_id).await;
+    let approval = rt
+        .request_flow_approval(&approvals::NewApproval {
+            run_id: run.id.clone(),
+            flow_id: flow_id.clone(),
+            step_id: "agent".into(),
+            command: "crm.note.add".into(),
+            payload: json!({ "text": "the proposed note" }),
+            reason: String::new(),
+            // What the model had already written when it stopped to ask — the sentence a later
+            // step is meant to send on.
+            partial_output: json!({ "text": "no free slot on Friday" }),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Continue,
+        })
+        .await
+        .unwrap();
+
+    rt.decide_flow_approval(&approval.id, false, "hub_user:owner", "we are full that day")
+        .await
+        .unwrap();
+
+    assert!(
+        notes(&rt).await.is_empty(),
+        "a rejection still executes nothing: what continues is the RUN, not the command"
+    );
+    rt.process_flows().await.unwrap();
+    assert_eq!(
+        notes(&rt).await,
+        vec!["rejected|no free slot on Friday|rejected|we are full that day"],
+        "the step that carried on reads the parked turn AND how it ended"
+    );
+    assert_eq!(
+        run_of(&rt, &flow_id).await.status,
+        store::STATUS_DONE,
+        "`continue` means the run finishes its remaining steps, not that it is cancelled"
+    );
+}
+
 /// The window this closes: the model proposes at 3 AM, the owner reads the tray at 9 AM, and in
 /// between somebody revoked the grant. The proposal is not a standing authorisation — the gate is
 /// re-read **at the moment of approving**, exactly as it is re-read at every step of a run.
@@ -364,7 +438,7 @@ async fn a_grant_revoked_between_the_proposal_and_the_approval_refuses_the_appro
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -378,6 +452,8 @@ async fn a_grant_revoked_between_the_proposal_and_the_approval_refuses_the_appro
             payload: json!({ "text": "the proposed note" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -411,7 +487,7 @@ async fn an_approval_is_decided_once() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -425,6 +501,8 @@ async fn an_approval_is_decided_once() {
             payload: json!({ "text": "one booking" }),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -456,7 +534,7 @@ async fn an_approval_is_decided_once() {
 async fn a_flow_may_only_run_the_queries_it_was_granted() {
     let rt = runtime().await;
     let flow_id = flow_with(&rt, agent_definition("manual")).await;
-    grant(&rt, &flow_id, &[(GrantKind::Query, "crm.note.list".into())]).await;
+    grant(&rt, &flow_id, &[GrantSpec::pair(GrantKind::Query, "crm.note.list")]).await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
     let run = run_of(&rt, &flow_id).await;
 
@@ -482,7 +560,7 @@ async fn an_approval_of_another_hub_is_not_visible_here() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -496,6 +574,8 @@ async fn an_approval_of_another_hub_is_not_visible_here() {
             payload: json!({}),
             reason: String::new(),
             partial_output: json!({}),
+            on_expire: approvals::ExpiryPolicy::Reject,
+            on_reject: approvals::RejectPolicy::Cancel,
         })
         .await
         .unwrap();
@@ -528,7 +608,7 @@ async fn the_tray_lists_what_is_waiting_with_the_command_and_its_payload() {
     grant(
         &rt,
         &flow_id,
-        &[(GrantKind::Command, "crm.note.add".into())],
+        &[GrantSpec::pair(GrantKind::Command, "crm.note.add")],
     )
     .await;
     start_and_tick(&rt, &flow_id, json!({ "who": "Marta" })).await;
@@ -541,6 +621,8 @@ async fn the_tray_lists_what_is_waiting_with_the_command_and_its_payload() {
         payload: json!({ "text": "book Marta at 10:00" }),
         reason: "proposed by the assistant".into(),
         partial_output: json!({}),
+        on_expire: approvals::ExpiryPolicy::Reject,
+        on_reject: approvals::RejectPolicy::Cancel,
     })
     .await
     .unwrap();

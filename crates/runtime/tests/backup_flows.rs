@@ -26,7 +26,7 @@ use std::path::PathBuf;
 
 use erplora_db::{testutil::fresh_db, Params};
 use erplora_runtime::export::{export_hub, BundlePurpose, ExportSelection, FLOWS_SECTION};
-use erplora_runtime::flows::grants::GrantKind;
+use erplora_runtime::flows::grants::{GrantKind, GrantSpec};
 use erplora_runtime::flows::NewFlow;
 use erplora_runtime::import::{import_sections, ImportReport, ImportSelection, SectionStatus};
 use erplora_runtime::{RequestContext, Runtime};
@@ -95,9 +95,8 @@ async fn create_flow(rt: &Runtime, name: &str, definition: Value, enabled: bool)
     .id
 }
 
-async fn grant(rt: &Runtime, flow_id: &str, pairs: &[(GrantKind, &str)]) {
-    let wanted: Vec<(GrantKind, String)> = pairs.iter().map(|(k, v)| (*k, v.to_string())).collect();
-    rt.replace_flow_grants(flow_id, &wanted, OWNER)
+async fn grant(rt: &Runtime, flow_id: &str, wanted: &[GrantSpec]) {
+    rt.replace_flow_grants(flow_id, wanted, OWNER)
         .await
         .expect("the owner grants the flow what it may do");
 }
@@ -158,6 +157,121 @@ fn ensure_master_key() {
 /// 🟢 The trip that names the issue: a hub whose owner automated «note the big sales» is backed up,
 /// redeployed and restored — and the automation **runs again**.
 ///
+/// hub#1623 — **the PIN travels with the grant.** A grant that fixes part of the payload («may
+/// cancel appointments as the customer») is a NARROWER permission than the bare command, so a
+/// backup that carried only the pair would restore the WIDE one and say nothing. Restoring a copy
+/// must never hand back more authority than the copy was taken with.
+#[tokio::test]
+async fn a_backup_restores_the_pin_and_not_just_the_command() {
+    let origin = hub_with("h1", &["sales", "crm"]).await;
+    let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
+    let mut pin = erplora_db::Params::new();
+    pin.insert("customer_id".into(), json!("c-1"));
+    grant(
+        &origin,
+        &flow_id,
+        &[GrantSpec::pinned("crm.note.add", pin.clone())],
+    )
+    .await;
+
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
+    let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
+        .await
+        .expect("export");
+    assert_eq!(
+        bundle.manifest.flows[0].grants[0].payload, pin,
+        "the bundle carries what the grant FIXED, not just what it named"
+    );
+
+    let mut restored = hub_with("h1", &["sales", "crm"]).await;
+    import_sections(
+        &mut restored,
+        &bundle.manifest,
+        &bundle.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("the backup is accepted");
+
+    let flows = restored.list_flows().await.unwrap();
+    let grants = restored.list_flow_grants(&flows[0].id).await.unwrap();
+    assert_eq!(grants.len(), 1);
+    assert_eq!(
+        grants[0].payload,
+        json!({ "customer_id": "c-1" }),
+        "the restored grant is as NARROW as the one that was taken, or the backup widened it"
+    );
+}
+
+/// 🔴 The same widening, one pair LATER — the half a single-grant backup can never show. The import
+/// re-grants the bundle **one pair at a time** through the real door, rebuilding the wanted list
+/// from the grants that are already live; if that rebuild hands them back as bare pairs, every
+/// extra pair of the bundle silently re-grants the previous ones WITHOUT their pin. With one grant
+/// the loop turns once and nothing is ever rebuilt, so the bug only appears from the second.
+///
+/// Both pins are asserted on purpose: `created_at` ties inside a single `replace`, so which pair
+/// the bundle lists first is decided by the row id — and it is the one restored FIRST that the
+/// rebuild can widen.
+#[tokio::test]
+async fn restoring_a_second_grant_does_not_widen_the_pin_of_the_first() {
+    let origin = hub_with("h1", &["sales", "crm"]).await;
+    let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
+    let mut add_pin = Params::new();
+    add_pin.insert("customer_id".into(), json!("c-1"));
+    let mut count_pin = Params::new();
+    count_pin.insert("customer_id".into(), json!("c-2"));
+    grant(
+        &origin,
+        &flow_id,
+        &[
+            GrantSpec::pinned("crm.note.add", add_pin),
+            GrantSpec::pinned("crm.note.count", count_pin),
+        ],
+    )
+    .await;
+
+    let selection = ExportSelection {
+        purpose: BundlePurpose::Backup,
+        ..Default::default()
+    };
+    let bundle = export_hub(&origin, "h1", &selection, "bar-pepe", "es", CREATED_AT)
+        .await
+        .expect("export");
+
+    let mut restored = hub_with("h1", &["sales", "crm"]).await;
+    import_sections(
+        &mut restored,
+        &bundle.manifest,
+        &bundle.files,
+        &ImportSelection::default(),
+        "h1",
+    )
+    .await
+    .expect("the backup is accepted");
+
+    let flows = restored.list_flows().await.unwrap();
+    let restored_grants = restored.list_flow_grants(&flows[0].id).await.unwrap();
+    assert_eq!(restored_grants.len(), 2, "both keys came back");
+    for (value, pinned) in [
+        ("crm.note.add", json!({ "customer_id": "c-1" })),
+        ("crm.note.count", json!({ "customer_id": "c-2" })),
+    ] {
+        let grant = restored_grants
+            .iter()
+            .find(|g| g.value == value)
+            .unwrap_or_else(|| panic!("`{value}` came back"));
+        assert_eq!(
+            grant.payload, pinned,
+            "`{value}` came back WIDER than it was taken: restoring the other pair re-granted it \
+             without its pin"
+        );
+    }
+}
+
 /// Proven by firing a REAL event, not by counting rows: the run has to be created by the relay from
 /// a sale nobody scripted, and the step has to pass the grant gate. Before this, `export_hub` never
 /// looked at `_flow`, so the restore came back with an empty flow list and the report said the
@@ -166,7 +280,7 @@ fn ensure_master_key() {
 async fn a_backup_restores_the_flows_and_they_run_again() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
@@ -343,7 +457,7 @@ async fn a_flow_secret_never_leaves_the_hub_in_any_form() {
         .await
         .expect("the owner stores the credential of an `http` step");
     let flow_id = create_flow(&origin, "Reorder", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
@@ -374,7 +488,7 @@ async fn a_flow_secret_never_leaves_the_hub_in_any_form() {
 async fn the_execution_history_does_not_travel() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     complete_sale(&origin, "h1", "120.50").await;
     origin.drain_outbox().await.unwrap();
     origin.process_flows().await.unwrap();
@@ -436,7 +550,7 @@ async fn the_execution_history_does_not_travel() {
 async fn a_template_carries_no_flows() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
 
     let selection = ExportSelection {
         purpose: BundlePurpose::Template,
@@ -512,7 +626,7 @@ async fn the_export_carries_only_the_flows_of_its_own_hub() {
 async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
         ..Default::default()
@@ -579,7 +693,7 @@ async fn a_bundle_from_another_hub_regrants_nothing_and_its_flows_arrive_paused(
 async fn a_bundle_of_unknown_origin_regrants_nothing() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let mut bundle = export_hub(
         &origin,
         "h1",
@@ -628,7 +742,7 @@ async fn a_bundle_of_unknown_origin_regrants_nothing() {
 async fn a_flow_whose_grant_cannot_be_regranted_arrives_disabled() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let selection = ExportSelection {
         purpose: BundlePurpose::Backup,
         ..Default::default()
@@ -687,9 +801,9 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         &origin,
         &flow_id,
         &[
-            (GrantKind::Command, "crm.note.add"),
-            (GrantKind::Query, "crm.customer.list"),
-            (GrantKind::Http, "https://supplier.example/orders*"),
+            GrantSpec::pair(GrantKind::Command, "crm.note.add"),
+            GrantSpec::pair(GrantKind::Query, "crm.customer.list"),
+            GrantSpec::pair(GrantKind::Http, "https://supplier.example/orders*"),
         ],
     )
     .await;
@@ -711,6 +825,7 @@ async fn the_grants_that_can_come_back_come_back_even_if_one_cannot() {
         .push(erplora_runtime::export::FlowGrantSpec {
             kind: "command".into(),
             value: "ghost.module.act".into(),
+            payload: Default::default(),
         });
 
     let report = import_sections(
@@ -823,7 +938,7 @@ async fn a_document_the_save_door_refuses_does_not_get_in_through_a_backup() {
 async fn restoring_the_same_backup_twice_does_not_duplicate_the_flows() {
     let origin = hub_with("h1", &["sales", "crm"]).await;
     let flow_id = create_flow(&origin, "Welcome", welcome_definition(), true).await;
-    grant(&origin, &flow_id, &[(GrantKind::Command, "crm.note.add")]).await;
+    grant(&origin, &flow_id, &[GrantSpec::pair(GrantKind::Command, "crm.note.add")]).await;
     let bundle = export_hub(
         &origin,
         "h1",
