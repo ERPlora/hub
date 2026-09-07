@@ -114,6 +114,44 @@ const V1_INIT: &str = "CREATE TABLE IF NOT EXISTS parts_item (\
     id TEXT PRIMARY KEY, hub_id TEXT NOT NULL, name TEXT NOT NULL);";
 const V1_LIST: &str = "SELECT id, name FROM parts_item WHERE hub_id = :hub_id";
 
+/// The files of one factory-automation family (hub#1611), ready for [`write_module`].
+///
+/// A family is `flows/<family>.<lang>.flow.json` plus its `flows/<family>.grants.json`: without
+/// the sidecar the template is not offered, so a fixture that forgot it would assert nothing.
+fn flow_template_files(family: &str) -> Vec<(String, String)> {
+    let mut files: Vec<(String, String)> = Vec::new();
+    for (lang, name) in [("en", "Restock parts"), ("es", "Reponer piezas")] {
+        let doc = json!({
+            "schema_version": 1,
+            "name": name,
+            "triggers": [{ "kind": "manual" }],
+            "steps": [{ "id": "s1", "kind": "command", "command": "parts.parts.restock" }]
+        });
+        files.push((
+            format!("flows/{family}.{lang}.flow.json"),
+            doc.to_string(),
+        ));
+    }
+    files.push((
+        format!("flows/{family}.grants.json"),
+        r#"{"grants":[{"kind":"command","value":"parts.parts.restock"}]}"#.to_string(),
+    ));
+    files
+}
+
+/// The families `parts` offers right now, sorted — the gallery's view of this module.
+fn offered_families(rt: &Runtime) -> Vec<String> {
+    let mut families: Vec<String> = rt
+        .registry()
+        .flow_templates()
+        .into_iter()
+        .filter(|(module_id, _)| *module_id == "parts")
+        .map(|(_, tpl)| tpl.family.clone())
+        .collect();
+    families.sort();
+    families
+}
+
 // ── 1. Only the new migrations run, and the data survives ────────────────────────────────
 
 #[tokio::test]
@@ -195,15 +233,22 @@ async fn an_update_applies_only_the_migrations_the_new_version_adds() {
 #[tokio::test]
 async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
     let root = scratch("fails");
-    let v1 = write_module(
-        &root,
-        "1.0.0",
-        v1_manifest(),
-        &[
-            ("migrations/postgres/001_init.sql", V1_INIT),
-            ("sql/list.sql", V1_LIST),
-        ],
-    );
+    // v1 ships a factory automation (hub#1611). The rollback has to bring it back with the module:
+    // otherwise the entry vanishes from Automations until the next boot and the owner sees a
+    // template disappear because of an update that, on screen, never happened (hub#1650).
+    let mut v1_files: Vec<(String, String)> = vec![
+        (
+            "migrations/postgres/001_init.sql".to_string(),
+            V1_INIT.to_string(),
+        ),
+        ("sql/list.sql".to_string(), V1_LIST.to_string()),
+    ];
+    v1_files.extend(flow_template_files("parts-restock"));
+    let v1_refs: Vec<(&str, &str)> = v1_files
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    let v1 = write_module(&root, "1.0.0", v1_manifest(), &v1_refs);
     let mut broken = v1_manifest();
     broken["version"] = json!("2.0.0");
     broken["migrations"]["postgres"] = json!([
@@ -216,23 +261,37 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
         json!([{ "id": "parts2", "label": "Parts v2", "component": "parts-page-2" }]);
     broken["queries"] =
         json!({ "parts.list_v2": { "permission": "parts.read", "sql": "sql/list.sql" } });
-    let v2 = write_module(
-        &root,
-        "2.0.0",
-        broken,
-        &[
-            ("migrations/postgres/001_init.sql", V1_INIT),
-            // Passes the guard (expand, own table prefix) but explodes: the table does not exist.
-            (
-                "migrations/postgres/002_broken.sql",
-                "ALTER TABLE parts_missing ADD COLUMN note TEXT;",
-            ),
-            ("sql/list.sql", V1_LIST),
-        ],
-    );
+    // The failing version renames its automation family too, so "v1's template is back" cannot
+    // pass by coincidence: v1's name and v2's name are different strings.
+    let mut v2_files: Vec<(String, String)> = vec![
+        (
+            "migrations/postgres/001_init.sql".to_string(),
+            V1_INIT.to_string(),
+        ),
+        // Passes the guard (expand, own table prefix) but explodes: the table does not exist.
+        (
+            "migrations/postgres/002_broken.sql".to_string(),
+            "ALTER TABLE parts_missing ADD COLUMN note TEXT;".to_string(),
+        ),
+        ("sql/list.sql".to_string(), V1_LIST.to_string()),
+    ];
+    v2_files.extend(flow_template_files("parts-restock-v2"));
+    let v2_refs: Vec<(&str, &str)> = v2_files
+        .iter()
+        .map(|(a, b)| (a.as_str(), b.as_str()))
+        .collect();
+    let v2 = write_module(&root, "2.0.0", broken, &v2_refs);
 
     let mut rt = Runtime::new(Box::new(fresh_db().await));
     rt.install_from_dir(&v1).await.expect("install v1");
+    // Positive control BEFORE the failure: the assertion below is only worth something if the
+    // template was actually being offered to begin with. A filter that returned empty always would
+    // otherwise make the post-rollback check pass while proving nothing.
+    assert_eq!(
+        offered_families(&rt),
+        vec!["parts-restock".to_string()],
+        "v1's factory automation is offered before the update is even attempted"
+    );
 
     let error = rt
         .update_from_dir(&v2)
@@ -288,6 +347,15 @@ async fn an_update_that_fails_halfway_leaves_the_previous_version_running() {
         recorded_version(&rt, "parts").await,
         "1.0.0",
         "hub_module still points at the version that works"
+    );
+    // hub#1650: the rollback also puts the factory automations back. `restore_module` clears the
+    // module's share of the registry before restoring, so the templates only come back if the
+    // snapshot carried them — nothing else repopulates them until the next boot.
+    assert_eq!(
+        offered_families(&rt),
+        vec!["parts-restock".to_string()],
+        "v1's factory automation is offered again after the failed update, and it is v1's — \
+         not the family the version that failed declared"
     );
 
     let _ = fs::remove_dir_all(&root);
