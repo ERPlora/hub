@@ -50,6 +50,11 @@ pub struct AiRequest {
     /// prompt is: the runner must not re-read the document to know what it was asked to do, and a
     /// second read would be a second answer if the flow changed in between.
     pub on_reject: RejectPolicy,
+    /// What the turn promised to leave behind (hub#1639), in the order the model is asked for it.
+    /// Empty — the default — means the step publishes `{text, tool_calls}` and nothing else, which
+    /// is what every flow already in production is written against. Carried here for the same
+    /// reason `on_reject` is.
+    pub output: Vec<def::AiOutputField>,
 }
 
 /// Reads the `ai` step a run is currently stopped on.
@@ -123,6 +128,7 @@ pub async fn prepare(
         max_iters: ai.max_iters,
         on_expire: ai.on_expire,
         on_reject: ai.on_reject,
+        output: ai.output.clone(),
     })
 }
 
@@ -277,6 +283,52 @@ mod tests {
             default.on_expire,
             ExpiryPolicy::Reject,
             "a document that says nothing still ends the run when nobody answers"
+        );
+    }
+
+    /// **What the turn promised to leave behind travels with the request** (hub#1639). The runner
+    /// builds the answering tool from `AiRequest::output` and never re-reads the document — a
+    /// second read would be a second answer if the flow were edited mid-turn — so a request that
+    /// dropped the fields would leave every `output` in every template a dead letter, silently,
+    /// with the parse tests still green.
+    #[tokio::test]
+    async fn the_request_carries_the_data_the_step_promised_to_leave_behind() {
+        let db = db().await;
+        let run_id = parked_with(
+            &db,
+            json!({
+                "schema_version": 1,
+                "steps": [
+                    { "id": "agent", "kind": "ai", "prompt": "book {{input.who}}",
+                      "output": {
+                          "slots": { "type": "options", "describe": "the free slots you found" },
+                          "action": { "type": "text", "describe": "what you did" }
+                      } }
+                ]
+            }),
+        )
+        .await;
+        let request = prepare(&db, HUB, &run_id, "agent").await.unwrap();
+        assert_eq!(
+            request
+                .output
+                .iter()
+                .map(|f| (f.name.as_str(), f.kind))
+                .collect::<Vec<_>>(),
+            vec![
+                ("action", def::AiOutputKind::Text),
+                ("slots", def::AiOutputKind::Options)
+            ],
+            "the runner asks the model for exactly what the document declared"
+        );
+        assert_eq!(request.output[1].describe, "the free slots you found");
+
+        let default = prepare(&db, HUB, &parked(&db).await, "agent")
+            .await
+            .unwrap();
+        assert!(
+            default.output.is_empty(),
+            "a document that declares nothing still publishes only {{text, tool_calls}}"
         );
     }
 
