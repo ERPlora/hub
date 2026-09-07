@@ -74,6 +74,9 @@ on:
       # El contrato del job que publica el SDK (hub#1308): vive fuera de `.github/`, así que sin
       # esta ruta una PR que solo tocara el guardarraíl no lo ejecutaría.
       - 'scripts/tests/publish-module-sdk-workflow.test.sh'
+      # El contrato del job que crea el canario al publicar (saas#1895), por lo mismo: vive fuera
+      # de `.github/`, así que sin esta ruta una PR que solo lo tocara no lo ejecutaría.
+      - 'scripts/tests/canary-on-publish.test.sh'
       # El guardia de los puertos de los service containers (hub#898). La regla que vigila vive
       # bajo `.github/workflows/**`, que ya está arriba: esta ruta es solo para que una PR que
       # toque ÚNICAMENTE el guardia ejecute sus propios casos.
@@ -299,6 +302,16 @@ jobs:
         run: |
           set -euo pipefail
           bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
+      # ── El canario que publica cada release (ERPlora/saas#1895) ───────────────────────
+      # El job `fleet-canary` es lo único que contesta «¿arranca lo que acabamos de publicar?»,
+      # y las tres formas de romperlo dejan la release VERDE: `continue-on-error`, quitarle la
+      # espera del veredicto (lanzar un canario no prueba nada), o promocionar un `rc` — que no
+      # es «rodar un rc», es que cada hub nuevo nazca sobre él. Ninguna deja rojo en otro sitio.
+      - name: Contrato del job fleet-canary (saas#1895)
+        run: |
+          set -euo pipefail
+          bash ./scripts/tests/canary-on-publish.test.sh
 
       # ── Los puertos de los service containers (hub#898) ───────────────────────────────
       # hub#898 quitó los puertos de host fijos de los cinco workflows con Postgres, uno a uno, y
