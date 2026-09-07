@@ -218,6 +218,26 @@ async fn a_floor_that_cannot_be_read_leaves_the_template_out() {
         runtime.registry().flow_templates().is_empty(),
         "un suelo ilegible deja la plantilla fuera, no dentro"
     );
+    // hub#1649: y lo DICE. Es el tercero de los cinco motivos que la issue enumera, y el único
+    // que se emitía sin que ningún test leyera su código: un renombrado o un motivo cambiado por
+    // otro pasaba el gate en verde y volvía a dejar al dueño sin saber qué mirar.
+    let discards = runtime.registry().flow_template_discards();
+    assert_eq!(
+        discards
+            .iter()
+            .map(|(m, d)| (*m, d.family.as_str(), d.code.as_str()))
+            .collect::<Vec<_>>(),
+        [(
+            "whatsapp_inbox",
+            "appointment-from-whatsapp",
+            "template_floor_unreadable"
+        )]
+    );
+    assert!(
+        discards[0].1.detail.contains("appointments") && discards[0].1.detail.contains("latest"),
+        "el motivo nombra al vecino y el suelo que no se lee: {}",
+        discards[0].1.detail
+    );
 }
 
 #[tokio::test]
