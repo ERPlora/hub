@@ -129,6 +129,12 @@ pub(crate) async fn prepare(
 
     let vars = def::resolve_map(&spec.vars, scope);
     let template = as_text(&def::resolve(&json!(spec.template), scope));
+    // The tappable options (hub#1633), mapped like the rest of the copy: `resolve` recurses, so a
+    // `{{steps.slots.first}}` inside a list row fills the same way `vars.text` does.
+    let interactive = spec
+        .interactive
+        .as_ref()
+        .map(|i| def::resolve(&Json::Object(i.clone()), scope));
 
     // The intent the transport already knows how to send (ADR-0012), plus the release. `to` is in
     // the QUEUE row because the transport needs an address to dial; it is not in the run history.
@@ -137,6 +143,11 @@ pub(crate) async fn prepare(
     payload.insert("to".into(), json!(to));
     payload.insert("template".into(), json!(template));
     payload.insert("vars".into(), Json::Object(vars.clone()));
+    // Absent rather than null on an ordinary message: the transport branches on its presence, and
+    // a key that is always there but usually empty is a key every reader has to interpret.
+    if let Some(interactive) = interactive.clone() {
+        payload.insert("interactive".into(), interactive);
+    }
     payload.insert(
         host_notify::RESOLVED_VIA_KEY.into(),
         json!(host_notify::flow_grant_release(&release_id)),
@@ -160,14 +171,21 @@ pub(crate) async fn prepare(
         .unwrap_or_default()
         .to_string();
 
+    let mut recorded_input = json!({
+        "channel": spec.channel.as_str(),
+        "to": { "query": spec.query, "params": Json::Object(params), "field": spec.field },
+        "template": template,
+        "vars": Json::Object(vars),
+        "recipient": REDACTED,
+    });
+    // The options are the author's own words: unlike the address there is nothing personal in them
+    // to keep out of the history, and a run that offered three slots is unreadable without them.
+    if let Some(interactive) = interactive {
+        recorded_input["interactive"] = interactive;
+    }
+
     Ok(Prepared {
-        recorded_input: json!({
-            "channel": spec.channel.as_str(),
-            "to": { "query": spec.query, "params": Json::Object(params), "field": spec.field },
-            "template": template,
-            "vars": Json::Object(vars),
-            "recipient": REDACTED,
-        }),
+        recorded_input,
         output: json!({
             "queued": true,
             "channel": spec.channel.as_str(),
@@ -565,5 +583,73 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_RECIPIENT_INVALID));
+    }
+
+    /// **The tappable options reach the queue rendered** (hub#1633).
+    ///
+    /// They are mapped against the run like the rest of the copy, so the slots a previous step
+    /// read become the rows of the list, and they ride in the SAME row that carries the address —
+    /// what the relay hands the proxy is one message, not a message plus an afterthought.
+    #[tokio::test]
+    async fn the_queued_message_carries_the_options_the_customer_will_tap() {
+        let db = db().await;
+        customer(&db, "c-1", "marta@example.com", "+34600111222").await;
+        let authority = allow(&db, &both("crm.customer.get", "phone", "whatsapp")).await;
+
+        let asking = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "{{input.name}}, ¿confirmas la cita?" },
+                    "action": { "buttons": [
+                        { "type": "reply", "reply": { "id": "confirm", "title": "Sí" } }
+                    ] }
+                }
+            }]
+        }))
+        .unwrap()
+        .steps
+        .remove(0);
+
+        let prepared = prepare_step(&db, &asking, &authority).await.unwrap();
+
+        let queued = &prepared.queue_op.1;
+        let payload: Json = serde_json::from_str(queued["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(payload["to"], json!("+34600111222"));
+        assert_eq!(
+            payload["interactive"]["body"]["text"],
+            json!("Marta, ¿confirmas la cita?"),
+            "the options are rendered against the run like any other copy"
+        );
+        assert_eq!(
+            payload["interactive"]["action"]["buttons"][0]["reply"]["id"],
+            json!("confirm")
+        );
+
+        // The history shows the shape of the decision — the options are the author's own words,
+        // and unlike the address there is nothing personal to keep out of them.
+        assert_eq!(
+            prepared.recorded_input["interactive"]["action"]["buttons"][0]["reply"]["title"],
+            json!("Sí")
+        );
+
+        // An ordinary message does not grow an empty key that a reader would have to interpret.
+        let plain = prepare_step(
+            &db,
+            &step("whatsapp", "crm.customer.get", "phone"),
+            &authority,
+        )
+        .await
+        .unwrap();
+        let plain_payload: Json =
+            serde_json::from_str(plain.queue_op.1["payload"].as_str().unwrap()).unwrap();
+        assert!(
+            plain_payload.get("interactive").is_none(),
+            "a plain message carries no `interactive`: {plain_payload}"
+        );
     }
 }

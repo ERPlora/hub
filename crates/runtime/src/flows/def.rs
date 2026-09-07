@@ -489,6 +489,9 @@ pub struct NotifyStep {
     /// The copy, mapped against the run. `vars.text` is what an email or a free WhatsApp message
     /// says; the transport refuses an intent with nothing to say rather than inventing it.
     pub vars: Map<String, Json>,
+    /// **Options the customer TAPS** (hub#1633): Meta's own `interactive` object, mapped against
+    /// the run like the copy and carried to the proxy unchanged. `None` is the ordinary message.
+    pub interactive: Option<Map<String, Json>>,
 }
 
 /// **A read a flow performs itself** (hub#954), shaped after Salesforce Flow's *Get Records* —
@@ -658,11 +661,18 @@ impl StepDef {
             // `secret.…` refusal of hub#662 has to reach both — a credential interpolated into a
             // message would be sent to a customer, and one interpolated into the params of the read
             // would be handed to a module's table.
-            StepSpec::Notify(n) => vec![
-                Json::Object(n.params.clone()),
-                Json::Object(n.vars.clone()),
-                json_str(&n.template),
-            ],
+            // …and INSIDE the tappable options (hub#1633), for the most literal reason of all:
+            // a credential interpolated into a button's title is printed on a customer's phone.
+            // `resolve` recurses, so the scan has to as well or a secret hides two objects deep.
+            StepSpec::Notify(n) => {
+                let mut out = vec![
+                    Json::Object(n.params.clone()),
+                    Json::Object(n.vars.clone()),
+                    json_str(&n.template),
+                ];
+                out.extend(n.interactive.clone().map(Json::Object));
+                out
+            }
             // The question a person reads. The `secret.…` refusal has to reach it for the most
             // literal reason of all: the tray is a SCREEN, and a credential interpolated into a
             // title would be printed on it for anybody who can open the approvals list.
@@ -1417,7 +1427,7 @@ fn parse_step(value: &Json) -> Result<StepDef> {
         ],
         StepKind::Http => &["id", "kind", "method", "url", "headers", "body", "timeout"],
         StepKind::Ai => &["id", "kind", "prompt", "tools", "policy", "max_iters", "on_reject"],
-        StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars"],
+        StepKind::Notify => &["id", "kind", "channel", "to", "template", "vars", "interactive"],
         StepKind::Approval => &[
             "id",
             "kind",
@@ -2045,18 +2055,72 @@ fn parse_notify(id: &str, map: &Map<String, Json>) -> Result<NotifyStep> {
         }
     };
     let vars = object("vars", "vars")?;
+    let template_name = map
+        .get("template")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    // **Options the customer TAPS** (hub#1633). Meta's own object, carried to the proxy unchanged:
+    // the SaaS checks it against Meta's limits before a paid call leaves the building
+    // (`too_many_options`, `duplicate_option_id`…), so what belongs here is only what the hub can
+    // answer for — the channel it is sent on, and that it is not competing with other copy.
+    let interactive = match map.get("interactive") {
+        None | Some(Json::Null) => None,
+        Some(Json::Object(m)) => Some(m.clone()),
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` is an object of Meta's own shape \
+                     (`{{type, body, action}}`), not a bare value"
+                ),
+            ))
+        }
+    };
+    if interactive.is_some() {
+        if channel != Channel::Whatsapp {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` is a whatsapp shape — an email has nothing to tap, \
+                     so options on `{}` would be dropped on the way out",
+                    channel.as_str()
+                ),
+            ));
+        }
+        // Meta's message has ONE type, and the proxy answers a request with two by name
+        // (`conflicting_message_type`). Refusing here says it where it was typed instead of eight
+        // retries later, and resolving it by precedence would send a message nobody wrote.
+        let competing = if !template_name.is_empty() {
+            Some("template")
+        } else if vars.contains_key("text") {
+            Some("vars.text")
+        } else if vars.contains_key("body") {
+            Some("vars.body")
+        } else {
+            None
+        };
+        if let Some(other) = competing {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `interactive` and `{other}` are two messages and one send. The \
+                     copy of a tappable message lives in `interactive.body.text`; keeping both \
+                     would silently drop one of them"
+                ),
+            ));
+        }
+    }
 
     Ok(NotifyStep {
+        interactive,
         channel,
         query,
         params,
         field,
-        template: map
-            .get("template")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .trim()
-            .to_string(),
+        template: template_name,
         vars,
     })
 }
@@ -2478,6 +2542,146 @@ mod tests {
             let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
                 .expect_err("a credential must never be interpolated into a message");
             assert!(format!("{err}").contains("API_KEY"), "{err}");
+        }
+    }
+
+    /// **Options the customer TAPS instead of a number they retype** (hub#1633).
+    ///
+    /// The step carries Meta's own `interactive` object and it is mapped against the run like the
+    /// rest of the copy, so the slots a previous step read become the rows of the list.
+    #[test]
+    fn a_notify_step_can_offer_options_to_tap_and_maps_them_against_the_run() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "¿Confirmas la cita del {{input.when}}?" },
+                    "action": { "buttons": [
+                        { "type": "reply", "reply": { "id": "confirm", "title": "Sí" } },
+                        { "type": "reply", "reply": { "id": "cancel", "title": "No" } }
+                    ] }
+                }
+            }]
+        }))
+        .expect("the shape the appointment confirmation is written in");
+        let StepSpec::Notify(step) = &def.steps[0].spec else {
+            panic!("a notify step parses as one");
+        };
+        let interactive = step.interactive.as_ref().expect("the options travel with the step");
+        assert_eq!(interactive["type"], json!("button"));
+
+        // Mapped like `vars`: the templates inside resolve against the run, however deep they sit.
+        let scope = json!({ "input": { "when": "martes a las 10:30" } });
+        let resolved = resolve(&Json::Object(interactive.clone()), &scope);
+        assert_eq!(
+            resolved["body"]["text"],
+            json!("¿Confirmas la cita del martes a las 10:30?")
+        );
+        assert_eq!(resolved["action"]["buttons"][0]["reply"]["id"], json!("confirm"));
+    }
+
+    /// A tappable option is a WhatsApp shape. Email has no buttons, so a step asking for them on
+    /// that channel is refused where it was typed — the same criterion `sms` gets.
+    #[test]
+    fn options_to_tap_are_refused_on_a_channel_that_has_none() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "email",
+                "to": { "query": "q.x", "field": "email" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            }]
+        }))
+        .expect_err("email has no tappable options");
+        let text = format!("{err}");
+        // Refused for having no buttons, NOT for being a key the step vocabulary never heard of:
+        // the second reason would make this test pass before the feature existed.
+        assert!(text.contains("interactive") && text.contains("whatsapp"), "{text}");
+        assert!(!text.contains("unknown key"), "{text}");
+    }
+
+    /// Meta's message has ONE type. Asking for two is named rather than resolved by precedence:
+    /// picking one silently would send a message nobody wrote — the SaaS answers the same request
+    /// with `conflicting_message_type`, and finding out at save time is cheaper than at send time.
+    #[test]
+    fn options_to_tap_next_to_other_copy_are_refused_instead_of_one_being_dropped() {
+        for extra in [
+            json!({ "template": "appointment_reminder" }),
+            json!({ "vars": { "text": "Te esperamos" } }),
+            json!({ "vars": { "body": "Te esperamos" } }),
+        ] {
+            let mut step = json!({
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            });
+            for (k, v) in extra.as_object().unwrap() {
+                step[k] = v.clone();
+            }
+            let err = FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [step] }))
+                .expect_err("one message carries one kind of content");
+            let text = format!("{err}");
+            assert!(text.contains("interactive"), "{text}");
+            assert!(!text.contains("unknown key"), "{text}");
+        }
+
+        // …and what is NOT copy still travels next to the options: `phone_number_id` picks which
+        // of this hub's numbers sends, and it is not something the customer ever reads.
+        FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "vars": { "phone_number_id": "123" },
+                "interactive": { "type": "button", "body": { "text": "¿Sí o no?" } }
+            }]
+        }))
+        .expect("a transport hint is not copy");
+    }
+
+    /// The `secret.…` refusal of hub#662 reaches INSIDE the options for the same reason it reaches
+    /// `vars`: a credential interpolated into a button's title would be printed on a customer's
+    /// phone. Scanning only the top level would let one hide two objects deep.
+    #[test]
+    fn a_notify_step_cannot_read_a_flow_secret_from_inside_its_options() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask", "kind": "notify", "channel": "whatsapp",
+                "to": { "query": "q.x", "field": "phone" },
+                "interactive": {
+                    "type": "button",
+                    "body": { "text": "Confirma" },
+                    "action": { "buttons": [
+                        { "type": "reply", "reply": { "id": "ok", "title": "{{secret.API_KEY}}" } }
+                    ] }
+                }
+            }]
+        }))
+        .expect_err("a credential must never be interpolated into a message");
+        assert!(format!("{err}").contains("API_KEY"), "{err}");
+    }
+
+    /// `interactive` is an object of Meta's own shape. A string or a list is a typo that would
+    /// otherwise reach the proxy and come back as an opaque refusal.
+    #[test]
+    fn options_to_tap_have_to_be_an_object() {
+        for bad in [json!("button"), json!(["confirm"]), json!(3)] {
+            let err = FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "ask", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "q.x", "field": "phone" },
+                    "interactive": bad
+                }]
+            }))
+            .expect_err("the options are an object");
+            let text = format!("{err}");
+            assert!(text.contains("interactive") && text.contains("object"), "{text}");
+            assert!(!text.contains("unknown key"), "{text}");
         }
     }
 

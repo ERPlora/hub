@@ -658,3 +658,80 @@ async fn a_transport_that_merely_fails_still_climbs_the_ladder() {
     assert_eq!(queued[0]["status"], json!("pending"), "{:?}", queued[0]);
     assert_eq!(queued[0]["attempts"], json!(1));
 }
+
+
+/// **The whole point of hub#1633, end to end**: the salon's automation offers the free slots as
+/// something the customer TAPS, and what comes out of the hub is the message Meta will paint.
+///
+/// It runs the same road as any other reminder — grants, the recipient read, the outbox — because
+/// the options are copy, not a second kind of send. What this proves is the half a unit test
+/// cannot: that the object survives the queue row and reaches the transport rendered, and that
+/// nothing else about the message changed on the way.
+#[tokio::test]
+async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_rendered() {
+    let (rt, transport) = runtime().await;
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "ask",
+                "kind": "notify",
+                "channel": "whatsapp",
+                "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                        "field": "phone" },
+                "interactive": {
+                    "type": "list",
+                    "body": { "text": "Estos son los huecos del {{input.when}}" },
+                    "action": {
+                        "button": "Ver huecos",
+                        "sections": [{ "title": "Mañana", "rows": [
+                            { "id": "slot:10:30", "title": "{{input.when}} 10:30" },
+                            { "id": "slot:12:00", "title": "{{input.when}} 12:00" }
+                        ] }]
+                    }
+                }
+            }]
+        }),
+    )
+    .await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    run_flow(&rt, &flow_id).await;
+
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let intent = &sent[0].0;
+    assert_eq!(intent.to, PHONE);
+    assert_eq!(
+        intent.interactive["body"]["text"],
+        json!("Estos son los huecos del martes"),
+        "the copy of a tappable message is rendered against the run like any other"
+    );
+    assert_eq!(
+        intent.interactive["action"]["sections"][0]["rows"][0]["title"],
+        json!("martes 10:30"),
+        "the templates INSIDE the options resolve too, however deep they sit"
+    );
+    assert_eq!(
+        intent.interactive["action"]["sections"][0]["rows"][0]["id"],
+        json!("slot:10:30"),
+        "the id is what comes back as `reply_id`, so it must survive untouched"
+    );
+
+    // The control: an ordinary reminder still carries no options at all, so the assertion above
+    // is about what this flow asked for and not about something every message now grows.
+    let plain_id = create_flow(&rt, reminder("whatsapp", "crm.customer.get", "phone")).await;
+    set_grants(&rt, &plain_id, &both_grants()).await;
+    run_flow(&rt, &plain_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent[1].0.interactive.is_null(),
+        "a plain reminder offers nothing to tap: {:?}",
+        sent[1].0.interactive
+    );
+}

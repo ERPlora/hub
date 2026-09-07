@@ -519,7 +519,7 @@ fn the_notify_channels_and_the_shape_of_a_recipient_are_the_same_on_both_sides()
 #[test]
 fn every_key_of_the_ai_step_is_declared_in_the_schema() {
     let declared = keys_at(&schema(), "/$defs/step/properties");
-    for key in ["channel", "to", "template", "vars"] {
+    for key in ["channel", "to", "template", "vars", "interactive"] {
         assert!(
             declared.contains(key),
             "the schema must declare `{key}` of a `notify` step; it has {declared:?}"
