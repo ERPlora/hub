@@ -170,7 +170,17 @@ impl Runtime {
         name: &str,
         params: &Params,
     ) -> Result<Vec<Json>> {
-        flows::grants::check_query_grant(self.db.as_ref(), &self.hub_id, flow_id, name).await?;
+        // hub#1662 — with the params, because a grant may fix WHOSE row is read and this is the
+        // door the model's own arguments arrive through.
+        flows::grants::check_query_grant(
+            self.db.as_ref(),
+            &self.hub_id,
+            flow_id,
+            run_id,
+            name,
+            params,
+        )
+        .await?;
         let ctx = self.automation_ctx(flow_id, run_id).await?;
         let r = queries::execute(self.db.as_ref(), &self.registry, name, params, &ctx).await;
         if let Err(e) = &r {
@@ -495,6 +505,7 @@ impl Runtime {
             self.db.as_ref(),
             &self.hub_id,
             &approval.flow_id,
+            &approval.run_id,
             &approval.command,
             &approval.payload.as_object().cloned().unwrap_or_default(),
         )

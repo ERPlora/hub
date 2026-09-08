@@ -68,6 +68,13 @@ jobs:
       contents: read
       packages: write   # push a GHCR con GITHUB_TOKEN
 
+    # Lo que el canario necesita saber para probar lo que se acaba de publicar (saas#1895): el
+    # numero servido y el canal que lo decidio. Salen de `image-tags.sh`, que ya es la unica
+    # autoridad sobre ambos — recalcularlos en otro job los haria divergir del binario estampado.
+    outputs:
+      version: ${{ steps.tags.outputs.version }}
+      channel: ${{ steps.tags.outputs.channel }}
+
     env:
       # Nombre del paquete GHCR. Minúsculas obligatorio. Default: ghcr.io/<owner>/hub.
       IMAGE: ghcr.io/${{ github.repository_owner }}/hub
@@ -110,6 +117,12 @@ jobs:
       # GitHub Packages y no al npmjs público. ~1 s.
       - name: Contrato del job publish-module-sdk (hub#1308)
         run: bash ./scripts/tests/publish-module-sdk-workflow.test.sh
+
+      # El tercero del mismo tipo: el cableado del job que prueba lo que este build publica
+      # (ERPlora/saas#1895). ~1 s, y aquí es donde importa — este workflow ES el camino a
+      # produccion, así que un `fleet-canary` roto se ve en la release, no dos días después.
+      - name: Contrato del job fleet-canary (saas#1895)
+        run: bash ./scripts/tests/canary-on-publish.test.sh
 
       # 🔴 LO PRIMERO tras el login, y ANTES de estampar o compilar.
       #
@@ -191,6 +204,186 @@ jobs:
           echo ""
           echo "(:latest/:stable = hubs reales, solo desde main o un tag vX.Y.Z · :canary = tag rc · :dev = develop → pre)"
           echo "Para pull desde Dokploy/provisioning: PAT con read:packages, o dar acceso al paquete."
+
+  # ── 🐤 ¿FUNCIONA lo que se acaba de publicar? (ERPlora/saas#1895) ──────────────────────────
+  #
+  # Punto 3 de Ioan (2026-09-06): «los Actions deberían crear el canario». Hasta aquí, publicar un
+  # tag dejaba una imagen en GHCR y nada más; que esa imagen ARRANQUE y sirva la versión que dice
+  # servir lo contestaba una persona acordándose de correr `manage.py hub_canary` DENTRO del
+  # contenedor de producción. El 2026-08-10 se midió lo que cuesta no contestarlo: una campaña
+  # informó `On target: 100.0%` mientras el nodo había RECHAZADO la imagen y seguía sirviendo la
+  # tarea vieja. El informe no mentía sobre lo que preguntó —Dokploy, que no está en el camino del
+  # tráfico—: mentía sobre el mundo. El canario es la única pieza de la cadena que le pregunta al
+  # hub, así que «alguien se acuerda» no es disparador suficiente.
+  #
+  # Lo que hace: promociona el tag como puntero de la flota y lanza el canario, ambos por la API
+  # del SaaS (nada de ssh). El SaaS crea un hub de usar y tirar sobre ESE digest, espera a su
+  # propio `/readyz`, compara la versión que reporta el binario y lo destruye — y si falla, VETA el
+  # digest, de modo que ningún hub nuevo nace ya sobre una imagen que acabamos de probar rota.
+  #
+  # 🔴 Lo que NO hace: rodar la flota. Que una versión llegue a los clientes sigue siendo un acto
+  # deliberado de una persona (ADR-0118, mantenida por ADR-0269 §10). El token que vive en este
+  # repositorio no puede hacerlo — el SaaS le responde 403 en `rollout/` — y este job no lo intenta.
+  #
+  # 🔴 Y NO BLOQUEA la publicación: `build-and-push` ya subió la imagen cuando esto empieza. Rojo
+  # aquí significa «la release no está probada», que es justo lo que hay que ver antes de rodarla.
+  fleet-canary:
+    name: la imagen publicada pasa el canario
+    # Solo releases estables. Un `rc` NO se promociona: `image_pointer.current()` no es solo a
+    # dónde rueda la flota, es la imagen con la que se CREA cada hub nuevo — promocionar una
+    # release candidate pondría a los clientes que se den de alta esa tarde sobre ella.
+    if: startsWith(github.ref, 'refs/tags/v') && needs.build-and-push.outputs.channel == 'release'
+    needs: build-and-push
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # El sondeo del SaaS espera hasta 10 min a que el canario conteste (un pull en frío no son
+    # segundos), más el aprovisionamiento del hub. 25 deja margen sin dejar el runner colgado.
+    timeout-minutes: 25
+    steps:
+      - name: Promocionar el tag y lanzar el canario
+        id: launch
+        env:
+          FLEET_API: ${{ vars.FLEET_API_URL || 'https://erplora.com' }}
+          FLEET_TOKEN: ${{ secrets.FLEET_PUBLISH_TOKEN }}
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+          IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/hub
+        run: |
+          set -uo pipefail
+          # Falta de configuración = ROJO, nunca un `skip` silencioso: un canario que deja de
+          # correr sin decirlo reconstruye exactamente el agujero que este job cierra.
+          if [ -z "${FLEET_TOKEN}" ]; then
+            echo "::error::Falta el secreto FLEET_PUBLISH_TOKEN del repo. Sin él la release queda SIN probar."
+            echo "Ponlo con: gh secret set FLEET_PUBLISH_TOKEN -R ERPlora/hub  (valor = env FLEET_PUBLISH_TOKEN del SaaS en Dokploy)"
+            exit 1
+          fi
+
+          ref="${IMAGE_REPO}:${VERSION}"
+          echo "Promocionando ${ref} como puntero de la flota…"
+          code=$(curl -sS -o /tmp/promote.json -w '%{http_code}' -X POST \
+            -H "X-Fleet-Token: ${FLEET_TOKEN}" -H 'Content-Type: application/json' \
+            -d "{\"image\": \"${ref}\", \"note\": \"release ${VERSION} (Actions, run ${GITHUB_RUN_ID})\"}" \
+            "${FLEET_API}/api/v1/fleet/release/promote/") || code=000
+          cat /tmp/promote.json 2>/dev/null; echo
+          # 201 = promocionada. Cualquier otra cosa es una release que no se puede probar: el
+          # 400 típico es «no se pudo resolver a digest», y un puntero sin digest deja la pregunta
+          # «¿queda alguien atrás?» sin respuesta posible.
+          if [ "$code" != "201" ]; then
+            echo "::error::El SaaS rechazó la promoción de ${ref} (HTTP ${code})."
+            exit 1
+          fi
+
+          digest=$(python3 -c 'import json,sys; print(json.load(open("/tmp/promote.json")).get("image",""))')
+          if [ -z "$digest" ]; then
+            echo "::error::La promoción no devolvió un digest."
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+          echo "Lanzando el canario sobre ${digest}…"
+          code=$(curl -sS -o /tmp/canary.json -w '%{http_code}' -X POST \
+            -H "X-Fleet-Token: ${FLEET_TOKEN}" -H 'Content-Type: application/json' \
+            -d "{\"image\": \"${digest}\"}" \
+            "${FLEET_API}/api/v1/fleet/canary/") || code=000
+          cat /tmp/canary.json 2>/dev/null; echo
+          if [ "$code" != "202" ]; then
+            echo "::error::El SaaS no aceptó el canario sobre ${digest} (HTTP ${code})."
+            exit 1
+          fi
+
+      # Lanzar un canario no prueba nada: el VEREDICTO es el producto de este job, y llega minutos
+      # después. Sin esta espera el run va verde con la imagen sin probar — el fallo mudo con un
+      # paso de más.
+      - name: Esperar el veredicto
+        env:
+          FLEET_API: ${{ vars.FLEET_API_URL || 'https://erplora.com' }}
+          FLEET_TOKEN: ${{ secrets.FLEET_PUBLISH_TOKEN }}
+          DIGEST: ${{ steps.launch.outputs.digest }}
+        run: |
+          set -uo pipefail
+          # 20 min de techo: el sondeo del SaaS se rinde a los 10, más el aprovisionamiento.
+          deadline=$(( $(date +%s) + 1200 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            curl -sS -H "X-Fleet-Token: ${FLEET_TOKEN}" \
+              "${FLEET_API}/api/v1/fleet/release/" -o /tmp/release.json || true
+            verdict=$(python3 - <<'PY'
+          import json
+          try:
+              cur = (json.load(open("/tmp/release.json")) or {}).get("current") or {}
+          except Exception:
+              print("unknown"); raise SystemExit
+          # `canary_verified` ya lleva el veto dentro: un digest probado a las 10:00 y vetado a las
+          # 11:00 NO está verificado, porque la evidencia posterior gana.
+          if cur.get("quarantined"):
+              print("quarantined")
+          elif cur.get("canary_verified"):
+              print("verified")
+          else:
+              print("pending")
+          PY
+          )
+            case "$verdict" in
+              verified)
+                echo "🐤 El canario aprobó ${DIGEST} — versión servida: $(python3 -c 'import json;print(json.load(open("/tmp/release.json"))["current"].get("canary_version_seen",""))')"
+                exit 0
+                ;;
+              quarantined)
+                echo "::error::El canario VETÓ ${DIGEST}: el puntero cayó solo a la release anterior y ningún hub nuevo nace ya con esta imagen."
+                cat /tmp/release.json
+                exit 1
+                ;;
+            esac
+            sleep 20
+          done
+          echo "::error::El canario no dio veredicto en 20 min sobre ${DIGEST}. La release NO está probada."
+          exit 1
+
+  # ── ¿Sabe el toolkit qué flota acaba de salir? (ERPlora/module-toolkit#226) ────────────────
+  #
+  # `module-toolkit` lleva `HUB_OUTFITKIT`: una fila por tag de release con el OutfitKit que carga
+  # esa imagen, y `erplora validate` mide contra ella las pantallas de los 27 módulos. La fila solo
+  # se puede escribir DESPUÉS de crear el tag, así que publicar es exactamente lo que la deja
+  # obsoleta — y lo que sale entonces no es un fallo sino un aviso que no bloquea: la comprobación
+  # deja de hacerse y no se entera nadie. Medido el 07/09, con `v1.1.16` ya publicado:
+  #
+  #     ✖ the NEWEST hub tag is in HUB_OUTFITKIT: publishing the hub adds its row (#201)
+  #     ℹ tests 20 · pass 19 · fail 1
+  #
+  # Esa afirmación ya existía y ya era correcta. Lo que no tenía era dónde correr: en la CI del
+  # toolkit se SALTA —los tags son refs y allí el hub llega como TARBALL de action, sin `.git`— y
+  # `canonical-mirrors.yml` solo dispara por su filtro de `paths`, que crear un tag no toca. Entre
+  # publicar la release y la siguiente PR que roce una ruta espejada, la alarma no sonaba en ningún
+  # sitio. `build-hub.yml` es el único que corre con `v*`, y ya hace checkout con `fetch-tags: true`,
+  # que es justo lo que el espejo de tags necesita para existir.
+  #
+  # 🔴 POR QUÉ NO REUSA `canonical-mirrors.yml`. Ese workflow no publica su propio veredicto: lo
+  # reescribe `scripts/canonical-mirrors-verdict.sh` (hub#1296), que degrada el fallo de la action
+  # a AVISO en cuanto alguna copia vendorizada va por detrás. Correcto para una PR de contrato —la
+  # copia vive en otro repo y no puede ir por delante—, y ruinoso aquí: el día que el toolkit vaya
+  # rezagado (que es su estado normal durante horas), esa degradación se tragaría TAMBIÉN la fila
+  # que falta y volveríamos al fallo mudo que este job viene a cerrar. En una release no hay PR de
+  # contrato en vuelo, así que el reparto de hub#1296 no aplica: aquí la comparación se lee cruda.
+  #
+  # 🔴 Y NO BLOQUEA LA RELEASE: sin `needs`, corre en paralelo a `build-and-push` y nadie lo espera.
+  # Retener una imagen que la flota aguarda porque la tabla de OTRO repo va por detrás sería la
+  # forma más rápida de que este job acabe borrado. Rojo = señal, no puerta.
+  canonical-mirrors:
+    name: la tabla del toolkit conoce este tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      # `fetch-tags` es la precondición del espejo, no un detalle: los tags son refs, y sin ellos
+      # `hubTags` se salta el caso —honestamente, pero se lo salta— y el job saldría verde sin
+      # haber comparado nada.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # Sin `with: token`: la action se resuelve por el Actions-sharing de module-toolkit con la
+      # organización. Si eso desapareciera, este paso falla en ROJO en vez de degradar a verde.
+      - uses: ERPlora/module-toolkit/.github/actions/check-canonical-mirrors@main
+        with:
+          hub-dir: ${{ github.workspace }}
 
   # ============================================================================
   # `@erplora/module-sdk` → GitHub Packages, en cada tag `v*` (hub#1236)

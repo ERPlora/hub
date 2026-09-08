@@ -735,3 +735,193 @@ async fn a_flow_offers_the_customer_options_to_tap_and_they_reach_the_transport_
         sent[1].0.interactive
     );
 }
+
+/// **The whole point of hub#1641, end to end**: the list is ALREADY in the database, so nothing
+/// asks a language model to read it out loud. A `query` step publishes it whole, and the tappable
+/// message names it with ONE bare path — `steps.<id>.options` — which is exactly the mapping the
+/// kernel could already resolve. Nothing indexes an array anywhere along the road.
+///
+/// What this proves that a unit test cannot: the list survives the run scope, the outbox row and
+/// the relay, and reaches the transport as the rows Meta will paint.
+#[tokio::test]
+async fn a_read_fills_the_tappable_list_and_it_reaches_the_transport_whole() {
+    let (rt, transport) = runtime().await;
+    for (id, text) in [("n-1", "martes 10:30"), ("n-2", "martes 12:00")] {
+        let mut p = Params::new();
+        p.insert("id".into(), json!(id));
+        p.insert("hub".into(), json!(HUB));
+        p.insert("text".into(), json!(text));
+        rt.db_for_test()
+            .execute(
+                "INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) \
+                 VALUES (:id, :hub, 'seed', 'c-1', :text)",
+                &p,
+            )
+            .await
+            .unwrap();
+    }
+
+    let flow_id = create_flow(
+        &rt,
+        json!({
+            "schema_version": 1,
+            "steps": [
+                { "id": "free", "kind": "query", "query": "crm.note.list", "limit": 5,
+                  "result": "options",
+                  "options": { "id": "id", "title": "text", "description": "customer_id" } },
+                { "id": "ask", "kind": "notify", "channel": "whatsapp",
+                  "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                          "field": "phone" },
+                  "interactive": {
+                      "type": "list",
+                      "body": { "text": "Estos son los huecos del {{input.when}}" },
+                      "action": {
+                          "button": "Ver huecos",
+                          "sections": [{ "title": "Mañana", "rows": "steps.free.options" }]
+                      }
+                  } }
+            ]
+        }),
+    )
+    .await;
+    let mut grants = both_grants();
+    grants.push(GrantSpec::pair(GrantKind::Query, "crm.note.list"));
+    set_grants(&rt, &flow_id, &grants).await;
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "one run, one message");
+    let rows = &sent[0].0.interactive["action"]["sections"][0]["rows"];
+    assert!(
+        rows.is_array(),
+        "the list travelled as a list, not as a string that looks like one: {rows}"
+    );
+    assert_eq!(
+        rows,
+        &json!([
+            { "id": "n-1", "title": "martes 10:30", "description": "c-1" },
+            { "id": "n-2", "title": "martes 12:00", "description": "c-1" }
+        ]),
+        "the rows the read found are the rows Meta will paint"
+    );
+    assert_eq!(
+        sent[0].0.interactive["body"]["text"],
+        json!("Estos son los huecos del martes"),
+        "and the rest of the message is rendered as it always was"
+    );
+
+    // The control, so the assertion above is about the read and not about anything a message now
+    // grows on its own: with the notes gone, the same flow sends the same message with no rows.
+    rt.db_for_test()
+        .execute("DELETE FROM crm_note", &Params::new())
+        .await
+        .unwrap();
+    run_flow(&rt, &flow_id).await;
+    rt.drain_outbox().await.unwrap();
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 2);
+    assert_eq!(
+        sent[1].0.interactive["action"]["sections"][0]["rows"],
+        json!([]),
+        "an empty read is an empty list, and the run does not fail over it"
+    );
+}
+
+/// **The step that fills the list failed, the run carried on, and the message did NOT go out**
+/// (hub#1646) — the shape `on_error: "continue"` (hub#1635) made reachable from a document nobody
+/// would call wrong.
+///
+/// The read here is refused because the flow was never granted `crm.note.list`, which is the
+/// cheapest deterministic failure at hand; what matters is what the failure leaves behind. A step
+/// that failed under `continue` publishes `{status, error}` and nothing else, so the `rows` of the
+/// message that promised its options resolve to nothing. Before this, that message was QUEUED with
+/// `rows: null`: the customer got a list with nothing to tap, and the proxy's refusal landed hours
+/// later in a background tick where nobody was looking.
+#[tokio::test]
+async fn a_list_the_failed_step_never_published_stops_the_message_instead_of_sending_it_empty() {
+    let (rt, transport) = runtime().await;
+
+    let asking = json!({
+        "schema_version": 1,
+        "steps": [
+            { "id": "free", "kind": "query", "query": "crm.note.list", "limit": 5,
+              "result": "options", "on_error": "continue",
+              "options": { "id": "id", "title": "text", "description": "customer_id" } },
+            { "id": "ask", "kind": "notify", "channel": "whatsapp",
+              "to": { "query": "crm.customer.get", "params": { "id": "input.customer_id" },
+                      "field": "phone" },
+              "interactive": {
+                  "type": "list",
+                  "body": { "text": "¿Qué hueco te viene bien?" },
+                  "action": {
+                      "button": "Ver huecos",
+                      "sections": [{ "title": "Mañana", "rows": "steps.free.options" }]
+                  }
+              } }
+        ]
+    });
+
+    // Everything the MESSAGE needs, and deliberately NOT the grant the read needs.
+    let flow_id = create_flow(&rt, asking.clone()).await;
+    set_grants(&rt, &flow_id, &both_grants()).await;
+    let run_id = run_flow(&rt, &flow_id).await;
+
+    let (run, steps) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_FAILED);
+    assert!(
+        run.last_error.contains("flow.options_not_found"),
+        "the run says the list was missing, not the transport hours later: {}",
+        run.last_error
+    );
+    assert!(
+        run.last_error.contains("`free`"),
+        "…and names the step that owed it: {}",
+        run.last_error
+    );
+    assert_eq!(
+        steps.len(),
+        2,
+        "the read failed and the run went on to the message, which is the combination this guards"
+    );
+
+    rt.drain_outbox().await.unwrap();
+    assert!(
+        transport.sent().is_empty(),
+        "no message with nothing to tap reached the transport"
+    );
+    assert!(
+        queued_notifications(&rt).await.is_empty(),
+        "and none was queued either: the refusal is before the outbox, not in it"
+    );
+
+    // **The control.** The same document and the same failing read, with the grant the read needs:
+    // the list arrives and the message goes out. Without this half, the assertions above would
+    // hold just as well if the `notify` step had stopped working altogether.
+    let mut p = Params::new();
+    p.insert("id".into(), json!("n-1"));
+    p.insert("hub".into(), json!(HUB));
+    rt.db_for_test()
+        .execute(
+            "INSERT INTO crm_note (id, hub_id, created_by, customer_id, text) \
+             VALUES (:id, :hub, 'seed', 'c-1', 'martes 10:30')",
+            &p,
+        )
+        .await
+        .unwrap();
+    let allowed = create_flow(&rt, asking).await;
+    let mut grants = both_grants();
+    grants.push(GrantSpec::pair(GrantKind::Query, "crm.note.list"));
+    set_grants(&rt, &allowed, &grants).await;
+    let run_id = run_flow(&rt, &allowed).await;
+    let (run, _) = rt.get_flow_run(&run_id).await.unwrap();
+    assert_eq!(run.status, store::STATUS_DONE, "{}", run.last_error);
+
+    rt.drain_outbox().await.unwrap();
+    let sent = transport.sent();
+    assert_eq!(sent.len(), 1, "the message with its list did go out");
+    assert_eq!(
+        sent[0].0.interactive["action"]["sections"][0]["rows"][0]["title"],
+        json!("martes 10:30")
+    );
+}

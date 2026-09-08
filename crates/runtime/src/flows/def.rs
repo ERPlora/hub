@@ -110,6 +110,20 @@ pub const MAX_RESCHEDULES: i64 = 20;
 /// step that says nothing about how much it wants is capped, never quietly cut short.
 pub const MAX_QUERY_ROWS: i64 = 200;
 
+/// The most rows one `query` step may publish as [`QueryResult::Options`] (hub#1641).
+///
+/// Ten, and not [`MAX_QUERY_ROWS`], because these rows have ONE destination: the tappable list of
+/// an `interactive` send (hub#1633), and Meta holds ten rows in a list. The default is the ceiling
+/// for the same reason it is above — a step that says nothing about how much it wants is capped,
+/// never quietly cut short — but the ceiling itself is the transport's, because a read that
+/// carries 200 rows into a message that holds 10 is a document that cannot do what it says.
+///
+/// It is the FLOOR of the refusals, not the last word: the SaaS proxy still checks the message it
+/// is handed (`whatsapp_inbox/services/interactive.py`: three buttons, ten rows TOTAL across
+/// sections, each title and id within Meta's lengths). What this ceiling buys is that the common
+/// mistake is refused on the screen where it was typed instead of in a tick at 3 AM.
+pub const MAX_OPTION_ROWS: i64 = 10;
+
 /// Turns of the agent loop when the document does not say (ADR-0283 §7).
 pub const DEFAULT_MAX_ITERS: i64 = 6;
 /// Hard ceiling, refused above rather than clamped. Every turn is a real call through the SaaS
@@ -565,16 +579,41 @@ pub struct QueryStep {
     /// What lands in `steps.<id>`.
     pub result: QueryResult,
     /// The ceiling of rows this read may bring into the tick. `1..=`[`MAX_QUERY_ROWS`], refused
-    /// above it at save time, and defaulting to the ceiling itself.
+    /// above it at save time, and defaulting to the ceiling itself. A read that publishes
+    /// [`QueryResult::Options`] is held to the smaller [`MAX_OPTION_ROWS`] instead.
     pub limit: i64,
+    /// Which COLUMNS of each row make up the option the customer taps. Present exactly when
+    /// `result` is [`QueryResult::Options`] — required there because a list of table columns is
+    /// not something the transport can send, and refused elsewhere because a mapping nothing reads
+    /// is a promise the kernel does not keep.
+    pub options: Option<OptionShape>,
 }
 
-/// **What a `query` step leaves behind** — and, deliberately, not a list of rows.
+/// **The shape of one tappable option, read off the row** (hub#1641).
+///
+/// Column NAMES, not paths and not templates — the same idiom as [`NotifyStep::field`], which has
+/// picked the recipient out of a row by column name since hub#821. Composing a title out of two
+/// columns is a shape that belongs in the query, which is the same answer [`resolve_path`] gives
+/// to «the third line of the ticket»: the flow document maps fields, the module writes the SELECT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OptionShape {
+    /// The column whose value comes back as `event.reply_id` when she taps the row.
+    pub id: String,
+    /// The column she reads on the row.
+    pub title: String,
+    /// The optional second line. Absent here, or empty on a row, and the key is simply not sent —
+    /// Meta refuses a `description: null`.
+    pub description: Option<String>,
+}
+
+/// **What a `query` step leaves behind** — and, deliberately, still not a bag of raw rows.
 ///
 /// `rows` is NOT in v1 because [`resolve_path`] does not index arrays: a document could write
-/// `steps.week.rows.0.total` and the kernel would resolve it to nothing, silently. Offering a
-/// mapping the kernel cannot resolve is offering a lie, so the two shapes below are the two the
-/// mapping language can actually read.
+/// `steps.week.rows.0.total` and the kernel would resolve it to nothing, silently. That refusal
+/// stands. What hub#1641 adds is the case it was standing in the way of, and it adds it WITHOUT
+/// opening the array: a list can travel WHOLE, as one value, to the one place that reads a whole
+/// list — the `rows` of an `interactive` send (hub#1633). So the third shape is not «the rows»,
+/// it is [`QueryResult::Options`]: rows already in the form the transport receives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryResult {
     /// The fields of the FIRST row, at the root of `steps.<id>`, plus `found` and `count`. The
@@ -582,6 +621,13 @@ pub enum QueryResult {
     First,
     /// Only `count` and `found`. «Are there any, and how many» without carrying the rows.
     Count,
+    /// `steps.<id>.options` — the whole list, as `[{id, title, description}]`, plus `found` and
+    /// `count`. Meta's own row shape, by the same criterion as [`AiOutputKind::Options`]
+    /// (hub#1639) and [`NotifyStep::interactive`] (hub#1633): the kernel grows the shape the
+    /// transport already knows, so a document reads the same whether the list came from a model
+    /// or from the database. The array is addressed as ONE value (`steps.free.options`) and never
+    /// indexed, which is why this needs nothing from [`resolve_path`].
+    Options,
 }
 
 impl QueryResult {
@@ -589,16 +635,26 @@ impl QueryResult {
         match self {
             QueryResult::First => "first",
             QueryResult::Count => "count",
+            QueryResult::Options => "options",
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "first" => Some(QueryResult::First),
             "count" => Some(QueryResult::Count),
+            "options" => Some(QueryResult::Options),
             _ => None,
         }
     }
-    pub const ALL: &'static [QueryResult] = &[QueryResult::First, QueryResult::Count];
+    /// The ceiling this shape holds its `limit` to, and the default when the document is silent.
+    pub fn row_ceiling(self) -> i64 {
+        match self {
+            QueryResult::Options => MAX_OPTION_ROWS,
+            QueryResult::First | QueryResult::Count => MAX_QUERY_ROWS,
+        }
+    }
+    pub const ALL: &'static [QueryResult] =
+        &[QueryResult::First, QueryResult::Count, QueryResult::Options];
 }
 
 /// What an `ai` step may do, and how far it is trusted (ADR-0283 §7 / D3).
@@ -1551,7 +1607,9 @@ fn parse_step(value: &Json) -> Result<StepDef> {
 
     let allowed: &[&str] = match kind {
         StepKind::Command => &["id", "kind", "command", "params", "on_error"],
-        StepKind::Query => &["id", "kind", "query", "params", "result", "limit", "on_error"],
+        StepKind::Query => &[
+            "id", "kind", "query", "params", "result", "limit", "options", "on_error",
+        ],
         StepKind::Condition => &["id", "kind", "when"],
         StepKind::Delay => &[
             "id",
@@ -2077,11 +2135,13 @@ fn parse_correlate(id: &str, list: &str, value: Option<&Json>) -> Result<BTreeMa
 
 /// The keys of a `query` step (hub#954).
 ///
-/// Two of the three refusals here are about the same thing — that a document never quietly means
-/// something smaller than it says. `limit` above the ceiling is refused instead of clamped
-/// (`max_iters`'s precedent), and `result: "rows"` is refused instead of accepted-and-ignored,
-/// because the mapping language cannot index an array and a step whose output nobody can read is
-/// a promise the kernel does not keep.
+/// The refusals here are all the same refusal — that a document never quietly means something
+/// smaller than it says. `limit` above the ceiling is refused instead of clamped (`max_iters`'s
+/// precedent), and `result: "rows"` is STILL refused instead of accepted-and-ignored, because the
+/// mapping language cannot index an array and a step whose output nobody can read is a promise the
+/// kernel does not keep. hub#1641 answers what people reach for `rows` FOR — `result: "options"`,
+/// where the list travels whole to the one thing that reads a whole list — so the refusal now
+/// points at it by name instead of leaving the author with nowhere to go.
 fn parse_query(id: &str, map: &Map<String, Json>) -> Result<QueryStep> {
     let query = map
         .get("query")
@@ -2115,7 +2175,9 @@ fn parse_query(id: &str, map: &Map<String, Json>) -> Result<QueryStep> {
                 format!(
                     "step `{id}`: `result` is one of {} — `rows` is deliberately absent from v1, \
                      because the mapping language cannot index an array and `steps.{id}.rows.0.x` \
-                     would resolve to nothing without saying so",
+                     would resolve to nothing without saying so. To show a list to someone, that \
+                     is `options`: it travels whole into the `rows` of a tappable message, so \
+                     nobody has to index it",
                     QueryResult::ALL
                         .iter()
                         .map(|r| r.as_str())
@@ -2132,21 +2194,32 @@ fn parse_query(id: &str, map: &Map<String, Json>) -> Result<QueryStep> {
         }
     };
 
+    // The ceiling depends on WHERE the rows are going. `options` feeds a tappable list and Meta
+    // holds ten of those, so a document asking for two hundred cannot do what it says.
+    let ceiling = result.row_ceiling();
     let limit = match map.get("limit") {
-        None | Some(Json::Null) => MAX_QUERY_ROWS,
+        None | Some(Json::Null) => ceiling,
         Some(Json::Number(n)) => match n.as_i64() {
-            Some(v) if (1..=MAX_QUERY_ROWS).contains(&v) => v,
+            Some(v) if (1..=ceiling).contains(&v) => v,
             _ => {
+                let because = if result == QueryResult::Options {
+                    "A read that publishes `options` is capped at what a tappable message can \
+                     carry, not at what the tick can read: the send would be refused by the proxy \
+                     anyway, and a refusal on the screen where it was typed beats one in a tick \
+                     at 3 AM."
+                } else {
+                    "It is refused above the ceiling rather than cut down to it: the read happens \
+                     inside the tick, under the runtime's global lock, and a document that says \
+                     more than it reads is how a report comes out wrong with nobody noticing."
+                };
                 return Err(invalid(
                     ERR_LIMIT_OUT_OF_RANGE,
                     format!(
-                        "step `{id}`: `limit` is a whole number of rows between 1 and \
-                         {MAX_QUERY_ROWS}. It is refused above the ceiling rather than cut down to \
-                         it: the read happens inside the tick, under the runtime's global lock, and \
-                         a document that says more than it reads is how a report comes out wrong \
-                         with nobody noticing."
+                        "step `{id}`: `limit` is a whole number of rows between 1 and {ceiling} \
+                         for `result: \"{}\"`. {because}",
+                        result.as_str()
                     ),
-                ))
+                ));
             }
         },
         Some(_) => {
@@ -2157,12 +2230,123 @@ fn parse_query(id: &str, map: &Map<String, Json>) -> Result<QueryStep> {
         }
     };
 
+    let options = parse_option_shape(id, map.get("options"), result)?;
+
     Ok(QueryStep {
         query,
         params,
         result,
         limit,
+        options,
     })
+}
+
+/// **Which columns of a row become the option she taps** (hub#1641).
+///
+/// Present exactly when `result` is `options`, and both halves of that «exactly» are refusals the
+/// author wants at save time. Declared without the result, the mapping would be dead text nobody
+/// reads. Asked for without the mapping, the step would publish whatever columns the module's
+/// SELECT happens to have — and a row that is not `{id, title}` is refused by the proxy at send
+/// time, in a background tick, with the customer already waiting.
+fn parse_option_shape(
+    id: &str,
+    raw: Option<&Json>,
+    result: QueryResult,
+) -> Result<Option<OptionShape>> {
+    let map = match raw {
+        None | Some(Json::Null) => {
+            if result == QueryResult::Options {
+                return Err(invalid(
+                    ERR_INVALID_DEFINITION,
+                    format!(
+                        "step `{id}`: `result: \"options\"` needs an `options` block saying which \
+                         columns make up each row — `id` (what comes back when she taps it) and \
+                         `title` (what she reads), plus an optional `description`. Table columns \
+                         are not something a message can send."
+                    ),
+                ));
+            }
+            return Ok(None);
+        }
+        Some(Json::Object(m)) => m,
+        Some(_) => {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!("step `{id}`: `options` is an object of column names"),
+            ))
+        }
+    };
+
+    if result != QueryResult::Options {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: `options` shapes the rows of `result: \"options\"`, and this step \
+                 says `result: \"{}\"`. A mapping nothing reads is a promise the kernel does not \
+                 keep.",
+                result.as_str()
+            ),
+        ));
+    }
+
+    for key in map.keys() {
+        if !["id", "title", "description"].contains(&key.as_str()) {
+            return Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `options` takes `id`, `title` and `description` — the three a \
+                     tappable row has — and `{key}` is not one of them."
+                ),
+            ));
+        }
+    }
+
+    // A column NAME — not a path and not a template. Both would be looked up verbatim and fail at
+    // RUN time naming a column nobody wrote, which is a worse place to learn it than here. And the
+    // answer to «I want the title to say two things» is the same one `resolve_path` gives to «the
+    // third line of the ticket»: that shape belongs in the query.
+    let column = |key: &str| -> Result<Option<String>> {
+        let refuse = || {
+            Err(invalid(
+                ERR_INVALID_DEFINITION,
+                format!(
+                    "step `{id}`: `options.{key}` is the NAME of one column of the read, not a \
+                     value, not a path and not a `{{{{…}}}}` template. Composing one out of two \
+                     columns is a shape that belongs in the query."
+                ),
+            ))
+        };
+        match map.get(key) {
+            None | Some(Json::Null) => Ok(None),
+            Some(Json::String(s)) => {
+                let name = s.trim();
+                if name.is_empty() || name.contains("{{") || name.contains('.') {
+                    return refuse();
+                }
+                Ok(Some(name.to_string()))
+            }
+            Some(_) => refuse(),
+        }
+    };
+
+    let (id_col, title_col, description) =
+        (column("id")?, column("title")?, column("description")?);
+    let (Some(id_col), Some(title_col)) = (id_col, title_col) else {
+        return Err(invalid(
+            ERR_INVALID_DEFINITION,
+            format!(
+                "step `{id}`: every option needs an `id` (what comes back as `event.reply_id` \
+                 when she taps it) and a `title` (what she reads). `description` is the optional \
+                 second line."
+            ),
+        ));
+    };
+
+    Ok(Some(OptionShape {
+        id: id_col,
+        title: title_col,
+        description,
+    }))
 }
 
 /// The keys of a `notify` step (hub#821).
@@ -4339,10 +4523,10 @@ mod tests {
 
     // ── the `query` step (hub#954) ────────────────────────────────────────────────────────────
 
-    /// The whitelist of the kind, which is the whole shape of the step: six keys, and a seventh is
-    /// a document the editor accepts and the hub refuses.
+    /// The whitelist of the kind, which is the whole shape of the step: eight keys, and a ninth
+    /// is a document the editor accepts and the hub refuses.
     #[test]
-    fn a_query_step_takes_its_six_keys_and_refuses_a_seventh() {
+    fn a_query_step_takes_its_eight_keys_and_refuses_a_ninth() {
         let def = FlowDefinition::parse(&json!({
             "schema_version": 1,
             "steps": [{
@@ -4350,7 +4534,7 @@ mod tests {
                 "params": { "from": "input.from" }, "result": "first", "limit": 50
             }]
         }))
-        .expect("the six keys of the contract");
+        .expect("the keys of the contract");
         let StepSpec::Query(step) = &def.steps[0].spec else {
             panic!("a query step parses into a query spec");
         };
@@ -4432,6 +4616,191 @@ mod tests {
         }))
         .expect_err("`rows` is not in v1: the mapping language cannot index an array");
         assert!(format!("{err}").contains("rows"), "{err}");
+    }
+
+    // ── a read that serves a LIST (hub#1641) ──────────────────────────────────────────────────
+
+    /// **The symptom of hub#1641, written as the document that fails.**
+    ///
+    /// The free slots are ALREADY in the database. The only way to put them in front of the
+    /// customer was to have a language model read them out loud (hub#1639), because a read could
+    /// not say «I return a list» — `result` knew `first` and `count` and nothing else.
+    #[test]
+    fn a_read_can_serve_the_list_a_tappable_message_shows() {
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [
+                {
+                    "id": "free", "kind": "query", "query": "appointments.free_slots",
+                    "params": { "day": "input.day" }, "limit": 3,
+                    "result": "options",
+                    "options": { "id": "slot_id", "title": "label", "description": "staff" }
+                },
+                {
+                    "id": "ask", "kind": "notify", "channel": "whatsapp",
+                    "to": { "query": "crm.customer.get", "field": "phone" },
+                    "interactive": {
+                        "type": "list",
+                        "body": { "text": "¿Cuál te viene bien?" },
+                        "action": {
+                            "button": "Ver huecos",
+                            "sections": [{ "title": "Mañana", "rows": "steps.free.options" }]
+                        }
+                    }
+                }
+            ]
+        }))
+        .expect("a read that returns options, and a message that shows them");
+
+        let StepSpec::Query(step) = &def.steps[0].spec else {
+            panic!("a query step parses into a query spec");
+        };
+        assert_eq!(step.result.as_str(), "options");
+        assert_eq!(step.limit, 3);
+    }
+
+    /// The two halves of «exactly when», both refused at SAVE time. Asking for options without
+    /// saying which columns they are made of would publish whatever the module's SELECT happens to
+    /// have; declaring the columns without asking for options is dead text nobody reads.
+    #[test]
+    fn the_shape_of_an_option_and_the_result_that_uses_it_travel_together() {
+        let step = |extra: Json| {
+            let mut base = json!({
+                "id": "free", "kind": "query", "query": "appointments.free_slots"
+            });
+            let map = base.as_object_mut().unwrap();
+            for (k, v) in extra.as_object().unwrap() {
+                map.insert(k.clone(), v.clone());
+            }
+            FlowDefinition::parse(&json!({ "schema_version": 1, "steps": [base] }))
+        };
+
+        let err = step(json!({ "result": "options" }))
+            .expect_err("table columns are not something a message can send");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_INVALID_DEFINITION),
+            "{err}"
+        );
+        assert!(format!("{err}").contains("options"), "{err}");
+
+        let err = step(json!({ "options": { "id": "slot_id", "title": "label" } }))
+            .expect_err("a mapping nothing reads is a promise the kernel does not keep");
+        assert!(
+            format!("{err}").contains("first"),
+            "it names the result it got: {err}"
+        );
+
+        // And `id` and `title` are what a tappable row cannot be sent without.
+        for shape in [json!({ "id": "slot_id" }), json!({ "title": "label" })] {
+            let err = step(json!({ "result": "options", "options": shape }))
+                .expect_err("a row with no id or no title is a row nobody can tap");
+            assert!(format!("{err}").contains("title"), "{err}");
+        }
+
+        // A fourth key is a document the editor accepts and the hub refuses.
+        let err = step(json!({
+            "result": "options",
+            "options": { "id": "slot_id", "title": "label", "footer": "x" }
+        }))
+        .expect_err("a tappable row has three parts");
+        assert!(format!("{err}").contains("footer"), "{err}");
+
+        // A column NAME, never a template, a path or a value: all three would be looked up
+        // verbatim and fail at RUN time naming a column nobody wrote.
+        for bad in [
+            json!("{{steps.x.y}} con {{steps.x.z}}"),
+            json!("slot.id"),
+            json!(3),
+            json!(""),
+        ] {
+            let err = step(json!({
+                "result": "options",
+                "options": { "id": "slot_id", "title": bad }
+            }))
+            .expect_err("`options.title` is the name of one column");
+            assert!(format!("{err}").contains("column"), "{err}");
+        }
+    }
+
+    /// A read that publishes options is capped at what a tappable message can CARRY — ten, Meta's
+    /// list — and not at what the tick can read. Refused, never clamped: the same reason `limit`
+    /// is refused above 200, one destination further along.
+    #[test]
+    fn an_options_read_is_capped_at_what_a_tappable_message_holds() {
+        let step = |limit: i64| {
+            FlowDefinition::parse(&json!({
+                "schema_version": 1,
+                "steps": [{
+                    "id": "free", "kind": "query", "query": "appointments.free_slots",
+                    "result": "options", "limit": limit,
+                    "options": { "id": "slot_id", "title": "label" }
+                }]
+            }))
+        };
+        assert!(step(MAX_OPTION_ROWS).is_ok());
+
+        let err = step(MAX_OPTION_ROWS + 1)
+            .expect_err("a read of 11 rows for a message that holds 10 cannot do what it says");
+        assert!(
+            matches!(&err, RuntimeError::Domain { code, .. } if code == ERR_LIMIT_OUT_OF_RANGE),
+            "{err}"
+        );
+        assert!(
+            format!("{err}").contains(&MAX_OPTION_ROWS.to_string()),
+            "it says the number that applies: {err}"
+        );
+        // The wider ceiling is still there for the reads that are not going into a message.
+        assert!(FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "week", "kind": "query", "query": "sales.summary",
+                "result": "first", "limit": MAX_QUERY_ROWS
+            }]
+        }))
+        .is_ok());
+
+        // And silence defaults to the ceiling that applies, never to a smaller hidden number.
+        let def = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{
+                "id": "free", "kind": "query", "query": "appointments.free_slots",
+                "result": "options", "options": { "id": "slot_id", "title": "label" }
+            }]
+        }))
+        .unwrap();
+        let StepSpec::Query(step) = &def.steps[0].spec else {
+            panic!("a query step parses into a query spec");
+        };
+        assert_eq!(step.limit, MAX_OPTION_ROWS);
+    }
+
+    /// `rows` stays refused, and the refusal now says where to go: the reason it was kept out of
+    /// v1 has not changed — `resolve_path` still does not index arrays — but the case people
+    /// reached for it FOR has an answer, and an error that only says «no» sends them looking for
+    /// a way around it.
+    #[test]
+    fn rows_is_still_refused_and_the_refusal_points_at_options() {
+        let err = FlowDefinition::parse(&json!({
+            "schema_version": 1,
+            "steps": [{ "id": "w", "kind": "query", "query": "sales.summary", "result": "rows" }]
+        }))
+        .expect_err("the mapping language still cannot index an array");
+        let text = format!("{err}");
+        assert!(text.contains("rows"), "{text}");
+        assert!(
+            text.contains("options"),
+            "the refusal names the shape that does work: {text}"
+        );
+        assert_eq!(
+            resolve_path(
+                "steps.free.options.0.title",
+                &json!({
+                    "steps": { "free": { "options": [{ "id": "a", "title": "10:00" }] } }
+                })
+            ),
+            None,
+            "and the frozen surface is untouched: an array is still not walkable"
+        );
     }
 
     /// The params of a read are mapped like any other value, so the `secret.…` refusal has to

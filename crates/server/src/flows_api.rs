@@ -530,6 +530,71 @@ pub async fn get_schema(State(st): State<AppState>, headers: HeaderMap) -> Respo
     .into_response()
 }
 
+/// `GET /api/hub/flows/templates` — las automatizaciones que traen DE FÁBRICA los módulos
+/// instalados (hub#1611).
+///
+/// La galería del módulo `flows` ofrecía solo las plantillas escritas dentro de sí misma, así que
+/// un negocio que instalaba el módulo de WhatsApp no encontraba la automatización que ese módulo
+/// trae consigo: había que construirla a mano, paso a paso. Los módulos ya la publican —la carpeta
+/// `flows/` viaja en el zip desde `module-toolkit#209`— y el runtime ya la registra al instalar;
+/// esto es lo que la saca a la pantalla.
+///
+/// Se sirve del **registro**, no del disco: la carga la hizo el instalador, y `rehydrate_installed`
+/// vuelve a pasar por él en cada arranque. Así esta ruta no toca el sistema de ficheros por
+/// petición, y un módulo pausado no ofrece plantillas porque no está activo en el registro.
+///
+/// Por plantilla: el **módulo de origen** (la galería tiene que decir de dónde sale lo que ofrece),
+/// la **familia**, los **documentos por idioma** (el `en` es la fuente, ADR-0055/0199; se sirven
+/// todos porque `erplora validate` garantizó que son la misma automatización con otras palabras),
+/// los **grants que pedirá** y el **suelo de versión por plantilla**.
+///
+/// 🔴 Los `grants` que van aquí son **una petición, no una concesión**: se le enseñan al dueño para
+/// que los autorice él. Una plantilla nace apagada y sin permisos, como cualquier otra.
+///
+/// Y viajan **con su `payload`** (hub#1623, hub#1654): el pin es parte de lo que el permiso DICE, no
+/// decoración — «puede anular citas» y «puede anular citas COMO CLIENTA» son permisos distintos, y
+/// solo el segundo es seguro en una receta cuyo payload redacta un modelo leyendo el mensaje de un
+/// desconocido. La galería lo pinta y lo devuelve tal cual en `PUT …/flows/{id}/grants`, que es
+/// donde acaba en la fila de `_flow_grants` que `check_payload_pin` exige después. Un pin perdido
+/// en este tramo es un permiso ANCHO concedido por un dueño que creyó estar acotándolo, y **sin un
+/// solo error en pantalla**.
+pub async fn list_templates(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let (arc, _) = admin_session!(st, headers);
+    let rt = arc.read().await;
+    let data: Vec<_> = rt
+        .registry()
+        .flow_templates()
+        .into_iter()
+        .map(|(module_id, tpl)| {
+            json!({
+                "module": module_id,
+                "family": tpl.family,
+                "documents": tpl.documents,
+                "grants": tpl.grants,
+                "requires": tpl.requires,
+            })
+        })
+        .collect();
+    // Y lo que este hub NO ofrece, con su motivo (hub#1649). Va en la misma respuesta a propósito:
+    // la pantalla donde se nota que una automatización falta es esta, y una galería que solo
+    // enumera lo que hay deja «el módulo no trae ninguna» y «la trae y el hub la ha descartado»
+    // exactamente iguales. Se lee el `code`; el `detail` es prosa para una persona (ADR-0055).
+    let discarded: Vec<_> = rt
+        .registry()
+        .flow_template_discards()
+        .into_iter()
+        .map(|(module_id, discard)| {
+            json!({
+                "module": module_id,
+                "family": discard.family,
+                "code": discard.code,
+                "detail": discard.detail,
+            })
+        })
+        .collect();
+    Json(json!({ "ok": true, "data": data, "discarded": discarded })).into_response()
+}
+
 // ── secrets (hub#662) ─────────────────────────────────────────────────────────────────────────
 
 /// `GET /api/hub/flows/secrets` — **the names, never the values**.
@@ -730,6 +795,10 @@ mod tests {
             (approvals::ERR_APPROVAL_NOT_FOUND, StatusCode::NOT_FOUND),
             (secrets::ERR_SECRET_NOT_FOUND, StatusCode::NOT_FOUND),
             (notify::ERR_RECIPIENT_NOT_FOUND, StatusCode::NOT_FOUND),
+            // The list a message promised, which the run never published (hub#1646): the same
+            // shape as a recipient nobody could be found for, and pinned here rather than left to
+            // the `not_found` suffix rule, so renaming it cannot silently turn it into a `400`.
+            (notify::ERR_OPTIONS_NOT_FOUND, StatusCode::NOT_FOUND),
             // Refused by an authority.
             (grants::ERR_GRANT_DENIED, StatusCode::FORBIDDEN),
             (grants::ERR_INTERNAL_COMMAND, StatusCode::FORBIDDEN),

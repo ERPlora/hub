@@ -401,6 +401,10 @@ pub(crate) async fn execute_at(
             db,
             &ctx.hub_id,
             &automation.flow_id,
+            // hub#1662 — the RUN, because a pin may fix a value against what this run resolved
+            // («…only for the customer this conversation is with»), and that is a fact of the run
+            // and not of the flow.
+            &automation.run_id,
             name,
             payload,
         )
